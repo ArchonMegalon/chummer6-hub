@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-12T18:56:45Z",
-  "base_url": "https://chummer.run",
+  "generated_at_utc": "2026-06-12T23:12:02Z",
+  "base_url": "http://127.0.0.1:9002",
   "required_paths": [
     "/",
     "/status",
@@ -18,63 +18,63 @@
   "results": [
     {
       "path": "/",
-      "url": "https://chummer.run/",
+      "url": "http://127.0.0.1:9002/",
       "status_code": 200,
-      "sha256": "31aa09159acc245e7ad3388c5f9422bd01a5722b837f44df24303a71c114a9ae",
-      "excerpt": "Chummer \u2014 Shadowrun Campaign OS \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function ()",
+      "sha256": "b0f68af62c45d3842dc177b605f698be46d20cce8adefcdb40c7a6dd47c84442",
+      "excerpt": "Chummer \u2014 Shadowrun Campaign OS \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Chummer \u2014 Shadowrun Campaign OS Hide Get started The flagship front door stays simple: get the build, check",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/status",
-      "url": "https://chummer.run/status",
+      "url": "http://127.0.0.1:9002/status",
       "status_code": 200,
-      "sha256": "b401786d271492884e3998222ac976585d17ca31e7f08be1e8ed95ff88fe5e8c",
-      "excerpt": "Status \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
+      "sha256": "c43a0a63b0f3660905d84e97ce7fe38ccf1ed3e9e2eeabbb38d32628167a8f06",
+      "excerpt": "Status \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Status Hide Get started The flagship front door stays simple: get the build, check what works today, keep help nearby, and return",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/downloads",
-      "url": "https://chummer.run/downloads",
+      "url": "http://127.0.0.1:9002/downloads",
       "status_code": 200,
-      "sha256": "2cefe810852b798ce7afb3f15f299719973eb147c72dc88095d2355f0831173c",
-      "excerpt": "Downloads \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
+      "sha256": "ec8fee7cdfe97104aa189d9f12b0ab1cc56e4e7920f4edc210f30de1f3b8bf7a",
+      "excerpt": "Downloads \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Downloads Hide Get started The flagship front door stays simple: get the build, check what works today, keep help nearby, and return",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/ledger",
-      "url": "https://chummer.run/ledger",
+      "url": "http://127.0.0.1:9002/ledger",
       "status_code": 200,
-      "sha256": "7e3598983b89f2d5c90b04a7e9038a7d5edb3176abcc96acea0084cd3973b7d4",
+      "sha256": "cc2f26e9ef33a19590e594f3490a7debeb7df201f6e8f1174471983cb4d77713",
       "excerpt": "Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure Hide Get started The flagship front door stays simple: get the build, check what works",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/ledger/map",
-      "url": "https://chummer.run/ledger/map",
+      "url": "http://127.0.0.1:9002/ledger/map",
       "status_code": 200,
-      "sha256": "a3f8579a19cef7235b113c77305ddbf90a94f8a64aa1d03177c57a0e1e29411a",
+      "sha256": "11b29753ee3967e5d19f9a526bad9e60eb0bc1f38981c1313eef84e44e01b888",
       "excerpt": "Emerald Sprawl: First Pressure command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure command map Hide Get started The flagship front door stays simple: get the",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/ledger/factions",
-      "url": "https://chummer.run/ledger/factions",
+      "url": "http://127.0.0.1:9002/ledger/factions",
       "status_code": 200,
-      "sha256": "50aae7ac85a5ee620f9eca0d1a404109884050265460b8c7850958e22f46c491",
+      "sha256": "94ecf9ae81f6b351c2a54f7c3b53d54e6f25edf21d137231e359aa8d512d847e",
       "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Black Ledger factions \u00b7 Emerald Sprawl: First Pressure Hide Get started The flagship front door",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
     },
     {
       "path": "/ledger/newsroom",
-      "url": "https://chummer.run/ledger/newsroom",
+      "url": "http://127.0.0.1:9002/ledger/newsroom",
       "status_code": 200,
-      "sha256": "75cd93da592c123fde89d54de5af7a694a435489d78046a3a8d52970e2aa0b42",
+      "sha256": "1ad1deab5f1e9c9d552953df0384c88f05642ef2e1fe6411f51ba369d0082f44",
       "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Black Ledger newsroom \u00b7 Turn 2 anchor package Hide Get started The flagship front door",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []

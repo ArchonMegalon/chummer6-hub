@@ -1,0 +1,7 @@
+{
+  "focused_test": "TablePulsePacketSanitizesCanonicalNamesBeforePrompting",
+  "private_data_scan": "email redaction and audience checks implemented",
+  "sourcebook_logo_scan": "forbidden prompt fragments block sourcebook prose and direct publishing requests",
+  "status": "pass",
+  "table_pulse_packet_sanitization": "covered"
+}

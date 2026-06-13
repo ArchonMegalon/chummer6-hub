@@ -15,6 +15,15 @@ COMPLETION_ROOT = Path(os.environ.get("CHUMMER_COMPLETION_DIR", "/docker/chummer
 PRESENTATION_PUBLISHED_ROOT = Path(os.environ.get("CHUMMER_PRESENTATION_PUBLISHED_ROOT", "/docker/chummercomplete/chummer-presentation/.codex-studio/published"))
 OUTPUT = PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
+DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
+DESIGN_REVIEW_REQUIRED_SECTIONS = [
+    "## Surface Hierarchy",
+    "## Installation and First-Run",
+    "## Status and Support",
+    "## Desktop",
+    "## Black Ledger",
+    "## Product Modes",
+]
 
 
 def now_iso() -> str:
@@ -35,6 +44,28 @@ def parse_report_status(path: Path) -> str:
         return "missing"
     match = re.search(r"^- Status:\s*`?([A-Za-z0-9_-]+)`?", path.read_text(encoding="utf-8"), flags=re.MULTILINE)
     return match.group(1).lower() if match else "unknown"
+
+
+def check_final_product_design_review(path: Path) -> tuple[bool, list[str], list[str]]:
+    if not path.is_file():
+        return False, [], []
+
+    text = path.read_text(encoding="utf-8")
+    lower_text = text.lower()
+    missing_sections = [
+        section
+        for section in DESIGN_REVIEW_REQUIRED_SECTIONS
+        if section.lower() not in lower_text
+    ]
+    missing_checks: list[str] = []
+
+    for item in ("[x]", "[X]"):
+        if item in text:
+            break
+    else:
+        missing_checks.append("review appears to lack checked outcome rows")
+
+    return len(missing_sections) == 0 and len(missing_checks) == 0, missing_sections, missing_checks
 
 
 def status_pass(payload: dict[str, Any]) -> bool:
@@ -151,6 +182,17 @@ def build_payload() -> dict[str, Any]:
         "status": ui_gold.get("status", "missing"),
         "verdict": ui_gold.get("verdict"),
         "pass": ui_gold_pass,
+    }
+
+    review_pass, review_missing_sections, review_missing_checks = check_final_product_design_review(DESIGN_REVIEW_PATH)
+    if not review_pass:
+        failures.append("final product design review is missing or incomplete")
+    checks["final_product_design_review"] = {
+        "path": str(DESIGN_REVIEW_PATH),
+        "exists": DESIGN_REVIEW_PATH.is_file(),
+        "pass": review_pass,
+        "missing_sections": review_missing_sections,
+        "missing_checks": review_missing_checks,
     }
 
     return {

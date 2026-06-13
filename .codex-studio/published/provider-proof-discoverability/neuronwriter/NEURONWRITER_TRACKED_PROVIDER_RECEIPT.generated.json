@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "NeuronWriter",
+  "lane": "candidate SEO workflow",
+  "runtime_ready": false,
+  "boundary": "Inventory only until SEO workflow proof exists; not product, release, support, or truth authority.",
+  "claim_boundary": "Inventory only until SEO workflow proof exists; not product, release, support, or truth authority."
+}

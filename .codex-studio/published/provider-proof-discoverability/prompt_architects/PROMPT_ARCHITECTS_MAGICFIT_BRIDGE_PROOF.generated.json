@@ -1,0 +1,23 @@
+{
+  "approval_required_before_magicfit": true,
+  "fallback_to_local_chummer_template": true,
+  "required_fields": [
+    "title",
+    "video_type",
+    "duration",
+    "aspect_ratio",
+    "scene_description",
+    "camera_direction",
+    "character_descriptions",
+    "face_reference_policy",
+    "lighting",
+    "environment",
+    "motion",
+    "overlay_space",
+    "negative_prompt",
+    "privacy_exclusions",
+    "output_requirements"
+  ],
+  "status": "pass",
+  "template_id": "magicfit_video_bridge_v1"
+}

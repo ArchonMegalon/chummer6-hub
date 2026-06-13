@@ -1,0 +1,47 @@
+{
+  "provider": "MagicFit",
+  "generated_at": "2026-05-31",
+  "assets": [
+    {
+      "lane": "gm_session_video_foundry_samples",
+      "asset_id": "gm_session_video_foundry_samples",
+      "title": "GM Session Video Foundry Samples",
+      "horizon": "GM Session Video Foundry",
+      "duration_seconds": 32,
+      "scenes": [
+        {
+          "id": "gm_sample_01_pre_session_teaser",
+          "scene_number": 1,
+          "title": "Pre-session teaser",
+          "duration_seconds": 8,
+          "prompt": "Cinematic cyberpunk tabletop pre-session teaser, a diverse metahuman runner crew gathers around a rain-lit table, one elf fixer and one ork street medic review an abstract mission map, visible cyberware, subtle augmented reality overlays, player-safe mystery, no readable private names, no official logos, no sourcebook art, Chummer-owned campaign truth, MagicFit renders candidate media only.",
+          "negative_prompt": "No official Shadowrun logos, no real corporate logos, no sourcebook pages, no private player names, no gore, no direct publishing, no cross-campaign face reuse."
+        },
+        {
+          "id": "gm_sample_02_table_pulse_security_aftermath",
+          "scene_number": 2,
+          "title": "Table Pulse security aftermath",
+          "duration_seconds": 8,
+          "prompt": "In-universe tactical security aftermath clip, metahuman security analyst with visible cybernetic eye studies abstract heat indicators after a tabletop mission, AR overlays show generic breach zones and rising alert levels, urgent but public-safe, Chummer prompt approved before render, no private player data, no official marks.",
+          "negative_prompt": "No official logos, no real brands, no player emails, no exact campaign secrets, no sourcebook art, no direct publishing."
+        },
+        {
+          "id": "gm_sample_03_aftermath_newsreel",
+          "scene_number": 3,
+          "title": "Aftermath newsreel",
+          "duration_seconds": 8,
+          "prompt": "Public-safe cyberpunk aftermath newsreel, ork news anchor in a small studio reports on an unnamed research-center incident, holographic city map behind them, no real names, no official faction marks, polished but fictional newsroom, visible AR lower thirds without readable copyrighted text.",
+          "negative_prompt": "No official Shadowrun logos, no canonical faction marks, no sourcebook layout, no private faces, no real-world news branding."
+        },
+        {
+          "id": "gm_sample_04_faction_dispatch",
+          "scene_number": 4,
+          "title": "Faction dispatch",
+          "duration_seconds": 8,
+          "prompt": "Cinematic faction dispatch for a private tabletop campaign, troll negotiator with chrome jaw and an elf decker in a neon operations room react to a mission outcome, abstract faction pressure cards and AR overlays, original generic cyberpunk symbols only, GM-reviewed prompt feel, no direct publish.",
+          "negative_prompt": "No official logos, no sourcebook art, no real corporate marks, no private player data, no gore, no public sharing UI."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "Rybbit",
+  "lane": "bounded public analytics",
+  "runtime_ready": true,
+  "boundary": "Public-shell analytics only; event taxonomy and privacy posture must remain discoverable before expansion.",
+  "claim_boundary": "Public-shell analytics only; event taxonomy and privacy posture must remain discoverable before expansion."
+}

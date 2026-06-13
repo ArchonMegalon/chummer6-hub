@@ -91,7 +91,7 @@ horizons:
     - AI Magicx
     bounded:
     - 1min.AI
-    - Prompt Architects
+    - Prompting Systems
   success_signals:
   - Comparison outputs stay tied to core receipts.
   - Build suggestions do not invent mechanics or legality.
@@ -139,7 +139,7 @@ horizons:
     - Taja
     - vidBoard
     - ApproveThis
-    - Prompt Architects
+    - Prompting Systems
     - AI Magicx
   success_signals:
   - House-rule demand packets are normalized into Chummer-owned packets before backlog routing.
@@ -185,7 +185,7 @@ horizons:
   - A4
   tool_posture:
     promoted:
-    - Prompt Architects
+    - Prompting Systems
     - Documentation.AI
     - AI Magicx
     bounded:

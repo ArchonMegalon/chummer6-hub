@@ -1,0 +1,9 @@
+{
+  "artifact": "PAYFUNNELS_SECURITY_REVIEW",
+  "card_data_stored_in_chummer": false,
+  "raw_payload_hash_recorded": true,
+  "secret_material_in_artifact": false,
+  "status": "pass",
+  "subscriptions_rejected_for_current_test": true,
+  "webhook_signature_required": true
+}

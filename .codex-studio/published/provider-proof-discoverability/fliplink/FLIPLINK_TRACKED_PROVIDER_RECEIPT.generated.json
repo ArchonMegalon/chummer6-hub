@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "FlipLink.me",
+  "lane": "candidate document portal",
+  "runtime_ready": false,
+  "boundary": "First-publication progress only; dashboard capacity, CNAME/API/embed/analytics/password, and expanded access-control proof remain gated.",
+  "claim_boundary": "First-publication progress only; dashboard capacity, CNAME/API/embed/analytics/password, and expanded access-control proof remain gated."
+}

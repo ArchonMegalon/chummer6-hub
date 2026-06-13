@@ -1,0 +1,38 @@
+{
+  "contact_sheet": "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/GM_SESSION_VIDEO_SAMPLE_CONTACT_SHEET.jpg",
+  "direct_publish_allowed": false,
+  "provider_account_id": "magicfit_gm_session_video_foundry",
+  "required_samples": [
+    "pre-session teaser",
+    "Table Pulse security aftermath",
+    "newsreel",
+    "faction dispatch"
+  ],
+  "sample_renders": [
+    {
+      "duration_seconds": 4.062993,
+      "file": "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/sample_clips/gm_session_video_foundry_samples/gm_sample_01_pre_session_teaser.mp4",
+      "has_video": true,
+      "sample_type": "pre-session teaser"
+    },
+    {
+      "duration_seconds": 3.938005,
+      "file": "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/sample_clips/gm_session_video_foundry_samples/gm_sample_02_table_pulse_security_aftermath.mp4",
+      "has_video": true,
+      "sample_type": "Table Pulse security aftermath"
+    },
+    {
+      "duration_seconds": 7.931995,
+      "file": "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/sample_clips/gm_session_video_foundry_samples/gm_sample_03_aftermath_newsreel.mp4",
+      "has_video": true,
+      "sample_type": "newsreel"
+    },
+    {
+      "duration_seconds": 8.057007,
+      "file": "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/sample_clips/gm_session_video_foundry_samples/gm_sample_04_faction_dispatch.mp4",
+      "has_video": true,
+      "sample_type": "faction dispatch"
+    }
+  ],
+  "status": "pass"
+}

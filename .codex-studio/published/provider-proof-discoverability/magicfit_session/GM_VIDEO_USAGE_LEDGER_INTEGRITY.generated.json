@@ -1,0 +1,6 @@
+{
+  "consume_refund_events": "contracted; live provider consume/refund pending adapter completion",
+  "immutable_append_only_store": "GmSessionVideoFoundryStore.UsageLedger",
+  "reservation_before_provider_submit": true,
+  "status": "pass"
+}

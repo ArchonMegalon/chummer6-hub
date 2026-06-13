@@ -1,0 +1,15 @@
+{
+  "acknowledgement_required": true,
+  "artifact": "PAYFUNNELS_TEST_CHECKOUT_RECEIPT",
+  "button_text": "Pay $1 test payment",
+  "can_continue_without_acknowledgement": false,
+  "forbidden_words_absent_from_cta": [
+    "Premium",
+    "Pro",
+    "Subscribe",
+    "Upgrade"
+  ],
+  "required_copy": "This is a $1 test payment.\nIt currently unlocks no benefits, no premium features, no render credits, and no special access.\nIt only helps us test payment processing.",
+  "route": "/account/billing/test",
+  "status": "pass"
+}

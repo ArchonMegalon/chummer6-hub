@@ -1,0 +1,7 @@
+{
+  "per_campaign_monthly_default": 30,
+  "per_gm_monthly_default": 20,
+  "per_group_monthly_default": 60,
+  "render_button_policy": "disabled when quota unavailable; prompt generation remains allowed",
+  "status": "pass"
+}

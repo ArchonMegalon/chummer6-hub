@@ -1,0 +1,10 @@
+{
+  "blocks_sourcebook_prose": true,
+  "does_not_invent_rules": true,
+  "preserves_explain_receipt_ids": true,
+  "preserves_rule_fact_ids": true,
+  "prompt_architects_is_rules_truth": false,
+  "rules_truth_authority": "Chummer RuleFact/explain receipts only",
+  "status": "pass",
+  "template_id": "rules_safe_humanizer_v1"
+}

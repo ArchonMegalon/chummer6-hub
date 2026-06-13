@@ -1,0 +1,11 @@
+{
+  "artifact": "PAYFUNNELS_ENTITLEMENT_NOOP_PROOF",
+  "billing_product_id": "payfunnels_test_payment_1usd_v1",
+  "effect_type": "no_op",
+  "feature_flags_added": [],
+  "payfunnels_treated_as_entitlement_truth": false,
+  "premium_enabled_delta": false,
+  "render_units_delta": 0,
+  "source": "PayFunnels",
+  "status": "pass"
+}

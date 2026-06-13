@@ -1,0 +1,8 @@
+{
+  "artifact": "PAYFUNNELS_WEBHOOK_IDEMPOTENCY",
+  "duplicate_creates_entitlement_ledger_entry": false,
+  "duplicate_creates_receipt": false,
+  "duplicate_policy": "duplicate_ignored",
+  "idempotency_key": "provider_event_id",
+  "status": "pass"
+}

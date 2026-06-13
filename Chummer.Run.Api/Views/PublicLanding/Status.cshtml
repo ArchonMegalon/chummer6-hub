@@ -24,7 +24,7 @@
         },
         new
         {
-            Badge = "Live proof",
+            Badge = "Live checks",
             Title = "Use what works today when the question is proof, not packaging",
             Summary = "Open the proof page when you need the current result, current cautions, or one inspectable explanation before you move a device.",
             Href = "/now",
@@ -95,7 +95,13 @@
             .Replace("proof freshness", "proof recency", StringComparison.OrdinalIgnoreCase)
             .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
             .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("open-public artifacts", "public downloads", StringComparison.OrdinalIgnoreCase)
+            .Replace("local edge proof", "current release check", StringComparison.OrdinalIgnoreCase)
+            .Replace("edge proof", "release check", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof view", "current status view", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof page", "current status page", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
+            .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
             .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
@@ -189,7 +195,7 @@
     <div class="page-lead">
         <p class="eyebrow">Snapshot</p>
         <h2 class="page-title">The short status line stays visible on one page.</h2>
-        <p class="page-copy">This is the customer-safe readout: current release posture, current caution, support fallback, and campaign-proof visibility.</p>
+        <p class="page-copy">This is the customer-safe readout: current release posture, current caution, support fallback, and campaign status.</p>
     </div>
     <div class="settings-summary-list">
         <div class="settings-summary-row">
@@ -254,7 +260,7 @@
                 @foreach (var row in Model.LaunchHealthRows)
                 {
                     <div class="settings-summary-row">
-                        <span>@row.Label</span>
+                        <span>@CustomerStatusText(row.Label, "Current status label")</span>
                         <strong>@CustomerStatusText(row.Value, "Current")</strong>
                     </div>
                 }

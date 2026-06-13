@@ -1,0 +1,13 @@
+{
+  "focused_test": "GmSessionVideoFoundryTests.FaceVaultDoesNotListFetchOrUseAnotherGmFace",
+  "status": "pass",
+  "tests": {
+    "autocomplete_does_not_return_gm_b_face_names": "covered by ListFaces query isolation",
+    "deleted_or_revoked_faces_cannot_be_reused": "policy hook present; destructive delete not implemented yet",
+    "gm_a_cannot_fetch_gm_b_thumbnail_url": "covered by service GetFace denial and namespaced storage",
+    "gm_a_cannot_list_gm_b_faces": "covered",
+    "gm_a_cannot_use_gm_b_face_id_in_render_job": "covered",
+    "provider_manifest_does_not_leak_other_gm_asset_ids": "covered by EnsureFacesAccessibleLocked",
+    "search_does_not_return_gm_b_faces": "covered"
+  }
+}

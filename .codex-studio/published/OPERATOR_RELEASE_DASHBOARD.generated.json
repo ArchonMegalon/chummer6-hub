@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-12T18:58:23Z",
+  "generated_at_utc": "2026-06-12T23:13:37Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
@@ -42,7 +42,7 @@
     }
   },
   "ui": {
-    "frame_base_url": "http://127.0.0.1:8091",
+    "frame_base_url": "http://127.0.0.1:9002",
     "frame_checked_pages": 66,
     "frame_failure_count": 0,
     "design_verdict": "DESIGN_READY"
@@ -61,7 +61,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-12T18:57:00Z",
+      "generated_at_utc": "2026-06-12T23:12:13Z",
       "pass": true
     },
     "ruleset_readiness": {
@@ -69,7 +69,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-12T18:56:45.780339Z",
+      "generated_at_utc": "2026-06-12T23:12:02.514324Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -77,7 +77,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-12T18:58:07.232Z",
+      "generated_at_utc": "2026-06-12T23:13:21.568Z",
       "pass": true
     },
     "design_quality_gate": {
@@ -85,7 +85,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "generated_at_utc": "2026-06-12T23:13:22Z",
       "pass": true
     },
     "public_copy_leak_gate": {
@@ -93,25 +93,25 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "generated_at_utc": "2026-06-12T23:13:22Z",
       "pass": true
     },
     "release_ready": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
-      "status": "pass",
-      "verdict": "RELEASE_READY",
-      "generated_at_utc": "2026-06-12T18:56:44Z",
-      "pass": true,
+      "status": "fail",
+      "verdict": "NOT_RELEASE_READY",
+      "generated_at_utc": "2026-06-12T23:11:49Z",
+      "pass": false,
       "release_blocking": false
     },
     "final_gold_janitor": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
       "exists": true,
-      "status": "pass",
-      "verdict": "GOLD_READY",
-      "generated_at_utc": "2026-06-12T18:41:39Z",
-      "pass": true,
+      "status": "fail",
+      "verdict": "NOT_GOLD",
+      "generated_at_utc": "2026-06-12T23:11:49Z",
+      "pass": false,
       "release_blocking": false
     },
     "google_oauth_linking_proof": {

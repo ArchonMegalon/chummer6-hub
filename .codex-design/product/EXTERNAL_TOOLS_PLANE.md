@@ -39,8 +39,7 @@ A tool may be promoted, bounded, parked, or explicitly excluded.
 Current known external-tool inventory includes:
 
 * 1min.AI
-* Prompt Architects
-* PayFunnels
+* Prompting Systems
 * ChatPlayground AI
 * Soundmadeseen
 * vidBoard
@@ -570,19 +569,18 @@ Primary or alternate structured AI provider route.
 * no storage truth
 * no approval truth
 
-## Prompt Architects
+## Prompting Systems
 
 ### Role
 
-Prompt/template and prompt-engineering support used by `PromptFoundry` and run-surface media pre-production.
+Prompt/style/persona authoring support.
 
 ### Architectural use
 
 * prompt-template authoring
 * style-template drafting
 * reusable assistant instruction experimentation
-* `PromptFoundry` seed templates, draft enhancement, and operator assist templates
-* runtime-safe GM prompt planning and review lanes
+* future publishable prompt/style artifacts after curation
 
 ### Owner
 
@@ -594,28 +592,6 @@ Prompt/template and prompt-engineering support used by `PromptFoundry` and run-s
 * not runtime truth by itself
 * not a substitute for Chummer prompt/version registry
 
-## PayFunnels
-
-### Role
-
-Billing adapter and entitlement event simulation.
-
-### Architectural use
-
-* test payment intent creation
-* webhook signature verification and idempotent replay protection
-* no-op entitlement ledger and bounded closeout verification
-* entitlement and feature truth stays Chummer-owned
-
-### Owner
-
-* `chummer6-hub`
-
-### Hard boundary
-
-* not product entitlement truth
-* no direct premium feature entitlement from provider events
-* provider secrets are only for webhook trust
 ## ChatPlayground AI
 
 ### Role

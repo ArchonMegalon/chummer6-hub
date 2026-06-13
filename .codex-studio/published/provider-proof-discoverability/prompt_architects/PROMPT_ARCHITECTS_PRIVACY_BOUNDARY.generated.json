@@ -1,0 +1,14 @@
+{
+  "cross_gm_prompt_isolation": "covered",
+  "face_asset_policy": "placeholders only; no face asset URLs sent to Prompt Architects",
+  "focused_tests": [
+    "SourcebookProseAndPrivateDataBlockApproval",
+    "CrossGmPromptDraftsAreIsolated"
+  ],
+  "gm_secret_blocker": "implemented",
+  "private_player_data_blocker": "implemented",
+  "provider_personal_context_policy": "do not store GM secrets or private campaign data",
+  "runtime_mode": "disabled until privacy/export/API/MCP proof",
+  "sourcebook_prose_blocker": "implemented",
+  "status": "pass"
+}

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-12T18:58:23Z",
+  "generated_at_utc": "2026-06-12T23:13:37Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,7 +14,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:56:45Z",
+      "generated_at_utc": "2026-06-12T23:12:02Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -90,7 +90,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:56:45.780339Z",
+      "generated_at_utc": "2026-06-12T23:12:02.514324Z",
       "fresh_within_hours": null,
       "pass": true,
       "assumed_rulesets": []
@@ -147,7 +147,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:57:00Z",
+      "generated_at_utc": "2026-06-12T23:12:13Z",
       "fresh_within_hours": null,
       "pass": true,
       "external_required": false,
@@ -162,7 +162,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "generated_at_utc": "2026-06-12T23:13:22Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -170,7 +170,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "generated_at_utc": "2026-06-12T23:13:22Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -178,7 +178,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:58:23Z",
+      "generated_at_utc": "2026-06-12T23:13:37Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
@@ -196,7 +196,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T18:58:23Z",
+      "generated_at_utc": "2026-06-12T23:13:37Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "RELEASE_READY",
@@ -205,7 +205,7 @@
   },
   "materializers": [
     {
-      "command": "python3 scripts/verify_live_public_web_recrawl.py --base-url https://chummer.run",
+      "command": "python3 scripts/verify_live_public_web_recrawl.py --base-url http://127.0.0.1:9002",
       "returncode": 0,
       "stdout": "live_public_web_recrawl:ok",
       "stderr": ""
@@ -229,27 +229,27 @@
       "stderr": ""
     },
     {
-      "command": "python3 scripts/verify_black_ledger_live_media_proof.py --base-url https://chummer.run",
+      "command": "python3 scripts/verify_black_ledger_live_media_proof.py --base-url http://127.0.0.1:9002",
       "returncode": 0,
       "stdout": "black_ledger_live_media_proof:ok",
       "stderr": ""
     },
     {
-      "command": "python3 scripts/verify_table_pulse_scenario_replay.py --base-url https://chummer.run",
+      "command": "python3 scripts/verify_table_pulse_scenario_replay.py --base-url http://127.0.0.1:9002",
       "returncode": 0,
       "stdout": "table_pulse_scenario_replay:ok",
       "stderr": ""
     },
     {
-      "command": "python3 scripts/materialize_external_distribution_mirror_proof.py --base-url http://127.0.0.1:8091",
+      "command": "python3 scripts/materialize_external_distribution_mirror_proof.py --base-url http://127.0.0.1:9002",
       "returncode": 0,
       "stdout": "external_distribution_mirror_proof:ok",
       "stderr": ""
     },
     {
-      "command": "python3 scripts/verify_public_copy_leak_gate.py --base-url https://chummer.run",
+      "command": "python3 scripts/verify_public_copy_leak_gate.py --base-url http://127.0.0.1:9002",
       "returncode": 0,
-      "stdout": "{\"contract_name\": \"chummer.public_copy_leak_gate\", \"generated_at_utc\": \"2026-06-12T18:57:02Z\", \"base_url\": \"https://chummer.run\", \"status\": \"pass\", \"summary\": {\"route_count\": 11, \"failed_route_count\": 0, \"forbidden_pattern_count\": 24, \"failed_routes\": []}, \"forbidden_patterns\": [\"\\\\bchummer-api\\\\b\", \"\\\\bchummer6-hub\\\\b\", \"\\\\bchummer6-ui\\\\b\", \"\\\\bchummer-presentation\\\\b\", \"\\\\bchummer-core-engine\\\\b\", \"\\\\bhost\\\\.docker\\\\.internal\\\\b\", \"\\\\blocalhost\\\\b\", \"\\\\b127\\\\.0\\\\.0\\\\.1\\\\b\", \"/docker/chummercomplete\", \"/var/lib/\", \"/home/[A-Za-z0-9_.-]+/\", \"\\\\bFleet-written\\\\b\", \"\\\\bProductLift\\\\b\", \"\\\\bICanpreneur\\\\b\", \"\\\\bIcanpreneur\\\\b\", \"\\\\bEmailit\\\\b\", \"\\\\bClickRank\\\\b\", \"\\\\bDocumentation\\\\.AI\\\\b\", \"\\\\bBrowserAct\\\\b\", \"\\\\bTeable\\\\b\", \"\\\\bSignitic\\\\b\", \"\\\\bMagicFit\\\\b\", \"\\\\bLoad Demo Runner\\\\b\", \"\\\\bOpen Demo\\\\b\"], \"routes\": [{\"route\": \"/\", \"url\": \"https://chummer.run/\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/downloads\", \"url\": \"https://chummer.run/downloads\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/status\", \"url\": \"https://chummer.run/status\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/faq\", \"url\": \"https://chummer.run/faq\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger\", \"url\": \"https://chummer.run/ledger\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger/map\", \"url\": \"https://chummer.run/ledger/map\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/packages\", \"url\": \"https://chummer.run/packages\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/participate\", \"url\": \"https://chummer.run/participate\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/feedback\", \"url\": \"https://chummer.run/feedback\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/what-is-chummer\", \"url\": \"https://chummer.run/what-is-chummer\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/login?next=%2Faccount%2Faccess\", \"url\": \"https://chummer.run/login?next=%2Faccount%2Faccess\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}]}",
+      "stdout": "{\"contract_name\": \"chummer.public_copy_leak_gate\", \"generated_at_utc\": \"2026-06-12T23:12:14Z\", \"base_url\": \"http://127.0.0.1:9002\", \"status\": \"pass\", \"summary\": {\"route_count\": 11, \"failed_route_count\": 0, \"forbidden_pattern_count\": 32, \"failed_routes\": []}, \"forbidden_patterns\": [\"\\\\bchummer-api\\\\b\", \"\\\\bchummer6-hub\\\\b\", \"\\\\bchummer6-ui\\\\b\", \"\\\\bchummer-presentation\\\\b\", \"\\\\bchummer-core-engine\\\\b\", \"\\\\bhost\\\\.docker\\\\.internal\\\\b\", \"\\\\blocalhost\\\\b\", \"\\\\b127\\\\.0\\\\.0\\\\.1\\\\b\", \"/docker/chummercomplete\", \"/var/lib/\", \"/home/[A-Za-z0-9_.-]+/\", \"\\\\bFleet-written\\\\b\", \"\\\\bProductLift\\\\b\", \"\\\\bICanpreneur\\\\b\", \"\\\\bIcanpreneur\\\\b\", \"\\\\bEmailit\\\\b\", \"\\\\bClickRank\\\\b\", \"\\\\bDocumentation\\\\.AI\\\\b\", \"\\\\bBrowserAct\\\\b\", \"\\\\bTeable\\\\b\", \"\\\\bSignitic\\\\b\", \"\\\\bMagicFit\\\\b\", \"\\\\bgovernor truth\\\\b\", \"\\\\bjourney proofs\\\\b\", \"\\\\bopen-public artifacts\\\\b\", \"\\\\blocal edge proof\\\\b\", \"\\\\bproof freshness\\\\b\", \"\\\\bproof is green\\\\b\", \"\\\\bcreate an account first\\\\b\", \"\\\\bsign in first only\\\\b\", \"\\\\bLoad Demo Runner\\\\b\", \"\\\\bOpen Demo\\\\b\"], \"routes\": [{\"route\": \"/\", \"url\": \"http://127.0.0.1:9002/\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/downloads\", \"url\": \"http://127.0.0.1:9002/downloads\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/status\", \"url\": \"http://127.0.0.1:9002/status\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/faq\", \"url\": \"http://127.0.0.1:9002/faq\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger\", \"url\": \"http://127.0.0.1:9002/ledger\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger/map\", \"url\": \"http://127.0.0.1:9002/ledger/map\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/packages\", \"url\": \"http://127.0.0.1:9002/packages\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/participate\", \"url\": \"http://127.0.0.1:9002/participate\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/feedback\", \"url\": \"http://127.0.0.1:9002/feedback\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/what-is-chummer\", \"url\": \"http://127.0.0.1:9002/what-is-chummer\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/login?next=%2Faccount%2Faccess\", \"url\": \"http://127.0.0.1:9002/login?next=%2Faccount%2Faccess\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}]}",
       "stderr": ""
     },
     {

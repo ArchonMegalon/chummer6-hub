@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "Unmixr AI",
+  "lane": "bounded voice adapter",
+  "runtime_ready": true,
+  "boundary": "Private API key, voice id, Piper fallback, and voice roundtrip validation are proven locally; secrets remain outside git.",
+  "claim_boundary": "Private API key, voice id, Piper fallback, and voice roundtrip validation are proven locally; secrets remain outside git."
+}

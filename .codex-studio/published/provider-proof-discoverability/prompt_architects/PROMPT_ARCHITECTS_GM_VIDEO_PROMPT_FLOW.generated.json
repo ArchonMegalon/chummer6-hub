@@ -1,0 +1,11 @@
+{
+  "base_chummer_prompt_exists": true,
+  "forbidden_data_sent": false,
+  "gm_can_edit": true,
+  "gm_must_approve_before_render": true,
+  "gm_sees_diff": true,
+  "magicfit_render_starts_only_after_approval": true,
+  "prompt_architects_template_enhancement_exists": true,
+  "runtime_provider_call_enabled": false,
+  "status": "pass"
+}

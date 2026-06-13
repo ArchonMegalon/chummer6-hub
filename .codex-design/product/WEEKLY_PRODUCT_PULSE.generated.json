@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-12T15:25:45Z",
+  "generated_at": "2026-06-12T18:29:23Z",
   "as_of": "2026-06-12",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
@@ -84,8 +84,8 @@
     },
     {
       "decision_id": "2026-06-12-launch-governance",
-      "action": "freeze_launch",
-      "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+      "action": "launch_expand",
+      "reason": "Launch expansion is approved for the next bounded window while canaries and support closure remain clear.",
       "cited_signals": [
         "journey_gate_state=ready",
         "journey_gate_blocked_count=0",
@@ -97,7 +97,7 @@
         "successor_dependency_state=ready",
         "successor_open_dependency_ids=",
         "successor_open_dependency_work_task_ids=",
-        "status_plane_final_claim_status=fail"
+        "status_plane_final_claim_status=pass"
       ]
     }
   ],
@@ -178,8 +178,8 @@
       },
       {
         "decision_id": "2026-06-12-launch-governance",
-        "action": "freeze_launch",
-        "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+        "action": "launch_expand",
+        "reason": "Launch expansion is approved for the next bounded window while canaries and support closure remain clear.",
         "cited_signals": [
           "journey_gate_state=ready",
           "journey_gate_blocked_count=0",
@@ -191,7 +191,7 @@
           "successor_dependency_state=ready",
           "successor_open_dependency_ids=",
           "successor_open_dependency_work_task_ids=",
-          "status_plane_final_claim_status=fail"
+          "status_plane_final_claim_status=pass"
         ]
       }
     ],
@@ -203,7 +203,7 @@
     "phase_label": "Public-fit polish",
     "history_snapshot_count": 39,
     "longest_pole": "Core Engine",
-    "launch_readiness": "Hold launch expansion until the whole-product final claim returns to pass (current: fail).",
+    "launch_readiness": "Route-canary validation is green; widen launch only while support fallout remains stable.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
       "canary_status": "Canary green on all active lanes",

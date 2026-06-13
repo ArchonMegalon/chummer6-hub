@@ -17,7 +17,7 @@ Those projections may include chunks, embeddings, graph edges, searchable receip
 
 ## Key tool posture
 
-* `Prompt Architects` - explain and prompt-shaping support
+* `Prompting Systems` - explain and prompt-shaping support
 * `Documentation.AI` - downstream docs/help projection
 * `AI Magicx` - bounded synthesis support
 * `1min.AI` - bounded specialist explain/generation support

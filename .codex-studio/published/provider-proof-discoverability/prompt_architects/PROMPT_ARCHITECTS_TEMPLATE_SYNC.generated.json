@@ -1,0 +1,22 @@
+{
+  "adapter": "PromptArchitects template-sync adapter",
+  "code_files": [
+    "Chummer.Campaign.Contracts/PromptFoundryContracts.cs",
+    "Chummer.Run.Api/Services/Community/PromptFoundryStore.cs",
+    "Chummer.Run.Api/Services/Community/PromptFoundryService.cs",
+    "Chummer.Run.Api/Controllers/PromptFoundryController.cs",
+    "Chummer.Tests/PromptFoundryTests.cs"
+  ],
+  "fallback_to_chummer_templates": true,
+  "missing_code": [],
+  "runtime_dependency": false,
+  "seed_templates": [
+    "gm_session_video_aftermath_v1",
+    "magicfit_video_bridge_v1",
+    "black_ledger_newsroom_v1",
+    "faction_video_series_v1",
+    "rules_safe_humanizer_v1",
+    "codex_audit_prompt_v1"
+  ],
+  "status": "pass"
+}

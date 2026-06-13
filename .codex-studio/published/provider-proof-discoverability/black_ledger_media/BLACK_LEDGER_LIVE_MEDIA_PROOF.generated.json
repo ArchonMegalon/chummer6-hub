@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
-  "base_url": "https://chummer.run",
+  "base_url": "http://127.0.0.1:9002",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
   "attempt_count": 1,

@@ -40,7 +40,6 @@ capability_slots:
       - MarkupGo
       - PeekShot
       - Soundmadeseen
-      - Unmixr AI
       - Taja
     boundary: approved_source_packet_only
   discovery_research:
@@ -49,7 +48,6 @@ capability_slots:
       - MetaSurvey
       - Paperguide
       - ChatPlayground AI
-      - Prompt Architects
     boundary: product_signal_only
   automation_glue:
     primary: ApiX-Drive
@@ -62,7 +60,6 @@ capability_slots:
       - first_party_hub_events
       - PostHog_candidate
       - Sentry_candidate
-      - PayFunnels
     boundary: analytics_and_observability_not_user_truth
 product_systems:
   public_growth_system:

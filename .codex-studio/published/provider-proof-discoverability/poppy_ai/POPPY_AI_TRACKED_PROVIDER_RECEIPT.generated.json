@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "Poppy AI",
+  "lane": "operator draft lane",
+  "runtime_ready": false,
+  "boundary": "Not a runtime adapter and not product, release, support, entitlement, prompt, sourcebook, private-user, or memorial-private truth.",
+  "claim_boundary": "Not a runtime adapter and not product, release, support, entitlement, prompt, sourcebook, private-user, or memorial-private truth."
+}

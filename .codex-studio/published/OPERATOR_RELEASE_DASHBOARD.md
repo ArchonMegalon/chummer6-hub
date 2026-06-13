@@ -1,6 +1,6 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-12T18:58:23Z
+- Generated: 2026-06-12T23:13:37Z
 - Version: `run-20260612-121055`
 - Channel: `public_stable`
 - Published: `2026-06-12T13:20:46Z`
@@ -15,10 +15,10 @@
 ## Checks
 - PASS `design_quality_gate`: `pass`
 - PASS `external_distribution_mirror_proof`: `pass`
-- PASS `final_gold_janitor`: `pass`
+- FAIL `final_gold_janitor`: `fail`
 - PASS `google_oauth_linking_proof`: `pass`
 - PASS `public_copy_leak_gate`: `pass`
 - PASS `release_channel`: `published`
-- PASS `release_ready`: `pass`
+- FAIL `release_ready`: `fail`
 - PASS `ruleset_readiness`: `pass`
 - PASS `ui_frame_integrity`: `pass`

@@ -1,0 +1,8 @@
+{
+  "artifact": "PAYFUNNELS_REFUND_PATH_PROOF",
+  "features_removed": [],
+  "reason": "No feature was granted by the $1 test payment.",
+  "receipt_status_after_refund": "refunded",
+  "refund_event": "payment_refunded",
+  "status": "pass"
+}

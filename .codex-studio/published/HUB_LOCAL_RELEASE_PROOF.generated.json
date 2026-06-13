@@ -5,13 +5,13 @@
   "desktop_client_readiness": {
     "status": "pass",
     "scoped_status": "pass",
-    "generated_at": "2026-06-12T15:25:14Z",
+    "generated_at": "2026-06-12T18:37:17Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
     "reason": "Flagship product readiness proof is green.",
     "completion_audit_status": "pass",
     "completion_audit_reason": "Flagship product readiness proof is green.",
-    "source_path": "/docker/chummercomplete/.mini-hub-newsroom/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+    "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
     "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
@@ -1635,6 +1635,6 @@
       ]
     }
   ],
-  "generated_at": "2026-06-12T15:27:48Z",
-  "generatedAt": "2026-06-12T15:27:48Z"
+  "generated_at": "2026-06-12T19:34:35Z",
+  "generatedAt": "2026-06-12T19:34:35Z"
 }

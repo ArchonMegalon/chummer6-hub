@@ -202,11 +202,11 @@ public sealed class ReleaseSelectionService
         }
         else if (accountRequiredInstallAvailable)
         {
-            availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
+            availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Sign in when you want recovery, support, and install return attached to the same account.";
             accountValueSummary = "The account does not change the published file. It is part of the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
-            createAccountSummary = "Create the account first. The current install route keeps recovery, support, and install return attached from the first launch.";
+            createAccountSummary = "Create an account only when you want the guided handoff, recovery, support history, and linked install return attached.";
             signInSummary = "Sign in to continue the current install route and reopen the same recovery and support path.";
-            downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
+            downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Signing in keeps recovery, support, and install return attached.";
             accountFaqAnswer = "Account creation starts the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
         }
         else
@@ -520,7 +520,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return "This route starts with account creation so Chummer can keep the download handoff and recovery path attached from the first launch.";
+            return "Sign in to use this guided handoff. It keeps recovery, support, and install return attached without changing the published file.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))

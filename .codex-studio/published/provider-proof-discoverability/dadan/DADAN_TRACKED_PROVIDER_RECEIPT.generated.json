@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "status": "tracked",
+  "provider": "Dadan",
+  "lane": "candidate video report workflow",
+  "runtime_ready": false,
+  "boundary": "Inventory only until provider verification and first workflow proof are captured.",
+  "claim_boundary": "Inventory only until provider verification and first workflow proof are captured."
+}

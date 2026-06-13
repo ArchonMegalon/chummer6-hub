@@ -1,0 +1,15 @@
+{
+  "accepted_event": {
+    "amount_cents": 100,
+    "billing_product_id": "payfunnels_test_payment_1usd_v1",
+    "currency": "USD",
+    "entitlement_effect": "none",
+    "event_type": "payment_succeeded"
+  },
+  "artifact": "PAYFUNNELS_WEBHOOK_RECEIPT",
+  "endpoint": "/api/billing/payfunnels/webhook",
+  "signature_verification": "hmac_sha256_header:X-PayFunnels-Signature",
+  "status": "pass",
+  "wrong_amount_rejected": true,
+  "wrong_product_rejected": true
+}

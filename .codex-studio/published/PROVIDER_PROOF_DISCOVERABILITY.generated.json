@@ -10,7 +10,14 @@
       ],
       "mirrored_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/FINAL_PAYFUNNELS_TEST_BILLING_ADAPTER_VERDICT.md",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json"
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_COPY_HONESTY_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_ENTITLEMENT_NOOP_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_REFUND_PATH_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_SECURITY_REVIEW.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_TEST_CHECKOUT_RECEIPT.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_WEBHOOK_IDEMPOTENCY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_WEBHOOK_RECEIPT.generated.json"
       ],
       "missing_paths": []
     },
@@ -22,7 +29,14 @@
       ],
       "mirrored_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/FINAL_PROMPT_ARCHITECTS_INTEGRATION_VERDICT.md",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json"
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_GM_VIDEO_PROMPT_FLOW.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_HUMAN_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_MAGICFIT_BRIDGE_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PRIVACY_BOUNDARY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_RULES_SAFE_HUMANIZER.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_TEMPLATE_SYNC.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_USAGE_METERING.generated.json"
       ],
       "missing_paths": []
     },
@@ -67,10 +81,81 @@
         "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json"
       ],
       "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/FACE_VAULT_TENANT_ISOLATION.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/FINAL_GM_SESSION_VIDEO_FOUNDRY_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_HUMAN_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_PUBLIC_SAFETY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_CONTACT_SHEET.jpg",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_RENDER_MANIFEST.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_RENDER_RECEIPT.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_QUOTA_POLICY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_LEDGER_INTEGRITY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json"
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "dadan": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/dadan/DADAN_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "rybbit": {
+      "status": "pass",
+      "tracked_inventory_only": false,
+      "runtime_ready": true,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/rybbit/RYBBIT_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "neuronwriter": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/neuronwriter/NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "joggai": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/joggai/JOGGAI_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "poppy_ai": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/poppy_ai/POPPY_AI_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "fliplink": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/fliplink/FLIPLINK_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "unmixr": {
+      "status": "pass",
+      "tracked_inventory_only": false,
+      "runtime_ready": true,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/unmixr/UNMIXR_TRACKED_PROVIDER_RECEIPT.generated.json"
       ],
       "missing_paths": []
     }

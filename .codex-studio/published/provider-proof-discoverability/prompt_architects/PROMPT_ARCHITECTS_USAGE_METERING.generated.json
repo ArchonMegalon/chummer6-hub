@@ -1,0 +1,25 @@
+{
+  "dimensions": [
+    "user_id",
+    "group_id",
+    "campaign_id",
+    "prompt_draft_id",
+    "template_id",
+    "provider_account"
+  ],
+  "focused_tests": [
+    "TemplateSeedEnhancementProducesDiffAndPromptUnitsWithoutRenderUnits",
+    "ApprovalConsumesPromptUnitsButStillDoesNotRender"
+  ],
+  "ledger_events": [
+    "estimate",
+    "consume",
+    "refund",
+    "admin_adjustment"
+  ],
+  "monthly_prompt_quota": 20000,
+  "provider": "PromptArchitects",
+  "separate_from_magicfit_render_units": true,
+  "status": "pass",
+  "unit_name": "Prompt Units"
+}
