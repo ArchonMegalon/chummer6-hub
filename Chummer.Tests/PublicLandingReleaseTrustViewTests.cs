@@ -210,6 +210,29 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void StatusRouteForcesNoStoreCachingBoundary()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("[HttpGet(\"/status\")", controller, StringComparison.Ordinal);
+        Assert.Contains("ApplyNoStoreHeaders(Response.Headers);", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusControllerSanitizesLaunchHealthRowsBeforeSurfaceRender()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("Select(SanitizePublicLaunchHealthRow)", controller, StringComparison.Ordinal);
+        Assert.Contains("NormalizePublicLaunchHealthText(row.Label)", controller, StringComparison.Ordinal);
+        Assert.Contains("NormalizePublicLaunchHealthText(row.Value)", controller, StringComparison.Ordinal);
+        Assert.Contains("proof freshness", controller, StringComparison.Ordinal);
+        Assert.Contains("Proof freshness", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusPageCustomerTextSanitizesInternalProofTokensAndRuleAuthorityJargon()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");

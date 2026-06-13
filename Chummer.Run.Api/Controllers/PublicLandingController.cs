@@ -3597,6 +3597,8 @@ public sealed class PublicLandingController : Controller
             GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot()),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience, pulse),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+
+        ApplyNoStoreHeaders(Response.Headers);
         return View("~/Views/PublicLanding/Status.cshtml", model);
     }
 
@@ -8917,8 +8919,8 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         PublicTrustPulseSnapshot? pulse)
     {
-        return
-        [
+        var rows = new List<PublicTrustPulseRowViewModel>
+        {
             new("Live", BuildLiveLaunchSummary(manifest)),
             new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
@@ -8930,7 +8932,41 @@ Boundary:
             new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)
                 : BuildTrustPulseAdoptionSummary(pulse))
-        ];
+        };
+
+        return rows
+            .Select(SanitizePublicLaunchHealthRow)
+            .ToArray();
+    }
+
+    private static PublicTrustPulseRowViewModel SanitizePublicLaunchHealthRow(PublicTrustPulseRowViewModel row)
+    {
+        return new PublicTrustPulseRowViewModel(
+            NormalizePublicLaunchHealthText(row.Label),
+            NormalizePublicLaunchHealthText(row.Value));
+    }
+
+    private static string NormalizePublicLaunchHealthText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Release checks")
+            .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof-freshness", "Release checks")
+            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof recency", "Release checks")
+            .Replace("local edge proof", "current release check", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
+            .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
+            .Replace("Open demo", "Open launcher")
+            .Replace("Load Demo Runner", "Run example")
+            .Replace("Proof freshness", "Release checks");
     }
 
     private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus(GoldReadinessSnapshot? snapshot)
