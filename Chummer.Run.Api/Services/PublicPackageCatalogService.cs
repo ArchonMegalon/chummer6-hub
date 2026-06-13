@@ -343,16 +343,16 @@ public sealed class PublicPackageCatalogService
                 "Rules and source package",
                 "Inspectable",
                 [
-                    "Binds to the deterministic rules runtime, explanation trail, and current proof view.",
+                    "Binds to the deterministic rules runtime, explanation trail, and current release status view.",
                     "Compatibility posture depends on the current explain receipt and import/export boundaries, not on route existence alone.",
-                    "Public detail can point to current proof, but cannot overstate overall ruleset seriousness."
+                    "Public detail can point to current availability, but cannot overstate overall ruleset seriousness."
                 ],
                 [
                     "Proof must stay attached before broader parity language becomes public copy.",
                     "Rollback and boundary posture stay explicit when this package changes explainable rules behavior.",
                     "The package browser shows compatibility and status; it does not replace the rules proof audit."
                 ],
-                "The current proof view already points to the explanation trail and live rules posture.",
+                "The current release status view already points to the explanation trail and live rules posture.",
                 "Open what works today",
                 "/now#real-rules-truth",
                 "Account package tracking keeps follows and votes attached to the same signed-in return path.",

@@ -108,7 +108,7 @@ public sealed class HostedProofContractService
             ],
             Actions:
             [
-                new HostedProofContractActionProjection("open_shadowcasters_brief", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Read the named horizon brief before comparing it to live proof."),
+                new HostedProofContractActionProjection("open_shadowcasters_brief", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Read the named horizon brief before comparing it to current release status."),
                 new HostedProofContractActionProjection("compare_black_ledger", "Compare Black Ledger", "/roadmap/black-ledger", "Compare the adjacent world-state horizon that already shares the same governed roadmap rail."),
                 new HostedProofContractActionProjection("open_horizons", "Open roadmap browser", "/horizons", "Return to the shared horizons browser instead of inventing a horizon-only side surface.")
             ],

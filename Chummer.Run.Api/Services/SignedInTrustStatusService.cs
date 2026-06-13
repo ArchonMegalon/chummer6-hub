@@ -148,7 +148,7 @@ public sealed class SignedInTrustStatusService
         bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)
             || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase);
         string summary = reviewRequired
-            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive desktop checks remain review-required until current proof receipts are green."
+            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive desktop checks remain review-required until current release receipts are green."
             : $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.";
         return new SignedInTrustStatusPanelViewModel(
             Eyebrow: "Signed-in trust status",
@@ -586,7 +586,7 @@ public sealed class SignedInTrustStatusService
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
                 ? "The linked install route stays preferred while desktop proof receipts are still review-required."
-                : "Public downloads are visible, but parity-sensitive desktop checks still stay on the review-required support path until current proof receipts are green.";
+                : "Public downloads are visible, but parity-sensitive desktop checks still stay on the review-required support path until current release receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)

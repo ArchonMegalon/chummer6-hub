@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-13T12:16:19Z",
+  "generated_at_utc": "2026-06-13T12:38:33Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "summary": {
-    "route_count": 11,
+    "route_count": 15,
     "failed_route_count": 0,
-    "forbidden_pattern_count": 37,
+    "forbidden_pattern_count": 40,
     "failed_routes": []
   },
   "forbidden_patterns": [
@@ -40,6 +40,9 @@
     "\\bproof-freshness\\b",
     "\\bproof recency\\b",
     "\\bproof is green\\b",
+    "\\blive proof\\b",
+    "\\bcurrent proof\\b",
+    "\\bproof page\\b",
     "\\bstartup-smoke\\b",
     "\\bexecutable-gate\\b",
     "\\bpromoted flagship bytes\\b",
@@ -82,6 +85,30 @@
       "detail": null
     },
     {
+      "route": "/horizons",
+      "url": "https://chummer.run/horizons",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/roadmap",
+      "url": "https://chummer.run/roadmap",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/changelog",
+      "url": "https://chummer.run/changelog",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
       "route": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
@@ -116,6 +143,14 @@
     {
       "route": "/feedback",
       "url": "https://chummer.run/feedback",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/artifacts",
+      "url": "https://chummer.run/artifacts",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],

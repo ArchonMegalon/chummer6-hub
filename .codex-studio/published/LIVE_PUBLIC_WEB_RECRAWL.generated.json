@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-13T12:14:31Z",
+  "generated_at_utc": "2026-06-13T12:37:07Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -20,7 +20,7 @@
       "path": "/",
       "url": "https://chummer.run/",
       "status_code": 200,
-      "sha256": "660be391d04c3921645e73b26d9c411521f9516311aa820defd333c25287bc9e",
+      "sha256": "c6281e9b062ed5ebcd0aa51c2def827c40f97383789f6a7dc31589acec5c84c2",
       "excerpt": "Chummer \u2014 Shadowrun Campaign OS \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function ()",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -29,7 +29,7 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "5ef968979e41017a88cc479eea19be12b9a0d841dc97f49fa84d2e3c1363587a",
+      "sha256": "5bf753ea7c6507b0e1513bf9d1adb1c7618951097915170d89b4d1d018af8bd9",
       "excerpt": "Status \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -38,7 +38,7 @@
       "path": "/downloads",
       "url": "https://chummer.run/downloads",
       "status_code": 200,
-      "sha256": "7dfd16e32243739c12f90e69a216b918730e3fda458c684a6e27d31cb2af9740",
+      "sha256": "298a59f731a708695e0a35cf5e84e8480f9593316ec898e6ce7d2b081729c857",
       "excerpt": "Downloads \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -47,7 +47,7 @@
       "path": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
-      "sha256": "7e3598983b89f2d5c90b04a7e9038a7d5edb3176abcc96acea0084cd3973b7d4",
+      "sha256": "65a286db17b588fb71dcb45806e356bcef45f2d0221da14b9cc76a76d347f0a6",
       "excerpt": "Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure Hide Get started The flagship front door stays simple: get the build, check what works",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -56,7 +56,7 @@
       "path": "/ledger/map",
       "url": "https://chummer.run/ledger/map",
       "status_code": 200,
-      "sha256": "a3f8579a19cef7235b113c77305ddbf90a94f8a64aa1d03177c57a0e1e29411a",
+      "sha256": "32ec8f4d7c7c91a358f7d80910506bf9d442eeeaff615143ad23234db8e30df2",
       "excerpt": "Emerald Sprawl: First Pressure command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure command map Hide Get started The flagship front door stays simple: get the",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -65,7 +65,7 @@
       "path": "/ledger/factions",
       "url": "https://chummer.run/ledger/factions",
       "status_code": 200,
-      "sha256": "50aae7ac85a5ee620f9eca0d1a404109884050265460b8c7850958e22f46c491",
+      "sha256": "552184c31682c09a73d3d71a0e60a4360381a3242b47fe2879bd26363d42b3f8",
       "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Black Ledger factions \u00b7 Emerald Sprawl: First Pressure Hide Get started The flagship front door",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -74,7 +74,7 @@
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
       "status_code": 200,
-      "sha256": "75cd93da592c123fde89d54de5af7a694a435489d78046a3a8d52970e2aa0b42",
+      "sha256": "63bf3eff3dd7ba4119c5f694b265c792cf92df6adc1e5df9d1919f8f623c84c5",
       "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Black Ledger newsroom \u00b7 Turn 2 anchor package Hide Get started The flagship front door",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []

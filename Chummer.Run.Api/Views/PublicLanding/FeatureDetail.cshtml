@@ -62,9 +62,9 @@
         "roadmap" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Compare with live proof instead of treating a horizon as already shipped",
-            Summary: "Roadmap detail keeps direction honest, but the live proof page still owns current user-available truth.",
-            Proof: new[] { "Current proof view", "No fake ship claim", "Install truth stays separate" }),
+            Title: "Compare with current release status instead of treating a horizon as already shipped",
+            Summary: "Roadmap detail keeps direction honest, but what works today still owns current user-available truth.",
+            Proof: new[] { "Current status view", "No fake ship claim", "Install truth stays separate" }),
         "live-proof" => (
             Href: "/downloads",
             Label: "Open downloads",
@@ -74,15 +74,15 @@
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Compare with the live proof page before treating a preview as already available",
-            Summary: "Preview concepts stay explicit about what is still opening next. The live proof page still answers what a user can start from today.",
-            Proof: new[] { "Preview stays honest", "Current proof nearby", "No fake availability" }),
+            Title: "Compare with current release status before treating a preview as already available",
+            Summary: "Preview concepts stay explicit about what is still opening next. What works today still answers what a user can start from today.",
+            Proof: new[] { "Preview stays honest", "Current status nearby", "No fake availability" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check the live proof page when current availability matters more than the feature brief",
-            Summary: "The feature detail answers one bounded question. The live proof page still owns current release truth.",
-            Proof: new[] { "Current proof", "Availability first", "No mixed jobs" })
+            Title: "Check current release status when availability matters more than the feature brief",
+            Summary: "The feature detail answers one bounded question. What works today still owns current release truth.",
+            Proof: new[] { "Current availability", "Availability first", "No mixed jobs" })
     };
 
     var deeperRoute = Model.SecondaryAction is not null
@@ -219,7 +219,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
     <h2 class="editorial-title">Use the feature detail to answer one question, then move to the page that owns the next job.</h2>
-    <p class="editorial-copy">Take the explicit next action when the card is clear, compare against live proof when availability matters, and leave for help as soon as the issue becomes private, recovery-bound, or support-owned.</p>
+    <p class="editorial-copy">Take the explicit next action when the card is clear, compare against current release status when availability matters, and leave for help as soon as the issue becomes private, recovery-bound, or support-owned.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
         <a class="cta-link cta-link--secondary" href="@deeperRoute.Href">@deeperRoute.Label</a>

@@ -785,7 +785,7 @@ public sealed class PublicLandingController : Controller
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
                 ReadmeUrl: BuildAbsoluteUrl("/artifacts/mac-codex-release-pipeline/readme.md"),
                 VerifyUrl: BuildAbsoluteUrl("/downloads/RELEASE_CHANNEL.generated.json"),
-                WindowsUploadNote: "Windows bundles use the same upload endpoint and the same signed-in claim-code return path once the signed installer, startup-smoke receipts, and promotion evidence are present.",
+                WindowsUploadNote: "Windows bundles use the same upload endpoint and the same signed-in claim-code return path once the signed installer, startup verification receipts, and promotion evidence are present.",
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
             return View("~/Views/PublicLanding/ReleaseUpload.cshtml", model);
@@ -3909,7 +3909,7 @@ public sealed class PublicLandingController : Controller
             routeReceipt = BuildRouteReceiptPayload(routeLookup.ReceiptMatch),
             boundedFailureReason = routeClaim.BoundedFailureReason,
             nextSafeAction = routeClaim.Blocked
-                ? $"Stay on {installRef} or the governed support lane until a current proof receipt is published for {bundleRef}."
+                ? $"Stay on {installRef} or the governed support lane until a current release receipt is published for {bundleRef}."
                 : "Current release-bundle proof is attached to this public route.",
             requiredReceiptRefs = new[]
             {
@@ -10256,7 +10256,7 @@ Boundary:
         return card.Bucket switch
         {
             "featured_artifacts" => "This artifact keeps the preview tangible through manifests, provenance, and one truthful next action instead of a vague gallery card.",
-            "coming_next" => "The payoff only becomes real when the horizon moves onto the live proof view, but the user value is already explicit here.",
+            "coming_next" => "The payoff only becomes real when the horizon moves onto the current release view, but the user value is already explicit here.",
             _ => null
         };
     }
@@ -10271,7 +10271,7 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => new[] { "Planned product work", "Current proof view contrast", "Deeper horizon brief" },
+            "coming_next" => new[] { "Planned product work", "Current release contrast", "Deeper horizon brief" },
             "featured_artifacts" => new[] { "Manifest-backed", "Preview or live status", "Next truthful action" },
             _ => Array.Empty<string>()
         };

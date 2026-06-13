@@ -1370,8 +1370,8 @@ public sealed class ReleaseBundlePromotionService
                         promotionReasonCode = "installer_smoke_and_release_proof_passed";
                         string promotionSubject = DesktopRoutePromotionSubject(head);
                         promotionReason = routeRole == "primary"
-                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted because the flagship head is present on the registry shelf and passed independent startup-smoke and release-proof gates for this channel."
-                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted for recovery/manual routing because it is present on the registry shelf and passed the current startup-smoke and release-proof gates for this channel.";
+                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted because the flagship head is present on the registry shelf and passed independent startup verification and release verification gates for this channel."
+                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted for recovery/manual routing because it is present on the registry shelf and passed the current startup verification and release verification gates for this channel.";
                         installPosture = "installer_first";
                         installPostureReason = $"Promoted installer media {artifactId} is present for {AppLabels[head]} tuple {routeTupleLabel} on {tupleLabel}.";
                     }

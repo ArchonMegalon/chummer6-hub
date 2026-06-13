@@ -226,7 +226,7 @@ def verify_queue_and_registry(errors: list[str]) -> None:
         errors.append(f"successor registry missing milestone {MILESTONE_ID}")
         return
 
-    if normalize(milestone.get("title")) != "Desktop executable proof integrity and publishable flagship-route closure":
+    if normalize(milestone.get("title")) != "Desktop executable release integrity and publishable flagship-route closure":
         errors.append("milestone 144 title drifted")
 
     work_tasks = milestone.get("work_tasks")
