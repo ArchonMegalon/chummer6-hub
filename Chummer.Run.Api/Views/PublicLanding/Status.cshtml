@@ -141,7 +141,7 @@
         cautionSummary = "Known issues and install help stay one short step away, even when the current release checks are green.";
     }
     var compactReleaseSummary = CustomerStatusText(FindLaunchHealthValue("Live"), releasePostureSummary);
-    var compactCautionSummary = CustomerStatusText(FindLaunchHealthValue("Proof freshness"), cautionSummary);
+    var compactCautionSummary = CustomerStatusText(FindLaunchHealthValue("Proof recency"), cautionSummary);
     var compactFollowThroughSummary = CustomerStatusText(
         FindLaunchHealthValue("Support pulse"),
         CustomerStatusText(Model.Manifest.FixAvailabilitySummary, "Use support only when downloads, notes, and known issues stop being enough to move forward."));
