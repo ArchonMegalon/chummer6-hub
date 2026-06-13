@@ -8966,6 +8966,11 @@ Boundary:
             .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
+            .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("startup-smoke", "startup verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("executable-gate proof", "executable verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("executable-gate", "executable verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("promoted flagship bytes", "promoted release packages", StringComparison.OrdinalIgnoreCase)
             .Replace("Open demo", "Open launcher")
             .Replace("Load Demo Runner", "Run example")
             .Replace("Proof freshness", "Release checks");

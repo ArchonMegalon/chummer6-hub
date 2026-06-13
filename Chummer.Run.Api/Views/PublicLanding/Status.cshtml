@@ -27,11 +27,11 @@
         new
         {
             Badge = "Live checks",
-            Title = "Use what works today when the question is proof, not packaging",
-            Summary = "Open the proof page when you need the current result, current cautions, or one inspectable explanation before you move a device.",
+            Title = "Use what works today when the question is readiness, not packaging",
+            Summary = "Open what works today when you need the current result, current cautions, or one inspectable explanation before you move a device.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Current proof", "Caution explicit", "One inspectable trail" }
+            Proof = new[] { "Current result", "Caution explicit", "One inspectable trail" }
         },
         new
         {
@@ -55,7 +55,7 @@
     var campaignStatusTitle = CustomerStatusText(
         Model.CampaignOsProof is null
             ? "Campaign detail stays on the longer report"
-            : $"Campaign proof is currently {Model.CampaignOsProof.Status}",
+            : $"Campaign status is currently {Model.CampaignOsProof.Status}",
         "Campaign detail stays on the longer report");
     var campaignStatusSummary = CustomerStatusText(
         Model.CampaignOsProof is null
@@ -115,7 +115,12 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
             .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("startup-smoke", "startup verification", StringComparison.OrdinalIgnoreCase)
             .Replace("proof-gated", "waiting for current proof", StringComparison.OrdinalIgnoreCase)
+            .Replace("executable-gate proof", "executable verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("executable-gate", "executable verification", StringComparison.OrdinalIgnoreCase)
+            .Replace("promoted flagship bytes", "promoted release packages", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof for the promoted", "verification for the promoted", StringComparison.OrdinalIgnoreCase)
             .Replace("tuple", "build", StringComparison.OrdinalIgnoreCase)
             .Replace("avalonia:linux:linux-x64", "Avalonia Linux x64", StringComparison.OrdinalIgnoreCase)
             .Replace("blazor-desktop:linux:linux-x64", "Blazor Desktop Linux x64", StringComparison.OrdinalIgnoreCase)
@@ -204,7 +209,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Current status</p>
         <h1 class="page-title">What works now, what needs caution, and where to go next</h1>
-        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, live proof, support, or the deeper report without making you decode the whole release stack.</p>
+        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, current checks, support, or the deeper report without making you decode the whole release stack.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
@@ -223,7 +228,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, proof, help, or the deeper report as soon as the job changes.</p>
+        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, current checks, help, or the deeper report as soon as the job changes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in statusRouteChoices)

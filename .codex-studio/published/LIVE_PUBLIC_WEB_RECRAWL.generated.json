@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-13T12:01:16Z",
+  "generated_at_utc": "2026-06-13T12:14:31Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -20,7 +20,7 @@
       "path": "/",
       "url": "https://chummer.run/",
       "status_code": 200,
-      "sha256": "31aa09159acc245e7ad3388c5f9422bd01a5722b837f44df24303a71c114a9ae",
+      "sha256": "660be391d04c3921645e73b26d9c411521f9516311aa820defd333c25287bc9e",
       "excerpt": "Chummer \u2014 Shadowrun Campaign OS \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function ()",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -29,7 +29,7 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "5f63bc53aebdaafb18839e7e4fddac3941e05876cb696e7777442293902e3791",
+      "sha256": "5ef968979e41017a88cc479eea19be12b9a0d841dc97f49fa84d2e3c1363587a",
       "excerpt": "Status \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
