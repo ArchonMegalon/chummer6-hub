@@ -1,19 +1,18 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-06-13T04:20:24Z",
+  "generated_at_utc": "2026-06-13T08:00:49Z",
   "status": "fail",
   "verdict": "NOT_RELEASE_READY",
   "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash /docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
   "returncode": 1,
   "failures": [
-    "FAIL verify_public_projection",
     "FAIL verify_public_copy_leak_gate",
     "FAIL verify_operator_release_dashboard",
-    "verify_public_projection",
     "verify_public_copy_leak_gate",
     "verify_operator_release_dashboard"
   ],
   "stdout_tail": [
+    "      \"status_code\": 200,",
     "      \"success\": false,",
     "      \"forbidden_hits\": [",
     "        \"\\\\bproof freshness\\\\b\"",
@@ -91,7 +90,6 @@
     "operator_release_dashboard:fail",
     "",
     "NOT RELEASE READY",
-    "verify_public_projection",
     "verify_public_copy_leak_gate",
     "verify_operator_release_dashboard"
   ],

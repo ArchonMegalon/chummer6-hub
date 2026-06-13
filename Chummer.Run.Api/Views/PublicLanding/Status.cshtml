@@ -122,6 +122,7 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("authority facts", "rules checks", StringComparison.OrdinalIgnoreCase)
             .Replace("errata posture", "errata updates", StringComparison.OrdinalIgnoreCase)
             .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof freshness", "Release checks")
             .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase);
 }
@@ -133,14 +134,12 @@ static string CustomerStatusText(string? value, string fallback)
             return string.Empty;
         }
 
-    return label
-        .Trim()
-        .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-        .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-        .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
-        .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase)
-        .Replace("Proof freshness", "Release checks")
-        .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase);
+        return label
+            .Trim()
+            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
 }
 
     string? FindLaunchHealthValue(string label)

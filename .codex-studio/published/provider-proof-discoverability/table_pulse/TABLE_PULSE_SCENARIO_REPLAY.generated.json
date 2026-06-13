@@ -1,6 +1,6 @@
 {
   "contract_name": "fleet.table_pulse_scenario_replay",
-  "generated_at_utc": "2026-06-13T04:21:23Z",
+  "generated_at_utc": "2026-06-13T07:59:11Z",
   "status": "pass",
   "required_steps": [
     "heat-event",
