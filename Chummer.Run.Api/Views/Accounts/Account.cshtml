@@ -147,6 +147,13 @@
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
+    var selectedWorkspacePrepLibraryQueryHistory = selectedWorkspace is null
+        ? Array.Empty<Chummer.Run.Contracts.Community.WorkspacePrepLibrarySearchHistoryItem>()
+        : (Model.Experience.WorkspacePrepLibrarySearchHistory ?? Array.Empty<Chummer.Run.Contracts.Community.WorkspacePrepLibrarySearchHistoryItem>())
+            .Where(item => string.Equals(item.WorkspaceId, selectedWorkspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(item => item.LastUsedUtc)
+            .Take(8)
+            .ToArray();
     var selectedWorkspaceFirstPlayableSession = selectedWorkspaceServerPlane?.FirstPlayableSession ?? selectedWorkspace?.FirstPlayableSession;
     var selectedWorkspaceFirstPlayableEvidence = selectedWorkspaceFirstPlayableSession?.EvidenceLines.FirstOrDefault();
     var selectedWorkspaceNextSessionCarryForward = selectedWorkspaceServerPlane?.NextSessionCarryForward;
@@ -407,6 +414,7 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string RulesDetailHref(string entryId) => $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+    static string WorkspacePrepLibrarySearchHref(string workspaceId, string query) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={Uri.EscapeDataString(query)}";
     static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
     static bool IsDiscoverablePublicCreatorPublication(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
         => publication is not null
@@ -2509,33 +2517,57 @@
                             <form class="stacked-copy" method="get" action="@WorkspaceDetailHref(selectedWorkspace!.WorkspaceId)">
                                 <div class="field">
                                     <label for="prepQuery">Search governed prep packets</label>
-                                    <input id="prepQuery" name="prepQuery" type="search" value="@selectedWorkspacePrepLibraryQuery" placeholder="opposition, scene, safehouse, dossier..." />
-                                    </div>
-                                    <div class="stacked-actions">
-                                        <button class="button-like button-like--secondary" type="submit">Search prep library</button>
-                                        @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
-                                        {
-                                            <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(selectedWorkspace.WorkspaceId)">Clear search</a>
-                                        }
-                                    </div>
-                                </form>
-                                @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
-                                {
-                                    <p><strong>Search results:</strong> @(selectedWorkspacePrepLibrarySearch?.TotalCount ?? 0) match(es) for "@selectedWorkspacePrepLibraryQuery".</p>
-                                    @if (selectedWorkspacePrepLibrarySearch?.Items.Count > 0)
+                                    <input id="prepQuery" name="prepQuery" type="search" value="@selectedWorkspacePrepLibraryQuery" list="prepQueryHistory" placeholder="opposition, scene, safehouse, dossier..." />
+                                    @if (selectedWorkspacePrepLibraryQueryHistory.Length > 0)
                                     {
-                                        <ul class="muted-copy">
-                                            @foreach (var packet in selectedWorkspacePrepLibrarySearch.Items)
+                                        <datalist id="prepQueryHistory">
+                                            @foreach (var item in selectedWorkspacePrepLibraryQueryHistory)
                                             {
-                                                <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                                <option value="@item.Query" />
                                             }
-                                        </ul>
+                                        </datalist>
                                     }
-                                    else
+                                </div>
+                                <div class="stacked-actions">
+                                    <button class="button-like button-like--secondary" type="submit">Search prep library</button>
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
                                     {
-                                        <p class="muted-copy">No governed prep packet matched that search yet. Try campaign, scene, opposition, dossier, or safehouse terms.</p>
+                                        <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(selectedWorkspace.WorkspaceId)">Clear search</a>
                                     }
+                                </div>
+                            </form>
+                            @if (selectedWorkspacePrepLibraryQueryHistory.Length > 0)
+                            {
+                                <p>Recent searches for this workspace:</p>
+                                <div class="muted-copy">
+                                    @foreach (var item in selectedWorkspacePrepLibraryQueryHistory)
+                                    {
+                                        <p class="small-copy">
+                                            <a class="button-like button-like--ghost" href="@WorkspacePrepLibrarySearchHref(selectedWorkspace.WorkspaceId, item.Query)">
+                                                @item.Query
+                                            </a>
+                                            <span> (used @FormatUtc(item.LastUsedUtc))</span>
+                                        </p>
+                                    }
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
+                            {
+                                <p><strong>Search results:</strong> @(selectedWorkspacePrepLibrarySearch?.TotalCount ?? 0) match(es) for "@selectedWorkspacePrepLibraryQuery".</p>
+                                @if (selectedWorkspacePrepLibrarySearch?.Items.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var packet in selectedWorkspacePrepLibrarySearch.Items)
+                                        {
+                                            <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                        }
+                                    </ul>
                                 }
+                                else
+                                {
+                                    <p class="muted-copy">No governed prep packet matched that search yet. Try campaign, scene, opposition, dossier, or safehouse terms.</p>
+                                }
+                            }
                             @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
                             {
                                 <ul class="muted-copy">

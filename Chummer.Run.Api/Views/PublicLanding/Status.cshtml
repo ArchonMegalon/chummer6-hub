@@ -87,10 +87,10 @@
                 .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 
-    static string CustomerStatusText(string? value, string fallback)
-    {
-        var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
-        return text
+static string CustomerStatusText(string? value, string fallback)
+{
+    var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
+    return text
             .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
             .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
             .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
@@ -121,8 +121,10 @@
             .Replace("reviewed authority closure", "reviewed coverage closure", StringComparison.OrdinalIgnoreCase)
             .Replace("authority facts", "rules checks", StringComparison.OrdinalIgnoreCase)
             .Replace("errata posture", "errata updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase);
-    }
+            .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Release checks")
+            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase);
+}
 
     static string NormalizeLaunchHealthLabel(string? label)
     {
@@ -131,13 +133,15 @@
             return string.Empty;
         }
 
-        return label
-            .Trim()
-            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
-    }
+    return label
+        .Trim()
+        .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+        .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+        .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
+        .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase)
+        .Replace("Proof freshness", "Release checks")
+        .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase);
+}
 
     string? FindLaunchHealthValue(string label)
     {

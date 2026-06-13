@@ -37,7 +37,13 @@ public sealed record HubUserExperienceDto(
     bool ImpactCloseoutNotifications = false,
     bool PublicContributionProfileOptIn = false,
     bool BlackLedgerNewsEmail = false,
+    IReadOnlyList<WorkspacePrepLibrarySearchHistoryItem>? WorkspacePrepLibrarySearchHistory = null,
     IReadOnlyList<string>? BlackLedgerWorldsFollowed = null);
+
+public sealed record WorkspacePrepLibrarySearchHistoryItem(
+    string WorkspaceId,
+    string Query,
+    DateTimeOffset LastUsedUtc);
 
 public sealed record UpsertHubUserExperienceRequest(
     [StringLength(128)] string? SubjectId,

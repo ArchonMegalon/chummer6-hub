@@ -121,7 +121,7 @@ public sealed class AccountsController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var links = _links.GetSummary(subject.SubjectId);
-            var experience = _experience.GetOrCreate(subject.SubjectId);
+            HubUserExperienceDto experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
@@ -134,6 +134,10 @@ public sealed class AccountsController : Controller
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
+            if (selectedWorkspace is not null && !string.IsNullOrWhiteSpace(prepQuery))
+            {
+                experience = _experience.RecordWorkspacePrepLibrarySearch(subject.SubjectId, selectedWorkspace.WorkspaceId, prepQuery);
+            }
             var selectedWorkspaceServerPlane = selectedWorkspace is null
                 ? null
                 : _workspaceServerPlane.GetWorkspaceServerPlane(user, selectedWorkspace.WorkspaceId, installLinking);

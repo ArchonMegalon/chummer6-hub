@@ -53,6 +53,60 @@ public sealed class TeableUserProjectionServiceTests
     }
 
     [Fact]
+    public async Task SyncAllWritesWorkspacePrepLibrarySearchHistoryField()
+    {
+        using Fixture fixture = new();
+        HubUserDto user = new(
+            UserId: "usr-demo",
+            SubjectId: "subject.demo",
+            DisplayName: "Demo Runner",
+            Handle: "demo-runner",
+            Visibility: "private",
+            Timezone: "Europe/Vienna",
+            CountryCode: "AT",
+            LinkedPrincipals: ["subject.demo"],
+            GroupIds: ["grp-alpha"],
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:15:00Z"))
+        {
+            Email = "demo@example.com",
+        };
+        SeedUser(fixture.Store, user);
+        fixture.Store.UserExperienceByUserId[user.UserId] = new HubUserExperienceDto(
+            UserId: user.UserId,
+            LaneInterests: Array.Empty<string>(),
+            FollowHorizons: false,
+            BetaInterest: false,
+            OnboardingCompleted: false,
+            OnboardingCompletedAtUtc: null,
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:15:00Z"),
+            ImpactCloseoutNotifications: false,
+            PublicContributionProfileOptIn: false,
+            BlackLedgerNewsEmail: false,
+            WorkspacePrepLibrarySearchHistory:
+            [
+                new WorkspacePrepLibrarySearchHistoryItem("ws-demo", "opposition", DateTimeOffset.Parse("2026-04-12T10:01:00Z")),
+                new WorkspacePrepLibrarySearchHistoryItem("ws-demo", "scene", DateTimeOffset.Parse("2026-04-12T10:02:00Z")),
+            ],
+            BlackLedgerWorldsFollowed: Array.Empty<string>());
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+        Assert.Equal("passed", result.State);
+
+        LoggedRequest create = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+        using JsonDocument created = JsonDocument.Parse(create.Body);
+        JsonElement records = created.RootElement.GetProperty("records");
+        using JsonDocument history = JsonDocument.Parse(records[0].GetProperty("fields").GetProperty("Workspace Prep Library Search History").GetString() ?? "[]");
+
+        Assert.Equal(JsonValueKind.Array, history.RootElement.ValueKind);
+        Assert.Equal(2, history.RootElement.GetArrayLength());
+        Assert.Equal("ws-demo", history.RootElement[0].GetProperty("WorkspaceId").GetString());
+        Assert.Equal("scene", history.RootElement[1].GetProperty("Query").GetString());
+    }
+
+    [Fact]
     public void EnsureUserRetainsEmailInHubStore()
     {
         using Fixture fixture = new(enableTeable: false);

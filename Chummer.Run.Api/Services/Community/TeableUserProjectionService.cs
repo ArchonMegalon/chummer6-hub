@@ -18,7 +18,8 @@ public sealed record TeableUserProjectionRow(
     IReadOnlyList<string> LinkedPrincipals,
     IReadOnlyList<string> GroupIds,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string WorkspacePrepLibrarySearchHistory);
 
 public sealed record TeableUserProjectionDashboard(
     bool Enabled,
@@ -68,6 +69,7 @@ public sealed class TeableUserProjectionService
         new("Country Code", "singleLineText", Description: "ISO country code."),
         new("Linked Principals", "longText", Description: "All linked principal ids, one per line."),
         new("Group Ids", "longText", Description: "All joined group ids, one per line."),
+        new("Workspace Prep Library Search History", "longText", Description: "Recent workspace prep search queries with last-used timestamps."),
         new("Created At UTC", "singleLineText", Description: "Initial account creation timestamp."),
         new("Updated At UTC", "singleLineText", Description: "Most recent hub-side account update timestamp."),
         new("Last Synced At UTC", "singleLineText", Description: "Most recent Teable projection timestamp.")
@@ -112,7 +114,14 @@ public sealed class TeableUserProjectionService
         {
             try
             {
-                await SyncUsersInternalAsync([user], options, CancellationToken.None);
+                TeableUserProjectionRow? row = GetStoredUsers().FirstOrDefault(item => string.Equals(item.UserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                {
+                    SetSyncFailure($"autosync_failed:user_not_found:{user.UserId}", DateTimeOffset.UtcNow);
+                    return;
+                }
+
+                await SyncUsersInternalAsync([row], options, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -163,10 +172,10 @@ public sealed class TeableUserProjectionService
     }
 
     public Task<TeableUserProjectionSyncResult> SyncAllAsync(CancellationToken cancellationToken = default)
-        => SyncUsersInternalAsync(GetStoredUsers().Select(ToHubUser).ToArray(), ResolveOptions(), cancellationToken);
+        => SyncUsersInternalAsync(GetStoredUsers(), ResolveOptions(), cancellationToken);
 
     private async Task<TeableUserProjectionSyncResult> SyncUsersInternalAsync(
-        IReadOnlyList<HubUserDto> users,
+        IReadOnlyList<TeableUserProjectionRow> users,
         TeableOptions options,
         CancellationToken cancellationToken)
     {
@@ -189,7 +198,7 @@ public sealed class TeableUserProjectionService
             TeableDestination destination = await EnsureDestinationAsync(options, cancellationToken);
             int synced = 0;
             List<string> errors = new();
-            foreach (HubUserDto user in users)
+            foreach (TeableUserProjectionRow user in users)
             {
                 try
                 {
@@ -343,7 +352,7 @@ public sealed class TeableUserProjectionService
 
     private async Task UpsertUserRecordAsync(
         TeableDestination destination,
-        HubUserDto user,
+        TeableUserProjectionRow user,
         TeableOptions options,
         CancellationToken cancellationToken)
     {
@@ -420,7 +429,7 @@ public sealed class TeableUserProjectionService
         }
     }
 
-    private static JsonObject BuildFields(HubUserDto user)
+    private static JsonObject BuildFields(TeableUserProjectionRow user)
         => new()
         {
             ["Display Name"] = user.DisplayName,
@@ -433,6 +442,7 @@ public sealed class TeableUserProjectionService
             ["Country Code"] = user.CountryCode,
             ["Linked Principals"] = string.Join('\n', user.LinkedPrincipals ?? Array.Empty<string>()),
             ["Group Ids"] = string.Join('\n', user.GroupIds ?? Array.Empty<string>()),
+            ["Workspace Prep Library Search History"] = user.WorkspacePrepLibrarySearchHistory,
             ["Created At UTC"] = user.CreatedAtUtc.ToString("O"),
             ["Updated At UTC"] = user.UpdatedAtUtc.ToString("O"),
             ["Last Synced At UTC"] = DateTimeOffset.UtcNow.ToString("O"),
@@ -445,7 +455,7 @@ public sealed class TeableUserProjectionService
             return _store.UsersById.Values
                 .OrderBy(static item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
-                .Select(static item => new TeableUserProjectionRow(
+                .Select(item => new TeableUserProjectionRow(
                     UserId: item.UserId,
                     SubjectId: item.SubjectId,
                     Email: Normalize(item.Email) ?? string.Empty,
@@ -457,27 +467,32 @@ public sealed class TeableUserProjectionService
                     LinkedPrincipals: item.LinkedPrincipals,
                     GroupIds: item.GroupIds,
                     CreatedAtUtc: item.CreatedAtUtc,
-                    UpdatedAtUtc: item.UpdatedAtUtc))
+                    UpdatedAtUtc: item.UpdatedAtUtc,
+                    WorkspacePrepLibrarySearchHistory: BuildWorkspacePrepHistory(
+                        _store.UserExperienceByUserId.TryGetValue(item.UserId, out var experience)
+                            ? experience.WorkspacePrepLibrarySearchHistory
+                            : Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())))
                 .ToArray();
         }
     }
 
-    private static HubUserDto ToHubUser(TeableUserProjectionRow row)
-        => new(
-            UserId: row.UserId,
-            SubjectId: row.SubjectId,
-            DisplayName: row.DisplayName,
-            Handle: row.Handle,
-            Visibility: row.Visibility,
-            Timezone: row.Timezone,
-            CountryCode: row.CountryCode,
-            LinkedPrincipals: row.LinkedPrincipals,
-            GroupIds: row.GroupIds,
-            CreatedAtUtc: row.CreatedAtUtc,
-            UpdatedAtUtc: row.UpdatedAtUtc)
+    private static string BuildWorkspacePrepHistory(IReadOnlyList<WorkspacePrepLibrarySearchHistoryItem>? history)
+    {
+        if (history is null || history.Count == 0)
         {
-            Email = row.Email,
-        };
+            return string.Empty;
+        }
+
+        return JsonSerializer.Serialize(
+            history
+                .Select(static item => new
+                {
+                    item.WorkspaceId,
+                    item.Query,
+                    item.LastUsedUtc,
+                })
+                .ToArray());
+    }
 
     private TeableOptions ResolveOptions()
     {
