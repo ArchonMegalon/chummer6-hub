@@ -8925,7 +8925,7 @@ Boundary:
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
-            new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),
+            new("Release checks", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
             new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)

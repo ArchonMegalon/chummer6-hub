@@ -247,7 +247,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("FindLaunchHealthValue(\"Preview\")", view, StringComparison.Ordinal);
-        Assert.Contains("FindLaunchHealthValue(\"Proof recency\")", view, StringComparison.Ordinal);
+        Assert.Contains("FindLaunchHealthValue(\"Release checks\")", view, StringComparison.Ordinal);
         Assert.Contains("FindLaunchHealthValue(\"Support pulse\")", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Current public release</h2>", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Install help stays close</h2>", view, StringComparison.Ordinal);
