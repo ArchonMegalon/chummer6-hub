@@ -224,6 +224,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains(".Replace(\"Promoted installer media\", \"Recommended installer\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"startup-smoke proof\", \"startup verification\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"tuple\", \"build\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"proof freshness\", \"release checks\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"proof recency\", \"release checks\"", view, StringComparison.Ordinal);
     }
 
     [Fact]

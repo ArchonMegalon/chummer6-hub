@@ -99,6 +99,8 @@
             .Replace("edge proof", "release check", StringComparison.OrdinalIgnoreCase)
             .Replace("proof view", "current status view", StringComparison.OrdinalIgnoreCase)
             .Replace("proof page", "current status page", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
             .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
@@ -122,10 +124,28 @@
             .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase);
     }
 
+    static string NormalizeLaunchHealthLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return string.Empty;
+        }
+
+        return label
+            .Trim()
+            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
+    }
+
     string? FindLaunchHealthValue(string label)
-        => Model.LaunchHealthRows?
-            .FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.OrdinalIgnoreCase))
+    {
+        var normalizedLookup = NormalizeLaunchHealthLabel(label);
+        return Model.LaunchHealthRows?
+            .FirstOrDefault(row => string.Equals(NormalizeLaunchHealthLabel(row.Label), normalizedLookup, StringComparison.OrdinalIgnoreCase))
             ?.Value;
+    }
 
     var releasePostureSummary = CustomerStatusText(
         FindLaunchHealthValue("Preview"),
@@ -258,8 +278,9 @@
             <div class="settings-summary-list">
                 @foreach (var row in Model.LaunchHealthRows)
                 {
+                    var rowLabel = NormalizeLaunchHealthLabel(row.Label);
                     <div class="settings-summary-row">
-                        <span>@CustomerStatusText(row.Label, "Current status label")</span>
+                        <span>@CustomerStatusText(rowLabel, "Current status label")</span>
                         <strong>@CustomerStatusText(row.Value, "Current")</strong>
                     </div>
                 }
