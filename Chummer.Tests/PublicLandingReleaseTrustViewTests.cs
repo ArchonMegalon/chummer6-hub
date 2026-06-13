@@ -260,7 +260,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("available on downloads right now", controller, StringComparison.Ordinal);
-        Assert.Contains("start with sign-in so recovery and support stay attached", controller, StringComparison.Ordinal);
+        Assert.Contains("guided install routes for linked recovery and support", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or tested journey is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("tested journeys and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
         Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);

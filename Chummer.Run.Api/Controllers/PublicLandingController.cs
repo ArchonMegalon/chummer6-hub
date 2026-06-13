@@ -9193,10 +9193,10 @@ Boundary:
         {
             <= 0 => "No live install routes are available on downloads right now.",
             1 when accountRequiredCount <= 0 => "1 live install route is available on downloads right now.",
-            1 => "1 live install route is available on downloads right now, and it starts with sign-in so recovery and support stay attached.",
+            1 => "1 guided install route is available on downloads right now for linked recovery and support.",
             _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now.",
-            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now, and all {accountRequiredCount} start with sign-in so recovery and support stay attached.",
-            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} start with sign-in so recovery and support stay attached."
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} guided install routes are available on downloads right now for linked recovery and support.",
+            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} are guided install routes for linked recovery and support."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
