@@ -51,6 +51,12 @@
         => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
 
     var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
+    var recommendedIsWindowsInstaller = release.Recommended is not null
+        && recommendedIsInstaller
+        && MatchesPlatform(release.Recommended.Artifact, "windows");
+    var windowsZipFallback = release.ManualPackages.FirstOrDefault(option =>
+        MatchesPlatform(option.Artifact, "windows")
+        && string.Equals(option.Artifact.Kind ?? string.Empty, "archive", StringComparison.OrdinalIgnoreCase));
 }
 
 <section class="release-stage">
@@ -76,7 +82,9 @@
         </p>
         <p class="muted-copy">
             @(guestGateRequired
-                ? "Start with the recommended install path. This route begins with account handoff so setup continuity, recovery, and support stay attached."
+                ? recommendedIsWindowsInstaller && windowsZipFallback is not null
+                    ? "Start with the guided installer when you want the full setup path. If size matters more, use the smaller Windows ZIP below."
+                    : "Start with the recommended install path when you want the guided setup and linked recovery path."
                 : "Start with the recommended download. Install first, then sign in if you want setup continuity.")
         </p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
@@ -138,7 +146,9 @@ else
                     @(requestedPlatformUnavailable
                         ? release.PlatformShelfNoticeSummary
                         : guestGateRequired
-                            ? "Use the main install path for this platform. This route starts with account handoff so recovery and support stay attached from the first launch."
+                            ? recommendedIsWindowsInstaller && windowsZipFallback is not null
+                                ? "Use the guided installer when you want the managed setup path. If you want the smaller direct payload instead, open the Windows ZIP right below."
+                                : "Use the main install path for this platform when you want the guided setup and linked recovery path."
                             : "Use the main install path for this platform. You can install first and sign in later for continuity.")
                 </p>
                 <div class="recommended-download__meta">
@@ -201,7 +211,14 @@ else
                     else if (guestGateRequired)
                     {
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                        <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
+                        @if (recommendedIsWindowsInstaller && windowsZipFallback is not null)
+                        {
+                            <a class="button-like button-like--secondary" href="@windowsZipFallback.DispatchHref">@windowsZipFallback.ActionLabel</a>
+                        }
+                        else
+                        {
+                            <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
+                        }
                         <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                     else
@@ -303,7 +320,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>Windows size</span>
-                                <strong>The Windows installer is larger because it bundles the self-contained setup app and the desktop payload together. The ZIP is smaller because it is only the portable package.</strong>
+                                <strong>The Windows installer is larger because it bundles the self-contained setup app and the desktop payload together. Need the smaller download instead? Use the Windows ZIP.</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">
