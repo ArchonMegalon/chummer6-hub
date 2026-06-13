@@ -112,9 +112,20 @@ def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_se
     return age_seconds <= max_age_seconds
 
 
+def _release_readiness_reason(value: str) -> str:
+    text = value.strip()
+    replacements = {
+        "Flagship product readiness proof is green.": "Flagship product readiness checks are clear.",
+        "flagship product readiness proof did not publish a desktop-client reason.": (
+            "flagship product readiness checks did not publish a desktop-client reason."
+        ),
+    }
+    return replacements.get(text, text)
+
+
 def _load_flagship_readiness_snapshot() -> dict:
     readiness_path = _flagship_readiness_path()
-    default_reason = "flagship product readiness proof did not publish a desktop-client reason."
+    default_reason = "flagship product readiness checks did not publish a desktop-client reason."
     snapshot = {
         "status": "unknown",
         "scoped_status": "unknown",
@@ -166,11 +177,16 @@ def _load_flagship_readiness_snapshot() -> dict:
         if str(item).strip()
     ]
     completion_audit = readiness_payload.get("completion_audit")
-    reason = (
+    reason = _release_readiness_reason(
         str(readiness_audit.get("reason") or "").strip()
         if isinstance(readiness_audit, dict)
         else ""
     ) or default_reason
+    completion_audit_reason = _release_readiness_reason(
+        str(completion_audit.get("reason") or "").strip()
+        if isinstance(completion_audit, dict)
+        else ""
+    )
 
     return {
         "status": str(readiness_payload.get("status") or "").strip() or "unknown",
@@ -184,11 +200,7 @@ def _load_flagship_readiness_snapshot() -> dict:
             if isinstance(completion_audit, dict)
             else "unknown"
         ),
-        "completion_audit_reason": (
-            str(completion_audit.get("reason") or "").strip()
-            if isinstance(completion_audit, dict)
-            else ""
-        ),
+        "completion_audit_reason": completion_audit_reason,
         "source_path": str(readiness_path),
     }
 
@@ -644,7 +656,7 @@ def main() -> int:
             "completion_action": "verify_closed_package_only",
             "do_not_reopen_reason": "M120 chummer6-hub public trust and launch-health publication package is complete; future shards must verify the launch-health contract, canonical registry row, queue parity, and local+served proof before reopening this package.",
             "wave": "W14",
-            "task": "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces.",
+            "task": "Compile live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health into public status surfaces.",
             "title": "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth.",
             "allowed_paths": [
                 "Chummer.Run.Api",
@@ -668,7 +680,7 @@ def main() -> int:
                 "public_trust_surface:v3",
                 "launch_health:public",
             ],
-            "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces.",
+            "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health into public status surfaces.",
         },
         {
             "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
@@ -1291,7 +1303,7 @@ def main() -> int:
                 "package_id": "next90-m120-hub-public-launch-health",
                 "milestone_id": 120,
                 "frontier_id": 4442751895,
-                "summary": "Public launch health now compiles live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health from mirrored release and weekly governor truth instead of leaving the public status lane to infer them.",
+                "summary": "Public launch health now compiles live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health from mirrored release and weekly release truth instead of leaving the public status lane to infer them.",
                 "routes": [
                     "/status",
                     "/api/public/weekly-pulse",
@@ -1304,10 +1316,10 @@ def main() -> int:
                     "adoption_health:public",
                 ],
                 "evidence": [
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs builds explicit launch-health rows from the public release and governor truth.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs builds explicit launch-health rows from the public release and release truth.",
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs keeps launch-health rows as an explicit status-page projection instead of free-form copy.",
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders Model.LaunchHealthRows on the public status lane.",
-                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs fail-closes the status route if the public launch-health rows stop surfacing the mirrored release and weekly governor truth.",
+                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs fail-closes the status route if the public launch-health rows stop surfacing the mirrored release and weekly release truth.",
                 ],
             },
             {

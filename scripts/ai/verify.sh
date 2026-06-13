@@ -451,13 +451,23 @@ block = proof.get("desktop_client_readiness")
 if not isinstance(block, dict):
     block = {}
 
+def release_readiness_reason(value):
+    text = str(value or "").strip()
+    replacements = {
+        "Flagship product readiness proof is green.": "Flagship product readiness checks are clear.",
+        "flagship product readiness proof did not publish a desktop-client reason.": (
+            "flagship product readiness checks did not publish a desktop-client reason."
+        ),
+    }
+    return replacements.get(text, text)
+
 missing_coverage_keys = block.get("missing_coverage_keys")
 if not isinstance(missing_coverage_keys, list):
     missing_coverage_keys = []
 
-reason = str(block.get("reason") or "").strip() or "flagship product readiness proof did not publish a desktop-client reason."
+reason = release_readiness_reason(block.get("reason")) or "flagship product readiness checks did not publish a desktop-client reason."
 completion_status = str(block.get("completion_audit_status") or "").strip() or "unknown"
-completion_reason = str(block.get("completion_audit_reason") or "").strip()
+completion_reason = release_readiness_reason(block.get("completion_audit_reason"))
 
 payload = {
     "contract_name": "fleet.flagship_product_readiness",

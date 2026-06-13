@@ -21,7 +21,7 @@
   "deferred_warning_keys": [],
   "completion_audit": {
     "status": "pass",
-    "reason": "Flagship product readiness proof is green.",
+    "reason": "Flagship product readiness checks are clear.",
     "external_only": false,
     "unresolved_external_proof_request_count": 0,
     "unresolved_external_proof_request_hosts": [],
@@ -29,7 +29,7 @@
   },
   "flagship_readiness_audit": {
     "status": "pass",
-    "reason": "Flagship product readiness proof is green.",
+    "reason": "Flagship product readiness checks are clear.",
     "coverage_gap_keys": [],
     "scoped_coverage_gap_keys": [],
     "warning_coverage_keys": [],

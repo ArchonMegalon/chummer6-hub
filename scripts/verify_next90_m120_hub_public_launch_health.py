@@ -142,7 +142,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
                 "live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health",
                 "live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health",
             ),
-            "mirrored release and weekly governor truth",
+            ("mirrored release and weekly governor truth", "mirrored release and weekly release truth"),
         ],
         "evidence_markers": [
             "PublicLandingController.cs builds explicit launch-health rows",
