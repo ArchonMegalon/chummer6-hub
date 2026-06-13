@@ -9174,7 +9174,7 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         PublicTrustPulseSnapshot? pulse)
     {
-        string published = $"Published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        string published = $"Released {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
         bool reviewRequired = string.Equals(supportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
             || pulse?.ParityClaimsReviewRequired == true

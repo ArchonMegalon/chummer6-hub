@@ -148,7 +148,7 @@ else
                     }
                     <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
                     <span>@release.Display.BuildLabel</span>
-                    <span>@release.Display.PublishedLabel</span>
+                    <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
                 </div>
                 <div class="recommended-download__trustrail" aria-label="Install continuity facts">
@@ -256,7 +256,7 @@ else
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h2 class="downloads-subheading">Main platform downloads</h2>
-                        <p class="muted-copy">Published installers for each supported platform stay available here, but the main page keeps the first decision focused on one install path.</p>
+                        <p class="muted-copy">Current installers for each supported platform stay available here, but the main page keeps the first decision focused on one install path.</p>
                         <div class="downloads-platform-grid">
                             @foreach (var platform in release.PlatformAvailability)
                             {

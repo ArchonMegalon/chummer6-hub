@@ -551,7 +551,7 @@ public sealed class ReleaseSelectionService
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Sign in to install on Mac"
+                ? "Create account to install on Mac"
                 : "Install on Mac";
         }
 
