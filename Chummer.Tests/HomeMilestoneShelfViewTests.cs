@@ -12,7 +12,7 @@ public sealed class RoadmapMilestoneProjectionViewTests
 
         Assert.Contains("roadmap-signal", source, StringComparison.Ordinal);
         Assert.Contains("roadmap-signal-grid", source, StringComparison.Ordinal);
-        Assert.Contains("Feedback, planning, shipped proof, and private help stay on different pages.", source, StringComparison.Ordinal);
+        Assert.Contains("Feedback, planning, shipped updates, and private help stay on different pages.", source, StringComparison.Ordinal);
         Assert.Contains("Votes inform demand", source, StringComparison.Ordinal);
         Assert.Contains("Open changelog", source, StringComparison.Ordinal);
         Assert.Contains("Model.Milestones", source, StringComparison.Ordinal);

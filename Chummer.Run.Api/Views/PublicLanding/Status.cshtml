@@ -8,6 +8,9 @@
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
+    var verifiedLabel = (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
+        .ToUniversalTime()
+        .ToString("yyyy-MM-dd");
     var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
     var accountReturnSummary = Model.Chrome.Authenticated
@@ -213,7 +216,8 @@ static string CustomerStatusText(string? value, string fallback)
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
-            <span>Published @publishedLabel</span>
+            <span>Released @publishedLabel</span>
+            <span>Last verified @verifiedLabel</span>
             <span>Validation @validationState</span>
         </div>
     </div>

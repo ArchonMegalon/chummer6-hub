@@ -117,15 +117,15 @@ Component families:
 | Route | Primary job | Stop doing | Inherit | Visual density | Mobile simplification | CTA posture | Proof posture |
 |---|---|---|---|---|---|---|---|
 | `/` | Turn proof into belief and explain who Chummer is for | Acting like only a proof shelf | Hero proof float, workflow band, trust band, role-fit grid | High | Collapse into stacked hero, trust, lanes | Primary install/account CTA, secondary `what works today` | One concrete result, trust pulse, role fit |
-| `/what-is-chummer` | Tell the product story | Repeating downloads or roadmap verbatim | Editorial hero, trust pillars, route family links | Medium | Story blocks only | Primary `downloads`, secondary `status` | Proof examples inline, no release shelf duplication |
-| `/downloads` | Get the user onto the right build safely | Letting artifact explainers crowd the install decision | Shared header, trust rail, help adjacency | Medium | Recommended platform first, advanced accordion later | Recommended install first, sign-in secondary only when needed | Shelf-level proof, known issues, current caution |
-| `/now` | Help users decide install now vs wait | Reading like changelog fluff | Workflow cards, release posture, signed-in return rail | Medium-high | Keep 3 core proof cards, collapse supporting proof | Primary `downloads`, secondary `status` | Live, preview, and caution all explicit |
+| `/what-is-chummer` | Tell the product story | Repeating downloads or roadmap verbatim | Editorial hero, trust pillars, route family links | Medium | Story blocks only | Primary `downloads`, secondary `status` | Validation examples inline, no release shelf duplication |
+| `/downloads` | Get the user onto the right build safely | Letting artifact explainers crowd the install decision | Shared header, trust rail, help adjacency | Medium | Recommended platform first, advanced accordion later | Recommended install first, sign-in secondary only when needed | Shelf-level validation, known issues, current caution |
+| `/now` | Help users decide install now vs wait | Reading like changelog fluff | Workflow cards, release posture, signed-in return rail | Medium-high | Keep 3 core validation cards, collapse supporting validation | Primary `downloads`, secondary `status` | Live, preview, and caution all explicit |
 | `/horizons` | Explain what is next and why it matters | Pretending research is almost shipped | Shared trust pulse, horizon cards, readiness labels | Medium-high | Show 1-2 cards per horizon group | Primary `downloads`, secondary detail route | Pain, payoff, and next truthful step |
 | `/roadmap` | Show milestone-backed direction | Redirecting back to a softer summary shelf | Milestone drawer, horizon cards, public loop framing | High | Keep cards collapsed by default | Primary detail routes, secondary `status` | Milestone difficulty, claimed state, dependencies |
-| `/artifacts` | Make the factory tangible | Becoming a junk drawer | Proof gallery, publication rail, route-boundary copy | Medium | Featured artifact stack | Primary artifact details, secondary `downloads` | Evidence-first, not hype-first |
+| `/artifacts` | Make the factory tangible | Becoming a junk drawer | Publication gallery, publication rail, route-boundary copy | Medium | Featured artifact stack | Primary artifact details, secondary `downloads` | Evidence-first, not hype-first |
 | `/participate` | Route signal safely to public or signed-in lanes | Mixing support, contribution, and roadmap authority | Trust claims, route choice cards, public loop stages | Medium | Two primary paths: public and signed-in | Primary public route, secondary signed-in route | ProductLift boundary, first-party fallback honesty |
 | `/help` | Triage install, account, and product help fast | Acting like a legal FAQ | Support decision cards, downloads and contact adjacency | Medium | Three biggest jobs first | Primary support intake, secondary `downloads` | First-party support truth only |
-| `/faq` | Answer normal product questions plainly | Becoming a catch-all support form | Plain-language cards, route links | Low-medium | Accordion or stacked Q/A | CTAs back to help/downloads | Proof via route references, not screenshots |
+| `/faq` | Answer normal product questions plainly | Becoming a catch-all support form | Plain-language cards, route links | Low-medium | Accordion or stacked Q/A | CTAs back to help/downloads | Validation via route references, not screenshots |
 | `/privacy` | Bound trust around data handling | Sounding like generic SaaS boilerplate | Calm legal shell, route adjacency | Low | Short sections | No sales CTA; help context only | Explicit scope and retention boundaries |
 | `/terms` | Bound preview usage expectations | Carrying marketing language | Calm legal shell | Low | Short sections | No sales CTA; help context only | Preview and support boundary only |
 | `/contact` | Start first-party help with the right expectation | Competing with ProductLift | Same support decision language as `/help` | Medium | Single intake path and escalation notes | Primary support intake | Private follow-up boundary explicit |
@@ -288,7 +288,7 @@ Ingress:
 Canonical-boundary rules:
 
 - ProductLift statuses are public approximations
-- internal roadmap truth remains in design canon and proof-backed route state
+- internal roadmap truth remains in design canon and release-backed route state
 - support, installs, accounts, and private cases stay first-party
 
 Rollout order:

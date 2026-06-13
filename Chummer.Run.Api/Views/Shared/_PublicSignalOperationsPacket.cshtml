@@ -9,7 +9,7 @@
         ? $"{Model.CloseoutDispatchSentCount} follow-up record(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
             ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
-            : "Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.";
+            : "Public feedback can still show demand, but account-backed follow-up stays off until shipped updates and first-party closeout receipts are both real on this host.";
     string readinessTag = followThroughReady ? "Posted follow-up examples" : "Preview-only follow-up";
 }
 

@@ -84,10 +84,10 @@ Package routes are intentionally split across public browser, account tracking, 
 `/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are bounded wrapper routes: optional guided branching may appear there, but download truth, release truth, support truth, account truth, and governed invite follow-through remain first-party Hub rails.
 `/docs` is a governed document-portal surface: Chummer owns source documents, access policy, and truth; FlipLink is a candidate viewer layer only after provider verification and publication proof exist.
 `/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
-Discoverable publication pages may still open bounded creator or moderated public-proof follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
+Discoverable publication pages may still open bounded creator or moderated public-validation follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
-`/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped proof do not collapse into one vague route family.
+`/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped updates do not collapse into one vague route family.
 
 ## Route family posture
 

@@ -20,6 +20,9 @@
     var accessPosture = Model.AccessPosture;
     var returningUserLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
     var returningUserHref = Model.Chrome.Authenticated ? "/account/access" : "/auth/google/start?next=%2Fdownloads";
+    var verifiedLabel = (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
+        .ToUniversalTime()
+        .ToString("yyyy-MM-dd");
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -67,10 +70,14 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? "You can continue as a guest and install directly. Sign in if you want setup return, recovery, and support tied to one account."
+                        ? "This install path starts with account handoff so setup return, recovery, and support stay attached from the first launch."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
-        <p class="muted-copy">Start with the recommended download. Install first, then sign in if you want setup continuity.</p>
+        <p class="muted-copy">
+            @(guestGateRequired
+                ? "Start with the recommended install path. This route begins with account handoff so setup continuity, recovery, and support stay attached."
+                : "Start with the recommended download. Install first, then sign in if you want setup continuity.")
+        </p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
@@ -126,7 +133,13 @@ else
                             : $"Recommended for {deviceLabel}")
                 </span>
                 <h2>@(requestedPlatformUnavailable ? $"This browser looks like {deviceLabel}" : release.Recommended.Title)</h2>
-                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : "Use the main install path for this platform. You can install first and sign in later for continuity.")</p>
+                <p>
+                    @(requestedPlatformUnavailable
+                        ? release.PlatformShelfNoticeSummary
+                        : guestGateRequired
+                            ? "Use the main install path for this platform. This route starts with account handoff so recovery and support stay attached from the first launch."
+                            : "Use the main install path for this platform. You can install first and sign in later for continuity.")
+                </p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
                     @if (!requestedPlatformUnavailable)
@@ -136,6 +149,7 @@ else
                     <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
                     <span>@release.Display.BuildLabel</span>
                     <span>@release.Display.PublishedLabel</span>
+                    <span>Last verified @verifiedLabel</span>
                 </div>
                 <div class="recommended-download__trustrail" aria-label="Install continuity facts">
                     <article class="recommended-download__trustfact">
@@ -280,7 +294,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
-                                <strong>Open a starter workspace or preview the bundled <code class="mono-receipt">Soma-Career.chum5</code> example before you build from scratch.</strong>
+                                <strong>Open a starter workspace, or preview the bundled <code class="mono-receipt">Soma-Career.chum5</code> example if you want a quick tour before you build from scratch.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>

@@ -21,7 +21,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/participate/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
         Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
-        Assert.Contains("public signal, projected movement, and shipped proof", doc, StringComparison.Ordinal);
+        Assert.Contains("public signal, projected movement, and shipped updates", doc, StringComparison.Ordinal);
     }
 
     [Fact]

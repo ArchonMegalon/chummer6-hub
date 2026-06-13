@@ -10240,8 +10240,8 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => "Compare this horizon with the current preview proof first, then open the deeper roadmap brief only when you need the longer rationale.",
-            "featured_artifacts" => "Use the proof gallery and current release page together to verify whether this artifact is live today or still preview-only.",
+            "coming_next" => "Compare this horizon with the current preview surface first, then open the deeper roadmap brief only when you need the longer rationale.",
+            "featured_artifacts" => "Use publication discovery and the current release page together to verify whether this artifact is live today or still preview-only.",
             _ => null
         };
     }
@@ -13328,7 +13328,7 @@ echo "Help: ${HELP_URL}"
                 ? "Adjudication is parked until a governed workspace is available for this signed-in account."
                 : null;
 
-        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same proof-backed rail. Table Pulse Aftermath is the separate private return lane.";
+        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same governed rail. Table Pulse Aftermath is the separate private return lane.";
         string[] labels =
         [
             "Table Pulse Live",
