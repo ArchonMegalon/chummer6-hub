@@ -33,6 +33,24 @@ def is_pass(payload: dict[str, Any]) -> bool:
     return str(payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
 
 
+def customer_safe_release_text(value: object) -> str:
+    text = str(value or "").strip()
+    replacements = (
+        ("Current release proof is green", "Current release checks are clear"),
+        ("proof is green", "release checks are clear"),
+        ("startup-smoke proof", "startup verification"),
+        ("startup-smoke", "startup verification"),
+        ("executable-gate proof", "executable verification"),
+        ("executable-gate", "executable"),
+        ("promoted flagship bytes", "promoted release packages"),
+        ("proof", "checks"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+        text = text.replace(old.capitalize(), new.capitalize())
+    return text
+
+
 def gate(name: str, path: Path, payload: dict[str, Any] | None = None, *, accepted_statuses: set[str] | None = None) -> dict[str, Any]:
     loaded = payload if payload is not None else load_json(path)
     status = str(loaded.get("status") or "").strip().lower()
@@ -118,7 +136,7 @@ def build_payload() -> dict[str, Any]:
             "channel": release_channel.get("channel") or release_channel.get("channelId"),
             "rollout_state": release_channel.get("rolloutState"),
             "supportability_state": release_channel.get("supportabilityState"),
-            "known_issue_summary": release_channel.get("knownIssueSummary"),
+            "known_issue_summary": customer_safe_release_text(release_channel.get("knownIssueSummary")),
         },
         "mirrors": {
             "external_required": mirror.get("external_required"),

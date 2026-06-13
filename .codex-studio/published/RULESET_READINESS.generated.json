@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ruleset_readiness",
-  "generated_at_utc": "2026-06-13T10:51:58.230648Z",
+  "generated_at_utc": "2026-06-13T11:28:45.993675Z",
   "fleet_closeout_status": "pass",
   "frontier_receipts": {
     "ui_sr4_sr6_desktop_parity_frontier": "pass",
@@ -31,6 +31,12 @@
   "rulesets": {
     "sr4": {
       "readiness": "full",
+      "readiness_basis": "workflow_parity_receipt",
+      "authority_receipts": [
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+      ],
       "workflow_parity_status": "pass",
       "rule_authority_status": "pass",
       "frontier_status": "pass",
@@ -45,6 +51,8 @@
     },
     "sr5": {
       "readiness": "full",
+      "readiness_basis": "flagship_ui_release_gate",
+      "authority_receipts": [],
       "flagship_ui_status": "pass",
       "ui_orientation": "verified",
       "codec_import_export": "baseline",
@@ -56,6 +64,12 @@
     },
     "sr6": {
       "readiness": "full",
+      "readiness_basis": "workflow_parity_receipt",
+      "authority_receipts": [
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
+        "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+      ],
       "workflow_parity_status": "pass",
       "rule_authority_status": "pass",
       "frontier_status": "pass",

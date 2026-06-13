@@ -1,5 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
+  "generated_at_utc": "2026-06-13T11:30:25Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
@@ -18,22 +19,124 @@
     {
       "route": "/",
       "viewport": "desktop",
-      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/home.png"
+      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/home.png",
+      "screenshotBytes": 2187773,
+      "visualSignals": {
+        "textLength": 4054,
+        "blackLedgerMentions": 5,
+        "commandMapMentions": 0,
+        "globeMentions": 0,
+        "factionMentions": 11,
+        "pressureMentions": 13,
+        "newsreelMentions": 1,
+        "videoMentions": 0,
+        "mediaElementCount": 13,
+        "videoElementCount": 2,
+        "imageElementCount": 6,
+        "svgElementCount": 0,
+        "geoscapePanelCount": 1,
+        "geoscapeControlCount": 1,
+        "geoscapeSignalRailCount": 1,
+        "largestMediaArea": 641601,
+        "viewportArea": 1296000
+      }
     },
     {
       "route": "/ledger/map",
       "viewport": "desktop",
-      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-map.png"
+      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-map.png",
+      "screenshotBytes": 4808704,
+      "visualSignals": {
+        "textLength": 11868,
+        "blackLedgerMentions": 9,
+        "commandMapMentions": 8,
+        "globeMentions": 4,
+        "factionMentions": 26,
+        "pressureMentions": 35,
+        "newsreelMentions": 4,
+        "videoMentions": 6,
+        "mediaElementCount": 19,
+        "videoElementCount": 3,
+        "imageElementCount": 6,
+        "svgElementCount": 0,
+        "geoscapePanelCount": 2,
+        "geoscapeControlCount": 2,
+        "geoscapeSignalRailCount": 2,
+        "largestMediaArea": 662688,
+        "viewportArea": 1296000
+      }
     },
     {
       "route": "/",
       "viewport": "mobile",
-      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/home.png"
+      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/home.png",
+      "screenshotBytes": 1127218,
+      "visualSignals": {
+        "textLength": 3237,
+        "blackLedgerMentions": 5,
+        "commandMapMentions": 0,
+        "globeMentions": 0,
+        "factionMentions": 11,
+        "pressureMentions": 13,
+        "newsreelMentions": 1,
+        "videoMentions": 0,
+        "mediaElementCount": 13,
+        "videoElementCount": 2,
+        "imageElementCount": 6,
+        "svgElementCount": 0,
+        "geoscapePanelCount": 1,
+        "geoscapeControlCount": 1,
+        "geoscapeSignalRailCount": 1,
+        "largestMediaArea": 150400,
+        "viewportArea": 329160
+      }
     },
     {
       "route": "/ledger/map",
       "viewport": "mobile",
-      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-map.png"
+      "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-map.png",
+      "screenshotBytes": 2800871,
+      "visualSignals": {
+        "textLength": 12893,
+        "blackLedgerMentions": 9,
+        "commandMapMentions": 7,
+        "globeMentions": 6,
+        "factionMentions": 26,
+        "pressureMentions": 42,
+        "newsreelMentions": 4,
+        "videoMentions": 6,
+        "mediaElementCount": 19,
+        "videoElementCount": 3,
+        "imageElementCount": 6,
+        "svgElementCount": 0,
+        "geoscapePanelCount": 2,
+        "geoscapeControlCount": 2,
+        "geoscapeSignalRailCount": 2,
+        "largestMediaArea": 189800,
+        "viewportArea": 329160
+      }
     }
-  ]
+  ],
+  "media_quality": {
+    "screenshot_min_bytes": 100000,
+    "routes_checked": [
+      "/",
+      "/ledger/map"
+    ],
+    "viewports_checked": [
+      "desktop",
+      "mobile"
+    ],
+    "large_visual_centerpiece": true,
+    "faction_markers_visible": true,
+    "pressure_signals_visible": true,
+    "newsreel_or_video_surface_visible": true,
+    "geoscape_controls_visible": true
+  },
+  "human_creative_review": {
+    "path": "/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md",
+    "status": "required",
+    "scope": "Large Black Ledger command-map centerpiece, readable faction/pressure signals, newsroom/video presence, desktop and mobile framing."
+  },
+  "failures": []
 }

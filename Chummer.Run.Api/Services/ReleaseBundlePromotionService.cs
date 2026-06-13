@@ -988,7 +988,7 @@ public sealed class ReleaseBundlePromotionService
                 : $"Published {channelId} channel keeps primary-route {tupleId} current for installed build selector {installedBuildSelector}.";
         }
 
-        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup-smoke proof are present.";
+        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup verification are present.";
     }
 
     private static string InstallAwareCorrectnessReason(
@@ -1381,8 +1381,8 @@ public sealed class ReleaseBundlePromotionService
                         promotionReasonCode = "missing_artifact_or_startup_smoke_proof";
                         string promotionSubject = DesktopRoutePromotionSubject(head);
                         promotionReason = routeRole == "primary"
-                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is not promoted until the flagship head has matching artifact bytes and fresh startup-smoke proof for this channel."
-                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is retained for recovery/manual routing on {tupleLabel} but is not promoted until matching artifact bytes and fresh startup-smoke proof are present.";
+                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is not promoted until the flagship head has matching artifact bytes and fresh startup verification for this channel."
+                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is retained for recovery/manual routing on {tupleLabel} but is not promoted until matching artifact bytes and fresh startup verification are present.";
                         installPosture = "proof_capture_required";
                         installPostureReason = $"Do not present {routeTupleLabel} as installable until the missing tuple proof is captured.";
                     }
@@ -1441,7 +1441,7 @@ public sealed class ReleaseBundlePromotionService
                             {
                                 rollbackState = "manual_recovery_required";
                                 rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
-                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup-smoke proof are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
+                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup verification are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
                             }
                         }
                     }
@@ -1462,7 +1462,7 @@ public sealed class ReleaseBundlePromotionService
                             updateEligibilityReason = $"Fallback route {routeTupleLabel} is not update-eligible until promoted.";
                             rollbackState = "fallback_not_promoted";
                             rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
-                            rollbackReason = $"Fallback route {routeTupleLabel} needs artifact and startup-smoke proof before rollback use.";
+                            rollbackReason = $"Fallback route {routeTupleLabel} needs artifact and startup verification before rollback use.";
                         }
                     }
 
@@ -1689,7 +1689,7 @@ public sealed class ReleaseBundlePromotionService
 
         if (!proofPassed)
         {
-            return $"The {NormalizeToken(channel)} release page is visible, but known-issue review should stay front-and-center until proof is refreshed.";
+            return $"The {NormalizeToken(channel)} release page is visible, but known-issue review should stay front-and-center until release checks are refreshed.";
         }
 
         List<string> journeys = proofJourneys?
@@ -1720,12 +1720,12 @@ public sealed class ReleaseBundlePromotionService
         {
             return "No blocking release caveat is mirrored for the current public release. The promoted routes have recent install"
                 + proofNoteClause
-                + ", bounded offline prefetch, and support proof instead of only manifest presence.";
+                + ", bounded offline prefetch, and support checks instead of only manifest presence.";
         }
 
         return "Preview caveats still apply, but the current release has recent install"
             + proofNoteClause
-            + ", bounded offline prefetch, and support proof instead of only manifest presence.";
+            + ", bounded offline prefetch, and support checks instead of only manifest presence.";
     }
 
     private static string DeriveFixAvailabilitySummary(string? status, bool proofPassed, bool desktopCoverageComplete)
@@ -1871,7 +1871,7 @@ public sealed class ReleaseBundlePromotionService
         string routeTupleLabel = string.IsNullOrWhiteSpace(rid) ? $"{head}:{platform}" : $"{head}:{platform}:{rid}";
         if (string.Equals(DesktopRouteRoles[head], "primary", StringComparison.Ordinal))
         {
-            return $"{AppLabels[head]} route {routeTupleLabel} is the flagship desktop route for {tupleLabel} and must carry independent startup-smoke proof before promotion.";
+            return $"{AppLabels[head]} route {routeTupleLabel} is the flagship desktop route for {tupleLabel} and must carry independent startup verification before promotion.";
         }
 
         return $"{AppLabels[head]} route {routeTupleLabel} is retained as an explicit fallback route for {tupleLabel}; it cannot satisfy the primary-route promise.";

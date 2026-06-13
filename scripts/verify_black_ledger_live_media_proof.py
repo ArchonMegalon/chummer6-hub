@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,11 @@ PUBLISHED_ROOT = REPO_ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
 SCREENSHOT_ROOT = PUBLISHED_ROOT / "black-ledger-live-media"
 CAPTURE_ATTEMPTS = 3
+MIN_SCREENSHOT_BYTES = 100_000
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 NODE_SCRIPT = r"""
 const fs = require("fs");
@@ -58,10 +64,41 @@ async function main() {
         if (!matchedNeedle) {
           throw new Error(`Expected one of [${route.needles.join(", ")}] on ${url}`);
         }
+        const visualSignals = await page.evaluate(() => {
+          const text = document.body.innerText || "";
+          const lower = text.toLowerCase();
+          const count = (needle) => lower.split(needle.toLowerCase()).length - 1;
+          const media = Array.from(document.querySelectorAll("video,img,picture,canvas,svg,[data-geoscape-panel],[data-geoscape-controls],[data-geoscape-signal-rail]"));
+          let largestMediaArea = 0;
+          for (const element of media) {
+            const rect = element.getBoundingClientRect();
+            largestMediaArea = Math.max(largestMediaArea, Math.round(rect.width * rect.height));
+          }
+          return {
+            textLength: text.length,
+            blackLedgerMentions: count("Black Ledger"),
+            commandMapMentions: count("command map"),
+            globeMentions: count("globe"),
+            factionMentions: count("faction"),
+            pressureMentions: count("pressure"),
+            newsreelMentions: count("newsreel"),
+            videoMentions: count("video"),
+            mediaElementCount: media.length,
+            videoElementCount: document.querySelectorAll("video").length,
+            imageElementCount: document.querySelectorAll("img,picture").length,
+            svgElementCount: document.querySelectorAll("svg").length,
+            geoscapePanelCount: document.querySelectorAll("[data-geoscape-panel]").length,
+            geoscapeControlCount: document.querySelectorAll("[data-geoscape-controls]").length,
+            geoscapeSignalRailCount: document.querySelectorAll("[data-geoscape-signal-rail]").length,
+            largestMediaArea,
+            viewportArea: window.innerWidth * window.innerHeight,
+          };
+        });
         const screenshotPath = path.join(config.outputRoot, viewport.name, `${route.label}.png`);
         fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
         await page.screenshot({ path: screenshotPath, fullPage: true });
-        entries.push({ route: route.path, viewport: viewport.name, screenshotPath });
+        const screenshotBytes = fs.statSync(screenshotPath).size;
+        entries.push({ route: route.path, viewport: viewport.name, screenshotPath, screenshotBytes, visualSignals });
       }
       await context.close();
     }
@@ -87,6 +124,63 @@ def parse_args() -> argparse.Namespace:
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_entries(entries: list[dict[str, Any]]) -> tuple[list[str], dict[str, Any]]:
+    failures: list[str] = []
+    expected_pairs = {
+        ("/", "desktop"),
+        ("/", "mobile"),
+        ("/ledger/map", "desktop"),
+        ("/ledger/map", "mobile"),
+    }
+    actual_pairs = {(str(entry.get("route")), str(entry.get("viewport"))) for entry in entries}
+    missing_pairs = sorted(expected_pairs - actual_pairs)
+    for route, viewport in missing_pairs:
+        failures.append(f"missing screenshot capture for {route} on {viewport}")
+
+    media_quality: dict[str, Any] = {
+        "screenshot_min_bytes": MIN_SCREENSHOT_BYTES,
+        "routes_checked": sorted({str(entry.get("route")) for entry in entries}),
+        "viewports_checked": sorted({str(entry.get("viewport")) for entry in entries}),
+        "large_visual_centerpiece": False,
+        "faction_markers_visible": False,
+        "pressure_signals_visible": False,
+        "newsreel_or_video_surface_visible": False,
+        "geoscape_controls_visible": False,
+    }
+
+    for entry in entries:
+        route = str(entry.get("route"))
+        viewport = str(entry.get("viewport"))
+        screenshot_path = Path(str(entry.get("screenshotPath") or ""))
+        screenshot_bytes = int(entry.get("screenshotBytes") or 0)
+        if not screenshot_path.is_file():
+            failures.append(f"screenshot missing on disk for {route} on {viewport}: {screenshot_path}")
+        elif screenshot_bytes < MIN_SCREENSHOT_BYTES:
+            failures.append(f"screenshot is too small to prove visual surface for {route} on {viewport}: {screenshot_bytes} bytes")
+
+        signals = entry.get("visualSignals") if isinstance(entry.get("visualSignals"), dict) else {}
+        largest_area = int(signals.get("largestMediaArea") or 0)
+        viewport_area = int(signals.get("viewportArea") or 1)
+        if route == "/ledger/map":
+            media_quality["large_visual_centerpiece"] = media_quality["large_visual_centerpiece"] or largest_area >= int(viewport_area * 0.20)
+            media_quality["faction_markers_visible"] = media_quality["faction_markers_visible"] or int(signals.get("factionMentions") or 0) >= 6
+            media_quality["pressure_signals_visible"] = media_quality["pressure_signals_visible"] or int(signals.get("pressureMentions") or 0) >= 4
+            media_quality["newsreel_or_video_surface_visible"] = media_quality["newsreel_or_video_surface_visible"] or (
+                int(signals.get("newsreelMentions") or 0) > 0 or int(signals.get("videoMentions") or 0) > 0
+            )
+            media_quality["geoscape_controls_visible"] = media_quality["geoscape_controls_visible"] or (
+                int(signals.get("geoscapePanelCount") or 0) > 0
+                and int(signals.get("geoscapeControlCount") or 0) > 0
+                and int(signals.get("geoscapeSignalRailCount") or 0) > 0
+            )
+
+    for key in ("large_visual_centerpiece", "faction_markers_visible", "pressure_signals_visible", "newsreel_or_video_surface_visible", "geoscape_controls_visible"):
+        if not media_quality[key]:
+            failures.append(f"Black Ledger media quality signal failed: {key}")
+
+    return failures, media_quality
 
 
 def main() -> int:
@@ -141,6 +235,7 @@ def main() -> int:
 
         payload = {
             "contract_name": "chummer.black_ledger_live_media_proof",
+            "generated_at_utc": now_iso(),
             "base_url": base_url,
             "status": "pass" if completed and completed.returncode == 0 else "fail",
             "capture_mode": "playwright_screenshot",
@@ -149,9 +244,21 @@ def main() -> int:
             "stderr": completed.stderr.strip() if completed else "",
             "attempts": attempts,
             "screenshots": [],
+            "media_quality": {},
+            "human_creative_review": {
+                "path": "/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md",
+                "status": "required",
+                "scope": "Large Black Ledger command-map centerpiece, readable faction/pressure signals, newsroom/video presence, desktop and mobile framing."
+            },
+            "failures": [],
         }
         if completed and completed.returncode == 0 and result_path.is_file():
             payload["screenshots"] = json.loads(result_path.read_text(encoding="utf-8")).get("entries", [])
+            failures, media_quality = validate_entries(payload["screenshots"])
+            payload["media_quality"] = media_quality
+            payload["failures"] = failures
+            if failures:
+                payload["status"] = "fail"
 
     write_json(OUTPUT_PATH, payload)
     if payload["status"] != "pass":

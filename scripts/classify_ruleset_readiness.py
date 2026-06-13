@@ -87,6 +87,18 @@ def rule_status(rule_authority: dict[str, object], ruleset: str) -> str:
     return "fail"
 
 
+def authority_receipts_for(rule_authority: dict[str, object], ruleset: str) -> list[str]:
+    rulesets = rule_authority.get("rulesets")
+    if not bool(rule_authority.get("approved")) or not isinstance(rulesets, list) or ruleset not in rulesets:
+        return []
+
+    return [
+        str(rule_authority.get("review_receipt") or ""),
+        str(rule_authority.get("approval_receipt") or ""),
+        str(rule_authority.get("completion_receipt") or ""),
+    ]
+
+
 def classify() -> dict[str, object]:
     sr4 = receipt_status(PRESENTATION_PUBLISHED / "SR4_DESKTOP_WORKFLOW_PARITY.generated.json")
     sr6 = receipt_status(PRESENTATION_PUBLISHED / "SR6_DESKTOP_WORKFLOW_PARITY.generated.json")
@@ -102,6 +114,8 @@ def classify() -> dict[str, object]:
     rulesets = {
         "sr4": {
             "readiness": "full" if (sr4 == "pass" or sr4_authority == "pass") and frontier == "pass" else "baseline",
+            "readiness_basis": "workflow_parity_receipt" if sr4 == "pass" else "human_approved_rule_authority_receipts",
+            "authority_receipts": authority_receipts_for(authority, "sr4"),
             "workflow_parity_status": sr4,
             "rule_authority_status": sr4_authority,
             "frontier_status": frontier,
@@ -116,6 +130,8 @@ def classify() -> dict[str, object]:
         },
         "sr5": {
             "readiness": "full" if sr5 == "pass" else "baseline",
+            "readiness_basis": "flagship_ui_release_gate",
+            "authority_receipts": [],
             "flagship_ui_status": sr5,
             "ui_orientation": "verified" if sr5 == "pass" else "missing",
             "codec_import_export": "baseline",
@@ -127,6 +143,8 @@ def classify() -> dict[str, object]:
         },
         "sr6": {
             "readiness": "full" if (sr6 == "pass" or sr6_authority == "pass") and frontier == "pass" else "baseline",
+            "readiness_basis": "workflow_parity_receipt" if sr6 == "pass" else "human_approved_rule_authority_receipts",
+            "authority_receipts": authority_receipts_for(authority, "sr6"),
             "workflow_parity_status": sr6,
             "rule_authority_status": sr6_authority,
             "frontier_status": frontier,

@@ -1736,7 +1736,7 @@ public sealed class PublicReleaseManifestService
                 : $"Published {channelId} channel keeps primary-route {tupleId} current for installed build selector {installedBuildSelector}.";
         }
 
-        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup-smoke proof are present.";
+        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup verification are present.";
     }
 
     private static string InstallAwareCorrectnessReason(

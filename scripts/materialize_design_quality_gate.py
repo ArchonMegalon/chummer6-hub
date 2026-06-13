@@ -22,7 +22,17 @@ DESIGN_REVIEW_REQUIRED_SECTIONS = [
     "## Status and Support",
     "## Desktop",
     "## Black Ledger",
+    "## Human Acceptance",
+    "## Media Acceptance",
     "## Product Modes",
+]
+DESIGN_REVIEW_REQUIRED_CHECKS = [
+    "first impression communicates Chummer in under five seconds",
+    "Black Ledger has a large command-map centerpiece",
+    "public copy is free of proof-dashboard language",
+    "downloads keep account setup optional",
+    "desktop surfaces do not present inert actions as ready",
+    "provider and proof lanes stay out of the primary user journey",
 ]
 
 
@@ -64,6 +74,10 @@ def check_final_product_design_review(path: Path) -> tuple[bool, list[str], list
             break
     else:
         missing_checks.append("review appears to lack checked outcome rows")
+
+    for required_check in DESIGN_REVIEW_REQUIRED_CHECKS:
+        if required_check.lower() not in lower_text:
+            missing_checks.append(f"missing required checked design assertion: {required_check}")
 
     return len(missing_sections) == 0 and len(missing_checks) == 0, missing_sections, missing_checks
 

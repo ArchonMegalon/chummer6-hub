@@ -410,7 +410,7 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
         if not artifact_id and (promotion_state == "proof_required" or install_posture == "proof_capture_required"):
             # Fallback lanes are still route-truth rows, but they do not get
             # artifact identity/install registry rows until artifact bytes and
-            # startup-smoke proof exist for that fallback tuple.
+            # startup verification exists for that fallback tuple.
             continue
 
         if not tuple_id:
@@ -471,8 +471,8 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
                 errors.append(f"release channel must stay review_required when tuple {tuple_id} startup-smoke digest drifts")
             if rollout_state != "coverage_incomplete":
                 errors.append(f"release channel must stay coverage_incomplete when tuple {tuple_id} startup-smoke digest drifts")
-            if "startup-smoke proof" not in message.lower():
-                errors.append(f"release channel message must mention startup-smoke proof when tuple {tuple_id} digest drifts")
+            if "startup verification" not in message.lower():
+                errors.append(f"release channel message must mention startup verification when tuple {tuple_id} digest drifts")
 
 
 def verify_source_markers(errors: list[str]) -> None:
