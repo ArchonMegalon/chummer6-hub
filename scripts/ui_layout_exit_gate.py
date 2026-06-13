@@ -19,6 +19,8 @@ CRITICAL_NO_WRAP_SELECTORS = (
     "hero-brand",
     "launch-hero__title",
     "home-hero__title",
+    "page-title",
+    "editorial-title",
 )
 
 
@@ -98,8 +100,11 @@ def build_payload(
             reason = str(failure.get("reason", ""))
             route = str(failure.get("route", ""))
             viewport = str(failure.get("viewport", ""))
+            overflow = str(failure.get("frameOverflow", ""))
             if any(needle in selector for needle in CRITICAL_NO_WRAP_SELECTORS):
                 failures.append(f"critical selector overflow/wrap: {viewport} {route} {selector}: {reason}")
+            elif overflow.startswith("line-count") and any(needle in selector for needle in CRITICAL_NO_WRAP_SELECTORS):
+                failures.append(f"critical selector forced line-wrap: {viewport} {route} {selector}: {reason}")
 
     checked_pages = frame_summary.get("checked_pages")
     if int(checked_pages if isinstance(checked_pages, int) else 0) == 0:

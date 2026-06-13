@@ -8954,10 +8954,12 @@ Boundary:
         }
 
         return value
+            .Replace("proof\u00a0freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof freshness", "Release checks")
             .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof-freshness", "Release checks")
+            .Replace("proof\u00a0recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof recency", "Release checks")
             .Replace("local edge proof", "current release check", StringComparison.OrdinalIgnoreCase)

@@ -52,14 +52,18 @@
             Proof = new[] { "Short public summary", "Longer machine report", "No page confusion" }
         }
     };
-    var campaignStatusTitle = Model.CampaignOsProof is null
-        ? "Campaign detail stays on the longer report"
-        : $"Campaign proof is currently {Model.CampaignOsProof.Status}";
-    var campaignStatusSummary = Model.CampaignOsProof is null
-        ? "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail."
-        : Model.CampaignOsProof.JourneysPassed.Count == 0
-            ? "The campaign packet is mirrored, but this snapshot does not list named completed journeys yet."
-            : $"Current mirrored journey coverage: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.";
+    var campaignStatusTitle = CustomerStatusText(
+        Model.CampaignOsProof is null
+            ? "Campaign detail stays on the longer report"
+            : $"Campaign proof is currently {Model.CampaignOsProof.Status}",
+        "Campaign detail stays on the longer report");
+    var campaignStatusSummary = CustomerStatusText(
+        Model.CampaignOsProof is null
+            ? "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail."
+            : Model.CampaignOsProof.JourneysPassed.Count == 0
+                ? "The campaign packet is mirrored, but this snapshot does not list named completed journeys yet."
+                : $"Current mirrored journey coverage: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.",
+        "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail.");
 
     string ContextualPreviewHref(string? href)
     {
@@ -93,6 +97,7 @@ static string CustomerStatusText(string? value, string fallback)
 {
     var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
     return text
+            .Replace("proof\u00a0freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
             .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
@@ -142,6 +147,7 @@ static string CustomerStatusText(string? value, string fallback)
 
         var normalized = label
             .Trim()
+            .Replace("proof\u00a0freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
@@ -158,6 +164,7 @@ static string CustomerStatusText(string? value, string fallback)
     static string SanitizeLaunchHealthDisplay(string? value, string fallback)
     {
         return CustomerStatusText(value, fallback)
+            .Replace("proof\u00a0freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof-freshness", "Release checks")
             .Replace("Proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
@@ -175,7 +182,9 @@ static string CustomerStatusText(string? value, string fallback)
     var releasePostureSummary = CustomerStatusText(
         FindLaunchHealthValue("Preview"),
         CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release notes and support path should read like one honest record."));
+    var updatePostureSummary = CustomerStatusText(Model.ReleaseExperience.UpdatePostureSummary, "Updates follow release supportability and launch checks.");
     var cautionSummary = CustomerStatusText(Model.Manifest.KnownIssueSummary, string.Empty);
+    var supportLabel = CustomerStatusText(Model.ReleaseExperience.KnownIssuesLabel, "Support");
     if (string.IsNullOrWhiteSpace(cautionSummary))
     {
         cautionSummary = FindLaunchHealthValue("Blocked") ?? "Known issues and install help stay one short step away.";
@@ -256,17 +265,17 @@ static string CustomerStatusText(string? value, string fallback)
         </div>
         <div class="settings-summary-row">
             <span>Update status</span>
-            <strong>@Model.ReleaseExperience.UpdatePostureSummary</strong>
+            <strong>@updatePostureSummary</strong>
         </div>
         @if (Model.CampaignOsProof is not null)
         {
             <div class="settings-summary-row">
                 <span>Campaign status</span>
-                <strong>@Model.CampaignOsProof.Status</strong>
+                <strong>@campaignStatusTitle</strong>
             </div>
             <div class="settings-summary-row">
                 <span>Journeys covered</span>
-                <strong>@(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored journeys yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed))</strong>
+                <strong>@CustomerStatusText(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored journeys yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed), "No mirrored journeys yet")</strong>
             </div>
         }
     </div>
@@ -283,7 +292,7 @@ static string CustomerStatusText(string? value, string fallback)
         <span class="tag tag--amber">Current caution</span>
         <h2>Install help stays close</h2>
         <p>@cautionSummary</p>
-        <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+        <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@supportLabel</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Campaign proof</span>
@@ -363,7 +372,7 @@ static string CustomerStatusText(string? value, string fallback)
             <h3>Current caution</h3>
             <p>@compactCautionSummary</p>
         </div>
-        <a class="inline-link" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+        <a class="inline-link" href="@Model.ReleaseExperience.KnownIssuesHref">@supportLabel</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
