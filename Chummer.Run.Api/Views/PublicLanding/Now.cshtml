@@ -33,9 +33,10 @@
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-        .ToUniversalTime()
-        .ToString("yyyy-MM-dd");
+    var verifiedLabel = Model.VerifiedAtLabel
+        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
+            .ToUniversalTime()
+            .ToString("yyyy-MM-dd");
 
     string ContextualPreviewHref(string? href)
     {

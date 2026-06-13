@@ -316,11 +316,13 @@ public sealed class PublicLandingController : Controller
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current public release, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
+        var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
         var model = new DownloadsPageViewModel(
             Chrome: chrome,
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
+            VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             SignedInWindowsBuilds: signedInWindowsBuilds,
@@ -3588,9 +3590,11 @@ public sealed class PublicLandingController : Controller
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var pulse = _trustPulse.LoadSnapshot();
+        var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
         var model = new StatusPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),
             Manifest: manifest,
+            VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
             CampaignOsProof: _campaignOsProof.LoadProof(),
             LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),
@@ -8475,11 +8479,52 @@ Boundary:
             Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, currentPath),
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: manifest,
+            VerifiedAtLabel: BuildLiveVerificationLabel(manifest),
             SignalLoop: signalLoop,
             SignalProjection: signalProjection,
             CampaignOsProof: _campaignOsProof.LoadProof(),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private static string BuildLiveVerificationLabel(PublicReleaseManifestDto manifest)
+    {
+        DateTimeOffset fallback = manifest.ProofGeneratedAt ?? manifest.GeneratedAt ?? manifest.PublishedAt;
+        DateTimeOffset effective = fallback;
+
+        foreach (string receiptPath in new[]
+                 {
+                     "/proofs/FINAL_GOLD_JANITOR.generated.json",
+                     "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json",
+                     Path.Combine(AppContext.BaseDirectory, ".codex-studio", "published", "LIVE_PUBLIC_WEB_RECRAWL.generated.json")
+                 })
+        {
+            if (!System.IO.File.Exists(receiptPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(System.IO.File.ReadAllText(receiptPath));
+                foreach (string propertyName in new[] { "generated_at_utc", "generatedAtUtc", "generatedAt" })
+                {
+                    if (document.RootElement.TryGetProperty(propertyName, out JsonElement generatedAtElement)
+                        && generatedAtElement.ValueKind == JsonValueKind.String
+                        && DateTimeOffset.TryParse(generatedAtElement.GetString(), out DateTimeOffset generatedAt))
+                    {
+                        effective = generatedAt;
+                        return effective.ToUniversalTime().ToString("yyyy-MM-dd");
+                    }
+                }
+            }
+            catch
+            {
+                continue;
+            }
+        }
+
+        return effective.ToUniversalTime().ToString("yyyy-MM-dd");
     }
 
     private async Task<KarmaForgeSubmittedPageViewModel> BuildKarmaForgeSubmittedPageModel(

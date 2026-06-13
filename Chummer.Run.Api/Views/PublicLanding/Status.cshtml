@@ -8,9 +8,10 @@
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-        .ToUniversalTime()
-        .ToString("yyyy-MM-dd");
+    var verifiedLabel = Model.VerifiedAtLabel
+        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
+            .ToUniversalTime()
+            .ToString("yyyy-MM-dd");
     var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
     var accountReturnSummary = Model.Chrome.Authenticated

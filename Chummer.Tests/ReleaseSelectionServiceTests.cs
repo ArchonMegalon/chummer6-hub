@@ -374,6 +374,61 @@ platforms:
     }
 
     [Fact]
+    public void BuildOptionDistinguishesWindowsLauncherAndZipFallbackPackages()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260612-121055",
+            Channel: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-12T13:20:46Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-portable",
+                    Platform: "Avalonia Desktop Windows X64 Portable Launcher",
+                    Url: "/downloads/files/chummer-avalonia-win-x64.exe",
+                    Sha256: "portable-launcher",
+                    SizeBytes: 433152,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "portable_exe",
+                    FileName: "chummer-avalonia-win-x64.exe",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-archive",
+                    Platform: "Avalonia Desktop Windows X64 Portable ZIP",
+                    Url: "/downloads/files/chummer-avalonia-win-x64.zip",
+                    Sha256: "portable-zip",
+                    SizeBytes: 49292098,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "archive",
+                    FileName: "chummer-avalonia-win-x64.zip",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        var launcher = service.BuildOption(manifest, manifest.Downloads[0], authenticated: false, recommended: false);
+        var archive = service.BuildOption(manifest, manifest.Downloads[1], authenticated: false, recommended: false);
+
+        Assert.Equal("Portable launcher for Windows", launcher.Title);
+        Assert.Equal("Small launcher for Windows. Use this only when support sends you to the app launcher instead of the full installer or ZIP.", launcher.SupportLine);
+        Assert.Equal("Download Windows launcher", launcher.ActionLabel);
+
+        Assert.Equal("Portable ZIP for Windows", archive.Title);
+        Assert.Equal("Portable ZIP for Windows. Use this when you want the full desktop payload without the installer wrapper.", archive.SupportLine);
+        Assert.Equal("Download Windows ZIP", archive.ActionLabel);
+    }
+
+    [Fact]
     public void BuildExperienceKeepsPublicStableMacDmgVisibleWhenProofIsMirrored()
     {
         var configuration = new ConfigurationBuilder()
@@ -743,7 +798,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Sign in to install on Mac", recommended.ActionLabel);
+        Assert.Equal("Create account to install on Mac", recommended.ActionLabel);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);

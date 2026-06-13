@@ -20,9 +20,10 @@
     var accessPosture = Model.AccessPosture;
     var returningUserLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
     var returningUserHref = Model.Chrome.Authenticated ? "/account/access" : "/auth/google/start?next=%2Fdownloads";
-    var verifiedLabel = (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-        .ToUniversalTime()
-        .ToString("yyyy-MM-dd");
+    var verifiedLabel = Model.VerifiedAtLabel
+        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
+            .ToUniversalTime()
+            .ToString("yyyy-MM-dd");
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)

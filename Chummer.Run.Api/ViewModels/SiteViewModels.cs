@@ -871,7 +871,8 @@ public sealed record NowPageViewModel(
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    string? VerifiedAtLabel = null);
 
 public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -909,6 +910,7 @@ public sealed record DownloadsPageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
+    string? VerifiedAtLabel,
     ReleaseExperienceViewModel ReleaseExperience,
     FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
@@ -1021,6 +1023,7 @@ public sealed record KarmaForgeSubmittedPageViewModel(
 public sealed record StatusPageViewModel(
     SiteChromeViewModel Chrome,
     PublicReleaseManifestDto Manifest,
+    string? VerifiedAtLabel,
     ReleaseExperienceViewModel ReleaseExperience,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,

@@ -490,7 +490,7 @@ public sealed class ReleaseSelectionService
     private static string AlternativeSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"Alternative desktop build for {PlatformLabel(download)}. Use this only when support sends you to a different build on the same platform."
-            : $"Manual package for {PlatformLabel(download)}. Use this only for advanced or support-directed install work.";
+            : AlternativePackageSupport(download);
 
     private static string SupportLine(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
@@ -576,7 +576,7 @@ public sealed class ReleaseSelectionService
     private static string AlternativeActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"Install {HeadLabel(download)}"
-            : $"Download {PlatformLabel(download)} package";
+            : AlternativePackageActionLabel(download);
 
     private static string OptionTitle(PublicReleaseArtifactDto download, bool recommended)
     {
@@ -595,8 +595,32 @@ public sealed class ReleaseSelectionService
             return $"{HeadLabel(download)} for {PlatformLabel(download)}";
         }
 
-        return $"Public package for {PlatformLabel(download)}";
+        return AlternativePackageTitle(download);
     }
+
+    private static string AlternativePackageTitle(PublicReleaseArtifactDto download)
+        => NormalizePackageKind(download.Kind) switch
+        {
+            "portable_exe" => $"Portable launcher for {PlatformLabel(download)}",
+            "archive" => $"Portable ZIP for {PlatformLabel(download)}",
+            _ => $"Public package for {PlatformLabel(download)}"
+        };
+
+    private static string AlternativePackageSupport(PublicReleaseArtifactDto download)
+        => NormalizePackageKind(download.Kind) switch
+        {
+            "portable_exe" => $"Small launcher for {PlatformLabel(download)}. Use this only when support sends you to the app launcher instead of the full installer or ZIP.",
+            "archive" => $"Portable ZIP for {PlatformLabel(download)}. Use this when you want the full desktop payload without the installer wrapper.",
+            _ => $"Manual package for {PlatformLabel(download)}. Use this only for advanced or support-directed install work."
+        };
+
+    private static string AlternativePackageActionLabel(PublicReleaseArtifactDto download)
+        => NormalizePackageKind(download.Kind) switch
+        {
+            "portable_exe" => $"Download {PlatformLabel(download)} launcher",
+            "archive" => $"Download {PlatformLabel(download)} ZIP",
+            _ => $"Download {PlatformLabel(download)} package"
+        };
 
     private static string HeadLabel(PublicReleaseArtifactDto download)
         => download.Head?.ToLowerInvariant() switch
@@ -983,7 +1007,7 @@ public sealed class ReleaseSelectionService
         => PackageKindLabel(platform?.PrimaryPackageKind);
 
     private static string PackageKindLabel(string? packageKind)
-        => (packageKind ?? string.Empty).Trim().ToLowerInvariant() switch
+        => NormalizePackageKind(packageKind) switch
         {
             "deb" => "DEB package",
             "dmg" => "DMG installer",
@@ -995,6 +1019,9 @@ public sealed class ReleaseSelectionService
             "none" => "no public fallback",
             _ => string.IsNullOrWhiteSpace(packageKind) ? "package not specified" : packageKind.Replace('_', ' ')
         };
+
+    private static string NormalizePackageKind(string? packageKind)
+        => (packageKind ?? string.Empty).Trim().ToLowerInvariant();
 
     private static string SupportabilityLabel(DesktopPlatformAcceptancePlatformDocument? platform)
         => (platform?.Supportability ?? string.Empty).Trim().ToLowerInvariant() switch
