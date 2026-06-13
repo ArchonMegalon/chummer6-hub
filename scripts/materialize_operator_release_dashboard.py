@@ -160,8 +160,15 @@ def build_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## Checks"])
     for name, data in sorted(checks.items()):
         if isinstance(data, dict):
-            mark = "PASS" if data.get("pass") else "FAIL"
-            lines.append(f"- {mark} `{name}`: `{data.get('status')}`")
+            release_blocking = bool(data.get("release_blocking", True))
+            if data.get("pass"):
+                mark = "PASS"
+            elif release_blocking:
+                mark = "FAIL"
+            else:
+                mark = "INFO"
+            suffix = "" if release_blocking else " (operator context, not release-blocking)"
+            lines.append(f"- {mark} `{name}`: `{data.get('status')}`{suffix}")
     failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
     if failures:
         lines.extend(["", "## Failures"])

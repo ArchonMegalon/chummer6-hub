@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-13T07:59:23Z",
+  "generated_at_utc": "2026-06-13T10:52:14Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "external_required": false,
   "status": "pass",
@@ -81,7 +81,7 @@
           "content_range": "",
           "content_length": 0,
           "streamed_size": 6852,
-          "streamed_sha256": "8a093214564edebc35cd1b54480f85c288750fef0aa689315b9b61586886036d",
+          "streamed_sha256": "5fe1ebcc442597c438ff39eaa599a78a6bf51fb27f517507db3eaf438c1fa2f7",
           "posture": "account_required_handoff",
           "status": "pass"
         },
@@ -94,7 +94,7 @@
           "content_range": "",
           "content_length": 0,
           "streamed_size": 6846,
-          "streamed_sha256": "df707b5a377566c0a38144bc1a315137c0af8bb5847e7a7d9b7e01d497e61253",
+          "streamed_sha256": "71df6e294067f3e9d98184b9c9583dca37694415d6c109605afe082b22177528",
           "posture": "account_required_handoff",
           "status": "pass"
         },

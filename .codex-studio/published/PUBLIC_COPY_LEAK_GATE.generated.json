@@ -1,15 +1,13 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-13T08:00:34Z",
+  "generated_at_utc": "2026-06-13T10:53:30Z",
   "base_url": "https://chummer.run",
-  "status": "fail",
+  "status": "pass",
   "summary": {
     "route_count": 11,
-    "failed_route_count": 1,
-    "forbidden_pattern_count": 33,
-    "failed_routes": [
-      "/status"
-    ]
+    "failed_route_count": 0,
+    "forbidden_pattern_count": 34,
+    "failed_routes": []
   },
   "forbidden_patterns": [
     "\\bchummer-api\\b",
@@ -39,6 +37,7 @@
     "\\bopen-public artifacts\\b",
     "\\blocal edge proof\\b",
     "\\bproof freshness\\b",
+    "\\bproof-freshness\\b",
     "\\bproof recency\\b",
     "\\bproof is green\\b",
     "\\bcreate an account first\\b",
@@ -67,11 +66,9 @@
       "route": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "success": false,
-      "forbidden_hits": [
-        "\\bproof freshness\\b"
-      ],
-      "detail": "public visible copy contains internal, provider, local-host, or demo wording"
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
     },
     {
       "route": "/faq",

@@ -1,6 +1,6 @@
-# OPERABLE_RELEASE_BLOCKED
+# OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-13T08:00:49Z
+- Generated: 2026-06-13T10:53:45Z
 - Version: `run-20260612-121055`
 - Channel: `public_stable`
 - Published: `2026-06-12T13:20:46Z`
@@ -15,13 +15,10 @@
 ## Checks
 - PASS `design_quality_gate`: `pass`
 - PASS `external_distribution_mirror_proof`: `pass`
-- FAIL `final_gold_janitor`: `fail`
-- PASS `google_oauth_linking_proof`: `pass`
-- FAIL `public_copy_leak_gate`: `fail`
+- PASS `final_gold_janitor`: `pass` (operator context, not release-blocking)
+- PASS `google_oauth_linking_proof`: `pass` (operator context, not release-blocking)
+- PASS `public_copy_leak_gate`: `pass`
 - PASS `release_channel`: `published`
-- FAIL `release_ready`: `fail`
+- PASS `release_ready`: `pass` (operator context, not release-blocking)
 - PASS `ruleset_readiness`: `pass`
 - PASS `ui_frame_integrity`: `pass`
-
-## Failures
-- `public_copy_leak_gate`
