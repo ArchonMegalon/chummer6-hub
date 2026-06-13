@@ -31,7 +31,7 @@ public sealed class FeedbackOperatingLoopViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Participation is easier to trust when the public loop points at live milestones, named horizons, and proof-backed closeout.", view, StringComparison.Ordinal);
+        Assert.Contains("Participation is easier to trust when the public loop points at live milestones, named horizons, and release-backed closeout.", view, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
         Assert.Contains("Participation loop snapshot", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);

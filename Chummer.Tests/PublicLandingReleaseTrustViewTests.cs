@@ -302,7 +302,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void HomeAndProofPagesPreferViewAndNextStepLanguageOverShelfAndFollowThroughLanguage()
+    public void HomeAndArtifactPagesPreferViewAndNextStepLanguageOverShelfAndFollowThroughLanguage()
     {
         string homeViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
         string shelfViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml");
@@ -316,9 +316,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("install return, support, and campaign return", homeView, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", homeView, StringComparison.Ordinal);
 
-        Assert.Contains("Open proof view", shelfView, StringComparison.Ordinal);
+        Assert.Contains("Open detail view", shelfView, StringComparison.Ordinal);
         Assert.Contains("signed-in view", shelfView, StringComparison.Ordinal);
-        Assert.Contains("proof view", shelfView, StringComparison.Ordinal);
+        Assert.Contains("detail view", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", shelfView, StringComparison.Ordinal);
 
         Assert.Contains("Use the signed-in detail view", creatorView, StringComparison.Ordinal);
@@ -934,9 +934,10 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Choose discovery, downloads, signed-in continuity, or help on purpose.", publicationView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Stay in the proof gallery when the job is proof, provenance, or comparison", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Stay in publication discovery when the job is lineage, provenance, or comparison", publicationView, StringComparison.Ordinal);
         Assert.Contains("Leave this page when the next job is installing the product", publicationView, StringComparison.Ordinal);
         Assert.Contains("Use this page to inspect the publication, then move to the page that owns the next job.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Open detail view", publicationView, StringComparison.Ordinal);
     }
 
     [Fact]

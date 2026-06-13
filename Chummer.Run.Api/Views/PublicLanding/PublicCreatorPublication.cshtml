@@ -59,12 +59,12 @@
     {
         new
         {
-            Badge = "Proof discovery",
-            Title = "Stay in the proof gallery when the job is proof, provenance, or comparison",
-            Summary = "This publication detail page belongs to the proof family. Use the gallery and discovery pages when you want to inspect related outputs instead of jumping straight to downloads.",
+            Badge = "Publication discovery",
+            Title = "Stay in publication discovery when the job is lineage, provenance, or comparison",
+            Summary = "This publication detail page belongs to the discovery family. Use the gallery and discovery pages when you want to inspect related outputs instead of jumping straight to downloads.",
             Href = Model.BackHref,
             Label = "Back to publication discovery",
-            Proof = new[] { "Proof first", "Publication lineage", "Comparison nearby" }
+            Proof = new[] { "Details first", "Publication lineage", "Comparison nearby" }
         },
         new
         {
@@ -88,23 +88,23 @@
         {
             Badge = "Signed-in continuity",
             Title = Model.Chrome.Authenticated
-                ? "Signed-in continuity keeps public and private proof returns together"
+                ? "Signed-in continuity keeps public and private returns together"
                 : "Create the account only when you want the signed-in continuity view too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
             Proof = Model.Chrome.Authenticated
-                ? new[] { "Personal and campaign returns", "Creator next steps", "Same proof view" }
-                : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
+                ? new[] { "Personal and campaign returns", "Creator next steps", "Same detail view" }
+                : new[] { "Public first", "Account adds continuity", "No auth wall for discovery" }
         },
         new
         {
-            Badge = "Public proof",
-            Title = "Use the testimonial wrapper when you want moderated public proof instead of support follow-up",
-            Summary = "The testimonial route keeps ratings, media proof, and moderation separate from support cases, install recovery, and publication approval.",
+            Badge = "Public testimonials",
+            Title = "Use the testimonial wrapper when you want moderated public validation instead of support follow-up",
+            Summary = "The testimonial route keeps ratings, media captures, and moderation separate from support cases, install recovery, and publication approval.",
             Href = testimonialConciergeHref,
             Label = "Open testimonial wrapper",
-            Proof = new[] { "Moderated public proof", "Optional media capture", "Support stays separate" }
+            Proof = new[] { "Moderated public validation", "Optional media capture", "Support stays separate" }
         },
         new
         {
@@ -157,11 +157,11 @@
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
-            <p class="muted-copy">Current direct parity proof receipts still keep the public parity claim under review.</p>
+            <p class="muted-copy">Current direct parity receipts still keep the public parity claim under review.</p>
         }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
-            <a class="button-like button-like--ghost" href="/artifacts">Open proof view</a>
+            <a class="button-like button-like--ghost" href="/artifacts">Open detail view</a>
         </div>
     </div>
 </section>
@@ -253,10 +253,10 @@
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
     <h2 class="editorial-title">Use this page to inspect the publication, then move to the page that owns the next job.</h2>
-    <p class="editorial-copy">Stay in the proof gallery for related items, open Downloads when you actually want the build, or leave for Help when the issue becomes private, recovery-bound, or support-owned.</p>
+    <p class="editorial-copy">Stay in publication discovery for related items, open Downloads when you actually want the build, or leave for Help when the issue becomes private, recovery-bound, or support-owned.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to publication discovery</a>
-        <a class="cta-link cta-link--secondary" href="/artifacts">Open proof view</a>
+        <a class="cta-link cta-link--secondary" href="/artifacts">Open detail view</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>
     <p class="muted-copy">Need private help instead? <a class="inline-link" href="/contact#support-intake">Open support intake</a>.</p>
