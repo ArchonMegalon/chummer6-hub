@@ -107,7 +107,8 @@ public sealed class DownloadsCompatibilityControllerTests
         JsonElement downloads = document.RootElement.GetProperty("downloads");
         Assert.Contains(downloads.EnumerateArray(), item =>
             string.Equals(item.GetProperty("id").GetString(), "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(item.GetProperty("platformId").GetString(), "win-x64", StringComparison.OrdinalIgnoreCase));
+            && string.Equals(item.GetProperty("platformId").GetString(), "windows", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.GetProperty("rid").GetString(), "win-x64", StringComparison.OrdinalIgnoreCase));
 
         JsonElement coverage = document.RootElement.GetProperty("desktopTupleCoverage");
         Assert.Contains(coverage.GetProperty("promotedInstallerTuples").EnumerateArray(), item =>

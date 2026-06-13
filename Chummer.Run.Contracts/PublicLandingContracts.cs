@@ -62,10 +62,21 @@ public sealed record PublicReleaseArtifactDto(
     long? SizeBytes = null,
     string? Head = null,
     string? PlatformId = null,
+    string? Rid = null,
     string? Arch = null,
     string? Kind = null,
     string? FileName = null,
-    string? InstallAccessClass = null);
+    string? InstallAccessClass = null,
+    string? PlatformLabel = null,
+    string? Format = null,
+    string? Flavor = null,
+    string? ChannelId = null,
+    string? Channel = null,
+    string? Version = null,
+    string? ReleaseVersion = null,
+    string? CompatibilityState = null,
+    string? CompatibilityReason = null,
+    string? ArtifactId = null);
 
 public sealed record PublicReleaseManifestDto(
     string Version,
@@ -139,6 +150,26 @@ public sealed record PublicReleaseManifestDto(
     [JsonPropertyName("publicTrustMetrics")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? PublicTrustMetrics { get; init; }
+
+    [JsonPropertyName("installAwareArtifactRegistry")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? InstallAwareArtifactRegistry { get; init; }
+
+    [JsonPropertyName("desktopSurfaceRefs")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? DesktopSurfaceRefs { get; init; }
+
+    [JsonPropertyName("artifactIdentityRegistry")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? ArtifactIdentityRegistry { get; init; }
+
+    [JsonPropertyName("artifactPublicationBindings")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? ArtifactPublicationBindings { get; init; }
+
+    [JsonPropertyName("exchangeLineageRegistry")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? ExchangeLineageRegistry { get; init; }
 
     [JsonIgnore]
     public JsonElement? ProofUiLocalizationReleaseGate { get; init; }

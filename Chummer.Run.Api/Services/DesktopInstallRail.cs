@@ -133,11 +133,11 @@ internal static class DesktopInstallRail
     }
 
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)
-        => string.IsNullOrWhiteSpace(artifact.Platform)
+        => string.IsNullOrWhiteSpace(artifact.PlatformLabel ?? artifact.Platform)
             ? artifact.Id
             : string.IsNullOrWhiteSpace(artifact.Head)
-                ? artifact.Platform
-                : $"{artifact.Platform} {artifact.Head}";
+                ? artifact.PlatformLabel ?? artifact.Platform
+                : $"{artifact.PlatformLabel ?? artifact.Platform} {artifact.Head}";
 
     private static string BuildSupportDetail(bool recoveryMode, string? installedBuildReceiptId)
     {

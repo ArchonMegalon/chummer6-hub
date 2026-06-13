@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -139,6 +140,7 @@ public sealed class PublicReleaseManifestService
             }
 
             return RuntimeManifestDropsCanonicalArtifacts(runtimeManifest, canonicalManifest)
+                   || RuntimeManifestDriftsCanonicalRegistryTruth(runtimeManifest, canonicalManifest)
                 ? canonicalManifest
                 : runtimeManifest;
         }
@@ -262,6 +264,35 @@ public sealed class PublicReleaseManifestService
         HashSet<string> runtimeInstallerIds = LoadArtifactIds(runtimeManifest.Downloads, installersOnly: true);
         HashSet<string> canonicalInstallerIds = LoadArtifactIds(canonicalManifest.Downloads, installersOnly: true);
         return !canonicalInstallerIds.IsSubsetOf(runtimeInstallerIds);
+    }
+
+    private static bool RuntimeManifestDriftsCanonicalRegistryTruth(
+        PublicReleaseManifestDto runtimeManifest,
+        PublicReleaseManifestDto canonicalManifest)
+        => JsonElementDrifts(runtimeManifest.DesktopTupleCoverage, canonicalManifest.DesktopTupleCoverage)
+           || JsonElementDrifts(runtimeManifest.RegistryBoundaryCoverage, canonicalManifest.RegistryBoundaryCoverage)
+           || JsonElementDrifts(runtimeManifest.PublicTrustMetrics, canonicalManifest.PublicTrustMetrics)
+           || JsonElementDrifts(runtimeManifest.InstallAwareArtifactRegistry, canonicalManifest.InstallAwareArtifactRegistry)
+           || JsonElementDrifts(runtimeManifest.DesktopSurfaceRefs, canonicalManifest.DesktopSurfaceRefs)
+           || JsonElementDrifts(runtimeManifest.ArtifactIdentityRegistry, canonicalManifest.ArtifactIdentityRegistry)
+           || JsonElementDrifts(runtimeManifest.ArtifactPublicationBindings, canonicalManifest.ArtifactPublicationBindings)
+           || JsonElementDrifts(runtimeManifest.ExchangeLineageRegistry, canonicalManifest.ExchangeLineageRegistry);
+
+    private static bool JsonElementDrifts(JsonElement? runtimeElement, JsonElement? canonicalElement)
+    {
+        if (runtimeElement is not JsonElement runtime)
+        {
+            return canonicalElement is JsonElement;
+        }
+
+        if (canonicalElement is not JsonElement canonical)
+        {
+            return true;
+        }
+
+        return !JsonNode.DeepEquals(
+            JsonNode.Parse(runtime.GetRawText()),
+            JsonNode.Parse(canonical.GetRawText()));
     }
 
     private static HashSet<string> LoadArtifactIds(
@@ -616,11 +647,22 @@ public sealed class PublicReleaseManifestService
                 Sha256: item.Sha256 ?? "",
                 SizeBytes: item.SizeBytes,
                 Head: item.Head,
-                PlatformId: string.IsNullOrWhiteSpace(item.Rid) ? item.Platform : item.Rid,
+                PlatformId: item.Platform ?? InferPlatformFromRid(item.Rid) ?? "unknown",
+                Rid: item.Rid,
                 Arch: item.Arch,
                 Kind: item.Kind,
                 FileName: item.FileName,
-                InstallAccessClass: item.InstallAccessClass))
+                InstallAccessClass: item.InstallAccessClass,
+                PlatformLabel: item.PlatformLabel ?? item.Platform ?? "Preview build",
+                Format: InferArtifactFormat(item.FileName, item.DownloadUrl),
+                Flavor: InferArtifactFlavor(item.Kind, item.FileName, item.DownloadUrl),
+                ChannelId: parsed.ChannelId,
+                Channel: parsed.ChannelId,
+                Version: parsed.Version,
+                ReleaseVersion: parsed.Version,
+                CompatibilityState: item.CompatibilityState,
+                CompatibilityReason: item.CompatibilityReason,
+                ArtifactId: item.ArtifactId ?? item.FileName ?? "artifact"))
             .ToList();
 
         var status = downloads.Count > 0
@@ -668,8 +710,24 @@ public sealed class PublicReleaseManifestService
             RegistryBoundaryCoverage = parsed.RegistryBoundaryCoverage is JsonElement registryBoundaryCoverage
                 ? registryBoundaryCoverage.Clone()
                 : null,
-            PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
-                ? publicTrustMetrics.Clone()
+            PublicTrustMetrics = NormalizePublicTrustMetricsElement(parsed.PublicTrustMetrics)
+                is JsonElement publicTrustMetrics
+                ? publicTrustMetrics
+                : null,
+            InstallAwareArtifactRegistry = parsed.InstallAwareArtifactRegistry is JsonElement installAwareArtifactRegistry
+                ? installAwareArtifactRegistry.Clone()
+                : null,
+            DesktopSurfaceRefs = parsed.DesktopSurfaceRefs is JsonElement desktopSurfaceRefs
+                ? desktopSurfaceRefs.Clone()
+                : null,
+            ArtifactIdentityRegistry = parsed.ArtifactIdentityRegistry is JsonElement artifactIdentityRegistry
+                ? artifactIdentityRegistry.Clone()
+                : null,
+            ArtifactPublicationBindings = parsed.ArtifactPublicationBindings is JsonElement artifactPublicationBindings
+                ? artifactPublicationBindings.Clone()
+                : null,
+            ExchangeLineageRegistry = parsed.ExchangeLineageRegistry is JsonElement exchangeLineageRegistry
+                ? exchangeLineageRegistry.Clone()
                 : null
         };
     }
@@ -716,8 +774,24 @@ public sealed class PublicReleaseManifestService
             RegistryBoundaryCoverage = parsed.RegistryBoundaryCoverage is JsonElement registryBoundaryCoverage
                 ? registryBoundaryCoverage.Clone()
                 : null,
-            PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
-                ? publicTrustMetrics.Clone()
+            PublicTrustMetrics = NormalizePublicTrustMetricsElement(parsed.PublicTrustMetrics)
+                is JsonElement publicTrustMetrics
+                ? publicTrustMetrics
+                : null,
+            InstallAwareArtifactRegistry = parsed.InstallAwareArtifactRegistry is JsonElement installAwareArtifactRegistry
+                ? installAwareArtifactRegistry.Clone()
+                : null,
+            DesktopSurfaceRefs = parsed.DesktopSurfaceRefs is JsonElement desktopSurfaceRefs
+                ? desktopSurfaceRefs.Clone()
+                : null,
+            ArtifactIdentityRegistry = parsed.ArtifactIdentityRegistry is JsonElement artifactIdentityRegistry
+                ? artifactIdentityRegistry.Clone()
+                : null,
+            ArtifactPublicationBindings = parsed.ArtifactPublicationBindings is JsonElement artifactPublicationBindings
+                ? artifactPublicationBindings.Clone()
+                : null,
+            ExchangeLineageRegistry = parsed.ExchangeLineageRegistry is JsonElement exchangeLineageRegistry
+                ? exchangeLineageRegistry.Clone()
                 : null
         };
     }
@@ -1528,6 +1602,11 @@ public sealed class PublicReleaseManifestService
                 continue;
             }
 
+            if (!artifactById.ContainsKey(NormalizeToken(artifactId)))
+            {
+                continue;
+            }
+
             string head = NormalizeToken(GetJsonString(routeRow["head"]));
             string platform = NormalizePlatformToken(GetJsonString(routeRow["platform"]));
             string rid = NormalizeToken(GetJsonString(routeRow["rid"]));
@@ -1623,6 +1702,11 @@ public sealed class PublicReleaseManifestService
         {
             string artifactId = ExpectedInstallerArtifactIdForRoute(routeRow);
             if (string.IsNullOrWhiteSpace(artifactId))
+            {
+                continue;
+            }
+
+            if (!artifactById.ContainsKey(NormalizeToken(artifactId)))
             {
                 continue;
             }
@@ -2041,7 +2125,11 @@ public sealed class PublicReleaseManifestService
 
     private static ManifestArtifactShape BuildArtifactShape(PublicReleaseArtifactDto artifact)
     {
-        string rid = NormalizeRidToken(artifact.PlatformId);
+        string rid = NormalizeRidToken(artifact.Rid);
+        if (string.IsNullOrWhiteSpace(rid))
+        {
+            rid = NormalizeRidToken(artifact.PlatformId);
+        }
         string platform = NormalizePlatformToken(artifact.PlatformId);
         if (string.IsNullOrWhiteSpace(platform))
         {
@@ -2113,6 +2201,14 @@ public sealed class PublicReleaseManifestService
         };
     }
 
+    private static string? InferPlatformFromRid(string? value)
+    {
+        string rid = NormalizeRidToken(value);
+        return RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) mapping)
+            ? mapping.Platform
+            : null;
+    }
+
     private static string InferRid(string platform, string arch)
         => platform switch
         {
@@ -2124,6 +2220,78 @@ public sealed class PublicReleaseManifestService
             "linux" => "linux-x64",
             _ => string.Empty
         };
+
+    private static string? InferArtifactFormat(string? fileName, string? downloadUrl)
+    {
+        string candidate = !string.IsNullOrWhiteSpace(fileName)
+            ? fileName
+            : Path.GetFileName((downloadUrl ?? string.Empty).Split('?', '#')[0]);
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return null;
+        }
+
+        return candidate.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)
+            ? "tar.gz"
+            : Path.GetExtension(candidate).TrimStart('.').ToLowerInvariant();
+    }
+
+    private static string? InferArtifactFlavor(string? kind, string? fileName, string? downloadUrl)
+    {
+        string normalizedKind = NormalizeToken(kind);
+        if (normalizedKind.Length == 0)
+        {
+            string? format = InferArtifactFormat(fileName, downloadUrl);
+            return format is "exe" or "deb" or "dmg" or "pkg" or "msix"
+                ? "installer"
+                : format is "zip" or "tar.gz"
+                    ? "archive"
+                    : null;
+        }
+
+        return normalizedKind switch
+        {
+            "installer" => "installer",
+            "dmg" => "installer",
+            "pkg" => "installer",
+            "msix" => "installer",
+            "archive" => "archive",
+            "portable" => "portable",
+            _ => normalizedKind
+        };
+    }
+
+    private static JsonElement? NormalizePublicTrustMetricsElement(JsonElement? metricsElement)
+    {
+        if (metricsElement is not JsonElement metrics || metrics.ValueKind != JsonValueKind.Object)
+        {
+            return metricsElement;
+        }
+
+        JsonObject? root = JsonNode.Parse(metrics.GetRawText())?.AsObject();
+        if (root is null)
+        {
+            return metricsElement;
+        }
+
+        if (root["proofFreshness"] is JsonObject proofFreshness)
+        {
+            NormalizeTimestampNode(proofFreshness, "releaseProofGeneratedAt");
+        }
+
+        return JsonSerializer.SerializeToElement(root, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    }
+
+    private static void NormalizeTimestampNode(JsonObject container, string key)
+    {
+        string? raw = GetJsonString(container[key]);
+        if (string.IsNullOrWhiteSpace(raw) || !DateTimeOffset.TryParse(raw, out DateTimeOffset timestamp))
+        {
+            return;
+        }
+
+        container[key] = timestamp.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture);
+    }
 
     private static string? GetJsonString(JsonNode? node)
         => node switch
@@ -2169,6 +2337,11 @@ public sealed class PublicReleaseManifestService
         JsonElement? DesktopTupleCoverage,
         JsonElement? RegistryBoundaryCoverage,
         JsonElement? PublicTrustMetrics,
+        JsonElement? InstallAwareArtifactRegistry,
+        JsonElement? DesktopSurfaceRefs,
+        JsonElement? ArtifactIdentityRegistry,
+        JsonElement? ArtifactPublicationBindings,
+        JsonElement? ExchangeLineageRegistry,
         IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
 
     private sealed record RegistryReleaseProof(
@@ -2202,7 +2375,12 @@ public sealed class PublicReleaseManifestService
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
         JsonElement? DesktopTupleCoverage,
         JsonElement? RegistryBoundaryCoverage,
-        JsonElement? PublicTrustMetrics);
+        JsonElement? PublicTrustMetrics,
+        JsonElement? InstallAwareArtifactRegistry,
+        JsonElement? DesktopSurfaceRefs,
+        JsonElement? ArtifactIdentityRegistry,
+        JsonElement? ArtifactPublicationBindings,
+        JsonElement? ExchangeLineageRegistry);
 
     private sealed record CompatibilityReleaseProof(
         string? Status,
@@ -2224,7 +2402,9 @@ public sealed class PublicReleaseManifestService
         string? DownloadUrl,
         string? Sha256,
         long? SizeBytes,
-        string? InstallAccessClass);
+        string? InstallAccessClass,
+        string? CompatibilityState,
+        string? CompatibilityReason);
 
     private sealed record LocalReleaseProof(
         [property: JsonPropertyName("contract_name")] string? ContractName,

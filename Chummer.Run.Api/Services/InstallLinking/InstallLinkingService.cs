@@ -45,7 +45,7 @@ public sealed class InstallLinkingService
             var receipt = new DownloadReceiptDto(
                 ReceiptId: NewId("dlr"),
                 ArtifactId: artifact.Id,
-                ArtifactLabel: artifact.Platform,
+                ArtifactLabel: artifact.PlatformLabel ?? artifact.Platform,
                 FileName: artifact.FileName ?? Path.GetFileName(artifact.Url),
                 DownloadUrl: artifact.Url,
                 Channel: manifest.Channel,
@@ -516,7 +516,7 @@ public sealed class InstallLinkingService
             TicketId: NewId("ict"),
             ClaimCode: NewClaimCode(),
             ArtifactId: artifact.Id,
-            ArtifactLabel: artifact.Platform,
+            ArtifactLabel: artifact.PlatformLabel ?? artifact.Platform,
             Channel: manifest.Channel,
             Version: manifest.Version,
             InstallAccessClass: NormalizeAccessClass(artifact.InstallAccessClass),
