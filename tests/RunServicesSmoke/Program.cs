@@ -5420,7 +5420,7 @@ async Task VerifyPublicLandingProjectionAsync()
         "Revoked",
         "Fixed",
         "Blocked",
-        "Proof freshness",
+        "Proof recency",
         "Support pulse",
         "Adoption health",
     }) == true, "status page should preserve the full public launch-health row order.");

@@ -432,7 +432,7 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
         self.assertEqual("/api/public/weekly-pulse", public_trust_surface["weeklyPulseRoute"])
         self.assertEqual("/api/public/progress-poster.svg", public_trust_surface["progressPosterRoute"])
         self.assertEqual(
-            ["Live", "Preview", "Fallback", "Revoked", "Fixed", "Blocked", "Proof freshness", "Support pulse", "Adoption health"],
+            ["Live", "Preview", "Fallback", "Revoked", "Fixed", "Blocked", "Proof recency", "Support pulse", "Adoption health"],
             public_trust_surface["launchHealthLabels"],
         )
 

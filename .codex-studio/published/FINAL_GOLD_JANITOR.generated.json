@@ -1,20 +1,20 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-12T23:13:37Z",
+  "generated_at_utc": "2026-06-13T04:30:05Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
   "live_backed_required": true,
   "live_recrawl_required": true,
   "recrawl_max_age_hours": 24,
-  "status": "pass",
-  "verdict": "GOLD_READY",
+  "status": "fail",
+  "verdict": "NOT_GOLD",
   "required_gates": {
     "live_public_web_recrawl": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T23:12:02Z",
+      "generated_at_utc": "2026-06-13T04:21:26Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -90,7 +90,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T23:12:02.514324Z",
+      "generated_at_utc": "2026-06-13T04:20:04.911272Z",
       "fresh_within_hours": null,
       "pass": true,
       "assumed_rulesets": []
@@ -147,7 +147,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T23:12:13Z",
+      "generated_at_utc": "2026-06-13T04:21:28Z",
       "fresh_within_hours": null,
       "pass": true,
       "external_required": false,
@@ -161,28 +161,30 @@
     "public_copy_leak_gate": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
-      "status": "pass",
-      "generated_at_utc": "2026-06-12T23:13:22Z",
+      "status": "fail",
+      "generated_at_utc": "2026-06-13T04:29:49Z",
       "fresh_within_hours": null,
-      "pass": true
+      "pass": false
     },
     "design_quality_gate": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T23:13:22Z",
+      "generated_at_utc": "2026-06-13T04:27:07Z",
       "fresh_within_hours": null,
       "pass": true
     },
     "operator_release_dashboard": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
-      "status": "pass",
-      "generated_at_utc": "2026-06-12T23:13:37Z",
+      "status": "fail",
+      "generated_at_utc": "2026-06-13T04:28:04Z",
       "fresh_within_hours": null,
-      "pass": true,
-      "verdict": "OPERABLE_RELEASE_READY",
-      "failures": [],
+      "pass": false,
+      "verdict": "OPERABLE_RELEASE_BLOCKED",
+      "failures": [
+        "public_copy_leak_gate"
+      ],
       "release": {
         "version": "run-20260612-121055",
         "published_at": "2026-06-12T13:20:46Z",
@@ -195,82 +197,26 @@
     "release_ready": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
-      "status": "pass",
-      "generated_at_utc": "2026-06-12T23:13:37Z",
+      "status": "fail",
+      "generated_at_utc": "2026-06-13T04:20:24Z",
       "fresh_within_hours": null,
-      "pass": true,
-      "verdict": "RELEASE_READY",
-      "failures": []
+      "pass": false,
+      "verdict": "NOT_RELEASE_READY",
+      "failures": [
+        "FAIL verify_public_projection",
+        "FAIL verify_public_copy_leak_gate",
+        "FAIL verify_operator_release_dashboard",
+        "verify_public_projection",
+        "verify_public_copy_leak_gate",
+        "verify_operator_release_dashboard"
+      ]
     }
   },
-  "materializers": [
-    {
-      "command": "python3 scripts/verify_live_public_web_recrawl.py --base-url http://127.0.0.1:9002",
-      "returncode": 0,
-      "stdout": "live_public_web_recrawl:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/verify_rules_authority_minimum_coverage.py",
-      "returncode": 0,
-      "stdout": "rule_authority_minimum_coverage:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/classify_ruleset_readiness.py --output /docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
-      "returncode": 0,
-      "stdout": "",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/verify_provider_proof_discoverability.py",
-      "returncode": 0,
-      "stdout": "provider_proof_discoverability:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/verify_black_ledger_live_media_proof.py --base-url http://127.0.0.1:9002",
-      "returncode": 0,
-      "stdout": "black_ledger_live_media_proof:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/verify_table_pulse_scenario_replay.py --base-url http://127.0.0.1:9002",
-      "returncode": 0,
-      "stdout": "table_pulse_scenario_replay:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/materialize_external_distribution_mirror_proof.py --base-url http://127.0.0.1:9002",
-      "returncode": 0,
-      "stdout": "external_distribution_mirror_proof:ok",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/verify_public_copy_leak_gate.py --base-url http://127.0.0.1:9002",
-      "returncode": 0,
-      "stdout": "{\"contract_name\": \"chummer.public_copy_leak_gate\", \"generated_at_utc\": \"2026-06-12T23:12:14Z\", \"base_url\": \"http://127.0.0.1:9002\", \"status\": \"pass\", \"summary\": {\"route_count\": 11, \"failed_route_count\": 0, \"forbidden_pattern_count\": 32, \"failed_routes\": []}, \"forbidden_patterns\": [\"\\\\bchummer-api\\\\b\", \"\\\\bchummer6-hub\\\\b\", \"\\\\bchummer6-ui\\\\b\", \"\\\\bchummer-presentation\\\\b\", \"\\\\bchummer-core-engine\\\\b\", \"\\\\bhost\\\\.docker\\\\.internal\\\\b\", \"\\\\blocalhost\\\\b\", \"\\\\b127\\\\.0\\\\.0\\\\.1\\\\b\", \"/docker/chummercomplete\", \"/var/lib/\", \"/home/[A-Za-z0-9_.-]+/\", \"\\\\bFleet-written\\\\b\", \"\\\\bProductLift\\\\b\", \"\\\\bICanpreneur\\\\b\", \"\\\\bIcanpreneur\\\\b\", \"\\\\bEmailit\\\\b\", \"\\\\bClickRank\\\\b\", \"\\\\bDocumentation\\\\.AI\\\\b\", \"\\\\bBrowserAct\\\\b\", \"\\\\bTeable\\\\b\", \"\\\\bSignitic\\\\b\", \"\\\\bMagicFit\\\\b\", \"\\\\bgovernor truth\\\\b\", \"\\\\bjourney proofs\\\\b\", \"\\\\bopen-public artifacts\\\\b\", \"\\\\blocal edge proof\\\\b\", \"\\\\bproof freshness\\\\b\", \"\\\\bproof is green\\\\b\", \"\\\\bcreate an account first\\\\b\", \"\\\\bsign in first only\\\\b\", \"\\\\bLoad Demo Runner\\\\b\", \"\\\\bOpen Demo\\\\b\"], \"routes\": [{\"route\": \"/\", \"url\": \"http://127.0.0.1:9002/\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/downloads\", \"url\": \"http://127.0.0.1:9002/downloads\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/status\", \"url\": \"http://127.0.0.1:9002/status\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/faq\", \"url\": \"http://127.0.0.1:9002/faq\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger\", \"url\": \"http://127.0.0.1:9002/ledger\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger/map\", \"url\": \"http://127.0.0.1:9002/ledger/map\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/packages\", \"url\": \"http://127.0.0.1:9002/packages\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/participate\", \"url\": \"http://127.0.0.1:9002/participate\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/feedback\", \"url\": \"http://127.0.0.1:9002/feedback\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/what-is-chummer\", \"url\": \"http://127.0.0.1:9002/what-is-chummer\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/login?next=%2Faccount%2Faccess\", \"url\": \"http://127.0.0.1:9002/login?next=%2Faccount%2Faccess\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}]}",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/materialize_design_quality_gate.py",
-      "returncode": 0,
-      "stdout": "design_quality_gate:pass",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/materialize_operator_release_dashboard.py",
-      "returncode": 0,
-      "stdout": "operator_release_dashboard:pass",
-      "stderr": ""
-    },
-    {
-      "command": "python3 scripts/materialize_release_ready_receipt.py",
-      "returncode": 0,
-      "stdout": "release_ready_receipt:pass",
-      "stderr": ""
-    }
-  ],
+  "materializers": [],
   "caveats": [],
-  "failures": []
+  "failures": [
+    "public_copy_leak_gate failed",
+    "operator_release_dashboard failed",
+    "release_ready failed"
+  ]
 }

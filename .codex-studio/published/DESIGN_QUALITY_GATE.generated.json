@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-12T23:13:22Z",
+  "generated_at_utc": "2026-06-13T04:27:07Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -8,7 +8,7 @@
     "ui_frame_integrity": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
       "status": "pass",
-      "base_url": "http://127.0.0.1:9002",
+      "base_url": "http://127.0.0.1:8091",
       "checked_pages": 66,
       "failure_count": 0,
       "pass": true

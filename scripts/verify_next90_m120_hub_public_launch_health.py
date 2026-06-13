@@ -14,7 +14,7 @@ WORK_TASK_ID = "120.1"
 FRONTIER_ID = 4442751895
 MILESTONE_ID = 120
 PACKAGE_TITLE = "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth."
-PACKAGE_TASK = "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces."
+PACKAGE_TASK = "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces."
 PACKAGE_REPO = "chummer6-hub"
 PACKAGE_WAVE = "W14"
 PACKAGE_STATUS = "complete"
@@ -85,7 +85,7 @@ LOCAL_RELEASE_PROOF_SURFACE = {
         "Revoked",
         "Fixed",
         "Blocked",
-        "Proof freshness",
+        "Proof recency",
         "Support pulse",
         "Adoption health",
     ],
@@ -136,7 +136,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
             "adoption_health:public",
         ],
         "summary_markers": [
-            "live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health",
+            "live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health",
             "mirrored release and weekly governor truth",
         ],
         "evidence_markers": [
@@ -157,7 +157,7 @@ SOURCE_MARKERS = {
         'new("Revoked", BuildRevokedLaunchSummary(manifest)),',
         'new("Fixed", BuildFixedLaunchSummary(manifest)),',
         'new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),',
-        'new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),',
+        'new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),',
         'new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),',
         'new("Adoption health", pulse is null',
         "private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(",

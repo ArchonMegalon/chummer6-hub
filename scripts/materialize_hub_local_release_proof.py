@@ -644,7 +644,7 @@ def main() -> int:
             "completion_action": "verify_closed_package_only",
             "do_not_reopen_reason": "M120 chummer6-hub public trust and launch-health publication package is complete; future shards must verify the launch-health contract, canonical registry row, queue parity, and local+served proof before reopening this package.",
             "wave": "W14",
-            "task": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces.",
+            "task": "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces.",
             "title": "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth.",
             "allowed_paths": [
                 "Chummer.Run.Api",
@@ -668,7 +668,7 @@ def main() -> int:
                 "public_trust_surface:v3",
                 "launch_health:public",
             ],
-            "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces.",
+            "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces.",
         },
         {
             "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
@@ -734,7 +734,7 @@ def main() -> int:
                 "Revoked",
                 "Fixed",
                 "Blocked",
-                "Proof freshness",
+                "Proof recency",
                 "Support pulse",
                 "Adoption health",
             ],
@@ -1291,7 +1291,7 @@ def main() -> int:
                 "package_id": "next90-m120-hub-public-launch-health",
                 "milestone_id": 120,
                 "frontier_id": 4442751895,
-                "summary": "Public launch health now compiles live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health from mirrored release and weekly governor truth instead of leaving the public status lane to infer them.",
+                "summary": "Public launch health now compiles live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health from mirrored release and weekly governor truth instead of leaving the public status lane to infer them.",
                 "routes": [
                     "/status",
                     "/api/public/weekly-pulse",
