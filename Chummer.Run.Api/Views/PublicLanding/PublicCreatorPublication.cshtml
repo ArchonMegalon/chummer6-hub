@@ -49,10 +49,10 @@
         ?? Model.BoundedFailureReason
         ?? "No visible receipt is attached to this outward-facing publication yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-view" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity view" : "Create account for signed-in continuity";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in account return view" : "Create account for signed-in account return";
     var signedInShelfSummary = Model.Chrome.Authenticated
         ? "Use the signed-in detail view when you want personal, campaign, creator, and public returns to stay in one calmer place."
-        : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator next steps in one place.";
+        : "Public discovery works without an account. Sign in only when you want private account return, campaign return, and creator next steps in one place.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
@@ -86,16 +86,16 @@
         },
         new
         {
-            Badge = "Signed-in continuity",
+            Badge = "Signed-in account return",
             Title = Model.Chrome.Authenticated
-                ? "Signed-in continuity keeps public and private returns together"
-                : "Create the account only when you want the signed-in continuity view too",
+                ? "Signed-in account return keeps public and private returns together"
+                : "Create the account only when you want the signed-in account-return view too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
             Proof = Model.Chrome.Authenticated
                 ? new[] { "Personal and campaign returns", "Creator next steps", "Same detail view" }
-                : new[] { "Public first", "Account adds continuity", "No auth wall for discovery" }
+                : new[] { "Public first", "Account adds return paths", "No auth wall for discovery" }
         },
         new
         {
@@ -121,7 +121,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Choose discovery, downloads, signed-in continuity, or help on purpose.</h2>
+        <h2 class="editorial-title">Choose discovery, downloads, signed-in account return, or help on purpose.</h2>
         <p class="editorial-copy">A publication detail page should make trust and provenance tangible. It should not pretend to be the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">

@@ -30,7 +30,7 @@
                 ? "#preview-artifacts"
                 : "#artifact-route-map";
     var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in continuity view" : "Create account for signed-in continuity";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in account return view" : "Create account for signed-in account return";
     var routeChoices = new[]
     {
         new
@@ -53,18 +53,18 @@
         },
         new
         {
-            Badge = "Signed-in continuity",
+            Badge = "Signed-in account return",
             Title = Model.Chrome.Authenticated
                 ? "Personal, campaign, creator, and public returns stay in one signed-in view"
-                : "Sign in when you want the private continuity view as well as public detail pages",
+                : "Sign in when you want the private account-return view as well as public detail pages",
             Summary = Model.Chrome.Authenticated
                 ? "The signed-in view is the return rail for Table Pulse Aftermath: aftermath, replay, publication, Signal Deck continuity, and campaign next steps stay visible without splitting into separate stories."
-                : "Public detail pages work without an account. Sign in only when you want private continuity, linked returns, and campaign or creator-owned next steps.",
+                : "Public detail pages work without an account. Sign in only when you want private account return, linked returns, and campaign or creator-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Proof = Model.Chrome.Authenticated
                 ? new[] { "Table Pulse Aftermath return rail", "Creator next steps", "Same return view" }
-                : new[] { "Public first", "Account adds continuity", "No auth wall for detail pages" }
+                : new[] { "Public first", "Account adds return paths", "No auth wall for detail pages" }
         },
         new
         {
@@ -195,7 +195,7 @@
 <section class="editorial-block" id="artifact-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick details, downloads, signed-in continuity, or help without mixing their jobs.</h2>
+        <h2 class="editorial-title">Pick details, downloads, signed-in account return, or help without mixing their jobs.</h2>
         <p class="editorial-copy">The detail view should make outputs and provenance tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
@@ -290,7 +290,7 @@
 {
     <section class="continuity-band" id="signed-in-proof-view">
         <div class="continuity-band__copy">
-            <p class="eyebrow">Signed-in continuity view</p>
+            <p class="eyebrow">Signed-in account return view</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
             <div class="stacked-actions">
@@ -320,7 +320,7 @@
             <article class="continuity-band__fact">
                 <span>Boundary</span>
                 <strong>@(publicationRouteReviewRequired ? "Public parity still reviewed" : "Public parity ready now")</strong>
-                <p>Signed-in continuity can stay productive even while the public publication page is still review-required.</p>
+                <p>Signed-in account return can stay productive even while the public publication page is still review-required.</p>
             </article>
         </div>
     </section>

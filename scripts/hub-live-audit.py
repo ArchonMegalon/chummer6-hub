@@ -11981,7 +11981,7 @@ def main() -> int:
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Windows, macOS, and Linux still use a guided install handoff",
+                "Public downloads are available now on Windows and Linux.",
                 "Main platform downloads",
                 "Windows",
                 "Linux",
@@ -12023,7 +12023,7 @@ def main() -> int:
         AuditRoute(
             "/horizons",
             "What Chummer is building toward",
-            required_texts=("Preparing next", "Research track", "Compare with live proof"),
+            required_texts=("Preparing next", "Research track", "Compare with current release status"),
             forbidden_texts=("Research tracks",),
             expects_header_count=1),
         AuditRoute(
@@ -12145,7 +12145,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Live proof", "Proof freshness", "Adoption health"):
+    for snippet in ("Quick release checks", "Current local release checks passed.", "Campaign checks"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

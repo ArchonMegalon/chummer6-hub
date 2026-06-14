@@ -13,8 +13,8 @@ public sealed class ArtifactsFlagshipViewTests
         Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-artifacts\";", view, StringComparison.Ordinal);
         Assert.Contains("Current usable detail surfaces", view, StringComparison.Ordinal);
         Assert.Contains("Open downloads", view, StringComparison.Ordinal);
-        Assert.Contains("Pick details, downloads, signed-in continuity, or help without mixing their jobs.", view, StringComparison.Ordinal);
-        Assert.Contains("Signed-in continuity view", view, StringComparison.Ordinal);
+        Assert.Contains("Pick details, downloads, signed-in account return, or help without mixing their jobs.", view, StringComparison.Ordinal);
+        Assert.Contains("Signed-in account return view", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public sealed class ArtifactsFlagshipViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("Public publication detail", view, StringComparison.Ordinal);
-        Assert.Contains("Signed-in continuity view", view, StringComparison.Ordinal);
+        Assert.Contains("Signed-in account return view", view, StringComparison.Ordinal);
         Assert.Contains("Current usable detail surfaces", view, StringComparison.Ordinal);
         Assert.Contains("Opening next in the detail view", view, StringComparison.Ordinal);
         Assert.Contains("artifact-gallery__grid", view, StringComparison.Ordinal);

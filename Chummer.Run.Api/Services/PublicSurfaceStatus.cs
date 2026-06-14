@@ -52,7 +52,7 @@ public static class PublicSurfaceStatus
     {
         if (string.IsNullOrWhiteSpace(audience))
         {
-            return "Anyone evaluating the preview";
+            return "Anyone evaluating Chummer";
         }
 
         var rawParts = audience
@@ -60,7 +60,7 @@ public static class PublicSurfaceStatus
 
         if (rawParts.Length == 0)
         {
-            return "Anyone evaluating the preview";
+            return "Anyone evaluating Chummer";
         }
 
         var labels = rawParts
@@ -68,8 +68,8 @@ public static class PublicSurfaceStatus
             .Where(static part => !string.IsNullOrWhiteSpace(part))
             .Select(static part => part.ToLowerInvariant() switch
             {
-                "public" => "Anyone evaluating the preview",
-                "signed_in" or "signed-in" or "registered" or "account" => "Signed-in preview users",
+                "public" => "Anyone evaluating Chummer",
+                "signed_in" or "signed-in" or "registered" or "account" => "Signed-in users",
                 "gm" or "game_master" or "game-master" => "Game masters",
                 "player" => "Players",
                 "creator" => "Creators",
@@ -80,7 +80,7 @@ public static class PublicSurfaceStatus
             .ToArray();
 
         return labels.Length == 0
-            ? "Anyone evaluating the preview"
+            ? "Anyone evaluating Chummer"
             : string.Join(", ", labels);
     }
 }

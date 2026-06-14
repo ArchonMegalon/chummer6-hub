@@ -946,7 +946,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string publicationViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml");
         string publicationView = File.ReadAllText(publicationViewPath);
 
-        Assert.Contains("Choose discovery, downloads, signed-in continuity, or help on purpose.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Choose discovery, downloads, signed-in account return, or help on purpose.", publicationView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", publicationView, StringComparison.Ordinal);
         Assert.Contains("Stay in publication discovery when the job is lineage, provenance, or comparison", publicationView, StringComparison.Ordinal);
         Assert.Contains("Leave this page when the next job is installing the product", publicationView, StringComparison.Ordinal);
