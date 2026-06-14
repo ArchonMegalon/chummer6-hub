@@ -142,7 +142,7 @@ public sealed class RegistryTruthBindingService
             : $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
         string summary = installation is not null
             ? $"Account-aware guidance keeps claimed install {installation.Platform ?? "desktop"} {installation.Version} on registry-backed release truth without changing the published bytes."
-            : $"Receipt {receipt!.ReceiptId} keeps the public download path open while linked install continuity stays attached to first-party install truth.";
+            : $"Receipt {receipt!.ReceiptId} keeps the public download path open while account-linked return stays attached to first-party install truth.";
 
         return new RegistryTruthBindingProjection(
             BindingId: StableId("registry-truth-account-aware", sourceId),
@@ -166,8 +166,8 @@ public sealed class RegistryTruthBindingService
             ],
             Actions:
             [
-                new RegistryTruthBindingActionProjection("open_account_access", "Open Devices & access", "/account/access", "Review the signed-in install continuity rail."),
-                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install route", comparisonRoute, "Compare linked install continuity with the same published installer route."),
+                new RegistryTruthBindingActionProjection("open_account_access", "Open Devices & access", "/account/access", "Review the signed-in account-return rail."),
+                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install route", comparisonRoute, "Compare account-linked return with the same published installer route."),
                 new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", "/downloads", "Return to the public downloads page that still points at the same bytes.")
             ],
             EmittedAtUtc: now,

@@ -52,7 +52,7 @@
     if (installAction is not null)
     {
         responseRoutes.Add((
-            Badge: "Install continuity",
+            Badge: "Account return",
             Title: Model.TrackedCaseSummary?.NeedsLinkedInstall == true || Model.TrackedCaseSummary?.NeedsInstallUpdate == true
                 ? "Return to the same install page for relink, update, or reclaim"
                 : "Return to the same install page after support",
@@ -86,7 +86,7 @@
                 : "Guest support replies should come back through the email path attached to the case, so keep that inbox visible until the next tracked update lands."));
         if (installAction is not null)
         {
-            helperFacts.Add(("Install continuity", "If the report started from an install or recovery page, return to that same guided copy after support tells you the next safe move."));
+            helperFacts.Add(("Account return", "If the report started from an install or recovery page, return to that same guided copy after support tells you the next safe move."));
         }
     }
 }
@@ -157,7 +157,7 @@
         <h2 class="editorial-title">Keep the case moving on the same support path.</h2>
         <p class="editorial-copy">
             @(Model.TrackedCaseSummary is null
-                ? "This pack keeps the case id, reply path, and install continuity visible until the next tracked update lands."
+                ? "This pack keeps the case id, reply path, and account return visible until the next tracked update lands."
                 : "This pack keeps the current case state, install readiness, release progress, and follow-up status visible without forcing you back into guesswork.")
         </p>
     </div>

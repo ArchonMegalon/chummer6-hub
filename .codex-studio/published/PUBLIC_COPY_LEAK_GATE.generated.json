@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-14T11:41:33Z",
+  "generated_at_utc": "2026-06-14T12:32:53Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "summary": {
     "route_count": 15,
     "failed_route_count": 0,
-    "forbidden_pattern_count": 44,
+    "forbidden_pattern_count": 46,
     "failed_routes": []
   },
   "forbidden_patterns": [
@@ -53,7 +53,9 @@
     "\\bProof gallery\\b",
     "\\bproof gallery\\b",
     "\\bpreview-only on this host\\b",
-    "\\bJourney refs\\b"
+    "\\bJourney refs\\b",
+    "\\binstall continuity\\b",
+    "\\bGold-ready on Public release\\b"
   ],
   "routes": [
     {

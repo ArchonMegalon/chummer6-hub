@@ -262,7 +262,7 @@ public sealed class HostedProofContractService
             Actions:
             [
                 new HostedProofContractActionProjection("open_shadowcasters_route", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Review the public horizon brief before stepping into account-aware follow-through."),
-                new HostedProofContractActionProjection("open_account_access", "Open Devices & access", "/account/access", "Inspect the signed-in install continuity and recovery path."),
+                new HostedProofContractActionProjection("open_account_access", "Open Devices & access", "/account/access", "Inspect the signed-in account-return and recovery path."),
                 new HostedProofContractActionProjection("open_download_dispatch", "Open downloads", "/downloads", "Compare the same published bytes against the open public release shelf.")
             ],
             EmittedAtUtc: now,

@@ -89,7 +89,7 @@
             : Model.SupportIntake.InstallRailSummary!;
         string installTitle = Model.SupportIntake.RecoveryModeOnly
             ? "Install recovery stays on the same device page"
-            : "Install continuity stays attached to the affected copy";
+            : "Account return stays attached to the affected copy";
         string installRouteLabel = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
             ? Model.SupportIntake.InstallAccessLabel
             : Model.SupportIntake.InstallRailLabel!;
@@ -119,7 +119,7 @@
             Proof: new[] { "Guest allowed", "History in Account", "No GitHub required" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
-            Badge: "Install continuity",
+            Badge: "Account return",
             Title: installTitle,
             Summary: installSummary,
             Href: installHref,

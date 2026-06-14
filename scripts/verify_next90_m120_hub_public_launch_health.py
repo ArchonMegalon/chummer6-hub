@@ -182,7 +182,7 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Public launch health",
         "Quick release checks",
-        "These rows keep release availability, fallback posture, verification freshness, support history, and adoption evidence in one short summary.",
+        "These rows keep release availability, fallback posture, verification freshness, support history, and usage history in one short summary.",
         "@if (Model.LaunchHealthRows is { Count: > 0 })",
         "@foreach (var row in Model.LaunchHealthRows)",
         "/api/public/progress-poster.svg",

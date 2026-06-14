@@ -596,10 +596,10 @@ public sealed class SignedInTrustStatusService
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "The public download is visible now, and signing in adds linked-install continuity once you want the install attached to your account.";
+            return "The public download is visible now, and signing in adds account return and device-specific support once you want the install attached to your account.";
         }
 
-        return "Linked-install continuity is available now when you sign in.";
+        return "Account-linked return is available now when you sign in.";
     }
 
     private static string BuildTrustPulseAdoptionSummary(PublicTrustPulseSnapshot pulse)

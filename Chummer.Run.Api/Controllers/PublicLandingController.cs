@@ -9193,10 +9193,10 @@ Boundary:
         {
             <= 0 => "No live install routes are available on downloads right now.",
             1 when accountRequiredCount <= 0 => "1 live install route is available on downloads right now.",
-            1 => "1 guided install route is available on downloads right now for linked recovery and support.",
+            1 => "1 account-assisted install path is available on downloads right now with linked support.",
             _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now.",
-            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} guided install routes are available on downloads right now for linked recovery and support.",
-            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} are guided install routes for linked recovery and support."
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} account-assisted install paths are available on downloads right now with linked support.",
+            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} are account-assisted install paths with linked support."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
@@ -9883,7 +9883,7 @@ Boundary:
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current local release checks passed."
+                ? "Current release checks passed."
                 : $"Current local release checks are {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
@@ -9903,17 +9903,17 @@ Boundary:
         if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)
         {
             segments.Add(historySnapshotCount < 6
-                ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
-                : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture.");
+                ? $"{historySnapshotCount} weekly snapshots are measured so far, so usage history is still early."
+                : $"{historySnapshotCount} weekly snapshots are on record for the current public release picture.");
         }
 
         if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
         {
-            segments.Add($"Flagship desktop proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
+            segments.Add($"Flagship desktop readiness still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
         }
 
         return segments.Count == 0
-            ? "Measured adoption evidence is still accumulating."
+            ? "Measured usage history is still accumulating."
             : string.Join(" ", segments);
     }
 

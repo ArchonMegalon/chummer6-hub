@@ -145,7 +145,13 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("Proof freshness", "Recent checks")
             .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase);
+            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Gold-ready on Public release", "Public Stable", StringComparison.OrdinalIgnoreCase)
+            .Replace("claimed-device recovery", "account return", StringComparison.OrdinalIgnoreCase)
+            .Replace("clustered release notification", "release updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("support proof", "tracked support follow-up", StringComparison.OrdinalIgnoreCase)
+            .Replace("adoption evidence", "usage history", StringComparison.OrdinalIgnoreCase)
+            .Replace("install continuity", "account return", StringComparison.OrdinalIgnoreCase);
 }
 
     static string NormalizeLaunchHealthLabel(string? label)

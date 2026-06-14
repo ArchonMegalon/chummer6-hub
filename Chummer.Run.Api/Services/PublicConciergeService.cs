@@ -276,7 +276,7 @@ public sealed class PublicConciergeService
                 FlowId: "support_entry_concierge",
                 Eyebrow: "Support routing concierge",
                 Heading: "Choose the safe first-party help lane before the issue gets louder.",
-                Intro: "Public feedback, private support, install continuity, and human escalation stay separate jobs. This wrapper keeps the branching visible without making any external tool the system of record.",
+                Intro: "Public feedback, private support, account return, and human escalation stay separate jobs. This wrapper keeps the branching visible without making any external tool the system of record.",
                 EntrySurfaceLabel: "contact",
                 EntryRoute: "/contact",
                 ReturnActionLabel: "Back to contact",
@@ -409,13 +409,13 @@ public sealed class PublicConciergeService
                 "secondary",
                 "First-party support intake"),
             ("contact", "install_continuity") => new ConciergeBranchPresentation(
-                "I need install continuity",
+                "I need account return",
                 authenticated
                     ? "Open the signed-in devices and access rail so the affected install stays attached to the same return path."
-                    : "Open the public install shelf first, then attach the installed copy when you are ready for account-backed recovery.",
+                    : "Open the public install shelf first, then attach the installed copy when you are ready for account-backed return.",
                 authenticated ? "Open devices and access" : "Open downloads",
                 "ghost",
-                authenticated ? "Signed-in install continuity" : "Public install shelf"),
+                authenticated ? "Signed-in account return" : "Public install shelf"),
             ("contact", "human_help") => new ConciergeBranchPresentation(
                 "I need a human handoff",
                 "Escalate to a human help lane without turning booking into the only route to support.",

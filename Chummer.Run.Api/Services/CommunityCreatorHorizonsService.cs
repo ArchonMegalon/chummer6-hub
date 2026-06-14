@@ -64,7 +64,7 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "runner_return_posture",
             "Runner return posture",
-            "Public-safe identity posture for runner return, install continuity, and open-run readiness.",
+            "Public-safe identity posture for runner return, account return, and open-run readiness.",
             "/passport/receipts/runner_return_posture.md",
             "/passport/receipts/runner_return_posture.json",
             ["Runner return", "Install continuity", "Participation posture"]),

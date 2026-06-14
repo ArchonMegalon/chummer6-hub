@@ -80,6 +80,8 @@ FORBIDDEN_PATTERNS = [
     r"\bproof gallery\b",
     r"\bpreview-only on this host\b",
     r"\bJourney refs\b",
+    r"\binstall continuity\b",
+    r"\bGold-ready on Public release\b",
 ]
 
 
