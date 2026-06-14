@@ -154,7 +154,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
 }
 SOURCE_MARKERS = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
-        'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),',
+        'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current release status, recent checks, and the next safe step on one calmer route.", "/status", cancellationToken),',
         "LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),",
         'new("Live", BuildLiveLaunchSummary(manifest)),',
         'new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),',

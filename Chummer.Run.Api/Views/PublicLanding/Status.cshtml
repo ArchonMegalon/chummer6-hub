@@ -50,7 +50,7 @@
         {
             Badge = "Deeper report",
             Title = "Open the larger machine picture only when the short status line is not enough",
-            Summary = "This page should stay short and customer-safe. The deeper progress report is the place for the broader operational readout.",
+            Summary = "This page should stay short and customer-safe. The progress page is where the longer operating detail lives.",
             Href = "/progress",
             Label = "Open progress",
             Proof = new[] { "Short public summary", "Longer report", "No page confusion" }
@@ -214,7 +214,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Current status</p>
         <h1 class="page-title">What works now, what needs caution, and where to go next</h1>
-        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, current checks, support, or the deeper report without making you decode the whole release stack.</p>
+        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, current checks, support, or the progress page without making you decode the whole release stack.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
@@ -234,7 +234,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, current checks, help, or the deeper report as soon as the job changes.</p>
+        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, current checks, help, or the progress page as soon as the job changes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in statusRouteChoices)

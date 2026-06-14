@@ -263,7 +263,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("guided install routes for linked recovery and support", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or verified path is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("verified paths and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
-        Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);
+        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("journey proofs and {routeCount} trust routes", controller, StringComparison.Ordinal);
     }
 
@@ -338,7 +338,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Current public release:", controller, StringComparison.Ordinal);
         Assert.Contains("Preview posture on", controller, StringComparison.Ordinal);
         Assert.Contains("Review is still required before this release can be treated as supportable.", controller, StringComparison.Ordinal);
-        Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);
+        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -3592,7 +3592,7 @@ public sealed class PublicLandingController : Controller
         var pulse = _trustPulse.LoadSnapshot();
         var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
         var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current release status, recent checks, and the next safe step on one calmer route.", "/status", cancellationToken),
             Manifest: manifest,
             VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
@@ -9233,7 +9233,7 @@ Boundary:
 
         if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
         {
-            return $"Gold-ready on Public release {releaseExperience.Display.BuildLabel}. {published}";
+            return $"Public Stable. {releaseExperience.Display.BuildLabel}. {published}";
         }
 
         return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
@@ -9794,12 +9794,12 @@ Boundary:
 
         if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
         {
-            segments.Add($"Desktop flagship proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
+            segments.Add($"Desktop flagship checks still need closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
         }
 
         if (!string.IsNullOrWhiteSpace(pulse.LongestPoleLabel))
         {
-            segments.Add($"{pulse.LongestPoleLabel} remains the current longest pole.");
+            segments.Add($"Current focus: {pulse.LongestPoleLabel}.");
         }
 
         if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)

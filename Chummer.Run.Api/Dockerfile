@@ -1,4 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG CHUMMER_BUILD_CONCURRENCY=1
 WORKDIR /src
 COPY chummercomplete/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj chummercomplete/chummer.run-services/Chummer.Run.Api/
 COPY chummercomplete/chummer.run-services/Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj chummercomplete/chummer.run-services/Chummer.Campaign.Contracts/
@@ -24,13 +25,13 @@ COPY chummercomplete/chummer-hub-registry/Chummer.Run.Registry/ chummercomplete/
 COPY chummercomplete/chummer-hub-registry/black-ledger/ chummercomplete/chummer-hub-registry/black-ledger/
 COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummercomplete/chummer.run-services/Chummer.Run.Api
-RUN dotnet build /src/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo \
- && dotnet build /src/chummercomplete/chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj -c Release --nologo \
- && dotnet build /src/chummercomplete/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj -c Release --nologo \
- && dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj -c Release --nologo \
- && dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj -c Release --nologo \
- && dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo
-RUN dotnet publish -c Release -o /app/publish
+RUN nice -n 10 dotnet build /src/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && nice -n 10 dotnet build /src/chummercomplete/chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && nice -n 10 dotnet build /src/chummercomplete/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && nice -n 10 dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && nice -n 10 dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && nice -n 10 dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false
+RUN nice -n 10 dotnet publish -c Release -o /app/publish --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app

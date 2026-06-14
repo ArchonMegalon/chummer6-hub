@@ -24,6 +24,8 @@ services:
     build:
       context: /docker
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     environment:
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       IDENTITY_ENABLE_HTTPS_REDIRECTION: ${IDENTITY_ENABLE_HTTPS_REDIRECTION:-false}
@@ -47,6 +49,8 @@ services:
       IDENTITY_SMTP_USE_SSL: ${IDENTITY_SMTP_USE_SSL:-true}
     volumes:
       - chummer-run-identity-state:/app/state
+    cpu_shares: 128
+    cpus: ${CHUMMER_IDENTITY_CPUS:-0.50}
     networks:
       public-origin:
         aliases:
@@ -59,6 +63,8 @@ services:
     build:
       context: /docker
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     depends_on:
       - chummer-run-identity
       - support-progress-mock
@@ -228,6 +234,8 @@ services:
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
+    cpu_shares: 256
+    cpus: ${CHUMMER_PORTAL_CPUS:-1.00}
     networks:
       public-origin:
         aliases:

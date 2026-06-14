@@ -1700,17 +1700,17 @@ public sealed class ReleaseBundlePromotionService
         List<string> proofNotes = [];
         if (journeys.Contains("install_claim_restore_continue", StringComparer.Ordinal))
         {
-            proofNotes.Add("claimed-device recovery");
+            proofNotes.Add("account return");
         }
 
         if (journeys.Contains("report_cluster_release_notify", StringComparer.Ordinal))
         {
-            proofNotes.Add("clustered release notification");
+            proofNotes.Add("release updates");
         }
 
         if (journeys.Contains("organize_community_and_close_loop", StringComparer.Ordinal))
         {
-            proofNotes.Add("community closure");
+            proofNotes.Add("community wrap-up");
         }
 
         string proofNoteClause = proofNotes.Count > 0
@@ -1720,12 +1720,12 @@ public sealed class ReleaseBundlePromotionService
         {
             return "No blocking release caveat is mirrored for the current public release. The promoted routes have recent install"
                 + proofNoteClause
-                + ", bounded offline prefetch, and support checks instead of only manifest presence.";
+                + ", bounded offline prefetch, and current support follow-up coverage.";
         }
 
         return "Preview caveats still apply, but the current release has recent install"
             + proofNoteClause
-            + ", bounded offline prefetch, and support checks instead of only manifest presence.";
+            + ", bounded offline prefetch, and current support follow-up coverage.";
     }
 
     private static string DeriveFixAvailabilitySummary(string? status, bool proofPassed, bool desktopCoverageComplete)
