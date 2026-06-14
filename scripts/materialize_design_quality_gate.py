@@ -14,6 +14,9 @@ PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 COMPLETION_ROOT = Path(os.environ.get("CHUMMER_COMPLETION_DIR", "/docker/chummercomplete/_completion/chummer_run_redesign_closure"))
 PRESENTATION_PUBLISHED_ROOT = Path(os.environ.get("CHUMMER_PRESENTATION_PUBLISHED_ROOT", "/docker/chummercomplete/chummer-presentation/.codex-studio/published"))
 OUTPUT = PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json"
+LIVE_RECRAWL_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json"
+PUBLIC_ROUTE_PROOF_PATH = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
+LIVE_SURFACE_PARITY_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
 DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
 DESIGN_REVIEW_REQUIRED_SECTIONS = [
@@ -79,6 +82,9 @@ def check_final_product_design_review(path: Path) -> tuple[bool, list[str], list
         if required_check.lower() not in lower_text:
             missing_checks.append(f"missing required checked design assertion: {required_check}")
 
+    if "Verdict: `DESIGN_READY`" not in text:
+        missing_checks.append("final product design review is not currently design-ready")
+
     return len(missing_sections) == 0 and len(missing_checks) == 0, missing_sections, missing_checks
 
 
@@ -89,6 +95,45 @@ def status_pass(payload: dict[str, Any]) -> bool:
 def build_payload() -> dict[str, Any]:
     failures: list[str] = []
     checks: dict[str, Any] = {}
+
+    live_recrawl = load_json(LIVE_RECRAWL_PATH)
+    live_recrawl_pass = status_pass(live_recrawl) and int(len(live_recrawl.get("results") or [])) >= 6
+    if not live_recrawl_pass:
+        failures.append("live public recrawl is missing or failing")
+    checks["live_public_web_recrawl"] = {
+        "path": str(LIVE_RECRAWL_PATH),
+        "status": live_recrawl.get("status", "missing"),
+        "result_count": len(live_recrawl.get("results") or []),
+        "pass": live_recrawl_pass,
+    }
+
+    public_route_proof = load_json(PUBLIC_ROUTE_PROOF_PATH)
+    public_route_summary = public_route_proof.get("summary") if isinstance(public_route_proof.get("summary"), dict) else {}
+    public_route_pass = (
+        int(public_route_summary.get("route_count") or 0) > 0
+        and int(public_route_summary.get("failed_count") or 0) == 0
+        and int(public_route_summary.get("negative_path_failed_count") or 0) == 0
+    )
+    if not public_route_pass:
+        failures.append("public route proof is missing or failing")
+    checks["public_route_proof"] = {
+        "path": str(PUBLIC_ROUTE_PROOF_PATH),
+        "status": public_route_proof.get("status", "pass" if public_route_pass else "fail"),
+        "route_count": public_route_summary.get("route_count"),
+        "failed_count": public_route_summary.get("failed_count"),
+        "pass": public_route_pass,
+    }
+
+    live_surface_parity = load_json(LIVE_SURFACE_PARITY_PATH)
+    live_surface_parity_pass = status_pass(live_surface_parity) and not live_surface_parity.get("failures")
+    if not live_surface_parity_pass:
+        failures.append("live surface parity is missing or failing")
+    checks["live_surface_parity"] = {
+        "path": str(LIVE_SURFACE_PARITY_PATH),
+        "status": live_surface_parity.get("status", "missing"),
+        "failure_count": len(live_surface_parity.get("failures") or []),
+        "pass": live_surface_parity_pass,
+    }
 
     ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"
     ui_frame = load_json(ui_frame_path)

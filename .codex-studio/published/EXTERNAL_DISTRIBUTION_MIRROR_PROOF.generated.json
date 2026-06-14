@@ -1,8 +1,13 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-14T08:48:34Z",
+  "generated_at_utc": "2026-06-14T20:10:01Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "external_required": false,
+  "distribution_resilience_status": "optional_external_mirrors_degraded",
+  "advisory_external_failures": [
+    "onedrive",
+    "pcloud"
+  ],
   "status": "pass",
   "required_providers": [
     "local_registry",
@@ -80,8 +85,8 @@
           "final_url": "http://127.0.0.1:8091/login?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer",
           "content_range": "",
           "content_length": 0,
-          "streamed_size": 6815,
-          "streamed_sha256": "5927df9e56647d1a2cd20f638f55659b3b41858e17e5d12e0a254ff279e74d34",
+          "streamed_size": 7460,
+          "streamed_sha256": "88a8a0e382f712aaff09ca510406a46a212b5fa0bb89dd8a275676e3915b470e",
           "posture": "account_required_handoff",
           "status": "pass"
         },
@@ -93,8 +98,8 @@
           "final_url": "http://127.0.0.1:8091/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
           "content_range": "",
           "content_length": 0,
-          "streamed_size": 6809,
-          "streamed_sha256": "5f06b54308608764fc0addafc04a88d42a0f40aa2c2038cd0debf88a169e2769",
+          "streamed_size": 7454,
+          "streamed_sha256": "0975a4078531c40d9aee83c4d280d3c5ba4a98c2537aefee92d1f6e03cbf7b9e",
           "posture": "account_required_handoff",
           "status": "pass"
         },
@@ -106,8 +111,8 @@
           "final_url": "http://127.0.0.1:8091/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-portable",
           "content_range": "",
           "content_length": 0,
-          "streamed_size": 6806,
-          "streamed_sha256": "e9f139601f32115edf9ee6bc17f4c09f9e0bfbaf2a427a3d19facc57bf8d3512",
+          "streamed_size": 7451,
+          "streamed_sha256": "c8f07dc92f7005de445e7d43525410257921c1d2f6555be647a72dbdfac05815",
           "posture": "account_required_handoff",
           "status": "pass"
         },
@@ -213,79 +218,37 @@
       "roots": [
         "/mnt/onedrive/Documents/codex-audit/chummer"
       ],
-      "mounted_roots": [
-        "/mnt/onedrive/Documents/codex-audit/chummer"
-      ],
+      "mounted_roots": [],
       "artifacts": [
         {
           "id": "avalonia-linux-x64-installer",
           "file_name": "chummer-avalonia-linux-x64-installer.deb",
-          "status": "pass",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-linux-x64-installer.deb",
-              "size": 42855330,
-              "sha256": "158294957a9456ddfb561325d5e503f22879ff1ff4036a360f2812099d7fc475",
-              "status": "pass"
-            }
-          ]
+          "status": "fail",
+          "candidates": []
         },
         {
           "id": "avalonia-osx-arm64-installer",
           "file_name": "chummer-avalonia-osx-arm64-installer.dmg",
-          "status": "pass",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-osx-arm64-installer.dmg",
-              "size": 52497210,
-              "sha256": "02b4822232a592f97307cf34a11eed92d698f8ac6bbd7e8948404b6148f6d89b",
-              "status": "pass"
-            }
-          ]
+          "status": "fail",
+          "candidates": []
         },
         {
           "id": "avalonia-win-x64-installer",
           "file_name": "chummer-avalonia-win-x64-installer.exe",
           "status": "fail",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64-installer.exe",
-              "size": 150422394,
-              "sha256": "8341f191e65ded9b00f75290d65e58e01a4fa29c89fc970e975ddbc5c1999a33",
-              "status": "fail"
-            }
-          ]
+          "candidates": []
         },
         {
           "id": "avalonia-win-x64-portable",
           "file_name": "chummer-avalonia-win-x64.exe",
-          "status": "pass",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64.exe",
-              "size": 433152,
-              "sha256": "200e1e92bf7d5535643cc3bcbc5b6f34efe083c39ce5f2ddbbad11fecf4a66f2",
-              "status": "pass"
-            }
-          ]
+          "status": "fail",
+          "candidates": []
         },
         {
           "id": "avalonia-win-x64-archive",
           "file_name": "chummer-avalonia-win-x64.zip",
-          "status": "pass",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64.zip",
-              "size": 49292098,
-              "sha256": "ac19fcf4c6233f12abd2c77c9c2dff89541a097704eb8af8307fc3237ba2972e",
-              "status": "pass"
-            }
-          ]
+          "status": "fail",
+          "candidates": []
         }
       ]
     }

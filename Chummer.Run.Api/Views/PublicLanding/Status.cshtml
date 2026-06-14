@@ -50,7 +50,7 @@
         {
             Badge = "Deeper report",
             Title = "Open the larger machine picture only when the short status line is not enough",
-            Summary = "This page should stay short and customer-safe. The progress page is where the longer operating detail lives.",
+            Summary = "Use the progress page when you need the longer operating report behind the current public release summary.",
             Href = "/progress",
             Label = "Open progress",
             Proof = new[] { "Short public summary", "Longer report", "No page confusion" }
@@ -172,9 +172,20 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("Proof-freshness", "Recent checks")
             .Replace("proof checks", "Recent checks", StringComparison.OrdinalIgnoreCase);
 
-        return string.Equals(normalized, "release check", StringComparison.OrdinalIgnoreCase)
-            ? "Release checks"
-            : normalized;
+        return normalized.ToLowerInvariant() switch
+        {
+            "live" => "Availability",
+            "preview" => "Release",
+            "fallback" => "Other downloads",
+            "revoked" => "Unavailable",
+            "fixed" => "Updates",
+            "blocked" => "Issues",
+            "support pulse" => "Support",
+            "adoption health" => "History",
+            "release check" => "Recent checks",
+            "release checks" => "Recent checks",
+            _ => normalized,
+        };
     }
 
     static string SanitizeLaunchHealthDisplay(string? value, string fallback)
@@ -240,7 +251,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, recent checks, help, or the progress page as soon as the job changes.</p>
+        <p class="editorial-copy">Status stays short. Use downloads, what works today, support, or progress as soon as the job changes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in statusRouteChoices)
@@ -319,13 +330,21 @@ static string CustomerStatusText(string? value, string fallback)
     </article>
 </section>
 
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Public launch health</p>
+        <h2 class="editorial-title">Compact release summary</h2>
+        <p class="editorial-copy">These rows keep availability, alternate routes, recent checks, support history, and usage history in one compact summary.</p>
+    </div>
+</section>
+
 @if (Model.LaunchHealthRows is { Count: > 0 })
 {
     <section class="release-shelf">
         <article class="app-action-card">
             <span class="tag">Public launch health</span>
-            <h2>Quick release checks</h2>
-            <p>These rows keep release availability, fallback posture, verification freshness, support history, and adoption evidence in one short summary.</p>
+            <h2>Compact status summary</h2>
+            <p>These rows keep availability, alternate routes, recent checks, support history, and usage history in one compact summary.</p>
             <div class="settings-summary-list">
                 @foreach (var row in Model.LaunchHealthRows)
                 {

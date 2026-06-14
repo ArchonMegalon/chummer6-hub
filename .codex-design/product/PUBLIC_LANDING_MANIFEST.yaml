@@ -4,8 +4,8 @@ version: 1
 headline: Build Shadowrun characters. Know why the numbers changed.
 subhead: Download Chummer, open or import a character, and keep sessions moving with
   explainable rules math, durable local state, and clear recovery paths.
-proof_line: Current release builds, install checks, and route evidence are posted
-  so you can verify what works today.
+proof_line: Current release builds, install checks, and route checks are posted so
+  you can confirm what works today.
 no_provider_names: true
 no_ltd_names: true
 hero_ctas:
@@ -26,19 +26,19 @@ secondary_highlights:
 - Deterministic engine
 - Rules receipts
 - Local-first continuity
-product_proof_eyebrow: Verifiable preview evidence
-product_proof_intro: Start with the current download, then inspect the evidence trail
-  when you need to confirm what the posted builds, routes, and named flows prove today.
+product_proof_eyebrow: Current release checks
+product_proof_intro: Start with the current download, then open current release checks
+  when you want to confirm the posted builds, routes, and named flows.
 product_proof_primary_label: Download Chummer
 product_proof_primary_href: /downloads
-product_proof_secondary_label: Inspect evidence
+product_proof_secondary_label: Open current checks
 product_proof_secondary_href: /now#real-rules-truth
-product_proof_topline_label: Posted preview evidence
-product_proof_scope_line: Evidence on the public shelf is scoped to the posted files,
+product_proof_topline_label: Posted current checks
+product_proof_scope_line: Current release checks stay scoped to the posted files,
   named flows, and recent checks you can inspect today; downloads remain the primary
-  route for trying Chummer.
-product_flagship_boundary_line: Preview evidence and fallback routes can show real
-  progress, but flagship wording is reserved for surfaces that independently clear
+  place to try Chummer.
+product_flagship_boundary_line: Current checks and fallback routes can show real
+  progress, but flagship wording stays tied to surfaces that independently clear
   the flagship acceptance bar.
 product_proof_result_title: Final pool 9
 product_proof_result_summary: Same inputs, same answer, with the trail, posted-shelf
@@ -737,6 +737,10 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: public aggregate world-state entry only
+  required_final_url_prefix: /ledger/map
+  required_texts:
+  - Black Ledger command map
+  - Command map
 - path: /ledger/map
   title: Black Ledger map
   audience: public
@@ -746,6 +750,9 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: public aggregate map only
+  required_texts:
+  - Black Ledger command map
+  - Command map
 - path: /ledger/factions
   title: Black Ledger factions
   audience: public
@@ -804,6 +811,10 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: redirect to the current public-safe newsroom episode only
+  required_texts:
+  - Black Ledger newsroom
+  - Turn 2 anchor package
+  required_final_url_prefix: /ledger/newsroom/
 - path: /ledger/newsroom/turn-1-newsreel
   title: Black Ledger newsroom episode
   audience: public

@@ -11,6 +11,7 @@ PUBLIC_EDGE_COMPOSE_PATH = REPO_ROOT / "docker-compose.public-edge.yml"
 class PublicShellAnalyticsHooksTests(unittest.TestCase):
     def test_layout_wires_rybbit_as_env_gated_public_only_hook(self) -> None:
         source = LAYOUT_PATH.read_text(encoding="utf-8")
+        self.assertIn("CLICKRANK_AI_CHUMMER_RUN_SITE_ID", source)
         self.assertIn("RYBBIT_CHUMMER_RUN_SITE_ID", source)
         self.assertIn("RYBBIT_CHUMMER_RUN_SCRIPT_URL", source)
         self.assertIn("RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN", source)
@@ -26,6 +27,8 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
     def test_local_env_and_public_edge_compose_expose_rybbit_configuration(self) -> None:
         env_example = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")
         compose = PUBLIC_EDGE_COMPOSE_PATH.read_text(encoding="utf-8")
+        self.assertIn("CLICKRANK_AI_CHUMMER_RUN_SITE_ID=", env_example)
+        self.assertIn("CLICKRANK_AI_CHUMMER_RUN_SITE_ID: ${CLICKRANK_AI_CHUMMER_RUN_SITE_ID:-}", compose)
         self.assertIn("RYBBIT_CHUMMER_RUN_SITE_ID=", env_example)
         self.assertIn("RYBBIT_CHUMMER_RUN_SCRIPT_URL=", env_example)
         self.assertIn("RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN=https://app.rybbit.io", env_example)

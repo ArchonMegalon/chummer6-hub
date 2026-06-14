@@ -29,6 +29,13 @@ def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def path_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -89,7 +96,7 @@ def verify_local_registry(registry_root: Path, rows: list[dict[str, Any]]) -> di
 
 
 def verify_provider(name: str, roots: list[Path], rows: list[dict[str, Any]]) -> dict[str, Any]:
-    mounted_roots = [root for root in roots if root.exists()]
+    mounted_roots = [root for root in roots if path_exists(root)]
     checks = []
     for row in rows:
         candidates = [root / "files" / row["file_name"] for root in mounted_roots]
@@ -192,11 +199,22 @@ def main() -> int:
     required = ["local_registry", "public_edge"]
     if args.require_external:
         required.extend(["pcloud", "onedrive"])
+    optional_external_failures = sorted(
+        name
+        for name in DEFAULT_PROVIDER_ROOTS
+        if providers.get(name, {}).get("status") != "pass"
+    )
     payload = {
         "contract_name": "chummer.external_distribution_mirror_proof",
         "generated_at_utc": now_iso(),
         "registry_root": str(registry_root),
         "external_required": bool(args.require_external),
+        "distribution_resilience_status": (
+            "full_external_mirror_ready"
+            if not optional_external_failures
+            else "optional_external_mirrors_degraded"
+        ),
+        "advisory_external_failures": optional_external_failures,
         "status": "pass" if all(providers[name]["status"] == "pass" for name in required) else "fail",
         "required_providers": required,
         "providers": providers,

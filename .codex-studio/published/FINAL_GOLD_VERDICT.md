@@ -1,6 +1,6 @@
 # GOLD_READY
 
-Generated: 2026-06-14T09:08:06Z
+Generated: 2026-06-14T20:36:10Z
 Scope: full_estate_v20
 
 ## Gate Summary
@@ -10,6 +10,7 @@ Scope: full_estate_v20
 - PASS `external_distribution_mirror_proof`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json`
   - mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass; external_required=False
 - PASS `live_public_web_recrawl`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json`
+- PASS `live_surface_parity`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json`
 - PASS `operator_release_dashboard`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
   - release: run-20260612-121055 on public_stable
 - PASS `provider_proof_discoverability`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json`
@@ -19,5 +20,10 @@ Scope: full_estate_v20
 - PASS `release_ready`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json`
 - PASS `rule_authority_minimum_coverage`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json`
 - PASS `ruleset_readiness`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json`
+  - accepted human-side assumption: sr4
 - PASS `table_pulse_scenario_replay`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json`
 - PASS `ui_layout_exit_gate`: `pass` at `/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json`
+
+## Accepted Boundaries
+- `ruleset_human_side_gold_assumption`: SR4/SR6 readiness includes the current human-side gold assumption; mechanical rule authority is covered, but workflow parity remains explicitly accepted rather than independently re-proven.
+- `optional_external_mirrors_degraded`: Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.

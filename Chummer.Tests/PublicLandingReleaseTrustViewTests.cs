@@ -33,9 +33,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open play shell", view, StringComparison.Ordinal);
         Assert.Contains("Open status", view, StringComparison.Ordinal);
         Assert.Contains("Replay Turn 1", view, StringComparison.Ordinal);
-        Assert.Contains("One compact rail for downloads, play, and public status.", view, StringComparison.Ordinal);
-        Assert.Contains("Short, practical downloads page for the current build and platform notes.", view, StringComparison.Ordinal);
-        Assert.Contains("Session access and current play status stay explicit on the play surface", view, StringComparison.Ordinal);
+        Assert.Contains("Choose the build, open play, or replay Turn 1.", view, StringComparison.Ordinal);
+        Assert.Contains("Current desktop builds and platform notes.", view, StringComparison.Ordinal);
+        Assert.Contains("Open the mobile play shell when the table is already live.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.FlagshipCoverage", view, StringComparison.Ordinal);
     }
@@ -65,7 +65,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("recommended-download__trustrail", view, StringComparison.Ordinal);
         Assert.Contains("The same build for everyone", view, StringComparison.Ordinal);
-        Assert.Contains("Link this copy on first launch", view, StringComparison.Ordinal);
+        Assert.Contains("Sign in later if you need return and support", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access stay calm", view, StringComparison.Ordinal);
         Assert.Contains("Release notes, known issues, and requirements", view, StringComparison.Ordinal);
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
@@ -181,7 +181,6 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Use what works today when the question is readiness, not packaging", view, StringComparison.Ordinal);
         Assert.Contains("Leave status for first-party help as soon as the issue becomes private", view, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
-        Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref(choice.Href)", view, StringComparison.Ordinal);
         Assert.Contains("What still blocks gold support", view, StringComparison.Ordinal);
         Assert.Contains("Model.GoldReadiness.Blockers", view, StringComparison.Ordinal);
@@ -259,8 +258,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("available on downloads right now", controller, StringComparison.Ordinal);
-        Assert.Contains("account-assisted install paths with linked support", controller, StringComparison.Ordinal);
+        Assert.Contains("current install routes are available on downloads right now", controller, StringComparison.Ordinal);
+        Assert.Contains("optional sign-in and support attached", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or verified path is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("verified paths and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
         Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
@@ -278,7 +277,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("FindLaunchHealthValue(\"Support pulse\")", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Current public release</h2>", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Install help stays close</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Quick release checks</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Compact status summary</h2>", view, StringComparison.Ordinal);
         Assert.Contains("FindLaunchHealthValue(\"Release checks\")", view, StringComparison.Ordinal);
     }
 
@@ -294,13 +293,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Home or Horizons", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Need help choosing a setup path?", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Need install help?", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Deeper release detail lives on What works today and Status", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("sign in later if you want recovery and support linked", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Sign in later if you want account return and support attached.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("included example runner", nowView, StringComparison.Ordinal);
+        Assert.Contains("start from Home or Horizons after the first launch", nowView, StringComparison.Ordinal);
         Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
     }
@@ -337,8 +336,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.DoesNotContain("Current public release:", controller, StringComparison.Ordinal);
-        Assert.Contains("Preview posture on", controller, StringComparison.Ordinal);
-        Assert.Contains("Review is still required before this release can be treated as supportable.", controller, StringComparison.Ordinal);
+        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
+        Assert.Contains("Check what works today and support before wider rollouts.", controller, StringComparison.Ordinal);
         Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
     }
 

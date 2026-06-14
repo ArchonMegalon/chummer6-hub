@@ -562,7 +562,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return recommended ? "Open guided install" : "Open guided download";
+            return recommended ? "Open install path" : "Open download path";
         }
 
         return recommended ? RecommendedActionLabel(download) : AlternativeActionLabel(download);
@@ -903,13 +903,13 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "An account-assisted install path is available when you want sign-in and support linked from the first launch.";
+            return "An optional account-return install path is available when you want sign-in and support attached from the first launch.";
         }
 
         var labels = FormatPlatformList(platforms);
         return platforms.Count == 1
-            ? $"{labels} also has an account-assisted install path when you want sign-in and support linked from the first launch."
-            : $"{labels} also have account-assisted install paths when you want sign-in and support linked from the first launch.";
+            ? $"{labels} also has an optional account-return install path when you want sign-in and support attached from the first launch."
+            : $"{labels} also have optional account-return install paths when you want sign-in and support attached from the first launch.";
     }
 
     private static string FormatPlatformList(IReadOnlyList<string> platforms)

@@ -77,7 +77,7 @@
     var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
-    var defaultNavOpen = !authSurface && !isBuildCurrent;
+    var defaultNavOpen = false;
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass} {(defaultNavOpen ? "nav-panel-open" : string.Empty)}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
@@ -156,6 +156,9 @@
     var rybbitSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
         : string.Empty;
+    var requestPath = Context?.Request?.Path.Value ?? string.Empty;
+    var normalizedRequestPath = string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath.TrimEnd('/');
+    var requestPathSegments = normalizedRequestPath.AsSpan();
     var clickRankEligible = !authSurface
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(clickRankSiteId)
@@ -163,6 +166,23 @@
             routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
+    var requestPathIsRoot = string.Equals(normalizedRequestPath, "/", StringComparison.Ordinal);
+    var requestPathIndexable = requestPathIsRoot
+        || normalizedRequestPath is "/now" or "/downloads" or "/status" or "/changelog" or "/what-is-chummer" or "/help" or "/faq" or "/contact" or "/privacy" or "/terms" or "/ledger" or "/ledger/map" or "/ledger/factions" or "/ledger/newsroom"
+        || routeKey is "landing" or "what-is-chummer" or "now" or "downloads" or "changelog" || routeKey is "help" or "faq" || routeKey is "contact" or "privacy" or "terms" or "status"
+        || routeKey is "horizons" or "roadmap" or "artifacts" || routeKey is "participate" or "feedback";
+    var newsroomEpisodeIndexable = requestPathSegments.StartsWith("/ledger/newsroom/".AsSpan(), StringComparison.OrdinalIgnoreCase)
+        && !requestPathSegments.EndsWith("/transcript".AsSpan(), StringComparison.OrdinalIgnoreCase)
+        && !requestPathSegments.EndsWith("/receipts".AsSpan(), StringComparison.OrdinalIgnoreCase);
+    var requestPathLedgerEpisode = !requestPathIndexable
+        && requestPathSegments.StartsWith("/ledger/".AsSpan(), StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalizedRequestPath, "/ledger", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalizedRequestPath, "/ledger/map", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalizedRequestPath, "/ledger/factions", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalizedRequestPath, "/ledger/newsroom", StringComparison.OrdinalIgnoreCase);
+    var indexablePublicRoute = !authSurface
+        && !chrome.Authenticated
+        && (requestPathIndexable || newsroomEpisodeIndexable || requestPathLedgerEpisode || routeKey.StartsWith("ledger", StringComparison.Ordinal));
     var rybbitEligible = !authSurface
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(rybbitSiteId)
@@ -171,6 +191,58 @@
             routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
+    var robotsPolicy = indexablePublicRoute
+        ? "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+        : "noindex, nofollow, noarchive, nosnippet, noimageindex";
+    var canonicalPath = string.Equals(normalizedRequestPath, "/", StringComparison.Ordinal)
+        ? string.Empty
+        : normalizedRequestPath;
+    var canonicalUrl = string.Empty;
+    if (indexablePublicRoute)
+    {
+        var canonicalHost = requestHost is "chummer.run" or "www.chummer.run" ? "https://chummer.run" : $"{Context?.Request?.Scheme}://{Context?.Request?.Host.Value}";
+        canonicalUrl = $"{canonicalHost}{canonicalPath}";
+    }
+    object? publicSchema = null;
+    if (indexablePublicRoute)
+    {
+        if (routeKey.StartsWith("ledger", StringComparison.Ordinal))
+        {
+            publicSchema = new Dictionary<string, object?>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "WebApplication",
+                ["name"] = pageTitle,
+                ["url"] = canonicalUrl,
+                ["description"] = chrome.Description,
+                ["applicationCategory"] = "GameApplication"
+            };
+        }
+        else if (routeKey is "landing" or "what-is-chummer" or "downloads")
+        {
+            publicSchema = new Dictionary<string, object?>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "SoftwareApplication",
+                ["name"] = "Chummer",
+                ["operatingSystem"] = "Windows, Linux, macOS",
+                ["applicationCategory"] = "GameApplication",
+                ["url"] = canonicalUrl,
+                ["description"] = chrome.Description
+            };
+        }
+        else
+        {
+            publicSchema = new Dictionary<string, object?>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "WebPage",
+                ["name"] = pageTitle,
+                ["url"] = canonicalUrl,
+                ["description"] = chrome.Description
+            };
+        }
+    }
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -183,8 +255,21 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Chummer" />
-    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta property="og:title" content="@pageTitle · Chummer" />
+    <meta property="og:description" content="@chrome.Description" />
+    <meta property="og:url" content="@canonicalUrl" />
+    <meta property="og:site_name" content="Chummer" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@pageTitle · Chummer" />
+    <meta name="twitter:description" content="@chrome.Description" />
+    <meta name="twitter:image" content="/favicon.svg" />
+    <meta name="robots" content="@robotsPolicy" />
+    <meta name="googlebot" content="@robotsPolicy" />
+    @if (!string.IsNullOrWhiteSpace(canonicalUrl))
+    {
+        <link rel="canonical" href="@canonicalUrl" />
+    }
     <link rel="manifest" href="~/manifest.json" asp-append-version="true" />
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml" asp-append-version="true" />
     <link rel="shortcut icon" href="~/favicon.ico" asp-append-version="true" />
@@ -192,6 +277,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    @if (publicSchema is not null)
+    {
+        <script type="application/ld+json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(publicSchema))</script>
+    }
     @if (rybbitEligible)
     {
         <script>

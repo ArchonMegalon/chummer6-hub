@@ -2033,8 +2033,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
     Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
     var robotsText = File.ReadAllText(robotsPath);
-    Assert(robotsText.Contains("Disallow: /", StringComparison.Ordinal), "robots.txt should disallow crawler access.");
-    Assert(robotsText.Contains("Noindex: /", StringComparison.Ordinal), "robots.txt should carry the explicit noindex directive requested for the public shell.");
+    Assert(robotsText.Contains("Allow: /", StringComparison.Ordinal), "robots.txt should allow crawler access to the public shell.");
+    Assert(robotsText.Contains("Disallow: /account/", StringComparison.Ordinal), "robots.txt should keep private account routes blocked.");
+    Assert(robotsText.Contains("Sitemap: https://chummer.run/sitemap.xml", StringComparison.Ordinal), "robots.txt should advertise the public sitemap.");
     var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
     Assert(layoutSource.Contains("data-nav-sheet", StringComparison.Ordinal), "layout should keep the compact mobile navigation sheet wired into the public shell.");
     Assert(layoutSource.Contains("aria-controls=\"site-nav-sheet\"", StringComparison.Ordinal), "layout should expose the compact navigation sheet through the header toggle.");

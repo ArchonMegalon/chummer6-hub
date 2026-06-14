@@ -1642,8 +1642,8 @@ public sealed class ReleaseBundlePromotionService
         if (journeys.Count == 0)
         {
             return NormalizeToken(channel) is "public_stable" or "stable" or "docker"
-                ? "Current public release is supported on the promoted routes. Recent checks cover install, bounded offline prefetch, and current support follow-up."
-                : "Current preview release is supported on the promoted routes. Recent checks cover install, bounded offline prefetch, and current support follow-up.";
+                ? "Current public release is supported on the promoted routes. Recent coverage includes install, bounded offline prefetch, and current support follow-up."
+                : "Current preview release is supported on the promoted routes. Recent coverage includes install, bounded offline prefetch, and current support follow-up.";
         }
 
         List<string> proofNotes = [];
@@ -1673,8 +1673,8 @@ public sealed class ReleaseBundlePromotionService
         }
 
         string proofNoteClause = proofNotes.Count > 0
-            ? " Recent checks cover " + string.Join(", ", proofNotes) + ","
-            : " Recent checks cover install,";
+            ? " Recent coverage includes " + string.Join(", ", proofNotes) + ","
+            : " Recent coverage includes install,";
         return (NormalizeToken(channel) is "public_stable" or "stable" or "docker"
                 ? "Current public release is supported on the promoted routes."
                 : "Current preview release is supported on the promoted routes.")
@@ -1703,7 +1703,7 @@ public sealed class ReleaseBundlePromotionService
 
         if (!proofPassed)
         {
-            return $"The {NormalizeToken(channel)} release page is visible, but known-issue review should stay front-and-center until release checks are refreshed.";
+            return $"The {NormalizeToken(channel)} release page is visible, but known-issue review should stay front-and-center until the current verification is refreshed.";
         }
 
         List<string> journeys = proofJourneys?

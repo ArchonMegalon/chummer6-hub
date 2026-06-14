@@ -167,14 +167,14 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             status_path.write_text(
                 status_text
                 .replace("Model.LaunchHealthRows", "Model.TrustPulse.Rows", 1)
-                .replace("Quick release checks", "Quick release summary", 1),
+                .replace("Compact status summary", "Quick release summary", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Quick release checks", result.stderr)
+        self.assertIn("return Model.LaunchHealthRows?", result.stderr)
 
     def test_verifier_fails_when_release_proof_drops_public_trust_surface_block(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-surface-") as temp_dir:

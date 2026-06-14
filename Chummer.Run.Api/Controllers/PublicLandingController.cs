@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
@@ -593,6 +594,526 @@ public sealed class PublicLandingController : Controller
             _logger.LogWarning(ex, "Package operator summary could not confirm the signed-in identity.");
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+    }
+
+    [HttpGet("/admin/providers/clickrank")]
+    [Produces("application/json")]
+    public async Task<IActionResult> AdminClickRankProviderDashboard(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/admin/providers/clickrank";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+
+            JsonElement? providerVerification = ReadCompletionArtifact("CLICKRANK_PROVIDER_VERIFICATION.generated.json");
+            JsonElement? domainSetup = ReadCompletionArtifact("CLICKRANK_DOMAIN_SETUP.generated.json");
+            JsonElement? gscConnection = ReadCompletionArtifact("CLICKRANK_GSC_CONNECTION.generated.json");
+            JsonElement? patchPlan = ReadCompletionArtifact("CLICKRANK_METADATA_SCHEMA_PATCH_PLAN.generated.json");
+            JsonElement? recommendationExport = ReadCompletionArtifact("CLICKRANK_RECOMMENDATION_EXPORT.generated.json");
+            JsonElement? firstPatch = ReadCompletionArtifact("CLICKRANK_FIRST_PATCH_RECEIPT.generated.json");
+            JsonElement? baselineCrawl = ReadCompletionArtifact("CLICKRANK_CHUMMER_BASELINE_CRAWL.generated.json");
+            JsonElement? recrawl = ReadCompletionArtifact("CLICKRANK_RECRAWL_VERIFICATION.generated.json");
+            JsonElement? privateRouteProof = ReadCompletionArtifact("CLICKRANK_NO_PRIVATE_ROUTE_CRAWL_PROOF.generated.json");
+            JsonElement? copyrightBoundary = ReadCompletionArtifact("CLICKRANK_SOURCEBOOK_COPYRIGHT_BOUNDARY.generated.json");
+
+            return Json(new
+            {
+                adapter = "ClickRankVisibilityAdapter",
+                currentPath,
+                generatedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+                provider = new
+                {
+                    status = ReadStatus(providerVerification),
+                    verifiedAtUtc = ReadDate(providerVerification, "verified_at_utc") ?? ReadDate(providerVerification, "generated_at_utc"),
+                    service = ReadString(providerVerification, "service"),
+                    accountEmail = ReadString(providerVerification, "account_email"),
+                    plan = ReadString(providerVerification, "plan"),
+                    siteIds = ReadStringArray(providerVerification, "site_ids"),
+                    autoFixDisabled = ReadBoolean(providerVerification, "auto_fix_disabled_by_default"),
+                    failures = ReadStringArray(providerVerification, "failures"),
+                    payload = providerVerification
+                },
+                domain = new
+                {
+                    status = ReadStatus(domainSetup),
+                    siteId = ReadString(domainSetup, "site_id"),
+                    domain = ReadString(domainSetup, "domain"),
+                    homepageStatus = ReadNumber(domainSetup, "homepage_status_code"),
+                    failures = ReadStringArray(domainSetup, "failures"),
+                    payload = domainSetup
+                },
+                gsc = new
+                {
+                    status = ReadStatus(gscConnection),
+                    connected = ReadBoolean(gscConnection, "connected"),
+                    documentedUnavailable = ReadBoolean(gscConnection, "documented_unavailable"),
+                    failures = ReadStringArray(gscConnection, "failures"),
+                    payload = gscConnection
+                },
+                patchPlan = new
+                {
+                    status = ReadStatus(patchPlan),
+                    readyForPrProposalMode = ReadBoolean(patchPlan, "ready_for_pr_proposal_mode"),
+                    autoFixDisabled = ReadBoolean(patchPlan, "auto_fix_disabled"),
+                    failures = ReadStringArray(patchPlan, "failures"),
+                    payload = patchPlan
+                },
+                recommendations = new
+                {
+                    status = ReadStatus(recommendationExport),
+                    generatedAtUtc = ReadDate(recommendationExport, "generated_at_utc"),
+                    payload = recommendationExport
+                },
+                releaseReadiness = new
+                {
+                    firstPatchStatus = ReadStatus(firstPatch),
+                    firstPatch = ReadDate(firstPatch, "deployed_at_utc") ?? ReadDate(firstPatch, "generated_at_utc"),
+                    baselineStatus = ReadStatus(baselineCrawl),
+                    recrawlStatus = ReadStatus(recrawl),
+                    privateRoutesOk = IsPass(ReadStatus(privateRouteProof)),
+                    copyrightBoundaryOk = IsPass(ReadStatus(copyrightBoundary)),
+                    summary = BuildClickRankProviderSummary(providerVerification, domainSetup, gscConnection, baselineCrawl, patchPlan, recommendationExport, firstPatch, recrawl)
+                }
+            });
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "ClickRank provider dashboard could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/admin/visibility")]
+    [Produces("application/json")]
+    public async Task<IActionResult> AdminVisibilityDashboard(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/admin/visibility";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+
+            JsonElement? recrawl = ReadCompletionArtifact("CLICKRANK_RECRAWL_VERIFICATION.generated.json");
+            JsonElement? baseline = ReadCompletionArtifact("CLICKRANK_CHUMMER_BASELINE_CRAWL.generated.json");
+            JsonElement? visibilityReport = ReadCompletionArtifact("CLICKRANK_MONTHLY_VISIBILITY_REPORT.generated.json");
+            JsonElement? privateRouteProof = ReadCompletionArtifact("CLICKRANK_NO_PRIVATE_ROUTE_CRAWL_PROOF.generated.json");
+            JsonElement? finalVerdict = ReadFinalClickRankVerdict();
+
+            var baselineRoutes = GetRouteVisibilityRows(baseline);
+
+            return Json(new
+            {
+                surface = "public_visibility_health",
+                generatedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+                currentPath,
+                status = ReadStatus(visibilityReport),
+                reportSummary = ReadString(visibilityReport, "summary"),
+                recrawl = new
+                {
+                    status = ReadStatus(recrawl),
+                    latest = ReadDate(recrawl, "verified_at_utc") ?? ReadDate(recrawl, "generated_at_utc"),
+                    routeCount = ReadInt(recrawl, "route_count"),
+                    passingRoutes = ReadInt(recrawl, "passing_routes"),
+                    failingRoutes = ReadInt(recrawl, "failing_routes"),
+                    payload = recrawl
+                },
+                baseline = new
+                {
+                    status = ReadStatus(baseline),
+                    crawlDate = ReadDate(baseline, "baseline_crawl", "crawl_date") ?? ReadDate(baseline, "generated_at_utc"),
+                    pagesCrawled = ReadInt(baseline, "baseline_crawl", "pages_crawled"),
+                    missingCanonical = ReadInt(baseline, "baseline_crawl", "canonical_errors"),
+                    missingSchema = ReadInt(baseline, "baseline_crawl", "missing_schema"),
+                    noindexPages = ReadInt(baseline, "baseline_crawl", "noindex_pages"),
+                    payload = baseline,
+                    routes = baselineRoutes
+                },
+                privateRouteBoundary = new
+                {
+                    status = ReadStatus(privateRouteProof),
+                    failures = ReadStringArray(privateRouteProof, "failures"),
+                },
+                finalVerdict = new
+                {
+                    verdict = ReadString(finalVerdict, "verdict"),
+                    status = ReadString(finalVerdict, "status"),
+                    summary = ReadString(finalVerdict, "summary"),
+                    payload = finalVerdict
+                },
+                operatorSignals = new
+                {
+                    goldReadiness = BuildGoldReadinessSummary(_goldReadiness.LoadSnapshot()),
+                    launchReadinessLabel = BuildLiveVerificationLabel(_releaseSelection.ApplyAccessPolicy(_releases.LoadManifest())),
+                    launchReadiness = BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot())?.Summary,
+                    trustPulse = _trustPulse.LoadSnapshot()
+                },
+                recommendations = BuildClickRankRouteRecommendations(recrawl)
+            });
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Visibility dashboard could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    private static JsonElement? ReadCompletionArtifact(string fileName)
+    {
+        string? path = ResolveCompletionArtifactPath(fileName);
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(System.IO.File.ReadAllText(path, Encoding.UTF8));
+            return document.RootElement.Clone();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static JsonElement? ReadFinalClickRankVerdict()
+    {
+        JsonElement? generated = ReadCompletionArtifact("FINAL_CLICKRANK_CHUMMER_VISIBILITY_VERDICT.generated.json");
+        if (generated is not null)
+        {
+            return generated;
+        }
+
+        string? path = ResolveCompletionArtifactPath("FINAL_CLICKRANK_CHUMMER_VISIBILITY_VERDICT.md");
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+        {
+            return null;
+        }
+
+        string content = System.IO.File.ReadAllText(path, Encoding.UTF8);
+        bool ready = content.Contains("CLICKRANK_CHUMMER_VISIBILITY_READY", StringComparison.OrdinalIgnoreCase);
+        string summary = ready
+            ? "Final ClickRank visibility verdict is present and reports READY."
+            : "Final ClickRank visibility verdict is present but does not report READY.";
+
+        return JsonSerializer.SerializeToElement(new
+        {
+            verdict = ready ? "CLICKRANK_CHUMMER_VISIBILITY_READY" : "NOT_READY",
+            status = ready ? "pass" : "blocked",
+            summary,
+            generated_at_utc = new DateTimeOffset(System.IO.File.GetLastWriteTimeUtc(path)).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture)
+        });
+    }
+
+    private static string? ResolveCompletionArtifactPath(string fileName)
+    {
+        foreach (string candidate in EnumerateCompletionArtifactPaths(fileName))
+        {
+            if (System.IO.File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateCompletionArtifactPaths(string fileName)
+    {
+        string[] roots =
+        [
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "_completion", "clickrank"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "fleet", "_completion", "clickrank"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".integrated", "fleet", "_completion", "clickrank"),
+            Path.Combine(Directory.GetCurrentDirectory(), "_completion", "clickrank"),
+            Path.Combine(Directory.GetCurrentDirectory(), "fleet", "_completion", "clickrank"),
+            Path.Combine(Directory.GetCurrentDirectory(), ".integrated", "fleet", "_completion", "clickrank"),
+            Path.Combine(AppContext.BaseDirectory, ".codex-studio", "published"),
+            Path.Combine(Directory.GetCurrentDirectory(), ".codex-studio", "published"),
+            "/docker/chummercomplete/_completion/clickrank",
+            "/docker/chummercomplete/fleet/_completion/clickrank",
+            "/docker/chummercomplete/.integrated/fleet/_completion/clickrank"
+        ];
+
+        foreach (string root in roots)
+        {
+            yield return Path.GetFullPath(Path.Combine(root, fileName));
+        }
+    }
+
+    private static string ReadStatus(JsonElement? artifact)
+    {
+        if (artifact is null)
+        {
+            return "missing";
+        }
+
+        foreach (string propertyName in new[] { "status", "verdict", "result", "state" })
+        {
+            string? value = ReadString(artifact, propertyName);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return "present";
+    }
+
+    private static string? ReadDate(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(value.Value.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed))
+        {
+            return parsed.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetInt64(out long unixSeconds))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        }
+
+        return null;
+    }
+
+    private static string? ReadString(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value.Value.ValueKind switch
+        {
+            JsonValueKind.String => value.Value.GetString(),
+            JsonValueKind.Number => value.Value.ToString(),
+            JsonValueKind.True => bool.TrueString,
+            JsonValueKind.False => bool.FalseString,
+            _ => null
+        };
+    }
+
+    private static string[] ReadStringArray(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return [];
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.Array)
+        {
+            return value.Value.EnumerateArray()
+                .Select(static item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString())
+                .Where(static item => !string.IsNullOrWhiteSpace(item))
+                .Cast<string>()
+                .ToArray();
+        }
+
+        string? single = ReadString(artifact, propertyPath);
+        return string.IsNullOrWhiteSpace(single) ? [] : [single];
+    }
+
+    private static bool ReadBoolean(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return false;
+        }
+
+        return value.Value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.Value.GetString(), out bool parsed) => parsed,
+            JsonValueKind.String => string.Equals(value.Value.GetString(), "pass", StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(value.Value.GetString(), "ready", StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(value.Value.GetString(), "verified", StringComparison.OrdinalIgnoreCase),
+            JsonValueKind.Number when value.Value.TryGetInt32(out int number) => number != 0,
+            _ => false
+        };
+    }
+
+    private static int ReadInt(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return 0;
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.Number)
+        {
+            if (value.Value.TryGetInt32(out int intValue))
+            {
+                return intValue;
+            }
+
+            if (value.Value.TryGetDouble(out double doubleValue))
+            {
+                return Convert.ToInt32(doubleValue, CultureInfo.InvariantCulture);
+            }
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.String && int.TryParse(value.Value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+        {
+            return parsed;
+        }
+
+        return 0;
+    }
+
+    private static double? ReadNumber(JsonElement? artifact, params string[] propertyPath)
+    {
+        JsonElement? value = ResolvePath(artifact, propertyPath);
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetDouble(out double number))
+        {
+            return number;
+        }
+
+        if (value.Value.ValueKind == JsonValueKind.String && double.TryParse(value.Value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private static JsonElement? ResolvePath(JsonElement? artifact, params string[] propertyPath)
+    {
+        if (artifact is null)
+        {
+            return null;
+        }
+
+        JsonElement current = artifact.Value;
+        foreach (string propertyName in propertyPath)
+        {
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(propertyName, out JsonElement next))
+            {
+                return null;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
+    private static bool IsPass(string? status)
+        => !string.IsNullOrWhiteSpace(status)
+           && (string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(status, "passed", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(status, "verified", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(status, "ready", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(status, "healthy", StringComparison.OrdinalIgnoreCase));
+
+    private static string BuildClickRankProviderSummary(
+        JsonElement? providerVerification,
+        JsonElement? domainSetup,
+        JsonElement? gscConnection,
+        JsonElement? baselineCrawl,
+        JsonElement? patchPlan,
+        JsonElement? recommendationExport,
+        JsonElement? firstPatch,
+        JsonElement? recrawl)
+    {
+        int passingChecks = new[]
+        {
+            IsPass(ReadStatus(providerVerification)),
+            IsPass(ReadStatus(domainSetup)),
+            IsPass(ReadStatus(gscConnection)),
+            IsPass(ReadStatus(baselineCrawl)),
+            IsPass(ReadStatus(patchPlan)),
+            IsPass(ReadStatus(firstPatch)),
+            IsPass(ReadStatus(recrawl))
+        }.Count(static item => item);
+
+        int recommendationCount = ResolvePath(recommendationExport, "recommendations") is JsonElement recommendations
+            && recommendations.ValueKind == JsonValueKind.Array
+            ? recommendations.GetArrayLength()
+            : 0;
+
+        return $"{passingChecks}/7 ClickRank readiness checks are currently passing. Exported recommendation count: {recommendationCount}.";
+    }
+
+    private static object[] GetRouteVisibilityRows(JsonElement? baseline)
+    {
+        JsonElement? routes = ResolvePath(baseline, "baseline_crawl", "routes") ?? ResolvePath(baseline, "routes");
+        if (routes is null || routes.Value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return routes.Value.EnumerateArray()
+            .Take(12)
+            .Select(route => (object)new
+            {
+                route = ReadString(route, "route") ?? ReadString(route, "path") ?? ReadString(route, "url") ?? "unknown",
+                status = ReadString(route, "status") ?? ReadString(route, "result") ?? "present",
+                issues = ReadStringArray(route, "issues"),
+                title = ReadString(route, "title")
+            })
+            .ToArray();
+    }
+
+    private static object[] BuildClickRankRouteRecommendations(JsonElement? recrawl)
+    {
+        JsonElement? recommendations = ResolvePath(recrawl, "recommendations") ?? ResolvePath(recrawl, "routes");
+        if (recommendations is null || recommendations.Value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return recommendations.Value.EnumerateArray()
+            .Take(20)
+            .Select(item => (object)new
+            {
+                route = ReadString(item, "route") ?? ReadString(item, "path") ?? ReadString(item, "url") ?? "unknown",
+                status = ReadString(item, "status") ?? ReadString(item, "result") ?? "present",
+                severity = ReadString(item, "severity") ?? "info",
+                summary = ReadString(item, "summary") ?? ReadString(item, "issue_type") ?? "No summary mirrored."
+            })
+            .ToArray();
+    }
+
+    private static object? BuildGoldReadinessSummary(GoldReadinessSnapshot? snapshot)
+    {
+        GoldReadinessStatusViewModel? status = BuildGoldReadinessStatus(snapshot);
+        if (status is null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            statusLabel = status.StatusLabel,
+            summary = status.Summary,
+            generatedAtUtc = status.GeneratedAtLabel,
+            blockerCount = status.Blockers.Count
+        };
     }
 
     [HttpGet("/mobile")]
@@ -2605,21 +3126,8 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/ledger")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerPage([FromQuery] int? turn, CancellationToken cancellationToken)
-    {
-        if (await TryIsAuthenticatedAsync(cancellationToken))
-        {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            if (!_blackLedgerFactions.HasActiveAllegiance(user.UserId))
-            {
-                return Redirect("/account/ledger/onboarding");
-            }
-        }
-
-        var model = await BuildBlackLedgerPageModel("/ledger", "hub", turn, cancellationToken);
-        return View("~/Views/PublicLanding/Ledger.cshtml", model);
-    }
+    public IActionResult LedgerPage([FromQuery] int? turn, [FromQuery] string? mode)
+        => Redirect(BuildLedgerMapEntryHref(turn, mode));
 
     [HttpGet("/ledger/map")]
     [Produces("text/html")]
@@ -2631,11 +3139,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/black-ledger")]
     public IActionResult LedgerAliasPage()
-        => Redirect("/ledger");
+        => Redirect("/ledger/map");
 
     [HttpGet("/roadmap/black-ledger")]
     public IActionResult BlackLedgerRoadmapAlias()
-        => Redirect("/ledger");
+        => Redirect("/ledger/map");
 
     [HttpGet("/ledger/stats")]
     [Produces("text/html")]
@@ -9191,12 +9699,12 @@ Boundary:
         int directPublicCount = totalLiveRouteCount - accountRequiredCount;
         string routeSummary = totalLiveRouteCount switch
         {
-            <= 0 => "No live install routes are available on downloads right now.",
-            1 when accountRequiredCount <= 0 => "1 live install route is available on downloads right now.",
-            1 => "1 account-assisted install path is available on downloads right now with linked support.",
-            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now.",
-            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} account-assisted install paths are available on downloads right now with linked support.",
-            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} are account-assisted install paths with linked support."
+            <= 0 => "No current install routes are available on downloads right now.",
+            1 when accountRequiredCount <= 0 => "1 current install route is available on downloads right now.",
+            1 => "1 current install route is available on downloads right now with optional sign-in and support attached.",
+            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} current install routes are available on downloads right now.",
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} current install routes are available on downloads right now with optional sign-in and support attached.",
+            _ => $"{totalLiveRouteCount} current install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} can start with sign-in and support attached."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
@@ -9221,22 +9729,20 @@ Boundary:
     {
         string published = $"Released {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
-        bool reviewRequired = string.Equals(supportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
-            || pulse?.ParityClaimsReviewRequired == true
-            || (!string.IsNullOrWhiteSpace(pulse?.LocalReleaseProofStatus)
-                && !string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase));
-
-        if (reviewRequired)
-        {
-            return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Review is still required before this release can be treated as supportable.";
-        }
 
         if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
         {
             return $"Public Stable. {releaseExperience.Display.BuildLabel}. {published}";
         }
 
-        return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
+        bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(manifest.ProofStatus, "pass", StringComparison.OrdinalIgnoreCase);
+        if (checksPassing || pulse?.ParityClaimsReviewRequired == false)
+        {
+            return $"Public Stable. {releaseExperience.Display.BuildLabel}. {published}";
+        }
+
+        return $"Current public release on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
     }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9253,9 +9759,17 @@ Boundary:
             TryGetJsonString(fallbackRoutes[0], "rollbackReason"),
             TryGetJsonString(fallbackRoutes[0], "promotionReason"),
             TryGetJsonString(fallbackRoutes[0], "updateEligibilityReason"));
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            reason = reason
+                .Replace("Fallback route", "Alternate route", StringComparison.OrdinalIgnoreCase)
+                .Replace("fallback route", "alternate route", StringComparison.OrdinalIgnoreCase)
+                .Replace("Fallback ", "Alternate ", StringComparison.OrdinalIgnoreCase)
+                .Replace("fallback ", "alternate ", StringComparison.OrdinalIgnoreCase);
+        }
         return string.IsNullOrWhiteSpace(reason)
-            ? $"{fallbackRoutes.Length} fallback download route(s) are published right now."
-            : $"{fallbackRoutes.Length} fallback download route(s) are published right now. {reason}";
+            ? $"{fallbackRoutes.Length} alternate download route(s) are published right now."
+            : $"{fallbackRoutes.Length} alternate download route(s) are published right now. {reason}";
     }
 
     private static string BuildRevokedLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9268,15 +9782,15 @@ Boundary:
         {
             return routeRows.Count == 0
                 ? "No desktop download revoke state is published right now."
-                : $"No revoke markers are active across {routeRows.Count} tracked desktop download routes.";
+                : $"No revoked markers are active across {routeRows.Count} tracked desktop download routes.";
         }
 
         string? reason = FirstNonEmpty(
             TryGetJsonString(revokedRoutes[0], "revokeReason"),
             TryGetJsonString(revokedRoutes[0], "installPostureReason"));
         return string.IsNullOrWhiteSpace(reason)
-            ? $"{revokedRoutes.Length} desktop download route(s) are currently revoked."
-            : $"{revokedRoutes.Length} desktop download route(s) are currently revoked. {reason}";
+            ? $"{revokedRoutes.Length} desktop download route(s) are currently unavailable."
+            : $"{revokedRoutes.Length} desktop download route(s) are currently unavailable. {reason}";
     }
 
     private static string BuildFixedLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9366,6 +9880,24 @@ Boundary:
         return !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
             ? manifest.SupportabilitySummary!
             : "Support history is not mirrored yet.";
+    }
+
+    private static string BuildLedgerMapEntryHref(int? turn, string? mode)
+    {
+        var queryParts = new List<string>(2);
+        if (turn is int requestedTurn)
+        {
+            queryParts.Add($"turn={requestedTurn}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(mode))
+        {
+            queryParts.Add($"mode={Uri.EscapeDataString(mode.Trim())}");
+        }
+
+        return queryParts.Count == 0
+            ? "/ledger/map"
+            : $"/ledger/map?{string.Join("&", queryParts)}";
     }
 
     private static bool IsBlockedStatus(string? value)
@@ -9882,9 +10414,12 @@ Boundary:
 
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
-            segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current release checks passed."
-                : $"Current local release checks are {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+            string proofStatus = pulse.LocalReleaseProofStatus.Trim();
+            segments.Add(string.Equals(proofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+                ? "Current release is verified."
+                : string.Equals(proofStatus, "review_required", StringComparison.OrdinalIgnoreCase)
+                    ? "Current release checks are recorded."
+                    : $"Current release verification is {HumanizeToken(proofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)

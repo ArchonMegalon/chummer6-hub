@@ -28,8 +28,9 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   failures.push(...badLinks.map((item) => `bad link: ${item}`));
 
   await page.goto(`${baseUrl}/ledger`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('link', { name: 'Open command map' }).first()).toHaveAttribute('href', '/ledger/map#ledger-map');
-  await expect(page.getByRole('link', { name: 'Read dispatches' }).first()).toHaveAttribute('href', '/ledger/dispatches');
+  await expect(page).toHaveURL(/\/ledger\/map/);
+  await expect(page.locator('#ledger-map')).toBeVisible();
+  await expect(page.locator('[data-black-ledger-geoscape-root]').first()).toBeVisible();
 
   await page.goto(`${baseUrl}/ledger/factions/ashline-circle`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#ledger-faction-file')).toContainText('Ashline Circle');

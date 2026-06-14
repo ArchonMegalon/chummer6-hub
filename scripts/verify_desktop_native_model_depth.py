@@ -10,15 +10,18 @@ from typing import Any
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
-CHUMMER_UI_ROOT = Path(os.environ.get("CHUMMER_UI_ROOT", "/docker/chummercomplete/chummer6-ui"))
+CHUMMER_UI_ROOT = Path(os.environ.get("CHUMMER_UI_ROOT", "/docker/chummercomplete/chummer-presentation"))
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "DESKTOP_NATIVE_MODEL_DEPTH.generated.json"
 REALITY_AUDIT_PATH = CHUMMER_UI_ROOT / ".codex-studio" / "published" / "CLASSIC_FORMPORT_REALITY_AUDIT.generated.json"
 BRIDGE_PATH = CHUMMER_UI_ROOT / "Chummer.Avalonia" / "Controls" / "ClassicFormPorts" / "ClassicFormPortViewModelBridge.cs"
 SECTION_HOST_PATH = CHUMMER_UI_ROOT / "Chummer.Avalonia" / "Controls" / "SectionHostControl.axaml.cs"
 
 GENERIC_BLOCKERS = {
-    "bridge_create_from_rows_signature": "CreateFromRows(IReadOnlyList<SectionRowDisplayItem> rows)",
-    "bridge_from_rows_signature": "FromRows(IReadOnlyList<SectionRowDisplayItem> rows)",
+    "bridge_create_from_section_rows_signature": "CreateFromSectionRows(IReadOnlyList<SectionRowDisplayItem> sourceRows)",
+    "bridge_parse_document_rows_signature": "ParseDocumentRows(IReadOnlyList<SectionRowDisplayItem> sourceRows)",
+    "bridge_line_item_projection": "ClassicPortLineItem ToLineItem(",
+    "bridge_bucket_projection": "SelectBucket(",
+    "bridge_multi_bucket_projection": "SelectBuckets(",
     "section_host_row_record": "public sealed record SectionRowDisplayItem(string Path, string Value)",
 }
 
@@ -51,21 +54,21 @@ def main() -> int:
         name: marker in (bridge_text if "bridge_" in name else section_host_text)
         for name, marker in GENERIC_BLOCKERS.items()
     }
-    classic_line_item_count = bridge_text.count("IReadOnlyList<ClassicPortLineItem>")
-    bucket_call_count = bridge_text.count("Bucket(")
-    key_snapshot_count = bridge_text.count("Snapshot(")
+    classic_line_item_count = bridge_text.count("ClassicPortLineItem")
+    bucket_call_count = bridge_text.count("SelectBucket(")
+    multi_bucket_call_count = bridge_text.count("SelectBuckets(")
     reality_status = str(reality_payload.get("status") or "missing").strip().lower()
 
     failures: list[str] = []
     if reality_status not in {"pass", "passed", "ready"}:
         failures.append("classic_formport_reality_audit is not passing")
-    if marker_hits["bridge_create_from_rows_signature"]:
-        failures.append("desktop flagship bridge still creates domain state directly from SectionRowDisplayItem rows")
-    if marker_hits["bridge_from_rows_signature"]:
-        failures.append("desktop flagship bridge still derives row facts from generic SectionRowDisplayItem rows")
-    if classic_line_item_count >= 12:
-        failures.append(f"desktop flagship bridge still exposes {classic_line_item_count} ClassicPortLineItem list surfaces")
-    if bucket_call_count >= 3 and key_snapshot_count >= 1:
+    if marker_hits["bridge_create_from_section_rows_signature"]:
+        failures.append("desktop flagship bridge still creates document state directly from SectionRowDisplayItem rows")
+    if marker_hits["bridge_parse_document_rows_signature"]:
+        failures.append("desktop flagship bridge still parses generic SectionRowDisplayItem rows into workflow state")
+    if marker_hits["bridge_line_item_projection"] or classic_line_item_count >= 12:
+        failures.append(f"desktop flagship bridge still projects ClassicPortLineItem wrappers across the desktop surface ({classic_line_item_count} references)")
+    if marker_hits["bridge_bucket_projection"] or marker_hits["bridge_multi_bucket_projection"] or (bucket_call_count + multi_bucket_call_count) >= 3:
         failures.append("desktop flagship bridge still buckets generic row facts instead of typed workflow models")
 
     result = {
@@ -82,7 +85,7 @@ def main() -> int:
             **marker_hits,
             "classic_port_line_item_list_count": classic_line_item_count,
             "bucket_call_count": bucket_call_count,
-            "snapshot_call_count": key_snapshot_count,
+            "multi_bucket_call_count": multi_bucket_call_count,
         },
         "reality_audit_status": reality_status,
         "failures": failures,

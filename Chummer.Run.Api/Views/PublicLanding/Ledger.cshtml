@@ -125,6 +125,19 @@
     var heroGlobeRenderMode = mapFocused ? "command-map" : "magicfit-newsreel";
     var heroDisableWebGl = mapFocused ? "false" : "true";
     var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "magicfit-newsreel";
+    static string softenLedgerNote(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("Proof lane anchored to", "Source signal:", StringComparison.OrdinalIgnoreCase)
+            .Replace("Review lane anchored to", "Source signal:", StringComparison.OrdinalIgnoreCase)
+            .Replace("Routed through", "Built from", StringComparison.OrdinalIgnoreCase)
+            .Trim();
+    }
 }
 
 <section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
@@ -260,7 +273,7 @@
                 <div class="ledger-provider-tours" data-ledger-tour-exports="/media/ledger/tours/black-ledger-tour-exports.manifest.json" aria-label="External 3D viewer exports">
                     <div>
                         <span class="tag">3D viewer exports</span>
-                        <p>Provider-hosted viewer validation links. Chummer tactical truth stays in the command map.</p>
+                        <p>Optional external viewer exports stay here. The live board stays on this command map.</p>
                     </div>
                     <div class="ledger-provider-tours__actions">
                         <a class="button-like button-like--primary" href="/media/ledger/tours/black-ledger-3dvista-flythrough.mp4">Fly-through</a>
@@ -334,7 +347,7 @@
                                             <p>@beat.ActionSummary</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.Stakes</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.ConsequenceLine</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@softenLedgerNote(beat.ProofNote)</p>
                                         </article>
                                     }
                                 </div>

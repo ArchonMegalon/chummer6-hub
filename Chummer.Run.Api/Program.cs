@@ -102,7 +102,8 @@ if (!hubGoogleAuth.IsConfigured())
 {
     app.Logger.LogWarning("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.");
 }
-const string SearchRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+const string NoIndexRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+const string PublicIndexRobotsPolicy = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
 
 // Configure the HTTP request pipeline.
 
@@ -137,9 +138,10 @@ else if (enableHttpsRedirection)
 app.Use(async (context, next) =>
 {
     bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
+    string robotsPolicy = ResolveRobotsPolicy(context.Request.Path);
     context.Response.OnStarting(() =>
     {
-        context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
+        context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
         if (requiresNoStore)
         {
             context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
@@ -173,7 +175,7 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = contentTypeProvider,
     OnPrepareResponse = fileContext =>
     {
-        fileContext.Context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
+        fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy(fileContext.Context.Request.Path);
     }
 });
 
@@ -206,6 +208,43 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
+}
+
+static string ResolveRobotsPolicy(PathString path)
+{
+    return IsIndexablePublicPath(path) ? PublicIndexRobotsPolicy : NoIndexRobotsPolicy;
+}
+
+static bool IsIndexablePublicPath(PathString path)
+{
+    string rawPath = path.Value ?? string.Empty;
+    bool newsroomEpisodePath = rawPath.StartsWith("/ledger/newsroom/", StringComparison.OrdinalIgnoreCase)
+        && !rawPath.EndsWith("/transcript", StringComparison.OrdinalIgnoreCase)
+        && !rawPath.EndsWith("/receipts", StringComparison.OrdinalIgnoreCase);
+
+    if (path.Equals("/", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    return path.Equals("/downloads", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/status", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/now", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/changelog", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/what-is-chummer", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/help", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/faq", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/contact", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/privacy", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/terms", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/ledger", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/ledger/map", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/ledger/factions", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/ledger/newsroom", StringComparison.OrdinalIgnoreCase)
+        || newsroomEpisodePath
+        || path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/sitemap.xml", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)

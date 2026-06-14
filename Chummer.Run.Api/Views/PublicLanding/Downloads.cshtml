@@ -83,11 +83,11 @@
         <p class="muted-copy">
             @(guestGateRequired
                 ? recommendedIsWindowsInstaller && windowsZipFallback is not null
-                    ? "Start with the guided installer when you want the full setup path. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path when you want the guided setup path and signed-in return."
-                : "Start with the recommended download. Install first, then sign in later if you want recovery and support linked.")
+                    ? "Start with the recommended installer. If size matters more, use the smaller Windows ZIP below."
+                    : "Start with the recommended install path. Sign in only when you want account return and support attached."
+                : "Start with the recommended download. Install first. Sign in later if you want account return and support attached.")
         </p>
-        <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
+        <p class="muted-copy">Need another platform or package type? <a class="inline-link" href="/downloads">Browse all downloads</a>.</p>
     </div>
 </section>
 
@@ -147,9 +147,9 @@ else
                         ? release.PlatformShelfNoticeSummary
                         : guestGateRequired
                             ? recommendedIsWindowsInstaller && windowsZipFallback is not null
-                                ? "Use the guided installer when you want the managed setup path. If you want the smaller direct payload instead, open the Windows ZIP right below."
-                                : "Use the main install path for this platform. If you want sign-in and support linked from the first launch, open the account-assisted route."
-                            : "Use the main install path for this platform. You can install first and sign in later if you want account return and support linked.")
+                                ? "Use the recommended installer for this platform. If you want the smaller direct payload instead, open the Windows ZIP right below."
+                                : "Use the main install path for this platform. Sign in only when you want support and account return attached from the first launch."
+                            : "Use the main install path for this platform. You can install first and sign in later when you want account return and support attached.")
                 </p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
@@ -170,11 +170,11 @@ else
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>First launch</span>
-                        <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
+                        <strong>@(guestGateRequired ? "Sign in only when you want return and support" : "Sign in later if you need return and support")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "Recovery and support can stay linked when you choose sign-in."
-                                : "You can install now and link the app after setup.")
+                                ? "The installer stays the same. Sign-in only adds account return and support."
+                                : "Install first. Account return and support can be linked afterward.")
                         </p>
                     </article>
                     <article class="recommended-download__trustfact">
@@ -229,10 +229,10 @@ else
                     }
                 </div>
                 <div class="route-callout" role="status" aria-live="polite">
-                    <h3>Need help choosing a setup path?</h3>
-                    <p>Open setup concierge when you want one short path into downloads, platform help, or a human handoff without losing the first-party fallback.</p>
+                    <h3>Need install help?</h3>
+                    <p>Use setup concierge only when you need help choosing a platform, recovering a setup, or reaching a human handoff.</p>
                     <div class="route-callout__actions">
-                        <a class="inline-link" href="/downloads/concierge">Open setup concierge</a>
+                        <a class="inline-link" href="/downloads/concierge">Get setup help</a>
                         <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     </div>
                 </div>

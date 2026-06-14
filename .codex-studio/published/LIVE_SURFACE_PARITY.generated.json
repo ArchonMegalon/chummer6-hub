@@ -1,0 +1,93 @@
+{
+  "contract_name": "chummer.live_surface_parity",
+  "generated_at_utc": "2026-06-14T20:35:54Z",
+  "base_url": "https://chummer.run",
+  "status": "pass",
+  "verdict": "LIVE_SURFACE_PARITY_READY",
+  "results": [
+    {
+      "path": "/",
+      "url": "https://chummer.run/",
+      "final_url": "https://chummer.run/",
+      "status_code": 200,
+      "required_texts": [
+        "Black Ledger command deck",
+        "The city is moving.",
+        "Choose the build, open play, or replay Turn 1."
+      ],
+      "missing_required_texts": [],
+      "forbidden_texts": [
+        "One compact rail for downloads, play, and public status.",
+        "Reel details",
+        "Keep it simple"
+      ],
+      "forbidden_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/downloads",
+      "url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/downloads",
+      "status_code": 200,
+      "required_texts": [
+        "Install Chummer",
+        "Start with the recommended build",
+        "Need install help?"
+      ],
+      "missing_required_texts": [],
+      "forbidden_texts": [
+        "account-assisted install paths",
+        "Link this copy from the first launch",
+        "guided installer"
+      ],
+      "forbidden_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/status",
+      "url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/status",
+      "status_code": 200,
+      "required_texts": [
+        "Use this page for the short customer-facing summary.",
+        "Compact release summary",
+        "Compact status summary"
+      ],
+      "missing_required_texts": [],
+      "forbidden_texts": [
+        "Preview posture on Public release",
+        "Review is still required before this release can be treated as supportable.",
+        "Fallback",
+        "Revoked",
+        "usage snapshot"
+      ],
+      "forbidden_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/ledger",
+      "url": "https://chummer.run/ledger",
+      "final_url": "https://chummer.run/ledger/map",
+      "status_code": 200,
+      "required_texts": [
+        "Black Ledger command map",
+        "Command map"
+      ],
+      "missing_required_texts": [],
+      "forbidden_texts": [
+        "Internal Error"
+      ],
+      "forbidden_hits": [],
+      "required_final_url_prefix": "/ledger/map",
+      "final_url_matches": true,
+      "status": "pass"
+    }
+  ],
+  "failures": []
+}

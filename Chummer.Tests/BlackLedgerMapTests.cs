@@ -72,6 +72,17 @@ public sealed class BlackLedgerMapTests
     }
 
     [Fact]
+    public void BlackLedger_public_entry_route_redirects_to_the_stable_command_map_surface()
+    {
+        string publicLanding = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string manifest = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml"));
+
+        Assert.Contains("[HttpGet(\"/ledger\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(BuildLedgerMapEntryHref(turn, mode));", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("required_final_url_prefix: /ledger/map", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BlackLedgerMap_view_mounts_real_globe_at_anchor_instead_of_legacy_svg_fallback()
     {
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));

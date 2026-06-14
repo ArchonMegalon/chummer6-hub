@@ -20,6 +20,7 @@ UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
+FRESHNESS_REQUIRED_GATES = {"live_public_web_recrawl", "public_route_proof"}
 
 REQUIRED_RECEIPTS = {
     "live_public_web_recrawl": PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
@@ -30,6 +31,7 @@ REQUIRED_RECEIPTS = {
     "black_ledger_live_media_proof": PUBLISHED_ROOT / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
     "table_pulse_scenario_replay": PUBLISHED_ROOT / "TABLE_PULSE_SCENARIO_REPLAY.generated.json",
     "public_route_proof": PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+    "live_surface_parity": PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json",
     "external_distribution_mirror_proof": PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
     "public_copy_leak_gate": PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json",
     "design_quality_gate": PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json",
@@ -40,6 +42,19 @@ REQUIRED_RECEIPTS = {
 
 MATERIALIZERS = [
     ["python3", "scripts/verify_live_public_web_recrawl.py", "--base-url", DEFAULT_BASE_URL],
+    [
+        "python3",
+        "scripts/verify_public_routes_from_manifest.py",
+        "--strict-positive",
+        "--seed-receipts",
+        "--base-url",
+        DEFAULT_BASE_URL,
+        "--manifest",
+        ".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml",
+        "--output",
+        str(PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"),
+    ],
+    ["python3", "scripts/verify_live_surface_parity.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_rules_authority_minimum_coverage.py"],
     ["python3", "scripts/classify_ruleset_readiness.py", "--output", str(PUBLISHED_ROOT / "RULESET_READINESS.generated.json")],
     ["python3", "scripts/verify_provider_proof_discoverability.py"],
@@ -115,7 +130,7 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
     for name, path in REQUIRED_RECEIPTS.items():
         payload = load_json(path)
         generated_at = str(payload.get("generated_at_utc") or payload.get("generatedAt") or "")
-        is_fresh = generated_at_is_fresh(generated_at, RECRAWL_MAX_AGE_HOURS) if name == "live_public_web_recrawl" else True
+        is_fresh = generated_at_is_fresh(generated_at, RECRAWL_MAX_AGE_HOURS) if name in FRESHNESS_REQUIRED_GATES else True
         status_value = str(payload.get("status") or "").strip().lower()
         passed = path.is_file() and status_value in {"pass", "passed", "ready"} and is_fresh
         if name == "public_route_proof" and path.is_file():
@@ -124,19 +139,20 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
                 int(summary.get("route_count") or 0) > 0
                 and int(summary.get("failed_count") or 0) == 0
                 and int(summary.get("negative_path_failed_count") or 0) == 0
+                and is_fresh
             )
             status_value = "pass" if passed else "fail"
         if not passed:
             reason = f"{name} missing" if not path.is_file() else f"{name} failed"
-            if path.is_file() and name == "live_public_web_recrawl" and not is_fresh:
+            if path.is_file() and name in FRESHNESS_REQUIRED_GATES and not is_fresh:
                 reason = f"{name} stale"
             failures.append(reason)
         required_gates[name] = {
             "path": str(path),
             "exists": path.is_file(),
-            "status": payload.get("status", "missing"),
+            "status": status_value or payload.get("status", "missing"),
             "generated_at_utc": generated_at,
-            "fresh_within_hours": RECRAWL_MAX_AGE_HOURS if name == "live_public_web_recrawl" else None,
+            "fresh_within_hours": RECRAWL_MAX_AGE_HOURS if name in FRESHNESS_REQUIRED_GATES else None,
             "pass": passed,
         }
         if name == "rule_authority_minimum_coverage" and path.is_file():
@@ -160,15 +176,29 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["assumed_rulesets"] = sorted(assumed_rulesets)
         if name == "public_route_proof" and path.is_file():
             required_gates[name]["summary"] = payload.get("summary", {})
-            if passed:
-                required_gates[name]["status"] = "pass"
         if name == "external_distribution_mirror_proof" and path.is_file():
             required_gates[name]["external_required"] = payload.get("external_required")
+            required_gates[name]["distribution_resilience_status"] = payload.get("distribution_resilience_status")
+            required_gates[name]["advisory_external_failures"] = payload.get("advisory_external_failures", [])
             required_gates[name]["providers"] = {
                 provider: data.get("status")
                 for provider, data in (payload.get("providers") or {}).items()
                 if isinstance(data, dict)
             }
+            advisory_failures = payload.get("advisory_external_failures")
+            if (
+                isinstance(advisory_failures, list)
+                and advisory_failures
+                and not payload.get("external_required")
+            ):
+                caveats.append(
+                    {
+                        "id": "optional_external_mirrors_degraded",
+                        "severity": "operational_advisory",
+                        "summary": "Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.",
+                        "providers": sorted(str(item) for item in advisory_failures),
+                    }
+                )
         if name == "release_ready" and path.is_file():
             required_gates[name]["verdict"] = payload.get("verdict")
             required_gates[name]["failures"] = payload.get("failures", [])

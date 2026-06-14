@@ -190,6 +190,12 @@ def verify_route(
     request_path = str(route.get("verification_path") or path)
     resolved_request_path = resolve_route_path_placeholders(request_path)
     resolved_guest_fallback = resolve_route_path_placeholders(guest_fallback) if guest_fallback else None
+    required_texts = tuple(
+        str(item).strip()
+        for item in (route.get("required_texts") or [])
+        if str(item).strip()
+    )
+    required_final_url_prefix = str(route.get("required_final_url_prefix") or "").strip()
     verification_mode = str(route.get("verification_mode") or "").strip()
     receipt_seed_required = verification_mode == "controller_contract" and route_path_contains_placeholders(request_path)
 
@@ -442,15 +448,28 @@ def verify_route(
     mode = "public_route"
     expectation = "public route resolves successfully"
     try:
-        status, _, headers, final_url = fetch(
+        status, body, headers, final_url = fetch(
             base_url,
             resolved_request_path,
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
             follow_redirects=True)
         redirect_location = headers.get("location")
-        success = status == 200
-        detail = f"expected 200 from public route, got {status}"
+        missing_texts = [snippet for snippet in required_texts if snippet not in body]
+        final_url_ok = (
+            not required_final_url_prefix
+            or final_url.startswith(f"{base_url.rstrip('/')}{required_final_url_prefix}")
+            or final_url.startswith(required_final_url_prefix)
+        )
+        success = status == 200 and not missing_texts and final_url_ok
+        detail_parts = [f"expected 200 from public route, got {status}"]
+        if missing_texts:
+            detail_parts.append("missing required text: " + ", ".join(missing_texts))
+        if not final_url_ok:
+            detail_parts.append(
+                f"final URL {final_url!r} does not match required prefix {required_final_url_prefix!r}"
+            )
+        detail = "; ".join(detail_parts)
         return RouteResult(
             path=path,
             audience=audience,

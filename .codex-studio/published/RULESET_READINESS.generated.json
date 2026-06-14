@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ruleset_readiness",
-  "generated_at_utc": "2026-06-14T08:48:20.319645Z",
+  "generated_at_utc": "2026-06-14T20:09:52.522267Z",
   "fleet_closeout_status": "pass",
   "frontier_receipts": {
     "ui_sr4_sr6_desktop_parity_frontier": "pass",
@@ -31,17 +31,17 @@
   "rulesets": {
     "sr4": {
       "readiness": "full",
-      "readiness_basis": "workflow_parity_receipt",
+      "readiness_basis": "human_approved_rule_authority_receipts",
       "authority_receipts": [
         "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
         "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
         "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
       ],
-      "workflow_parity_status": "pass",
+      "workflow_parity_status": "fail",
       "rule_authority_status": "pass",
       "frontier_status": "pass",
-      "human_side_gold_assumption": false,
-      "ui_orientation": "verified",
+      "human_side_gold_assumption": true,
+      "ui_orientation": "human_approved_gap",
       "codec_import_export": "baseline",
       "deterministic_provider_depth": "verified",
       "mechanics_corpus": "verified",

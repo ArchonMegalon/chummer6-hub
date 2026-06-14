@@ -1,10 +1,29 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-14T08:49:44Z",
+  "generated_at_utc": "2026-06-14T20:36:03Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
   "checks": {
+    "live_public_web_recrawl": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
+      "status": "pass",
+      "result_count": 7,
+      "pass": true
+    },
+    "public_route_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+      "status": "pass",
+      "route_count": 165,
+      "failed_count": 0,
+      "pass": true
+    },
+    "live_surface_parity": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
+      "status": "pass",
+      "failure_count": 0,
+      "pass": true
+    },
     "ui_frame_integrity": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
       "status": "pass",

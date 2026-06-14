@@ -11974,7 +11974,7 @@ def main() -> int:
                 "Current release",
                 "Known issues and install help",
                 "Update path",
-                "Three release checks that show what works beyond the landing page"),
+                "Three quick checks that show what works beyond the landing page"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
@@ -12145,7 +12145,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Public Stable", "Quick release checks", "Campaign checks"):
+    for snippet in ("Public Stable", "Compact status summary", "Campaign checks"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

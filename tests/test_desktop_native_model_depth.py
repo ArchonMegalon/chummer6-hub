@@ -30,9 +30,10 @@ class DesktopNativeModelDepthTests(unittest.TestCase):
             bridge.write_text(
                 "\n".join(
                     [
-                        "public static ClassicFormPortDomainModel CreateFromRows(IReadOnlyList<SectionRowDisplayItem> rows)",
-                        "public static IReadOnlyList<ClassicPortRowFact> FromRows(IReadOnlyList<SectionRowDisplayItem> rows)",
-                    ] + ["IReadOnlyList<ClassicPortLineItem> Example,"] * 12 + ["Bucket(", "Bucket(", "Bucket(", "Snapshot("]
+                        "public static ClassicFormPortDocument CreateFromSectionRows(IReadOnlyList<SectionRowDisplayItem> sourceRows)",
+                        "private static IEnumerable<ClassicPortRowFact> ParseDocumentRows(IReadOnlyList<SectionRowDisplayItem> sourceRows)",
+                        "private static ClassicPortLineItem ToLineItem(string label, string value) => new(label, value);",
+                    ] + ["ClassicPortLineItem"] * 12 + ["SelectBucket(", "SelectBucket(", "SelectBuckets("]
                 ),
                 encoding="utf-8",
             )
@@ -47,7 +48,7 @@ class DesktopNativeModelDepthTests(unittest.TestCase):
 
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual("fail", payload["status"])
-            self.assertIn("desktop flagship bridge still creates domain state directly from SectionRowDisplayItem rows", payload["failures"])
+            self.assertIn("desktop flagship bridge still creates document state directly from SectionRowDisplayItem rows", payload["failures"])
 
     def test_passes_when_generic_projection_markers_are_absent(self) -> None:
         module = load_module()

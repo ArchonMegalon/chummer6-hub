@@ -1,6 +1,6 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-14T08:48:35Z
+- Generated: 2026-06-14T20:11:17Z
 - Version: `run-20260612-121055`
 - Channel: `public_stable`
 - Published: `2026-06-13T18:49:54Z`
@@ -8,7 +8,7 @@
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 
 ## Rulesets
-- `sr4`: status `None`, workflow parity `pass`, assumption `False`
+- `sr4`: status `None`, workflow parity `fail`, assumption `True`
 - `sr5`: status `None`, workflow parity `None`, assumption `None`
 - `sr6`: status `None`, workflow parity `pass`, assumption `False`
 

@@ -6,6 +6,14 @@
     var accessPosture = Model.AccessPosture;
     var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
     var installLinkReturnsToLocalApp = false;
+    static bool IsLoopbackCallbackUri(string candidate)
+    {
+        return Uri.TryCreate(candidate, UriKind.Absolute, out var parsedCallback)
+            && parsedCallback.IsLoopback
+            && (string.Equals(parsedCallback.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsedCallback.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+    }
+
     if (isInstallLinkReturn)
     {
         var parsedNextPath = new Uri($"https://chummer.run{Model.NextPath}", UriKind.Absolute);
@@ -13,12 +21,7 @@
         if (nextQuery.TryGetValue("installLinkCallbackUri", out var callbackValues))
         {
             var callbackUri = callbackValues.ToString();
-            installLinkReturnsToLocalApp = callbackUri.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase)
-                || callbackUri.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase)
-                || callbackUri.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase)
-                || callbackUri.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase)
-                || callbackUri.StartsWith("http://[::1]", StringComparison.OrdinalIgnoreCase)
-                || callbackUri.StartsWith("https://[::1]", StringComparison.OrdinalIgnoreCase);
+            installLinkReturnsToLocalApp = IsLoopbackCallbackUri(callbackUri);
         }
     }
     var nextTarget = isInstallLinkReturn
