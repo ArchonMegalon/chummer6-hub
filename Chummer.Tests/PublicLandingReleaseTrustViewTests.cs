@@ -813,10 +813,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep feature detail, proof, installs, and help on their own pages.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep feature detail, downloads, installs, and help on their own pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Compare with current release status instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
         Assert.Contains("Current status view", view, StringComparison.Ordinal);
+        Assert.Contains("Detail view", view, StringComparison.Ordinal);
         Assert.Contains("Open detail view", view, StringComparison.Ordinal);
         Assert.Contains("Use downloads when the question becomes install or update posture", view, StringComparison.Ordinal);
         Assert.Contains("Leave feature detail for first-party help as soon as the issue becomes support or recovery", view, StringComparison.Ordinal);

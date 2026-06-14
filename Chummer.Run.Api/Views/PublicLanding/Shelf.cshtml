@@ -133,8 +133,8 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
-            ? "/artifacts#signed-in-proof-view"
-            : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-proof-view";
+            ? "/artifacts#signed-in-detail-view"
+            : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-detail-view";
     static string ArtifactViewTitle(string view) => view switch
     {
         "personal" => "Personal view",
@@ -288,7 +288,7 @@
 
 @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
 {
-    <section class="continuity-band" id="signed-in-proof-view">
+    <section class="continuity-band" id="signed-in-detail-view">
         <div class="continuity-band__copy">
             <p class="eyebrow">Signed-in account return view</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>

@@ -48,7 +48,7 @@
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
         ?? "No visible receipt is attached to this outward-facing publication yet.";
-    var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-view" : "/signup?next=%2Fartifacts";
+    var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
     var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in account return view" : "Create account for signed-in account return";
     var signedInShelfSummary = Model.Chrome.Authenticated
         ? "Use the signed-in detail view when you want personal, campaign, creator, and public returns to stay in one calmer place."
