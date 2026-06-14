@@ -3642,12 +3642,12 @@ public sealed class PublicLandingController : Controller
                 signedInArtifactView);
         }
         var model = new ShelfPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current public release.", "/artifacts", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Detail surfaces, briefs, and grounded outputs connected to the current public release.", "/artifacts", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Eyebrow: "Artifacts",
-            Heading: "Proof gallery",
-            Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
+            Heading: "Detail gallery",
+            Intro: "Browse the packs, briefs, and detail surfaces that make the current release feel tangible.",
             Items: guestCards,
             PublicCreatorPublications: publicCreatorPublications,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),

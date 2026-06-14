@@ -4,13 +4,13 @@
     bool publicSignalLive = Model.ReceiptCount > 0 || Model.CategoryCount > 0;
     string followThroughHeading = followThroughReady
         ? "Chummer follow-up examples are visible now."
-        : "First-party follow-up is still preview-only on this host.";
+        : "First-party follow-up is not posted here yet.";
     string followThroughSummary = followThroughReady
         ? $"{Model.CloseoutDispatchSentCount} follow-up record(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
             ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
-            : "Public feedback can still show demand, but account-backed follow-up stays off until shipped updates and first-party closeout receipts are both real on this host.";
-    string readinessTag = followThroughReady ? "Posted follow-up examples" : "Preview-only follow-up";
+            : "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.";
+    string readinessTag = followThroughReady ? "Posted follow-up examples" : "Pending follow-up";
 }
 
 <section class="editorial-block">

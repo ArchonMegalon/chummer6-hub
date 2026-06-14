@@ -185,11 +185,11 @@ public sealed class ReleaseSelectionService
         if (guestInstallAvailable && accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity after the first launch link.";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach account return after the first launch link.";
             createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, tracked support, or linked install history on the same return path.";
             signInSummary = "Sign in to reopen linked installs, recovery history, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to routes that keep install continuity attached after linking.";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to routes that keep account return attached after linking.";
         }
         else if (guestInstallAvailable)
         {

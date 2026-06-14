@@ -76,6 +76,10 @@ FORBIDDEN_PATTERNS = [
     r"\bsign in first only\b",
     r"\bLoad Demo Runner\b",
     r"\bOpen Demo\b",
+    r"\bProof gallery\b",
+    r"\bproof gallery\b",
+    r"\bpreview-only on this host\b",
+    r"\bJourney refs\b",
 ]
 
 

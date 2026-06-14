@@ -3,7 +3,7 @@ Chummer public route guide
 Overview
 - Chummer is the public front door and support-aware release rail for the Shadowrun campaign OS preview.
 - This hosted surface keeps current release status, future direction, public signal, and private support on separate routes.
-- Signed-in account overlays exist for install continuity, support return, and follow-up, but the public pages remain readable without an account.
+- Signed-in account overlays exist for account return, support return, and follow-up, but the public pages remain readable without an account.
 
 Primary routes
 - / : landing and product entry
@@ -46,7 +46,7 @@ Help and account routes
 - /contact : private support and follow-up
 - /contact/concierge : bounded support-routing wrapper
 - /home : signed-in return surface
-- /account : signed-in account, install continuity, and follow settings
+- /account : signed-in account, account return, and follow settings
 
 Reading rules
 - Do not treat /roadmap or /horizons as shipped truth.

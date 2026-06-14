@@ -12028,8 +12028,8 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/artifacts",
-            "Proof gallery",
-            required_texts=("Current usable proof surfaces", "Current preview build", "Mac release pipeline"),
+            "Detail gallery",
+            required_texts=("Current usable detail surfaces", "Current release build", "Mac release pipeline"),
             expects_header_count=1),
         AuditRoute(
             "/participate",

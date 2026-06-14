@@ -448,11 +448,11 @@
 
 @if (liveItems.Length > 0)
 {
-    <section class="artifact-gallery" id="current-proof-surfaces">
+    <section class="artifact-gallery" id="current-detail-surfaces">
         <div class="artifact-gallery__lead">
             <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
             <h2 class="editorial-title">Current usable detail surfaces</h2>
-            <p class="editorial-copy">These are the proof surfaces you can use or inspect today. They support the install decision; they do not replace downloads.</p>
+            <p class="editorial-copy">These are the detail surfaces you can use or inspect today. They support the install decision; they do not replace downloads.</p>
         </div>
         <div class="artifact-gallery__grid">
             @foreach (var card in liveItems)
@@ -482,7 +482,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
-                            <p><strong>Proof:</strong> @card.Card.ProofNote</p>
+                            <p><strong>Detail:</strong> @card.Card.ProofNote</p>
                         }
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>

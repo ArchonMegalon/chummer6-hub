@@ -124,7 +124,7 @@ async function assertPublicArtifactDetail(page, pageErrors, path, label) {
   await gotoAndAssert(page, pageErrors, path, async () => {
     const currentPath = new URL(page.url()).pathname;
     assert(/^\/artifacts\//.test(currentPath), `${label} should open a public artifact detail route.`);
-    await expectBodyText(page, 'Current preview build', label);
+    await expectBodyText(page, 'Current release build', label);
     await expectBodyText(page, 'Available today. The installer shelf, release channel, and integrity trail are live right now.', label);
     await expectBodyText(page, 'Keep feature detail, proof, installs, and help on their own pages.', label);
     await expectBodyText(page, 'Open downloads stays available because this page is proving one user-visible artifact', label);
@@ -510,10 +510,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
-    await expectVisible(page, 'text=Proof gallery');
-    await expectVisible(page, 'text=Pick proof, downloads, signed-in continuity, or help without mixing their jobs.');
-    await expectVisible(page, 'text=Inspect live proof, dossiers, and publication lineage here');
-    await expectVisible(page, 'text=Current usable proof surfaces');
+    await expectVisible(page, 'text=Detail gallery');
+    await expectVisible(page, 'text=Pick details, downloads, signed-in continuity, or help without mixing their jobs.');
+    await expectVisible(page, 'text=Inspect live details, dossiers, and publication lineage here');
+    await expectVisible(page, 'text=Current usable detail surfaces');
     await expectVisible(page, 'text=Opening next');
     publicArtifactDetailPath = await readFirstHref(page, 'a[href="/artifacts/current-preview-build"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');

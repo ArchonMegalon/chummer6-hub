@@ -603,7 +603,7 @@ QUEUE_MARKERS = [
 SUCCESSOR_REGISTRY_MARKERS = [
     "program_wave: next_90_day_product_advance",
     "  - id: 107",
-    "title: Artifact factory and public proof gallery",
+    "title: Artifact factory and public detail gallery",
     "      - id: 107.1",
     "owner: chummer6-hub",
     "title: Orchestrate recipe-backed artifact jobs from approved release, support, and publication packs.",

@@ -13,10 +13,10 @@ OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
-    "Votes show demand; Chummer-owned proof decides what ships.",
-    "proof-backed closeout",
-    "First-party follow-up is still preview-only on this host.",
-    "Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.",
+    "Votes show demand; Chummer-owned release decisions decide what ships.",
+    "release-backed closeout",
+    "First-party follow-up is not posted here yet.",
+    "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.",
 )
 FORBIDDEN_HTML_PHRASES = (
     "webhook verification",
@@ -28,10 +28,10 @@ FORBIDDEN_HTML_PHRASES = (
     "sent receipts",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "Votes show demand; Chummer-owned proof decides what ships.",
-    "proof-backed closeout",
-    "preview-only on this host",
-    "stays off until shipped proof and first-party closeout receipts are both real on this host",
+    "Votes show demand; Chummer-owned release decisions decide what ships.",
+    "release-backed closeout",
+    "First-party follow-up is not posted here yet.",
+    "account-backed follow-up waits until the shipped path is available on this host",
 )
 FORBIDDEN_SOURCE_PHRASES = (
     "pending/zero closeout",

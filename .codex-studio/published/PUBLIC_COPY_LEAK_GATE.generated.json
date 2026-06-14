@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-14T06:53:26Z",
+  "generated_at_utc": "2026-06-14T07:37:51Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "summary": {
     "route_count": 15,
     "failed_route_count": 0,
-    "forbidden_pattern_count": 40,
+    "forbidden_pattern_count": 44,
     "failed_routes": []
   },
   "forbidden_patterns": [
@@ -49,7 +49,11 @@
     "\\bcreate an account first\\b",
     "\\bsign in first only\\b",
     "\\bLoad Demo Runner\\b",
-    "\\bOpen Demo\\b"
+    "\\bOpen Demo\\b",
+    "\\bProof gallery\\b",
+    "\\bproof gallery\\b",
+    "\\bpreview-only on this host\\b",
+    "\\bJourney refs\\b"
   ],
   "routes": [
     {
