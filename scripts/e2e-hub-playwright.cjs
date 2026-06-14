@@ -493,7 +493,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=Ready to install?');
-    await expectVisible(page, 'text=What you can verify now');
+    await expectVisible(page, 'text=What you can check now');
     await expectVisible(page, 'text=Downloads stays the primary install surface');
     await assertNoBannedCopy(page, 'Now');
   });
