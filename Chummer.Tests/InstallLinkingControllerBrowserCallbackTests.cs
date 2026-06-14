@@ -153,6 +153,12 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         ContentResult page = Assert.IsType<ContentResult>(result);
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.Contains("Finish linking this install", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Finish linking", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Manual callback link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Copy callback link", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("iframe", page.Content, StringComparison.Ordinal);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
         string decodedCallbackHref = WebUtility.HtmlDecode(callbackHref);
         Assert.True(Uri.TryCreate(decodedCallbackHref, UriKind.Absolute, out Uri? redirectUri), "The controller should emit a valid app-local callback URI.");

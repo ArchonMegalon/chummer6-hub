@@ -199,7 +199,8 @@ public sealed class InstallLinkingController : ControllerBase
                         $"Requested build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}",
                         $"Requested target: {NormalizeBrowserInstallLinkLabel(headId, "desktop")} {NormalizeBrowserInstallLinkLabel(platform, "unknown")} {NormalizeBrowserInstallLinkLabel(arch, "unknown")}"
                     ],
-                    autoOpenHref: null);
+                    autoOpenHref: null,
+                    appLocalCallback: false);
             }
 
             IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
@@ -227,11 +228,14 @@ public sealed class InstallLinkingController : ControllerBase
                 releaseChannel ?? manifest.Channel,
                 platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
                 arch ?? artifact.Arch ?? "unknown");
+            bool appLocalCallback = IsAppLocalInstallLinkCallbackUri(callbackRedirectUri);
             return BuildBrowserInstallLinkStatusPage(
                 statusCode: StatusCodes.Status200OK,
-                heading: "Open Chummer to finish linking this install",
-                supportLine: "Your account approved this install. If the app does not open automatically, use the button below from this same browser.",
-                primaryLabel: "Open Chummer",
+                heading: appLocalCallback ? "Finish linking this install" : "Open Chummer to finish linking this install",
+                supportLine: appLocalCallback
+                    ? "Your account approved this install. Keep this browser tab open while the running app finishes linking through the local callback."
+                    : "Your account approved this install. If the app does not open automatically, use the button below from this same browser.",
+                primaryLabel: appLocalCallback ? "Finish linking" : "Open Chummer",
                 primaryHref: callbackRedirectUri,
                 secondaryLabel: "Open devices and access",
                 secondaryHref: "/account/access",
@@ -242,7 +246,8 @@ public sealed class InstallLinkingController : ControllerBase
                     $"Package: {artifact.Id}",
                     $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
                 ],
-                autoOpenHref: callbackRedirectUri);
+                autoOpenHref: callbackRedirectUri,
+                appLocalCallback: appLocalCallback);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -268,8 +273,43 @@ public sealed class InstallLinkingController : ControllerBase
         string secondaryHref,
         string stateLabel,
         IReadOnlyList<string> highlights,
-        string? autoOpenHref)
+        string? autoOpenHref,
+        bool appLocalCallback)
     {
+        string clickAttemptMessage = appLocalCallback
+            ? "Tried the local callback again. If this tab still does not finish linking, copy the callback link below and open it in the same browser."
+            : "Tried the Chummer app handoff again. If nothing opens, copy the launch link below and paste it into the browser address bar.";
+        string copiedMessage = appLocalCallback
+            ? "Callback link copied. Open it in this browser if the tab still does not finish linking."
+            : "Launch link copied. Paste it into the browser address bar if the app still does not open.";
+        string autoAttemptMessage = appLocalCallback
+            ? "Tried the local callback automatically. If this tab did not finish linking, use the button again or copy the callback link below."
+            : "Tried the Chummer app handoff automatically. If the app did not open, use the button again or copy the launch link below.";
+        string tryOpenBody = appLocalCallback
+            ? """
+                  try {
+                    window.location.assign(href);
+                  } catch {}
+              """
+            : """
+                  try {
+                    const frame = document.createElement("iframe");
+                    frame.setAttribute("aria-hidden", "true");
+                    frame.tabIndex = -1;
+                    frame.style.position = "absolute";
+                    frame.style.inlineSize = "1px";
+                    frame.style.blockSize = "1px";
+                    frame.style.opacity = "0";
+                    frame.style.pointerEvents = "none";
+                    frame.src = href;
+                    document.body.appendChild(frame);
+                    window.setTimeout(() => frame.remove(), 1500);
+                  } catch {}
+
+                  try {
+                    window.location.assign(href);
+                  } catch {}
+              """;
         string autoOpenScript = string.IsNullOrWhiteSpace(autoOpenHref)
             ? string.Empty
             : $$"""
@@ -292,29 +332,13 @@ public sealed class InstallLinkingController : ControllerBase
                 };
 
                 const tryOpen = () => {
-                  try {
-                    const frame = document.createElement("iframe");
-                    frame.setAttribute("aria-hidden", "true");
-                    frame.tabIndex = -1;
-                    frame.style.position = "absolute";
-                    frame.style.inlineSize = "1px";
-                    frame.style.blockSize = "1px";
-                    frame.style.opacity = "0";
-                    frame.style.pointerEvents = "none";
-                    frame.src = href;
-                    document.body.appendChild(frame);
-                    window.setTimeout(() => frame.remove(), 1500);
-                  } catch {}
-
-                  try {
-                    window.location.assign(href);
-                  } catch {}
+              {{tryOpenBody}}
                 };
 
                 if (primaryAction) {
                   primaryAction.addEventListener("click", (event) => {
                     event.preventDefault();
-                    markAttempted("Tried the Chummer app handoff again. If nothing opens, copy the launch link below and paste it into the browser address bar.");
+                    markAttempted({{JsonSerializer.Serialize(clickAttemptMessage)}});
                     tryOpen();
                   });
                 }
@@ -325,7 +349,7 @@ public sealed class InstallLinkingController : ControllerBase
                     try {
                       await navigator.clipboard.writeText(href);
                       if (status) {
-                        status.textContent = "Launch link copied. Paste it into the browser address bar if the app still does not open.";
+                        status.textContent = {{JsonSerializer.Serialize(copiedMessage)}};
                       }
                     } catch {}
                   });
@@ -334,7 +358,7 @@ public sealed class InstallLinkingController : ControllerBase
                 window.setTimeout(() => {
                   tryOpen();
                   window.setTimeout(() => {
-                    markAttempted("Tried the Chummer app handoff automatically. If the app did not open, use the button again or copy the launch link below.");
+                    markAttempted({{JsonSerializer.Serialize(autoAttemptMessage)}});
                   }, 900);
                 }, 300);
               })();
@@ -368,11 +392,13 @@ public sealed class InstallLinkingController : ControllerBase
                       <a class="button-like button-like--primary" id="install-link-open" href="{{WebUtility.HtmlEncode(primaryHref)}}">{{WebUtility.HtmlEncode(primaryLabel)}}</a>
                       <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(secondaryHref)}}">{{WebUtility.HtmlEncode(secondaryLabel)}}</a>
                     </div>
-                    <p id="install-link-status" class="muted-copy">Chummer should open from this page. If the browser blocks the handoff, use the button again or the manual launch link below.</p>
+                    <p id="install-link-status" class="muted-copy">{{WebUtility.HtmlEncode(appLocalCallback
+                        ? "This page should finish linking with your running Chummer app. If the local callback does not respond, use the button again or the manual callback link below."
+                        : "Chummer should open from this page. If the browser blocks the handoff, use the button again or the manual launch link below.")}}</p>
                     <div id="install-link-manual" class="field" hidden>
-                      <label for="install-link-manual-field">Manual launch link</label>
+                      <label for="install-link-manual-field">{{WebUtility.HtmlEncode(appLocalCallback ? "Manual callback link" : "Manual launch link")}}</label>
                       <input id="install-link-manual-field" type="text" readonly value="{{WebUtility.HtmlEncode(primaryHref)}}">
-                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>Copy launch link</button>
+                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>{{WebUtility.HtmlEncode(appLocalCallback ? "Copy callback link" : "Copy launch link")}}</button>
                     </div>
                   </div>
                 </section>
@@ -2040,6 +2066,19 @@ public sealed class InstallLinkingController : ControllerBase
         => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
            || (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address)
                && System.Net.IPAddress.IsLoopback(address));
+
+    private static bool IsAppLocalInstallLinkCallbackUri(string callbackUri)
+    {
+        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed))
+        {
+            return false;
+        }
+
+        return (string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+               && IsAppLocalCallbackHost(parsed.Host)
+               && IsAppLocalInstallLinkCallbackPath(parsed.AbsolutePath);
+    }
 
     private static bool IsAppLocalInstallLinkCallbackPath(string absolutePath)
     {

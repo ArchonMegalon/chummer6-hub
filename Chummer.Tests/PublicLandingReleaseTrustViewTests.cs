@@ -850,6 +850,17 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void AuthEntryViewTreatsLoopbackInstallReturnsAsInBrowserFinishInsteadOfProtocolLaunch()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
+        Assert.Contains("The next page finishes linking this install with your running Chummer app in this browser tab.", view, StringComparison.Ordinal);
+        Assert.Contains("If the local callback stalls, use the button again from the same browser.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LayoutLoadsClickRankOnlyWhenExplicitlyConfiguredWithoutCacheBusting()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");

@@ -5,6 +5,22 @@
     ViewData["SurfaceClass"] = "surface-auth";
     var accessPosture = Model.AccessPosture;
     var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
+    var installLinkReturnsToLocalApp = false;
+    if (isInstallLinkReturn)
+    {
+        var parsedNextPath = new Uri($"https://chummer.run{Model.NextPath}", UriKind.Absolute);
+        var nextQuery = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(parsedNextPath.Query);
+        if (nextQuery.TryGetValue("installLinkCallbackUri", out var callbackValues))
+        {
+            var callbackUri = callbackValues.ToString();
+            installLinkReturnsToLocalApp = callbackUri.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || callbackUri.StartsWith("https://127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || callbackUri.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase)
+                || callbackUri.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase)
+                || callbackUri.StartsWith("http://[::1]", StringComparison.OrdinalIgnoreCase)
+                || callbackUri.StartsWith("https://[::1]", StringComparison.OrdinalIgnoreCase);
+        }
+    }
     var nextTarget = isInstallLinkReturn
         ? "Chummer"
         : Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
@@ -70,7 +86,9 @@
             <p class="muted-copy">After verification you land in @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
-                <p class="muted-copy">The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.</p>
+                <p class="muted-copy">@(installLinkReturnsToLocalApp
+                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If the local callback stalls, use the button again from the same browser."
+                    : "The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.")</p>
             }
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
@@ -110,7 +128,9 @@
             <p class="muted-copy">After verification you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
-                <p class="muted-copy">The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.</p>
+                <p class="muted-copy">@(installLinkReturnsToLocalApp
+                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If the local callback stalls, use the button again from the same browser."
+                    : "The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.")</p>
             }
 
             <form class="auth-form" method="post" action="/auth/email/start">
