@@ -509,7 +509,7 @@ public sealed class ReleaseSelectionService
             return authenticated
                 ? "Download the published Mac DMG immediately. If you want the guided Terminal flow or install-link history, you can still open that route separately."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create an account to download the Mac DMG immediately and keep recovery or install history attached if you need it later."
+                ? "Open the Mac install path. You can create an account there if you want recovery or install history attached later."
                     : "Download the Mac DMG immediately, or sign in if you want recovery and install history tied back to your account.";
         }
 
@@ -520,7 +520,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return "Sign in to use this guided handoff. It keeps recovery, support, and install return attached without changing the published file.";
+            return "Open the account-assisted install path when you want sign-in, support, and install return attached without changing the published file.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))
@@ -551,7 +551,7 @@ public sealed class ReleaseSelectionService
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create account to install on Mac"
+                ? "Open Mac install path"
                 : "Install on Mac";
         }
 

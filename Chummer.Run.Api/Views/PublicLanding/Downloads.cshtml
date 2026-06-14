@@ -77,7 +77,7 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? "This install path keeps account return and support close when you want them linked from the first launch."
+                        ? "This install path can link sign-in and support from the first launch when you want them attached."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
         <p class="muted-copy">
@@ -148,7 +148,7 @@ else
                         : guestGateRequired
                             ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                                 ? "Use the guided installer when you want the managed setup path. If you want the smaller direct payload instead, open the Windows ZIP right below."
-                                : "Use the main install path for this platform when you want the guided setup and signed-in return."
+                                : "Use the main install path for this platform. If you want sign-in and support linked from the first launch, open the account-assisted route."
                             : "Use the main install path for this platform. You can install first and sign in later if you want account return and support linked.")
                 </p>
                 <div class="recommended-download__meta">

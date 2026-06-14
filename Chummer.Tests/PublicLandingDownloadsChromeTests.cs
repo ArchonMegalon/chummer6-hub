@@ -119,9 +119,9 @@ public sealed class PublicLandingDownloadsChromeTests
             HeaderActions:
             [
                 new SiteChromeActionViewModel("Sign in", "/auth/google/start?next=%2Fdownloads", "link"),
-                new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
+                new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
-            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
+            PublicPrimaryCta: new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: "fixture",
@@ -158,9 +158,9 @@ public sealed class PublicLandingDownloadsChromeTests
             HeaderActions:
             [
                 new SiteChromeActionViewModel("Sign in", "/login?next=%2Fstatus", "link"),
-                new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
+                new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
-            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
+            PublicPrimaryCta: new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: "fixture",

@@ -836,7 +836,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Create account to install on Mac", recommended.ActionLabel);
+        Assert.Equal("Open Mac install path", recommended.ActionLabel);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);

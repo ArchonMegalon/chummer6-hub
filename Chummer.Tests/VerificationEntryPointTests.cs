@@ -3655,7 +3655,7 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("\"/downloads\"", audit, StringComparison.Ordinal);
         Assert.Contains("\"Open downloads\"", audit, StringComparison.Ordinal);
-        Assert.Contains("\"Create account to install\"", audit, StringComparison.Ordinal);
+        Assert.Contains("\"Open account-assisted install\"", audit, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Get preview build\"", audit, StringComparison.Ordinal);
     }
 
@@ -3677,14 +3677,14 @@ public sealed class VerificationEntryPointTests
         string mirroredLandingManifest = File.ReadAllText(mirroredLandingManifestPath);
         string mirroredFeatureRegistry = File.ReadAllText(mirroredFeatureRegistryPath);
 
-        Assert.Contains("`Create account to install`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.Contains("`Open account-assisted install`", downloadsPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", downloadsPolicy, StringComparison.Ordinal);
         Assert.Contains("`Open downloads`", landingPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", landingPolicy, StringComparison.Ordinal);
-        Assert.Contains("headline: Shadowrun rules truth, with receipts.", landingManifest, StringComparison.Ordinal);
-        Assert.Contains("product_proof_primary_label: Open downloads", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("headline: Build Shadowrun characters. Know why the numbers changed.", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("product_proof_primary_label: Download Chummer", landingManifest, StringComparison.Ordinal);
         Assert.Contains("Open downloads for the current preview", landingManifest, StringComparison.Ordinal);
-        Assert.DoesNotContain("product_proof_primary_label: Create account to install", landingManifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("product_proof_primary_label: Open account-assisted install", landingManifest, StringComparison.Ordinal);
         Assert.Contains("action_label: Open downloads", canonicalFeatureRegistry, StringComparison.Ordinal);
         Assert.DoesNotContain("action_label: Install the current preview", canonicalFeatureRegistry, StringComparison.Ordinal);
         Assert.Equal(landingManifest, mirroredLandingManifest);
