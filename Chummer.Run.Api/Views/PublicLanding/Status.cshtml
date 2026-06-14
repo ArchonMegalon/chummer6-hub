@@ -23,19 +23,19 @@
         {
             Badge = "Downloads",
             Title = "Install or update from the downloads page",
-            Summary = "Downloads still owns the recommended build, platform notes, current package details, and the calmest first-run path for this device.",
+            Summary = "Downloads owns the recommended build, platform notes, current package details, and the calmest first-run path for this device.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "Recommended build", "Known issues nearby", "Install continuity" }
+            Proof = new[] { "Recommended build", "Known issues nearby", "Account return available" }
         },
         new
         {
             Badge = "Live checks",
             Title = "Use what works today when the question is readiness, not packaging",
-            Summary = "Open what works today when you need the current result, current cautions, or one inspectable explanation before you move a device.",
+            Summary = "Open what works today when you need the current result, current cautions, or one clear explanation before you move a device.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Current result", "Caution explicit", "One inspectable trail" }
+            Proof = new[] { "Current result", "Caution explicit", "One clear explanation" }
         },
         new
         {
@@ -50,10 +50,10 @@
         {
             Badge = "Deeper report",
             Title = "Open the larger machine picture only when the short status line is not enough",
-            Summary = "This page should stay short and customer-safe. The deeper progress report remains the place for the broader operational readout.",
+            Summary = "This page should stay short and customer-safe. The deeper progress report is the place for the broader operational readout.",
             Href = "/progress",
             Label = "Open progress",
-            Proof = new[] { "Short public summary", "Longer machine report", "No page confusion" }
+            Proof = new[] { "Short public summary", "Longer report", "No page confusion" }
         }
     };
     var campaignStatusTitle = CustomerStatusText(
@@ -65,8 +65,8 @@
         Model.CampaignOsProof is null
             ? "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail."
             : Model.CampaignOsProof.JourneysPassed.Count == 0
-                ? "The campaign packet is mirrored, but this snapshot does not list named completed journeys yet."
-                : $"Current mirrored journey coverage: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.",
+                ? "The campaign packet is mirrored, but this snapshot does not list named completed paths yet."
+                : $"Current mirrored campaign paths: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.",
         "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail.");
 
     string ContextualPreviewHref(string? href)
@@ -114,9 +114,10 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof is green", "checks are clear", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
+            .Replace("journey proofs", "tested paths", StringComparison.OrdinalIgnoreCase)
             .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
+            .Replace("adoption health", "usage snapshot", StringComparison.OrdinalIgnoreCase)
             .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke", "startup verification", StringComparison.OrdinalIgnoreCase)
@@ -285,7 +286,7 @@ static string CustomerStatusText(string? value, string fallback)
             </div>
             <div class="settings-summary-row">
                 <span>Journeys covered</span>
-                <strong>@CustomerStatusText(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored journeys yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed), "No mirrored journeys yet")</strong>
+                <strong>@CustomerStatusText(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored campaign paths yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed), "No mirrored campaign paths yet")</strong>
             </div>
         }
     </div>

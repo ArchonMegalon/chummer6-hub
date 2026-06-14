@@ -261,8 +261,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("available on downloads right now", controller, StringComparison.Ordinal);
         Assert.Contains("guided install routes for linked recovery and support", controller, StringComparison.Ordinal);
-        Assert.Contains("No blocked public install path or tested journey is active right now.", controller, StringComparison.Ordinal);
-        Assert.Contains("tested journeys and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
+        Assert.Contains("No blocked public install path or verified path is active right now.", controller, StringComparison.Ordinal);
+        Assert.Contains("verified paths and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
         Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("journey proofs and {routeCount} trust routes", controller, StringComparison.Ordinal);
     }
@@ -292,10 +292,11 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Start with the recommended download.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("starter workspace", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("preview the bundled", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Need help choosing a setup path?", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Deeper release detail lives on What works today and Status", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("sign in later if you want recovery and support linked", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
         Assert.Contains("included example runner", nowView, StringComparison.Ordinal);

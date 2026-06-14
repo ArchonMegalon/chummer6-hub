@@ -77,15 +77,15 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? "This install path keeps a guided recovery route available when you want linked setup continuity and support."
+                        ? "This install path keeps account return and support close when you want them attached from the first launch."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
         <p class="muted-copy">
             @(guestGateRequired
                 ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                     ? "Start with the guided installer when you want the full setup path. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path when you want the guided setup and linked recovery path."
-                : "Start with the recommended download. Install first, then sign in if you want setup continuity.")
+                    : "Start with the recommended install path when you want the guided setup path and account return."
+                : "Start with the recommended download. Install first, then sign in later if you want recovery and support linked.")
         </p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
@@ -312,7 +312,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
-                                <strong>Open a starter workspace, or preview the bundled <code class="mono-receipt">Soma-Career.chum5</code> example if you want a quick tour before you build from scratch.</strong>
+                                <strong>Open a starter workspace if you want a quick tour before you build from scratch.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>

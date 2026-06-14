@@ -903,13 +903,13 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "Guided install handoff is available when you want linking, recovery, and support attached from the first launch.";
+            return "An account-assisted install path is available when you want recovery and support attached from the first launch.";
         }
 
         var labels = FormatPlatformList(platforms);
         return platforms.Count == 1
-            ? $"{labels} also has a guided install handoff when you want linking, recovery, and support attached from the first launch."
-            : $"{labels} also have guided install handoff when you want linking, recovery, and support attached from the first launch.";
+            ? $"{labels} also has an account-assisted install path when you want recovery and support attached from the first launch."
+            : $"{labels} also have account-assisted install paths when you want recovery and support attached from the first launch.";
     }
 
     private static string FormatPlatformList(IReadOnlyList<string> platforms)
@@ -977,7 +977,7 @@ public sealed class ReleaseSelectionService
     {
         if (UsesMacBootstrapFlow(promotedDownload))
         {
-            return "The current downloads page publishes the Mac DMG directly, and the guided install handoff stays available when you want linking, recovery, and support attached from the first launch.";
+            return "The current downloads page publishes the Mac DMG directly, and the account-assisted install path stays available when you want recovery and support attached from the first launch.";
         }
 
         var packageKind = PackageKindLabel(promotedDownload.Kind);

@@ -9309,7 +9309,7 @@ Boundary:
         int blockedJourneyCount = pulse?.BlockedJourneyCount ?? 0;
         if (blockedRouteCount == 0 && blockedJourneyCount == 0)
         {
-            return "No blocked public install path or tested journey is active right now.";
+            return "No blocked public install path or verified path is active right now.";
         }
 
         var segments = new List<string>(2);
@@ -9320,7 +9320,7 @@ Boundary:
 
         if (blockedJourneyCount > 0)
         {
-            segments.Add($"{blockedJourneyCount} tested journeys remain blocked");
+            segments.Add($"{blockedJourneyCount} verified paths remain blocked");
         }
 
         return string.Join("; ", segments) + ".";
@@ -9889,11 +9889,11 @@ Boundary:
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
         {
-            segments.Add($"{journeyCount} tested journeys and {routeCount} checked routes are on record.");
+            segments.Add($"{journeyCount} verified paths and {routeCount} checked routes are on record.");
         }
         else if (pulse.ProvenJourneyCount is int journeyOnly && journeyOnly > 0)
         {
-            segments.Add($"{journeyOnly} tested journeys are on record.");
+            segments.Add($"{journeyOnly} verified paths are on record.");
         }
         else if (pulse.ProvenRouteCount is int routeOnly && routeOnly > 0)
         {
