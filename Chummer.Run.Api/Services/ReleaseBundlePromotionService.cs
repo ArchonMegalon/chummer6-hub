@@ -1642,30 +1642,44 @@ public sealed class ReleaseBundlePromotionService
         if (journeys.Count == 0)
         {
             return NormalizeToken(channel) is "public_stable" or "stable" or "docker"
-                ? "Gold release proof passed for the current release."
-                : "Local release proof passed for the current release.";
+                ? "Current public release is supported on the promoted routes. Recent checks cover install, bounded offline prefetch, and current support follow-up."
+                : "Current preview release is supported on the promoted routes. Recent checks cover install, bounded offline prefetch, and current support follow-up.";
         }
 
         List<string> proofNotes = [];
+        if (journeys.Contains("build_explain_publish", StringComparer.Ordinal))
+        {
+            proofNotes.Add("install guidance");
+        }
+
+        if (journeys.Contains("campaign_session_recover_recap", StringComparer.Ordinal))
+        {
+            proofNotes.Add("session recovery");
+        }
+
         if (journeys.Contains("install_claim_restore_continue", StringComparer.Ordinal))
         {
-            proofNotes.Add("Claimed-device restore and bounded offline prefetch stayed grounded on the current release.");
+            proofNotes.Add("account return");
         }
 
         if (journeys.Contains("report_cluster_release_notify", StringComparer.Ordinal))
         {
-            proofNotes.Add("Clustered release notification stayed grounded on the current release.");
+            proofNotes.Add("release updates");
         }
 
         if (journeys.Contains("organize_community_and_close_loop", StringComparer.Ordinal))
         {
-            proofNotes.Add("Community organizer closure stayed grounded on the current release.");
+            proofNotes.Add("community wrap-up");
         }
 
-        string noteSuffix = proofNotes.Count > 0
-            ? " " + string.Join(" ", proofNotes)
-            : string.Empty;
-        return $"{(NormalizeToken(channel) is "public_stable" or "stable" or "docker" ? "Gold release proof passed" : "Local release proof passed")} for: {string.Join(", ", journeys)}.{noteSuffix}";
+        string proofNoteClause = proofNotes.Count > 0
+            ? " Recent checks cover " + string.Join(", ", proofNotes) + ","
+            : " Recent checks cover install,";
+        return (NormalizeToken(channel) is "public_stable" or "stable" or "docker"
+                ? "Current public release is supported on the promoted routes."
+                : "Current preview release is supported on the promoted routes.")
+            + proofNoteClause
+            + " bounded offline prefetch, and current support follow-up.";
     }
 
     private static string DeriveKnownIssueSummary(
