@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,10 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def main() -> int:
     reality_payload = load_json(REALITY_AUDIT_PATH)
     bridge_text = read_text(BRIDGE_PATH)
@@ -65,7 +70,7 @@ def main() -> int:
 
     result = {
         "contract_name": "chummer.desktop_native_model_depth",
-        "generated_at_utc": reality_payload.get("generated_at") or reality_payload.get("generated_at_utc") or "",
+        "generated_at_utc": now_iso(),
         "status": "pass" if not failures else "fail",
         "verdict": "DESKTOP_NATIVE_MODEL_READY" if not failures else "DESKTOP_NATIVE_MODEL_REVIEW_REQUIRED",
         "inputs": {
