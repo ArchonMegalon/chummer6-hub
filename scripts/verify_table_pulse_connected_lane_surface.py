@@ -34,7 +34,7 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
         "The signed-in view is the return rail for Table Pulse Aftermath",
-        "the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+        "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
         "Table Pulse Aftermath return items that stay in this signed-in view",
     ),
     "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (

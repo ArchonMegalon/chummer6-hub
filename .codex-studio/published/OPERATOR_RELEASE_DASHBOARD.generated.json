@@ -1,15 +1,15 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-13T13:33:06Z",
+  "generated_at_utc": "2026-06-14T08:48:35Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
     "version": "run-20260612-121055",
-    "published_at": "2026-06-12T13:20:46Z",
+    "published_at": "2026-06-13T18:49:54Z",
     "channel": "public_stable",
     "rollout_state": "public_stable",
     "supportability_state": "gold_supported",
-    "known_issue_summary": "Current release checks are clear, including current cross-platform startup verification and executable verification for the promoted release packages."
+    "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
   },
   "mirrors": {
     "external_required": false,
@@ -20,8 +20,8 @@
     "providers": {
       "local_registry": "pass",
       "public_edge": "pass",
-      "pcloud": "pass",
-      "onedrive": "pass"
+      "pcloud": "fail",
+      "onedrive": "fail"
     }
   },
   "rulesets": {
@@ -53,7 +53,7 @@
       "exists": true,
       "status": "published",
       "verdict": null,
-      "generated_at_utc": "2026-06-12T12:29:42Z",
+      "generated_at_utc": "2026-06-13T18:49:54Z",
       "pass": true
     },
     "external_distribution_mirror_proof": {
@@ -61,7 +61,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-13T13:31:35Z",
+      "generated_at_utc": "2026-06-14T08:48:34Z",
       "pass": true
     },
     "ruleset_readiness": {
@@ -69,7 +69,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-13T13:31:20.887819Z",
+      "generated_at_utc": "2026-06-14T08:48:20.319645Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -85,7 +85,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-06-13T13:32:50Z",
+      "generated_at_utc": "2026-06-14T08:48:35Z",
       "pass": true
     },
     "public_copy_leak_gate": {
@@ -93,7 +93,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-13T13:32:50Z",
+      "generated_at_utc": "2026-06-14T08:48:35Z",
       "pass": true
     },
     "release_ready": {
@@ -110,7 +110,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "GOLD_READY",
-      "generated_at_utc": "2026-06-13T13:32:39Z",
+      "generated_at_utc": "2026-06-13T13:34:14Z",
       "pass": true,
       "release_blocking": false
     },

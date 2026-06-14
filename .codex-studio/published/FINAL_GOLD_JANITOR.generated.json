@@ -1,20 +1,20 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-13T13:34:14Z",
+  "generated_at_utc": "2026-06-14T08:50:39Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
   "live_backed_required": true,
   "live_recrawl_required": true,
   "recrawl_max_age_hours": 24,
-  "status": "pass",
-  "verdict": "GOLD_READY",
+  "status": "fail",
+  "verdict": "NOT_GOLD",
   "required_gates": {
     "live_public_web_recrawl": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:31:20Z",
+      "generated_at_utc": "2026-06-14T08:48:20Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -90,7 +90,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:31:20.887819Z",
+      "generated_at_utc": "2026-06-14T08:48:20.319645Z",
       "fresh_within_hours": null,
       "pass": true,
       "assumed_rulesets": []
@@ -103,11 +103,19 @@
       "fresh_within_hours": null,
       "pass": true
     },
+    "desktop_native_model_depth": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESKTOP_NATIVE_MODEL_DEPTH.generated.json",
+      "exists": true,
+      "status": "fail",
+      "generated_at_utc": "2026-05-29T16:55:12Z",
+      "fresh_within_hours": null,
+      "pass": false
+    },
     "black_ledger_live_media_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:31:30Z",
+      "generated_at_utc": "2026-06-14T08:48:27Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -147,22 +155,22 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:31:35Z",
+      "generated_at_utc": "2026-06-14T08:48:34Z",
       "fresh_within_hours": null,
       "pass": true,
       "external_required": false,
       "providers": {
         "local_registry": "pass",
         "public_edge": "pass",
-        "pcloud": "pass",
-        "onedrive": "pass"
+        "pcloud": "fail",
+        "onedrive": "fail"
       }
     },
     "public_copy_leak_gate": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:32:50Z",
+      "generated_at_utc": "2026-06-14T08:49:44Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -170,7 +178,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:32:50Z",
+      "generated_at_utc": "2026-06-14T08:49:44Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -178,7 +186,7 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:31:37Z",
+      "generated_at_utc": "2026-06-14T08:48:35Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -186,18 +194,18 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-13T13:33:06Z",
+      "generated_at_utc": "2026-06-14T08:48:35Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
         "version": "run-20260612-121055",
-        "published_at": "2026-06-12T13:20:46Z",
+        "published_at": "2026-06-13T18:49:54Z",
         "channel": "public_stable",
         "rollout_state": "public_stable",
         "supportability_state": "gold_supported",
-        "known_issue_summary": "Current release checks are clear, including current cross-platform startup verification and executable verification for the promoted release packages."
+        "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
       }
     },
     "release_ready": {
@@ -286,5 +294,7 @@
     }
   ],
   "caveats": [],
-  "failures": []
+  "failures": [
+    "desktop_native_model_depth failed"
+  ]
 }

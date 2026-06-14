@@ -1,11 +1,11 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-13T13:33:06Z
+- Generated: 2026-06-14T08:48:35Z
 - Version: `run-20260612-121055`
 - Channel: `public_stable`
-- Published: `2026-06-12T13:20:46Z`
+- Published: `2026-06-13T18:49:54Z`
 - Supportability: `gold_supported`
-- Mirrors: local_registry=pass, onedrive=pass, pcloud=pass, public_edge=pass
+- Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 
 ## Rulesets
 - `sr4`: status `None`, workflow parity `pass`, assumption `False`

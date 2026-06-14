@@ -1,0 +1,26 @@
+{
+  "contract_name": "chummer.desktop_native_model_depth",
+  "generated_at_utc": "2026-05-29T16:55:12Z",
+  "status": "fail",
+  "verdict": "DESKTOP_NATIVE_MODEL_REVIEW_REQUIRED",
+  "inputs": {
+    "classic_formport_reality_audit_path": "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CLASSIC_FORMPORT_REALITY_AUDIT.generated.json",
+    "bridge_path": "/docker/chummercomplete/chummer6-ui/Chummer.Avalonia/Controls/ClassicFormPorts/ClassicFormPortViewModelBridge.cs",
+    "section_host_path": "/docker/chummercomplete/chummer6-ui/Chummer.Avalonia/Controls/SectionHostControl.axaml.cs"
+  },
+  "source_markers": {
+    "bridge_create_from_rows_signature": true,
+    "bridge_from_rows_signature": true,
+    "section_host_row_record": true,
+    "classic_port_line_item_list_count": 51,
+    "bucket_call_count": 15,
+    "snapshot_call_count": 4
+  },
+  "reality_audit_status": "pass",
+  "failures": [
+    "desktop flagship bridge still creates domain state directly from SectionRowDisplayItem rows",
+    "desktop flagship bridge still derives row facts from generic SectionRowDisplayItem rows",
+    "desktop flagship bridge still exposes 51 ClassicPortLineItem list surfaces",
+    "desktop flagship bridge still buckets generic row facts instead of typed workflow models"
+  ]
+}
