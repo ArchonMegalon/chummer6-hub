@@ -89,7 +89,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Role entry</p>
         <h2 class="editorial-title">Player, GM, and observer routes converge on one shell.</h2>
-        <p class="editorial-copy">Choose a role-specific front door without branching into different product truths. The same app shell keeps install, continuity, and reconnect posture visible in every role.</p>
+        <p class="editorial-copy">Choose a role-specific front door without branching into different product truths. The same app shell keeps install, return, and reconnect posture visible in every role.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var role in Model.Roles)
@@ -180,7 +180,7 @@
             window.addEventListener("appinstalled", function () {
                 deferredPrompt = null;
                 if (installState) {
-                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep continuity and role entry on the same rail.";
+                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep return and role entry on the same rail.";
                 }
                 setInstallAvailability(false);
             });

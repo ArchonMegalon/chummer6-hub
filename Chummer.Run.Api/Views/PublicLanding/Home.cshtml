@@ -12,7 +12,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-home";
     ViewData["ContextSidebarHeading"] = "Home sections";
-    ViewData["ContextSidebarSummary"] = "Keep signed-in continuity, access, and work sections in the shared side panel.";
+    ViewData["ContextSidebarSummary"] = "Keep signed-in access and work sections in the shared side panel.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -776,7 +776,7 @@ else
                                                                 <p class="muted-copy">Evidence: @leadFirstPlayableEvidence</p>
                                                             }
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session</a>
                                                     </article>
                                                 }
 

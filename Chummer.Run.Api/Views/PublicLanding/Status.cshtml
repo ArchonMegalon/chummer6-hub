@@ -16,7 +16,7 @@
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
     var accountReturnSummary = Model.Chrome.Authenticated
         ? "Use Home when install return, support status, and the next safe action should stay in one signed-in place."
-        : "Use account setup when you want install return, support history, and roadmap follow-up attached to one calmer place.";
+        : "Use account setup when you want install return, support history, and roadmap follow-up in one calmer place.";
     var statusRouteChoices = new[]
     {
         new
@@ -101,20 +101,20 @@ static string CustomerStatusText(string? value, string fallback)
 {
     var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
     return text
-            .Replace("proof\u00a0freshness", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof\u00a0freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof-freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
             .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
             .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
-            .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor truth", "recent checks", StringComparison.OrdinalIgnoreCase)
             .Replace("open-public artifacts", "public downloads", StringComparison.OrdinalIgnoreCase)
             .Replace("local edge proof", "current release check", StringComparison.OrdinalIgnoreCase)
             .Replace("edge proof", "release check", StringComparison.OrdinalIgnoreCase)
             .Replace("proof view", "current status view", StringComparison.OrdinalIgnoreCase)
             .Replace("proof page", "current status page", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof is green", "checks are clear", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("journey proofs", "tested paths", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("journey proofs", "verified paths", StringComparison.OrdinalIgnoreCase)
             .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
             .Replace("adoption health", "usage snapshot", StringComparison.OrdinalIgnoreCase)
@@ -141,11 +141,11 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("authority facts", "rules checks", StringComparison.OrdinalIgnoreCase)
             .Replace("errata posture", "errata updates", StringComparison.OrdinalIgnoreCase)
             .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Release checks")
-            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase);
+            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Recent checks")
+            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase);
 }
 
     static string NormalizeLaunchHealthLabel(string? label)
@@ -157,14 +157,14 @@ static string CustomerStatusText(string? value, string fallback)
 
         var normalized = label
             .Trim()
-            .Replace("proof\u00a0freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Release checks")
-            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof-freshness", "Release checks")
-            .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
+            .Replace("proof\u00a0freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof-freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Recent checks")
+            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof-freshness", "Recent checks")
+            .Replace("proof checks", "Recent checks", StringComparison.OrdinalIgnoreCase);
 
         return string.Equals(normalized, "release check", StringComparison.OrdinalIgnoreCase)
             ? "Release checks"
@@ -214,7 +214,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Current status</p>
         <h1 class="page-title">What works now, what needs caution, and where to go next</h1>
-        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, current checks, support, or the progress page without making you decode the whole release stack.</p>
+        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, recent checks, support, or the progress page without making you decode the whole release stack.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
@@ -234,7 +234,7 @@ static string CustomerStatusText(string? value, string fallback)
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, current checks, help, or the progress page as soon as the job changes.</p>
+        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, recent checks, help, or the progress page as soon as the job changes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in statusRouteChoices)

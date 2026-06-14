@@ -77,14 +77,14 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? "This install path keeps account return and support close when you want them attached from the first launch."
+                        ? "This install path keeps account return and support close when you want them linked from the first launch."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
         <p class="muted-copy">
             @(guestGateRequired
                 ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                     ? "Start with the guided installer when you want the full setup path. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path when you want the guided setup path and account return."
+                    : "Start with the recommended install path when you want the guided setup path and signed-in return."
                 : "Start with the recommended download. Install first, then sign in later if you want recovery and support linked.")
         </p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
@@ -148,8 +148,8 @@ else
                         : guestGateRequired
                             ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                                 ? "Use the guided installer when you want the managed setup path. If you want the smaller direct payload instead, open the Windows ZIP right below."
-                                : "Use the main install path for this platform when you want the guided setup and linked recovery path."
-                            : "Use the main install path for this platform. You can install first and sign in later for continuity.")
+                                : "Use the main install path for this platform when you want the guided setup and signed-in return."
+                            : "Use the main install path for this platform. You can install first and sign in later if you want account return and support linked.")
                 </p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
@@ -166,21 +166,21 @@ else
                     <article class="recommended-download__trustfact">
                         <span>Binary</span>
                         <strong>The same build for everyone</strong>
-                        <p>Install state lives in the handoff and account return, not in a personalized binary.</p>
+                        <p>The build stays the same for everyone. Sign-in only adds account return and support around it.</p>
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>First launch</span>
                         <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "Recovery and support can stay attached when you choose sign-in."
-                                : "You can install now, and Chummer links your setup after install.")
+                                ? "Recovery and support can stay linked when you choose sign-in."
+                                : "You can install now and link the app after setup.")
                         </p>
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>Recovery path</span>
                         <strong>Devices and access stay calm</strong>
-                        <p>Relink, reclaim, and recovery belong on the account page after the installer or app does the real work.</p>
+                        <p>Relink, reclaim, and recovery belong on the account page after the app is installed.</p>
                     </article>
                 </div>
                 <div class="stacked-actions">
@@ -241,7 +241,7 @@ else
                     <p class="downloads-inline-note">
                         @(recommendedUsesMacSetupScript
                             ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
-                            : "After install, open Chummer and continue through Home, Horizons, or a starter workspace.")
+                            : "After install, open Chummer and continue through Home or Horizons.")
                     </p>
                     <details class="release-accordion">
                         <summary>Release notes, known issues, and requirements</summary>
@@ -312,7 +312,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
-                                <strong>Open a starter workspace if you want a quick tour before you build from scratch.</strong>
+                                <strong>Open Home or Horizons if you want a quick tour before you build from scratch.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>

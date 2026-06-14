@@ -249,8 +249,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains(".Replace(\"Promoted installer media\", \"Recommended installer\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"startup-smoke proof\", \"startup verification\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"tuple\", \"build\"", view, StringComparison.Ordinal);
-        Assert.Contains(".Replace(\"proof freshness\", \"release checks\"", view, StringComparison.Ordinal);
-        Assert.Contains(".Replace(\"proof recency\", \"release checks\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"proof freshness\", \"recent checks\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"proof recency\", \"recent checks\"", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -291,12 +291,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string nowView = File.ReadAllText(nowViewPath);
 
         Assert.Contains("Start with the recommended download.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("starter workspace", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Home or Horizons", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Need help choosing a setup path?", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Deeper release detail lives on What works today and Status", downloadsView, StringComparison.Ordinal);
         Assert.Contains("sign in later if you want recovery and support linked", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
         Assert.Contains("included example runner", nowView, StringComparison.Ordinal);
@@ -362,7 +363,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep intake, roadmap, continuity, and support on separate pages.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep intake, roadmap, account return, and support on separate pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Stay on this page when the job is turning table pain into a Chummer-owned packet", view, StringComparison.Ordinal);
         Assert.Contains("Return to participate when the question is broader public discovery, not this intake packet", view, StringComparison.Ordinal);
@@ -441,8 +442,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Shipped updates stay upstream of public celebration.", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
 
-        Assert.Contains("world-facing continuity", productStory, StringComparison.Ordinal);
-        Assert.DoesNotContain("world-facing follow-through", productStory, StringComparison.Ordinal);
+        Assert.Contains("world-facing follow-through", productStory, StringComparison.Ordinal);
+        Assert.DoesNotContain("world-facing continuity", productStory, StringComparison.Ordinal);
 
         Assert.Contains("tracked history", packages, StringComparison.Ordinal);
         Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
@@ -453,7 +454,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("support history", faq, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", faq, StringComparison.Ordinal);
 
-        Assert.Contains("command continuity", ledgerNotifications, StringComparison.Ordinal);
+        Assert.Contains("command carry-forward", ledgerNotifications, StringComparison.Ordinal);
         Assert.DoesNotContain("command follow-through", ledgerNotifications, StringComparison.Ordinal);
 
         Assert.Contains("Black Ledger continuity", gmSessionVenue, StringComparison.Ordinal);

@@ -501,7 +501,7 @@ public sealed class ReleaseSelectionService
 
         if (authenticated && UsesLinuxBootstrapFlow(download))
         {
-            return "Open the Linux install handoff. It gives you a short-lived shell command that offers Auto select for the matching Linux desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the applications menu or add Desktop links, verifies the published package digest, and confirms the selected apps wrote a linked install receipt successfully.";
+            return "Open the Linux install handoff. It gives you a short-lived shell command that offers Auto select for the matching Linux desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the applications menu or add Desktop links, verifies the published package digest, and confirms the selected apps linked back successfully.";
         }
 
         if (UsesMacBootstrapFlow(download))
@@ -525,7 +525,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))
         {
-            return "You can download this copy as a guest, but signing in keeps recovery, support continuity, and any available device linking attached to your account.";
+            return "You can download this copy as a guest, but signing in keeps recovery, support history, and any available device linking attached to your account.";
         }
 
         return recommended ? RecommendedSupport(download) : AlternativeSupport(download);
@@ -903,13 +903,13 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "An account-assisted install path is available when you want recovery and support attached from the first launch.";
+            return "An account-assisted install path is available when you want sign-in and support linked from the first launch.";
         }
 
         var labels = FormatPlatformList(platforms);
         return platforms.Count == 1
-            ? $"{labels} also has an account-assisted install path when you want recovery and support attached from the first launch."
-            : $"{labels} also have account-assisted install paths when you want recovery and support attached from the first launch.";
+            ? $"{labels} also has an account-assisted install path when you want sign-in and support linked from the first launch."
+            : $"{labels} also have account-assisted install paths when you want sign-in and support linked from the first launch.";
     }
 
     private static string FormatPlatformList(IReadOnlyList<string> platforms)
@@ -977,7 +977,7 @@ public sealed class ReleaseSelectionService
     {
         if (UsesMacBootstrapFlow(promotedDownload))
         {
-            return "The current downloads page publishes the Mac DMG directly, and the account-assisted install path stays available when you want recovery and support attached from the first launch.";
+            return "The current downloads page publishes the Mac DMG directly, and the account-assisted install path stays available when you want sign-in and support linked from the first launch.";
         }
 
         var packageKind = PackageKindLabel(promotedDownload.Kind);
