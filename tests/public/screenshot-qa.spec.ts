@@ -26,11 +26,12 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     const factions = page.locator('[data-homepage-section="factions"]');
     const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
     const sidebar = page.locator('.site-sidebar');
+    const navLinks = page.locator('[aria-label="Primary navigation"] a, [aria-label="Primary navigation"] .site-sidebar__current');
 
     await expect(heroTitle).toContainText('The city is moving.');
     await expect(primaryCta).toContainText('Open Black Ledger');
     await expect(factions).toContainText('Six seeded houses are already pushing on the same city.');
-    await expect(playDownloads).toContainText('Download, play, check status, or replay Turn 1.');
+    await expect(playDownloads).toContainText('Install, play, or open the city.');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {
@@ -46,6 +47,10 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     if (!heroBox || !ctaBox) {
       failures.push(`${viewport.width}x${viewport.height}: hero title or primary CTA is not visible`);
     }
+    const navCount = await navLinks.count();
+    if (navCount > 4) {
+      failures.push(`${viewport.width}x${viewport.height}: primary navigation exposes ${navCount} links`);
+    }
 
     const screenshotName = `homepage-${viewport.width}x${viewport.height}.png`;
     await page.screenshot({ path: completionPath(screenshotName), fullPage: true });
@@ -57,6 +62,7 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
       cta_visible: !!ctaBox,
       footer_visible: await footer.isVisible(),
       sidebar_visible: await sidebar.isVisible(),
+      nav_panel_open: await page.evaluate(() => document.body.classList.contains('nav-panel-open')),
       screenshot: screenshotName,
       status: overflow <= 1 && heroBox && ctaBox ? 'pass' : 'fail',
     });
@@ -66,6 +72,7 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
 
   writeJsonArtifact('SCREENSHOT_QA.generated.json', {
     generated_at_utc: new Date().toISOString(),
+    base_url: baseUrl,
     status: failures.length === 0 ? 'pass' : 'fail',
     verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
     failures,

@@ -449,7 +449,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
     await expectVisible(page, 'text=Install Chummer');
-    await expectVisible(page, 'text=Open guided install');
+    await expectVisible(page, 'text=Open install path');
     await expectVisible(page, 'text=Advanced download options');
     await assertNoBannedCopy(page, 'Downloads');
   });

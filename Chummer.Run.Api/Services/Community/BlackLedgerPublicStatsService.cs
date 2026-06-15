@@ -105,8 +105,8 @@ public sealed class BlackLedgerPublicStatsService
 
     private static readonly BlackLedgerCloseoutViewModel[] Closeouts =
     [
-        new("Last tick receipt", "Turn 1 already ran, and the first seeded receipt stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe receipt"),
-        new("Closeout witness feed", "Proof-backed closeout updates only appear after package, route, and release receipts all agree.", "/ledger/closeouts", "Proof-backed"),
+        new("Last turn summary", "Turn 1 already ran, and the first seeded board stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe board"),
+        new("Closeout witness feed", "Reviewed closeout updates only appear after package, route, and release checks all agree.", "/ledger/closeouts", "Reviewed only"),
         new("Package recovery watch", "Recovery and rollback posture stays visible without implying promoted shipment.", "/packages", "Governed watch"),
         new("Karma Forge dispatch", "Discovery packets can point at candidate motion, but not shipped status, until release proof is real.", "/karma-forge", "Signal only"),
     ];
@@ -117,12 +117,12 @@ public sealed class BlackLedgerPublicStatsService
         CurrentTurn: 1,
         TurnHeadline: "Turn 1 already ran. Debt Heat rose in Rust Bazaar while Ashline MysAd density pushed package pressure toward awakened build support.",
         SafetyNote: "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.",
-        MapNote: "Route-backed globe geometry stays public-safe and receipt-backed. Use the map to inspect faction pressure, package heat, and closeout motion.",
+        MapNote: "Public-safe globe geometry keeps faction pressure, package heat, and closeout motion readable without exposing private tables.",
         DeterministicPreview: false,
         TurnNavigation:
         [
             new(1, "Turn 1 live board", "/ledger?turn=1", true, false),
-            new(2, "Turn 2 deterministic board", "/ledger?turn=2", false, true),
+            new(2, "Turn 2 preview board", "/ledger?turn=2", false, true),
         ],
         Districts:
         [
@@ -146,11 +146,11 @@ public sealed class BlackLedgerPublicStatsService
         ],
         StewardshipPosts:
         [
-            new("ledger_gm", "Ledger GM", "ai", "ai ledger architect", "Runs the deterministic world-turn shell until verified human stewards take over.", true),
+            new("ledger_gm", "Ledger GM", "ai", "ai ledger architect", "Runs the public world-turn shell until verified human stewards take over.", true),
             new("public_intel_provider", "Public Intel Provider", "ai", "ai public intel provider", "Turns world movement into public-safe summaries without leaking private administrative data.", true),
             new("package_pressure_analyst", "Package Pressure Analyst", "ai", "ai package factor", "Explains package demand as governed pressure, not shipped truth.", true),
             new("privacy_marshal", "Privacy Marshal", "ai", "ai privacy marshal", "Blocks private, identifying, sourcebook, support, or administrative data from public rendering.", true),
-            new("closeout_clerk", "Closeout Clerk", "ai", "ai closeout clerk", "Keeps closeout movement tied to first-party receipts before it appears publicly.", true),
+            new("closeout_clerk", "Closeout Clerk", "ai", "ai closeout clerk", "Keeps closeout movement tied to first-party turn records before it appears publicly.", true),
         ],
         StewardshipTransferPreview: new(
             "stewardship_transfer",
@@ -470,7 +470,7 @@ public sealed class BlackLedgerPublicStatsService
                 : Array.Empty<string>(),
             DispatchUrl: latest.Href,
             SourceReceiptUrl: latest.SourceReceiptHref,
-            PrivacyNote: "Generated from a receipt-backed public-safe dispatch. No private campaign, support, or administrative data is included.");
+            PrivacyNote: "Generated from a public-safe dispatch. No private campaign, support, or administrative data is included.");
     }
 
     private static IReadOnlyList<BlackLedgerDispatch> BuildDispatchRecords(BlackLedgerWorldPreviewViewModel world)
@@ -860,7 +860,7 @@ public sealed class BlackLedgerPublicStatsService
         string turnHeadline = currentTurn is null
             ? "Turn 0 is loaded."
             : selectedTurn.IsDeterministicPreview
-                ? $"Turn {currentTurn.Turn} deterministic board is ready. {currentTurn.Summary}"
+                ? $"Turn {currentTurn.Turn} preview board is ready. {currentTurn.Summary}"
                 : currentTurn.Headline;
         string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.";
         string mapNote = "Use the map to inspect seeded districts, visible pressure arcs, and public-safe dispatches without exposing private tables.";

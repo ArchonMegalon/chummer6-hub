@@ -236,12 +236,12 @@
       }
 
       const stored = getDesktopPreference();
-      if (stored === "0") {
-        closeNavPanel();
+      if (stored === "1") {
+        openNavPanel();
         return;
       }
 
-      openNavPanel();
+      closeNavPanel();
     };
 
     initializeNavPanel();

@@ -91,19 +91,12 @@
     var supplementalSignalLinks = publicSignalLinks
         .Where(link => !string.Equals(link.Href, "/roadmap", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var guidedStartLinks = new[]
+    var primaryDrawerLinks = new[]
     {
+        new PublicNavigationLink("Home", "/"),
         new PublicNavigationLink("Get Chummer", "/downloads"),
-        new PublicNavigationLink("What Works Today", "/now"),
-        new PublicNavigationLink("Help", "/help"),
-        new PublicNavigationLink("Account", chrome.Authenticated ? "/account" : "/signup")
-    };
-    var worldLinks = new[]
-    {
-        new PublicNavigationLink("Worlds home", "/ledger"),
-        new PublicNavigationLink("Dispatches", "/ledger/dispatches"),
-        new PublicNavigationLink("Karma Forge", "/participate/karma-forge"),
-        new PublicNavigationLink("Anarchy", "/anarchy")
+        new PublicNavigationLink("Ledger", "/ledger"),
+        new PublicNavigationLink("Help", "/help")
     };
     var compactDrawerLinks = chrome.PrimaryNavigation
         .Concat(supplementalSignalLinks)
@@ -441,54 +434,16 @@
             </div>
         </header>
         <div class="site-sidebar-backdrop" data-nav-backdrop hidden></div>
-        <aside class="site-sidebar" id="site-nav-panel" data-nav-panel aria-hidden="false">
+        <aside class="site-sidebar" id="site-nav-panel" data-nav-panel aria-hidden="@(defaultNavOpen ? "false" : "true")"@(defaultNavOpen ? null : " hidden inert")>
             <div class="site-sidebar__panel">
                 <div class="site-sidebar__masthead">
-                    <div>
-                        <p class="site-sidebar__kicker">Navigation</p>
-                        <strong class="site-sidebar__title">@pageTitle</strong>
-                    </div>
+                    <strong class="site-sidebar__title">@pageTitle</strong>
                     <button class="site-sidebar__close button-like button-like--ghost" type="button" data-nav-close aria-label="Hide navigation panel">Hide</button>
                 </div>
-                <div class="site-sidebar__section site-sidebar__section--summary">
-                    <p class="site-sidebar__heading">Get started</p>
-                    <p class="site-sidebar__summary">The flagship front door stays simple: get the build, check what works today, keep help nearby, and keep account return close.</p>
-                    <nav class="site-sidebar__nav" aria-label="Get started navigation">
-                        @foreach (var link in guidedStartLinks)
-                        {
-                            var current = isContextualRouteCurrent(link.Href);
-                            if (current)
-                            {
-                                <span class="site-sidebar__current">@link.Label</span>
-                            }
-                            else
-                            {
-                                <a href="@link.Href">@link.Label</a>
-                            }
-                        }
-                    </nav>
-                </div>
                 <div class="site-sidebar__section">
-                    <p class="site-sidebar__heading">Worlds</p>
-                    <nav class="site-sidebar__nav" aria-label="World navigation">
-                        @foreach (var link in worldLinks)
-                        {
-                            var current = isContextualRouteCurrent(link.Href);
-                            if (current)
-                            {
-                                <span class="site-sidebar__current">@link.Label</span>
-                            }
-                            else
-                            {
-                                <a href="@link.Href">@link.Label</a>
-                            }
-                        }
-                    </nav>
-                </div>
-                <div class="site-sidebar__section">
-                    <p class="site-sidebar__heading">Flagship routes</p>
+                    <p class="site-sidebar__heading">Menu</p>
                     <nav class="site-sidebar__nav" aria-label="Primary navigation">
-                        @foreach (var link in chrome.PrimaryNavigation)
+                        @foreach (var link in primaryDrawerLinks)
                         {
                             var current = isContextualRouteCurrent(link.Href);
                             if (current)
@@ -526,51 +481,11 @@
                         </nav>
                     </div>
                 }
-                @if (supplementalSignalLinks.Length > 0)
+                @if (chrome.Authenticated)
                 {
                     <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Signals and horizons</p>
-                        <nav class="site-sidebar__nav" aria-label="Signal navigation">
-                            @foreach (var link in supplementalSignalLinks)
-                            {
-                                var current = isPublicSignalCurrent(link.Href);
-                                if (current)
-                                {
-                                    <span class="site-sidebar__current">@link.Label</span>
-                                }
-                                else
-                                {
-                                    <a href="@link.Href">@link.Label</a>
-                                }
-                            }
-                        </nav>
-                    </div>
-                }
-                @if (supportLinks.Length > 0)
-                {
-                    <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Trust and support</p>
-                        <nav class="site-sidebar__nav" aria-label="Support navigation">
-                            @foreach (var link in supportLinks)
-                            {
-                                var current = isContextualRouteCurrent(link.Href);
-                                if (current)
-                                {
-                                    <span class="site-sidebar__current">@link.Label</span>
-                                }
-                                else
-                                {
-                                    <a href="@link.Href">@link.Label</a>
-                                }
-                            }
-                        </nav>
-                    </div>
-                }
-                @if (chrome.Authenticated || nonBuildHeaderActions.Length > 0 || buildAction is not null)
-                {
-                    <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Account and quick actions</p>
-                        <div class="site-sidebar__actions" role="group" aria-label="Account and quick actions">
+                        <p class="site-sidebar__heading">Account</p>
+                        <div class="site-sidebar__actions" role="group" aria-label="Account actions">
                             @foreach (var action in nonBuildHeaderActions)
                             {
                                 if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
@@ -620,7 +535,7 @@
             <div class="site-footer__inner">
                 <div class="site-footer__brand">
                     <a class="site-footer__wordmark" href="/">CHUMMER</a>
-                    <p class="site-footer__copy">Flagship Shadowrun character and campaign companion with one install path, one account return, and one place to check what is ready today.</p>
+                    <p class="site-footer__copy">Shadowrun companion.</p>
                 </div>
                 <nav class="site-footer__nav" aria-label="Footer navigation">
                     <div class="site-footer__link-group">
@@ -650,9 +565,9 @@
                     }
                     else
                     {
-                        <p>Live product. Clear downloads, account return, and grounded support guidance.</p>
+                        <p>Live product. Clear downloads and support.</p>
                     }
-                    <p class="site-footer__provenance">Use <a class="quiet-link" href="/downloads">Get Chummer</a> for the acquisition path, <a class="quiet-link" href="/now">what works today</a> for current availability, and <a class="quiet-link" href="/status">status</a> for cautions.</p>
+                    <p class="site-footer__provenance"><a class="quiet-link" href="/downloads">Get Chummer</a> for installs. <a class="quiet-link" href="/status">Status</a> for cautions.</p>
                     @if (utilityLink is not null)
                     {
                         var utilityIsExternal = Uri.TryCreate(utilityLink.Href, UriKind.Absolute, out _);

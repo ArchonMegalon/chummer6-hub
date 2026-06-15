@@ -133,9 +133,13 @@
         }
 
         return value
-            .Replace("Proof lane anchored to", "Source signal:", StringComparison.OrdinalIgnoreCase)
-            .Replace("Review lane anchored to", "Source signal:", StringComparison.OrdinalIgnoreCase)
-            .Replace("Routed through", "Built from", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof lane anchored to", "Visible move:", StringComparison.OrdinalIgnoreCase)
+            .Replace("Review lane anchored to", "Visible move:", StringComparison.OrdinalIgnoreCase)
+            .Replace("City pulse:", "Visible move:", StringComparison.OrdinalIgnoreCase)
+            .Replace("Routed through", "Seen in", StringComparison.OrdinalIgnoreCase)
+            .Replace("Linked through", "Seen in", StringComparison.OrdinalIgnoreCase)
+            .Replace("deterministic board", "live board", StringComparison.OrdinalIgnoreCase)
+            .Replace("Provider-hosted", "External", StringComparison.OrdinalIgnoreCase)
             .Trim();
     }
 }
@@ -176,7 +180,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">Black Ledger should read like a live command desk, not a generic map widget. Watch the city breathe, see which bloc is leaning on which district, and lift a usable hook straight into the next scene.</p>
+        <p class="ledger-flagship__support">Watch the city breathe, see which bloc is leaning on which district, and lift a hook straight into the next scene.</p>
         <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
             <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
             <span><strong>@worldFactions.Length</strong> factions</span>
@@ -199,7 +203,6 @@
             <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
             <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
             <a class="inline-link" href="/ledger/map#ledger-map">Open command map</a>
-            <a class="inline-link" href="/ledger/dispatches">Read dispatches</a>
         </div>
         <div class="trust-claim__microproof ledger-flagship__boundary">
             <span>Opt-in aggregate only</span>
@@ -220,7 +223,7 @@
         </a>
         <a class="ledger-flagship__nav-card" href="/ledger/dispatches">
             <span class="tag">Newsroom</span>
-            <strong>Read dispatches</strong>
+            <strong>Open newsroom</strong>
             <p>Latest dispatches, table hooks, and the current bulletin without private campaign spillover.</p>
         </a>
         <a class="ledger-flagship__nav-card" href="@accountCtaHref">
@@ -238,7 +241,10 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Command map</p>
             <h2 class="editorial-title">@Model.World.PublicName</h2>
-            <p class="editorial-copy">@Model.World.TurnHeadline</p>
+            @if (!string.IsNullOrWhiteSpace(Model.World.TurnHeadline))
+            {
+                <p class="editorial-copy">@Model.World.TurnHeadline</p>
+            }
             <p class="muted-copy">@Model.World.MapNote</p>
         </div>
         <div class="ledger-command-map ledger-command-map--pregold">
@@ -270,16 +276,16 @@
                         data-secondary-label="Open latest dispatch"
                         data-secondary-href="/ledger/dispatches"></div>
                 </div>
-                <div class="ledger-provider-tours" data-ledger-tour-exports="/media/ledger/tours/black-ledger-tour-exports.manifest.json" aria-label="External 3D viewer exports">
+                <div class="ledger-provider-tours" data-ledger-tour-exports="/media/ledger/tours/black-ledger-tour-exports.manifest.json" aria-label="Optional external viewer links">
                     <div>
-                        <span class="tag">3D viewer exports</span>
-                        <p>Optional external viewer exports stay here. The live board stays on this command map.</p>
+                        <span class="tag">Optional viewers</span>
+                        <p>Optional viewer links.</p>
                     </div>
                     <div class="ledger-provider-tours__actions">
                         <a class="button-like button-like--primary" href="/media/ledger/tours/black-ledger-3dvista-flythrough.mp4">Fly-through</a>
                         <a class="button-like button-like--secondary" href="https://my.matterport.com/show/?m=ax2JhiPGk5P" rel="noopener noreferrer" target="_blank">Matterport</a>
                         <a class="button-like button-like--secondary" href="https://www.3dvista.com/samples/new_york_loft.html" rel="noopener noreferrer" target="_blank">3DVista</a>
-                        <a class="inline-link" href="/media/ledger/tours/black-ledger-tour-exports.manifest.json">Manifest</a>
+                        <a class="inline-link" href="/media/ledger/tours/black-ledger-tour-exports.manifest.json">Link list</a>
                     </div>
                 </div>
             }
@@ -359,18 +365,18 @@
                             <p>@newsreelBroadcast.AudioPosture</p>
                             <p>@newsreelBroadcast.MusicPosture</p>
                             <p>@newsreelBroadcast.PublicSafetyNote</p>
-                            <p>@newsreelBroadcast.ReconstructionNote</p>
+                            <p>@softenLedgerNote(newsreelBroadcast.ReconstructionNote)</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
-                                <a href="@newsreelBroadcast.ReceiptsHref">Source receipts</a>
+                                <a href="@newsreelBroadcast.ReceiptsHref">Episode details</a>
                                 <a href="@newsreelBroadcast.CaptionsHref">Captions</a>
                                 <a href="@newsreelBroadcast.FeedbackHref">Feedback</a>
                             </div>
                         </article>
                         <article class="route-choice-card">
                             <span class="tag">Rundown</span>
-                            <h3>Producer sheet</h3>
+                            <h3>Rundown</h3>
                             <ul class="ledger-newsreel-broadcast__list">
                                 @foreach (var line in newsreelBroadcast.Rundown)
                                 {
@@ -399,7 +405,7 @@
                 <div class="editorial-block__lead">
                     <p class="eyebrow">Dispatch lane</p>
                     <h2 class="editorial-title">Latest dispatches</h2>
-                    <p class="editorial-copy">Each dispatch is a table-ready pressure beat with a clear public boundary.</p>
+                    <p class="editorial-copy">Table-ready pressure beats.</p>
                 </div>
                 <div class="ledger-dispatch-strip__grid">
                     @foreach (var dispatch in latestDispatches)
@@ -424,7 +430,7 @@
             <div class="trust-claim__microproof">
                 <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
                 <span>Delivery: first-party email rail</span>
-                <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
+                            <span>Clips: @Model.NewsreelStatus.ReceiptCount</span>
             </div>
         </section>
     }
@@ -433,7 +439,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction files</p>
             <h2 class="editorial-title">Logos, backdrops, score ledgers, and first-party motion intros.</h2>
-            <p class="editorial-copy">Every public faction lane shows pressure, not people, with one clear CTA and no unproven provider claim.</p>
+            <p class="editorial-copy">Public faction lanes show pressure, not people.</p>
         </div>
         <div class="faction-profile-grid">
             @foreach (var faction in world.Factions)
@@ -460,9 +466,9 @@
                         }
                     </div>
                     <div class="trust-claim__microproof">
-                        <span>Safety: public-safe</span>
+                        <span>Safety: public</span>
                         <span>Video: first-party motion</span>
-                        <span>Receipt: @(world.LastTick?.ReceiptId ?? "turn-1")</span>
+                        <span>Turn: @(world.LastTick?.ReceiptId ?? "turn-1")</span>
                     </div>
                     <a class="editorial-strip__action" href="/ledger/factions/@slug" data-faction-file-link="@slug">Open faction file</a>
                 </article>
@@ -482,9 +488,9 @@
                     <p class="eyebrow">Faction profile</p>
                     <h2 class="editorial-title">@selectedFaction.PublicName</h2>
                     <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
-                    <p class="muted-copy">This page explains pressure, not people. Public faction files never expose player identities, private campaign labels, or account-linked overlays.</p>
+                    <p class="muted-copy">This page explains pressure, not people.</p>
                     <div class="trust-claim__microproof">
-                        <span>Safety: public-safe</span>
+                        <span>Safety: public</span>
                         <span>Video: first-party motion</span>
                         <span>Package pressure visible</span>
                     </div>
@@ -503,7 +509,7 @@
                         <h3>@ledger.CurrentValue</h3>
                         <p>Delta since last turn: @ledger.Delta</p>
                         <p>Trend: @ledger.Trend</p>
-                        <p>Source receipt: @ledger.SourceReceipt</p>
+                        <p>Latest turn: @ledger.SourceReceipt</p>
                         <p>What changes it: @ledger.WhatChangesIt</p>
                         <p>Latest action: @ledger.LatestAction</p>
                     </article>

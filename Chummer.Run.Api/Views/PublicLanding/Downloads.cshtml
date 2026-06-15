@@ -66,7 +66,7 @@
         <p class="page-copy">
             @(requestedPlatformUnavailable
                 ? $"This browser looks like {deviceLabel}, but that platform is not publicly available right now."
-                : $"This browser looks like {deviceLabel}. Start with the recommended build for that platform.")
+                : $"This browser looks like {deviceLabel}. Start with the recommended build.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
@@ -78,42 +78,16 @@
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
                         ? "This install path can link sign-in and support from the first launch when you want them attached."
-                        : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
+                        : "Other platforms and technical details stay below."))
         </p>
         <p class="muted-copy">
             @(guestGateRequired
                 ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                     ? "Start with the recommended installer. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path. Sign in only when you want account return and support attached."
-                : "Start with the recommended download. Install first. Sign in later if you want account return and support attached.")
+                    : "Start with the recommended install path. Sign in later when you need account return or support."
+                : "Start with the recommended download. Sign in later when you need account return or support.")
         </p>
-        <p class="muted-copy">Need another platform or package type? <a class="inline-link" href="/downloads">Browse all downloads</a>.</p>
     </div>
-</section>
-
-<section class="release-shelf" aria-label="Download filters">
-    <form class="downloads-filter-bar" method="get" action="/downloads">
-        <div class="field">
-            <label for="download-platform">Platform</label>
-            <select id="download-platform" name="platform">
-                <option value="">All platforms</option>
-                <option value="windows">Windows</option>
-                <option value="macos">macOS</option>
-                <option value="linux">Linux</option>
-            </select>
-        </div>
-        <div class="field">
-            <label for="download-type">Package type</label>
-            <select id="download-type" name="type">
-                <option value="">All types</option>
-                <option value="installer">Installers</option>
-                <option value="archive">Archives</option>
-                <option value="manual">Manual packages</option>
-            </select>
-        </div>
-        <button class="button-like button-like--secondary" type="submit">Apply</button>
-        <a class="button-like button-like--ghost" href="/downloads">Reset</a>
-    </form>
 </section>
 
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
@@ -148,7 +122,7 @@ else
                         : guestGateRequired
                             ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                                 ? "Use the recommended installer for this platform. If you want the smaller direct payload instead, open the Windows ZIP right below."
-                                : "Use the main install path for this platform. Sign in only when you want support and account return attached from the first launch."
+                                : "Use the main install path for this platform. Sign in later only when you want support and account return attached from the first launch."
                             : "Use the main install path for this platform. You can install first and sign in later when you want account return and support attached.")
                 </p>
                 <div class="recommended-download__meta">
@@ -162,27 +136,7 @@ else
                     <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
                 </div>
-                <div class="recommended-download__trustrail" aria-label="Install and account facts">
-                    <article class="recommended-download__trustfact">
-                        <span>Binary</span>
-                        <strong>The same build for everyone</strong>
-                        <p>The build stays the same for everyone. Sign-in only adds account return and support around it.</p>
-                    </article>
-                    <article class="recommended-download__trustfact">
-                        <span>First launch</span>
-                        <strong>@(guestGateRequired ? "Sign in only when you want return and support" : "Sign in later if you need return and support")</strong>
-                        <p>
-                            @(guestGateRequired
-                                ? "The installer stays the same. Sign-in only adds account return and support."
-                                : "Install first. Account return and support can be linked afterward.")
-                        </p>
-                    </article>
-                    <article class="recommended-download__trustfact">
-                        <span>Recovery path</span>
-                        <strong>Devices and access stay calm</strong>
-                        <p>Relink, reclaim, and recovery belong on the account page after the app is installed.</p>
-                    </article>
-                </div>
+                <p class="recommended-download__summary-note">Install first. Sign in later when you need account return or support.</p>
                 <div class="stacked-actions">
                     @if (requestedPlatformUnavailable)
                     {
@@ -215,39 +169,37 @@ else
                         {
                             <a class="button-like button-like--secondary" href="@windowsZipFallback.DispatchHref">@windowsZipFallback.ActionLabel</a>
                         }
-                        else
-                        {
-                            <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
-                        }
-                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                     else
                     {
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                        <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
-                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
-                </div>
-                <div class="route-callout" role="status" aria-live="polite">
-                    <h3>Need install help?</h3>
-                    <p>Use setup concierge only when you need help choosing a platform, recovering a setup, or reaching a human handoff.</p>
-                    <div class="route-callout__actions">
-                        <a class="inline-link" href="/downloads/concierge">Get setup help</a>
-                        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                    </div>
                 </div>
                 @if (!requestedPlatformUnavailable)
                 {
-                    <p class="downloads-inline-note">
-                        @(recommendedUsesMacSetupScript
-                            ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
-                            : "After install, open Chummer and continue through Home or Horizons.")
-                    </p>
                     <details class="release-accordion">
-                        <summary>Release notes, known issues, and requirements</summary>
+                        <summary>Help and notes</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">Known issues and install help stay nearby. Deeper release detail lives on What works today and Status, not in front of the install button.</p>
-                            <p class="muted-copy">Release notes and known issues stay tied to this downloads page so the install decision stays honest while availability evolves.</p>
+                            <div class="route-callout" role="status" aria-live="polite">
+                                <h3>Install questions?</h3>
+                                <p>Open setup help only when install is blocked.</p>
+                                <div class="route-callout__actions">
+                                    <a class="inline-link" href="/downloads/concierge">Get setup help</a>
+                                    <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                                </div>
+                            </div>
+                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref">@returningUserLabel</a>.</p>
+                            <p class="downloads-inline-note">
+                                @(recommendedUsesMacSetupScript
+                                    ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
+                                    : "After install, open Chummer.")
+                            </p>
+                        </div>
+                    </details>
+                    <details class="release-accordion">
+                        <summary>Release notes and requirements</summary>
+                        <div class="release-accordion__body">
+                            <p class="muted-copy">Known issues and install help stay nearby.</p>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
@@ -256,14 +208,59 @@ else
                         </div>
                     </details>
                 }
+                else
+                {
+                    <details class="release-accordion">
+                        <summary>Help and notes</summary>
+                        <div class="release-accordion__body">
+                            <div class="route-callout" role="status" aria-live="polite">
+                                <h3>Install questions?</h3>
+                                <p>Open setup help only when install is blocked.</p>
+                                <div class="route-callout__actions">
+                                    <a class="inline-link" href="/downloads/concierge">Get setup help</a>
+                                    <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                                </div>
+                            </div>
+                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref">@returningUserLabel</a>.</p>
+                        </div>
+                    </details>
+                }
                 @if (hasAdvancedPanels)
                 {
-                    <p class="downloads-advanced-link">
-                        <a class="inline-link" href="#advanced-downloads">Advanced download options</a>
-                    </p>
+                    <p class="downloads-advanced-link"><a class="inline-link" href="#advanced-downloads">More download options</a></p>
                 }
             </div>
         </article>
+    </section>
+
+    <section class="release-shelf" aria-label="Download filters">
+        <details class="release-accordion">
+            <summary>Filter downloads</summary>
+            <div class="release-accordion__body">
+                <form class="downloads-filter-bar" method="get" action="/downloads">
+                    <div class="field">
+                        <label for="download-platform">Platform</label>
+                        <select id="download-platform" name="platform">
+                            <option value="">All platforms</option>
+                            <option value="windows">Windows</option>
+                            <option value="macos">macOS</option>
+                            <option value="linux">Linux</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="download-type">Package type</label>
+                        <select id="download-type" name="type">
+                            <option value="">All types</option>
+                            <option value="installer">Installers</option>
+                            <option value="archive">Archives</option>
+                            <option value="manual">Manual packages</option>
+                        </select>
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Apply</button>
+                    <a class="button-like button-like--ghost" href="/downloads">Reset</a>
+                </form>
+            </div>
+        </details>
     </section>
 
     @if (showPlatformShelf)
@@ -332,7 +329,7 @@ else
 
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Need more detail?</h3>
-                        <p class="muted-copy">Use Status when you want platform readiness, the current caution, and the deeper release trail without crowding the main install decision.</p>
+                        <p class="muted-copy">Use Status when you want the deeper release trail.</p>
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="/status">Open status</a>
                             <a class="button-like button-like--ghost" href="/now">Open what works today</a>

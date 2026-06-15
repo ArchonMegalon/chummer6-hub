@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-14T20:35:54Z",
+  "generated_at_utc": "2026-06-15T07:35:37Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -13,13 +13,19 @@
       "required_texts": [
         "Black Ledger command deck",
         "The city is moving.",
-        "Choose the build, open play, or replay Turn 1."
+        "Install, play, or open the city."
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
         "One compact rail for downloads, play, and public status.",
         "Reel details",
-        "Keep it simple"
+        "Keep it simple",
+        "Get started",
+        "Worlds",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions"
       ],
       "forbidden_hits": [],
       "required_final_url_prefix": null,
@@ -34,13 +40,19 @@
       "required_texts": [
         "Install Chummer",
         "Start with the recommended build",
-        "Need install help?"
+        "Install questions?",
+        "Filter downloads"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
         "account-assisted install paths",
         "Link this copy from the first launch",
-        "guided installer"
+        "guided installer",
+        "Get started",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions"
       ],
       "forbidden_hits": [],
       "required_final_url_prefix": null,
@@ -53,9 +65,9 @@
       "final_url": "https://chummer.run/status",
       "status_code": 200,
       "required_texts": [
-        "Use this page for the short customer-facing summary.",
-        "Compact release summary",
-        "Compact status summary"
+        "Release, caution, next click.",
+        "Release, caution, next click.",
+        "Current public release"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
@@ -63,7 +75,15 @@
         "Review is still required before this release can be treated as supportable.",
         "Fallback",
         "Revoked",
-        "usage snapshot"
+        "usage snapshot",
+        "At a glance",
+        "Signed-in return",
+        "Status poster",
+        "Get started",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions"
       ],
       "forbidden_hits": [],
       "required_final_url_prefix": null,
@@ -81,7 +101,18 @@
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
-        "Internal Error"
+        "Internal Error",
+        "Board signal:",
+        "Turn source:",
+        "Production notes",
+        "City note:",
+        "City pulse:",
+        "Built from",
+        "deterministic board",
+        "Linked through",
+        "Turn record:",
+        "Scene notes",
+        "<p class=\"editorial-copy\"></p>"
       ],
       "forbidden_hits": [],
       "required_final_url_prefix": "/ledger/map",

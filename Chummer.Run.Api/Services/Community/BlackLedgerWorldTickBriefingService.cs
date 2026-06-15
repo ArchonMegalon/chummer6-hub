@@ -30,7 +30,7 @@ public sealed class BlackLedgerWorldTickBriefingService
         string transitionLabel = $"Turn {fromTurn} -> Turn {tick.Turn}";
         string transitionNarrative = fromTurn == 0
             ? "Turn 0 was operator setup, hidden clocks, and seeded faction posture. Turn 1 is the first public city reaction that players can inspect without touching private table state."
-            : $"Turn {fromTurn} carried forward the prior public board state. Turn {tick.Turn} is the receipt-backed city answer to those visible pressures.";
+            : $"Turn {fromTurn} carried forward the prior public board state. Turn {tick.Turn} shifts the visible pressure across the city.";
         string stateSummary = BuildStateSummary(world);
         string inboxHeadline = fromTurn == 0
             ? $"World Turn 1 opened the board for {world.PublicName}"
@@ -254,7 +254,7 @@ public sealed class BlackLedgerWorldTickBriefingService
         string publishedLabel = new DateTimeOffset(File.GetLastWriteTimeUtc(mp4Path)).ToString("MMMM d, yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
         IReadOnlyList<string> rundown =
         [
-            $"Open on anchor desk: {transitionLabel} with receipt {tick.ReceiptId}.",
+            $"Open on anchor desk: {transitionLabel} with turn {tick.ReceiptId}.",
             $"{world.TurnHeadline}",
             ..actionBeats.Take(4).Select(static beat => $"{beat.ActorLabel}: {beat.CommandIntent}"),
             ..actionBeats.Take(3).Select(static beat => beat.ConsequenceLine),
@@ -264,7 +264,7 @@ public sealed class BlackLedgerWorldTickBriefingService
         IReadOnlyList<string> ticker =
         [
             $"{world.PublicName} live",
-            $"Turn {tick.Turn} receipt-backed",
+            $"Turn {tick.Turn} live board",
             ..actionBeats.Take(3).Select(static beat => beat.VisualHook),
             $"{world.Districts.OrderByDescending(static district => district.Heat).First().Name} hottest district",
             $"{world.Districts.OrderByDescending(static district => Math.Abs(district.DeltaSinceLastTick)).First().Name} biggest move",
@@ -277,7 +277,7 @@ public sealed class BlackLedgerWorldTickBriefingService
                 Label: "Anchor Open",
                 DurationLabel: "00:08",
                 Purpose: "Open on the turn boundary and establish why this board move matters now.",
-                VisualDirection: $"Anchor desk, city incident wall, and receipt {tick.ReceiptId} already live on the lower third.",
+                VisualDirection: $"Anchor desk, city incident wall, and turn {tick.ReceiptId} already live on the lower third.",
                 NarratorLine: $"{transitionLabel} for {world.PublicName}. {newsreelLead}"),
             new(
                 SceneId: $"turn-{tick.Turn}-field-pressure",
@@ -297,9 +297,9 @@ public sealed class BlackLedgerWorldTickBriefingService
                 SceneId: $"turn-{tick.Turn}-validation-close",
                 Label: "Validation Close",
                 DurationLabel: "00:06",
-                Purpose: "Close on the receipts and keep the bulletin subordinate to proof.",
-                VisualDirection: "Validation packet, receipts lane, and captions route remain visible in frame.",
-                NarratorLine: "The bulletin can be dramatic, but the receipts still get the last word.")
+                Purpose: "Close on the board state and keep the bulletin anchored to what changed this turn.",
+                VisualDirection: "Validation packet, turn summary, and captions route remain visible in frame.",
+                NarratorLine: "The bulletin can be dramatic, but the turn summary still gets the last word.")
         ];
 
         return new BlackLedgerNewsreelBroadcastViewModel(
@@ -308,7 +308,7 @@ public sealed class BlackLedgerWorldTickBriefingService
             DeskLabel: "Black Ledger Network",
             ProviderStatus: "FIRST_PARTY_NEWSREEL",
             RenderMode: "first_party_anchor_bulletin",
-            StorylineSummary: "Each turn bulletin opens on the boundary, translates pressure into visible consequences, and closes on the validation lane.",
+            StorylineSummary: "Each turn bulletin opens on the boundary, translates pressure into visible consequences, and closes on the turn summary.",
             NarratorPosture: "Continuous newsroom narration over a ducked synthetic score bed.",
             RenderPipelineLabel: "First-party bulletin render -> narration mix -> captions -> public newsroom route",
             WatchHref: watchHref,
@@ -323,8 +323,8 @@ public sealed class BlackLedgerWorldTickBriefingService
             DurationLabel: "00:16",
             PublishedLabel: publishedLabel,
             EpisodeTypeLabel: "Turn newsreel",
-            PublicSafetyNote: "Public-safe bulletin built from aggregate Black Ledger world receipts. No private campaign table data or sourcebook text is exposed here.",
-            ReconstructionNote: "Some footage is reconstructed from public-safe receipts. Source records stay available for review.",
+            PublicSafetyNote: "Public-safe bulletin built from aggregate Black Ledger world activity. No private campaign table data or sourcebook text is exposed here.",
+            ReconstructionNote: "Some footage is reconstructed from public-safe world activity. Supporting records stay available for review.",
             FeedbackHref: "/feedback",
             ActionBeats: actionBeats,
             Rundown: rundown,
@@ -367,7 +367,7 @@ public sealed class BlackLedgerWorldTickBriefingService
                 BeatLabel: effect.Metric,
                 ActionSummary: effect.PublicReason,
                 Stakes: $"{world.PublicName} visible pressure moved on the city board.",
-                ProofNote: $"Board record: {tick.ReceiptId}",
+                ProofNote: $"Visible move: {tick.ReceiptId}",
                 VisualHook: $"Flash {effect.Target} across the globe while {effect.Metric} moves.",
                 CommandIntent: $"Push {effect.Target} onto the command board as a live {effect.Metric} shift.",
                 ConsequenceLine: $"{effect.Target} now changes what players and GMs have to answer next."))

@@ -158,7 +158,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("work task 120.1 title drifted", result.stderr)
 
-    def test_verifier_fails_when_status_view_loses_launch_health_rows(self) -> None:
+    def test_verifier_fails_when_status_view_loses_the_single_decision_surface(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-status-view-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
@@ -166,15 +166,15 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             status_text = status_path.read_text(encoding="utf-8")
             status_path.write_text(
                 status_text
-                .replace("Model.LaunchHealthRows", "Model.TrustPulse.Rows", 1)
-                .replace("Compact status summary", "Quick release summary", 1),
+                .replace('data-status-surface="decision-surface"', "data-status-surface=\"missing\"", 1)
+                .replace("Current caution", "Quick release summary", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("return Model.LaunchHealthRows?", result.stderr)
+        self.assertIn('data-status-surface="decision-surface"', result.stderr)
 
     def test_verifier_fails_when_release_proof_drops_public_trust_surface_block(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-surface-") as temp_dir:
@@ -224,22 +224,22 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('new("Revoked", BuildRevokedLaunchSummary(manifest)),', result.stderr)
 
-    def test_verifier_fails_when_smoke_drops_fixed_launch_health_assertion(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m120-fixed-row-") as temp_dir:
+    def test_verifier_fails_when_smoke_drops_status_decision_surface_assertion(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-status-surface-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
             smoke_text = smoke_path.read_text(encoding="utf-8")
-            fixed_assertion = 'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Fixed", StringComparison.Ordinal) && row.Value.Contains("fix", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface fixed-release follow-through in launch-health rows.");'
+            fixed_assertion = 'Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep the deeper report as a secondary step.");'
             smoke_path.write_text(
-                smoke_text.replace(fixed_assertion, "// fixed launch-health assertion removed", 1),
+                smoke_text.replace(fixed_assertion, "// status decision surface assertion removed", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("fixed-release follow-through", result.stderr)
+        self.assertIn("Open progress", result.stderr)
 
     def test_verifier_fails_when_release_proof_duplicates_package_receipt_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-duplicate-") as temp_dir:

@@ -18,6 +18,7 @@ LIVE_RECRAWL_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json"
 PUBLIC_ROUTE_PROOF_PATH = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 LIVE_SURFACE_PARITY_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
+MINIMAL_EXPERIENCE_GATE_PATH = COMPLETION_ROOT / "MINIMAL_EXPERIENCE_GATE.generated.json"
 DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
 DESIGN_REVIEW_REQUIRED_SECTIONS = [
     "## Surface Hierarchy",
@@ -160,13 +161,20 @@ def build_payload() -> dict[str, Any]:
         for item in screenshot_results
         if isinstance(item, dict) and str(item.get("status") or "").lower() != "pass"
     ]
+    screenshot_base_url = str(screenshot.get("base_url") or "").strip().rstrip("/")
     missing_viewports = sorted(REQUIRED_VIEWPORTS - screenshot_viewports)
-    screenshot_pass = status_pass(screenshot) and not screenshot_failures and not missing_viewports
+    screenshot_pass = (
+        status_pass(screenshot)
+        and not screenshot_failures
+        and not missing_viewports
+        and screenshot_base_url == "https://chummer.run"
+    )
     if not screenshot_pass:
         failures.append("homepage screenshot QA is missing required viewport coverage or has failures")
     checks["screenshot_qa"] = {
         "path": str(screenshot_path),
         "status": screenshot.get("status", "missing"),
+        "base_url": screenshot.get("base_url"),
         "viewports": sorted(screenshot_viewports),
         "missing_viewports": missing_viewports,
         "failed_viewports": screenshot_failures,
@@ -183,6 +191,23 @@ def build_payload() -> dict[str, Any]:
         "status": cta.get("status", "missing"),
         "failure_count": len(cta.get("failures") or []),
         "pass": cta_pass,
+    }
+
+    minimal_experience = load_json(MINIMAL_EXPERIENCE_GATE_PATH)
+    minimal_experience_base_url = str(minimal_experience.get("base_url") or "").strip().rstrip("/")
+    minimal_experience_pass = (
+        status_pass(minimal_experience)
+        and not minimal_experience.get("failures")
+        and minimal_experience_base_url == "https://chummer.run"
+    )
+    if not minimal_experience_pass:
+        failures.append("minimal experience gate is missing or failing")
+    checks["minimal_experience_gate"] = {
+        "path": str(MINIMAL_EXPERIENCE_GATE_PATH),
+        "status": minimal_experience.get("status", "missing"),
+        "base_url": minimal_experience.get("base_url"),
+        "failure_count": len(minimal_experience.get("failures") or []),
+        "pass": minimal_experience_pass,
     }
 
     asset_path = COMPLETION_ROOT / "PUBLIC_ASSET_QUALITY_GATE.generated.json"

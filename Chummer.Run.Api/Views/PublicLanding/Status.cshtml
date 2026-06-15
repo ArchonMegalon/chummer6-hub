@@ -12,63 +12,6 @@
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
             .ToUniversalTime()
             .ToString("yyyy-MM-dd");
-    var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
-    var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
-    var accountReturnSummary = Model.Chrome.Authenticated
-        ? "Use Home when install return, support status, and the next safe action should stay in one signed-in place."
-        : "Use account setup when you want install return, support history, and roadmap follow-up in one calmer place.";
-    var statusRouteChoices = new[]
-    {
-        new
-        {
-            Badge = "Downloads",
-            Title = "Install or update from the downloads page",
-            Summary = "Downloads owns the recommended build, platform notes, current package details, and the calmest first-run path for this device.",
-            Href = "/downloads",
-            Label = "Open downloads",
-            Proof = new[] { "Recommended build", "Known issues nearby", "Account return available" }
-        },
-        new
-        {
-            Badge = "Live checks",
-            Title = "Use what works today when the question is readiness, not packaging",
-            Summary = "Open what works today when you need the current result, current cautions, or one clear explanation before you move a device.",
-            Href = "/now",
-            Label = "Open what works today",
-            Proof = new[] { "Current result", "Caution explicit", "One clear explanation" }
-        },
-        new
-        {
-            Badge = "Private help",
-            Title = "Leave status for first-party help as soon as the issue becomes private",
-            Summary = "Install failures, crashes, account recovery, and campaign-sensitive detail belong on support instead of sitting on a public summary surface.",
-            Href = "/contact#support-intake",
-            Label = "Open support intake",
-            Proof = new[] { "Private by default", "Tracked return", "Support-owned" }
-        },
-        new
-        {
-            Badge = "Deeper report",
-            Title = "Open the larger machine picture only when the short status line is not enough",
-            Summary = "Use the progress page when you need the longer operating report behind the current public release summary.",
-            Href = "/progress",
-            Label = "Open progress",
-            Proof = new[] { "Short public summary", "Longer report", "No page confusion" }
-        }
-    };
-    var campaignStatusTitle = CustomerStatusText(
-        Model.CampaignOsProof is null
-            ? "Campaign detail stays on the longer report"
-            : $"Campaign status is currently {Model.CampaignOsProof.Status}",
-        "Campaign detail stays on the longer report");
-    var campaignStatusSummary = CustomerStatusText(
-        Model.CampaignOsProof is null
-            ? "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail."
-            : Model.CampaignOsProof.JourneysPassed.Count == 0
-                ? "The campaign packet is mirrored, but this snapshot does not list named completed paths yet."
-                : $"Current mirrored campaign paths: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.",
-        "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail.");
-
     string ContextualPreviewHref(string? href)
     {
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
@@ -117,7 +60,7 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("journey proofs", "verified paths", StringComparison.OrdinalIgnoreCase)
             .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
-            .Replace("adoption health", "usage snapshot", StringComparison.OrdinalIgnoreCase)
+            .Replace("adoption health", "usage history", StringComparison.OrdinalIgnoreCase)
             .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke", "startup verification", StringComparison.OrdinalIgnoreCase)
@@ -188,16 +131,6 @@ static string CustomerStatusText(string? value, string fallback)
         };
     }
 
-    static string SanitizeLaunchHealthDisplay(string? value, string fallback)
-    {
-        return CustomerStatusText(value, fallback)
-            .Replace("proof\u00a0freshness", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof-freshness", "Release checks")
-            .Replace("Proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase);
-    }
-
     string? FindLaunchHealthValue(string label)
     {
         var normalizedLookup = NormalizeLaunchHealthLabel(label);
@@ -209,9 +142,29 @@ static string CustomerStatusText(string? value, string fallback)
     var releasePostureSummary = CustomerStatusText(
         FindLaunchHealthValue("Preview"),
         CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release notes and support path should read like one honest record."));
-    var updatePostureSummary = CustomerStatusText(Model.ReleaseExperience.UpdatePostureSummary, "Updates follow release supportability and launch checks.");
     var cautionSummary = CustomerStatusText(Model.Manifest.KnownIssueSummary, string.Empty);
     var supportLabel = CustomerStatusText(Model.ReleaseExperience.KnownIssuesLabel, "Support");
+    var nextActions = new[]
+    {
+        new
+        {
+            Label = "Open downloads",
+            Href = "/downloads",
+            Tone = "primary",
+        },
+        new
+        {
+            Label = "Open support",
+            Href = Model.ReleaseExperience.KnownIssuesHref,
+            Tone = "secondary",
+        },
+        new
+        {
+            Label = "Open progress",
+            Href = "/progress",
+            Tone = "ghost",
+        }
+    };
     if (string.IsNullOrWhiteSpace(cautionSummary))
     {
         cautionSummary = FindLaunchHealthValue("Blocked") ?? "Known issues and install help stay one short step away.";
@@ -220,18 +173,20 @@ static string CustomerStatusText(string? value, string fallback)
     {
         cautionSummary = "Known issues and install help stay one short step away, even when the current release checks are green.";
     }
-    var compactReleaseSummary = CustomerStatusText(FindLaunchHealthValue("Live"), releasePostureSummary);
-    var compactCautionSummary = CustomerStatusText(FindLaunchHealthValue("Release checks"), cautionSummary);
-    var compactFollowThroughSummary = CustomerStatusText(
-        FindLaunchHealthValue("Support pulse"),
-        CustomerStatusText(Model.Manifest.FixAvailabilitySummary, "Use support only when downloads, notes, and known issues stop being enough to move forward."));
+
+    if (cautionSummary.Contains("Current release checks are clear", StringComparison.OrdinalIgnoreCase)
+        || cautionSummary.Contains("account return", StringComparison.OrdinalIgnoreCase)
+        || cautionSummary.Contains("support follow-up coverage", StringComparison.OrdinalIgnoreCase))
+    {
+        cautionSummary = "Known issues, install help, and account return stay nearby.";
+    }
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Current status</p>
-        <h1 class="page-title">What works now, what needs caution, and where to go next</h1>
-        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, recent checks, support, or the progress page without making you decode the whole release stack.</p>
+        <h1 class="page-title">What works now</h1>
+        <p class="page-copy">Release, caution, next click.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
@@ -240,197 +195,36 @@ static string CustomerStatusText(string? value, string fallback)
             <span>Validation @validationState</span>
         </div>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/now">Open what works today</a>
-        <a class="button-like button-like--secondary" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
-        <a class="button-like button-like--ghost" href="/progress">Open progress</a>
-    </div>
 </section>
 
-<section class="editorial-block">
+<section class="editorial-block" data-status-surface="decision-surface">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays short. Use downloads, what works today, support, or progress as soon as the job changes.</p>
+        <p class="eyebrow">Current release</p>
+        <h2 class="editorial-title">Release, caution, next click.</h2>
     </div>
-    <div class="route-choice-grid">
-        @foreach (var choice in statusRouteChoices)
-        {
-            <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
-                    {
-                        <span>@item</span>
-                    }
-                </div>
-                <a class="editorial-strip__action" href="@ContextualPreviewHref(choice.Href)">@choice.Label</a>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="section-band">
-    <div class="page-lead">
-        <p class="eyebrow">Snapshot</p>
-        <h2 class="page-title">The short status line stays visible on one page.</h2>
-        <p class="page-copy">This is the customer-safe readout: current release posture, current caution, support fallback, and campaign status.</p>
-    </div>
-    <div class="settings-summary-list">
-        <div class="settings-summary-row">
-            <span>Channel</span>
-            <strong>@Model.ReleaseExperience.Display.ChannelLabel</strong>
-        </div>
-        <div class="settings-summary-row">
-            <span>Build</span>
-            <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
-        </div>
-        <div class="settings-summary-row">
-            <span>Validation state</span>
-            <strong>@CustomerStatusText(validationState, "Not mirrored")</strong>
-        </div>
-        <div class="settings-summary-row">
-            <span>Update status</span>
-            <strong>@updatePostureSummary</strong>
-        </div>
-        @if (Model.CampaignOsProof is not null)
-        {
-            <div class="settings-summary-row">
-                <span>Campaign status</span>
-                <strong>@campaignStatusTitle</strong>
-            </div>
-            <div class="settings-summary-row">
-                <span>Journeys covered</span>
-                <strong>@CustomerStatusText(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored campaign paths yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed), "No mirrored campaign paths yet")</strong>
-            </div>
-        }
-    </div>
-</section>
-
-<section class="status-decision-strip" aria-label="Current status decisions">
-    <article class="status-decision-strip__card">
-        <span class="tag">Release posture</span>
-        <h2>Current public release</h2>
+    <article class="route-choice-card">
+        <span class="tag">Release</span>
+        <h3>Current public release</h3>
         <p>@releasePostureSummary</p>
-        <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
+        <span class="tag tag--amber">Caution</span>
+        <p><strong>Current caution.</strong> @cautionSummary</p>
     </article>
-    <article class="status-decision-strip__card">
-        <span class="tag tag--amber">Current caution</span>
-        <h2>Install help stays close</h2>
-        <p>@cautionSummary</p>
-        <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@supportLabel</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag">Campaign checks</span>
-        <h2>@campaignStatusTitle</h2>
-        <p>@campaignStatusSummary</p>
-        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
-    </article>
-</section>
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Public launch health</p>
-        <h2 class="editorial-title">Compact release summary</h2>
-        <p class="editorial-copy">These rows keep availability, alternate routes, recent checks, support history, and usage history in one compact summary.</p>
+    <div class="stacked-actions" aria-label="Status next actions">
+        @foreach (var action in nextActions)
+        {
+            var href = string.Equals(action.Href, "/downloads", StringComparison.OrdinalIgnoreCase)
+                ? ContextualPreviewHref(action.Href)
+                : action.Href;
+            <a class="button-like button-like--@action.Tone" href="@href">@action.Label</a>
+        }
     </div>
-</section>
-
-@if (Model.LaunchHealthRows is { Count: > 0 })
-{
-    <section class="release-shelf">
-        <article class="app-action-card">
-            <span class="tag">Public launch health</span>
-            <h2>Compact status summary</h2>
-            <p>These rows keep availability, alternate routes, recent checks, support history, and usage history in one compact summary.</p>
-            <div class="settings-summary-list">
-                @foreach (var row in Model.LaunchHealthRows)
-                {
-                    var rowLabel = NormalizeLaunchHealthLabel(row.Label);
-                    <div class="settings-summary-row">
-                        <span>@SanitizeLaunchHealthDisplay(rowLabel, "Current status label")</span>
-                        <strong>@SanitizeLaunchHealthDisplay(row.Value, "Current")</strong>
-                    </div>
-                }
-            </div>
-        </article>
-    </section>
-}
-
-@if (Model.GoldReadiness is not null)
-{
-    <section class="release-shelf">
-        <article class="app-action-card">
-            <span class="tag tag--amber">Gold support</span>
-            <h2>What still blocks gold support</h2>
-            <p>@Model.GoldReadiness.StatusLabel @Model.GoldReadiness.Summary</p>
-            @if (!string.IsNullOrWhiteSpace(Model.GoldReadiness.GeneratedAtLabel))
-            {
-                <p class="app-action-card__meta">Last reviewed @Model.GoldReadiness.GeneratedAtLabel</p>
-            }
-            <div class="route-choice-grid">
-                @foreach (var blocker in Model.GoldReadiness.Blockers)
-                {
-                    <article class="route-choice-card">
-                        <span class="tag">@blocker.RulesetLabel</span>
-                        <h3>@blocker.NextStepLabel</h3>
-                        <p>@blocker.Summary</p>
-                        <p class="app-action-card__meta">@blocker.ReviewStatusLabel</p>
-                        <p class="app-action-card__meta">@blocker.MatrixStatusLabel</p>
-                        @if (blocker.RemainingChecks.Count > 0)
-                        {
-                            <div class="route-choice-card__proof">
-                                @foreach (var item in blocker.RemainingChecks.Take(3))
-                                {
-                                    <span>@item</span>
-                                }
-                            </div>
-                        }
-                    </article>
-                }
-            </div>
-        </article>
-    </section>
-}
-
-<section class="compact-rail">
-    <article class="compact-rail__item">
-        <div class="compact-rail__copy">
-            <h3>Release status</h3>
-            <p>@compactReleaseSummary</p>
-        </div>
-        <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
-    </article>
-    <article class="compact-rail__item">
-        <div class="compact-rail__copy">
-            <h3>Current caution</h3>
-            <p>@compactCautionSummary</p>
-        </div>
-        <a class="inline-link" href="@Model.ReleaseExperience.KnownIssuesHref">@supportLabel</a>
-    </article>
-    <article class="compact-rail__item">
-        <div class="compact-rail__copy">
-            <h3>Fix and closure next steps</h3>
-            <p>@compactFollowThroughSummary</p>
-        </div>
-        <a class="inline-link" href="/contact#support-intake">Open support</a>
-    </article>
-    <article class="compact-rail__item">
-        <div class="compact-rail__copy">
-            <h3>Detailed progress report</h3>
-            <p>The deeper build report stays separate from this page so the public status view can stay short and honest.</p>
-        </div>
-        <a class="inline-link" href="/progress">Open progress</a>
-    </article>
 </section>
 
 @if (Model.ReleaseExperience.PlatformAvailability.Count > 0)
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
-            <summary>Desktop platform availability</summary>
+            <summary>Other platform details</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
                     @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)
@@ -452,24 +246,3 @@ static string CustomerStatusText(string? value, string fallback)
         </details>
     </section>
 }
-
-<section class="release-footnote">
-    <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Keep status, install return, and support history in one calmer signed-in place.</h2>
-    <p class="editorial-copy">@accountReturnSummary</p>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@accountReturnHref">@accountReturnLabel</a>
-        <a class="button-like button-like--ghost" href="/contact#support-intake">Open support intake</a>
-    </div>
-</section>
-
-<section class="trust-rail-section">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Status poster</p>
-        <h2 class="editorial-title">One public visual for current progress</h2>
-        <p class="editorial-copy">The poster is the lighter public companion to the deeper progress report. It should match this page.</p>
-    </div>
-    <div class="story-cinematic__media">
-        <img src="/api/public/progress-poster.svg" alt="Current public progress poster" loading="lazy" />
-    </div>
-</section>

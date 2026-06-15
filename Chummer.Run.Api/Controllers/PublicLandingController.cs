@@ -13208,7 +13208,7 @@ echo "Help: ${HELP_URL}"
                 : mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Read dispatches", "/ledger/dispatches", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Latest dispatch", "/ledger/dispatches", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }

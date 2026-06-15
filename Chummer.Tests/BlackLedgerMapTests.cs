@@ -37,7 +37,8 @@ public sealed class BlackLedgerMapTests
         Assert.NotEmpty(map.Factions);
         Assert.NotEmpty(map.Events);
         Assert.NotEmpty(map.ReplaySteps);
-        Assert.Contains(map.ReplaySteps, step => step.Turn == 0 && step.Summary.Contains("player", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(map.ReplaySteps, step => step.Turn == 1 && !string.IsNullOrWhiteSpace(step.Summary));
+        Assert.Contains(map.ReplaySteps, step => step.Turn == 2 && !string.IsNullOrWhiteSpace(step.Label));
     }
 
     [Fact]
@@ -93,6 +94,19 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("data-map-url=\"/api/v1/ledger/worlds/emerald-sprawl-prelude/map", view, StringComparison.Ordinal);
         Assert.DoesNotContain("tactical fallback map", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<svg viewBox=\"0 0 1200 760\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"editorial-copy\"></p>", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BlackLedgerMap_view_keeps_one_dispatch_entry_and_terse_optional_viewer_copy()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
+
+        Assert.Contains("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<strong>Read dispatches</strong>", view, StringComparison.Ordinal);
+        Assert.Contains("<strong>Open newsroom</strong>", view, StringComparison.Ordinal);
+        Assert.Contains("Optional viewer links.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Optional external viewer links stay here. The live board stays on this command map.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -107,7 +121,7 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("data-signal-primary=\"district heat live\"", view, StringComparison.Ordinal);
         Assert.Contains("ledger-flagship__briefing", view, StringComparison.Ordinal);
         Assert.Contains("ledger-flagship__briefing-card", view, StringComparison.Ordinal);
-        Assert.Contains("Black Ledger should read like a live command desk", view, StringComparison.Ordinal);
+        Assert.Contains("Watch the city breathe, see which bloc is leaning on which district", view, StringComparison.Ordinal);
         Assert.Contains(".ledger-flagship__briefing", css, StringComparison.Ordinal);
         Assert.Contains(".ledger-flagship__briefing-card", css, StringComparison.Ordinal);
         Assert.Contains("data-geoscape-stage", script, StringComparison.Ordinal);
