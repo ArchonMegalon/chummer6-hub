@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T13:13:11Z",
+  "generated_at_utc": "2026-06-15T14:41:17Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
   "live_backed_required": true,
   "live_recrawl_required": true,
   "recrawl_max_age_hours": 24,
-  "status": "fail",
-  "verdict": "NOT_GOLD",
+  "status": "pass",
+  "verdict": "GOLD_READY",
   "required_gates": {
     "live_public_web_recrawl": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
@@ -165,10 +165,10 @@
     "desktop_native_model_depth": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESKTOP_NATIVE_MODEL_DEPTH.generated.json",
       "exists": true,
-      "status": "fail",
-      "generated_at_utc": "2026-06-15T13:12:24Z",
+      "status": "pass",
+      "generated_at_utc": "2026-06-15T14:41:17Z",
       "fresh_within_hours": null,
-      "pass": false
+      "pass": true
     },
     "black_ledger_live_media_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
@@ -271,7 +271,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T12:08:48Z",
+      "generated_at_utc": "2026-06-15T13:13:11Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
@@ -389,7 +389,5 @@
     }
   ],
   "caveats": [],
-  "failures": [
-    "desktop_native_model_depth failed"
-  ]
+  "failures": []
 }
