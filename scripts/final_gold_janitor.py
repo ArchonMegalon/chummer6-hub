@@ -28,6 +28,10 @@ FRESHNESS_REQUIRED_GATES = {
     "ltd_optimization_stack",
     "design_quality_gate",
 }
+FAIL_CLOSED_CAVEAT_IDS = {
+    "ruleset_human_side_gold_assumption",
+    "optional_external_mirrors_degraded",
+}
 
 REQUIRED_RECEIPTS = {
     "live_public_web_recrawl": PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
@@ -227,6 +231,13 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["verdict"] = payload.get("verdict")
             required_gates[name]["failures"] = payload.get("failures", [])
             required_gates[name]["release"] = payload.get("release", {})
+
+    for caveat in caveats:
+        if not isinstance(caveat, dict):
+            continue
+        caveat_id = str(caveat.get("id") or "").strip()
+        if caveat_id in FAIL_CLOSED_CAVEAT_IDS:
+            failures.append(f"{caveat_id} unresolved")
 
     for result in command_results:
         if result["returncode"] != 0:

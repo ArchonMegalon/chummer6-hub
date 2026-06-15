@@ -1,6 +1,6 @@
-# GOLD_READY
+# NOT_GOLD
 
-Generated: 2026-06-15T11:02:54Z
+Generated: 2026-06-15T11:42:18Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -30,3 +30,7 @@ Accepted boundaries: yes
 ## Accepted Boundaries
 - `ruleset_human_side_gold_assumption`: Ruleset readiness still includes an explicitly accepted human-side boundary; authority coverage is approved separately from any workflow-parity assumptions.
 - `optional_external_mirrors_degraded`: Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.
+
+## Failures
+- ruleset_human_side_gold_assumption unresolved
+- optional_external_mirrors_degraded unresolved
