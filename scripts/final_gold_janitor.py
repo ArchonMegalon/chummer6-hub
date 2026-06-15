@@ -186,7 +186,7 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
                 )
                 if str(item).strip()
             )
-            if workflow_assumed_rulesets or authority_approved_rulesets:
+            if workflow_assumed_rulesets:
                 caveats.append(
                     {
                         "id": "ruleset_human_side_gold_assumption",

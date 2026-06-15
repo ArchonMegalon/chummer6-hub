@@ -19,6 +19,15 @@ DEFAULT_PROVIDER_ROOTS = {
     "pcloud": [Path("/mnt/pcloud/Documents/codex-audit/chummer"), Path("/media/pcloud/Documents/codex-audit/chummer")],
     "onedrive": [Path("/mnt/onedrive/Documents/codex-audit/chummer")],
 }
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+)
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+        return None
 
 
 def now_iso() -> str:
@@ -121,14 +130,18 @@ def verify_provider(name: str, roots: list[Path], rows: list[dict[str, Any]]) ->
 def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float) -> dict[str, Any]:
     if not base_url:
         return {"status": "skipped", "reason": "no base URL configured", "artifacts": []}
+    opener = urllib.request.build_opener(NoRedirectHandler)
     checks = []
     for row in rows:
         url = f"{base_url.rstrip('/')}/downloads/files/{row['file_name']}"
-        request = urllib.request.Request(url, headers={"Range": "bytes=0-0"})
+        request = urllib.request.Request(url, headers={"Range": "bytes=0-0", "User-Agent": BROWSER_USER_AGENT})
         account_required_handoff = False
+        redirect_location = ""
+        response_url = url
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with opener.open(request, timeout=timeout) as response:
                 status_code = int(response.status)
+                response_url = str(response.url)
                 content_range = response.headers.get("Content-Range") or ""
                 content_length = int(response.headers.get("Content-Length") or 0)
                 expected_size_seen = content_range.endswith(f"/{row['size']}") or content_length == int(row["size"])
@@ -150,6 +163,22 @@ def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float
                     and streamed_size is not None
                     and streamed_size < 1024 * 1024
                 )
+        except urllib.error.HTTPError as exc:
+            status_code = int(exc.code)
+            redirect_location = str(exc.headers.get("Location") or "").strip()
+            content_range = str(exc.headers.get("Content-Range") or "").strip()
+            content_length = int(exc.headers.get("Content-Length") or 0)
+            streamed_size = None
+            streamed_sha256 = ""
+            expected_size_seen = content_range.endswith(f"/{row['size']}") or content_length == int(row["size"])
+            account_required_handoff = (
+                str(row.get("access_class") or "").strip().lower() == "account_required"
+                and status_code in {301, 302, 303, 307, 308}
+                and "/login?next=" in redirect_location
+            )
+            if not account_required_handoff:
+                checks.append({"id": row["id"], "url": url, "status": "fail", "error": str(exc)})
+                continue
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
             checks.append({"id": row["id"], "url": url, "status": "fail", "error": str(exc)})
             continue
@@ -159,13 +188,18 @@ def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float
                 "url": url,
                 "access_class": row.get("access_class"),
                 "status_code": status_code,
-                "final_url": response.url,
+                "final_url": redirect_location or response_url,
                 "content_range": content_range,
                 "content_length": content_length,
                 "streamed_size": streamed_size,
                 "streamed_sha256": streamed_sha256,
                 "posture": "account_required_handoff" if account_required_handoff else "direct_download_bytes",
-                "status": "pass" if status_code in {200, 206} and (expected_size_seen or account_required_handoff) else "fail",
+                "status": "pass"
+                if (
+                    (status_code in {200, 206} and expected_size_seen)
+                    or account_required_handoff
+                )
+                else "fail",
             }
         )
     return {

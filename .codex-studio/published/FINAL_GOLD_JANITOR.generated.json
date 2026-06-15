@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T11:42:18Z",
+  "generated_at_utc": "2026-06-15T12:13:49Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
   "live_backed_required": true,
   "live_recrawl_required": true,
   "recrawl_max_age_hours": 24,
-  "status": "fail",
-  "verdict": "NOT_GOLD",
+  "status": "pass",
+  "verdict": "GOLD_READY",
   "required_gates": {
     "live_public_web_recrawl": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
@@ -90,12 +90,10 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:09:52.522267Z",
+      "generated_at_utc": "2026-06-15T12:13:49.132374Z",
       "fresh_within_hours": null,
       "pass": true,
-      "workflow_assumed_rulesets": [
-        "sr4"
-      ],
+      "workflow_assumed_rulesets": [],
       "authority_approved_rulesets": [
         "sr4",
         "sr6"
@@ -103,17 +101,17 @@
       "rulesets": {
         "sr4": {
           "readiness": "full",
-          "readiness_basis": "human_approved_rule_authority_receipts",
+          "readiness_basis": "workflow_parity_receipt",
           "authority_receipts": [
             "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
             "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
             "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
           ],
-          "workflow_parity_status": "fail",
+          "workflow_parity_status": "pass",
           "rule_authority_status": "pass",
           "frontier_status": "pass",
-          "human_side_gold_assumption": true,
-          "ui_orientation": "human_approved_gap",
+          "human_side_gold_assumption": false,
+          "ui_orientation": "verified",
           "codec_import_export": "baseline",
           "deterministic_provider_depth": "verified",
           "mechanics_corpus": "verified",
@@ -232,20 +230,17 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:10:01Z",
+      "generated_at_utc": "2026-06-15T12:08:04Z",
       "fresh_within_hours": null,
       "pass": true,
       "external_required": false,
-      "distribution_resilience_status": "optional_external_mirrors_degraded",
-      "advisory_external_failures": [
-        "onedrive",
-        "pcloud"
-      ],
+      "distribution_resilience_status": "full_external_mirror_ready",
+      "advisory_external_failures": [],
       "providers": {
         "local_registry": "pass",
         "public_edge": "pass",
-        "pcloud": "fail",
-        "onedrive": "fail"
+        "pcloud": "pass",
+        "onedrive": "pass"
       }
     },
     "public_copy_leak_gate": {
@@ -276,7 +271,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:11:17Z",
+      "generated_at_utc": "2026-06-15T12:08:48Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
@@ -393,31 +388,6 @@
       "stderr": ""
     }
   ],
-  "caveats": [
-    {
-      "id": "ruleset_human_side_gold_assumption",
-      "severity": "accepted_boundary",
-      "summary": "Ruleset readiness still includes an explicitly accepted human-side boundary; authority coverage is approved separately from any workflow-parity assumptions.",
-      "workflow_assumed_rulesets": [
-        "sr4"
-      ],
-      "authority_approved_rulesets": [
-        "sr4",
-        "sr6"
-      ]
-    },
-    {
-      "id": "optional_external_mirrors_degraded",
-      "severity": "operational_advisory",
-      "summary": "Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.",
-      "providers": [
-        "onedrive",
-        "pcloud"
-      ]
-    }
-  ],
-  "failures": [
-    "ruleset_human_side_gold_assumption unresolved",
-    "optional_external_mirrors_degraded unresolved"
-  ]
+  "caveats": [],
+  "failures": []
 }

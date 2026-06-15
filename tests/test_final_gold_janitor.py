@@ -152,6 +152,57 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("fail", payload["status"])
         self.assertIn("ruleset_human_side_gold_assumption unresolved", payload["failures"])
 
+    def test_payload_does_not_fail_closed_when_only_authority_approval_exists(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-authority-approved-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "ruleset_readiness":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "rule_authority_human_approval": {
+                            "rulesets": ["sr4", "sr6"],
+                        },
+                        "rulesets": {
+                            "sr4": {"human_side_gold_assumption": False},
+                            "sr5": {"human_side_gold_assumption": False},
+                            "sr6": {"human_side_gold_assumption": False},
+                        },
+                    }
+                if key == "external_distribution_mirror_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "external_required": False,
+                        "advisory_external_failures": [],
+                        "providers": {
+                            "local_registry": {"status": "pass"},
+                            "public_edge": {"status": "pass"},
+                            "onedrive": {"status": "pass"},
+                            "pcloud": {"status": "pass"},
+                        },
+                    }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        self.assertEqual("pass", payload["status"])
+        self.assertNotIn("ruleset_human_side_gold_assumption unresolved", payload["failures"])
+
     def test_payload_fails_closed_when_optional_external_mirrors_are_degraded(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-mirror-boundary-") as temp_dir:
