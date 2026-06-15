@@ -25,6 +25,9 @@ class DesktopNativeModelDepthTests(unittest.TestCase):
             reality = root / "CLASSIC_FORMPORT_REALITY_AUDIT.generated.json"
             bridge = root / "ClassicFormPortViewModelBridge.cs"
             section_host = root / "SectionHostControl.axaml.cs"
+            classic_host = root / "ClassicFormPortHostControl.axaml.cs"
+            shell_frame = root / "MainWindow.ShellFrameProjector.cs"
+            gear_port = root / "GearClassicPort.axaml.cs"
             output = root / "DESKTOP_NATIVE_MODEL_DEPTH.generated.json"
             reality.write_text(json.dumps({"status": "pass", "generated_at": "2026-06-14T00:00:00Z"}), encoding="utf-8")
             bridge.write_text(
@@ -38,10 +41,25 @@ class DesktopNativeModelDepthTests(unittest.TestCase):
                 encoding="utf-8",
             )
             section_host.write_text("public sealed record SectionRowDisplayItem(string Path, string Value)", encoding="utf-8")
+            classic_host.write_text(
+                "\n".join(
+                    [
+                        "[\"gear\"] = new GearClassicPort()",
+                        "ClassicFormPortDocument.CreateFromPreview(",
+                        "IReadOnlyList<SectionRowDisplayItem> Rows,",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            shell_frame.write_text("new SectionRowDisplayItem(row.Path, row.Value)", encoding="utf-8")
+            gear_port.write_text("public partial class GearClassicPort", encoding="utf-8")
 
             with mock.patch.object(module, "REALITY_AUDIT_PATH", reality), \
                 mock.patch.object(module, "BRIDGE_PATH", bridge), \
                 mock.patch.object(module, "SECTION_HOST_PATH", section_host), \
+                mock.patch.object(module, "CLASSIC_HOST_PATH", classic_host), \
+                mock.patch.object(module, "SHELL_FRAME_PROJECTOR_PATH", shell_frame), \
+                mock.patch.object(module, "GEAR_PORT_PATH", gear_port), \
                 mock.patch.object(module, "OUTPUT_PATH", output):
                 with self.assertRaises(SystemExit):
                     module.main()
@@ -57,14 +75,23 @@ class DesktopNativeModelDepthTests(unittest.TestCase):
             reality = root / "CLASSIC_FORMPORT_REALITY_AUDIT.generated.json"
             bridge = root / "ClassicFormPortViewModelBridge.cs"
             section_host = root / "SectionHostControl.axaml.cs"
+            classic_host = root / "ClassicFormPortHostControl.axaml.cs"
+            shell_frame = root / "MainWindow.ShellFrameProjector.cs"
+            gear_port = root / "GearClassicPort.axaml.cs"
             output = root / "DESKTOP_NATIVE_MODEL_DEPTH.generated.json"
             reality.write_text(json.dumps({"status": "pass", "generated_at": "2026-06-14T00:00:00Z"}), encoding="utf-8")
             bridge.write_text("public sealed record TypedGearModel(string Name, int Rating);", encoding="utf-8")
             section_host.write_text("// no generic row record", encoding="utf-8")
+            classic_host.write_text("public sealed record TypedGearSurfaceState(string Name);", encoding="utf-8")
+            shell_frame.write_text("// no section row projection", encoding="utf-8")
+            gear_port.write_text("public sealed record GearSurface(string Name);", encoding="utf-8")
 
             with mock.patch.object(module, "REALITY_AUDIT_PATH", reality), \
                 mock.patch.object(module, "BRIDGE_PATH", bridge), \
                 mock.patch.object(module, "SECTION_HOST_PATH", section_host), \
+                mock.patch.object(module, "CLASSIC_HOST_PATH", classic_host), \
+                mock.patch.object(module, "SHELL_FRAME_PROJECTOR_PATH", shell_frame), \
+                mock.patch.object(module, "GEAR_PORT_PATH", gear_port), \
                 mock.patch.object(module, "OUTPUT_PATH", output):
                 self.assertEqual(0, module.main())
 

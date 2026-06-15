@@ -1,12 +1,15 @@
 {
   "contract_name": "chummer.desktop_native_model_depth",
-  "generated_at_utc": "2026-06-14T20:09:52Z",
-  "status": "pass",
-  "verdict": "DESKTOP_NATIVE_MODEL_READY",
+  "generated_at_utc": "2026-06-15T13:12:24Z",
+  "status": "fail",
+  "verdict": "DESKTOP_NATIVE_MODEL_REVIEW_REQUIRED",
   "inputs": {
     "classic_formport_reality_audit_path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CLASSIC_FORMPORT_REALITY_AUDIT.generated.json",
     "bridge_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/ClassicFormPorts/ClassicFormPortViewModelBridge.cs",
-    "section_host_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/SectionHostControl.axaml.cs"
+    "section_host_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/SectionHostControl.axaml.cs",
+    "classic_host_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/ClassicFormPortHostControl.axaml.cs",
+    "shell_frame_projector_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.ShellFrameProjector.cs",
+    "gear_port_path": "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/ClassicFormPorts/GearClassicPort.axaml.cs"
   },
   "source_markers": {
     "bridge_create_from_section_rows_signature": false,
@@ -15,10 +18,19 @@
     "bridge_bucket_projection": false,
     "bridge_multi_bucket_projection": false,
     "section_host_row_record": true,
+    "classic_host_preview_document": true,
+    "classic_host_section_row_state": true,
+    "classic_host_gear_port_mount": true,
+    "shell_frame_row_projection": true,
+    "gear_port_classic_type": true,
     "classic_port_line_item_list_count": 0,
     "bucket_call_count": 0,
     "multi_bucket_call_count": 0
   },
   "reality_audit_status": "pass",
-  "failures": []
+  "failures": [
+    "desktop shell still mounts GearClassicPort as the gear compatibility surface",
+    "desktop classic host still derives gear workflow state from preview JSON instead of a typed gear surface model",
+    "desktop shell still projects SectionRowDisplayItem rows into the desktop gear compatibility surface"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-15T12:08:48Z",
+  "generated_at_utc": "2026-06-15T13:13:11Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
@@ -53,7 +53,7 @@
       "exists": true,
       "status": "published",
       "verdict": null,
-      "generated_at_utc": "2026-06-15T12:08:00Z",
+      "generated_at_utc": "2026-06-13T18:49:54Z",
       "pass": true
     },
     "external_distribution_mirror_proof": {
@@ -61,7 +61,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-15T12:08:04Z",
+      "generated_at_utc": "2026-06-15T12:13:52Z",
       "pass": true
     },
     "ruleset_readiness": {
@@ -69,7 +69,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-15T12:07:28.060248Z",
+      "generated_at_utc": "2026-06-15T12:13:49.132374Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -85,7 +85,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-06-15T11:02:54Z",
+      "generated_at_utc": "2026-06-15T13:00:16Z",
       "pass": true
     },
     "public_copy_leak_gate": {
@@ -108,10 +108,10 @@
     "final_gold_janitor": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
       "exists": true,
-      "status": "pass",
-      "verdict": "GOLD_READY",
-      "generated_at_utc": "2026-06-15T12:08:19Z",
-      "pass": true,
+      "status": "fail",
+      "verdict": "NOT_GOLD",
+      "generated_at_utc": "2026-06-15T13:13:11Z",
+      "pass": false,
       "release_blocking": false
     },
     "google_oauth_linking_proof": {
