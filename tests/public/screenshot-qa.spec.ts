@@ -34,6 +34,12 @@ const supportingSurfaces = [
     screenshotPrefix: 'ledger-map',
     requiredText: ['Open newsroom', 'Turn 1 board'],
   },
+  {
+    id: 'ledger-newsroom',
+    route: '/ledger/newsroom',
+    screenshotPrefix: 'ledger-newsroom',
+    requiredText: ['Black Ledger Newsroom', 'Transcript', 'Published:'],
+  },
 ] as const;
 
 test('public flagship screenshots stay readable across live surfaces', async ({ browser }) => {

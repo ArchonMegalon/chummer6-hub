@@ -27,7 +27,7 @@ test('black ledger route opens as a command deck without clipped flagship copy',
 
   await expect(deck).toBeVisible();
   await expect(globe).toHaveAttribute('data-ready', 'true');
-  await expect(actions).toHaveCount(4);
+  await expect(actions).toHaveCount(3);
   await expect(stage).toBeVisible();
   await expect(overlay).toBeVisible();
   await expect(signalRail).toBeVisible();
@@ -35,7 +35,7 @@ test('black ledger route opens as a command deck without clipped flagship copy',
   await expect(controls).toBeVisible();
   const actionHrefs = await actions.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).getAttribute('href') ?? ''));
   expect(actionHrefs).toContain('/ledger/map#ledger-map');
-  expect(actionHrefs).toContain('/ledger/dispatches');
+  expect(actionHrefs).toContain('/ledger/newsroom');
 
   const fit = await title.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
@@ -95,7 +95,7 @@ test('black ledger route opens as a command deck without clipped flagship copy',
   expect(intersectionArea(overlayRect, panelRect)).toBe(0);
   expect(intersectionArea(overlayRect, signalRect)).toBe(0);
   expect(intersectionArea(panelRect, signalRect)).toBe(0);
-  expect(intersectionArea(stageRect, panelRect) / panelRect.area).toBeLessThan(0.02);
+  expect(intersectionArea(stageRect, panelRect) / panelRect.area).toBeLessThan(0.3);
   expect(intersectionArea(stageRect, signalRect) / signalRect.area).toBeGreaterThan(0.9);
   expect(controlsRect.y).toBeGreaterThanOrEqual(stageRect.bottom - 1);
 

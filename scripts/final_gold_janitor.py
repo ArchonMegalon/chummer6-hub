@@ -252,14 +252,19 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
 
 def build_verdict_markdown(payload: dict[str, Any]) -> str:
     verdict = str(payload.get("verdict") or "NOT_GOLD")
+    caveats = payload.get("caveats") if isinstance(payload.get("caveats"), list) else []
     lines = [
         f"# {verdict}",
         "",
         f"Generated: {payload.get('generated_at_utc')}",
         f"Scope: {payload.get('scope')}",
+    ]
+    if caveats:
+        lines.append("Accepted boundaries: yes")
+    lines.extend([
         "",
         "## Gate Summary",
-    ]
+    ])
     for name, gate in sorted((payload.get("required_gates") or {}).items()):
         if not isinstance(gate, dict):
             continue
@@ -288,7 +293,6 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
         if name == "operator_release_dashboard" and gate.get("failures"):
             lines.append(f"  - dashboard failures: {', '.join(str(item) for item in gate['failures'])}")
 
-    caveats = payload.get("caveats") if isinstance(payload.get("caveats"), list) else []
     if caveats:
         lines.extend(["", "## Accepted Boundaries"])
         for item in caveats:

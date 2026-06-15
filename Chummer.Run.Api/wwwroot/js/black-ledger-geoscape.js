@@ -291,7 +291,7 @@ class BlackLedgerGeoscapeRoot {
         <aside class="black-ledger-geoscape__panel" data-geoscape-panel aria-live="polite">
           <span class="tag black-ledger-geoscape__panel-tag">Faction pressure</span>
           <h3 class="black-ledger-geoscape__panel-title">Loading geoscape…</h3>
-          <p class="black-ledger-geoscape__panel-summary">Pulling the public-safe world state.</p>
+          <p class="black-ledger-geoscape__panel-summary">Loading the city board.</p>
           <div class="black-ledger-geoscape__panel-metrics"></div>
           <div class="black-ledger-geoscape__panel-actions"></div>
         </aside>
@@ -958,7 +958,7 @@ class BlackLedgerGeoscapeRoot {
     const highlightedEvent = this.events[this.state.replayState === 'turn-0' ? 0 : clamp(this.state.replayIndex, 0, Math.max(0, this.events.length - 1))];
     const activeFaction = selectedFaction || this.factionNodes[0];
     const relatedRegions = this.currentData.regions.filter((region) => slugify(region.dominantFactionId) === activeFaction.slug);
-    const dispatchHref = highlightedEvent?.dispatchHref || '/ledger/dispatches';
+    const dispatchHref = highlightedEvent?.dispatchHref || '/ledger/newsroom';
     const defaultPrimaryHref = this.variant === 'onboarding'
       ? `#faction-join-${activeFaction.slug}`
       : `/ledger/factions/${activeFaction.slug}`;
@@ -988,16 +988,16 @@ class BlackLedgerGeoscapeRoot {
       `Mode: ${this.state.mode.replace('-', ' ')}`,
       `Countries: ${Math.max(1, relatedRegions.length)}`,
       `Pressure: ${activeFaction.pressureScore}`,
-      highlightedEvent?.sourceReceiptId && this.variant !== 'teaser' ? `Receipt: ${highlightedEvent.sourceReceiptId}` : `Turn: ${this.currentData.currentTurn}`,
+      highlightedEvent?.sourceReceiptId && this.variant !== 'teaser' ? `Move: ${highlightedEvent.sourceReceiptId}` : `Turn: ${this.currentData.currentTurn}`,
     ];
     this.panelMetrics.innerHTML = metrics.map((metric) => `<span>${metric}</span>`).join('');
 
     this.panelActions.innerHTML = this.variant === 'teaser'
-      ? '<span class="muted-copy">Faction countries, pressure arrows, and turn replay stay public-safe and route-backed.</span>'
+      ? '<span class="muted-copy">Faction countries, pressure arrows, and turn replay stay visible.</span>'
       : `
         <a class="button-like button-like--primary" href="${primaryHref}">${primaryLabel}</a>
         <a class="button-like button-like--secondary" href="${secondaryHref}">${secondaryLabel}</a>
-        <a class="inline-link" href="${dispatchHref}">Latest dispatch</a>
+        <a class="inline-link" href="${dispatchHref}">Latest bulletin</a>
       `;
 
     if (this.statusLine) {

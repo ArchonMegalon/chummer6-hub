@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-15T09:48:05Z",
+  "generated_at_utc": "2026-06-15T11:02:23Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -41,10 +41,12 @@
         "Install Chummer",
         "Start with the recommended build",
         "Install questions?",
-        "Filter downloads"
+        "Filter downloads",
+        "Public downloads are available now on Windows, macOS, and Linux."
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
+        "Public downloads are available now on Windows and Linux.",
         "account-assisted install paths",
         "Link this copy from the first launch",
         "guided installer",
@@ -116,6 +118,25 @@
       ],
       "forbidden_hits": [],
       "required_final_url_prefix": "/ledger/map",
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/ledger/newsroom",
+      "url": "https://chummer.run/ledger/newsroom",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-1-newsreel",
+      "status_code": 200,
+      "required_texts": [
+        "Black Ledger Newsroom",
+        "Transcript",
+        "Published:"
+      ],
+      "missing_required_texts": [],
+      "forbidden_texts": [
+        "Internal Error"
+      ],
+      "forbidden_hits": [],
+      "required_final_url_prefix": null,
       "final_url_matches": true,
       "status": "pass"
     }

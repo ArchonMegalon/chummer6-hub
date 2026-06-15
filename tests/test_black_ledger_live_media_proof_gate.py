@@ -18,6 +18,58 @@ def load_module():
 
 
 class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
+    def _write_capture_result(self, root: Path) -> dict[str, object]:
+        entries = []
+        for route, viewport, label in (
+            ("/", "desktop", "home-desktop"),
+            ("/", "mobile", "home-mobile"),
+            ("/ledger/map", "desktop", "map-desktop"),
+            ("/ledger/map", "mobile", "map-mobile"),
+            ("/ledger/newsroom", "desktop", "newsroom-desktop"),
+            ("/ledger/newsroom", "mobile", "newsroom-mobile"),
+            ("/ledger/factions/ashline-circle/promo", "desktop", "promo-desktop"),
+            ("/ledger/factions/ashline-circle/promo", "mobile", "promo-mobile"),
+            ("/ledger/map?replay=turn-1", "desktop", "replay-desktop"),
+            ("/ledger/map?replay=turn-1", "mobile", "replay-mobile"),
+        ):
+            screenshot = root / f"{label}.png"
+            screenshot.write_bytes(b"0" * 125_000)
+            final_url = {
+                "/ledger/newsroom": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
+                "/ledger/factions/ashline-circle/promo": "https://chummer.run/ledger/factions/ashline-circle/promo",
+                "/ledger/map?replay=turn-1": "https://chummer.run/ledger/map?replay=turn-1",
+            }.get(route, f"https://chummer.run{route}")
+            visual_signals = {
+                "textLength": 1400,
+                "blackLedgerMentions": 2,
+                "commandMapMentions": 2 if "/ledger/map" in route or route == "/" else 0,
+                "globeMentions": 1 if route == "/ledger/map" else 0,
+                "factionMentions": 6 if route in {"/ledger/map", "/ledger/factions/ashline-circle/promo"} else 1,
+                "pressureMentions": 5 if "/ledger/map" in route else 1,
+                "newsreelMentions": 2 if route == "/ledger/newsroom" else 0,
+                "videoMentions": 2 if route in {"/ledger/newsroom", "/ledger/factions/ashline-circle/promo"} else 1,
+                "mediaElementCount": 4,
+                "videoElementCount": 1 if route in {"/ledger/newsroom", "/ledger/factions/ashline-circle/promo"} else 0,
+                "imageElementCount": 1,
+                "svgElementCount": 1,
+                "geoscapePanelCount": 1 if "/ledger/map" in route else 0,
+                "geoscapeControlCount": 1 if "/ledger/map" in route else 0,
+                "geoscapeSignalRailCount": 1 if "/ledger/map" in route else 0,
+                "largestMediaArea": 250000 if "/ledger/map" in route else 120000,
+                "viewportArea": 1000000,
+            }
+            entries.append(
+                {
+                    "route": route,
+                    "viewport": viewport,
+                    "finalUrl": final_url,
+                    "screenshotPath": str(screenshot),
+                    "screenshotBytes": screenshot.stat().st_size,
+                    "visualSignals": visual_signals,
+                }
+            )
+        return {"entries": entries}
+
     def test_gate_fails_closed_on_capture_error(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="ledger-media-fail-") as temp_dir:
@@ -41,7 +93,7 @@ class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
             temp_root = Path(temp_dir)
             output = temp_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
             result = temp_root / "result.json"
-            result.write_text(json.dumps({"entries": [{"route": "/", "viewport": "desktop", "screenshotPath": "/tmp/home.png"}]}), encoding="utf-8")
+            result.write_text(json.dumps(self._write_capture_result(temp_root)), encoding="utf-8")
 
             def fake_run(*args, **kwargs):
                 result_path = Path(args[0][3])
@@ -62,7 +114,7 @@ class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
             temp_root = Path(temp_dir)
             output = temp_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
             result = temp_root / "result.json"
-            result.write_text(json.dumps({"entries": [{"route": "/ledger/map", "viewport": "desktop", "screenshotPath": "/tmp/map.png"}]}), encoding="utf-8")
+            result.write_text(json.dumps(self._write_capture_result(temp_root)), encoding="utf-8")
 
             responses = [
                 mock.Mock(returncode=1, stdout="", stderr="page.goto chrome-error://chromewebdata"),

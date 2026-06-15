@@ -1,7 +1,8 @@
 # GOLD_READY
 
-Generated: 2026-06-15T09:50:00Z
+Generated: 2026-06-15T11:02:54Z
 Scope: full_estate_v20
+Accepted boundaries: yes
 
 ## Gate Summary
 - PASS `black_ledger_live_media_proof`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json`

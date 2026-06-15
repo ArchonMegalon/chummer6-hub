@@ -9765,7 +9765,7 @@ Boundary:
             return blockedSummary;
         }
 
-        return "Known issues, install help, and account return stay nearby.";
+        return "Known issues and install help stay nearby.";
     }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
@@ -10953,7 +10953,7 @@ Boundary:
                             : string.Equals(entry.Question, "Can I actually use Chummer right now?", StringComparison.Ordinal)
                                 ? entry with
                                 {
-                                    Answer = "Yes. Chummer is publicly available now on Windows and Linux, with live downloads, current pages, and clear labels for what is still rough or still missing."
+                                    Answer = "Yes. Chummer is publicly available now on Windows, macOS, and Linux, with live downloads, current pages, and clear labels for what is still rough or still missing."
                                 }
                             : string.Equals(entry.Question, "What does account creation give me right away?", StringComparison.Ordinal)
                                 ? entry with { Answer = accessPosture.AccountFaqAnswer }
@@ -13167,7 +13167,7 @@ echo "Help: ${HELP_URL}"
         }
         else if (string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase))
         {
-            intro = "Public newsroom view for Emerald Sprawl. Bulletin playback, transcript, and bounded receipts stay distinct from the command map while still pointing back to the same public-safe world state.";
+            intro = "Public newsroom view for Emerald Sprawl. Bulletin playback, transcript, and episode details stay distinct from the command map while still pointing back to the same city board.";
         }
         else if (mapFocused)
         {
@@ -13197,7 +13197,7 @@ echo "Help: ${HELP_URL}"
         string sectionHeading =
             selectedFaction is not null ? $"{selectedFaction.PublicName} faction file"
             : string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel ?? $"Turn {newsTurn} anchor package"}"
-            : mapFocused ? $"{worldTitle} command map"
+            : mapFocused ? "Black Ledger command map"
             : string.Equals(currentSection, "dispatches", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger dispatches · {worldTitle}"
             : string.Equals(currentSection, "packages", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger packages · {worldTitle}"
             : string.Equals(currentSection, "closeouts", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger closeouts · {worldTitle}"
@@ -13231,7 +13231,7 @@ echo "Help: ${HELP_URL}"
                 : mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Latest dispatch", "/ledger/dispatches", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Latest bulletin", "/ledger/newsroom", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }

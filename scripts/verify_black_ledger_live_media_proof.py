@@ -98,7 +98,14 @@ async function main() {
         fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
         await page.screenshot({ path: screenshotPath, fullPage: true });
         const screenshotBytes = fs.statSync(screenshotPath).size;
-        entries.push({ route: route.path, viewport: viewport.name, screenshotPath, screenshotBytes, visualSignals });
+        entries.push({
+          route: route.path,
+          viewport: viewport.name,
+          finalUrl: page.url(),
+          screenshotPath,
+          screenshotBytes,
+          visualSignals,
+        });
       }
       await context.close();
     }
@@ -133,6 +140,12 @@ def validate_entries(entries: list[dict[str, Any]]) -> tuple[list[str], dict[str
         ("/", "mobile"),
         ("/ledger/map", "desktop"),
         ("/ledger/map", "mobile"),
+        ("/ledger/newsroom", "desktop"),
+        ("/ledger/newsroom", "mobile"),
+        ("/ledger/factions/ashline-circle/promo", "desktop"),
+        ("/ledger/factions/ashline-circle/promo", "mobile"),
+        ("/ledger/map?replay=turn-1", "desktop"),
+        ("/ledger/map?replay=turn-1", "mobile"),
     }
     actual_pairs = {(str(entry.get("route")), str(entry.get("viewport"))) for entry in entries}
     missing_pairs = sorted(expected_pairs - actual_pairs)
@@ -148,11 +161,15 @@ def validate_entries(entries: list[dict[str, Any]]) -> tuple[list[str], dict[str
         "pressure_signals_visible": False,
         "newsreel_or_video_surface_visible": False,
         "geoscape_controls_visible": False,
+        "newsroom_route_verified": False,
+        "faction_promo_verified": False,
+        "replay_route_verified": False,
     }
 
     for entry in entries:
         route = str(entry.get("route"))
         viewport = str(entry.get("viewport"))
+        final_url = str(entry.get("finalUrl") or "")
         screenshot_path = Path(str(entry.get("screenshotPath") or ""))
         screenshot_bytes = int(entry.get("screenshotBytes") or 0)
         if not screenshot_path.is_file():
@@ -175,8 +192,36 @@ def validate_entries(entries: list[dict[str, Any]]) -> tuple[list[str], dict[str
                 and int(signals.get("geoscapeControlCount") or 0) > 0
                 and int(signals.get("geoscapeSignalRailCount") or 0) > 0
             )
+        elif route == "/ledger/newsroom":
+            media_quality["newsroom_route_verified"] = media_quality["newsroom_route_verified"] or (
+                "/ledger/newsroom/turn-" in final_url
+                and int(signals.get("videoElementCount") or 0) > 0
+                and int(signals.get("newsreelMentions") or 0) > 0
+            )
+            media_quality["newsreel_or_video_surface_visible"] = media_quality["newsreel_or_video_surface_visible"] or int(signals.get("videoElementCount") or 0) > 0
+        elif route == "/ledger/factions/ashline-circle/promo":
+            media_quality["faction_promo_verified"] = media_quality["faction_promo_verified"] or (
+                "/ledger/factions/ashline-circle/promo" in final_url
+                and int(signals.get("videoElementCount") or 0) > 0
+                and int(signals.get("factionMentions") or 0) > 0
+            )
+        elif route == "/ledger/map?replay=turn-1":
+            media_quality["replay_route_verified"] = media_quality["replay_route_verified"] or (
+                "/ledger/map" in final_url
+                and int(signals.get("commandMapMentions") or 0) > 0
+                and int(signals.get("textLength") or 0) > 0
+            )
 
-    for key in ("large_visual_centerpiece", "faction_markers_visible", "pressure_signals_visible", "newsreel_or_video_surface_visible", "geoscape_controls_visible"):
+    for key in (
+        "large_visual_centerpiece",
+        "faction_markers_visible",
+        "pressure_signals_visible",
+        "newsreel_or_video_surface_visible",
+        "geoscape_controls_visible",
+        "newsroom_route_verified",
+        "faction_promo_verified",
+        "replay_route_verified",
+    ):
         if not media_quality[key]:
             failures.append(f"Black Ledger media quality signal failed: {key}")
 
@@ -193,6 +238,9 @@ def main() -> int:
         "routes": [
             {"path": "/", "label": "home", "needles": ["Open Black Ledger", "Black Ledger command deck", "Turn 1"]},
             {"path": "/ledger/map", "label": "ledger-map", "needles": ["command map", "Emerald Sprawl", "Pressure"]},
+            {"path": "/ledger/newsroom", "label": "ledger-newsroom", "needles": ["Black Ledger Newsroom", "Transcript", "Published:"]},
+            {"path": "/ledger/factions/ashline-circle/promo", "label": "ledger-faction-promo", "needles": ["Ashline Circle", "Open watch page", "Open captions"]},
+            {"path": "/ledger/map?replay=turn-1", "label": "ledger-replay-turn-1", "needles": ["command map", "Turn 1", "Pressure"]},
         ],
         "viewports": [
             {"name": "desktop", "width": 1440, "height": 900, "mobile": False},

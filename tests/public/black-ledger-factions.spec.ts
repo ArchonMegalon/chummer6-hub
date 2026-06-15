@@ -25,7 +25,7 @@ test('black ledger faction index and dedicated pages exist for the seeded six', 
     await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
     await expect(page.locator('#ledger-faction-file')).toContainText('Package pressure');
-    await expect(page.locator('#ledger-faction-file')).toContainText('Safety: public-safe');
+    await expect(page.locator('#ledger-faction-file')).toContainText('Safety: public');
     await expect(page.locator('#ledger-faction-file')).toContainText('Video: first-party motion');
     visited.push(`/ledger/factions/${faction.slug}`);
   }

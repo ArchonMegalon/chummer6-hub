@@ -39,7 +39,7 @@ REQUIRED_SOURCE_MARKERS: dict[str, tuple[str, ...]] = {
     "Chummer.Run.Api/Services/Community/BlackLedgerWorldTickBriefingService.cs": (
         'string watchHref = $"{ledgerBasePath.TrimEnd(\'/\')}/newsroom/{slug}";',
         "Public-safe bulletin built from aggregate Black Ledger world receipts.",
-        "Some footage is reconstructed from public-safe receipts.",
+        "Some shots restage city movement.",
     ),
     "Chummer.Run.Api/ViewModels/SiteViewModels.cs": (
         "TranscriptHref",

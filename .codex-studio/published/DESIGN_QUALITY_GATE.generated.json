@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-15T09:50:01Z",
+  "generated_at_utc": "2026-06-15T11:02:54Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -63,6 +63,10 @@
           "390x844"
         ],
         "ledger-map": [
+          "1366x768",
+          "390x844"
+        ],
+        "ledger-newsroom": [
           "1366x768",
           "390x844"
         ]

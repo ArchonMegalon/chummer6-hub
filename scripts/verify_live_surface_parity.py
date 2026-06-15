@@ -44,8 +44,10 @@ SURFACES = [
             "Start with the recommended build",
             "Install questions?",
             "Filter downloads",
+            "Public downloads are available now on Windows, macOS, and Linux.",
         ],
         "forbidden_texts": [
+            "Public downloads are available now on Windows and Linux.",
             "account-assisted install paths",
             "Link this copy from the first launch",
             "guided installer",
@@ -99,6 +101,17 @@ SURFACES = [
             "Turn record:",
             "Scene notes",
             "<p class=\"editorial-copy\"></p>",
+        ],
+    },
+    {
+        "path": "/ledger/newsroom",
+        "required_texts": [
+            "Black Ledger Newsroom",
+            "Transcript",
+            "Published:",
+        ],
+        "forbidden_texts": [
+            "Internal Error",
         ],
     },
 ]

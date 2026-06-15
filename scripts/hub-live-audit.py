@@ -11949,13 +11949,13 @@ def main() -> int:
             "The city is moving.",
             required_texts=(
                 "Black Ledger",
-                "Three signals, one moving city.",
+                "Three signals. One moving city.",
                 "Six seeded houses are already pushing on the same city.",
                 "Flagship reel",
                 "/media/promo/chummer6-flagship-promo.receipt.json",
                 "Desktop build",
                 "Mobile play shell",
-                "Release posture"),
+                "Status"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
@@ -11981,7 +11981,7 @@ def main() -> int:
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Public downloads are available now on Windows and Linux.",
+                "Public downloads are available now on Windows, macOS, and Linux.",
                 "Main platform downloads",
                 "Windows",
                 "Linux",

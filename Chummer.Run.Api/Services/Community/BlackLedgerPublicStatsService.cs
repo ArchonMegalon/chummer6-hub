@@ -116,8 +116,8 @@ public sealed class BlackLedgerPublicStatsService
         Status: "preseeded_preview",
         CurrentTurn: 1,
         TurnHeadline: "Turn 1 already ran. Debt Heat rose in Rust Bazaar while Ashline MysAd density pushed package pressure toward awakened build support.",
-        SafetyNote: "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.",
-        MapNote: "Public-safe globe geometry keeps faction pressure, package heat, and closeout motion readable without exposing private tables.",
+        SafetyNote: "Fictional city board only. The Ledger explains pressure, not people.",
+        MapNote: "Globe view keeps faction pressure, package heat, and closeout motion readable without exposing private tables.",
         DeterministicPreview: false,
         TurnNavigation:
         [
