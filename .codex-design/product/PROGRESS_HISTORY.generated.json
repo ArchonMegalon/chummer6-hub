@@ -1,7 +1,7 @@
 {
   "contract_name": "fleet.public_progress_history",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-06-12T15:25:39Z",
+  "generated_at": "2026-06-15T12:18:24Z",
   "snapshot_count": 39,
   "snapshots": [
     {
@@ -2551,71 +2551,10 @@
       ]
     },
     {
-      "as_of": "2026-06-12",
+      "as_of": "2026-06-15",
       "overall_progress_percent": 100,
-      "phase_label": "Public-fit polish",
-      "parts": [
-        {
-          "id": "core-engine",
-          "public_name": "Core Rules Engine",
-          "progress_percent": 100,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "recent_commit_count_7d": 11,
-          "uncovered_scope_count": 0,
-          "eta_weeks_low": 0,
-          "eta_weeks_high": 0,
-          "eta_source": "history_velocity"
-        },
-        {
-          "id": "workbench-ui",
-          "public_name": "Workbench & Shared UI",
-          "progress_percent": 100,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "recent_commit_count_7d": 15,
-          "uncovered_scope_count": 0,
-          "eta_weeks_low": 0,
-          "eta_weeks_high": 0,
-          "eta_source": "history_velocity"
-        },
-        {
-          "id": "live-play",
-          "public_name": "Live Play",
-          "progress_percent": 100,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "recent_commit_count_7d": 0,
-          "uncovered_scope_count": 0,
-          "eta_weeks_low": 0,
-          "eta_weeks_high": 0,
-          "eta_source": "history_velocity"
-        },
-        {
-          "id": "community-cloud",
-          "public_name": "Community Cloud & Publishing",
-          "progress_percent": 100,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "recent_commit_count_7d": 35,
-          "uncovered_scope_count": 0,
-          "eta_weeks_low": 0,
-          "eta_weeks_high": 0,
-          "eta_source": "history_velocity"
-        },
-        {
-          "id": "canon-guide",
-          "public_name": "Canon & Public Guide",
-          "progress_percent": 100,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "recent_commit_count_7d": 7,
-          "uncovered_scope_count": 0,
-          "eta_weeks_low": 0,
-          "eta_weeks_high": 0,
-          "eta_source": "history_velocity"
-        }
-      ]
+      "phase_label": "In progress",
+      "parts": []
     }
   ]
 }
