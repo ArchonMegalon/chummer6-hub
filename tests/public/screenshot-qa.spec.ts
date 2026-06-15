@@ -2,7 +2,7 @@ import { expect, test } from 'playwright/test';
 import { completionPath, writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const viewports = [
+const homepageViewports = [
   { width: 390, height: 844 },
   { width: 412, height: 915 },
   { width: 768, height: 1024 },
@@ -10,13 +10,39 @@ const viewports = [
   { width: 1440, height: 900 },
   { width: 1920, height: 1080 },
 ];
+const supportingSurfaceViewports = [
+  { width: 390, height: 844 },
+  { width: 1366, height: 768 },
+];
 
-test('public homepage screenshot QA stays readable across flagship viewports', async ({ browser }) => {
+const supportingSurfaces = [
+  {
+    id: 'downloads',
+    route: '/downloads',
+    screenshotPrefix: 'downloads',
+    requiredText: ['Install Chummer', 'Recommended for'],
+  },
+  {
+    id: 'status',
+    route: '/status',
+    screenshotPrefix: 'status',
+    requiredText: ['Release, caution, next click.', 'Open downloads'],
+  },
+  {
+    id: 'ledger-map',
+    route: '/ledger/map',
+    screenshotPrefix: 'ledger-map',
+    requiredText: ['Open newsroom', 'Turn 1 board'],
+  },
+] as const;
+
+test('public flagship screenshots stay readable across live surfaces', async ({ browser }) => {
   test.setTimeout(180000);
-  const results: Array<Record<string, unknown>> = [];
+  const homepageResults: Array<Record<string, unknown>> = [];
+  const surfaceResults: Array<Record<string, unknown>> = [];
   const failures: string[] = [];
 
-  for (const viewport of viewports) {
+  for (const viewport of homepageViewports) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
@@ -55,7 +81,7 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     const screenshotName = `homepage-${viewport.width}x${viewport.height}.png`;
     await page.screenshot({ path: completionPath(screenshotName), fullPage: true });
 
-    results.push({
+    homepageResults.push({
       viewport: `${viewport.width}x${viewport.height}`,
       overflow_px: overflow,
       hero_visible: !!heroBox,
@@ -70,13 +96,46 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     await page.close();
   }
 
+  for (const surface of supportingSurfaces) {
+    for (const viewport of supportingSurfaceViewports) {
+      const page = await browser.newPage({ baseURL: baseUrl, viewport });
+      await page.goto(`${baseUrl}${surface.route}`, { waitUntil: 'domcontentloaded' });
+
+      for (const marker of surface.requiredText) {
+        await expect(page.locator('body')).toContainText(marker);
+      }
+
+      const overflow = await page.evaluate(() => {
+        const root = document.documentElement;
+        return root.scrollWidth - root.clientWidth;
+      });
+      if (overflow > 1) {
+        failures.push(`${surface.id} ${viewport.width}x${viewport.height}: horizontal overflow ${overflow}px`);
+      }
+
+      const screenshotName = `${surface.screenshotPrefix}-${viewport.width}x${viewport.height}.png`;
+      await page.screenshot({ path: completionPath(screenshotName), fullPage: true });
+      surfaceResults.push({
+        surface: surface.id,
+        route: surface.route,
+        viewport: `${viewport.width}x${viewport.height}`,
+        overflow_px: overflow,
+        screenshot: screenshotName,
+        status: overflow <= 1 ? 'pass' : 'fail',
+      });
+
+      await page.close();
+    }
+  }
+
   writeJsonArtifact('SCREENSHOT_QA.generated.json', {
     generated_at_utc: new Date().toISOString(),
     base_url: baseUrl,
     status: failures.length === 0 ? 'pass' : 'fail',
     verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
     failures,
-    results,
+    homepage_results: homepageResults,
+    surface_results: surfaceResults,
   });
 
   const lines = [
@@ -84,7 +143,13 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     '',
     `- Generated: ${new Date().toISOString()}`,
     '',
-    ...results.map((result) => `- ${result.viewport}: ${result.status}`),
+    '## Homepage',
+    '',
+    ...homepageResults.map((result) => `- ${result.viewport}: ${result.status}`),
+    '',
+    '## Supporting Surfaces',
+    '',
+    ...surfaceResults.map((result) => `- ${result.surface} ${result.viewport}: ${result.status}`),
   ];
   if (failures.length > 0) {
     lines.push('', '## Failures', '', ...failures.map((failure) => `- ${failure}`));

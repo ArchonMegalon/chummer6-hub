@@ -136,7 +136,7 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
                     request.EventName,
                     (int)response.StatusCode,
                     error);
-                return new DesktopAnalyticsTrackResult(Accepted: true, Forwarded: false, Status: $"provider_http_{(int)response.StatusCode}");
+                return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: $"provider_http_{(int)response.StatusCode}");
             }
 
             return new DesktopAnalyticsTrackResult(
@@ -147,7 +147,7 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Desktop analytics forwarding failed for {EventName}.", request.EventName);
-            return new DesktopAnalyticsTrackResult(Accepted: true, Forwarded: false, Status: "provider_error");
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "provider_error");
         }
     }
 

@@ -20,7 +20,14 @@ UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
-FRESHNESS_REQUIRED_GATES = {"live_public_web_recrawl", "public_route_proof"}
+FRESHNESS_REQUIRED_GATES = {
+    "live_public_web_recrawl",
+    "public_route_proof",
+    "provider_proof_discoverability",
+    "table_pulse_scenario_replay",
+    "ltd_optimization_stack",
+    "design_quality_gate",
+}
 
 REQUIRED_RECEIPTS = {
     "live_public_web_recrawl": PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
@@ -161,21 +168,33 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["rulesets"] = payload.get("rulesets", {})
             required_gates[name]["failures"] = payload.get("failures", [])
         if name == "ruleset_readiness" and path.is_file():
-            assumed_rulesets = [
+            workflow_assumed_rulesets = [
                 ruleset
                 for ruleset, ruleset_payload in (payload.get("rulesets") or {}).items()
                 if isinstance(ruleset_payload, dict) and ruleset_payload.get("human_side_gold_assumption")
             ]
-            if assumed_rulesets:
+            authority_approved_rulesets = sorted(
+                str(item)
+                for item in (
+                    ((payload.get("rule_authority_human_approval") or {}).get("rulesets") or [])
+                    if isinstance(payload.get("rule_authority_human_approval"), dict)
+                    else []
+                )
+                if str(item).strip()
+            )
+            if workflow_assumed_rulesets or authority_approved_rulesets:
                 caveats.append(
                     {
                         "id": "ruleset_human_side_gold_assumption",
                         "severity": "accepted_boundary",
-                        "summary": "SR4/SR6 readiness includes the current human-side gold assumption; mechanical rule authority is covered, but workflow parity remains explicitly accepted rather than independently re-proven.",
-                        "rulesets": sorted(assumed_rulesets),
+                        "summary": "Ruleset readiness still includes an explicitly accepted human-side boundary; authority coverage is approved separately from any workflow-parity assumptions.",
+                        "workflow_assumed_rulesets": sorted(workflow_assumed_rulesets),
+                        "authority_approved_rulesets": authority_approved_rulesets,
                     }
                 )
-            required_gates[name]["assumed_rulesets"] = sorted(assumed_rulesets)
+            required_gates[name]["workflow_assumed_rulesets"] = sorted(workflow_assumed_rulesets)
+            required_gates[name]["authority_approved_rulesets"] = authority_approved_rulesets
+            required_gates[name]["rulesets"] = payload.get("rulesets", {})
         if name == "public_route_proof" and path.is_file():
             required_gates[name]["summary"] = payload.get("summary", {})
         if name == "external_distribution_mirror_proof" and path.is_file():
@@ -254,8 +273,13 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
         if name == "external_distribution_mirror_proof" and isinstance(gate.get("providers"), dict):
             provider_summary = ", ".join(f"{provider}={status}" for provider, status in sorted(gate["providers"].items()))
             lines.append(f"  - mirrors: {provider_summary}; external_required={gate.get('external_required')}")
-        if name == "ruleset_readiness" and gate.get("assumed_rulesets"):
-            lines.append(f"  - accepted human-side assumption: {', '.join(gate['assumed_rulesets'])}")
+        if name == "ruleset_readiness":
+            workflow_assumed = gate.get("workflow_assumed_rulesets") or []
+            authority_approved = gate.get("authority_approved_rulesets") or []
+            if workflow_assumed:
+                lines.append(f"  - workflow assumption: {', '.join(workflow_assumed)}")
+            if authority_approved:
+                lines.append(f"  - authority approved: {', '.join(authority_approved)}")
         if name == "release_ready" and gate.get("failures"):
             lines.append(f"  - release failures: {', '.join(str(item) for item in gate['failures'])}")
         if name == "operator_release_dashboard" and isinstance(gate.get("release"), dict):

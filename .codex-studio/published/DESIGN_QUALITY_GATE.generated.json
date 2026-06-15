@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-15T09:13:21Z",
+  "generated_at_utc": "2026-06-15T09:50:01Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -43,7 +43,7 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
       "status": "pass",
       "base_url": "https://chummer.run",
-      "viewports": [
+      "homepage_viewports": [
         "1366x768",
         "1440x900",
         "1920x1080",
@@ -51,8 +51,25 @@
         "412x915",
         "768x1024"
       ],
-      "missing_viewports": [],
-      "failed_viewports": [],
+      "missing_homepage_viewports": [],
+      "failed_homepage_viewports": [],
+      "supporting_surface_viewports": {
+        "downloads": [
+          "1366x768",
+          "390x844"
+        ],
+        "status": [
+          "1366x768",
+          "390x844"
+        ],
+        "ledger-map": [
+          "1366x768",
+          "390x844"
+        ]
+      },
+      "missing_supporting_surfaces": [],
+      "incomplete_supporting_viewports": {},
+      "failed_supporting_surface_viewports": [],
       "pass": true
     },
     "cta_hierarchy": {

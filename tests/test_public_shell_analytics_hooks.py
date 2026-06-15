@@ -73,6 +73,8 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn('trackUri.Scheme == Uri.UriSchemeHttp', source)
         self.assertIn('AllowedLocalOrigins.Contains(trackUri.Host)', source)
         self.assertIn('if (!string.IsNullOrWhiteSpace(apiKey))', source)
+        self.assertIn('Accepted: false, Forwarded: false, Status: $"provider_http_{(int)response.StatusCode}"', source)
+        self.assertIn('Accepted: false, Forwarded: false, Status: "provider_error"', source)
         self.assertIn('Status: string.IsNullOrWhiteSpace(apiKey) ? "forwarded_public" : "forwarded"', source)
 
 

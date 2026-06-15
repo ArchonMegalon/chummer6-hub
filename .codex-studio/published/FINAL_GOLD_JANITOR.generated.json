@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T09:13:21Z",
+  "generated_at_utc": "2026-06-15T09:50:00Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -93,16 +93,75 @@
       "generated_at_utc": "2026-06-14T20:09:52.522267Z",
       "fresh_within_hours": null,
       "pass": true,
-      "assumed_rulesets": [
+      "workflow_assumed_rulesets": [
         "sr4"
-      ]
+      ],
+      "authority_approved_rulesets": [
+        "sr4",
+        "sr6"
+      ],
+      "rulesets": {
+        "sr4": {
+          "readiness": "full",
+          "readiness_basis": "human_approved_rule_authority_receipts",
+          "authority_receipts": [
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+          ],
+          "workflow_parity_status": "fail",
+          "rule_authority_status": "pass",
+          "frontier_status": "pass",
+          "human_side_gold_assumption": true,
+          "ui_orientation": "human_approved_gap",
+          "codec_import_export": "baseline",
+          "deterministic_provider_depth": "verified",
+          "mechanics_corpus": "verified",
+          "explain_receipts": "verified",
+          "package_amend_support": "baseline",
+          "release_posture": "governed_preview"
+        },
+        "sr5": {
+          "readiness": "full",
+          "readiness_basis": "flagship_ui_release_gate",
+          "authority_receipts": [],
+          "flagship_ui_status": "pass",
+          "ui_orientation": "verified",
+          "codec_import_export": "baseline",
+          "deterministic_provider_depth": "verified",
+          "mechanics_corpus": "verified",
+          "explain_receipts": "verified",
+          "package_amend_support": "baseline",
+          "release_posture": "governed_preview"
+        },
+        "sr6": {
+          "readiness": "full",
+          "readiness_basis": "workflow_parity_receipt",
+          "authority_receipts": [
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
+            "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+          ],
+          "workflow_parity_status": "pass",
+          "rule_authority_status": "pass",
+          "frontier_status": "pass",
+          "human_side_gold_assumption": false,
+          "ui_orientation": "verified",
+          "codec_import_export": "baseline",
+          "deterministic_provider_depth": "verified",
+          "mechanics_corpus": "verified",
+          "explain_receipts": "verified",
+          "package_amend_support": "baseline",
+          "release_posture": "governed_preview"
+        }
+      }
     },
     "provider_proof_discoverability": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "",
-      "fresh_within_hours": null,
+      "generated_at_utc": "2026-06-15T09:47:19Z",
+      "fresh_within_hours": 24,
       "pass": true
     },
     "desktop_native_model_depth": {
@@ -125,8 +184,8 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "",
-      "fresh_within_hours": null,
+      "generated_at_utc": "2026-06-15T09:47:20Z",
+      "fresh_within_hours": 24,
       "pass": true
     },
     "public_route_proof": {
@@ -157,7 +216,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T09:11:39Z",
+      "generated_at_utc": "2026-06-15T09:48:05Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -166,7 +225,7 @@
       "exists": true,
       "status": "pass",
       "generated_at_utc": "2026-06-15T08:54:57Z",
-      "fresh_within_hours": null,
+      "fresh_within_hours": 24,
       "pass": true
     },
     "external_distribution_mirror_proof": {
@@ -202,7 +261,7 @@
       "exists": true,
       "status": "pass",
       "generated_at_utc": "2026-06-15T09:13:21Z",
-      "fresh_within_hours": null,
+      "fresh_within_hours": 24,
       "pass": true
     },
     "ui_layout_exit_gate": {
@@ -338,9 +397,13 @@
     {
       "id": "ruleset_human_side_gold_assumption",
       "severity": "accepted_boundary",
-      "summary": "SR4/SR6 readiness includes the current human-side gold assumption; mechanical rule authority is covered, but workflow parity remains explicitly accepted rather than independently re-proven.",
-      "rulesets": [
+      "summary": "Ruleset readiness still includes an explicitly accepted human-side boundary; authority coverage is approved separately from any workflow-parity assumptions.",
+      "workflow_assumed_rulesets": [
         "sr4"
+      ],
+      "authority_approved_rulesets": [
+        "sr4",
+        "sr6"
       ]
     },
     {

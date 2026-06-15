@@ -5,6 +5,7 @@ import argparse
 import json
 import shutil
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,10 @@ FLEET_COMPLETION_ROOT = Path("/docker/chummercomplete/.integrated/fleet/_complet
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "PROVIDER_PROOF_DISCOVERABILITY.generated.json"
 MIRROR_ROOT = PUBLISHED_ROOT / "provider-proof-discoverability"
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 def required_artifacts() -> dict[str, list[Path]]:
     return {
@@ -105,6 +110,7 @@ def write_tracked_provider_receipts() -> dict[str, Any]:
         receipt_path = provider_root / f"{provider.upper()}_TRACKED_PROVIDER_RECEIPT.generated.json"
         payload = {
             "contract_name": "chummer.provider.tracked_inventory_receipt",
+            "generated_at_utc": now_iso(),
             **receipt,
             "claim_boundary": receipt["boundary"],
         }
@@ -166,6 +172,7 @@ def main() -> int:
 
     payload = {
         "contract_name": "chummer.provider_proof_discoverability",
+        "generated_at_utc": now_iso(),
         "status": "pass" if not failures else "fail",
         "providers": providers,
         "failures": failures,

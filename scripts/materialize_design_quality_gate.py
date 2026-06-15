@@ -19,6 +19,8 @@ PUBLIC_ROUTE_PROOF_PATH = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated
 LIVE_SURFACE_PARITY_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
 LTD_OPTIMIZATION_STACK_PATH = PUBLISHED_ROOT / "LTD_OPTIMIZATION_STACK.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
+SUPPORTING_SURFACE_VIEWPORTS = {"390x844", "1366x768"}
+REQUIRED_SUPPORTING_SURFACES = {"downloads", "status", "ledger-map"}
 MINIMAL_EXPERIENCE_GATE_PATH = COMPLETION_ROOT / "MINIMAL_EXPERIENCE_GATE.generated.json"
 DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
 DESIGN_REVIEW_REQUIRED_SECTIONS = [
@@ -173,30 +175,58 @@ def build_payload() -> dict[str, Any]:
 
     screenshot_path = COMPLETION_ROOT / "SCREENSHOT_QA.generated.json"
     screenshot = load_json(screenshot_path)
-    screenshot_results = screenshot.get("results") if isinstance(screenshot.get("results"), list) else []
+    screenshot_results = screenshot.get("homepage_results") if isinstance(screenshot.get("homepage_results"), list) else []
+    supporting_surface_results = screenshot.get("surface_results") if isinstance(screenshot.get("surface_results"), list) else []
     screenshot_viewports = {str(item.get("viewport")) for item in screenshot_results if isinstance(item, dict)}
     screenshot_failures = [
         str(item.get("viewport"))
         for item in screenshot_results
         if isinstance(item, dict) and str(item.get("status") or "").lower() != "pass"
     ]
+    supporting_surface_failures = [
+        f"{item.get('surface')}:{item.get('viewport')}"
+        for item in supporting_surface_results
+        if isinstance(item, dict) and str(item.get("status") or "").lower() != "pass"
+    ]
+    supporting_surface_coverage = {
+        str(item.get("surface")): {
+            str(entry.get("viewport"))
+            for entry in supporting_surface_results
+            if isinstance(entry, dict) and str(entry.get("surface")) == str(item.get("surface"))
+        }
+        for item in supporting_surface_results
+        if isinstance(item, dict)
+    }
+    missing_supporting_surfaces = sorted(REQUIRED_SUPPORTING_SURFACES - set(supporting_surface_coverage))
+    incomplete_supporting_viewports = {
+        surface: sorted(SUPPORTING_SURFACE_VIEWPORTS - set(viewports))
+        for surface, viewports in supporting_surface_coverage.items()
+        if SUPPORTING_SURFACE_VIEWPORTS - set(viewports)
+    }
     screenshot_base_url = str(screenshot.get("base_url") or "").strip().rstrip("/")
     missing_viewports = sorted(REQUIRED_VIEWPORTS - screenshot_viewports)
     screenshot_pass = (
         status_pass(screenshot)
         and not screenshot_failures
+        and not supporting_surface_failures
         and not missing_viewports
+        and not missing_supporting_surfaces
+        and not incomplete_supporting_viewports
         and screenshot_base_url == "https://chummer.run"
     )
     if not screenshot_pass:
-        failures.append("homepage screenshot QA is missing required viewport coverage or has failures")
+        failures.append("live screenshot QA is missing required flagship surface coverage or has failures")
     checks["screenshot_qa"] = {
         "path": str(screenshot_path),
         "status": screenshot.get("status", "missing"),
         "base_url": screenshot.get("base_url"),
-        "viewports": sorted(screenshot_viewports),
-        "missing_viewports": missing_viewports,
-        "failed_viewports": screenshot_failures,
+        "homepage_viewports": sorted(screenshot_viewports),
+        "missing_homepage_viewports": missing_viewports,
+        "failed_homepage_viewports": screenshot_failures,
+        "supporting_surface_viewports": {surface: sorted(viewports) for surface, viewports in supporting_surface_coverage.items()},
+        "missing_supporting_surfaces": missing_supporting_surfaces,
+        "incomplete_supporting_viewports": incomplete_supporting_viewports,
+        "failed_supporting_surface_viewports": supporting_surface_failures,
         "pass": screenshot_pass,
     }
 

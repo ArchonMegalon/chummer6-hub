@@ -222,6 +222,17 @@ app.MapPost("/api/desktop-analytics/track", async (
 
     if (!result.Accepted)
     {
+        if (result.Status.StartsWith("provider_http_", StringComparison.Ordinal)
+            || result.Status == "provider_error")
+        {
+            return Results.Json(result, statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        if (result.Status == "provider_not_configured")
+        {
+            return Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
         return Results.BadRequest(result);
     }
 
