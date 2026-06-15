@@ -125,18 +125,6 @@
     var heroGlobeRenderMode = mapFocused ? "command-map" : "magicfit-newsreel";
     var heroDisableWebGl = mapFocused ? "false" : "true";
     var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "magicfit-newsreel";
-    static string cleanLedgerNote(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value.Trim()
-            .Replace("public-safe", "public", StringComparison.OrdinalIgnoreCase)
-            .Replace("aggregate city bulletin only", "city bulletin only", StringComparison.OrdinalIgnoreCase)
-            .Replace("recreated from city activity", "restage city movement", StringComparison.OrdinalIgnoreCase);
-    }
 }
 
 <section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
@@ -348,7 +336,7 @@
                                             <p>@beat.ActionSummary</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.Stakes</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.ConsequenceLine</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@cleanLedgerNote(beat.ProofNote)</p>
+                        <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
                                         </article>
                                     }
                                 </div>
@@ -360,7 +348,7 @@
                             <p>@newsreelBroadcast.AudioPosture</p>
                             <p>@newsreelBroadcast.MusicPosture</p>
                             <p>@newsreelBroadcast.PublicSafetyNote</p>
-                            <p>@cleanLedgerNote(newsreelBroadcast.ReconstructionNote)</p>
+                            <p>@newsreelBroadcast.ReconstructionNote</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>

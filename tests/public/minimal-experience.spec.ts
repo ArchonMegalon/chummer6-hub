@@ -17,7 +17,26 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   }
   await expect(desktop.locator('.launch-hero__actions a.button-like').first()).toContainText('Open Black Ledger');
   await expect(desktop.locator('[data-homepage-section="play-downloads"]')).toContainText('Install, play, or open the city.');
-  results.push({ surface: 'home', nav_panel_open: navPanelOpen });
+  const homeVideo = desktop.locator('.flagship-promo-player__video');
+  await expect(homeVideo).toBeVisible();
+  const homePlayback = await homeVideo.evaluate(async (node) => {
+    const video = node as HTMLVideoElement;
+    video.muted = true;
+    video.currentTime = 0;
+    await video.play();
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+    video.pause();
+    return {
+      source_count: video.querySelectorAll('source').length,
+      track_count: video.querySelectorAll('track').length,
+      current_time: video.currentTime,
+      poster: video.poster,
+    };
+  });
+  if (homePlayback.source_count < 2 || homePlayback.track_count < 1 || homePlayback.current_time <= 0) {
+    failures.push('homepage: flagship reel does not expose working playback with sources, captions, and advancing time');
+  }
+  results.push({ surface: 'home', nav_panel_open: navPanelOpen, media_playback: homePlayback });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
   const recommendedCard = desktop.locator('#recommended-download');
@@ -38,7 +57,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const decisionCards = decisionSurface.locator('.route-choice-card');
   const nextActions = decisionSurface.locator('.stacked-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
-  await expect(decisionSurface).toContainText('Release, caution, next click.');
+  await expect(decisionSurface).toContainText('Release, caution, next step.');
   const cardCount = await decisionCards.count();
   if (cardCount !== 1) {
     failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);
@@ -74,6 +93,28 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     }
   }
   results.push({ surface: 'ledger-map', cleaned_language: true, newsroom_link_count: newsroomLinkCount, empty_editorial_paragraphs: emptyEditorialParagraphs });
+
+  await desktop.goto(`${baseUrl}/ledger/newsroom`, { waitUntil: 'domcontentloaded' });
+  const newsroomVideo = desktop.locator('.ledger-newsreel-broadcast__video');
+  await expect(newsroomVideo).toBeVisible();
+  const newsroomPlayback = await newsroomVideo.evaluate(async (node) => {
+    const video = node as HTMLVideoElement;
+    video.muted = true;
+    video.currentTime = 0;
+    await video.play();
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+    video.pause();
+    return {
+      source_count: video.querySelectorAll('source').length,
+      track_count: video.querySelectorAll('track').length,
+      current_time: video.currentTime,
+      poster: video.poster,
+    };
+  });
+  if (newsroomPlayback.source_count < 2 || newsroomPlayback.track_count < 1 || newsroomPlayback.current_time <= 0) {
+    failures.push('ledger-newsroom: broadcast video does not expose working playback with sources, captions, and advancing time');
+  }
+  results.push({ surface: 'ledger-newsroom', media_playback: newsroomPlayback });
 
   await desktop.close();
 

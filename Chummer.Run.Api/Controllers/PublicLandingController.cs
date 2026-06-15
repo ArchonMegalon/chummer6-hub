@@ -9765,7 +9765,7 @@ Boundary:
             return blockedSummary;
         }
 
-        return "Known issues and install help stay nearby.";
+        return "Known issues stay on downloads.";
     }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)

@@ -92,7 +92,7 @@ public sealed class BlackLedgerDispatchService
                 : Array.Empty<string>(),
             DispatchUrl: latest.Href,
             SourceReceiptUrl: latest.SourceReceiptHref,
-            PrivacyNote: "Generated from a receipt-backed public-safe dispatch. No private campaign, support, or administrative data is included.");
+            PrivacyNote: "From a public dispatch. No private campaign, support, or administrative data is included.");
     }
 
     public BlackLedgerDispatchMutationResult CreateDraft(CreateBlackLedgerDispatchRequest request)
@@ -271,9 +271,9 @@ public sealed class BlackLedgerDispatchService
     private static string BuildDraftBody(DispatchFactPacket facts, string adapter)
         => adapter switch
         {
-            "manual" => $"{facts.Title}\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
-            "ea" or "1min.ai" or "syllabbles" => $"{facts.Title}\n\nDraft-only dispatch synthesized from Chummer-owned facts.\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
-            _ => $"{facts.Title}\n\n{facts.Summary}\n\nThe Ledger kept the names out and the pressure visible.\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
+            "manual" => $"{facts.Title}\n\n{facts.Summary}\n\nFiled after {facts.SourceReceiptId}. No private table data.",
+            "ea" or "1min.ai" or "syllabbles" => $"{facts.Title}\n\nDraft-only dispatch synthesized from Chummer-owned facts.\n\n{facts.Summary}\n\nFiled after {facts.SourceReceiptId}. No private table data.",
+            _ => $"{facts.Title}\n\n{facts.Summary}\n\nThe Ledger kept the names out and the pressure visible.\n\nFiled after {facts.SourceReceiptId}. No private table data.",
         };
 
     private static DispatchGateReceipt BuildGateReceipt(string dispatchId, DispatchFactPacket facts)

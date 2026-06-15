@@ -20,13 +20,13 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Recommended for'],
+    requiredText: ['Install Chummer', 'Recommended'],
   },
   {
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Release, caution, next click.', 'Open downloads'],
+    requiredText: ['Release, caution, next step.', 'Open downloads'],
   },
   {
     id: 'ledger-map',

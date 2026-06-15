@@ -470,7 +470,7 @@ public sealed class BlackLedgerPublicStatsService
                 : Array.Empty<string>(),
             DispatchUrl: latest.Href,
             SourceReceiptUrl: latest.SourceReceiptHref,
-            PrivacyNote: "Generated from a public-safe dispatch. No private campaign, support, or administrative data is included.");
+            PrivacyNote: "From a public dispatch. No private campaign, support, or administrative data is included.");
     }
 
     private static IReadOnlyList<BlackLedgerDispatch> BuildDispatchRecords(BlackLedgerWorldPreviewViewModel world)
@@ -490,8 +490,8 @@ public sealed class BlackLedgerPublicStatsService
                 body:
                     $"Turn {tick.Turn} already ran.\n\n" +
                     $"{tick.Summary}\n\n" +
-                    $"The Ledger marked the movement, not the people: faction pressure shifted, package demand moved, and public-safe closeout witnesses stayed tied to one receipt before any dispatch was allowed to talk.\n\n" +
-                    $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                    $"The Ledger marked the movement, not the people: faction pressure shifted, package demand moved, and closeout witnesses stayed tied to one receipt before any dispatch was allowed to talk.\n\n" +
+                    $"Filed after {tick.ReceiptId}. No private table data.",
                 involvedFactions: world.Factions.Take(4).Select(static item => item.PublicName).ToArray(),
                 involvedDistricts: world.Districts.Take(4).Select(static item => item.Name).ToArray(),
                 packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -513,7 +513,7 @@ public sealed class BlackLedgerPublicStatsService
                     summary: "Useful route-and-drone pressure crossed from rumor to watched package signal.",
                     body:
                         "The requests were not glamorous: better cargo state, clearer drone loadouts, fewer lost handoffs. The Ledger marked it as boring, useful, and therefore dangerous to ignore.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                        $"Filed after {tick.ReceiptId}. No private table data.",
                     involvedFactions: ["Neon Docks Union", "Ghostline Network"],
                     involvedDistricts: ["Neon Docks", "Old Signal Loop"],
                     packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -546,7 +546,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "The Bazaar did not need names. Gear requests spiked, favors got counted twice, and the district made boring logistics feel dangerous again.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                        $"Filed after {tick.ReceiptId}. No private table data.",
                     involvedFactions: ["Rust Market Syndicate"],
                     involvedDistricts: ["Rust Bazaar"],
                     packagePressureLinks: ["/ledger/packages"],
@@ -568,7 +568,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "The Circle did not argue about power. It argued about control. Clean intent with dirty paperwork pushed MysAd density upward and nudged package demand toward explainers instead of swagger.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                        $"Filed after {tick.ReceiptId}. No private table data.",
                     involvedFactions: ["Ashline Circle"],
                     involvedDistricts: ["Ashline Ward"],
                     packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -590,7 +590,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "Containers moved, drones failed, and somebody's maintenance debt became everybody's routing problem. The Docks did not ask for attention. Package pressure did that for them.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                        $"Filed after {tick.ReceiptId}. No private table data.",
                     involvedFactions: ["Neon Docks Union"],
                     involvedDistricts: ["Neon Docks"],
                     packagePressureLinks: ["/ledger/packages"],
@@ -612,7 +612,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "Ghostline killed the noise before it touched the shelf. No heroics, no badges, just one less false truth for the table to trip over.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
+                        $"Filed after {tick.ReceiptId}. No private table data.",
                     involvedFactions: ["Ghostline Network"],
                     involvedDistricts: ["Ghostline East", "Old Signal Loop"],
                     packagePressureLinks: ["/ledger/closeouts", "/ledger/packages"],
