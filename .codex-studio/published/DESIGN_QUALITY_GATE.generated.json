@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-15T07:35:55Z",
+  "generated_at_utc": "2026-06-15T08:06:27Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -21,6 +21,13 @@
     "live_surface_parity": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "status": "pass",
+      "failure_count": 0,
+      "pass": true
+    },
+    "ltd_optimization_stack": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
+      "status": "pass",
+      "verdict": "LTD_OPTIMIZATION_STACK_READY",
       "failure_count": 0,
       "pass": true
     },

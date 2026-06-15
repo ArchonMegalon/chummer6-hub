@@ -96,14 +96,42 @@
 - env_script_url_key: `RYBBIT_CHUMMER_RUN_SCRIPT_URL`
 - env_script_origin_key: `RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN`
 - env_same_host_proxy_key: `RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY`
-- status: `bounded_public_analytics_lane`
-- required_boundary: `event taxonomy and privacy review must stay discoverable before expanding beyond public-shell telemetry`
+- env_desktop_site_id_key: `RYBBIT_CHUMMER_DESKTOP_SITE_ID`
+- env_desktop_api_key: `RYBBIT_CHUMMER_DESKTOP_API_KEY`
+- env_desktop_api_origin_key: `RYBBIT_CHUMMER_DESKTOP_API_ORIGIN`
+- status: `bounded_public_and_desktop_analytics_lane`
+- required_boundary: `event taxonomy and privacy review must stay discoverable; CTA instrumentation and desktop shell events stay first-party, opt-in, and bounded to non-character metadata`
+- mirrors_default: `false`
+
+### clickrank
+
+- tier: `visibility`
+- credential_source: local `.env`
+- env_site_id_key: `CLICKRANK_AI_CHUMMER_RUN_SITE_ID`
+- status: `bounded_public_visibility_lane`
+- required_boundary: `recommendations only; Chummer-owned source patches stay canonical and reviewed before publication`
 - mirrors_default: `false`
 
 ### neuronwriter
 
 - tier: `candidate`
 - credential_source: local `.env`
-- status: `inventory_only`
-- required_boundary: `SEO workflow proof required before any public copy or roadmap claim uses NeuronWriter output`
+- status: `bounded_source_packet_seo_lane`
+- required_boundary: `source-packet SEO workflow only; Chummer-owned copy remains canonical and no release, support, roadmap, or rules claim may originate in NeuronWriter`
+- mirrors_default: `false`
+
+### rafter
+
+- tier: `qa`
+- credential_source: provider account
+- status: `auxiliary_release_qa_lane`
+- required_boundary: `security, accessibility, performance, SEO, and live-site evidence only; no product truth or deploy authority`
+- mirrors_default: `false`
+
+### pixefy
+
+- tier: `qa`
+- credential_source: provider account
+- status: `auxiliary_visual_qa_lane`
+- required_boundary: `responsive screenshot and visual QA only; no product truth, private data inspection, or media-authority role`
 - mirrors_default: `false`

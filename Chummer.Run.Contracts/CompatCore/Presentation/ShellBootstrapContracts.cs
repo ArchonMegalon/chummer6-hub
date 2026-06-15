@@ -15,6 +15,23 @@ public sealed record ShellPreferences(
     public static ShellPreferences Default { get; } = new(string.Empty);
 }
 
+public sealed record DesktopAnalyticsTrackRequest(
+    string HeadId,
+    string EventName,
+    string Surface,
+    string ReleaseVersion,
+    string ReleaseChannel,
+    bool OptIn,
+    string? UiMode = null,
+    string? Language = null,
+    DateTimeOffset? OccurredAtUtc = null,
+    IReadOnlyDictionary<string, string>? Properties = null);
+
+public sealed record DesktopAnalyticsTrackResult(
+    bool Accepted,
+    bool Forwarded,
+    string Status);
+
 public sealed record ShellSessionState(
     string? ActiveWorkspaceId = null,
     string? ActiveTabId = null,

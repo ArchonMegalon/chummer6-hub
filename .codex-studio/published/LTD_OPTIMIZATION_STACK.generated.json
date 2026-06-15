@@ -1,0 +1,41 @@
+{
+  "contract_name": "chummer.ltd_optimization_stack",
+  "generated_at_utc": "2026-06-15T08:06:27Z",
+  "status": "pass",
+  "verdict": "LTD_OPTIMIZATION_STACK_READY",
+  "checks": {
+    "rybbit_public_analytics": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/rybbit/RYBBIT_TRACKED_PROVIDER_RECEIPT.generated.json",
+      "status": "tracked",
+      "runtime_ready": true,
+      "pass": true
+    },
+    "neuronwriter_source_packet_workflow": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/neuronwriter/NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json",
+      "status": "tracked",
+      "runtime_ready": false,
+      "pass": true
+    },
+    "clickrank_visibility_lane": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
+      "status": "pass",
+      "pass": true
+    },
+    "rafter_security_gate": {
+      "path": "/docker/chummercomplete/_completion/rafter/RAFTER_SECURITY_GOLD_GATE.generated.json",
+      "status": "pass",
+      "pass": true
+    },
+    "pixefy_visual_gate": {
+      "path": "/docker/chummercomplete/_completion/pixefy/PIXEFY_RESPONSIVE_VISUAL_QA.generated.json",
+      "status": "pass",
+      "pass": true
+    },
+    "rafter_pixefy_stack": {
+      "path": "/docker/chummercomplete/_completion/rafter_pixefy/FINAL_RAFTER_PIXEFY_QA_STACK_REASONS.generated.json",
+      "status": "RAFTER_PIXEFY_QA_STACK_READY",
+      "pass": true
+    }
+  },
+  "failures": []
+}

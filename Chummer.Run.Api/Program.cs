@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Net;
+using Chummer.Contracts.Presentation;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
@@ -44,6 +45,7 @@ builder.Services
     .AddHubCampaignSpineContext()
     .AddHubControlAndSupportContext()
     .AddHubInstallAndOrchestrationAdapters();
+builder.Services.AddSingleton<DesktopAnalyticsBridgeService>();
 var trustedProxies = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_PROXIES"]);
 var trustedIpNetworks = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS"]);
 
@@ -191,6 +193,40 @@ app.MapGet("/api/health", () => Results.Json(new
     generatedAt = DateTimeOffset.UtcNow
 }));
 app.MapMethods("/api/rybbit/{**proxyPath}", new[] { "GET", "POST", "OPTIONS" }, ProxyRybbitAsync);
+app.MapPost("/api/desktop-analytics/track", async (
+    DesktopAnalyticsTrackRequest request,
+    DesktopAnalyticsBridgeService analyticsBridge,
+    HttpContext context,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.HeadId)
+        || string.IsNullOrWhiteSpace(request.EventName)
+        || string.IsNullOrWhiteSpace(request.Surface)
+        || string.IsNullOrWhiteSpace(request.ReleaseVersion)
+        || string.IsNullOrWhiteSpace(request.ReleaseChannel))
+    {
+        return Results.BadRequest(new ProblemDetails
+        {
+            Title = "Desktop analytics validation failed.",
+            Type = "https://chummer.run/problems/desktop-analytics-validation",
+            Status = StatusCodes.Status400BadRequest,
+            Detail = "Desktop analytics requests require head, event, surface, and release metadata."
+        });
+    }
+
+    DesktopAnalyticsTrackResult result = await analyticsBridge.TrackAsync(
+        request,
+        context.Connection.RemoteIpAddress?.ToString(),
+        context.Request.Headers.UserAgent.ToString(),
+        ct);
+
+    if (!result.Accepted)
+    {
+        return Results.BadRequest(result);
+    }
+
+    return Results.Accepted(value: result);
+});
 app.MapGet("/openapi/", GetSelfHostedDocs);
 
 app.MapControllers();

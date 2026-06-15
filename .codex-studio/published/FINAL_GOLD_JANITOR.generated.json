@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T07:35:55Z",
+  "generated_at_utc": "2026-06-15T08:06:27Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -161,6 +161,14 @@
       "fresh_within_hours": null,
       "pass": true
     },
+    "ltd_optimization_stack": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-15T08:06:27Z",
+      "fresh_within_hours": null,
+      "pass": true
+    },
     "external_distribution_mirror_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
@@ -193,7 +201,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T07:35:55Z",
+      "generated_at_utc": "2026-06-15T08:06:27Z",
       "fresh_within_hours": null,
       "pass": true
     },

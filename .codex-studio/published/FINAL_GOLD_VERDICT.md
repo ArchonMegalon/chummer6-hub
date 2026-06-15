@@ -1,6 +1,6 @@
 # GOLD_READY
 
-Generated: 2026-06-15T07:35:55Z
+Generated: 2026-06-15T08:06:27Z
 Scope: full_estate_v20
 
 ## Gate Summary
@@ -11,6 +11,7 @@ Scope: full_estate_v20
   - mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass; external_required=False
 - PASS `live_public_web_recrawl`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json`
 - PASS `live_surface_parity`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json`
+- PASS `ltd_optimization_stack`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json`
 - PASS `operator_release_dashboard`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
   - release: run-20260612-121055 on public_stable
 - PASS `provider_proof_discoverability`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json`
