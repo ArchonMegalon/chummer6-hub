@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-15T13:00:22Z",
+  "generated_at_utc": "2026-06-15T15:04:18Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -13,10 +13,14 @@
       "required_texts": [
         "Black Ledger command deck",
         "The city is moving.",
-        "Install, play, or open the city."
+        "Install, play, or open the city.",
+        "Support."
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
+        "Next move",
+        "Need help?",
+        "Live product.",
         "One compact rail for downloads, play, and public status.",
         "Reel details",
         "Keep it simple",
@@ -40,12 +44,18 @@
       "required_texts": [
         "Install Chummer",
         "Start with the recommended build",
-        "Install questions?",
+        "Install help",
         "Filter downloads",
-        "Public downloads are available now on Windows, macOS, and Linux."
+        "Public downloads are available now on Windows, macOS, and Linux.",
+        "Release notes live here."
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
+        "Need account return?",
+        "Current notes.",
+        "Install questions?",
+        "Account return later?",
+        "Release notes stay here.",
         "Public downloads are available now on Windows and Linux.",
         "account-assisted install paths",
         "Link this copy from the first launch",
@@ -67,12 +77,16 @@
       "final_url": "https://chummer.run/status",
       "status_code": 200,
       "required_texts": [
-        "Release and next step.",
-        "Release and next step.",
+        "Release, caution, next step.",
+        "Caution.",
         "Current public release"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
+        "Release and next step.",
+        "Release, caution, next click.",
+        "Known issues and install help stay nearby.",
+        "Current caution.",
         "Preview posture on Public release",
         "Review is still required before this release can be treated as supportable.",
         "Fallback",

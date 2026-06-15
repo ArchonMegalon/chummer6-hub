@@ -12145,7 +12145,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Public Stable", "Release and next step.", "Current caution"):
+    for snippet in ("Public Stable", "Release, caution, next step.", "Caution."):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

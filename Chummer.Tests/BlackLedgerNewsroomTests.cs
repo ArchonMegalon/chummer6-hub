@@ -35,8 +35,8 @@ public sealed class BlackLedgerNewsroomTests
         Assert.Contains("string transcriptHref = $\"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/transcript\";", briefingService, StringComparison.Ordinal);
         Assert.Contains("string receiptsHref = $\"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/receipts\";", briefingService, StringComparison.Ordinal);
         Assert.Contains("PackageLabel: $\"Turn {tick.Turn} anchor package\"", briefingService, StringComparison.Ordinal);
-        Assert.Contains("City bulletin only. No private table data.", briefingService, StringComparison.Ordinal);
-        Assert.Contains("Some shots restage city movement.", briefingService, StringComparison.Ordinal);
+        Assert.Contains("City bulletin only.", briefingService, StringComparison.Ordinal);
+        Assert.Contains("Some shots replay city movement.", briefingService, StringComparison.Ordinal);
         Assert.Contains("? $\"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel", controller, StringComparison.Ordinal);
         Assert.Contains("Turn {newsTurn} anchor package", controller, StringComparison.Ordinal);
         Assert.Contains("? $\"Black Ledger dispatches · {worldTitle}\"", controller, StringComparison.Ordinal);

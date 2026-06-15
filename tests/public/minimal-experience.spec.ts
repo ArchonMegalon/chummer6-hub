@@ -57,7 +57,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const decisionCards = decisionSurface.locator('.route-choice-card');
   const nextActions = decisionSurface.locator('.stacked-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
-  await expect(decisionSurface).toContainText('Release and next step.');
+  await expect(decisionSurface).toContainText('Release, caution, next step.');
   const cardCount = await decisionCards.count();
   if (cardCount !== 1) {
     failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);
@@ -67,7 +67,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     failures.push(`status: expected exactly 3 next actions, found ${nextActionCount}`);
   }
   const statusText = await desktop.locator('body').innerText();
-  for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance']) {
+  for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance', 'Release and next step.', 'Current caution.']) {
     if (statusText.includes(forbidden)) {
       failures.push(`status: contains retired secondary surface "${forbidden}"`);
     }

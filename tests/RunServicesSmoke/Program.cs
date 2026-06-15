@@ -2642,7 +2642,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "status should reuse the shared public trust pulse instead of inventing a second pulse renderer.");
     Assert(statusSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "status should reuse the shared signed-in trust panel instead of inventing another install-specific rail.");
     Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should stay collapsed to one decision surface before deeper platform details.");
-    Assert(statusSource.Contains("Current caution", StringComparison.Ordinal), "status should keep the current caution inside the one public decision surface.");
+    Assert(statusSource.Contains("Caution.", StringComparison.Ordinal), "status should keep the caution inside the one public decision surface.");
     Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep the deeper report as a secondary step.");
     Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep a direct route to the deeper weighted delivery report.");
     Assert(statusSource.Contains("<summary>Other platform details</summary>", StringComparison.Ordinal), "status should keep platform specifics behind one secondary disclosure instead of in the main summary.");

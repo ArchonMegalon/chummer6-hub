@@ -108,7 +108,7 @@ public sealed class RegistryTruthBindingService
             Summary: summary,
             EvidenceLines:
             [
-                "Known issues and install help stay nearby on the downloads page instead of becoming a second release page.",
+                "Known issues stay on downloads.",
                 $"Current supportability posture is {ResolveSupportabilityState(manifest)}.",
                 ResolveFixAvailabilitySummary(manifest)
             ],

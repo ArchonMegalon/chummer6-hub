@@ -167,7 +167,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             status_path.write_text(
                 status_text
                 .replace('data-status-surface="decision-surface"', "data-status-surface=\"missing\"", 1)
-                .replace("Current caution", "Quick release summary", 1),
+                .replace("Caution.", "Quick release summary", 1),
                 encoding="utf-8",
             )
 

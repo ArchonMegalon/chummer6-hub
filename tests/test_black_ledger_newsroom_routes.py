@@ -48,8 +48,8 @@ class BlackLedgerNewsroomRouteTests(unittest.TestCase):
     def test_briefing_service_builds_newsroom_links_and_safety_copy(self) -> None:
         briefing_service = BRIEFINGS.read_text(encoding="utf-8")
         self.assertIn('string watchHref = $"{ledgerBasePath.TrimEnd(\'/\')}/newsroom/{slug}";', briefing_service)
-        self.assertIn("City bulletin only. No private table data.", briefing_service)
-        self.assertIn("Some shots restage city movement.", briefing_service)
+        self.assertIn("City bulletin only.", briefing_service)
+        self.assertIn("Some shots replay city movement.", briefing_service)
 
     def test_ledger_map_exposes_real_provider_tour_exports_from_manifest(self) -> None:
         ledger_view = VIEW.read_text(encoding="utf-8")

@@ -1,6 +1,6 @@
 # GOLD_READY
 
-Generated: 2026-06-15T14:41:17Z
+Generated: 2026-06-15T15:05:16Z
 Scope: full_estate_v20
 
 ## Gate Summary
