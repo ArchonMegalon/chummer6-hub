@@ -200,9 +200,9 @@
             </article>
         </section>
         <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-            <a class="inline-link" href="/ledger/map#ledger-map">Open command map</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@Model.PrimaryAction.Label">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@Model.SecondaryAction.Label">@Model.SecondaryAction.Label</a>
+            <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
         <div class="trust-claim__microproof ledger-flagship__boundary">
             <span>Opt-in aggregate only</span>
@@ -211,22 +211,22 @@
         </div>
     </div>
     <nav class="ledger-flagship__nav" aria-label="Black Ledger navigation">
-        <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/ledger/map#ledger-map">
+        <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_nav" data-analytics-label="Open command map">
             <span class="tag">Command</span>
             <strong>Open command map</strong>
             <p>Replay the turn, switch pressure modes, and follow the arrows across the globe.</p>
         </a>
-        <a class="ledger-flagship__nav-card" href="/ledger/factions/@heroFactionSlug">
+        <a class="ledger-flagship__nav-card" href="/ledger/factions/@heroFactionSlug" data-analytics-event="ledger_open_faction_file" data-analytics-surface="ledger_nav" data-analytics-label="Faction file">
             <span class="tag">Faction</span>
             <strong>Faction file</strong>
             <p>Pick a house, read the mood, and find the next move they want runners to notice.</p>
         </a>
-        <a class="ledger-flagship__nav-card" href="/ledger/dispatches">
+        <a class="ledger-flagship__nav-card" href="/ledger/dispatches" data-analytics-event="ledger_open_newsroom" data-analytics-surface="ledger_nav" data-analytics-label="Open newsroom">
             <span class="tag">Newsroom</span>
             <strong>Open newsroom</strong>
             <p>Latest dispatches, table hooks, and the current bulletin without private campaign spillover.</p>
         </a>
-        <a class="ledger-flagship__nav-card" href="@accountCtaHref">
+        <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@accountCtaLabel">
             <span class="tag">Faction rail</span>
             <strong>@accountCtaLabel</strong>
             <p>Step from the public board into the account-side faction workspace.</p>

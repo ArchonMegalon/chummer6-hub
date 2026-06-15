@@ -30,8 +30,8 @@
             <h1 class="launch-hero__title">The city is moving.</h1>
             <p class="launch-hero__support">Watch the pressure, pick a faction, and step into Black Ledger.</p>
             <div class="launch-hero__actions">
-                <a class="button-like button-like--primary" href="@ledgerHref">Open Black Ledger</a>
-                <a class="button-like button-like--secondary" href="@buildHref">Download Chummer</a>
+                <a class="button-like button-like--primary" href="@ledgerHref" data-analytics-event="homepage_open_ledger" data-analytics-surface="landing_hero" data-analytics-label="Open Black Ledger">Open Black Ledger</a>
+                <a class="button-like button-like--secondary" href="@buildHref" data-analytics-event="homepage_open_downloads" data-analytics-surface="landing_hero" data-analytics-label="Download Chummer">Download Chummer</a>
             </div>
             <div class="launch-hero__metric-strip" aria-label="Ledger score strip">
                 @foreach (var stat in ledgerStats)
@@ -91,7 +91,7 @@
                         <h3>@faction.PublicName</h3>
                         <p>@string.Join(" · ", faction.PublicSignals.Take(2))</p>
                     </div>
-                    <a class="editorial-strip__action" href="/ledger/factions/@factionSlug(faction.Id)">Open faction file</a>
+                    <a class="editorial-strip__action" href="/ledger/factions/@factionSlug(faction.Id)" data-analytics-event="homepage_open_faction_file" data-analytics-surface="landing_factions" data-analytics-label="@faction.PublicName">Open faction file</a>
                 </div>
             </article>
         }
@@ -133,7 +133,7 @@
                 <h3>Desktop build</h3>
             </div>
             <p>Install the current desktop build.</p>
-            <a class="editorial-strip__action" href="@buildHref">Open downloads</a>
+            <a class="editorial-strip__action" href="@buildHref" data-analytics-event="homepage_gateway_downloads" data-analytics-surface="landing_gateway" data-analytics-label="Desktop build">Open downloads</a>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
@@ -141,7 +141,7 @@
                 <h3>Mobile play shell</h3>
             </div>
             <p>Open play when your table is live.</p>
-            <a class="editorial-strip__action" href="@playHref">Open play shell</a>
+            <a class="editorial-strip__action" href="@playHref" data-analytics-event="homepage_gateway_play" data-analytics-surface="landing_gateway" data-analytics-label="Mobile play shell">Open play shell</a>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
@@ -149,7 +149,7 @@
             <h3>Release posture</h3>
             </div>
             <p>Check the current release and cautions.</p>
-            <a class="editorial-strip__action" href="@statusHref">Open status</a>
+            <a class="editorial-strip__action" href="@statusHref" data-analytics-event="homepage_gateway_status" data-analytics-surface="landing_gateway" data-analytics-label="Release posture">Open status</a>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
@@ -157,7 +157,7 @@
                 <h3>Turn 1</h3>
             </div>
             <p>Replay the first public tick.</p>
-            <a class="editorial-strip__action" href="@replayTurnOneHref">Replay Turn 1</a>
+            <a class="editorial-strip__action" href="@replayTurnOneHref" data-analytics-event="homepage_gateway_replay" data-analytics-surface="landing_gateway" data-analytics-label="Replay Turn 1">Replay Turn 1</a>
         </article>
     </div>
 </section>
@@ -209,7 +209,7 @@
         <h2 class="editorial-title">Help is close.</h2>
     </div>
     <div class="access-band__actions">
-        <a class="button-like button-like--primary" href="/help">Open help</a>
+        <a class="button-like button-like--primary" href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="landing_footer" data-analytics-label="Open help">Open help</a>
         <p class="muted-copy"><a class="inline-link" href="/status">Status</a> · <a class="inline-link" href="/feedback">Feedback</a> · <a class="inline-link" href="/privacy">Privacy</a></p>
     </div>
 </section>

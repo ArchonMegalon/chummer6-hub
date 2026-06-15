@@ -17,6 +17,7 @@ OUTPUT = PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json"
 LIVE_RECRAWL_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json"
 PUBLIC_ROUTE_PROOF_PATH = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 LIVE_SURFACE_PARITY_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
+LTD_OPTIMIZATION_STACK_PATH = PUBLISHED_ROOT / "LTD_OPTIMIZATION_STACK.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
 MINIMAL_EXPERIENCE_GATE_PATH = COMPLETION_ROOT / "MINIMAL_EXPERIENCE_GATE.generated.json"
 DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
@@ -134,6 +135,18 @@ def build_payload() -> dict[str, Any]:
         "status": live_surface_parity.get("status", "missing"),
         "failure_count": len(live_surface_parity.get("failures") or []),
         "pass": live_surface_parity_pass,
+    }
+
+    ltd_optimization_stack = load_json(LTD_OPTIMIZATION_STACK_PATH)
+    ltd_optimization_stack_pass = status_pass(ltd_optimization_stack) and not ltd_optimization_stack.get("failures")
+    if not ltd_optimization_stack_pass:
+        failures.append("LTD optimization stack is missing or failing")
+    checks["ltd_optimization_stack"] = {
+        "path": str(LTD_OPTIMIZATION_STACK_PATH),
+        "status": ltd_optimization_stack.get("status", "missing"),
+        "verdict": ltd_optimization_stack.get("verdict"),
+        "failure_count": len(ltd_optimization_stack.get("failures") or []),
+        "pass": ltd_optimization_stack_pass,
     }
 
     ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"

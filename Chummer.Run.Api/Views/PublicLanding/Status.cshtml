@@ -215,7 +215,7 @@ static string CustomerStatusText(string? value, string fallback)
             var href = string.Equals(action.Href, "/downloads", StringComparison.OrdinalIgnoreCase)
                 ? ContextualPreviewHref(action.Href)
                 : action.Href;
-            <a class="button-like button-like--@action.Tone" href="@href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@href" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="@action.Label">@action.Label</a>
         }
     </div>
 </section>
@@ -224,7 +224,7 @@ static string CustomerStatusText(string? value, string fallback)
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
-            <summary>Other platform details</summary>
+            <summary data-analytics-event="status_open_platform_details" data-analytics-surface="status_details" data-analytics-label="Other platform details">Other platform details</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
                     @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)

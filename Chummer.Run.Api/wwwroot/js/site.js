@@ -153,6 +153,87 @@
     });
   };
 
+  const normalizeAnalyticsValue = (value) => {
+    if (value === undefined || value === null) return "";
+    return String(value).trim();
+  };
+
+  ChummerUi.analyticsQueue = Array.isArray(window.ChummerAnalyticsQueue)
+    ? window.ChummerAnalyticsQueue
+    : (window.ChummerAnalyticsQueue = []);
+
+  ChummerUi.trackPublicEvent = function trackPublicEvent(name, payload = {}) {
+    const eventName = normalizeAnalyticsValue(name);
+    if (!eventName) return;
+    const record = {
+      event: eventName,
+      ts: new Date().toISOString(),
+      route: normalizeAnalyticsValue(document.body?.dataset?.routeKey),
+      surfaceClass: normalizeAnalyticsValue(document.body?.dataset?.surfaceClass),
+      ...payload
+    };
+    ChummerUi.analyticsQueue.push(record);
+    window.dispatchEvent(new CustomEvent("chummer:analytics", { detail: record }));
+
+    const rybbitApi = window.rybbit;
+    if (rybbitApi && typeof rybbitApi.track === "function") {
+      try {
+        rybbitApi.track(eventName, record);
+      } catch {
+        // Keep first-party event capture even when the provider bridge is unavailable.
+      }
+    } else if (rybbitApi && typeof rybbitApi.event === "function") {
+      try {
+        rybbitApi.event(eventName, record);
+      } catch {
+        // Keep first-party event capture even when the provider bridge is unavailable.
+      }
+    }
+  };
+
+  const readAnalyticsPayload = (node, action = "click") => {
+    if (!node?.dataset) return null;
+    const eventName = normalizeAnalyticsValue(node.dataset.analyticsEvent);
+    if (!eventName) return null;
+    const href = node instanceof HTMLAnchorElement ? node.getAttribute("href") || "" : "";
+    const label =
+      normalizeAnalyticsValue(node.dataset.analyticsLabel) ||
+      normalizeAnalyticsValue(node.getAttribute("aria-label")) ||
+      normalizeAnalyticsValue(node.textContent);
+    return {
+      eventName,
+      payload: {
+        action,
+        surface: normalizeAnalyticsValue(node.dataset.analyticsSurface),
+        label,
+        href,
+        tag: node.tagName.toLowerCase()
+      }
+    };
+  };
+
+  document.addEventListener("click", (event) => {
+    const node = event.target instanceof Element
+      ? event.target.closest("[data-analytics-event]")
+      : null;
+    if (!node || node.tagName === "DETAILS" || node.tagName === "SUMMARY") {
+      return;
+    }
+    const analytics = readAnalyticsPayload(node, "click");
+    if (analytics) {
+      ChummerUi.trackPublicEvent(analytics.eventName, analytics.payload);
+    }
+  }, { capture: true });
+
+  document.querySelectorAll("details summary[data-analytics-event]").forEach((summary) => {
+    summary.addEventListener("click", () => {
+      const analytics = readAnalyticsPayload(summary, "expand");
+      if (analytics) {
+        ChummerUi.trackPublicEvent(analytics.eventName, analytics.payload);
+      }
+    });
+  });
+
   const header = document.querySelector("[data-site-header]");
   const navToggle = document.querySelector("[data-nav-toggle]");
   const navPanel = document.querySelector("[data-nav-panel]");

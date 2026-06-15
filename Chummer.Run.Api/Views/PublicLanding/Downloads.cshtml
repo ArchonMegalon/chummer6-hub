@@ -140,18 +140,18 @@ else
                 <div class="stacked-actions">
                     @if (requestedPlatformUnavailable)
                     {
-                        <a class="button-like button-like--primary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                        <a class="button-like button-like--secondary" href="#platform-shelf">See other platforms</a>
+                        <a class="button-like button-like--primary" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_recommended" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
+                        <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See other platforms">See other platforms</a>
                         @if (requestedWindowsUnavailable && hasSignedInWindowsBuilds)
                         {
-                            <a class="button-like button-like--ghost" href="#signed-in-windows-builds">Open signed-in Windows build</a>
+                            <a class="button-like button-like--ghost" href="#signed-in-windows-builds" data-analytics-event="downloads_open_signed_in_windows" data-analytics-surface="downloads_recommended" data-analytics-label="Open signed-in Windows build">Open signed-in Windows build</a>
                         }
                         else if (requestedWindowsUnavailable && hasWindowsProofRail)
                         {
-                            <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification page</a>
+                            <a class="button-like button-like--ghost" href="#windows-verification-rail" data-analytics-event="downloads_open_windows_verification" data-analytics-surface="downloads_recommended" data-analytics-label="Open Windows verification page">Open Windows verification page</a>
                         }
                         <details class="release-accordion">
-                            <summary>Release notes, known issues, and requirements</summary>
+                            <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Release notes, known issues, and requirements</summary>
                             <div class="release-accordion__body">
                                 <p class="muted-copy">This platform is not publicly available right now, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
                                 <div class="stacked-actions">
@@ -164,31 +164,31 @@ else
                     }
                     else if (guestGateRequired)
                     {
-                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
+                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
                         @if (recommendedIsWindowsInstaller && windowsZipFallback is not null)
                         {
-                            <a class="button-like button-like--secondary" href="@windowsZipFallback.DispatchHref">@windowsZipFallback.ActionLabel</a>
+                            <a class="button-like button-like--secondary" href="@windowsZipFallback.DispatchHref" data-analytics-event="downloads_secondary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@windowsZipFallback.ActionLabel">@windowsZipFallback.ActionLabel</a>
                         }
                     }
                     else
                     {
-                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
+                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
                     }
                 </div>
                 @if (!requestedPlatformUnavailable)
                 {
                     <details class="release-accordion">
-                        <summary>Help and notes</summary>
+                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help and notes">Help and notes</summary>
                         <div class="release-accordion__body">
                             <div class="route-callout" role="status" aria-live="polite">
                                 <h3>Install questions?</h3>
                                 <p>Open setup help only when install is blocked.</p>
                                 <div class="route-callout__actions">
-                                    <a class="inline-link" href="/downloads/concierge">Get setup help</a>
-                                    <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                                    <a class="inline-link" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
+                                    <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
                                 </div>
                             </div>
-                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref">@returningUserLabel</a>.</p>
+                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
                             <p class="downloads-inline-note">
                                 @(recommendedUsesMacSetupScript
                                     ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
@@ -197,7 +197,7 @@ else
                         </div>
                     </details>
                     <details class="release-accordion">
-                        <summary>Release notes and requirements</summary>
+                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes and requirements">Release notes and requirements</summary>
                         <div class="release-accordion__body">
                             <p class="muted-copy">Known issues and install help stay nearby.</p>
                             <div class="stacked-actions">
@@ -211,17 +211,17 @@ else
                 else
                 {
                     <details class="release-accordion">
-                        <summary>Help and notes</summary>
+                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help and notes">Help and notes</summary>
                         <div class="release-accordion__body">
                             <div class="route-callout" role="status" aria-live="polite">
                                 <h3>Install questions?</h3>
                                 <p>Open setup help only when install is blocked.</p>
                                 <div class="route-callout__actions">
-                                    <a class="inline-link" href="/downloads/concierge">Get setup help</a>
-                                    <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                                    <a class="inline-link" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
+                                    <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
                                 </div>
                             </div>
-                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref">@returningUserLabel</a>.</p>
+                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
                         </div>
                     </details>
                 }
@@ -235,7 +235,7 @@ else
 
     <section class="release-shelf" aria-label="Download filters">
         <details class="release-accordion">
-            <summary>Filter downloads</summary>
+            <summary data-analytics-event="downloads_open_filters" data-analytics-surface="downloads_filters" data-analytics-label="Filter downloads">Filter downloads</summary>
             <div class="release-accordion__body">
                 <form class="downloads-filter-bar" method="get" action="/downloads">
                     <div class="field">
@@ -267,7 +267,7 @@ else
     {
         <section class="release-shelf" id="platform-shelf">
             <details class="release-accordion">
-                <summary>Other supported platforms</summary>
+            <summary data-analytics-event="downloads_open_platform_shelf" data-analytics-surface="downloads_platforms" data-analytics-label="Other supported platforms">Other supported platforms</summary>
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h2 class="downloads-subheading">Main platform downloads</h2>
@@ -298,7 +298,7 @@ else
     {
         <section class="release-shelf release-shelf--manual" id="advanced-downloads">
             <details class="release-accordion">
-                <summary>Advanced download options</summary>
+            <summary data-analytics-event="downloads_open_advanced_options" data-analytics-surface="downloads_advanced" data-analytics-label="Advanced download options">Advanced download options</summary>
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Install notes</h3>

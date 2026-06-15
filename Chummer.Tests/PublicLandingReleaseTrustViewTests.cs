@@ -51,7 +51,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         int recommendedIndex = view.IndexOf("id=\"recommended-download\"", StringComparison.Ordinal);
         int filtersIndex = view.IndexOf("aria-label=\"Download filters\"", StringComparison.Ordinal);
 
-        Assert.Contains("<summary>Other supported platforms</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("Other supported platforms</summary>", view, StringComparison.Ordinal);
         Assert.Contains("Main platform downloads", view, StringComparison.Ordinal);
         Assert.Contains("Windows verification and support path", view, StringComparison.Ordinal);
         Assert.True(recommendedIndex >= 0, "recommended download shelf should stay visible on the main downloads page");
