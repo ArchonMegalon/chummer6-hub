@@ -41,10 +41,10 @@ public sealed class BlackLedgerPublicStatsService
             sampleCount: 6,
             confidenceKey: "seeded",
             confidence: "Seeded",
-            privacyNote: "Opt-in aggregate only",
+            privacyNote: "Aggregate city view",
             sourceKind: "seeded_board",
             sourceLabel: "Canonical seed world",
-            sourceSummary: "Derived from the canonical Emerald Sprawl world seed before any live opt-in campaign aggregation is allowed.",
+            sourceSummary: "Derived from the canonical Emerald Sprawl world seed before any live campaign aggregation is allowed.",
             status: "seeded",
             href: "/ledger/stats#mysad-density"),
         CreatePublicStat(
@@ -797,7 +797,7 @@ public sealed class BlackLedgerPublicStatsService
                 sampleCount: factions.Count,
                 confidenceKey: "seeded",
                 confidence: "Seeded",
-                privacyNote: "Opt-in aggregate only",
+                privacyNote: "Aggregate city view",
                 sourceKind: "seeded_board",
                 sourceLabel: "Canonical seed world",
                 sourceSummary: "Derived from the Emerald Sprawl seed model until opted-in live data clears privacy thresholds.",
@@ -862,8 +862,8 @@ public sealed class BlackLedgerPublicStatsService
             : selectedTurn.IsDeterministicPreview
                 ? $"Turn {currentTurn.Turn} preview board is ready. {currentTurn.Summary}"
                 : currentTurn.Headline;
-        string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.";
-        string mapNote = "Use the map to inspect seeded districts, visible pressure arcs, and public-safe dispatches without exposing private tables.";
+        string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Canonical seeded board and aggregate city view only.";
+        string mapNote = "Use the map to inspect districts, pressure arcs, and dispatches without exposing private tables.";
         var aiNames = GetAiPersonalities(seed)
             .Where(static personality => !string.IsNullOrWhiteSpace(GetPersonalityId(personality)))
             .ToDictionary(static personality => GetPersonalityId(personality), static personality => GetPersonalityLabel(personality), StringComparer.OrdinalIgnoreCase);

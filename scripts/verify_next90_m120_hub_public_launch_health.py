@@ -186,7 +186,7 @@ SOURCE_MARKERS = {
         "Current caution",
         'aria-label="Status next actions"',
         "Open progress",
-        "<summary>Other platform details</summary>",
+        "Other platform details</summary>",
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'Assert(statusSource.Contains("data-status-surface=\\"decision-surface\\"", StringComparison.Ordinal), "status should stay collapsed to one decision surface before deeper platform details.");',

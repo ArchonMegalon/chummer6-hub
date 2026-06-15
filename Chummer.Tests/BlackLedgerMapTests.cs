@@ -105,8 +105,9 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<strong>Read dispatches</strong>", view, StringComparison.Ordinal);
         Assert.Contains("<strong>Open newsroom</strong>", view, StringComparison.Ordinal);
-        Assert.Contains("Optional viewer links.", view, StringComparison.Ordinal);
+        Assert.Contains("Optional viewer exports.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Optional external viewer links stay here. The live board stays on this command map.", view, StringComparison.Ordinal);
+        Assert.Contains("Turn 1 board", view, StringComparison.Ordinal);
     }
 
     [Fact]

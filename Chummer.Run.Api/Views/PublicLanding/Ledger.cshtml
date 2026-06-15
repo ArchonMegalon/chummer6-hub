@@ -125,22 +125,14 @@
     var heroGlobeRenderMode = mapFocused ? "command-map" : "magicfit-newsreel";
     var heroDisableWebGl = mapFocused ? "false" : "true";
     var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "magicfit-newsreel";
-    static string softenLedgerNote(string? value)
+    static string cleanLedgerNote(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return string.Empty;
         }
 
-        return value
-            .Replace("Proof lane anchored to", "Visible move:", StringComparison.OrdinalIgnoreCase)
-            .Replace("Review lane anchored to", "Visible move:", StringComparison.OrdinalIgnoreCase)
-            .Replace("City pulse:", "Visible move:", StringComparison.OrdinalIgnoreCase)
-            .Replace("Routed through", "Seen in", StringComparison.OrdinalIgnoreCase)
-            .Replace("Linked through", "Seen in", StringComparison.OrdinalIgnoreCase)
-            .Replace("deterministic board", "live board", StringComparison.OrdinalIgnoreCase)
-            .Replace("Provider-hosted", "External", StringComparison.OrdinalIgnoreCase)
-            .Trim();
+        return value.Trim();
     }
 }
 
@@ -205,9 +197,9 @@
             <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
         <div class="trust-claim__microproof ledger-flagship__boundary">
-            <span>Opt-in aggregate only</span>
-            <span>No player identities</span>
-            <span>Table-ready city layer</span>
+            <span>Aggregate city view</span>
+            <span>No private table data</span>
+            <span>Ready for play</span>
         </div>
     </div>
     <nav class="ledger-flagship__nav" aria-label="Black Ledger navigation">
@@ -251,7 +243,7 @@
             @if (commandMap is not null)
             {
                 <div class="ledger-command-map__ribbon" aria-label="Command map status">
-                    <span>@(selectedTurn >= 2 ? "Turn 2 board" : "Seeded live board")</span>
+                    <span>@(selectedTurn >= 2 ? "Turn 2 board" : "Turn 1 board")</span>
                     <span>@worldDistricts.Length districts</span>
                     <span>@liveConfidence confidence</span>
                     <span>@(leadDispatch is null ? "Dispatch queue open" : leadDispatch.Title)</span>
@@ -279,7 +271,7 @@
                 <div class="ledger-provider-tours" data-ledger-tour-exports="/media/ledger/tours/black-ledger-tour-exports.manifest.json" aria-label="Optional external viewer links">
                     <div>
                         <span class="tag">Optional viewers</span>
-                        <p>Optional viewer links.</p>
+                        <p>Optional viewer exports.</p>
                     </div>
                     <div class="ledger-provider-tours__actions">
                         <a class="button-like button-like--primary" href="/media/ledger/tours/black-ledger-3dvista-flythrough.mp4">Fly-through</a>
@@ -353,7 +345,7 @@
                                             <p>@beat.ActionSummary</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.Stakes</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@beat.ConsequenceLine</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@softenLedgerNote(beat.ProofNote)</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@cleanLedgerNote(beat.ProofNote)</p>
                                         </article>
                                     }
                                 </div>
@@ -365,7 +357,7 @@
                             <p>@newsreelBroadcast.AudioPosture</p>
                             <p>@newsreelBroadcast.MusicPosture</p>
                             <p>@newsreelBroadcast.PublicSafetyNote</p>
-                            <p>@softenLedgerNote(newsreelBroadcast.ReconstructionNote)</p>
+                            <p>@cleanLedgerNote(newsreelBroadcast.ReconstructionNote)</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>

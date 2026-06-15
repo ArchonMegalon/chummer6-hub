@@ -64,6 +64,17 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn("DesktopAnalyticsBridgeService", source)
         self.assertIn("Desktop analytics validation failed.", source)
 
+    def test_desktop_analytics_bridge_requires_dedicated_desktop_site_id_and_restricts_http_to_local_hosts(self) -> None:
+        source = (REPO_ROOT / "Chummer.Run.Api" / "Services" / "DesktopAnalyticsBridgeService.cs").read_text(encoding="utf-8")
+        self.assertIn('(_configuration["RYBBIT_CHUMMER_DESKTOP_SITE_ID"] ?? string.Empty).Trim()', source)
+        self.assertNotIn('ResolveConfiguredValue("RYBBIT_CHUMMER_DESKTOP_SITE_ID", "RYBBIT_CHUMMER_RUN_SITE_ID")', source)
+        self.assertIn('AllowedLocalOrigins', source)
+        self.assertIn('trackUri.Scheme == Uri.UriSchemeHttps', source)
+        self.assertIn('trackUri.Scheme == Uri.UriSchemeHttp', source)
+        self.assertIn('AllowedLocalOrigins.Contains(trackUri.Host)', source)
+        self.assertIn('if (!string.IsNullOrWhiteSpace(apiKey))', source)
+        self.assertIn('Status: string.IsNullOrWhiteSpace(apiKey) ? "forwarded_public" : "forwarded"', source)
+
 
 if __name__ == "__main__":
     unittest.main()

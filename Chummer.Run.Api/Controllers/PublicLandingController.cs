@@ -4099,11 +4099,15 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var pulse = _trustPulse.LoadSnapshot();
         var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
+        var releaseSummary = BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse);
+        var cautionSummary = BuildPublicStatusCautionSummary(manifest, pulse);
         var model = new StatusPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current release status, recent checks, and the next safe step on one calmer route.", "/status", cancellationToken),
             Manifest: manifest,
             VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
+            ReleaseSummary: releaseSummary,
+            CautionSummary: cautionSummary,
             CampaignOsProof: _campaignOsProof.LoadProof(),
             LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),
             GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot()),
@@ -9743,6 +9747,25 @@ Boundary:
         }
 
         return $"Current public release on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
+    }
+
+    private static string BuildPublicStatusReleaseSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot? pulse)
+        => BuildPreviewLaunchSummary(manifest, releaseExperience, pulse);
+
+    private static string BuildPublicStatusCautionSummary(
+        PublicReleaseManifestDto manifest,
+        PublicTrustPulseSnapshot? pulse)
+    {
+        string blockedSummary = BuildBlockedLaunchSummary(manifest, pulse);
+        if (!blockedSummary.StartsWith("No blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return blockedSummary;
+        }
+
+        return "Known issues, install help, and account return stay nearby.";
     }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)

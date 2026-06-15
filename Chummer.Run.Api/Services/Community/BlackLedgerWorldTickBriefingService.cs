@@ -268,7 +268,7 @@ public sealed class BlackLedgerWorldTickBriefingService
             ..actionBeats.Take(3).Select(static beat => beat.VisualHook),
             $"{world.Districts.OrderByDescending(static district => district.Heat).First().Name} hottest district",
             $"{world.Districts.OrderByDescending(static district => Math.Abs(district.DeltaSinceLastTick)).First().Name} biggest move",
-            "No player identities or private table state"
+            "Private tables stay out"
         ];
         IReadOnlyList<BlackLedgerCinematicSceneViewModel> screenplayScenes =
         [
@@ -323,8 +323,8 @@ public sealed class BlackLedgerWorldTickBriefingService
             DurationLabel: "00:16",
             PublishedLabel: publishedLabel,
             EpisodeTypeLabel: "Turn newsreel",
-            PublicSafetyNote: "Public-safe bulletin built from aggregate Black Ledger world activity. No private campaign table data or sourcebook text is exposed here.",
-            ReconstructionNote: "Some footage is reconstructed from public-safe world activity. Supporting records stay available for review.",
+            PublicSafetyNote: "Aggregate city bulletin only. No private table data.",
+            ReconstructionNote: "Some footage is recreated from city activity.",
             FeedbackHref: "/feedback",
             ActionBeats: actionBeats,
             Rundown: rundown,
@@ -367,7 +367,7 @@ public sealed class BlackLedgerWorldTickBriefingService
                 BeatLabel: effect.Metric,
                 ActionSummary: effect.PublicReason,
                 Stakes: $"{world.PublicName} visible pressure moved on the city board.",
-                ProofNote: $"Visible move: {tick.ReceiptId}",
+                ProofNote: $"On the board: {tick.ReceiptId}.",
                 VisualHook: $"Flash {effect.Target} across the globe while {effect.Metric} moves.",
                 CommandIntent: $"Push {effect.Target} onto the command board as a live {effect.Metric} shift.",
                 ConsequenceLine: $"{effect.Target} now changes what players and GMs have to answer next."))

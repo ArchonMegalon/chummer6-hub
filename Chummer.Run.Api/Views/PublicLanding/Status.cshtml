@@ -4,7 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status";
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var validationState = CustomerStatusText(
+    var validationState = HumanizeStatusToken(
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
@@ -25,125 +25,6 @@
 
         return resolvedHref;
     }
-
-    static string HumanizeStatusToken(string? value, string fallback)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return string.Join(
-            " ",
-            value.Trim()
-                .Split(['_', '-'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
-    }
-
-static string CustomerStatusText(string? value, string fallback)
-{
-    var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
-    return text
-            .Replace("proof\u00a0freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
-            .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
-            .Replace("governor truth", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("open-public artifacts", "public downloads", StringComparison.OrdinalIgnoreCase)
-            .Replace("local edge proof", "current release check", StringComparison.OrdinalIgnoreCase)
-            .Replace("edge proof", "release check", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof view", "current status view", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof page", "current status page", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof is green", "checks are clear", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("journey proofs", "verified paths", StringComparison.OrdinalIgnoreCase)
-            .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
-            .Replace("adoption health", "usage history", StringComparison.OrdinalIgnoreCase)
-            .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
-            .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
-            .Replace("startup-smoke", "startup verification", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-gated", "waiting for current release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("executable-gate proof", "executable verification", StringComparison.OrdinalIgnoreCase)
-            .Replace("executable-gate", "executable verification", StringComparison.OrdinalIgnoreCase)
-            .Replace("promoted flagship bytes", "promoted release packages", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof for the promoted", "verification for the promoted", StringComparison.OrdinalIgnoreCase)
-            .Replace("tuple", "build", StringComparison.OrdinalIgnoreCase)
-            .Replace("avalonia:linux:linux-x64", "Avalonia Linux x64", StringComparison.OrdinalIgnoreCase)
-            .Replace("blazor-desktop:linux:linux-x64", "Blazor Desktop Linux x64", StringComparison.OrdinalIgnoreCase)
-            .Replace("install_claim_restore_continue", "install, restore, and continue", StringComparison.OrdinalIgnoreCase)
-            .Replace("build_explain_publish", "build, explain, and publish", StringComparison.OrdinalIgnoreCase)
-            .Replace("campaign_session_recover_recap", "campaign recovery and recap", StringComparison.OrdinalIgnoreCase)
-            .Replace("report_cluster_release_notify", "clustered release notification", StringComparison.OrdinalIgnoreCase)
-            .Replace("organize_community_and_close_loop", "community wrap-up", StringComparison.OrdinalIgnoreCase)
-            .Replace("closure", "wrap-up", StringComparison.OrdinalIgnoreCase)
-            .Replace("rules lanes", "rulesets", StringComparison.OrdinalIgnoreCase)
-            .Replace("rules lane", "ruleset", StringComparison.OrdinalIgnoreCase)
-            .Replace("reviewed authority closure", "reviewed coverage closure", StringComparison.OrdinalIgnoreCase)
-            .Replace("authority facts", "rules checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("errata posture", "errata updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Recent checks")
-            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Gold-ready on Public release", "Public Stable", StringComparison.OrdinalIgnoreCase)
-            .Replace("claimed-device recovery", "account return", StringComparison.OrdinalIgnoreCase)
-            .Replace("clustered release notification", "release updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("support proof", "tracked support follow-up", StringComparison.OrdinalIgnoreCase)
-            .Replace("adoption evidence", "usage history", StringComparison.OrdinalIgnoreCase)
-            .Replace("install continuity", "account return", StringComparison.OrdinalIgnoreCase);
-}
-
-    static string NormalizeLaunchHealthLabel(string? label)
-    {
-        if (string.IsNullOrWhiteSpace(label))
-        {
-            return string.Empty;
-        }
-
-        var normalized = label
-            .Trim()
-            .Replace("proof\u00a0freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof-freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Recent checks")
-            .Replace("Proof recency", "Recent checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof-freshness", "Recent checks")
-            .Replace("proof checks", "Recent checks", StringComparison.OrdinalIgnoreCase);
-
-        return normalized.ToLowerInvariant() switch
-        {
-            "live" => "Availability",
-            "preview" => "Release",
-            "fallback" => "Other downloads",
-            "revoked" => "Unavailable",
-            "fixed" => "Updates",
-            "blocked" => "Issues",
-            "support pulse" => "Support",
-            "adoption health" => "History",
-            "release check" => "Recent checks",
-            "release checks" => "Recent checks",
-            _ => normalized,
-        };
-    }
-
-    string? FindLaunchHealthValue(string label)
-    {
-        var normalizedLookup = NormalizeLaunchHealthLabel(label);
-        return Model.LaunchHealthRows?
-            .FirstOrDefault(row => string.Equals(NormalizeLaunchHealthLabel(row.Label), normalizedLookup, StringComparison.OrdinalIgnoreCase))
-            ?.Value;
-    }
-
-    var releasePostureSummary = CustomerStatusText(
-        FindLaunchHealthValue("Preview"),
-        CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release notes and support path should read like one honest record."));
-    var cautionSummary = CustomerStatusText(Model.Manifest.KnownIssueSummary, string.Empty);
-    var supportLabel = CustomerStatusText(Model.ReleaseExperience.KnownIssuesLabel, "Support");
     var nextActions = new[]
     {
         new
@@ -165,20 +46,21 @@ static string CustomerStatusText(string? value, string fallback)
             Tone = "ghost",
         }
     };
-    if (string.IsNullOrWhiteSpace(cautionSummary))
-    {
-        cautionSummary = FindLaunchHealthValue("Blocked") ?? "Known issues and install help stay one short step away.";
-    }
-    else if (cautionSummary.Contains("proof is green", StringComparison.OrdinalIgnoreCase))
-    {
-        cautionSummary = "Known issues and install help stay one short step away, even when the current release checks are green.";
-    }
+}
 
-    if (cautionSummary.Contains("Current release checks are clear", StringComparison.OrdinalIgnoreCase)
-        || cautionSummary.Contains("account return", StringComparison.OrdinalIgnoreCase)
-        || cautionSummary.Contains("support follow-up coverage", StringComparison.OrdinalIgnoreCase))
+@functions {
+    private static string HumanizeStatusToken(string? value, string fallback)
     {
-        cautionSummary = "Known issues, install help, and account return stay nearby.";
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return string.Join(
+            " ",
+            value.Trim()
+                .Split(['_', '-'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
     }
 }
 
@@ -205,9 +87,9 @@ static string CustomerStatusText(string? value, string fallback)
     <article class="route-choice-card">
         <span class="tag">Release</span>
         <h3>Current public release</h3>
-        <p>@releasePostureSummary</p>
+        <p>@Model.ReleaseSummary</p>
         <span class="tag tag--amber">Caution</span>
-        <p><strong>Current caution.</strong> @cautionSummary</p>
+        <p><strong>Current caution.</strong> @Model.CautionSummary</p>
     </article>
     <div class="stacked-actions" aria-label="Status next actions">
         @foreach (var action in nextActions)

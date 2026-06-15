@@ -153,9 +153,15 @@ def build_payload() -> dict[str, Any]:
     ui_frame = load_json(ui_frame_path)
     frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
     frame_failure_count = frame_summary.get("failure_count")
-    frame_pass = status_pass(ui_frame) and int(frame_summary.get("checked_pages") or 0) >= 60 and int(frame_failure_count if frame_failure_count is not None else -1) == 0
+    frame_base_url = str(ui_frame.get("base_url") or "").strip().rstrip("/")
+    frame_pass = (
+        status_pass(ui_frame)
+        and int(frame_summary.get("checked_pages") or 0) >= 60
+        and int(frame_failure_count if frame_failure_count is not None else -1) == 0
+        and frame_base_url == "https://chummer.run"
+    )
     if not frame_pass:
-        failures.append("ui frame integrity gate is missing, too narrow, or failing")
+        failures.append("ui frame integrity gate is missing, too narrow, failing, or not recorded against the live site")
     checks["ui_frame_integrity"] = {
         "path": str(ui_frame_path),
         "status": ui_frame.get("status", "missing"),

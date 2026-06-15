@@ -78,14 +78,14 @@
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
                         ? "This install path can link sign-in and support from the first launch when you want them attached."
-                        : "Other platforms and technical details stay below."))
+                        : "Other platforms and details stay below."))
         </p>
         <p class="muted-copy">
             @(guestGateRequired
                 ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                     ? "Start with the recommended installer. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path. Sign in later when you need account return or support."
-                : "Start with the recommended download. Sign in later when you need account return or support.")
+                    : "Start with the recommended install path. Sign in later if you need account return or support."
+                    : "Start with the recommended download. Sign in later if you need account return or support.")
         </p>
     </div>
 </section>
@@ -123,7 +123,7 @@ else
                             ? recommendedIsWindowsInstaller && windowsZipFallback is not null
                                 ? "Use the recommended installer for this platform. If you want the smaller direct payload instead, open the Windows ZIP right below."
                                 : "Use the main install path for this platform. Sign in later only when you want support and account return attached from the first launch."
-                            : "Use the main install path for this platform. You can install first and sign in later when you want account return and support attached.")
+                            : "Use the main install path for this platform. Install first. Sign in later if you want account return and support attached.")
                 </p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
@@ -136,7 +136,7 @@ else
                     <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
                 </div>
-                <p class="recommended-download__summary-note">Install first. Sign in later when you need account return or support.</p>
+                <p class="recommended-download__summary-note">Install first. Sign in later if you need account return or support.</p>
                 <div class="stacked-actions">
                     @if (requestedPlatformUnavailable)
                     {
@@ -188,7 +188,7 @@ else
                                     <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
                                 </div>
                             </div>
-                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
+                            <p class="downloads-inline-note">Need account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
                             <p class="downloads-inline-note">
                                 @(recommendedUsesMacSetupScript
                                     ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
@@ -199,7 +199,7 @@ else
                     <details class="release-accordion">
                         <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes and requirements">Release notes and requirements</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">Known issues and install help stay nearby.</p>
+                            <p class="muted-copy">Current notes stay nearby.</p>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
@@ -221,7 +221,7 @@ else
                                     <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
                                 </div>
                             </div>
-                            <p class="downloads-inline-note">Account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
+                            <p class="downloads-inline-note">Need account return later? <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
                         </div>
                     </details>
                 }
@@ -271,7 +271,7 @@ else
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h2 class="downloads-subheading">Main platform downloads</h2>
-                        <p class="muted-copy">Current installers for each supported platform stay available here, but the main page keeps the first decision focused on one install path.</p>
+                        <p class="muted-copy">Current installers for each supported platform stay here, but the first decision stays focused on one install path.</p>
                         <div class="downloads-platform-grid">
                             @foreach (var platform in release.PlatformAvailability)
                             {

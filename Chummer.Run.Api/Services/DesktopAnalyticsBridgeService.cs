@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Chummer.Contracts.Presentation;
@@ -23,6 +22,12 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
     private readonly IConfiguration _configuration;
     private readonly ILogger<DesktopAnalyticsBridgeService> _logger;
     private readonly HttpClient _httpClient;
+    private static readonly HashSet<string> AllowedLocalOrigins = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "localhost",
+        "127.0.0.1",
+        "host.docker.internal"
+    };
 
     public DesktopAnalyticsBridgeService(IConfiguration configuration, ILogger<DesktopAnalyticsBridgeService> logger)
     {
@@ -54,13 +59,13 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
         string apiKey = (_configuration["RYBBIT_CHUMMER_DESKTOP_API_KEY"] ?? string.Empty).Trim();
         string origin = (_configuration["RYBBIT_CHUMMER_DESKTOP_API_ORIGIN"] ?? "https://app.rybbit.io").Trim().TrimEnd('/');
 
-        if (string.IsNullOrWhiteSpace(siteId) || string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(siteId))
         {
             return new DesktopAnalyticsTrackResult(Accepted: true, Forwarded: false, Status: "provider_not_configured");
         }
 
         if (!Uri.TryCreate($"{origin}/api/track", UriKind.Absolute, out Uri? trackUri)
-            || (trackUri.Scheme != Uri.UriSchemeHttps && trackUri.Scheme != Uri.UriSchemeHttp))
+            || !IsAllowedTrackUri(trackUri))
         {
             return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "provider_origin_invalid");
         }
@@ -115,7 +120,10 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
                 Encoding.UTF8,
                 "application/json")
         };
-        outbound.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            outbound.Headers.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
+        }
 
         try
         {
@@ -131,7 +139,10 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
                 return new DesktopAnalyticsTrackResult(Accepted: true, Forwarded: false, Status: $"provider_http_{(int)response.StatusCode}");
             }
 
-            return new DesktopAnalyticsTrackResult(Accepted: true, Forwarded: true, Status: "forwarded");
+            return new DesktopAnalyticsTrackResult(
+                Accepted: true,
+                Forwarded: true,
+                Status: string.IsNullOrWhiteSpace(apiKey) ? "forwarded_public" : "forwarded");
         }
         catch (Exception ex)
         {
@@ -160,5 +171,16 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
 
         string normalized = builder.ToString().Trim('-');
         return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+    }
+
+    private static bool IsAllowedTrackUri(Uri trackUri)
+    {
+        if (trackUri.Scheme == Uri.UriSchemeHttps)
+        {
+            return true;
+        }
+
+        return trackUri.Scheme == Uri.UriSchemeHttp
+            && AllowedLocalOrigins.Contains(trackUri.Host);
     }
 }

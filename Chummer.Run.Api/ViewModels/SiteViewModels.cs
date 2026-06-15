@@ -1025,6 +1025,8 @@ public sealed record StatusPageViewModel(
     PublicReleaseManifestDto Manifest,
     string? VerifiedAtLabel,
     ReleaseExperienceViewModel ReleaseExperience,
+    string ReleaseSummary,
+    string CautionSummary,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,
     GoldReadinessStatusViewModel? GoldReadiness = null,
