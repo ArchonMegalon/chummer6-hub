@@ -11991,10 +11991,11 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/status",
-            "What works today",
+            "Release, caution, next step.",
             required_texts=(
                 "Current public release",
-                "Current local",
+                "Caution.",
+                "Known issues stay on downloads.",
                 "Windows",
                 "Linux",
                 "macOS"),
@@ -12018,7 +12019,7 @@ def main() -> int:
         AuditRoute(
             "/ledger/newsroom",
             "Emerald Sprawl: First Pressure",
-            required_texts=("Turn newsreel", "Broadcast posture", "Producer sheet"),
+            required_texts=("Turn newsreel", "Broadcast posture", "Viewer exports"),
             expects_header_count=1),
         AuditRoute(
             "/horizons",
@@ -12061,7 +12062,15 @@ def main() -> int:
             "Preview terms in plain language",
             required_texts=("The product is real, but still early access", "Use the current public download first"),
             expects_header_count=1),
-        AuditRoute("/robots.txt", "Disallow: /"),
+        AuditRoute(
+            "/robots.txt",
+            "Allow: /",
+            required_texts=(
+                "Disallow: /account/",
+                "Disallow: /admin/",
+                "Disallow: /api/",
+                "Sitemap: https://chummer.run/sitemap.xml",
+            )),
     ]
 
     if args.verify_http_redirects:
@@ -12087,8 +12096,9 @@ def main() -> int:
                 raise AssertionError(f"{route.path} rendered forbidden text: {snippet}")
         if route.path != "/robots.txt":
             robots = headers.get("x-robots-tag", "")
-            if "noindex" not in robots.lower():
-                raise AssertionError(f"{route.path} missing X-Robots-Tag noindex header")
+            normalized_robots = robots.lower()
+            if "index" not in normalized_robots or "follow" not in normalized_robots:
+                raise AssertionError(f"{route.path} missing public index/follow X-Robots-Tag header")
             if BANNED_COPY.search(body):
                 raise AssertionError(f"{route.path} rendered banned generic CTA copy")
             if route.path == "/" and body.count("Final pool 9") > 1:

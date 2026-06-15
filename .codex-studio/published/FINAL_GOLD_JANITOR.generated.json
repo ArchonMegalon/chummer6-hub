@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T15:05:16Z",
+  "generated_at_utc": "2026-06-15T19:13:29Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -255,7 +255,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T15:05:16Z",
+      "generated_at_utc": "2026-06-15T19:13:29Z",
       "fresh_within_hours": 24,
       "pass": true
     },
