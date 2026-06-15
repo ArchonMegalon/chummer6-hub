@@ -61,8 +61,8 @@ SURFACES = [
     {
         "path": "/status",
         "required_texts": [
-            "Current release and next step.",
-            "Release, caution, next step.",
+            "Release and next step.",
+            "Release and next step.",
             "Current public release",
         ],
         "forbidden_texts": [
