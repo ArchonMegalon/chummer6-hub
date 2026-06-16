@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Campaign.Contracts;
 
 public sealed record GmSessionVenueProjection(
@@ -51,7 +53,8 @@ public sealed record VenueLinkReceiptProjection(
     string Mode,
     bool LinkValidated,
     string PrivacyStatus,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record VenueCreatedReceiptProjection(
     string ReceiptId,
@@ -61,7 +64,8 @@ public sealed record VenueCreatedReceiptProjection(
     string AdapterMode,
     int? Capacity,
     string PrivacyStatus,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record SessionVenueCloseoutReceiptProjection(
     string ReceiptId,
@@ -71,4 +75,5 @@ public sealed record SessionVenueCloseoutReceiptProjection(
     int? AttendeeCount,
     string RecapStatus,
     string? BlackLedgerImpactReceiptId,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    ReceiptEnvelope? Envelope = null);

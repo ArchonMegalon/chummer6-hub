@@ -806,7 +806,8 @@ public sealed record LegacyMigrationReceiptProjection(
     string? TargetCampaignId,
     string Summary,
     IReadOnlyList<LegacyMigrationFieldProjection> Fields,
-    DateTimeOffset ImportedAtUtc);
+    DateTimeOffset ImportedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record CreatorPublicationProjection(
     string PublicationId,

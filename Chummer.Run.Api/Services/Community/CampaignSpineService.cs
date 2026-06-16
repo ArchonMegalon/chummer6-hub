@@ -8018,7 +8018,13 @@ public sealed class CampaignSpineService
                         new LegacyMigrationFieldProjection("campaign-link", "Campaign continuity link", campaign is null ? "risky" : "safe", campaign is null ? "No active campaign was linked yet, so the dossier is ready but still waiting for a campaign workspace." : $"Linked to {campaign.Name} without breaking the continuity spine."),
                         new LegacyMigrationFieldProjection("legacy-notes", "Legacy notes blob", "blocked", "Opaque legacy notes require manual review before they can become provenance-backed dossier facts.")
                     ],
-                    ImportedAtUtc: dossier.UpdatedAtUtc);
+                    ImportedAtUtc: dossier.UpdatedAtUtc,
+                    Envelope: ReceiptEnvelopeFactory.Runtime(
+                        receiptKind: "legacy_migration",
+                        ownerScope: "community.campaign_spine",
+                        exposureClass: ReceiptExposureClasses.SignedIn,
+                        evidenceRef: dossier.DossierId,
+                        reviewState: campaign is null ? "risky" : "safe"));
             })
             .Take(3)
             .ToArray();

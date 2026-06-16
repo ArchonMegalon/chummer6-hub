@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 
@@ -161,7 +162,8 @@ public sealed class GmSessionVenueService
                 Mode: "manual_link_mode",
                 LinkValidated: true,
                 PrivacyStatus: privacyStatus,
-                CreatedAtUtc: now);
+                CreatedAtUtc: now,
+                Envelope: BuildVenueReceiptEnvelope("venue_link", updated.VenueId, "manual_link_added"));
             _store.VenueLinkReceipts.Add(receipt);
             _store.PersistLocked();
             return receipt;
@@ -226,7 +228,8 @@ public sealed class GmSessionVenueService
                 AdapterMode: "adapter_create_mode",
                 Capacity: created.Capacity,
                 PrivacyStatus: created.PrivacyStatus,
-                CreatedAtUtc: now);
+                CreatedAtUtc: now,
+                Envelope: BuildVenueReceiptEnvelope("venue_created", updated.VenueId, "provider_created"));
             _store.VenueCreatedReceipts.Add(receipt);
             _store.PersistLocked();
             return receipt;
@@ -283,7 +286,8 @@ public sealed class GmSessionVenueService
                 AttendeeCount: attendeeCount,
                 RecapStatus: NormalizeRecapStatus(request.RecapStatus),
                 BlackLedgerImpactReceiptId: NormalizeOptional(request.LinkedBlackLedgerReceiptId),
-                CreatedAtUtc: now);
+                CreatedAtUtc: now,
+                Envelope: BuildVenueReceiptEnvelope("venue_closeout", updated.VenueId, "closed"));
             _store.CloseoutReceipts.Add(receipt);
             _store.PersistLocked();
             return receipt;
@@ -484,6 +488,14 @@ public sealed class GmSessionVenueService
             "not_created" => "not_created",
             _ => "private_only"
         };
+
+    private static ReceiptEnvelope BuildVenueReceiptEnvelope(string receiptKind, string venueId, string reviewState)
+        => ReceiptEnvelopeFactory.Runtime(
+            receiptKind: receiptKind,
+            ownerScope: "community.gm_session_venue",
+            exposureClass: ReceiptExposureClasses.SignedIn,
+            evidenceRef: venueId,
+            reviewState: reviewState);
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -37,6 +37,9 @@ public sealed class GmSessionVenueServiceTests
         Assert.Equal("manual_link_added", venue.VenueStatus);
         Assert.Equal("private_campaign", venue.Visibility);
         Assert.Equal("pass", venue.PrivacyStatus);
+        Assert.NotNull(receipt.Envelope);
+        Assert.Equal("venue_link", receipt.Envelope!.ReceiptKind);
+        Assert.Equal("community.gm_session_venue", receipt.Envelope.OwnerScope);
     }
 
     [Fact]
