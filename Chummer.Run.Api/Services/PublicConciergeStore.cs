@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -120,7 +121,8 @@ public sealed record PublicConciergeBranchReceipt(
     string CorrelationId,
     string TargetHref,
     string TargetKind,
-    DateTimeOffset RecordedAtUtc);
+    DateTimeOffset RecordedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record PublicConciergeWebhookReceipt(
     string ReceiptId,
@@ -140,7 +142,8 @@ public sealed record PublicConciergeWebhookReceipt(
     string? PublicationRef,
     string? MediaKind,
     DateTimeOffset ReceivedAtUtc,
-    IReadOnlyDictionary<string, string>? Metadata);
+    IReadOnlyDictionary<string, string>? Metadata,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record PublicConciergeModerationItem(
     string ItemId,

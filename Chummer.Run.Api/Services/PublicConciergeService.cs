@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -117,7 +118,13 @@ public sealed class PublicConciergeService
             CorrelationId: correlationId,
             TargetHref: targetHref,
             TargetKind: external ? "external_redirect" : "first_party_redirect",
-            RecordedAtUtc: DateTimeOffset.UtcNow);
+            RecordedAtUtc: DateTimeOffset.UtcNow,
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "public_concierge_branch",
+                ownerScope: "public.concierge",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                evidenceRef: receiptId,
+                reviewState: external ? "external_redirect" : "first_party_redirect"));
 
         lock (_store.Gate)
         {
@@ -200,7 +207,13 @@ public sealed class PublicConciergeService
                 PublicationRef: publicationRef,
                 MediaKind: mediaKind,
                 ReceivedAtUtc: DateTimeOffset.UtcNow,
-                Metadata: BuildMetadata(remoteIp, flowId, branchId));
+                Metadata: BuildMetadata(remoteIp, flowId, branchId),
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "public_concierge_webhook",
+                    ownerScope: "public.concierge",
+                    exposureClass: ReceiptExposureClasses.Internal,
+                    evidenceRef: providerReceiptId ?? correlationId,
+                    reviewState: verificationState));
 
             _store.WebhookReceiptsById[receipt.ReceiptId] = receipt;
             _store.WebhookReceiptIdByDedupKey[dedupKey] = receipt.ReceiptId;

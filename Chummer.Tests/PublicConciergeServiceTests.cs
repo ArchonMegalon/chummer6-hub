@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Contracts.Receipts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -66,6 +67,11 @@ public sealed class PublicConciergeServiceTests
         Assert.Equal("downloads", receipt.SurfaceKey);
         Assert.Equal("human_setup_call", receipt.BranchId);
         Assert.Equal("external_redirect", receipt.TargetKind);
+        Assert.NotNull(receipt.Envelope);
+        Assert.Equal("public_concierge_branch", receipt.Envelope!.ReceiptKind);
+        Assert.Equal("public.concierge", receipt.Envelope.OwnerScope);
+        Assert.Equal(ReceiptExposureClasses.PublicSafe, receipt.Envelope.ExposureClass);
+        Assert.Equal("external_redirect", receipt.Envelope.ReviewState);
     }
 
     [Fact]
@@ -117,6 +123,11 @@ public sealed class PublicConciergeServiceTests
         Assert.Equal("testimonial_capture", receipt.FlowId);
         Assert.Equal("video_review", receipt.BranchId);
         Assert.Equal("provider-1", receipt.ProviderReceiptId);
+        Assert.NotNull(receipt.Envelope);
+        Assert.Equal("public_concierge_webhook", receipt.Envelope!.ReceiptKind);
+        Assert.Equal("public.concierge", receipt.Envelope.OwnerScope);
+        Assert.Equal(ReceiptExposureClasses.Internal, receipt.Envelope.ExposureClass);
+        Assert.Equal("verified", receipt.Envelope.ReviewState);
         PublicConciergeModerationItem moderation = Assert.Single(store.ModerationItemsById.Values);
         Assert.Equal(receipt.ReceiptId, moderation.SourceReceiptId);
         Assert.Equal("pending_moderation", moderation.Status);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking;
 
@@ -13,19 +14,40 @@ public sealed class NexusPanContinuityService
             Topic: "Claimed install posture",
             Summary: "Shows how claimed installs stay tied to Chummer account truth instead of drifting into screenshots or loose docs.",
             Route: "/play/continuity/receipts/nexus_claimed_install_posture.json",
-            Status: "live"),
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "nexus_pan",
+                ownerScope: "play.nexus_pan",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "nexus_claimed_install_posture",
+                reviewState: "live")),
         new(
             ReceiptId: "nexus_reconnect_handoff",
             Topic: "Reconnect handoff",
             Summary: "Names the next-safe-action handoff when mobile continuity and browser return paths need to survive device drift.",
             Route: "/play/continuity/receipts/nexus_reconnect_handoff.json",
-            Status: "live"),
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "nexus_pan",
+                ownerScope: "play.nexus_pan",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "nexus_reconnect_handoff",
+                reviewState: "live")),
         new(
             ReceiptId: "nexus_runboard_boundary",
             Topic: "Runboard continuity boundary",
             Summary: "Keeps the public lane honest about what it previews and what still belongs on signed-in workspace rails.",
             Route: "/play/continuity/receipts/nexus_runboard_boundary.json",
-            Status: "live")
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "nexus_pan",
+                ownerScope: "play.nexus_pan",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "nexus_runboard_boundary",
+                reviewState: "live"))
     ];
 
     private readonly InstallLinkingStore _installLinkingStore;
@@ -203,7 +225,8 @@ public sealed record NexusPanReceipt(
     string Topic,
     string Summary,
     string Route,
-    string Status);
+    string Status,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record NexusPanPublicSummary(
     int ActiveInstallationCount,

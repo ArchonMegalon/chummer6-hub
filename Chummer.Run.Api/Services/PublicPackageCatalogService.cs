@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Api.Services;
 
@@ -30,7 +31,8 @@ public sealed record PublicPackageReceipt(
     string SubjectId,
     string ActorLabel,
     DateTimeOffset RecordedAtUtc,
-    string RouteSummary);
+    string RouteSummary,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed class PublicPackageCatalogService
 {
@@ -153,7 +155,13 @@ public sealed class PublicPackageCatalogService
                 SubjectId: normalizedSubjectId,
                 ActorLabel: normalizedActorLabel,
                 RecordedAtUtc: now,
-                RouteSummary: $"Package {normalizedActionKind} revoked for {package.Title}.");
+                RouteSummary: $"Package {normalizedActionKind} revoked for {package.Title}.",
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "public_package",
+                    ownerScope: "public.package_catalog",
+                    exposureClass: ReceiptExposureClasses.PublicSafe,
+                    evidenceRef: receiptId,
+                    reviewState: $"revoke_{normalizedActionKind}"));
             _receiptsById[receiptId] = created;
             return created;
         }
@@ -279,7 +287,13 @@ public sealed class PublicPackageCatalogService
                 RecordedAtUtc: now,
                 RouteSummary: normalizedActionKind == "vote"
                     ? $"Package vote recorded for {package.Title}."
-                    : $"Package follow recorded for {package.Title}.");
+                    : $"Package follow recorded for {package.Title}.",
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "public_package",
+                    ownerScope: "public.package_catalog",
+                    exposureClass: ReceiptExposureClasses.PublicSafe,
+                    evidenceRef: receiptId,
+                    reviewState: normalizedActionKind));
             _receiptsById[receiptId] = created;
             _receiptIdByActorAction[actorActionKey] = receiptId;
             return created;
