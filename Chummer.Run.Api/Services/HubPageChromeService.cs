@@ -30,8 +30,9 @@ public sealed class HubPageChromeService
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
-        var publicPrimaryCta = ResolvePublicPrimaryCta(surface, currentPath);
         var normalizedCurrentPath = NormalizeRoute(currentPath);
+        var downloadsSurface = normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase);
+        var publicPrimaryCta = downloadsSurface ? null : ResolvePublicPrimaryCta(surface, currentPath);
         var heroPrimaryAction = surface.HeroCtas
             .FirstOrDefault(action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase));
         var signInAction = surface.GuestShellActions
@@ -41,25 +42,34 @@ public sealed class HubPageChromeService
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Create account", "/signup?next=/home", "primary");
         var contextualSignInHref = BuildContextualSignInHref(normalizedCurrentPath, signInAction.Href);
-        var primaryHeaderAction = string.Equals(NormalizeRoute(currentPath), "/", StringComparison.OrdinalIgnoreCase) && heroPrimaryAction is not null
+        var primaryHeaderAction = downloadsSurface
+            ? null
+            : string.Equals(NormalizeRoute(currentPath), "/", StringComparison.OrdinalIgnoreCase) && heroPrimaryAction is not null
             ? heroPrimaryAction
             : publicPrimaryCta is null
             ? createAccountAction
             : new PublicLandingActionDto(publicPrimaryCta.Label, publicPrimaryCta.Href, publicPrimaryCta.Emphasis);
-        var actions = new[]
+        var actions = new List<SiteChromeActionViewModel>
         {
-            new SiteChromeActionViewModel(
+            new(
                 signInAction.Label,
                 contextualSignInHref,
                 "link",
-                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(contextualSignInHref), StringComparison.OrdinalIgnoreCase)),
-            new SiteChromeActionViewModel(
+                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(contextualSignInHref), StringComparison.OrdinalIgnoreCase))
+        };
+
+        if (primaryHeaderAction is not null)
+        {
+            actions.Add(new SiteChromeActionViewModel(
                 primaryHeaderAction.Label,
                 primaryHeaderAction.Href,
                 primaryHeaderAction.Emphasis,
-                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(primaryHeaderAction.Href), StringComparison.OrdinalIgnoreCase))
-        };
-        var publicPrimaryCtaView = new SiteChromeActionViewModel(publicPrimaryCta!.Label, publicPrimaryCta.Href, publicPrimaryCta.Emphasis);
+                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(primaryHeaderAction.Href), StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var publicPrimaryCtaView = publicPrimaryCta is null
+            ? null
+            : new SiteChromeActionViewModel(publicPrimaryCta.Label, publicPrimaryCta.Href, publicPrimaryCta.Emphasis);
 
         return new SiteChromeViewModel(
             Title: title,
@@ -68,7 +78,7 @@ public sealed class HubPageChromeService
             PrimaryNavigation: nav.Primary,
             SecondaryNavigation: nav.Secondary,
             UtilityNavigation: nav.Utility,
-            HeaderActions: actions,
+            HeaderActions: actions.ToArray(),
             PublicPrimaryCta: publicPrimaryCtaView,
             Authenticated: false,
             SignedInLabel: null,

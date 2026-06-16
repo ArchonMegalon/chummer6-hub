@@ -42,6 +42,8 @@ public sealed class HubPageChromeServiceTests
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
         Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
+        Assert.DoesNotContain(chrome.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
+        Assert.Null(chrome.PublicPrimaryCta);
     }
 
     [Fact]

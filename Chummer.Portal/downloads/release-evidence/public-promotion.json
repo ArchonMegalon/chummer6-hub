@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-16T13:26:00Z",
+  "generatedAt": "2026-06-16T13:40:00Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -18,34 +18,19 @@
       "kind": "installer"
     },
     {
-      "artifactId": "avalonia-win-x64-portable",
-      "fileName": "chummer-avalonia-win-x64.exe",
+      "artifactId": "avalonia-win-x64-installer",
+      "fileName": "chummer-avalonia-win-x64-installer.exe",
       "platform": "windows",
       "promotionStatus": "pass",
-      "startupSmokeStatus": "pass",
-      "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "",
+      "startupSmokeStatus": "skipped",
+      "startupSmokeReason": "Windows startup smoke requires Wine, PowerShell, or a Windows-compatible shell bridge; current host cannot execute Windows installer smoke.",
+      "startupSmokeReceiptPath": "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
-      "signingStatus": "skipped_preview",
+      "signingStatus": "unsigned_public_release",
       "notarizationStatus": null,
-      "artifactSha256": "17fd7dc1153f9a2747003181788f93257d582b1fc4c9f5a54d67e7e192f05e7d",
-      "artifactSizeBytes": 109953596,
-      "kind": "portable"
-    },
-    {
-      "artifactId": "avalonia-win-x64-archive",
-      "fileName": "chummer-avalonia-win-x64.zip",
-      "platform": "windows",
-      "promotionStatus": "pass",
-      "startupSmokeStatus": "pass",
-      "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "",
-      "signingReceiptPath": "",
-      "signingStatus": "skipped_preview",
-      "notarizationStatus": null,
-      "artifactSha256": "ac18c35b2188d7faf6709a0977e1244a53af143b018463474fc5a6415568ebc7",
-      "artifactSizeBytes": 45562443,
-      "kind": "archive"
+      "artifactSha256": "f54e890a7df67c3e89b32baf919007a239ce8c55f2f0426b2246b8e2f9ef1f78",
+      "artifactSizeBytes": 97408964,
+      "kind": "installer"
     }
   ]
 }

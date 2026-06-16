@@ -14,7 +14,7 @@
     var windowsProofInstallers = Model.WindowsProofInstallers ?? Array.Empty<WindowsProofInstallerRecord>();
     var hasWindowsProofRail = windowsProofInstallers.Count > 0;
     var requestedWindowsUnavailable = requestedPlatformUnavailable && string.Equals(deviceLabel, "Windows", StringComparison.OrdinalIgnoreCase);
-    var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
+    var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0;
     var showPlatformShelf = release.PlatformAvailability.Count > 0;
     var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
     var accessPosture = Model.AccessPosture;
@@ -51,12 +51,10 @@
         => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
 
     var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
-    var recommendedIsWindowsInstaller = release.Recommended is not null
-        && recommendedIsInstaller
-        && MatchesPlatform(release.Recommended.Artifact, "windows");
-    var windowsZipFallback = release.ManualPackages.FirstOrDefault(option =>
-        MatchesPlatform(option.Artifact, "windows")
-        && string.Equals(option.Artifact.Kind ?? string.Empty, "archive", StringComparison.OrdinalIgnoreCase));
+    var nightlyHref = requestedPlatformUnavailable
+        ? "#platform-shelf"
+        : release.Recommended!.DispatchHref;
+    var stableHref = "/status";
 }
 
 <section class="release-stage">
@@ -66,7 +64,7 @@
         <p class="page-copy">
             @(requestedPlatformUnavailable
                 ? $"{deviceLabel} is not publicly available from this browser right now."
-                : $"This browser looks like {deviceLabel}. Start with the recommended build.")
+                : $"This browser looks like {deviceLabel}. Choose a release lane.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
@@ -80,13 +78,10 @@
                         ? "This install path can link sign-in and support from the first launch when you want them attached."
                         : "Other platforms stay below."))
         </p>
-        <p class="muted-copy">
-            @(guestGateRequired
-                ? recommendedIsWindowsInstaller && windowsZipFallback is not null
-                    ? "Start with the recommended installer. If size matters more, use the smaller Windows ZIP below."
-                    : "Start with the recommended install path. Sign in later if you need account return or support."
-                    : "Start with the recommended download. Sign in later if you need account return or support.")
-        </p>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
+            <a class="button-like button-like--secondary" href="@stableHref">Stable</a>
+        </div>
     </div>
 </section>
 
@@ -120,10 +115,8 @@ else
                     @(requestedPlatformUnavailable
                         ? release.PlatformShelfNoticeSummary
                         : guestGateRequired
-                            ? recommendedIsWindowsInstaller && windowsZipFallback is not null
-                                ? "Use the recommended installer for this platform. If you want the smaller direct payload instead, open the Windows ZIP right below."
-                                : "Use the main install path for this platform. Sign in later only when you want support and account return attached from the first launch."
-                            : "Use the main install path for this platform. Install first. Sign in later if you want account return and support attached.")
+                            ? "Use the main install path for this platform."
+                            : "Use the main install path for this platform.")
                 </p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
@@ -136,45 +129,23 @@ else
                     <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
                 </div>
-                <p class="recommended-download__summary-note">Install first. Sign in later if you need return or support.</p>
-                <div class="stacked-actions">
-                    @if (requestedPlatformUnavailable)
-                    {
-                        <a class="button-like button-like--primary" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_recommended" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
+                @if (requestedPlatformUnavailable)
+                {
+                    <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See other platforms">See other platforms</a>
-                        @if (requestedWindowsUnavailable && hasSignedInWindowsBuilds)
-                        {
-                            <a class="button-like button-like--ghost" href="#signed-in-windows-builds" data-analytics-event="downloads_open_signed_in_windows" data-analytics-surface="downloads_recommended" data-analytics-label="Open signed-in Windows build">Open signed-in Windows build</a>
-                        }
-                        else if (requestedWindowsUnavailable && hasWindowsProofRail)
-                        {
-                            <a class="button-like button-like--ghost" href="#windows-verification-rail" data-analytics-event="downloads_open_windows_verification" data-analytics-surface="downloads_recommended" data-analytics-label="Open Windows verification page">Open Windows verification page</a>
-                        }
-                        <details class="release-accordion">
-                            <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Release notes, known issues, and requirements</summary>
-                            <div class="release-accordion__body">
-                                <p class="muted-copy">This platform is not publicly available right now, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
-                                <div class="stacked-actions">
-                                    <a class="button-like button-like--ghost" href="/now">Open current release</a>
-                                    <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                                    <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                                </div>
+                    </div>
+                    <details class="release-accordion">
+                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Release notes, known issues, and requirements</summary>
+                        <div class="release-accordion__body">
+                            <p class="muted-copy">This platform is not publicly available right now, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
+                            <div class="stacked-actions">
+                                <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                                <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                             </div>
-                        </details>
-                    }
-                    else if (guestGateRequired)
-                    {
-                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
-                        @if (recommendedIsWindowsInstaller && windowsZipFallback is not null)
-                        {
-                            <a class="button-like button-like--secondary" href="@windowsZipFallback.DispatchHref" data-analytics-event="downloads_secondary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@windowsZipFallback.ActionLabel">@windowsZipFallback.ActionLabel</a>
-                        }
-                    }
-                    else
-                    {
-                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
-                    }
-                </div>
+                        </div>
+                    </details>
+                }
                 @if (!requestedPlatformUnavailable)
                 {
                     <details class="release-accordion">
@@ -281,10 +252,6 @@ else
                                     <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
                                     <p>@platform.Summary</p>
                                     <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
-                                    @if (platformOption is not null)
-                                    {
-                                        <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
-                                    }
                                 </article>
                             }
                         </div>
@@ -314,10 +281,6 @@ else
                             <article class="downloads-fact">
                                 <span>Support path</span>
                                 <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery and support tied to this install.")</strong>
-                            </article>
-                            <article class="downloads-fact">
-                                <span>Windows size</span>
-                                <strong>The Windows installer is larger because it bundles the self-contained setup app and the desktop payload together. Need the smaller download instead? Use the Windows ZIP.</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">
@@ -439,30 +402,6 @@ else
                             </div>
                         </div>
                     }
-
-                    @if (release.ManualPackages.Count > 0)
-                    {
-                        <div class="downloads-advanced-group">
-                            <h3 class="downloads-subheading">Manual packages for support-directed installs</h3>
-                            <div class="evidence-row-list">
-                                @foreach (var download in release.ManualPackages)
-                                {
-                                    <article class="evidence-row evidence-row--download">
-                                        <div class="evidence-row__copy">
-                                            <h3>@download.Title</h3>
-                                            <p>@download.SupportLine</p>
-                                        </div>
-                                        <div class="download-row__meta">
-                                            <span class="platform-pill">@download.PlatformLabel</span>
-                                            <span class="muted-copy">@download.SizeLabel</span>
-                                        </div>
-                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-
                 </div>
             </details>
         </section>
