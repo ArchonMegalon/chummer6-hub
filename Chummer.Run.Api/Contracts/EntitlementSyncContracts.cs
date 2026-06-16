@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Leaderboards;
@@ -11,7 +12,8 @@ public sealed record EntitlementSyncReceiptProjection(
     IReadOnlyList<WorkspaceRestoreProvenanceReceipt> ProvenanceReceipts,
     IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> ProvenanceRecoveryReceipts,
     IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> ConflictReceipts,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record EntitlementAccountProjection(
     HubUserDto User,

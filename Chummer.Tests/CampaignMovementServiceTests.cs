@@ -77,6 +77,9 @@ public sealed class CampaignMovementServiceTests
             Assert.Contains(movement.TransferReceipt.Receipts, item => string.Equals(item.SourceKind, "target_scene", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(movement.AuditLines, line => line.Contains("Dockside handoff", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(movement.AuditLines, line => line.Contains("Pier 3 exchange", StringComparison.OrdinalIgnoreCase));
+            Assert.NotNull(movement.Envelope);
+            Assert.Equal("dossier_movement", movement.Envelope!.ReceiptKind);
+            Assert.Equal("community.campaign_spine", movement.Envelope.OwnerScope);
 
             var targetWorkspace = campaignSpine.GetAccountSummary(targetOwner).Workspaces
                 .First(item => string.Equals(item.CampaignId, targetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase));

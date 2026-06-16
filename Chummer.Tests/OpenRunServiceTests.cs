@@ -117,6 +117,9 @@ public sealed class OpenRunServiceTests
                 Timezone: "Europe/Vienna",
                 Note: "Lock the first Saturday night slot."));
             Assert.Contains("scheduled", schedule.Summary, StringComparison.OrdinalIgnoreCase);
+            Assert.NotNull(schedule.Envelope);
+            Assert.Equal("open_run_schedule", schedule.Envelope!.ReceiptKind);
+            Assert.Equal("community.open_run", schedule.Envelope.OwnerScope);
 
             OpenRunMeetingHandoffProjection handoff = campaignSpine.CreateOpenRunMeetingHandoff(gm, listing.OpenRunId, new OpenRunMeetingHandoffRequest(
                 ProviderKind: "discord_event",

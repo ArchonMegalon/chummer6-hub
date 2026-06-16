@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Run.Api.Contracts;
 
 public sealed record OpenRunJoinPolicyProjection(
@@ -72,7 +74,8 @@ public sealed record OpenRunScheduleReceiptProjection(
     string Summary,
     IReadOnlyList<string> EvidenceLines,
     string ScheduledByUserId,
-    DateTimeOffset ScheduledAtUtc);
+    DateTimeOffset ScheduledAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record OpenRunMeetingHandoffProjection(
     string HandoffId,

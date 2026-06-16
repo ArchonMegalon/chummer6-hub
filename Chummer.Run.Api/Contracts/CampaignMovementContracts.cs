@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Api.Contracts;
 
@@ -92,4 +93,5 @@ public sealed record DossierMovementReceiptProjection(
     IReadOnlyList<string> AuditLines,
     IReadOnlyList<CampaignConsequenceReceipt> Receipts,
     DateTimeOffset MovedAtUtc,
-    RosterTransferProjection TransferReceipt);
+    RosterTransferProjection TransferReceipt,
+    ReceiptEnvelope? Envelope = null);

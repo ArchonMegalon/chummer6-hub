@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Search;
+using Chummer.Contracts.Receipts;
 using System.Collections.Concurrent;
 using ApiWorkspaceRestoreConflictReceiptProjection = Chummer.Run.Api.Contracts.WorkspaceRestoreConflictReceiptProjection;
 
@@ -869,7 +870,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             ProvenanceReceipts: provenanceReceipts,
             ProvenanceRecoveryReceipts: provenanceRecoveryReceipts,
             ConflictReceipts: conflictReceipts,
-            GeneratedAtUtc: restore.GeneratedAtUtc);
+            GeneratedAtUtc: restore.GeneratedAtUtc,
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "entitlement_sync",
+                ownerScope: "community.workspace_restore",
+                exposureClass: ReceiptExposureClasses.SignedIn,
+                evidenceRef: user.UserId,
+                reviewState: provenanceReceipts.Count == 0 && conflictReceipts.Count == 0 ? "empty" : "ready"));
     }
 
     private static IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> BuildRestoreReceiptSurfaceProjections(

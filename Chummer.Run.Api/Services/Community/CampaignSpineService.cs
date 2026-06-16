@@ -672,7 +672,13 @@ public sealed class CampaignSpineService
                 normalizedNote is null ? string.Empty : $"GM scheduling note: {normalizedNote}"
             ]),
             ScheduledByUserId: user.UserId,
-            ScheduledAtUtc: now);
+            ScheduledAtUtc: now,
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "open_run_schedule",
+                ownerScope: "community.open_run",
+                exposureClass: ReceiptExposureClasses.SignedIn,
+                evidenceRef: openRun.Listing.OpenRunId,
+                reviewState: "scheduled"));
 
         lock (_store.Gate)
         {
@@ -2083,7 +2089,13 @@ public sealed class CampaignSpineService
                 ]),
                 Receipts: movementReceipts,
                 MovedAtUtc: movement.Now,
-                TransferReceipt: movement.TransferReceipt);
+                TransferReceipt: movement.TransferReceipt,
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "dossier_movement",
+                    ownerScope: "community.campaign_spine",
+                    exposureClass: ReceiptExposureClasses.SignedIn,
+                    evidenceRef: movement.TransferredDossier.DossierId,
+                    reviewState: "moved"));
             _store.DossierMovements.RemoveAll(item => string.Equals(item.MovementId, receipt.MovementId, StringComparison.OrdinalIgnoreCase));
             _store.DossierMovements.Add(receipt);
             _store.PersistLocked();
@@ -2347,7 +2359,13 @@ public sealed class CampaignSpineService
                 AuditLines: receipt.AuditLines,
                 Receipts: receipt.Receipts,
                 MovedAtUtc: now,
-                TransferReceipt: receipt);
+                TransferReceipt: receipt,
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "dossier_movement",
+                    ownerScope: "community.campaign_spine",
+                    exposureClass: ReceiptExposureClasses.SignedIn,
+                    evidenceRef: transferredDossier.DossierId,
+                    reviewState: "moved"));
             _store.DossierMovements.RemoveAll(item => string.Equals(item.MovementId, movementReceipt.MovementId, StringComparison.OrdinalIgnoreCase));
             _store.DossierMovements.Add(movementReceipt);
 
