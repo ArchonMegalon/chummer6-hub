@@ -289,7 +289,14 @@ if isinstance(downloads, list):
             continue
         if not force_account_required_downloads:
             kind = str(artifact.get("kind") or "").strip().lower()
-            if kind not in {"installer", "dmg", "pkg", "msix"}:
+            platform_tokens = " ".join(
+                str(artifact.get(key) or "").strip().lower()
+                for key in ("platform", "platformId", "rid", "artifactId", "fileName")
+            )
+            windows_preview_portable = kind == "portable" and any(
+                token in platform_tokens for token in ("windows", "win-", ".exe")
+            )
+            if kind not in {"installer", "dmg", "pkg", "msix"} and not windows_preview_portable:
                 continue
         access_class = resolved_access_class(artifact)
         if not access_class:
@@ -309,7 +316,14 @@ for artifact in payload.get("artifacts") or []:
 
     if not force_account_required_downloads:
         kind = str(artifact.get("kind") or "").strip().lower()
-        if kind not in {"installer", "dmg", "pkg", "msix"}:
+        platform_tokens = " ".join(
+            str(artifact.get(key) or "").strip().lower()
+            for key in ("platform", "platformId", "rid", "artifactId", "fileName")
+        )
+        windows_preview_portable = kind == "portable" and any(
+            token in platform_tokens for token in ("windows", "win-", ".exe")
+        )
+        if kind not in {"installer", "dmg", "pkg", "msix"} and not windows_preview_portable:
             continue
 
     access_class = resolved_access_class(artifact)

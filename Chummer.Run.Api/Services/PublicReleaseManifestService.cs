@@ -1853,7 +1853,11 @@ public sealed class PublicReleaseManifestService
         }
 
         bool accountRequiredPlatform = platform is "windows" or "macos";
-        bool accountRequiredKind = kind is "installer" or "portable" or "dmg" or "pkg";
+        bool accountRequiredKind = kind switch
+        {
+            "portable" when platform is "windows" => false,
+            _ => kind is "installer" or "portable" or "dmg" or "pkg"
+        };
         return accountRequiredPlatform && accountRequiredKind
             ? InstallAccessClasses.AccountRequired
             : InstallAccessClasses.OpenPublic;
