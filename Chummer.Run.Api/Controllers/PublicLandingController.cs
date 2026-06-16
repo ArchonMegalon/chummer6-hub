@@ -9970,8 +9970,8 @@ Boundary:
         if (installation is null)
         {
             return manifest.Downloads.Count == 0 || releaseExperience.Recommended is null
-                ? "Link the current preview first so Chummer can compare this account against the published shelf."
-                : $"Link the current preview first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
+                ? "Link the current public release first so Chummer can compare this account against the published shelf."
+                : $"Link the current public release first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
         }
 
         string installationLabel = ResolveInstallationDisplayLabel(installation);
@@ -10843,7 +10843,7 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => "Compare this horizon with the current preview surface first, then open the deeper roadmap brief only when you need the longer rationale.",
+            "coming_next" => "Compare this horizon with the current public-release surface first, then open the deeper roadmap brief only when you need the longer rationale.",
             "featured_artifacts" => "Use publication discovery and the current release page together to verify whether this artifact is live today or still preview-only.",
             _ => null
         };
@@ -10944,7 +10944,7 @@ Boundary:
                 .Select(section => section with
                 {
                     Entries = section.Entries
-                        .Select(entry => string.Equals(entry.Question, "Do I need an account to download the current preview?", StringComparison.Ordinal)
+                        .Select(entry => string.Equals(entry.Question, "Do I need an account to download the current release?", StringComparison.Ordinal)
                             ? entry with
                             {
                                 Question = "Do I need an account to download the current release?",

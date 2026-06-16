@@ -137,7 +137,7 @@ public sealed class SignedInTrustStatusService
             return new SignedInTrustStatusPanelViewModel(
                 Eyebrow: "Signed-in trust status",
                 Heading: "No linked install is attached yet",
-                Summary: "Claim the current preview first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
+                Summary: "Claim the current public release first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
                 Rows: rows,
                 PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
                 SecondaryAction: installAction);
@@ -263,8 +263,8 @@ public sealed class SignedInTrustStatusService
         if (installation is null)
         {
             return manifest.Downloads.Count == 0 || releaseExperience.Recommended is null
-                ? "Link the current preview first so Chummer can compare this account against the published public release."
-                : $"Link the current preview first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
+                ? "Link the current public release first so Chummer can compare this account against the published public release."
+                : $"Link the current public release first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
         }
 
         string installationLabel = ResolveInstallationDisplayLabel(installation);

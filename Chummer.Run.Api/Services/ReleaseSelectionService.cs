@@ -486,7 +486,7 @@ public sealed class ReleaseSelectionService
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"This is the default recommended installer for {PlatformLabel(download)}."
-            : $"This is the clearest current preview package for {PlatformLabel(download)}.";
+            : $"This is the clearest current public-release package for {PlatformLabel(download)}.";
 
     private static string AlternativeSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
@@ -588,7 +588,7 @@ public sealed class ReleaseSelectionService
 
         if (recommended)
         {
-            return $"Chummer preview for {PlatformLabel(download)}";
+            return $"Chummer for {PlatformLabel(download)}";
         }
 
         if (IsInstaller(download))
@@ -856,12 +856,12 @@ public sealed class ReleaseSelectionService
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the downloads page yet",
-                $"The current preview does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
+                $"The current public release does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
         }
 
         return new PlatformShelfNoticeViewModel(
             $"{label} is not on the current downloads page",
-            $"The current preview does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
+            $"The current public release does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
     }
 
     private static string? RequestedPlatformLabel(string? requestedPlatform)
@@ -916,13 +916,13 @@ public sealed class ReleaseSelectionService
     private static string FormatPlatformList(IReadOnlyList<string> platforms)
     {
         var labels = platforms
-            .Select(static family => RequestedPlatformLabel(family) ?? "the current preview route")
+            .Select(static family => RequestedPlatformLabel(family) ?? "the current public-release route")
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         return labels.Length switch
         {
-            0 => "the current preview route",
+            0 => "the current public-release route",
             1 => labels[0],
             2 => $"{labels[0]} and {labels[1]}",
             _ => $"{string.Join(", ", labels.Take(labels.Length - 1))}, and {labels[^1]}"

@@ -2261,7 +2261,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open invite rail", StringComparison.Ordinal), "home work should give operators a direct route to the invite and sponsorship rail.");
     Assert(homeSource.Contains("/account/work#community-op-sponsor-sessions-", StringComparison.Ordinal), "home work should deep-link the operator card into the sponsor-session rail.");
     Assert(homeSource.Contains("Open sponsor rail", StringComparison.Ordinal), "home work should give operators a direct route to the sponsor-session rail.");
-    Assert(homeSource.Contains("Guide: current preview, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
+    Assert(homeSource.Contains("Guide: current public release, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
     Assert(homeSource.Contains("Model.SignedInStatus", StringComparison.Ordinal), "signed-in home should project the shared signed-in trust panel instead of keeping trust posture trapped on account-only routes.");
     Assert(homeSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "signed-in home should reuse the shared signed-in trust panel instead of inventing a home-only trust surface.");
     Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for current access guidance.");
@@ -2985,8 +2985,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicFaqModel?.SignedInStatus is null, "guest faq should not project install-specific signed-in trust posture.");
     Assert(publicFaqModel?.AccessPosture is not null, "guest faq should bind the shared public access posture.");
     Assert(publicFaqModel!.Sections.SelectMany(static section => section.Entries).Any(entry =>
-        string.Equals(entry.Question, "Do I need an account to download the current preview?", StringComparison.Ordinal)
-        && entry.Answer.Contains("Create an account when you want recovery", StringComparison.OrdinalIgnoreCase)), "guest faq should reuse the shared access truth for the current preview-answer row.");
+        string.Equals(entry.Question, "Do I need an account to download the current release?", StringComparison.Ordinal)
+        && entry.Answer.Contains("Create an account when you want recovery", StringComparison.OrdinalIgnoreCase)), "guest faq should reuse the shared access truth for the current release-answer row.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;

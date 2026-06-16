@@ -33,7 +33,7 @@ const checks = [
   {
     url: `${baseUrl}/downloads/`,
     assert: text =>
-      text.includes('Install the current preview')
+      text.includes('Install the current public release')
       && text.includes('Chummer for Windows')
       && text.includes('Recommended desktop build for Linux')
   },
@@ -81,13 +81,13 @@ const checks = [
     url: `${baseUrl}/blazor/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Install the current preview')
+      && text.includes('Install the current public release')
   },
   {
     url: `${baseUrl}/avalonia/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Install the current preview')
+      && text.includes('Install the current public release')
   },
   {
     url: `${baseUrl}/session/`,

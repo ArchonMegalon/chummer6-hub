@@ -6522,7 +6522,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "League:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Sponsors:", "/home/work")
-    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same guided view.", "/home/work")
+    require_snippet(body, "Guide: current public release, downloads, and closure posture stay on the same guided view.", "/home/work")
     require_snippet(body, "Open league tools", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
     require_snippet(body, "Open invite tools", "/home/work")

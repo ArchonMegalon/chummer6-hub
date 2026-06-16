@@ -273,7 +273,11 @@ internal sealed class PublicReleaseExperienceDocument
     public string? DesktopGoldAcceptanceSource { get; init; }
     public List<string>? ReleaseLabelResolverRules { get; init; }
     public string? KnownIssueLanguageSource { get; init; }
+    public string? KnownIssueStatusLanguageSource { get; init; }
     public string? ResponsivenessBudgetsSource { get; init; }
+    public string? OnboardingAndEmptyStateSource { get; init; }
+    public string? LongRunningActionSafetySource { get; init; }
+    public string? CampaignOperabilityRubricSource { get; init; }
     public string? DesktopFlagshipHead { get; init; }
     public string? DesktopFallbackHead { get; init; }
     public string? DesktopCutSummary { get; init; }
