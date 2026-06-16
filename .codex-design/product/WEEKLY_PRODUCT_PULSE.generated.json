@@ -1,8 +1,8 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-15T19:41:24Z",
-  "as_of": "2026-06-15",
+  "generated_at": "2026-06-16T03:39:50Z",
+  "as_of": "2026-06-16",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
@@ -82,7 +82,7 @@
   "public_promise_drift_count": 0,
   "governor_decisions": [
     {
-      "decision_id": "2026-06-15-focus-next-12-biggest-wins",
+      "decision_id": "2026-06-16-focus-next-12-biggest-wins",
       "action": "focus_shift",
       "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 39 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
@@ -95,7 +95,7 @@
       ]
     },
     {
-      "decision_id": "2026-06-15-launch-governance",
+      "decision_id": "2026-06-16-launch-governance",
       "action": "freeze_launch",
       "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
       "cited_signals": [
@@ -188,7 +188,7 @@
     "public_promise_drift_count": 0,
     "governor_decisions": [
       {
-        "decision_id": "2026-06-15-focus-next-12-biggest-wins",
+        "decision_id": "2026-06-16-focus-next-12-biggest-wins",
         "action": "focus_shift",
         "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 39 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
@@ -201,7 +201,7 @@
         ]
       },
       {
-        "decision_id": "2026-06-15-launch-governance",
+        "decision_id": "2026-06-16-launch-governance",
         "action": "freeze_launch",
         "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
         "cited_signals": [

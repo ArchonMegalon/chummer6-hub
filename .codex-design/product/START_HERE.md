@@ -41,6 +41,7 @@ Read:
 5. `PUBLIC_AUTO_UPDATE_POLICY.md`
 6. `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
 7. `JOURNEY_GATES.generated.json`
+8. `HUMAN_ONLY_RELEASE_BOUNDARIES.generated.md`
 8. `PRIVACY_AND_RETENTION_BOUNDARIES.md`
 9. `PRODUCT_CONTROL_AND_GOVERNOR_LOOP.md`
 10. `SUPPORT_AND_SIGNAL_OODA_LOOP.md`
@@ -118,6 +119,7 @@ Read:
 * What are the shared severity, closure, and escalation words? -> `ERROR_TAXONOMY_AND_ESCALATION_MATRIX.yaml` and `KNOWN_ISSUE_AND_FIX_STATUS_LANGUAGE.md`
 * What keeps onboarding, empty state, and recovery copy from drifting? -> `ONBOARDING_AND_EMPTY_STATE_JOURNEY_CONTRACT.md` and `USER_JOURNEYS.md`
 * What keeps retry, cancel, rollback, and fallback behavior honest? -> `LONG_RUNNING_ACTION_SAFETY_CONTRACT.md` and `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
+* What is still blocked on human review rather than code drift? -> `HUMAN_ONLY_RELEASE_BOUNDARIES.generated.md`
 * What stops horizons from reading like shipped promises? -> `HORIZON_PROMOTION_RULES.md` and `HORIZON_REGISTRY.yaml`
 * What score still has to clear before a supposedly clean release can widen claims? -> `CAMPAIGN_OPERABILITY_SCORING_RUBRIC.yaml`
 * What is Build Lab supposed to become? -> `BUILD_LAB_PRODUCT_MODEL.md`
