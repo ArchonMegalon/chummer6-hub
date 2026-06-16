@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Contracts.Ledger;
 
@@ -39,7 +40,8 @@ public sealed record ContributionReceiptDto(
     int ParticipantTotalTokens = 0,
     string? SignedByFleet = null,
     string AuthorizationTierAtReceipt = "unknown",
-    string? TierSource = null);
+    string? TierSource = null,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record LedgerEntryDto(
     string EntryId,

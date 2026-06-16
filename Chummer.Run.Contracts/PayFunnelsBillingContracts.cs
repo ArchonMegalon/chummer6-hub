@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Contracts.Billing;
 
@@ -100,7 +101,8 @@ public sealed record PaymentReceiptDto(
     string Status,
     string EntitlementEffect,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? RefundedAtUtc);
+    DateTimeOffset? RefundedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record BillingEntitlementLedgerEntryDto(
     string EntryId,

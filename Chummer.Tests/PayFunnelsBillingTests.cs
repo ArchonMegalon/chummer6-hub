@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Billing;
+using Chummer.Contracts.Receipts;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -59,6 +60,10 @@ public sealed class PayFunnelsBillingTests
         PaymentReceiptDto receipt = Assert.Single(account.Receipts);
         Assert.Equal("paid", receipt.Status);
         Assert.Equal("none", receipt.EntitlementEffect);
+        Assert.NotNull(receipt.Envelope);
+        Assert.Equal(ReceiptProvenanceClasses.ExternalWebhook, receipt.Envelope!.ProvenanceClass);
+        Assert.Equal(ReceiptLifecycleStates.Verified, receipt.Envelope.LifecycleState);
+        Assert.Equal("billing.account", receipt.Envelope.OwnerScope);
         BillingEntitlementLedgerEntryDto ledger = Assert.Single(account.EntitlementLedger);
         Assert.Equal("no_op", ledger.EffectType);
         Assert.False(ledger.PremiumEnabledDelta);
@@ -130,6 +135,8 @@ public sealed class PayFunnelsBillingTests
         PaymentReceiptDto receipt = Assert.Single(account.Receipts);
         Assert.Equal("refunded", receipt.Status);
         Assert.NotNull(receipt.RefundedAtUtc);
+        Assert.NotNull(receipt.Envelope);
+        Assert.Equal(ReceiptLifecycleStates.Archived, receipt.Envelope!.LifecycleState);
         BillingEntitlementLedgerEntryDto ledger = Assert.Single(account.EntitlementLedger);
         Assert.Equal("no_op", ledger.EffectType);
         Assert.False(account.PremiumEnabled);

@@ -1,4 +1,5 @@
 using Chummer.Contracts.Rulesets;
+using Chummer.Contracts.Receipts;
 using System.ComponentModel.DataAnnotations;
 
 namespace Chummer.Campaign.Contracts;
@@ -65,7 +66,8 @@ public sealed record PublicationSafeProjection(
 public sealed record CampaignConsequenceReceipt(
     string ReceiptId,
     string SourceKind,
-    string Summary);
+    string Summary,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record CampaignConsequenceProjection(
     string ConsequenceId,

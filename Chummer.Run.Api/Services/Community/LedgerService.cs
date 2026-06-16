@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Contracts.Ledger;
 
 namespace Chummer.Run.Api.Services.Community;
@@ -77,14 +78,22 @@ public sealed class LedgerService
     }
 
     private static ContributionReceiptDto Canonicalize(ContributionReceiptDto receipt)
-        => receipt with
+    {
+        string receiptId = AccountService.NormalizeRequired(receipt.ReceiptId, nameof(receipt.ReceiptId));
+        string eventKind = AccountService.NormalizeRequired(receipt.EventKind, nameof(receipt.EventKind));
+        string laneId = AccountService.NormalizeRequired(receipt.LaneId, nameof(receipt.LaneId));
+        string projectId = AccountService.NormalizeRequired(receipt.ProjectId, nameof(receipt.ProjectId));
+        string? userId = AccountService.NormalizeOptional(receipt.UserId);
+        string? groupId = AccountService.NormalizeOptional(receipt.GroupId);
+
+        return receipt with
         {
-            ReceiptId = AccountService.NormalizeRequired(receipt.ReceiptId, nameof(receipt.ReceiptId)),
-            EventKind = AccountService.NormalizeRequired(receipt.EventKind, nameof(receipt.EventKind)),
-            LaneId = AccountService.NormalizeRequired(receipt.LaneId, nameof(receipt.LaneId)),
-            ProjectId = AccountService.NormalizeRequired(receipt.ProjectId, nameof(receipt.ProjectId)),
-            UserId = AccountService.NormalizeOptional(receipt.UserId),
-            GroupId = AccountService.NormalizeOptional(receipt.GroupId),
+            ReceiptId = receiptId,
+            EventKind = eventKind,
+            LaneId = laneId,
+            ProjectId = projectId,
+            UserId = userId,
+            GroupId = groupId,
             SponsorSessionId = AccountService.NormalizeOptional(receipt.SponsorSessionId),
             ParticipantCodexCode = AccountService.NormalizeOptional(receipt.ParticipantCodexCode),
             AuthClass = AccountService.NormalizeOptional(receipt.AuthClass) ?? "",
@@ -109,7 +118,14 @@ public sealed class LedgerService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
             SignedByFleet = AccountService.NormalizeOptional(receipt.SignedByFleet),
+            Envelope = receipt.Envelope ?? ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "community_contribution",
+                ownerScope: string.IsNullOrWhiteSpace(groupId) ? "community.user" : "community.group",
+                exposureClass: ReceiptExposureClasses.SignedIn,
+                evidenceRef: receiptId,
+                reviewState: receipt.Verified ? "verified" : "pending")
         };
+    }
 
     private static string ProjectionFingerprint(ContributionReceiptDto receipt)
     {

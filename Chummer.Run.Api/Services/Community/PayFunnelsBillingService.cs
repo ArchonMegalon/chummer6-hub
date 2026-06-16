@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.Extensions.Configuration;
 
@@ -147,7 +148,12 @@ public sealed class PayFunnelsBillingService
                     Status: "paid",
                     EntitlementEffect: "none",
                     CreatedAtUtc: DateTimeOffset.UtcNow,
-                    RefundedAtUtc: null);
+                    RefundedAtUtc: null,
+                    Envelope: ReceiptEnvelopeFactory.ExternalWebhook(
+                        receiptKind: "billing_payment",
+                        ownerScope: "billing.account",
+                        evidenceRef: request.ProviderEventId,
+                        reviewState: "verified"));
                 _store.Receipts.Add(receipt);
 
                 ledger = new BillingEntitlementLedgerEntryDto(
@@ -171,7 +177,19 @@ public sealed class PayFunnelsBillingService
                     && string.Equals(item.Status, "paid", StringComparison.OrdinalIgnoreCase));
                 if (original is not null)
                 {
-                    var updated = original with { Status = "refunded", RefundedAtUtc = DateTimeOffset.UtcNow };
+                    var updated = original with
+                    {
+                        Status = "refunded",
+                        RefundedAtUtc = DateTimeOffset.UtcNow,
+                        Envelope = (original.Envelope ?? ReceiptEnvelopeFactory.ExternalWebhook(
+                            receiptKind: "billing_payment",
+                            ownerScope: "billing.account",
+                            evidenceRef: request.ProviderEventId,
+                            reviewState: "verified")) with
+                        {
+                            LifecycleState = ReceiptLifecycleStates.Archived
+                        }
+                    };
                     _store.Receipts[_store.Receipts.IndexOf(original)] = updated;
                     receipt = updated;
                 }
