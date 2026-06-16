@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Contracts.Rulesets;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts;
@@ -977,8 +978,9 @@ public sealed class CampaignSpineService
         lock (_store.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            string receiptId = StableId("travel-prefetch", $"{workspace.WorkspaceId}:{device.InstallationId}:{now.ToUnixTimeMilliseconds()}");
             var receipt = new TravelPrefetchReceiptProjection(
-                ReceiptId: StableId("travel-prefetch", $"{workspace.WorkspaceId}:{device.InstallationId}:{now.ToUnixTimeMilliseconds()}"),
+                ReceiptId: receiptId,
                 WorkspaceId: workspace.WorkspaceId,
                 CampaignId: workspace.CampaignId,
                 InstallationId: device.InstallationId,
@@ -994,7 +996,8 @@ public sealed class CampaignSpineService
                     ])),
                 Boundaries: FinalizeLines(boundaries),
                 InitiatedByUserId: user.UserId,
-                StagedAtUtc: now);
+                StagedAtUtc: now,
+                Envelope: BuildCampaignReceiptEnvelope("travel_prefetch", receiptId));
 
             _store.TravelPrefetchReceipts.Add(receipt);
             if (_store.TravelPrefetchReceipts.Count > 64)
@@ -2007,31 +2010,31 @@ public sealed class CampaignSpineService
 
             List<CampaignConsequenceReceipt> movementReceipts =
             [
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.SourceGroup.GroupId,
                     SourceKind: "source_group",
                     Summary: movement.SourceGroup.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.TargetGroup.GroupId,
                     SourceKind: "target_group",
                     Summary: movement.TargetGroup.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.SourceCampaign.CampaignId,
                     SourceKind: "source_campaign",
                     Summary: movement.SourceCampaign.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.TargetCampaign.CampaignId,
                     SourceKind: "target_campaign",
                     Summary: movement.TargetCampaign.Title),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.TargetEvent.Run.RunId,
                     SourceKind: "target_run",
                     Summary: movement.TargetEvent.Run.Title),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.TargetEvent.Scene.SceneId,
                     SourceKind: "target_scene",
                     Summary: movement.TargetEvent.Scene.Title),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: movement.Continuity.SnapshotId,
                     SourceKind: "continuity",
                     Summary: movement.Continuity.Summary)
@@ -2226,37 +2229,37 @@ public sealed class CampaignSpineService
 
             List<CampaignConsequenceReceipt> transferReceipts =
             [
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: sourceGroup.GroupId,
                     SourceKind: "source_group",
                     Summary: sourceGroup.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: targetGroup.GroupId,
                     SourceKind: "target_group",
                     Summary: targetGroup.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: sourceCampaign.CampaignId,
                     SourceKind: "source_campaign",
                     Summary: sourceCampaign.Name),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: targetCampaign.CampaignId,
                     SourceKind: "target_campaign",
                     Summary: targetCampaign.Title),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: continuity.SnapshotId,
                     SourceKind: "continuity",
                     Summary: continuity.Summary)
             ];
             if (sourceRun is not null)
             {
-                transferReceipts.Add(new CampaignConsequenceReceipt(
+                transferReceipts.Add(CampaignConsequence(
                     ReceiptId: sourceRun.RunId,
                     SourceKind: "target_run",
                     Summary: sourceRun.Title));
             }
             if (sourceScene is not null)
             {
-                transferReceipts.Add(new CampaignConsequenceReceipt(
+                transferReceipts.Add(CampaignConsequence(
                     ReceiptId: sourceScene.SceneId,
                     SourceKind: "target_scene",
                     Summary: sourceScene.Title));
@@ -2736,31 +2739,31 @@ public sealed class CampaignSpineService
 
         List<CampaignConsequenceReceipt> transferReceipts =
         [
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: sourceGroup.GroupId,
                 SourceKind: "source_group",
                 Summary: sourceGroup.Name),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: targetGroup.GroupId,
                 SourceKind: "target_group",
                 Summary: targetGroup.Name),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: sourceCampaign.CampaignId,
                 SourceKind: "source_campaign",
                 Summary: sourceCampaign.Name),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: targetCampaign.CampaignId,
                 SourceKind: "target_campaign",
                 Summary: targetCampaign.Title),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: targetEvent.Run.RunId,
                 SourceKind: "target_run",
                 Summary: targetEvent.Run.Title),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: targetEvent.Scene.SceneId,
                 SourceKind: "target_scene",
                 Summary: targetEvent.Scene.Title),
-            new CampaignConsequenceReceipt(
+            CampaignConsequence(
                 ReceiptId: continuity.SnapshotId,
                 SourceKind: "continuity",
                 Summary: continuity.Summary)
@@ -7354,15 +7357,15 @@ public sealed class CampaignSpineService
             ]),
             Receipts:
             [
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: StableId("consequence-update", $"{workspace.WorkspaceId}:{normalizedKind}:{observedAtUtc.ToUnixTimeMilliseconds()}"),
                     SourceKind: GovernedConsequenceUpdateSourceKind,
                     Summary: normalizedSummary),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: StableId("consequence-return-loop-action", $"{workspace.WorkspaceId}:{normalizedKind}:{normalizedAction}"),
                     SourceKind: ReturnLoopActionSourceKind,
                     Summary: normalizedAction),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: normalizedRoute,
                     SourceKind: ReturnLoopRouteSourceKind,
                     Summary: $"Return-loop route: {normalizedRoute}.")
@@ -7415,15 +7418,15 @@ public sealed class CampaignSpineService
             EvidenceLines: FinalizeLines(evidenceLines),
             Receipts:
             [
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: package.PackageId,
                     SourceKind: GovernedAftermathPackageSourceKind,
                     Summary: package.Summary),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: StableId("consequence-return-loop-action", $"{workspace.WorkspaceId}:{normalizedKind}:review_downtime_obligations"),
                     SourceKind: ReturnLoopActionSourceKind,
                     Summary: "Review downtime obligations"),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: "/account/work#aftermath-packages",
                     SourceKind: ReturnLoopRouteSourceKind,
                     Summary: "Return-loop route: /account/work#aftermath-packages.")
@@ -7582,15 +7585,15 @@ public sealed class CampaignSpineService
                 ],
                 Receipts:
                 [
-                    new CampaignConsequenceReceipt(
+                    CampaignConsequence(
                         ReceiptId: leadObjective.ObjectiveId,
                         SourceKind: "objective",
                         Summary: leadObjective.Summary),
-                    new CampaignConsequenceReceipt(
+                    CampaignConsequence(
                         ReceiptId: activeScene.SceneId,
                         SourceKind: "scene",
                         Summary: activeScene.Summary),
-                    new CampaignConsequenceReceipt(
+                    CampaignConsequence(
                         ReceiptId: continuity.SnapshotId,
                         SourceKind: "continuity",
                         Summary: continuity.Summary)
@@ -7612,15 +7615,15 @@ public sealed class CampaignSpineService
             ],
             Receipts:
             [
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: group.GroupId,
                     SourceKind: "group",
                     Summary: $"{group.Name} sponsor group"),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: crew.CrewId,
                     SourceKind: "crew",
                     Summary: $"{crew.Members.Count} crew assignment(s) stay attached to the campaign"),
-                new CampaignConsequenceReceipt(
+                CampaignConsequence(
                     ReceiptId: sponsorCampaign.CampaignId,
                     SourceKind: "campaign",
                     Summary: sponsorCampaign.Title)
@@ -7640,13 +7643,13 @@ public sealed class CampaignSpineService
                 .ToArray(),
             Receipts: memberDossiers
                 .Take(3)
-                .Select(static dossier => new CampaignConsequenceReceipt(
+                .Select(static dossier => CampaignConsequence(
                     ReceiptId: dossier.DossierId,
                     SourceKind: "dossier",
                     Summary: $"{dossier.DisplayName} ({dossier.RunnerHandle})"))
                 .Concat(
                 [
-                    new CampaignConsequenceReceipt(
+                    CampaignConsequence(
                         ReceiptId: continuity.SnapshotId,
                         SourceKind: "continuity",
                         Summary: continuity.Summary)
@@ -7668,13 +7671,13 @@ public sealed class CampaignSpineService
             ],
             Receipts: outputs
                 .Take(3)
-                .Select(static output => new CampaignConsequenceReceipt(
+                .Select(static output => CampaignConsequence(
                     ReceiptId: output.ArtifactId ?? output.ProjectionId,
                     SourceKind: output.Kind,
                     Summary: output.Summary))
                 .Concat(
                 [
-                    new CampaignConsequenceReceipt(
+                    CampaignConsequence(
                         ReceiptId: continuity.SnapshotId,
                         SourceKind: "continuity",
                         Summary: continuity.Summary)
@@ -7686,6 +7689,27 @@ public sealed class CampaignSpineService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
     }
+
+    private static CampaignConsequenceReceipt CampaignConsequence(
+        string ReceiptId,
+        string SourceKind,
+        string Summary)
+        => new(
+            ReceiptId,
+            SourceKind,
+            Summary,
+            BuildCampaignReceiptEnvelope("campaign_consequence", ReceiptId));
+
+    private static ReceiptEnvelope BuildCampaignReceiptEnvelope(
+        string receiptKind,
+        string receiptId,
+        string ownerScope = "campaign.workspace")
+        => ReceiptEnvelopeFactory.Runtime(
+            receiptKind: receiptKind,
+            ownerScope: ownerScope,
+            exposureClass: ReceiptExposureClasses.SignedIn,
+            evidenceRef: receiptId,
+            reviewState: "verified");
 
     private static IReadOnlyList<string> BuildBuildLabWatchouts(
         CampaignWorkspaceProjection? workspace,

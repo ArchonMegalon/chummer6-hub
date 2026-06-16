@@ -182,7 +182,8 @@ public sealed record TravelPrefetchReceiptProjection(
     IReadOnlyList<string> InventoryLines,
     IReadOnlyList<string> Boundaries,
     string InitiatedByUserId,
-    DateTimeOffset StagedAtUtc);
+    DateTimeOffset StagedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record AftermathRecapPackageRequest(
     [StringLength(128)] string? RunId,
