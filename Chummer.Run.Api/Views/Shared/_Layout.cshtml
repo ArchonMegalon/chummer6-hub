@@ -391,7 +391,7 @@
                     data-nav-toggle
                     aria-expanded="false"
                     aria-controls="site-nav-panel">
-                    Panel
+                    Menu
                 </button>
                 <div class="site-actions">
                     @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
@@ -438,7 +438,7 @@
             <div class="site-sidebar__panel">
                 <div class="site-sidebar__masthead">
                     <strong class="site-sidebar__title">@pageTitle</strong>
-                    <button class="site-sidebar__close button-like button-like--ghost" type="button" data-nav-close aria-label="Hide navigation panel">Hide</button>
+                    <button class="site-sidebar__close button-like button-like--ghost" type="button" data-nav-close aria-label="Close navigation panel">Close</button>
                 </div>
                 <div class="site-sidebar__section">
                     <p class="site-sidebar__heading sr-only">Menu</p>
@@ -565,7 +565,7 @@
                     }
                     else
                     {
-                        <p>Shadowrun companion.</p>
+                        <p>Live product.</p>
                     }
                     <p class="site-footer__provenance"><a class="quiet-link" href="/downloads">Get Chummer</a> · <a class="quiet-link" href="/status">Status</a></p>
                     @if (utilityLink is not null)

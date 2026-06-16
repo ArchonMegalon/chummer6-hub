@@ -163,7 +163,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">Watch the city breathe, see which bloc is leaning on which district, and lift a hook straight into the next scene.</p>
+        <p class="ledger-flagship__support">Watch the city breathe, see who is leaning on which district, and lift a hook straight into the next scene.</p>
         <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
             <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
             <span><strong>@worldFactions.Length</strong> factions</span>
@@ -249,11 +249,11 @@
                         data-initial-mode="@(commandMap.CurrentMode)"
                         data-selected-faction="@selectedFactionSlug"
                         data-tick-headline="@Model.World?.TurnHeadline"
-                        data-overlay-eyebrow="Public pressure board"
+                        data-overlay-eyebrow="Pressure board"
                         data-overlay-headline="Read the board before you pick a side."
                         data-signal-primary="pressure vectors active"
-                        data-signal-secondary="open jobs mutating"
-                        data-signal-tertiary="newsroom bulletins linked"
+                        data-signal-secondary="open jobs shifting"
+                        data-signal-tertiary="newsroom linked"
                         data-primary-label="Open faction file"
                         data-primary-href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")"
                         data-secondary-label="Latest bulletin"
