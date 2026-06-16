@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
@@ -220,7 +221,14 @@ public sealed class CampaignFederationOrchestrationService
                 PackageId: $"creator-publication:{candidate.PublicationId}",
                 MatchedRoute: publicShelfRef,
                 MatchMode: "publication_status",
-                Summary: $"{candidate.Label} is live on the outward-facing governed publication shelf.")
+                Summary: $"{candidate.Label} is live on the outward-facing governed publication shelf.",
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "campaign_federation_route",
+                    ownerScope: "community.campaign_federation",
+                    exposureClass: ReceiptExposureClasses.PublicSafe,
+                    lifecycleState: ReceiptLifecycleStates.Published,
+                    evidenceRef: $"public-shelf:{publicShelfRef}",
+                    reviewState: "published"))
             : null;
         string? boundedFailureReason = routeReceipt is null
             ? $"{candidate.Label} stays {moderationState.Replace('_', ' ')} until outward-facing publication review promotes a live shelf receipt."

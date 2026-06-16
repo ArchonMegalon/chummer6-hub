@@ -1,3 +1,4 @@
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services;
 
 namespace Chummer.Run.Api.Contracts;
@@ -7,7 +8,8 @@ public sealed record CampaignFederationRouteReceiptProjection(
     string PackageId,
     string MatchedRoute,
     string MatchMode,
-    string Summary);
+    string Summary,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record CampaignFederationBatchRequest(
     IReadOnlyList<string>? SourceIds = null,

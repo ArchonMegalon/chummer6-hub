@@ -1,3 +1,4 @@
+using Chummer.Contracts.Receipts;
 using Chummer.Control.Contracts.Support;
 
 namespace Chummer.Run.Api.Contracts;
@@ -80,7 +81,8 @@ public sealed record OrganizerArtifactPublicationReceiptProjection(
     bool Discoverable,
     string? PublicationSummary,
     string? NextSafeAction,
-    string? AuditSummary);
+    string? AuditSummary,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record OrganizerSupportEscalationContractProjection(
     string Summary,

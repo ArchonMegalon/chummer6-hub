@@ -4808,7 +4808,18 @@ public sealed class CampaignSpineService
                 Discoverable: entry.Discoverable,
                 PublicationSummary: entry.PublicationSummary,
                 NextSafeAction: entry.NextSafeAction,
-                AuditSummary: entry.AuditSummary))
+                AuditSummary: entry.AuditSummary,
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "organizer_artifact_publication",
+                    ownerScope: "community.organizer_ops",
+                    exposureClass: entry.Discoverable
+                        ? ReceiptExposureClasses.PublicSafe
+                        : ReceiptExposureClasses.SignedIn,
+                    lifecycleState: string.Equals(entry.PublicationState, "published", StringComparison.OrdinalIgnoreCase)
+                        ? ReceiptLifecycleStates.Published
+                        : ReceiptLifecycleStates.Verified,
+                    evidenceRef: entry.CreatorPublicationId ?? entry.ProjectionId,
+                    reviewState: entry.PublicationState ?? "bounded")))
             .ToArray();
 
     private static IReadOnlyList<string> BuildOrganizerAuditLines(

@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
@@ -1888,11 +1889,18 @@ public sealed class CampaignSpineController : ControllerBase
         => routeReceipt is null
             ? null
             : new CampaignFederationRouteReceiptProjection(
-                routeReceipt.ReceiptId,
-                routeReceipt.PackageId,
-                routeReceipt.MatchedRoute,
-                routeReceipt.MatchMode,
-                routeReceipt.Summary);
+                ReceiptId: routeReceipt.ReceiptId,
+                PackageId: routeReceipt.PackageId,
+                MatchedRoute: routeReceipt.MatchedRoute,
+                MatchMode: routeReceipt.MatchMode,
+                Summary: routeReceipt.Summary,
+                Envelope: ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "campaign_federation_route",
+                    ownerScope: "community.campaign_federation",
+                    exposureClass: ReceiptExposureClasses.PublicSafe,
+                    lifecycleState: ReceiptLifecycleStates.Published,
+                    evidenceRef: routeReceipt.ReceiptId,
+                    reviewState: "published"));
 
     private LocalReleaseProofLookupResult FindLocalReleaseProofReceipt(params string?[] routeCandidates)
         => _localReleaseProof.FindReceipt(routeCandidates);
