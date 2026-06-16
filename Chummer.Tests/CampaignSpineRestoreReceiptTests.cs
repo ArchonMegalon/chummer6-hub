@@ -465,12 +465,17 @@ public sealed class CampaignSpineRestoreReceiptTests
                 item => string.Equals(item.Kind, "active_entitlement", StringComparison.OrdinalIgnoreCase));
             Assert.Equal("hub_entitlement_ledger", entitlementReceipt.Authority);
             Assert.False(string.IsNullOrWhiteSpace(entitlementReceipt.RecoveryHint));
+            Assert.NotNull(entitlementReceipt.Envelope);
+            Assert.Equal("workspace_restore_provenance", entitlementReceipt.Envelope!.ReceiptKind);
+            Assert.Equal("community.workspace_restore", entitlementReceipt.Envelope.OwnerScope);
 
             WorkspaceRestoreConflictReceipt orphanConflict = Assert.Single(
                 reloadedRestore.ConflictReceipts ?? [],
                 item => string.Equals(item.Kind, "entitlement_orphan", StringComparison.OrdinalIgnoreCase));
             Assert.Equal("entitlement_sync", orphanConflict.Surface);
             Assert.True(orphanConflict.BlocksContinue);
+            Assert.NotNull(orphanConflict.Envelope);
+            Assert.Equal("workspace_restore_conflict", orphanConflict.Envelope!.ReceiptKind);
 
             WorkspaceRestoreConflictReceipt inactiveInstallConflict = Assert.Single(
                 reloadedRestore.ConflictReceipts ?? [],

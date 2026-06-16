@@ -3743,7 +3743,17 @@ public sealed class CampaignSpineService
                 RecoveryHint: "If this inventory does not match the device you expected, stop before editing and review the restore plane first."));
         }
 
-        return receipts;
+        return receipts
+            .Select(receipt => receipt with
+            {
+                Envelope = ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "workspace_restore_provenance",
+                    ownerScope: "community.workspace_restore",
+                    exposureClass: ReceiptExposureClasses.SignedIn,
+                    evidenceRef: receipt.SubjectId,
+                    reviewState: receipt.Kind)
+            })
+            .ToArray();
     }
 
     private static IReadOnlyList<WorkspaceRestoreConflictReceipt> BuildRestoreConflictReceipts(
@@ -3970,7 +3980,17 @@ public sealed class CampaignSpineService
                 BlocksContinue: true));
         }
 
-        return receipts;
+        return receipts
+            .Select(receipt => receipt with
+            {
+                Envelope = ReceiptEnvelopeFactory.Runtime(
+                    receiptKind: "workspace_restore_conflict",
+                    ownerScope: "community.workspace_restore",
+                    exposureClass: ReceiptExposureClasses.SignedIn,
+                    evidenceRef: receipt.SubjectId,
+                    reviewState: receipt.Kind)
+            })
+            .ToArray();
     }
 
     private static bool HasRestoreDrift(string? left, string? right)

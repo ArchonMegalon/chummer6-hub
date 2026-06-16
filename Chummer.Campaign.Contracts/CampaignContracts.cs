@@ -677,7 +677,8 @@ public sealed record WorkspaceRestoreProvenanceReceipt(
     string? Proof,
     DateTimeOffset ObservedAtUtc,
     string? Authority = null,
-    string? RecoveryHint = null);
+    string? RecoveryHint = null,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record WorkspaceRestoreConflictReceipt(
     string ReceiptId,
@@ -688,7 +689,8 @@ public sealed record WorkspaceRestoreConflictReceipt(
     string? Resolution,
     DateTimeOffset ObservedAtUtc,
     string? Surface = null,
-    bool BlocksContinue = false);
+    bool BlocksContinue = false,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record RestoreEntitlementProjection(
     string EntitlementId,
