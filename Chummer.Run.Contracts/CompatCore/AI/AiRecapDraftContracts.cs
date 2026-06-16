@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiRecapDraftApiOperations
@@ -45,4 +47,5 @@ public sealed record AiRecapDraftReceipt(
     string Message,
     bool ApprovalRequired = true,
     string? SessionId = null,
-    string? OwnerId = null);
+    string? OwnerId = null,
+    ReceiptEnvelope? Envelope = null);

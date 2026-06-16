@@ -1,5 +1,7 @@
 using Chummer.Contracts.Owners;
 
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiApiOperations
@@ -551,7 +553,8 @@ public sealed record AiNotImplementedReceipt(
     string Message,
     string? ConversationId = null,
     string? RouteType = null,
-    string? OwnerId = null);
+    string? OwnerId = null,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record AiQuotaExceededReceipt(
     string Error,
@@ -563,7 +566,8 @@ public sealed record AiQuotaExceededReceipt(
     string? ConversationId = null,
     string? RouteType = null,
     string? OwnerId = null,
-    int? RetryAfterSeconds = null);
+    int? RetryAfterSeconds = null,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record AiApiResult<T>(
     T? Payload = default,

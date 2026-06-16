@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiApprovalApiOperations
@@ -74,4 +76,5 @@ public sealed record AiApprovalReceipt(
     bool ExternalBrokerConfigured = false,
     string? TargetKind = null,
     string? TargetId = null,
-    string? OwnerId = null);
+    string? OwnerId = null,
+    ReceiptEnvelope? Envelope = null);

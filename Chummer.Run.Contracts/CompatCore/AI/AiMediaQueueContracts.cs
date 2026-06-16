@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiMediaQueueApiOperations
@@ -34,4 +36,5 @@ public sealed record AiMediaQueueReceipt(
     IReadOnlyList<AiRiskEntry> Risks,
     bool ApprovalRequired = true,
     string? UnderlyingOperation = null,
-    string? UnderlyingState = null);
+    string? UnderlyingState = null,
+    ReceiptEnvelope? Envelope = null);

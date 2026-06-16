@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiTranscriptApiOperations
@@ -26,4 +28,5 @@ public sealed record AiTranscriptDocumentReceipt(
     bool ExternalProviderConfigured = false,
     string? SessionId = null,
     string? CharacterId = null,
-    string? OwnerId = null);
+    string? OwnerId = null,
+    ReceiptEnvelope? Envelope = null);

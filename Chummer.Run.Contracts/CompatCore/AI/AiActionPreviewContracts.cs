@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiActionPreviewApiOperations
@@ -60,4 +62,5 @@ public sealed record AiActionPreviewReceipt(
     bool RequiresConfirmation = true,
     string? ProfileId = null,
     string? ProfileTitle = null,
-    string? WorkspaceId = null);
+    string? WorkspaceId = null,
+    ReceiptEnvelope? Envelope = null);
