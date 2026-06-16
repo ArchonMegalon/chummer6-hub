@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -50,6 +51,11 @@ public sealed class ParticipantNotificationTests
             Assert.Equal("google", receipt.AuthProviderFamily);
             Assert.Equal("r***@example.com", receipt.EmailMasked);
             Assert.True(receipt.IsFirstParticipationEvent);
+            Assert.NotNull(receipt.Envelope);
+            Assert.Equal("participation_operator_notification", receipt.Envelope!.ReceiptKind);
+            Assert.Equal("community.participation", receipt.Envelope.OwnerScope);
+            Assert.Equal(ReceiptExposureClasses.Internal, receipt.Envelope.ExposureClass);
+            Assert.Equal("sent", receipt.Envelope.ReviewState);
             Assert.Single(service.ListReceiptsForUser(ensured.User.UserId));
 
             CapturedRequest request = Assert.Single(requests);
@@ -106,6 +112,7 @@ public sealed class ParticipantNotificationTests
             Assert.NotNull(first);
             Assert.NotNull(second);
             Assert.Equal("suppressed_recipient_missing", first!.Status);
+            Assert.Equal("suppressed_recipient_missing", first.Envelope!.ReviewState);
             Assert.Equal(first.ReceiptId, second!.ReceiptId);
             Assert.Empty(requests);
         }
@@ -149,6 +156,7 @@ public sealed class ParticipantNotificationTests
             Assert.NotNull(receipt);
             Assert.Equal("failed_delivery", receipt!.Status);
             Assert.Equal("karma_forge", receipt.IntentKind);
+            Assert.Equal("failed_delivery", receipt.Envelope!.ReviewState);
             Assert.Single(requests);
         }
         finally

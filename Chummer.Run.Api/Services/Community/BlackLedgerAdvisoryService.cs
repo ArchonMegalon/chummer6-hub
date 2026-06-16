@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 
@@ -29,7 +30,8 @@ public sealed record BlackLedgerAdvisoryVoteReceipt(
     string Audience,
     string UserId,
     string OptionId,
-    DateTimeOffset VotedAtUtc);
+    DateTimeOffset VotedAtUtc,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record BlackLedgerAdvisoryMailReceipt(
     string ReceiptId,
@@ -41,7 +43,8 @@ public sealed record BlackLedgerAdvisoryMailReceipt(
     string Status,
     string? DeliveryRef,
     DateTimeOffset CreatedAtUtc,
-    string? FailureReason);
+    string? FailureReason,
+    ReceiptEnvelope? Envelope = null);
 
 internal sealed record BlackLedgerAdvisoryRoleResolution(
     string? FactionId,
@@ -155,7 +158,13 @@ public sealed class BlackLedgerAdvisoryService
             Audience: ballot.Audience,
             UserId: user.UserId,
             OptionId: Normalize(optionId),
-            VotedAtUtc: DateTimeOffset.UtcNow);
+            VotedAtUtc: DateTimeOffset.UtcNow,
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "black_ledger_advisory_vote",
+                ownerScope: "community.black_ledger",
+                exposureClass: ReceiptExposureClasses.SignedIn,
+                evidenceRef: ballot.BallotId,
+                reviewState: "recorded"));
 
         lock (_store.Gate)
         {
@@ -244,7 +253,8 @@ public sealed class BlackLedgerAdvisoryService
             Status: "pending",
             DeliveryRef: null,
             CreatedAtUtc: DateTimeOffset.UtcNow,
-            FailureReason: null);
+            FailureReason: null,
+            Envelope: BuildMailReceiptEnvelope(mailKind, user.UserId, "pending"));
         UpsertMailReceipt(pending);
 
         try
@@ -333,11 +343,20 @@ public sealed class BlackLedgerAdvisoryService
         {
             Status = status,
             DeliveryRef = deliveryRef,
-            FailureReason = failureReason
+            FailureReason = failureReason,
+            Envelope = BuildMailReceiptEnvelope(receipt.MailKind, receipt.RecipientUserId, status)
         };
         UpsertMailReceipt(finalized);
         return finalized;
     }
+
+    private static ReceiptEnvelope BuildMailReceiptEnvelope(string mailKind, string userId, string reviewState)
+        => ReceiptEnvelopeFactory.Runtime(
+            receiptKind: "black_ledger_advisory_mail",
+            ownerScope: "community.black_ledger",
+            exposureClass: ReceiptExposureClasses.Internal,
+            evidenceRef: $"{mailKind}:{userId}",
+            reviewState: reviewState);
 
     private void UpsertMailReceipt(BlackLedgerAdvisoryMailReceipt receipt)
     {

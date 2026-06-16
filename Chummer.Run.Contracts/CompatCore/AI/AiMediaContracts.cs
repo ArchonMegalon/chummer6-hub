@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.AI;
 
 public static class AiMediaApiOperations
@@ -35,4 +37,5 @@ public sealed record AiMediaJobReceipt(
     bool ApprovalRequired = true,
     string? CharacterId = null,
     string? RuntimeFingerprint = null,
-    string? OwnerId = null);
+    string? OwnerId = null,
+    ReceiptEnvelope? Envelope = null);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Api.Services;
 
@@ -12,21 +13,42 @@ public sealed class KnowledgeFabricService
             Summary: "Shows the bounded modifier trail for initiative posture without copying official sourcebook text.",
             Provenance: "Chummer rules runtime + public-safe explain summary",
             Route: "/rules/receipts/kf_explain_initiative_sr5.json",
-            Status: "live"),
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "knowledge_fabric",
+                ownerScope: "rules.knowledge_fabric",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "kf_explain_initiative_sr5",
+                reviewState: "live")),
         new(
             ReceiptId: "kf_provenance_armor_stack",
             Topic: "Armor stack provenance",
             Summary: "Names where the answer came from and where the public-safe boundary stops.",
             Provenance: "Capability receipt + provenance label",
             Route: "/rules/receipts/kf_provenance_armor_stack.json",
-            Status: "live"),
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "knowledge_fabric",
+                ownerScope: "rules.knowledge_fabric",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "kf_provenance_armor_stack",
+                reviewState: "live")),
         new(
             ReceiptId: "kf_house_rule_boundary",
             Topic: "House-rule boundary",
             Summary: "Shows how Chummer distinguishes canon-facing runtime truth from a table-local amendment package.",
             Provenance: "Package posture + explain receipt",
             Route: "/rules/receipts/kf_house_rule_boundary.json",
-            Status: "live")
+            Status: "live",
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "knowledge_fabric",
+                ownerScope: "rules.knowledge_fabric",
+                exposureClass: ReceiptExposureClasses.PublicSafe,
+                lifecycleState: ReceiptLifecycleStates.Published,
+                evidenceRef: "kf_house_rule_boundary",
+                reviewState: "live"))
     ];
 
     public IReadOnlyList<KnowledgeFabricReceipt> ListReceipts() => Receipts;
@@ -101,4 +123,5 @@ public sealed record KnowledgeFabricReceipt(
     string Summary,
     string Provenance,
     string Route,
-    string Status);
+    string Status,
+    ReceiptEnvelope? Envelope = null);

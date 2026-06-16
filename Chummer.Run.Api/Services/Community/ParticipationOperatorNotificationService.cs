@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,7 +33,8 @@ public sealed record ParticipationOperatorNotificationReceipt(
     string? DeliveryRef = null,
     string? Summary = null,
     string? FailureReason = null,
-    string? RateLimitBucket = null);
+    string? RateLimitBucket = null,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed class ParticipationOperatorNotificationService
 {
@@ -331,6 +333,12 @@ public sealed class ParticipationOperatorNotificationService
             Summary = summary,
             FailureReason = failureReason,
             AttemptedAtUtc = DateTimeOffset.UtcNow,
+            Envelope = ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "participation_operator_notification",
+                ownerScope: "community.participation",
+                exposureClass: ReceiptExposureClasses.Internal,
+                evidenceRef: receipt.EventKey,
+                reviewState: status),
         };
 
         lock (_store.Gate)
@@ -381,7 +389,13 @@ public sealed class ParticipationOperatorNotificationService
             DeliveryRef: deliveryRef,
             Summary: summary,
             FailureReason: failureReason,
-            RateLimitBucket: rateLimitBucket);
+            RateLimitBucket: rateLimitBucket,
+            Envelope: ReceiptEnvelopeFactory.Runtime(
+                receiptKind: "participation_operator_notification",
+                ownerScope: "community.participation",
+                exposureClass: ReceiptExposureClasses.Internal,
+                evidenceRef: eventKey,
+                reviewState: status));
 
     private async Task<string> SendToEaAsync(ParticipationOperatorNotificationReceipt receipt, string recipient, CancellationToken cancellationToken)
     {

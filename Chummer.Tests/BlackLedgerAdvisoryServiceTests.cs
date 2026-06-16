@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
@@ -30,7 +31,12 @@ public sealed class BlackLedgerAdvisoryServiceTests
             Assert.Equal(1, options[0].GetProperty("VoteCount").GetInt32());
             Assert.Equal(0, options[2].GetProperty("VoteCount").GetInt32());
             Assert.Equal("1 advisory vote(s)", ballot.GetProperty("StatusLabel").GetString());
-            Assert.Single(harness.Store.BlackLedgerAdvisoryVoteReceipts);
+            BlackLedgerAdvisoryVoteReceipt receipt = Assert.Single(harness.Store.BlackLedgerAdvisoryVoteReceipts);
+            Assert.NotNull(receipt.Envelope);
+            Assert.Equal("black_ledger_advisory_vote", receipt.Envelope!.ReceiptKind);
+            Assert.Equal("community.black_ledger", receipt.Envelope.OwnerScope);
+            Assert.Equal(ReceiptExposureClasses.SignedIn, receipt.Envelope.ExposureClass);
+            Assert.Equal("recorded", receipt.Envelope.ReviewState);
         }
         finally
         {
@@ -70,6 +76,14 @@ public sealed class BlackLedgerAdvisoryServiceTests
 
             Assert.Equal(5, first.Count);
             Assert.All(first, receipt => Assert.Equal("sent", receipt.Status));
+            Assert.All(first, receipt =>
+            {
+                Assert.NotNull(receipt.Envelope);
+                Assert.Equal("black_ledger_advisory_mail", receipt.Envelope!.ReceiptKind);
+                Assert.Equal("community.black_ledger", receipt.Envelope.OwnerScope);
+                Assert.Equal(ReceiptExposureClasses.Internal, receipt.Envelope.ExposureClass);
+                Assert.Equal("sent", receipt.Envelope.ReviewState);
+            });
             Assert.Equal(5, harness.Requests.Count);
             Assert.Equal(5, second.Count);
             Assert.Equal(5, harness.Requests.Count);
@@ -100,7 +114,11 @@ public sealed class BlackLedgerAdvisoryServiceTests
             IReadOnlyList<BlackLedgerAdvisoryMailReceipt> receipts = await harness.Service.SendCurrentMailshotsAsync(CancellationToken.None);
 
             Assert.Equal(5, receipts.Count);
-            Assert.All(receipts, receipt => Assert.Equal("suppressed_delivery_unconfigured", receipt.Status));
+            Assert.All(receipts, receipt =>
+            {
+                Assert.Equal("suppressed_delivery_unconfigured", receipt.Status);
+                Assert.Equal("suppressed_delivery_unconfigured", receipt.Envelope!.ReviewState);
+            });
             Assert.Empty(harness.Requests);
             Assert.Equal(5, harness.Store.BlackLedgerAdvisoryMailReceipts.Count);
         }
