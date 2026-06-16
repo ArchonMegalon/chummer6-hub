@@ -314,7 +314,7 @@ public sealed class PublicLandingController : Controller
             .ToArray();
         var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
             surfacedWindowsArtifactIds);
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current public release, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current release build, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
@@ -9734,19 +9734,16 @@ Boundary:
         string published = $"Released {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
 
-        if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"Public Stable. {releaseExperience.Display.BuildLabel}. {published}";
-        }
-
         bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(manifest.ProofStatus, "pass", StringComparison.OrdinalIgnoreCase);
-        if (checksPassing || pulse?.ParityClaimsReviewRequired == false)
+        if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase)
+            || checksPassing
+            || pulse?.ParityClaimsReviewRequired == false)
         {
-            return $"Public Stable. {releaseExperience.Display.BuildLabel}. {published}";
+            return $"{releaseExperience.Display.ChannelLabel}. {releaseExperience.Display.BuildLabel}. {published}";
         }
 
-        return $"Current public release on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
+        return $"Current release build on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
     }
 
     private static string BuildPublicStatusReleaseSummary(

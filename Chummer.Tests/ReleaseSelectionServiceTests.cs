@@ -111,7 +111,7 @@ platforms:
 
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: false);
 
-        Assert.Equal("Preview channel", experience.Display.ChannelLabel);
+        Assert.Equal("Current release build", experience.Display.ChannelLabel);
         Assert.Equal("Need install help?", experience.InstallHelpLabel);
         Assert.NotNull(experience.Recommended);
         Assert.Equal("Avalonia Desktop Linux X64 Installer", experience.Recommended!.Artifact.Platform);

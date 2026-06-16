@@ -192,7 +192,7 @@ public sealed record PublicReleaseManifestDto(
         => IsPublicStable(channel, rolloutState)
             ? "Public release"
             : string.Equals((channel ?? string.Empty).Trim(), "preview", StringComparison.OrdinalIgnoreCase)
-                ? "Preview channel"
+                ? "Current release build"
                 : string.IsNullOrWhiteSpace(channel)
                     ? "Release channel"
                     : channel.Trim();

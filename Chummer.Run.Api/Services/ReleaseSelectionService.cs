@@ -856,12 +856,12 @@ public sealed class ReleaseSelectionService
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the downloads page yet",
-                $"The current public release does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
+                $"The current release build does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and release-truth checks.");
         }
 
         return new PlatformShelfNoticeViewModel(
             $"{label} is not on the current downloads page",
-            $"The current public release does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
+            $"The current release build does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
     }
 
     private static string? RequestedPlatformLabel(string? requestedPlatform)

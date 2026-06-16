@@ -38,7 +38,7 @@ public sealed class HubPageChromeServiceTests
 
         var service = CreateService(configuration);
 
-        var chrome = service.BuildPublicChrome("Downloads", "Install the current public release.", "/downloads");
+        var chrome = service.BuildPublicChrome("Downloads", "Install the current release build.", "/downloads");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
         Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);

@@ -111,7 +111,7 @@ public sealed class PublicLandingDownloadsChromeTests
         var releaseExperience = BuildGuestMacReleaseExperience();
         var chrome = new SiteChromeViewModel(
             Title: "Downloads",
-            Description: "Install the current public release.",
+            Description: "Install the current release build.",
             CurrentPath: "/downloads",
             PrimaryNavigation: [],
             SecondaryNavigation: [],

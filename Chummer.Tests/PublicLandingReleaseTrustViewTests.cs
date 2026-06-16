@@ -181,7 +181,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
         Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
-        Assert.Contains("Current public release", view, StringComparison.Ordinal);
+        Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
         Assert.Contains("Caution.", view, StringComparison.Ordinal);
         Assert.Contains("@Model.CautionSummary", view, StringComparison.Ordinal);
         Assert.Contains("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
@@ -257,7 +257,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("optional sign-in and support attached", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or verified path is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("verified paths and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
-        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
+        Assert.Contains("releaseExperience.Display.ChannelLabel", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("journey proofs and {routeCount} trust routes", controller, StringComparison.Ordinal);
     }
 
@@ -271,7 +271,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
-        Assert.Contains("Current public release", view, StringComparison.Ordinal);
+        Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
         Assert.Contains("Caution.", view, StringComparison.Ordinal);
         Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Current release at a glance.", view, StringComparison.Ordinal);
@@ -336,9 +336,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.DoesNotContain("Current public release:", controller, StringComparison.Ordinal);
-        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
+        Assert.Contains("releaseExperience.Display.ChannelLabel", controller, StringComparison.Ordinal);
         Assert.Contains("Check what works today and support before wider rollouts.", controller, StringComparison.Ordinal);
-        Assert.Contains("Public Stable.", controller, StringComparison.Ordinal);
     }
 
     [Fact]
