@@ -1,4 +1,5 @@
 using Chummer.Contracts.Content;
+using Chummer.Contracts.Receipts;
 
 namespace Chummer.Contracts.Hub;
 
@@ -57,4 +58,5 @@ public sealed record HubProjectInstallPreviewReceipt(
     string? DeferredReason = null,
     string? RuntimeCompatibilitySummary = null,
     string? CampaignReturnSummary = null,
-    string? SupportClosureSummary = null);
+    string? SupportClosureSummary = null,
+    ReceiptEnvelope? Envelope = null);

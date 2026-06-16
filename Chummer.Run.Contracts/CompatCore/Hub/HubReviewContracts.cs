@@ -1,3 +1,5 @@
+using Chummer.Contracts.Receipts;
+
 namespace Chummer.Contracts.Hub;
 
 public static class HubRecommendationStates
@@ -25,7 +27,8 @@ public sealed record HubReviewReceipt(
     DateTimeOffset UpdatedAtUtc,
     int? Stars = null,
     string? ReviewText = null,
-    bool UsedAtTable = false);
+    bool UsedAtTable = false,
+    ReceiptEnvelope? Envelope = null);
 
 public sealed record HubReviewCatalog(
     IReadOnlyList<HubReviewReceipt> Items);
