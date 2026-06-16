@@ -9001,8 +9001,16 @@ Boundary:
 
     private static string BuildLiveVerificationLabel(PublicReleaseManifestDto manifest)
     {
-        DateTimeOffset fallback = manifest.ProofGeneratedAt ?? manifest.GeneratedAt ?? manifest.PublishedAt;
-        DateTimeOffset effective = fallback;
+        DateTimeOffset effective = manifest.PublishedAt;
+        if (manifest.GeneratedAt is DateTimeOffset generatedAt && generatedAt > effective)
+        {
+            effective = generatedAt;
+        }
+
+        if (manifest.ProofGeneratedAt is DateTimeOffset proofGeneratedAt && proofGeneratedAt > effective)
+        {
+            effective = proofGeneratedAt;
+        }
 
         foreach (string receiptPath in new[]
                  {
@@ -9023,9 +9031,9 @@ Boundary:
                 {
                     if (document.RootElement.TryGetProperty(propertyName, out JsonElement generatedAtElement)
                         && generatedAtElement.ValueKind == JsonValueKind.String
-                        && DateTimeOffset.TryParse(generatedAtElement.GetString(), out DateTimeOffset generatedAt))
+                        && DateTimeOffset.TryParse(generatedAtElement.GetString(), out DateTimeOffset parsedGeneratedAt))
                     {
-                        effective = generatedAt;
+                        effective = parsedGeneratedAt;
                         return effective.ToUniversalTime().ToString("yyyy-MM-dd");
                     }
                 }
@@ -9743,7 +9751,7 @@ Boundary:
             return $"{releaseExperience.Display.ChannelLabel}. {releaseExperience.Display.BuildLabel}. {published}";
         }
 
-        return $"Current release build on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
+        return $"{releaseExperience.Display.ChannelLabel}. {releaseExperience.Display.BuildLabel}. {published} Check what works today and support before wider rollouts.";
     }
 
     private static string BuildPublicStatusReleaseSummary(

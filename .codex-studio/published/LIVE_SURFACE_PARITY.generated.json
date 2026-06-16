@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-15T20:06:33Z",
+  "generated_at_utc": "2026-06-16T18:57:14Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -11,16 +11,15 @@
       "final_url": "https://chummer.run/",
       "status_code": 200,
       "required_texts": [
-        "Black Ledger command deck",
+        "Black Ledger",
         "The city is moving.",
         "Install, play, or open the city.",
-        "Support."
+        "Get Chummer"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
         "Next move",
         "Need help?",
-        "Live product.",
         "One compact rail for downloads, play, and public status.",
         "Reel details",
         "Keep it simple",
@@ -43,11 +42,13 @@
       "status_code": 200,
       "required_texts": [
         "Install Chummer",
-        "Start with the recommended build",
+        "Choose a release lane.",
+        "Nightly",
+        "Stable",
         "Install help",
         "Filter downloads",
-        "Public downloads are available now on Windows, macOS, and Linux.",
-        "Release notes live here."
+        "Public downloads are available now on Windows and Linux.",
+        "Release notes and install requirements stay on this page."
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
@@ -55,8 +56,6 @@
         "Current notes.",
         "Install questions?",
         "Account return later?",
-        "Release notes stay here.",
-        "Public downloads are available now on Windows and Linux.",
         "account-assisted install paths",
         "Link this copy from the first launch",
         "guided installer",
@@ -77,9 +76,9 @@
       "final_url": "https://chummer.run/status",
       "status_code": 200,
       "required_texts": [
-        "Release, caution, next step.",
+        "Release. Caution. Next step.",
         "Caution.",
-        "Current public release"
+        "Current release build"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [

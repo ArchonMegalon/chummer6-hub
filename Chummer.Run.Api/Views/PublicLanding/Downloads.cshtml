@@ -73,10 +73,9 @@
                 : requestedWindowsUnavailable && hasWindowsProofRail
                         ? "Windows is not available for this browser right now. Check the main platform downloads below, and use the Windows verification page only if support points you there."
                     : release.PlatformShelfNoticeSummary
-                : accessPosture?.AvailabilitySummary
-                    ?? (guestGateRequired
-                        ? "This install path can link sign-in and support from the first launch when you want them attached."
-                        : "Other platforms stay below."))
+                : guestGateRequired
+                    ? "This install path can link sign-in and support from the first launch when you want them attached."
+                    : "Public downloads are available now on Windows and Linux.")
         </p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
@@ -170,7 +169,7 @@ else
                     <details class="release-accordion">
                         <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes and requirements">Release notes and requirements</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">Release notes stay here.</p>
+                            <p class="muted-copy">Release notes and install requirements stay on this page.</p>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>

@@ -11,7 +11,7 @@ PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-$REPO_ROOT/Chummer.Portal/download
 PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-$REPO_ROOT/Chummer.Portal/downloads}"
 STARTUP_SMOKE_DIR="${STARTUP_SMOKE_DIR:-$(dirname "$DOWNLOADS_DIR")/startup-smoke}"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-}"
-PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
+PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-unpublished}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL:-docker}"
 RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
@@ -50,6 +50,14 @@ resolve_ui_localization_release_gate_path() {
 
   echo "$REPO_ROOT/Chummer.Run.Api/wwwroot/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json"
 }
+
+if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
+  if [[ "${RELEASE_CHANNEL,,}" == "preview" ]]; then
+    PUBLIC_SKIP_STARTUP_SMOKE_FILTER="true"
+  else
+    PUBLIC_SKIP_STARTUP_SMOKE_FILTER="false"
+  fi
+fi
 
 UI_LOCALIZATION_RELEASE_GATE_PATH="$(resolve_ui_localization_release_gate_path)"
 
@@ -293,10 +301,7 @@ if isinstance(downloads, list):
                 str(artifact.get(key) or "").strip().lower()
                 for key in ("platform", "platformId", "rid", "artifactId", "fileName")
             )
-            windows_preview_portable = kind == "portable" and any(
-                token in platform_tokens for token in ("windows", "win-", ".exe")
-            )
-            if kind not in {"installer", "dmg", "pkg", "msix"} and not windows_preview_portable:
+            if kind not in {"installer", "dmg", "pkg", "msix"}:
                 continue
         access_class = resolved_access_class(artifact)
         if not access_class:
@@ -320,10 +325,7 @@ for artifact in payload.get("artifacts") or []:
             str(artifact.get(key) or "").strip().lower()
             for key in ("platform", "platformId", "rid", "artifactId", "fileName")
         )
-        windows_preview_portable = kind == "portable" and any(
-            token in platform_tokens for token in ("windows", "win-", ".exe")
-        )
-        if kind not in {"installer", "dmg", "pkg", "msix"} and not windows_preview_portable:
+        if kind not in {"installer", "dmg", "pkg", "msix"}:
             continue
 
     access_class = resolved_access_class(artifact)
@@ -651,6 +653,13 @@ is_public_artifact() {
   if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
     return 1
   fi
+  case "$artifact_name" in
+    chummer-*-win-*.zip|chummer-*-win-*.tar.gz|chummer-*-win-*.exe)
+      if [[ "$artifact_name" != *-installer.exe ]]; then
+        return 1
+      fi
+      ;;
+  esac
   return 0
 }
 

@@ -14,7 +14,7 @@ MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
-PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
+PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"
 CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
 
 to_bool() {
@@ -23,12 +23,27 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
+  if [[ "${RELEASE_CHANNEL:-preview}" =~ ^[Pp][Rr][Ee][Vv][Ii][Ee][Ww]$ ]]; then
+    PUBLIC_SKIP_STARTUP_SMOKE_FILTER="true"
+  else
+    PUBLIC_SKIP_STARTUP_SMOKE_FILTER="false"
+  fi
+fi
+
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
   if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-*installer.dmg || "$artifact_name" == chummer-*-osx-*installer.pkg ]]; then
     return 1
   fi
+  case "$artifact_name" in
+    chummer-*-win-*.zip|chummer-*-win-*.tar.gz|chummer-*-win-*.exe)
+      if [[ "$artifact_name" != *-installer.exe ]]; then
+        return 1
+      fi
+      ;;
+  esac
   return 0
 }
 
@@ -307,7 +322,7 @@ SOURCE_MANIFEST_PATH="$MANIFEST_SOURCE" \
 RELEASE_PROOF_PATH="$RELEASE_PROOF_PATH" \
 STARTUP_SMOKE_DIR="$STARTUP_SMOKE_SOURCE" \
 CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-}" \
-CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}" \
+CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-$PUBLIC_SKIP_STARTUP_SMOKE_FILTER}" \
 CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
 

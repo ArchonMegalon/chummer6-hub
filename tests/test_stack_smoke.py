@@ -364,7 +364,8 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn("bundle_manifest_matches_files()", script_text)
         self.assertIn("Set RELEASE_VERSION and RELEASE_PUBLISHED_AT explicitly for this republish.", script_text)
         self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', script_text)
-        self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', script_text)
+        self.assertIn('PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"', script_text)
+        self.assertIn('if [[ "${RELEASE_CHANNEL:-preview}" =~ ^[Pp][Rr][Ee][Vv][Ii][Ee][Ww]$ ]]; then', script_text)
         self.assertIn('chummer-blazor-desktop-*-installer.dmg', script_text)
         self.assertIn('bash "$SCRIPT_DIR/generate-releases-manifest.sh"', script_text)
         self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"', script_text)
@@ -379,7 +380,8 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn("bash scripts/publish-download-bundle.sh", bootstrap_text)
         self.assertIn("bundle_manifest_matches_files()", publish_text)
         self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', publish_text)
-        self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', publish_text)
+        self.assertIn('PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"', publish_text)
+        self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-$PUBLIC_SKIP_STARTUP_SMOKE_FILTER}"', publish_text)
         self.assertIn('chummer-blazor-desktop-*-installer.dmg', publish_text)
         self.assertIn("Set RELEASE_VERSION and RELEASE_PUBLISHED_AT explicitly for this republish.", publish_text)
         self.assertIn('CHUMMER_PUBLIC_EDGE_DOWNLOADS_MIRROR_DIRS', publish_text)
@@ -458,7 +460,7 @@ class StackConfigSmokeTests(unittest.TestCase):
             if not script_path.exists():
                 self.skipTest(f"missing shared bundle publisher: {script_path}")
             script_text = script_path.read_text(encoding="utf-8")
-            self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', script_text)
+            self.assertIn('PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"', script_text)
             self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', script_text)
 
     def test_run_services_manifest_generator_recanonicalizes_verifier_owned_release_channel_surfaces(self):
@@ -648,6 +650,7 @@ class StackConfigSmokeTests(unittest.TestCase):
 
             manifest_path = temp_path / "RELEASE_CHANNEL.generated.json"
             compat_path = temp_path / "releases.json"
+            release_fixture["releaseProof"]["status"] = "pass"
             release_fixture["releaseProof"]["generatedAt"] = published_at
             release_fixture["releaseProof"]["generated_at"] = published_at
             ui_gate = release_fixture["releaseProof"].get("uiLocalizationReleaseGate") or {}

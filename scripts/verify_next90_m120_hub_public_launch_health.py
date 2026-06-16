@@ -182,7 +182,7 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Current release",
         'data-status-surface="decision-surface"',
-        "Release, caution, next step.",
+        "Release. Caution. Next step.",
         "Caution.",
         'aria-label="Status next actions"',
         "Open progress",

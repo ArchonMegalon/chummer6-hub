@@ -21,15 +21,14 @@ SURFACES = [
     {
         "path": "/",
         "required_texts": [
-            "Black Ledger command deck",
+            "Black Ledger",
             "The city is moving.",
             "Install, play, or open the city.",
-            "Support.",
+            "Get Chummer",
         ],
         "forbidden_texts": [
             "Next move",
             "Need help?",
-            "Live product.",
             "One compact rail for downloads, play, and public status.",
             "Reel details",
             "Keep it simple",
@@ -45,19 +44,19 @@ SURFACES = [
         "path": "/downloads",
         "required_texts": [
             "Install Chummer",
-            "Start with the recommended build",
+            "Choose a release lane.",
+            "Nightly",
+            "Stable",
             "Install help",
             "Filter downloads",
-            "Public downloads are available now on Windows, macOS, and Linux.",
-            "Release notes live here.",
+            "Public downloads are available now on Windows and Linux.",
+            "Release notes and install requirements stay on this page.",
         ],
         "forbidden_texts": [
             "Need account return?",
             "Current notes.",
             "Install questions?",
             "Account return later?",
-            "Release notes stay here.",
-            "Public downloads are available now on Windows and Linux.",
             "account-assisted install paths",
             "Link this copy from the first launch",
             "guided installer",
@@ -71,9 +70,9 @@ SURFACES = [
     {
         "path": "/status",
         "required_texts": [
-            "Release, caution, next step.",
+            "Release. Caution. Next step.",
             "Caution.",
-            "Current public release",
+            "Current release build",
         ],
         "forbidden_texts": [
             "Release and next step.",

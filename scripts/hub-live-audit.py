@@ -11949,13 +11949,13 @@ def main() -> int:
             "The city is moving.",
             required_texts=(
                 "Black Ledger",
-                "Three signals. One moving city.",
-                "Six seeded houses are already pushing on the same city.",
-                "Flagship reel",
-                "/media/promo/chummer6-flagship-promo.receipt.json",
+                "Build the runner. Run the table. Move the city.",
+                "Six houses. One moving city.",
+                "Install, play, or open the city.",
                 "Desktop build",
                 "Mobile play shell",
-                "Status"),
+                "Status",
+                "Get Chummer"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
@@ -11981,19 +11981,18 @@ def main() -> int:
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Public downloads are available now on Windows, macOS, and Linux.",
                 "Main platform downloads",
                 "Windows",
                 "Linux",
                 "macOS",
-                "Install notes"),
+                "Install help"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
             "/status",
-            "Release, caution, next step.",
+            "Release. Caution. Next step.",
             required_texts=(
-                "Current public release",
+                "Current release build",
                 "Caution.",
                 "Known issues stay on downloads.",
                 "Windows",
@@ -12155,7 +12154,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Public Stable", "Release, caution, next step.", "Caution."):
+    for snippet in ("Current release build", "Release. Caution. Next step.", "Caution."):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

@@ -57,7 +57,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const decisionCards = decisionSurface.locator('.route-choice-card');
   const nextActions = decisionSurface.locator('.stacked-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
-  await expect(decisionSurface).toContainText('Release, caution, next step.');
+  await expect(decisionSurface).toContainText('Release. Caution. Next step.');
   const cardCount = await decisionCards.count();
   if (cardCount !== 1) {
     failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);

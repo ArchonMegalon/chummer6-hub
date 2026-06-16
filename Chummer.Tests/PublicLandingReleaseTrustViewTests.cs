@@ -13,7 +13,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
         Assert.Contains("@release.KnownIssuesLabel", view, StringComparison.Ordinal);
         Assert.Contains("@release.InstallHelpLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Release notes stay here.", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes and install requirements stay on this page.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Install help", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Filter downloads", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Release notes stay here.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Release notes and install requirements stay on this page.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Sign in later if you need return or support.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows ZIP", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);
