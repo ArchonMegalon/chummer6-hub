@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-17T15:11:42Z",
+  "generatedAt": "2026-06-17T15:37:58Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,12 +9,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.aPevcrNd9N/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.1KnHq26EnK/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "7c9968b1051d7a0d28cb7ba448363a10f6dd976f01719dd1c025d14329b72b50",
-      "artifactSizeBytes": 35408324,
+      "artifactSha256": "963f8e00511fdfbc37c5a8a2ac1bbc03697919410051ca7276b63da79f0e4e4d",
+      "artifactSizeBytes": 37576910,
       "kind": "installer"
     },
     {
@@ -24,12 +24,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "skipped_incompatible_host",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.aPevcrNd9N/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.1KnHq26EnK/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "9014793cb162659199d5dcdcc805e97e4f1d41aad47a62d6542ab129f01fcd01",
-      "artifactSizeBytes": 97469174,
+      "artifactSha256": "ca14535d869f6319a284b98b6c31f229730035df48ddd43bc2051ad625e2be5f",
+      "artifactSizeBytes": 101396281,
       "kind": "installer"
     },
     {
@@ -43,8 +43,8 @@
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "6971e67b894c356b6824c7cfa1839e4a9e5f4925ef4438140aed0333e2a08507",
-      "artifactSizeBytes": 110148116,
+      "artifactSha256": "8f6ba5b074a1b809a3a2e8e6fda7a5cd84c7dcd858f8a57242271e33b8d4e726",
+      "artifactSizeBytes": 433152,
       "kind": "portable"
     },
     {
@@ -58,8 +58,8 @@
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "395761b4824fbb7db5203d877138c182a472180b8eb063e2f6d643317f1e6d12",
-      "artifactSizeBytes": 45621401,
+      "artifactSha256": "2513ddece48991f84a198c66c519ffdb00b85a0da78c9d1cf3ff97742f9ef0a6",
+      "artifactSizeBytes": 49548508,
       "kind": "archive"
     }
   ]
