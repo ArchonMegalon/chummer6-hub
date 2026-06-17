@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-17T13:59:35Z",
+  "generatedAt": "2026-06-17T15:11:42Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,12 +9,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.yqJUmMzJEG/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.aPevcrNd9N/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "0109ba40a0078dd82802c6f9db43264dd10032ca99cb0133adfc2a7221e67d03",
-      "artifactSizeBytes": 35392226,
+      "artifactSha256": "7c9968b1051d7a0d28cb7ba448363a10f6dd976f01719dd1c025d14329b72b50",
+      "artifactSizeBytes": 35408324,
       "kind": "installer"
     },
     {
@@ -24,13 +24,43 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "skipped_incompatible_host",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.yqJUmMzJEG/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.aPevcrNd9N/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "0dd4c08005d23d7f6efde8045740187292971e7379d0c2a1e063490078764569",
-      "artifactSizeBytes": 97458244,
+      "artifactSha256": "9014793cb162659199d5dcdcc805e97e4f1d41aad47a62d6542ab129f01fcd01",
+      "artifactSizeBytes": 97469174,
       "kind": "installer"
+    },
+    {
+      "artifactId": "avalonia-win-x64-portable",
+      "fileName": "chummer-avalonia-win-x64.exe",
+      "platform": "windows",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "",
+      "signingReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": null,
+      "artifactSha256": "6971e67b894c356b6824c7cfa1839e4a9e5f4925ef4438140aed0333e2a08507",
+      "artifactSizeBytes": 110148116,
+      "kind": "portable"
+    },
+    {
+      "artifactId": "avalonia-win-x64-archive",
+      "fileName": "chummer-avalonia-win-x64.zip",
+      "platform": "windows",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "",
+      "signingReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": null,
+      "artifactSha256": "395761b4824fbb7db5203d877138c182a472180b8eb063e2f6d643317f1e6d12",
+      "artifactSizeBytes": 45621401,
+      "kind": "archive"
     }
   ]
 }
