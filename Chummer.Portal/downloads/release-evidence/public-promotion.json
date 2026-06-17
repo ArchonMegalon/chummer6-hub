@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-16T13:40:00Z",
+  "generatedAt": "2026-06-17T03:54:57Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,12 +9,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/docker/chummercomplete/_staging/release-candidate-run-20260616-110751/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.RUSgKAl9BD/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "2a6b961c19aa2cc18a75e89011a334bb41b09a34d970a1fb4bbdb404d7d14459",
-      "artifactSizeBytes": 35369378,
+      "artifactSha256": "bcb2837fbeb0cd6aba6e88464232a69a8ca1dd5a8327f25ecb9683d87b924819",
+      "artifactSizeBytes": 35372980,
       "kind": "installer"
     },
     {
@@ -22,14 +22,14 @@
       "fileName": "chummer-avalonia-win-x64-installer.exe",
       "platform": "windows",
       "promotionStatus": "pass",
-      "startupSmokeStatus": "skipped",
-      "startupSmokeReason": "Windows startup smoke requires Wine, PowerShell, or a Windows-compatible shell bridge; current host cannot execute Windows installer smoke.",
-      "startupSmokeReceiptPath": "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeStatus": "skipped_incompatible_host",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "/tmp/tmp.RUSgKAl9BD/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
-      "signingStatus": "unsigned_public_release",
+      "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "f54e890a7df67c3e89b32baf919007a239ce8c55f2f0426b2246b8e2f9ef1f78",
-      "artifactSizeBytes": 97408964,
+      "artifactSha256": "e57d7e56d53ec7c70ba79296c10049ea39cfdbcd660551e6a6afdf23dc0f048a",
+      "artifactSizeBytes": 97425073,
       "kind": "installer"
     }
   ]
