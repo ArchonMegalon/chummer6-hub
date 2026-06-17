@@ -1,40 +1,40 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-06-15T12:18:24Z",
-  "as_of": "2026-06-15",
-  "history_snapshot_count": 39,
+  "generated_at": "2026-06-17T04:41:51Z",
+  "as_of": "2026-06-17",
+  "history_snapshot_count": 40,
   "brand": "Chummer6",
-  "active_wave": "Scale & stabilize",
-  "active_wave_status": "unknown",
-  "active_slice": "Scale & stabilize",
-  "headline": "",
-  "overall_status": "unknown",
+  "active_wave": "Next 12 Biggest Wins",
+  "active_wave_status": "complete",
+  "active_slice": "Next 12 Biggest Wins",
+  "headline": "Progress report for a product becoming a build machine.",
+  "overall_status": "complete",
   "progress_percent": 100,
   "percent_complete": 100,
   "percent_inflight": 0,
   "percent_blocked": 0,
   "momentum": {
-    "label": "Complete",
-    "summary": "All mapped public parts are currently at zero open milestones."
+    "label": "Stale",
+    "summary": "Core Engine is currently setting the delivery pace."
   },
   "top_risks": [
     {
-      "key": "completion_frontier",
-      "summary": "Completion frontier closeout proof is still failing. weekly product pulse reports release health as needs_attention"
+      "key": "full_product_queue",
+      "summary": "1 open milestones remain in the full-product frontier. The current supervisor ETA is scoped to Completion review and proof recovery, not full-product parity."
     }
   ],
   "flagship_readiness": {
     "status": "ready",
-    "summary": "{'ready_count': 8, 'warning_count': 0, 'missing_count': 0, 'scoped_warning_count': 0, 'scoped_missing_count': 0, 'deferred_warning_count': 0, 'history_snapshot_count': 38}",
+    "summary": "Feature parity, desktop layout familiarity, and executable flagship proof are all green.",
     "feature_parity_proven": true,
     "layout_familiarity_proven": true,
     "desktop_executable_gate_status": "pass",
-    "desktop_executable_gate_summary": "Published flagship readiness proof is green.",
+    "desktop_executable_gate_summary": "Desktop executable exit gate is proven by passing packaged-head receipts for promoted desktop platforms (Linux, macOS, Windows) and per-head flagship UI release proof.",
     "windows_blocking_reason_count": 0,
     "windows_blocking_reasons": [],
     "proofs": {
-      "import_parity_status": "pass",
+      "import_parity_status": "passed",
       "chummer5a_workflow_parity_status": "pass",
       "sr4_workflow_parity_status": "pass",
       "sr6_workflow_parity_status": "pass",
@@ -43,8 +43,8 @@
     }
   },
   "release_readiness": {
-    "status": "warning",
-    "summary": "Completion frontier closeout proof is still failing. weekly product pulse reports release health as needs_attention. Mapped public parts are at zero open milestone weight, but the active wave is still unknown; flagship and release claims remain open until that wave closes.",
+    "status": "tracked",
+    "summary": "Mapped public parts are at zero open milestone weight, but there are still 1 open milestones in the full-product frontier. The current supervisor ETA is scoped to Completion review and proof recovery, so it should not be read as a full-product parity ETA.",
     "blocking_parts": []
   },
   "parity": {
@@ -64,29 +64,29 @@
       "route": "/downloads",
       "title": "Downloads and install truth",
       "semantic_family": "supportable_install",
-      "proof_state": "blocked",
+      "proof_state": "preview-bounded",
       "proof_badge": {
-        "state": "blocked",
-        "label": "Blocked",
-        "tone": "blocked"
+        "state": "preview-bounded",
+        "label": "Preview bounded",
+        "tone": "preview"
       },
       "summary": "Package compatibility, install, update, rollback, and revoke claims are published from the current release shelf instead of helper folklore.",
-      "detail": "0 compatible installer tuple(s) are published. Rollout state is unknown, support posture is unknown, and rollback stays armed.",
+      "detail": "0 compatible installer tuple(s) are published. Rollout state is promoted_preview, support posture is review_required, and rollback stays watch.",
       "evidence": [
-        "Release channel: missing",
-        "Release proof: missing",
+        "Release channel: published",
+        "Release proof: review_required",
         "Install journey: ready",
-        "Fix availability: not published"
+        "Fix availability: Verify fix availability against the live channel artifact before closing support loops."
       ],
       "package_claims": {
         "compatible_installer_count": 0,
-        "published_installer_count": 0,
-        "rollout_state": "unknown",
-        "supportability_state": "unknown",
-        "rollback_state": "armed",
+        "published_installer_count": 2,
+        "rollout_state": "promoted_preview",
+        "supportability_state": "review_required",
+        "rollback_state": "watch",
         "revoke_state": "not_revoked",
-        "known_issue_summary": "",
-        "supportability_summary": ""
+        "known_issue_summary": "The preview shelf is visible, but known-issue review should stay front-and-center until proof is refreshed.",
+        "supportability_summary": "Treat the current release as review-required until release proof and support closure checks pass."
       }
     },
     {
@@ -94,18 +94,18 @@
       "route": "/home/work",
       "title": "Desktop workbench",
       "semantic_family": "desktop_flagship",
-      "proof_state": "implemented",
+      "proof_state": "public-stable",
       "proof_badge": {
-        "state": "implemented",
-        "label": "Implemented",
-        "tone": "implemented"
+        "state": "public-stable",
+        "label": "Public stable",
+        "tone": "stable"
       },
       "summary": "The public route only claims the flagship workbench when executable proof and veteran-familiar desktop signals agree.",
-      "detail": "{'ready_count': 8, 'warning_count': 0, 'missing_count': 0, 'scoped_warning_count': 0, 'scoped_missing_count': 0, 'deferred_warning_count': 0, 'history_snapshot_count': 38}",
+      "detail": "Feature parity, desktop layout familiarity, and executable flagship proof are all green.",
       "evidence": [
         "Flagship readiness: ready",
         "Desktop executable gate: pass",
-        "Workbench route proof: missing"
+        "Workbench route proof: present"
       ]
     },
     {
@@ -113,17 +113,17 @@
       "route": "/account/access",
       "title": "Account, restore, and device continuity",
       "semantic_family": "restore_and_portability",
-      "proof_state": "implemented",
+      "proof_state": "public-stable",
       "proof_badge": {
-        "state": "implemented",
-        "label": "Implemented",
-        "tone": "implemented"
+        "state": "public-stable",
+        "label": "Public stable",
+        "tone": "stable"
       },
       "summary": "Account value is framed as claim, restore, second-device continuation, and support continuity, not as a browser ritual.",
       "detail": "A person can install the flagship client, claim it, restore the right workspace, and continue safely on a known install.",
       "evidence": [
         "Journey state: ready",
-        "Account route proof: missing",
+        "Account route proof: present",
         "Journey recommendation: Keep the journey under routine weekly proof."
       ]
     },
@@ -170,83 +170,808 @@
       "route": "/roadmap",
       "title": "Governance and rollout posture",
       "semantic_family": "governance",
-      "proof_state": "preview-bounded",
+      "proof_state": "public-stable",
       "proof_badge": {
-        "state": "preview-bounded",
-        "label": "Preview bounded",
-        "tone": "preview"
+        "state": "public-stable",
+        "label": "Public stable",
+        "tone": "stable"
       },
       "summary": "Governance cards describe launch, canary, rollback, and claim-safety posture. They do not imply immediate rollout just because a proposal exists.",
-      "detail": "weekly product pulse reports release health as needs_attention",
+      "detail": "trusted completion receipt plus whole-product release proof and Linux desktop exit gate are ready",
       "evidence": [
-        "Completion audit: fail",
-        "Launch expand: allowed",
-        "Freeze launch: available",
+        "Completion audit: pass",
+        "Launch expand: blocked",
+        "Freeze launch: active",
         "Canary: ready",
-        "Rollback: armed",
+        "Rollback: watch",
         "Journey summary: ready"
       ]
     }
   ],
   "hero": {
-    "headline": "",
-    "support": "",
-    "ctas": []
+    "headline": "Progress report for a product becoming a build machine.",
+    "support": "The project is moving from canon and architecture into a more coherent public product: clearer entry surfaces, hardened rules, stronger shared UI, and a more credible path toward release.",
+    "ctas": [
+      {
+        "label": "See the program pulse",
+        "href": "#program",
+        "kind": "primary"
+      },
+      {
+        "label": "Read the timeline",
+        "href": "#timeline",
+        "kind": "secondary"
+      },
+      {
+        "label": "How the ETA works",
+        "href": "#method",
+        "kind": "secondary"
+      }
+    ]
   },
   "overall_progress_percent": 100,
-  "phase_label": "In progress",
-  "current_phase": "In progress",
+  "phase_label": "Public-fit polish",
+  "current_phase": "Public-fit polish",
   "next_checkpoint_eta_weeks_low": 0,
   "next_checkpoint_eta_weeks_high": 0,
-  "eta_summary": "",
-  "eta_human": null,
+  "eta_summary": "tracked in full-product frontier",
+  "eta_human": "tracked in full-product frontier",
   "longest_pole": {
-    "id": "no-active-release-pole",
-    "label": "No active release pole",
+    "id": "core-engine",
+    "label": "Core Engine",
     "eta_weeks_low": 0,
     "eta_weeks_high": 0
   },
-  "parts": [],
-  "recent_movement": [],
+  "parts": [
+    {
+      "id": "core-engine",
+      "public_name": "Core Rules Engine",
+      "short_public_name": "Core Engine",
+      "mapped_projects": [
+        "core"
+      ],
+      "progress_percent": 100,
+      "momentum_label": "Stale",
+      "eta_weeks_low": 0,
+      "eta_weeks_high": 0,
+      "summary": "Deterministic mechanics, reducer truth, and compatibility-safe runtime hardening.",
+      "milestones": [
+        {
+          "phase": "landed",
+          "title": "Hardening wave",
+          "body": "Legacy purification, retention controls, observability slices, and stronger verifier guardrails moved forward."
+        },
+        {
+          "phase": "now",
+          "title": "F1 closure",
+          "body": "Finish observability, disaster recovery, and replay-safety proof."
+        },
+        {
+          "phase": "target",
+          "title": "Auditable boring runtime",
+          "body": "A boring, auditable core runtime with no hidden legacy cargo."
+        }
+      ],
+      "recent_commit_count_7d": 21,
+      "remaining_open_weight": 0,
+      "remaining_open_milestones": 0,
+      "uncovered_scope_count": 0,
+      "momentum_score": 0.0,
+      "eta_source": "history_velocity",
+      "formula": {
+        "weighted_units": 0.0,
+        "scope_multiplier": 1.0,
+        "center_weeks": 0.0
+      },
+      "history_velocity_weight_points_per_week": 0.0,
+      "source_status": {
+        "mapped_project_count": 1,
+        "dispatchable_truth_ready": false,
+        "dispatchable_truth_ready_count": 0,
+        "package_compile": true,
+        "package_compile_count": 1,
+        "capacity_compile": true,
+        "capacity_compile_count": 1,
+        "published_artifacts_present": true,
+        "published_artifact_count": 2,
+        "lifecycle_counts": {
+          "live": 1
+        }
+      },
+      "source_projects": [
+        {
+          "id": "core",
+          "repo_slug": "chummer6-core",
+          "path": "/docker/chummercomplete/chummer6-core",
+          "lifecycle": "live",
+          "recent_commit_count_7d": 21,
+          "design_total_weight": 40,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-16T20:07:33.596641Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": "live"
+          }
+        }
+      ]
+    },
+    {
+      "id": "workbench-ui",
+      "public_name": "Workbench & Shared UI",
+      "short_public_name": "Workbench",
+      "mapped_projects": [
+        "ui",
+        "ui-kit"
+      ],
+      "progress_percent": 100,
+      "momentum_label": "Stale",
+      "eta_weeks_low": 0,
+      "eta_weeks_high": 0,
+      "summary": "Character building, inspectors, dense data UX, and the reusable Chummer design system.",
+      "milestones": [
+        {
+          "phase": "landed",
+          "title": "Scope clarified",
+          "body": "Remaining work was sliced into concrete queues for relationship graph, heat/favor, calendar, inspector, hub UX, portrait, and NPC persona."
+        },
+        {
+          "phase": "now",
+          "title": "Workbench complete",
+          "body": "Close workbench-complete and quality-hardening waves; centralize reusable UI primitives."
+        },
+        {
+          "phase": "target",
+          "title": "Polished workbench",
+          "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
+        }
+      ],
+      "recent_commit_count_7d": 65,
+      "remaining_open_weight": 0,
+      "remaining_open_milestones": 0,
+      "uncovered_scope_count": 0,
+      "momentum_score": 0.0,
+      "eta_source": "history_velocity",
+      "formula": {
+        "weighted_units": 0.0,
+        "scope_multiplier": 1.0,
+        "center_weeks": 0.0
+      },
+      "history_velocity_weight_points_per_week": 0.0,
+      "source_status": {
+        "mapped_project_count": 2,
+        "dispatchable_truth_ready": false,
+        "dispatchable_truth_ready_count": 0,
+        "package_compile": true,
+        "package_compile_count": 2,
+        "capacity_compile": true,
+        "capacity_compile_count": 2,
+        "published_artifacts_present": true,
+        "published_artifact_count": 67,
+        "lifecycle_counts": {
+          "live": 1,
+          "scaffold": 1
+        }
+      },
+      "source_projects": [
+        {
+          "id": "ui",
+          "repo_slug": "chummer6-ui",
+          "path": "/docker/chummercomplete/chummer6-ui",
+          "lifecycle": "live",
+          "recent_commit_count_7d": 64,
+          "design_total_weight": 56,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-17T04:17:00.425362Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "CHUMMER4_SR4_MUSCLE_MEMORY_INVENTORY.generated.json",
+              "CHUMMER4_SR4_MUSCLE_MEMORY_PARITY_GATE.generated.json",
+              "CHUMMER5A_ABSOLUTE_PARITY_TESTER.generated.json",
+              "CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json",
+              "CHUMMER5A_LAYOUT_HARD_GATE.generated.json",
+              "CHUMMER5A_LEGACY_EQUIVALENT_CHROME_GATE.generated.json",
+              "CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json",
+              "CHUMMER5A_MUSCLE_MEMORY_PARITY_GATE.generated.json",
+              "CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
+              "CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
+              "CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.md",
+              "CHUMMER5A_UI_PARITY_TESTER.generated.json",
+              "CHUMMER5A_ULTIMATE_PARITY_TESTER.generated.json",
+              "CHUMMER_SHARED_LEGACY_EQUIVALENT_CHROME_GATE.generated.json",
+              "CHUMMER_SR6_SHARED_MUSCLE_MEMORY_INVENTORY.generated.json",
+              "CHUMMER_SR6_SHARED_MUSCLE_MEMORY_PARITY_GATE.generated.json",
+              "CLASSIC_DENSE_WORKBENCH_POSTURE_GATE.generated.json",
+              "DELEGATE_COMMAND_ROUTE_PARITY.generated.json",
+              "DENSE_WORKBENCH_RECOVERY_GATE.generated.json",
+              "DESKTOP_EXECUTABLE_EXIT_GATE.generated.json",
+              "DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
+              "DESKTOP_VISUAL_PARITY_AUDIT.generated.json",
+              "DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json",
+              "GENERATED_DIALOG_ELEMENT_PARITY.generated.json",
+              "INTERACTIVE_CONTROL_INVENTORY.generated.json",
+              "NEXT90_M101_AVALONIA_PRIMARY_ROUTE_PROOF.generated.json",
+              "NEXT90_M101_UI_RELEASE_TRAIN.generated.json",
+              "NEXT90_M103_UI_VETERAN_CERTIFICATION.generated.json",
+              "NEXT90_M103_UI_VETERAN_CERTIFICATION_REVIEW.generated.md",
+              "NEXT90_M104_UI_EXPLAIN_RECEIPTS.generated.json",
+              "NEXT90_M105_UI_RESTORE_CONTINUITY.generated.json",
+              "NEXT90_M108_UI_CAMPAIGN_HOME_ARTIFACTS.generated.json",
+              "NEXT90_M112_UI_CAMPAIGN_MEMORY.generated.json",
+              "NEXT90_M113_UI_GM_PREP_ROSTER_SURFACE.generated.json",
+              "NEXT90_M114_UI_RULE_STUDIO.generated.json",
+              "NEXT90_M115_UI_PORTABLE_DOSSIER.generated.json",
+              "NEXT90_M116_UI_CREATOR_PUBLICATION.generated.json",
+              "NEXT90_M117_UI_ARTIFACT_SHELF.generated.json",
+              "NEXT90_M118_UI_ORGANIZER_OPS.generated.json",
+              "NEXT90_M119_UI_FIRST_SESSION_FLOW.generated.json",
+              "NEXT90_M121_UI_GM_RUNBOARD_ROUTE.generated.json",
+              "NEXT90_M135_UI_DESKTOP_SURFACE_COVERAGE.generated.json",
+              "NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json",
+              "NEXT90_M142_UI_DIRECT_WORKFLOW_PROOF.generated.json",
+              "NEXT90_M143_UI_DIRECT_OUTPUT_PROOF.generated.json",
+              "NEXT90_M144_UI_STARTUP_SMOKE_AND_EXECUTABLE_GATE.generated.json",
+              "NEXT90_M145_UI_DESKTOP_EXPLAIN_DRAWER_AND_FOLLOW_UP.generated.json",
+              "PARITY_INVENTORY.generated.json",
+              "QUARANTINED_INSTALLER_PROMOTION.generated.json",
+              "QUEUE.generated.yaml",
+              "RULESET_UI_ADAPTATION.generated.json",
+              "SECTION_HOST_RULESET_PARITY.generated.json",
+              "SR4_DESKTOP_WORKFLOW_PARITY.generated.json",
+              "SR4_SR6_DESKTOP_PARITY_FRONTIER.generated.json",
+              "SR6_DESKTOP_WORKFLOW_PARITY.generated.json",
+              "UI_EXTERNAL_HOST_PROOF_BLOCKERS.generated.json",
+              "UI_FLAGSHIP_RELEASE_GATE.generated.json",
+              "UI_LINUX_DESKTOP_EXIT_GATE.generated.json",
+              "UI_LOCALIZATION_RELEASE_GATE.generated.json",
+              "UI_LOCAL_RELEASE_PROOF.generated.json",
+              "UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json",
+              "USER_JOURNEY_TESTER_AUDIT.generated.json",
+              "USER_JOURNEY_TESTER_TRACE.generated.json",
+              "VETERAN_TASK_TIME_EVIDENCE_GATE.generated.json",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": "live"
+          }
+        },
+        {
+          "id": "ui-kit",
+          "repo_slug": "chummer6-ui-kit",
+          "path": "/docker/chummercomplete/chummer-ui-kit",
+          "lifecycle": "scaffold",
+          "recent_commit_count_7d": 1,
+          "design_total_weight": 40,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-05-29T06:23:24.722538Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": "scaffold"
+          }
+        }
+      ]
+    },
+    {
+      "id": "live-play",
+      "public_name": "Live Play",
+      "short_public_name": "Live Play",
+      "mapped_projects": [
+        "mobile"
+      ],
+      "progress_percent": 100,
+      "momentum_label": "Stale",
+      "eta_weeks_low": 0,
+      "eta_weeks_high": 0,
+      "summary": "Player and GM shell, local-first sync, browser session transport, and offline-resume play surfaces.",
+      "milestones": [
+        {
+          "phase": "landed",
+          "title": "Play-shell hardening",
+          "body": "Play-shell hardening and browser transport/offline resume work was republished as runnable backlog."
+        },
+        {
+          "phase": "now",
+          "title": "E1 closure",
+          "body": "Drive the final Play complete milestone across live-session depth and installable hardening."
+        },
+        {
+          "phase": "target",
+          "title": "Reliable session shell",
+          "body": "A reliable session shell that survives weak networks and resumes cleanly."
+        }
+      ],
+      "recent_commit_count_7d": 1,
+      "remaining_open_weight": 0,
+      "remaining_open_milestones": 0,
+      "uncovered_scope_count": 0,
+      "momentum_score": 0.0,
+      "eta_source": "history_velocity",
+      "formula": {
+        "weighted_units": 0.0,
+        "scope_multiplier": 1.0,
+        "center_weeks": 0.0
+      },
+      "history_velocity_weight_points_per_week": 0.0,
+      "source_status": {
+        "mapped_project_count": 1,
+        "dispatchable_truth_ready": false,
+        "dispatchable_truth_ready_count": 0,
+        "package_compile": true,
+        "package_compile_count": 1,
+        "capacity_compile": true,
+        "capacity_compile_count": 1,
+        "published_artifacts_present": true,
+        "published_artifact_count": 4,
+        "lifecycle_counts": {
+          "dispatchable": 1
+        }
+      },
+      "source_projects": [
+        {
+          "id": "mobile",
+          "repo_slug": "chummer6-mobile",
+          "path": "/docker/chummercomplete/chummer6-mobile",
+          "lifecycle": "dispatchable",
+          "recent_commit_count_7d": 1,
+          "design_total_weight": 44,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-12T15:15:31.600223Z",
+            "stages": {
+              "design_compile": true,
+              "policy_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "capacity_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "MOBILE_LOCAL_RELEASE_PROOF.generated.json",
+              "PWA_TABLE_PULSE_MOBILE_SCENARIO_RECEIPTS.generated.json",
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "community-cloud",
+      "public_name": "Community Cloud & Publishing",
+      "short_public_name": "Cloud & Publishing",
+      "mapped_projects": [
+        "hub",
+        "hub-registry",
+        "media-factory"
+      ],
+      "progress_percent": 100,
+      "momentum_label": "Stale",
+      "eta_weeks_low": 0,
+      "eta_weeks_high": 0,
+      "summary": "Accounts, groups, sponsorship, public entry, publishing, registry, and media execution services.",
+      "milestones": [
+        {
+          "phase": "landed",
+          "title": "Public entry wave",
+          "body": "Public landing shell, email auth delivery, sponsor tiers/account linking, and canon refreshes across registry/media moved forward."
+        },
+        {
+          "phase": "now",
+          "title": "Completion wave",
+          "body": "Finish adapter waves, hub-complete surfaces, docs/operator projection, assistant plane, and media-plane completion."
+        },
+        {
+          "phase": "target",
+          "title": "Public participation stack",
+          "body": "A cohesive hosted community and publication stack ready for real public participation."
+        }
+      ],
+      "recent_commit_count_7d": 100,
+      "remaining_open_weight": 0,
+      "remaining_open_milestones": 0,
+      "uncovered_scope_count": 0,
+      "momentum_score": 0.0,
+      "eta_source": "history_velocity",
+      "formula": {
+        "weighted_units": 0.0,
+        "scope_multiplier": 1.0,
+        "center_weeks": 0.0
+      },
+      "history_velocity_weight_points_per_week": 0.0,
+      "source_status": {
+        "mapped_project_count": 3,
+        "dispatchable_truth_ready": false,
+        "dispatchable_truth_ready_count": 0,
+        "package_compile": true,
+        "package_compile_count": 3,
+        "capacity_compile": true,
+        "capacity_compile_count": 3,
+        "published_artifacts_present": true,
+        "published_artifact_count": 52,
+        "lifecycle_counts": {
+          "live": 1,
+          "dispatchable": 2
+        }
+      },
+      "source_projects": [
+        {
+          "id": "hub",
+          "repo_slug": "chummer6-hub",
+          "path": "/docker/chummercomplete/chummer6-hub",
+          "lifecycle": "live",
+          "recent_commit_count_7d": 88,
+          "design_total_weight": 60,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-15T20:07:43.238879Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json",
+              "BLACK_LEDGER_FEATURE_COMPLETION_AUDIT.generated.json",
+              "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
+              "CANONICAL_DOMAIN_POLICY.generated.json",
+              "CHUMMER_FLAGSHIP_CUSTOMER_SHAPE_GUIDE.generated.md",
+              "CHUMMER_LTD_MISSED_POTENTIAL_AUDIT.generated.md",
+              "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+              "DESIGN_QUALITY_GATE.generated.json",
+              "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+              "FINAL_GOLD_JANITOR.generated.json",
+              "FLAGSHIP_PRODUCT_READINESS.generated.json",
+              "GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+              "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+              "HUB_LOCAL_RELEASE_PROOF.generated.json",
+              "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
+              "NEXT90_M113_HUB_ROSTER_OPS.generated.json",
+              "NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json",
+              "NEXT90_M121_HUB_RUNBOARD_CONTINUITY.generated.json",
+              "NEXT90_M121_HUB_RUNBOARD_RESOLUTION.generated.json",
+              "NEXT90_M122_HUB_CAMPAIGN_ADOPTION.generated.json",
+              "NEXT90_M122_HUB_CAMPAIGN_ADOPTION_LOOP.generated.json",
+              "NEXT90_M123_HUB_OPEN_RUNS.generated.json",
+              "NEXT90_M123_HUB_OPEN_RUN_LOOP.generated.json",
+              "NEXT90_M124_HUB_HOSTED_COMPANION_PACKETS.generated.json",
+              "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+              "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+              "NEXT90_M127_HUB_REGISTRY_TRUTH_BINDING.generated.json",
+              "NEXT90_M128_HUB_PRIVACY_BOUNDED_SUPPORT_STATUS.generated.json",
+              "NEXT90_M129_HUB_REUSABLE_ACCOUNT_FLOWS.generated.json",
+              "NEXT90_M135_HUB_HOSTED_BOUNDED_CONTEXT_COVERAGE.generated.json",
+              "OPERATOR_RELEASE_DASHBOARD.generated.json",
+              "PORTABLE_RECEIPTS_AUDIT.generated.json",
+              "PROVIDER_PROOF_DISCOVERABILITY.generated.json",
+              "PUBLIC_CLAIM_SCAN.generated.json",
+              "PUBLIC_COPY_LEAK_GATE.generated.json",
+              "PUBLIC_ORIGIN_REACHABILITY_GATE.generated.json",
+              "PUBLIC_SHELL_CLICKABILITY_GATE.generated.json",
+              "PWA_TABLE_PULSE_SCENARIO_RECEIPTS.generated.json",
+              "QUEUE.generated.yaml",
+              "RELEASE_READY.generated.json",
+              "RULESET_READINESS.generated.json",
+              "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
+              "SUPPORT_CASE_FLOW_PROOF.generated.json",
+              "TABLE_PULSE_SCENARIO_REPLAY.generated.json",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": "live"
+          }
+        },
+        {
+          "id": "hub-registry",
+          "repo_slug": "chummer6-hub-registry",
+          "path": "/docker/chummercomplete/chummer-hub-registry",
+          "lifecycle": "dispatchable",
+          "recent_commit_count_7d": 12,
+          "design_total_weight": 44,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-16T18:52:04.987206Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "ARTIFACT_PUBLICATION_CERTIFICATION.generated.json",
+              "QUEUE.generated.yaml",
+              "RELEASE_CHANNEL.generated.json",
+              "WORKPACKAGES.generated.yaml",
+              "releases.json"
+            ],
+            "lifecycle": "scaffold"
+          }
+        },
+        {
+          "id": "media-factory",
+          "repo_slug": "chummer6-media-factory",
+          "path": "/docker/fleet/repos/chummer-media-factory",
+          "lifecycle": "dispatchable",
+          "recent_commit_count_7d": 0,
+          "design_total_weight": 54,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-02T04:06:04.948544Z",
+            "stages": {
+              "capacity_compile": true,
+              "design_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "policy_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": "scaffold"
+          }
+        }
+      ]
+    },
+    {
+      "id": "canon-guide",
+      "public_name": "Canon & Public Guide",
+      "short_public_name": "Canon & Guide",
+      "mapped_projects": [
+        "design",
+        "guide"
+      ],
+      "progress_percent": 100,
+      "momentum_label": "Stale",
+      "eta_weeks_low": 0,
+      "eta_weeks_high": 0,
+      "summary": "Product canon, horizons, participation workflow, public landing rules, and the public-facing guide bundle.",
+      "milestones": [
+        {
+          "phase": "landed",
+          "title": "Canon tightened",
+          "body": "Public landing/auth/download canon, participation workflow, sponsorship backlog, and release-governance wave were tightened."
+        },
+        {
+          "phase": "now",
+          "title": "Validator convergence",
+          "body": "Finish release-completion proof and stronger validator-backed convergence across downstream consumers."
+        },
+        {
+          "phase": "target",
+          "title": "One public story",
+          "body": "One authoritative public story, compiled cleanly into every downstream surface."
+        }
+      ],
+      "recent_commit_count_7d": 28,
+      "remaining_open_weight": 0,
+      "remaining_open_milestones": 0,
+      "uncovered_scope_count": 0,
+      "momentum_score": 0.0,
+      "eta_source": "history_velocity",
+      "formula": {
+        "weighted_units": 0.0,
+        "scope_multiplier": 1.0,
+        "center_weeks": 0.0
+      },
+      "history_velocity_weight_points_per_week": 0.0,
+      "source_status": {
+        "mapped_project_count": 2,
+        "dispatchable_truth_ready": true,
+        "dispatchable_truth_ready_count": 1,
+        "package_compile": true,
+        "package_compile_count": 1,
+        "capacity_compile": true,
+        "capacity_compile_count": 2,
+        "published_artifacts_present": true,
+        "published_artifact_count": 4,
+        "lifecycle_counts": {
+          "dispatchable": 1,
+          "signoff_only": 1
+        }
+      },
+      "source_projects": [
+        {
+          "id": "design",
+          "repo_slug": "chummer6-design",
+          "path": "/docker/chummercomplete/chummer-design",
+          "lifecycle": "dispatchable",
+          "recent_commit_count_7d": 20,
+          "design_total_weight": 44,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-05-21T17:35:58.884847Z",
+            "stages": {
+              "design_compile": true,
+              "policy_compile": true,
+              "execution_compile": true,
+              "package_compile": true,
+              "capacity_compile": true
+            },
+            "dispatchable_truth_ready": false,
+            "artifacts": [
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
+            ],
+            "lifecycle": ""
+          }
+        },
+        {
+          "id": "guide",
+          "repo_slug": "Chummer6",
+          "path": "/docker/chummercomplete/Chummer6",
+          "lifecycle": "signoff_only",
+          "recent_commit_count_7d": 8,
+          "design_total_weight": 1,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "uncovered_scope_count": 0,
+          "compile": {
+            "published_at": "2026-06-12T08:09:46.911302Z",
+            "stages": {
+              "design_compile": true,
+              "policy_compile": true,
+              "execution_compile": true,
+              "package_compile": false,
+              "capacity_compile": true
+            },
+            "dispatchable_truth_ready": true,
+            "artifacts": [
+              "QUEUE.generated.yaml",
+              "RELEASE_TRUTH_MATRIX.generated.json"
+            ],
+            "lifecycle": ""
+          }
+        }
+      ]
+    }
+  ],
+  "recent_movement": [
+    {
+      "title": "Delivery reporting got clearer.",
+      "body": "The public progress report, product-part grouping, and timeline view now read like one coherent status surface instead of scattered repo signals."
+    },
+    {
+      "title": "Public-facing product structure tightened.",
+      "body": "Public milestones, guide surfaces, and landing routes now line up more cleanly around user-visible product areas instead of internal execution seams."
+    },
+    {
+      "title": "The public entry story became clearer.",
+      "body": "Landing, auth, guide, and participation surfaces were tightened so the public front door stays closer to the actual product truth."
+    },
+    {
+      "title": "Workbench scope got easier to see.",
+      "body": "The remaining desktop/browser UX work has been sliced into concrete milestone- and backlog-shaped queues instead of sitting as fuzzy later work."
+    },
+    {
+      "title": "Core is moving from split-state cleanup toward hardening.",
+      "body": "The current core wave is no longer about who owns what; it is about observability, disaster recovery, replay safety, retention, and finishing the last legacy purification passes."
+    },
+    {
+      "title": "Cloud and publishing are now the clearest long pole.",
+      "body": "The hosted stack is visibly moving, especially around public entry and email identity, but it still carries the largest remaining completion wave because registry depth, media execution, adapters, and broader hub product surfaces remain open."
+    }
+  ],
   "participation": {
     "headline": "How to participate",
-    "body": "",
+    "body": "If you want to follow the rollout or join future contribution waves, the participation page explains the current public entry path.",
     "cta_label": "Open the participation page",
     "cta_href": "https://chummer.run/participate"
   },
   "method": {
     "progress_formula_version": "public_progress_v1",
-    "eta_formula_version": "momentum_proxy_v1",
-    "copy": "",
+    "eta_formula_version": "history_velocity_v1",
+    "copy": "Progress is a weighted estimate built from the current milestone map, grouped into public-facing product parts instead of repo names. The ETA is a momentum-based planning band, not a promise: it uses remaining milestone weight, recent repo activity, and uncovered scope breadth as a public proxy until weekly historical snapshots are published.",
     "limitations": [
-      "Weekly public progress history is now being recorded; ETA still uses the short-horizon momentum proxy until enough snapshots accumulate."
+      "ETA is a momentum-based planning band, not a delivery promise.",
+      "Weekly public progress history is now available; ETA uses recorded velocity where enough snapshots exist and falls back to the short-horizon momentum proxy elsewhere.",
+      "Mapped public milestones are complete, but the full-product frontier remains open with 1 milestone(s). Full completion requires full frontier closure.",
+      "The current supervisor ETA is tactical or otherwise not yet calendar-grade enough for a full-product parity forecast, so the public surface tracks the remaining frontier without publishing a parity date band."
     ],
-    "history_snapshot_count": 39
+    "history_snapshot_count": 40
   },
-  "eta_scope": "mapped_frontier",
+  "eta_scope": "full_product_queue_unestimated",
   "full_product_queue": {
-    "mode": "unknown",
-    "active_runs_count": 0,
-    "active_frontier_ids": [],
-    "open_milestone_ids": [],
-    "open_frontier_milestones": 0,
-    "open_milestone_ids_count": 0,
+    "mode": "sharded",
+    "active_runs_count": 3,
+    "active_frontier_ids": [
+      1239074135
+    ],
+    "open_milestone_ids": [
+      1239074135
+    ],
+    "open_frontier_milestones": 1,
+    "open_milestone_ids_count": 1,
     "eta": {
-      "eta_human": "",
-      "eta_status": "unknown",
-      "scope_kind": "unknown",
-      "scope_label": "Unknown ETA scope",
-      "scope_warning": "",
+      "eta_human": "2h-4h",
+      "eta_status": "tracked",
+      "scope_kind": "completion_review_recovery",
+      "scope_label": "Completion review and proof recovery",
+      "scope_warning": "This ETA covers registry trust, proof, and review recovery. It is still narrower than a final flagship parity claim unless full-product readiness is also green.",
       "eta_weeks_low": null,
       "eta_weeks_high": null,
-      "remaining_open_milestones": 0,
-      "remaining_in_progress_milestones": 0,
+      "remaining_open_milestones": 1,
+      "remaining_in_progress_milestones": 1,
       "remaining_not_started_milestones": 0
     },
-    "active_runs": []
+    "active_runs": [
+      {
+        "run_id": "20260613T160606Z-shard-1",
+        "shard": "shard-1",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      },
+      {
+        "run_id": "20260613T162729Z-shard-2",
+        "shard": "shard-2",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      },
+      {
+        "run_id": "20260613T163026Z-shard-3",
+        "shard": "shard-3",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      }
+    ]
   },
   "closing": {
-    "headline": "",
-    "body": ""
+    "headline": "The project no longer looks like a concept sketch.",
+    "body": "The most interesting change is not a single feature. It is that architecture, execution, public entry, and product canon are starting to reinforce each other. That is the point where a serious internal system turns into something people can eventually use, trust, and follow."
   }
 }

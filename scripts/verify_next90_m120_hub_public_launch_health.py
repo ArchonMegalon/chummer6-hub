@@ -182,15 +182,15 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Current release",
         'data-status-surface="decision-surface"',
-        "Release. Caution. Next step.",
-        "Caution.",
+        "Open downloads",
+        "Open support",
         'aria-label="Status next actions"',
         "Open progress",
         "Other platform details</summary>",
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'Assert(statusSource.Contains("data-status-surface=\\"decision-surface\\"", StringComparison.Ordinal), "status should stay collapsed to one decision surface before deeper platform details.");',
-        'Assert(statusSource.Contains("Caution.", StringComparison.Ordinal), "status should keep the caution inside the one public decision surface.");',
+        'Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");',
         'Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep the deeper report as a secondary step.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [

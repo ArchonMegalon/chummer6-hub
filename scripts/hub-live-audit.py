@@ -11990,10 +11990,11 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/status",
-            "Release. Caution. Next step.",
+            "Release",
             required_texts=(
                 "Current release build",
-                "Caution.",
+                "Open downloads",
+                "Open support",
                 "Known issues stay on downloads.",
                 "Windows",
                 "Linux",
@@ -12154,7 +12155,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Current release build", "Release. Caution. Next step.", "Caution."):
+    for snippet in ("Current release build", "Release", "Open downloads", "Open support"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

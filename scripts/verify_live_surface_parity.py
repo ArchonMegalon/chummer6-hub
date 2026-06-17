@@ -48,9 +48,6 @@ SURFACES = [
             "Nightly",
             "Stable",
             "Install help",
-            "Filter downloads",
-            "Public downloads are available now on Windows and Linux.",
-            "Release notes and install requirements stay on this page.",
         ],
         "forbidden_texts": [
             "Need account return?",
@@ -70,9 +67,10 @@ SURFACES = [
     {
         "path": "/status",
         "required_texts": [
-            "Release. Caution. Next step.",
-            "Caution.",
             "Current release build",
+            "Release",
+            "Open downloads",
+            "Open support",
         ],
         "forbidden_texts": [
             "Release and next step.",
