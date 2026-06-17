@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-17T15:37:58Z",
+  "generatedAt": "2026-06-17T16:03:00Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,12 +9,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.1KnHq26EnK/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.G2jTQjWDJ5/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "963f8e00511fdfbc37c5a8a2ac1bbc03697919410051ca7276b63da79f0e4e4d",
-      "artifactSizeBytes": 37576910,
+      "artifactSha256": "2b178e15826f1bcb54f506bc039f51287e9579b9e5e85dc9d40b7d66a4a810ed",
+      "artifactSizeBytes": 35414826,
       "kind": "installer"
     },
     {
@@ -24,28 +24,13 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "skipped_incompatible_host",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.1KnHq26EnK/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.G2jTQjWDJ5/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "ca14535d869f6319a284b98b6c31f229730035df48ddd43bc2051ad625e2be5f",
-      "artifactSizeBytes": 101396281,
+      "artifactSha256": "22b53cef366afbc1d10c203c6184864ced1c3ab4e0eb6f9a27e63e5108b5bf56",
+      "artifactSizeBytes": 97484167,
       "kind": "installer"
-    },
-    {
-      "artifactId": "avalonia-win-x64-portable",
-      "fileName": "chummer-avalonia-win-x64.exe",
-      "platform": "windows",
-      "promotionStatus": "pass",
-      "startupSmokeStatus": "pass",
-      "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "",
-      "signingReceiptPath": "",
-      "signingStatus": "skipped_preview",
-      "notarizationStatus": null,
-      "artifactSha256": "8f6ba5b074a1b809a3a2e8e6fda7a5cd84c7dcd858f8a57242271e33b8d4e726",
-      "artifactSizeBytes": 433152,
-      "kind": "portable"
     },
     {
       "artifactId": "avalonia-win-x64-archive",
@@ -58,8 +43,8 @@
       "signingReceiptPath": "",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "2513ddece48991f84a198c66c519ffdb00b85a0da78c9d1cf3ff97742f9ef0a6",
-      "artifactSizeBytes": 49548508,
+      "artifactSha256": "1be992a75f5632308e89b456e82af8a9508a508d99eefeff78b708924373f3c4",
+      "artifactSizeBytes": 45636400,
       "kind": "archive"
     }
   ]
