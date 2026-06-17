@@ -1852,7 +1852,7 @@ public sealed class PublicReleaseManifestService
             }
         }
 
-        bool accountRequiredPlatform = platform is "windows" or "macos";
+        bool accountRequiredPlatform = platform is "macos";
         bool accountRequiredKind = kind switch
         {
             "portable" when platform is "windows" => false,

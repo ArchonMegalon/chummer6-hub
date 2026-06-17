@@ -534,6 +534,73 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadCanonicalManifestJsonKeepsWindowsInstallerOpenWhenArtifactTruthIsGuestReadable()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260617-061500",
+            ["publishedAt"] = "2026-06-17T06:15:00Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Windows X64 Installer",
+                    ["fileName"] = "chummer-avalonia-win-x64-installer.exe",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L,
+                    ["installAccessClass"] = "open_public"
+                }
+            },
+            ["desktopSurfaceRefs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["registryId"] = "desktop-surface:preview:run-20260617-061500:avalonia:windows:win-x64",
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["channelId"] = "preview",
+                    ["releaseVersion"] = "run-20260617-061500",
+                    ["tupleId"] = "avalonia:windows:win-x64",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["installAccessClass"] = "open_public",
+                    ["desktopChannelRef"] = "desktop-channel:preview:run-20260617-061500:avalonia:windows:win-x64",
+                    ["installGuidanceRef"] = "install-guidance:preview:run-20260617-061500:avalonia-win-x64-installer",
+                    ["participationReceiptRef"] = "participation-receipt:preview:run-20260617-061500:avalonia:windows:win-x64",
+                    ["rewardPublicationRef"] = "reward-publication:binding:preview:run-20260617-061500:avalonia:windows:win-x64",
+                    ["publicationBindingId"] = "binding:preview:run-20260617-061500:avalonia:windows:win-x64",
+                    ["publicInstallRoute"] = "/downloads/install/avalonia-win-x64-installer",
+                    ["rationale"] = "preview keeps avalonia:windows:win-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
+                }
+            }
+        });
+
+        string json = fixture.CreateService().LoadCanonicalManifestJson()!;
+
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement artifact = document.RootElement.GetProperty("artifacts")[0];
+        JsonElement surface = document.RootElement.GetProperty("desktopSurfaceRefs")[0];
+
+        Assert.Equal("open_public", artifact.GetProperty("installAccessClass").GetString());
+        Assert.Equal("open_public", surface.GetProperty("installAccessClass").GetString());
+        Assert.Contains("guest-readable", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("entitlement-backed", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RequiresCanonicalManifestRewriteWhenInstallAwareRegistryDriftsFromCoverageTruth()
     {
         using var fixture = new PublicReleaseManifestFixture();
