@@ -21,6 +21,7 @@
     Func<string, string> factionSlug = id => id.Replace('_', '-');
     Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
     Func<string, string> backgroundHref = id => $"/media/ledger/factions/{factionSlug(id)}-bg.svg";
+    Func<string, string> posterHref = id => $"/media/ledger/factions/{factionSlug(id)}-promo-poster.png";
 }
 
 <section class="launch-hero launch-hero--ledger" data-homepage-section="hero">
@@ -57,11 +58,11 @@
 </section>
 <script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
 
-<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="score-strip" id="score-strip">
-        <div class="workflow-band__lead">
-            <p class="eyebrow">Pressure</p>
-            <h2 class="editorial-title">Three live signals.</h2>
-        </div>
+<section class="workflow-band workflow-band--flagship workflow-band--compact cinematic-band" data-homepage-section="score-strip" id="score-strip">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Pressure</p>
+        <h2 class="editorial-title">Three live signals.</h2>
+    </div>
     <div class="ledger-stats-grid ledger-stats-grid--hero">
         @foreach (var stat in ledgerStats)
         {
@@ -84,6 +85,7 @@
         {
             <article class="faction-identity-card">
                 <div class="faction-identity-card__backdrop" style="background-image:url('@backgroundHref(faction.Id)')"></div>
+                <img class="faction-identity-card__poster" src="@posterHref(faction.Id)" alt="" loading="lazy" />
                 <div class="faction-identity-card__body">
                     <img class="faction-identity-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
                     <div class="faction-identity-card__copy">
@@ -116,7 +118,7 @@
         </video>
         <div class="flagship-promo-player__proof">
             <a class="inline-link" href="/media/promo/chummer6-flagship-promo.vtt">Captions</a>
-            <a class="inline-link" href="/media/promo/chummer6-flagship-promo.receipt.json">Notes</a>
+            <a class="inline-link" href="/media/promo/chummer6-flagship-promo.receipt.json">Credits</a>
         </div>
     </div>
 </section>
