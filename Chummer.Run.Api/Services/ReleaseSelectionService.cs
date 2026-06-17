@@ -516,7 +516,7 @@ public sealed class ReleaseSelectionService
 
         if (authenticated)
         {
-            return "Signed-in download: the same published artifact plus recovery, support, and any optional device-linking help tied back to your account.";
+            return "Start the published download.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))

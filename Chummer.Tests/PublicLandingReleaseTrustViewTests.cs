@@ -10,10 +10,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Open current release", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes", view, StringComparison.Ordinal);
         Assert.Contains("@release.KnownIssuesLabel", view, StringComparison.Ordinal);
         Assert.Contains("@release.InstallHelpLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Release notes and install requirements stay on this page.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Release notes and install requirements stay on this page.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("Account return ", view, StringComparison.Ordinal);
-        Assert.Contains("Release notes and requirements", view, StringComparison.Ordinal);
-        Assert.Contains("Open current release", view, StringComparison.Ordinal);
+        Assert.Contains("Notes", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
         Assert.Contains("Choose a release lane.", view, StringComparison.Ordinal);
@@ -85,7 +85,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("href=\"/now\">What works today</a>", view, StringComparison.Ordinal);
         Assert.Contains("@Model.HelpLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open Devices and access only when this copy needs relink or reclaim help", view, StringComparison.Ordinal);
         Assert.Contains("Open what works today when the question is current release status, not this device handoff", view, StringComparison.Ordinal);
         Assert.Contains("Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound", view, StringComparison.Ordinal);
-        Assert.Contains("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
         Assert.Contains("Current release", view, StringComparison.Ordinal);
         Assert.Contains("downloads page", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Current release status shelf", view, StringComparison.Ordinal);
@@ -177,10 +177,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
-        Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
+        Assert.Contains("Current build.", view, StringComparison.Ordinal);
+        Assert.Contains("Release", view, StringComparison.Ordinal);
         Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Caution.", view, StringComparison.Ordinal);
         Assert.Contains("@Model.CautionSummary", view, StringComparison.Ordinal);
         Assert.Contains("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
@@ -270,8 +269,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
         Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Caution.", view, StringComparison.Ordinal);
-        Assert.Contains("Release. Caution. Next step.", view, StringComparison.Ordinal);
+        Assert.Contains("Current build.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Current release at a glance.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Status poster", view, StringComparison.Ordinal);
@@ -293,8 +291,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Install help", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Filter downloads", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Release notes and install requirements stay on this page.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Filters", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Release notes and install requirements stay on this page.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Sign in later if you need return or support.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows ZIP", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);

@@ -1586,7 +1586,7 @@ public sealed class PublicLandingController : Controller
                 : release.SignedInDispatchSummary;
             var dispatchNote = bootstrapScriptDownload
                 ? BuildBootstrapDispatchNote(bootstrapPlatform)
-                : "This handoff keeps the published installer unchanged while attaching the install relationship to your account through a short-lived install ticket.";
+                : string.Empty;
             var steps = bootstrapScriptDownload
                 ? BuildBootstrapSteps(bootstrapPlatform)
                 : release.SignedInDispatchSteps;
@@ -1614,8 +1614,8 @@ public sealed class PublicLandingController : Controller
                         BuildAbsoluteUrl(bootstrapScriptPath))
                 : null;
             var model = new DownloadDispatchPageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName, user.Email),
-                Eyebrow: "Signed-in download",
+                Chrome: _chrome.BuildAuthenticatedChrome("Download", "Start the installer download.", "/downloads", user.DisplayName, user.Email),
+                Eyebrow: "Download",
                 Heading: bootstrapScriptDownload
                     ? BuildDispatchHeading(release.SignedInDispatchHeading, bootstrapPlatform)
                     : release.SignedInDispatchHeading,

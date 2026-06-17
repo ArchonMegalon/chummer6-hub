@@ -66,9 +66,8 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">Status</p>
         <h1 class="page-title">What works now</h1>
-        <p class="page-copy">Release. Caution. Next step.</p>
+        <p class="page-copy">Current build.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
@@ -81,15 +80,13 @@
 
 <section class="editorial-block" data-status-surface="decision-surface">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Release</p>
-        <h2 class="editorial-title">Release. Caution. Next step.</h2>
+        <h2 class="editorial-title">Release</h2>
     </div>
     <article class="route-choice-card">
         <span class="tag">Release</span>
         <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
         <p>@Model.ReleaseSummary</p>
-        <span class="tag tag--amber">Caution</span>
-        <p><strong>Caution.</strong> @Model.CautionSummary</p>
+        <p>@Model.CautionSummary</p>
     </article>
     <div class="stacked-actions" aria-label="Status next actions">
         @foreach (var action in nextActions)

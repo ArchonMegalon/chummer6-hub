@@ -59,23 +59,11 @@
 
 <section class="release-stage">
     <div class="release-stage__lead">
-        <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install Chummer</h1>
         <p class="page-copy">
             @(requestedPlatformUnavailable
                 ? $"{deviceLabel} is not publicly available from this browser right now."
                 : $"This browser looks like {deviceLabel}. Choose a release lane.")
-        </p>
-        <p class="release-stage__note">
-            @(platformShelfNotice
-                ? requestedWindowsUnavailable && hasSignedInWindowsBuilds
-                    ? "Windows is not available to guests right now, but signed-in users can still open the latest Windows build below."
-                : requestedWindowsUnavailable && hasWindowsProofRail
-                        ? "Windows is not available for this browser right now. Check the main platform downloads below, and use the Windows verification page only if support points you there."
-                    : release.PlatformShelfNoticeSummary
-                : guestGateRequired
-                    ? "This install path can link sign-in and support from the first launch when you want them attached."
-                    : "Public downloads are available now on Windows and Linux.")
         </p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
@@ -134,11 +122,10 @@ else
                         <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See other platforms">See other platforms</a>
                     </div>
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Release notes, known issues, and requirements</summary>
+                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Notes</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">This platform is not publicly available right now, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                                <a class="button-like button-like--ghost" href="/now">Release notes</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                                 <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                             </div>
@@ -148,7 +135,7 @@ else
                 @if (!requestedPlatformUnavailable)
                 {
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help and notes">Help and notes</summary>
+                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help">Help</summary>
                         <div class="release-accordion__body">
                             <div class="route-callout" role="status" aria-live="polite">
                                 <h3>Install help</h3>
@@ -159,19 +146,13 @@ else
                                 </div>
                             </div>
                             <p class="downloads-inline-note">Account return <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
-                            <p class="downloads-inline-note">
-                                @(recommendedUsesMacSetupScript
-                                    ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
-                                    : "After install, open Chummer.")
-                            </p>
                         </div>
                     </details>
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes and requirements">Release notes and requirements</summary>
+                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Notes">Notes</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">Release notes and install requirements stay on this page.</p>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                                <a class="button-like button-like--ghost" href="/now">Release notes</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                                 <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                             </div>
@@ -181,7 +162,7 @@ else
                 else
                 {
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help and notes">Help and notes</summary>
+                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help">Help</summary>
                         <div class="release-accordion__body">
                             <div class="route-callout" role="status" aria-live="polite">
                                 <h3>Install help</h3>
@@ -205,7 +186,7 @@ else
 
     <section class="release-shelf" aria-label="Download filters">
         <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_filters" data-analytics-surface="downloads_filters" data-analytics-label="Filter downloads">Filter downloads</summary>
+            <summary data-analytics-event="downloads_open_filters" data-analytics-surface="downloads_filters" data-analytics-label="Filters">Filters</summary>
             <div class="release-accordion__body">
                 <form class="downloads-filter-bar" method="get" action="/downloads">
                     <div class="field">
