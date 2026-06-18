@@ -204,20 +204,53 @@ const { chromium } = require('playwright');
     def wait_for_image(self, session_id: str, timeout_seconds: int) -> dict[str, str]:
         deadline = time.time() + timeout_seconds
         last_body = ""
+        generation_id = ""
         while time.time() < deadline:
             last_body = self.fetch_session_raw(session_id)
-            urls = collect_urls(last_body, ("png", "webp", "jpg", "jpeg"))
+            generation_id = generation_id or self.extract_session_generation_id(last_body) or ""
+            generation_window = self.generation_window(last_body, generation_id) if generation_id else ""
+            urls = collect_urls(generation_window, ("png", "webp", "jpg", "jpeg"))
             if urls:
                 return {
                     "status": "COMPLETED",
                     "output_url": urls[0],
-                    "generation_id": self.extract_generation_id_for_url(last_body, urls[0]) or self.extract_generation_id(last_body) or "image",
+                    "generation_id": generation_id
+                    or self.extract_generation_id_for_url(generation_window, urls[0])
+                    or self.extract_generation_id(generation_window)
+                    or "image",
                     "session_payload": last_body,
                 }
-            if '"status","FAILED"' in last_body or '"FAILED"' in last_body:
+            if '"status","FAILED"' in generation_window or '"FAILED"' in generation_window:
                 raise RuntimeError(f"MagicFit image generation failed for session {session_id}")
             time.sleep(5)
         raise TimeoutError(f"Timed out waiting for MagicFit image session {session_id}: {last_body[:500]}")
+
+    @staticmethod
+    def extract_session_generation_id(payload: str) -> str | None:
+        match = re.search(r'"generations",\[[^\]]+\],\{[^}]+\},"(cm[a-z0-9]+)"', payload)
+        if match:
+            return match.group(1)
+        match = re.search(r'"session",\{[^}]+\},"cm[a-z0-9]+".{0,1200}?"(cm[a-z0-9]+)",\["D"', payload, flags=re.S)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def generation_window(payload: str, generation_id: str) -> str:
+        if not generation_id:
+            return ""
+        idx = payload.find(f'"{generation_id}"')
+        if idx < 0:
+            return ""
+        end_candidates = [
+            pos
+            for pos in (
+                payload.find('"children"', idx),
+                payload.find('"activeNodeId"', idx),
+                payload.find('"recentSessions"', idx),
+            )
+            if pos > idx
+        ]
+        end = min(end_candidates) if end_candidates else min(len(payload), idx + 8000)
+        return payload[idx:end]
 
     @staticmethod
     def extract_generation_id(payload: str) -> str | None:
