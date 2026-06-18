@@ -1,0 +1,11 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "generated_at_utc": "2026-06-18T22:49:37Z",
+  "status": "tracked",
+  "provider": "Subscribr",
+  "license_tier": "License Tier 7 / Scale 3",
+  "lane": "governed video script pre-production",
+  "runtime_ready": false,
+  "boundary": "Tracked as a draft/operator lane only; Chummer source packets own truth and publication approval remains separate.",
+  "claim_boundary": "Tracked as a draft/operator lane only; Chummer source packets own truth and publication approval remains separate."
+}

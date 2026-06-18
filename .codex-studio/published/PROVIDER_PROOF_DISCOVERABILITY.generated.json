@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.provider_proof_discoverability",
-  "generated_at_utc": "2026-06-18T21:49:14Z",
+  "generated_at_utc": "2026-06-18T22:49:37Z",
   "status": "pass",
   "providers": {
     "payfunnels": {
@@ -121,6 +121,15 @@
       "runtime_ready": false,
       "mirrored_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/neuronwriter/NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "subscribr": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/subscribr/SUBSCRIBR_TRACKED_PROVIDER_RECEIPT.generated.json"
       ],
       "missing_paths": []
     },

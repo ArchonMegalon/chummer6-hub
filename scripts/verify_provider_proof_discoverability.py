@@ -71,6 +71,14 @@ TRACKED_PROVIDER_RECEIPTS: dict[str, dict[str, Any]] = {
         "runtime_ready": False,
         "boundary": "Inventory only until SEO workflow proof exists; not product, release, support, or truth authority.",
     },
+    "subscribr": {
+        "status": "tracked",
+        "provider": "Subscribr",
+        "license_tier": "License Tier 7 / Scale 3",
+        "lane": "governed video script pre-production",
+        "runtime_ready": False,
+        "boundary": "Tracked as a draft/operator lane only; Chummer source packets own truth and publication approval remains separate.",
+    },
     "joggai": {
         "status": "tracked",
         "provider": "JoggAI",

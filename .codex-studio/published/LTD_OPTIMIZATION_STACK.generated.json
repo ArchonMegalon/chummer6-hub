@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ltd_optimization_stack",
-  "generated_at_utc": "2026-06-18T21:49:14Z",
+  "generated_at_utc": "2026-06-18T22:50:06Z",
   "status": "pass",
   "verdict": "LTD_OPTIMIZATION_STACK_READY",
   "checks": {
@@ -13,6 +13,13 @@
     "neuronwriter_source_packet_workflow": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/neuronwriter/NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json",
       "status": "tracked",
+      "runtime_ready": false,
+      "pass": true
+    },
+    "subscribr_script_preproduction": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/subscribr/SUBSCRIBR_TRACKED_PROVIDER_RECEIPT.generated.json",
+      "status": "tracked",
+      "license_tier": "License Tier 7 / Scale 3",
       "runtime_ready": false,
       "pass": true
     },

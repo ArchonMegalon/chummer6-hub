@@ -42,6 +42,13 @@ class ProviderProofDiscoverabilityGateTests(unittest.TestCase):
                 self.assertEqual(module.main(), 0)
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["providers"]["subscribr"]["status"], "pass")
+            self.assertFalse(payload["providers"]["subscribr"]["runtime_ready"])
+            subscribr_receipts = payload["providers"]["subscribr"]["mirrored_paths"]
+            self.assertEqual(len(subscribr_receipts), 1)
+            subscribr_payload = json.loads(Path(subscribr_receipts[0]).read_text(encoding="utf-8"))
+            self.assertEqual(subscribr_payload["license_tier"], "License Tier 7 / Scale 3")
+            self.assertIn("publication approval", subscribr_payload["claim_boundary"])
 
 
 if __name__ == "__main__":

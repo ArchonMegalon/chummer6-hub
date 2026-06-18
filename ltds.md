@@ -6,7 +6,7 @@
 - env_email_key: `CHUMMER_EA_DEFAULT_EMAIL`
 - env_password_key: `CHUMMER_EA_DEFAULT_PASSWORD`
 - env_password_alt_key: `CHUMMER_EA_DEFAULT_PASSWORD_ALT`
-- applies_to: `1min.AI`, `AI Magicx`, `Prompt Architects`, `ChatPlayground AI`, `BrowserAct`, `Browserly`, `ApproveThis`, `Documentation.AI`, `Icanpreneur`, `MetaSurvey`, `NextStep`, `Nonverbia`, `Teable`, `ApiX-Drive`, `FacePop`, `Deftform`, `Lunacal`, `Paperguide`, `Signitic`, `Emailit`, `Vizologi`, `MarkupGo`, `Soundmadeseen`, `Taja`, `vidBoard`, `PeekShot`, `Crezlo Tours`, `Mootion`, `First Book ai`, `AvoMap`, `Unmixr AI`, `Internxt Cloud Storage`, `Invoiless`, `FastestVPN PRO`, `OneAir`, `Headway`, `ClickRank`, `Katteb`, `ProductLift`, `hedy.ai`, `SendFox`, `Flonnect`, `CutMe Short`, `Backona AI`, `Visby`, `Dadan`, `Rybbit`, `NeuronWriter`
+- applies_to: `1min.AI`, `AI Magicx`, `Prompt Architects`, `ChatPlayground AI`, `BrowserAct`, `Browserly`, `ApproveThis`, `Documentation.AI`, `Icanpreneur`, `MetaSurvey`, `NextStep`, `Nonverbia`, `Teable`, `ApiX-Drive`, `FacePop`, `Deftform`, `Lunacal`, `Paperguide`, `Signitic`, `Emailit`, `Vizologi`, `MarkupGo`, `Soundmadeseen`, `Taja`, `vidBoard`, `PeekShot`, `Crezlo Tours`, `Mootion`, `First Book ai`, `AvoMap`, `Unmixr AI`, `Internxt Cloud Storage`, `Invoiless`, `FastestVPN PRO`, `OneAir`, `Headway`, `ClickRank`, `Katteb`, `ProductLift`, `hedy.ai`, `SendFox`, `Flonnect`, `CutMe Short`, `Backona AI`, `Visby`, `Dadan`, `Rybbit`, `NeuronWriter`, `Subscribr`
 
 ### blipai.app
 
@@ -118,6 +118,20 @@
 - credential_source: local `.env`
 - status: `bounded_source_packet_seo_lane`
 - required_boundary: `source-packet SEO workflow only; Chummer-owned copy remains canonical and no release, support, roadmap, or rules claim may originate in NeuronWriter`
+- mirrors_default: `false`
+
+### subscribr
+
+- tier: `License Tier 7 / Scale 3`
+- workspace_tier: `4`
+- credential_source: local `.env`
+- env_api_token_key: `SUBSCRIBR_API_TOKEN`
+- env_webhook_secret_key: `SUBSCRIBR_WEBHOOK_SECRET`
+- env_team_id_key: `SUBSCRIBR_TEAM_ID`
+- env_integration_channel_id_key: `SUBSCRIBR_INTEGRATION_CHANNEL_ID`
+- status: `tracked_video_script_preproduction_lane`
+- runtime_ready: `false`
+- required_boundary: `governed video script pre-production only; Chummer-owned source packets remain canonical and Subscribr may not own rules truth, release truth, private campaign data, entitlement truth, or publication approval`
 - mirrors_default: `false`
 
 ### rafter

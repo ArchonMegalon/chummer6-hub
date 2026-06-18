@@ -28,6 +28,7 @@ DESKTOP_PREFERENCE_PATH = Path("/docker/chummercomplete/chummer-presentation/Chu
 PROVIDER_DISCOVERABILITY_PATH = PUBLISHED_ROOT / "PROVIDER_PROOF_DISCOVERABILITY.generated.json"
 RYBBIT_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "rybbit" / "RYBBIT_TRACKED_PROVIDER_RECEIPT.generated.json"
 NEURONWRITER_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "neuronwriter" / "NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json"
+SUBSCRIBR_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "subscribr" / "SUBSCRIBR_TRACKED_PROVIDER_RECEIPT.generated.json"
 PUBLIC_GROWTH_DOC_PATH = DESIGN_ROOT / "PUBLIC_GROWTH_AND_VISIBILITY_STACK.md"
 LTD_REGISTRY_PATH = DESIGN_ROOT / "LTD_RUNTIME_AND_PROJECTION_REGISTRY.yaml"
 LTD_MAP_PATH = DESIGN_ROOT / "LTD_CAPABILITY_MAP.md"
@@ -130,6 +131,25 @@ def build_payload() -> dict[str, Any]:
         "status": neuronwriter_receipt.get("status", "missing"),
         "runtime_ready": neuronwriter_receipt.get("runtime_ready"),
         "pass": neuronwriter_pass,
+    }
+
+    subscribr_receipt = load_json(SUBSCRIBR_RECEIPT_PATH)
+    subscribr_pass = (
+        status_pass(subscribr_receipt)
+        and subscribr_receipt.get("license_tier") == "License Tier 7 / Scale 3"
+        and subscribr_receipt.get("runtime_ready") is False
+        and "Subscribr.ai" in ltd_registry
+        and "`Subscribr.ai`" in ltd_map
+        and "approved Chummer source packets" in read_text(DESIGN_ROOT / "SUBSCRIBR_SCRIPT_FACTORY_PROVIDER_BOUNDARY.md")
+    )
+    if not subscribr_pass:
+        failures.append("subscribr tier 7 script pre-production lane is not discoverable and bounded")
+    checks["subscribr_script_preproduction"] = {
+        "path": str(SUBSCRIBR_RECEIPT_PATH),
+        "status": subscribr_receipt.get("status", "missing"),
+        "license_tier": subscribr_receipt.get("license_tier"),
+        "runtime_ready": subscribr_receipt.get("runtime_ready"),
+        "pass": subscribr_pass,
     }
 
     provider_discoverability = load_json(PROVIDER_DISCOVERABILITY_PATH)
