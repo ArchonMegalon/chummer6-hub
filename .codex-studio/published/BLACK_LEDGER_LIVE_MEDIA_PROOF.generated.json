@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
-  "generated_at_utc": "2026-06-18T19:01:32Z",
+  "generated_at_utc": "2026-06-18T19:22:02Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
@@ -21,7 +21,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/map",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-map.png",
-      "screenshotBytes": 4942704,
+      "screenshotBytes": 4940758,
       "visualSignals": {
         "textLength": 11962,
         "blackLedgerMentions": 0,
@@ -47,7 +47,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-newsroom.png",
-      "screenshotBytes": 4617574,
+      "screenshotBytes": 4617195,
       "visualSignals": {
         "textLength": 12510,
         "blackLedgerMentions": 0,
@@ -73,7 +73,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/factions/ashline-circle/promo",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-faction-promo.png",
-      "screenshotBytes": 1801396,
+      "screenshotBytes": 1802005,
       "visualSignals": {
         "textLength": 7112,
         "blackLedgerMentions": 0,
@@ -99,7 +99,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/map?replay=turn-1",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-replay-turn-1.png",
-      "screenshotBytes": 4935052,
+      "screenshotBytes": 4935747,
       "visualSignals": {
         "textLength": 11953,
         "blackLedgerMentions": 0,
@@ -125,7 +125,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/map",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-map.png",
-      "screenshotBytes": 2669207,
+      "screenshotBytes": 2669196,
       "visualSignals": {
         "textLength": 10522,
         "blackLedgerMentions": 0,
@@ -151,14 +151,14 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-newsroom.png",
-      "screenshotBytes": 2652881,
+      "screenshotBytes": 2652800,
       "visualSignals": {
-        "textLength": 12352,
+        "textLength": 10907,
         "blackLedgerMentions": 0,
         "commandMapMentions": 5,
-        "globeMentions": 6,
-        "factionMentions": 25,
-        "pressureMentions": 40,
+        "globeMentions": 5,
+        "factionMentions": 23,
+        "pressureMentions": 35,
         "newsreelMentions": 4,
         "videoMentions": 6,
         "mediaElementCount": 19,
@@ -177,7 +177,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/factions/ashline-circle/promo",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-faction-promo.png",
-      "screenshotBytes": 1059279,
+      "screenshotBytes": 1059338,
       "visualSignals": {
         "textLength": 6980,
         "blackLedgerMentions": 0,
@@ -194,7 +194,7 @@
         "geoscapePanelCount": 0,
         "geoscapeControlCount": 0,
         "geoscapeSignalRailCount": 0,
-        "largestMediaArea": 4624,
+        "largestMediaArea": 57315,
         "viewportArea": 329160
       }
     },
@@ -203,7 +203,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/map?replay=turn-1",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-replay-turn-1.png",
-      "screenshotBytes": 2669902,
+      "screenshotBytes": 2669553,
       "visualSignals": {
         "textLength": 10513,
         "blackLedgerMentions": 0,

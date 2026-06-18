@@ -1,6 +1,6 @@
 # GOLD_READY
 
-Generated: 2026-06-18T19:03:23Z
+Generated: 2026-06-18T19:23:52Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
