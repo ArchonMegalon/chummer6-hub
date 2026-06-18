@@ -8,13 +8,14 @@ namespace Chummer.Tests;
 public sealed class BlackLedgerStatsViewTests
 {
     [Fact]
-    public void LandingUsesGovernedBlackLedgerStatsModel()
+    public void LandingNoLongerUsesBlackLedgerStatsAsPublicFrontDoor()
     {
         string landingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
         string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerPublicStatsService.cs"));
 
-        Assert.Contains("Model.BlackLedgerStats", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("The city is moving.", landingView, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.BlackLedgerStats", landingView, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("The city is moving.", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("Build the runner. Run the night.", landingView, System.StringComparison.Ordinal);
         Assert.Contains("Scope: \"Public aggregate\"", service, System.StringComparison.Ordinal);
         Assert.Contains("PrivacyNote:", service, System.StringComparison.Ordinal);
         Assert.Contains("ListPublicStats(int? requestedTurn = null)", service, System.StringComparison.Ordinal);
@@ -39,8 +40,8 @@ public sealed class BlackLedgerStatsViewTests
         string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerPublicStatsService.cs"));
         Assert.Contains("pressure, not people", ledgerView, System.StringComparison.Ordinal);
         Assert.Contains("Closeout Feed", service, System.StringComparison.Ordinal);
-        Assert.Contains("Replay Turn 1", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("carry your runners into the Black Ledger", landingView, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Replay Turn 1", landingView, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("carry your runners into the Black Ledger", landingView, System.StringComparison.Ordinal);
     }
 
     [Fact]

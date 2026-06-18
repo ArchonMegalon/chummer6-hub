@@ -31,6 +31,25 @@
         .ToArray();
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
     var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
+
+    static string CalmRoadmapText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("proof receipts", "checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("provider", "external service", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizons", "product threads", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizon", "product thread", StringComparison.OrdinalIgnoreCase);
+    }
+
     var signalLanes = new[]
     {
         new
@@ -39,8 +58,8 @@
             Title = "See what might come next without assuming it already shipped",
             Summary = "Use this page to see likely next steps, milestone pressure, and public direction. Use what works today before treating any roadmap note as already available.",
             Href = "#roadmap-horizons",
-            Label = "Browse horizons",
-            Proof = new[] { "Planned", "Milestone-backed", "Not shipped yet" }
+            Label = "Browse product threads",
+            Notes = new[] { "Planned", "Milestone-backed", "Not shipped yet" }
         },
         new
         {
@@ -49,7 +68,7 @@
             Summary = "Public ideas, votes, UX friction, and safe public bugs should enter the loop on the feedback page, not inside roadmap prose or support tickets.",
             Href = "/feedback",
             Label = "Open feedback",
-            Proof = new[] { "Votes inform demand", "Safe public bugs", "No private logs" }
+            Notes = new[] { "Votes inform demand", "Safe public bugs", "No private logs" }
         },
         new
         {
@@ -58,7 +77,7 @@
             Summary = "When you need to know whether something actually shipped, leave roadmap and open the changelog backed by release notes, guides, or live pages.",
             Href = "/changelog",
             Label = "Open changelog",
-            Proof = new[] { "Evidence first", "Release-linked", "User-available" }
+            Notes = new[] { "Evidence first", "Release-linked", "User-available" }
         },
         new
         {
@@ -67,7 +86,7 @@
             Summary = "Crashes, install recovery, account access, and private campaign details should move to Chummer help instead of sitting on the public roadmap or feedback board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
-            Proof = new[] { "Support-owned", "Tracked return", "Private by default" }
+            Notes = new[] { "Support-owned", "Tracked return", "Private by default" }
         }
     };
 }
@@ -76,10 +95,10 @@
     <div class="roadmap-hero__copy">
         <p class="eyebrow">Roadmap</p>
         <h1 class="page-title">What looks likely next, and what is still only planned</h1>
-        <p class="page-copy">Horizons explain what Chummer is trying to unlock next. Milestones show the slices already in motion and the work still being lined up.</p>
+        <p class="page-copy">Product threads explain what Chummer is trying to unlock next. Milestones show the slices already in motion and the work still being lined up.</p>
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestone ledger</a>
-            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse horizons</a>
+            <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestones</a>
+            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse product threads</a>
             <a class="button-like button-like--ghost" href="/now">Open what works today</a>
         </div>
     </div>
@@ -87,23 +106,13 @@
         <p class="roadmap-hero__kicker">Quick read</p>
         <ul class="roadmap-hero__notes">
             <li>Milestones show the work in motion.</li>
-            <li>Horizons show direction, not a shipping promise.</li>
+            <li>Product threads show direction, not a shipping promise.</li>
             <li>Use the changelog or what works today when you need current availability.</li>
         </ul>
     </aside>
 </section>
 
-@if (signalProjection is not null)
-{
-    <section class="editorial-block">
-        <details class="details-drawer">
-            <summary>How roadmap status is decided</summary>
-            <div class="stacked-copy">
-                @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
-            </div>
-        </details>
-    </section>
-}
+@* _PublicSignalProjectionPacket.cshtml remains available for internal review, but the public roadmap does not render the operational signal packet. *@
 
 <section class="roadmap-stats" aria-label="Roadmap snapshot">
     <article class="roadmap-stat">
@@ -119,7 +128,7 @@
     <article class="roadmap-stat">
         <span class="roadmap-stat__label">Open to claim</span>
         <strong class="roadmap-stat__value">@openMilestones</strong>
-        <p class="roadmap-stat__summary">Still not started on the tracked milestone ledger.</p>
+            <p class="roadmap-stat__summary">Still not started on the tracked milestone list.</p>
     </article>
     <article class="roadmap-stat">
         <span class="roadmap-stat__label">High difficulty</span>
@@ -153,8 +162,8 @@
                 <span class="tag">@lane.Badge</span>
                 <h3>@lane.Title</h3>
                 <p>@lane.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var item in lane.Proof)
+                <div class="route-choice-card__proof" aria-label="Route notes">
+                    @foreach (var item in lane.Notes)
                     {
                         <span>@item</span>
                     }
@@ -183,15 +192,15 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
-                                <p>@milestone.CasualSummary</p>
+                                <h3>@($"Milestone {milestone.Id}") · @CalmRoadmapText(milestone.Title)</h3>
+                                <p>@CalmRoadmapText(milestone.CasualSummary)</p>
                             </div>
                             <span class="tag">@milestone.StatusLabel</span>
                         </article>
                     }
                 </div>
             }
-            <a class="editorial-strip__action" href="#roadmap-milestones">Open milestone ledger</a>
+            <a class="editorial-strip__action" href="#roadmap-milestones">Open milestones</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">Shipped contrast</span>
@@ -204,8 +213,8 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@CalmRoadmapText(card.Card.Title)</h3>
+                                <p>@CalmRoadmapText(card.Card.Summary)</p>
                             </div>
                             <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
@@ -230,7 +239,7 @@
 
 <section class="roadmap-frame" id="roadmap-milestones">
     <div class="roadmap-frame__lead">
-        <p class="eyebrow">Milestone ledger</p>
+        <p class="eyebrow">Milestones</p>
         <h2 class="editorial-title">Active and upcoming work slices</h2>
         <p class="editorial-copy">Each row stays collapsed by default, with a casual summary visible up front. Expand any milestone when you need difficulty, upstream dependencies, or claimed state.</p>
     </div>
@@ -240,7 +249,7 @@
         <article class="roadmap-empty">
             <span class="tag tag--quiet">Temporarily unavailable</span>
             <h3>Milestone detail is not loaded right now</h3>
-            <p>The roadmap view could not read the milestone registry on this request. The public horizons below still reflect the broader direction.</p>
+            <p>The roadmap view could not read the milestone registry on this request. The product threads below still reflect the broader direction.</p>
         </article>
     }
     else
@@ -253,8 +262,8 @@
                         <span class="milestone-drawer__header">
                             <span class="milestone-drawer__title">
                                 <span class="tag">@($"Milestone {milestone.Id}") · @milestone.WaveLabel</span>
-                                <span class="milestone-drawer__heading">@milestone.Title</span>
-                                <span class="milestone-drawer__tease">@milestone.CasualSummary</span>
+                                <span class="milestone-drawer__heading">@CalmRoadmapText(milestone.Title)</span>
+                                <span class="milestone-drawer__tease">@CalmRoadmapText(milestone.CasualSummary)</span>
                             </span>
                             <span class="milestone-pills" aria-hidden="true">
                                 <span class="milestone-pill milestone-pill--status">@milestone.StatusLabel</span>
@@ -265,9 +274,9 @@
                     </summary>
                     <div class="milestone-body">
                         <div class="milestone-meta">
-                            <p><strong>Difficulty:</strong> @milestone.DifficultyLabel. @milestone.DifficultySummary</p>
-                            <p><strong>Claimed:</strong> @milestone.ClaimedLabel. @milestone.ClaimedSummary</p>
-                            <p><strong>Dependencies:</strong> @milestone.DependencySummary</p>
+                            <p><strong>Difficulty:</strong> @milestone.DifficultyLabel. @CalmRoadmapText(milestone.DifficultySummary)</p>
+                            <p><strong>Claimed:</strong> @milestone.ClaimedLabel. @CalmRoadmapText(milestone.ClaimedSummary)</p>
+                            <p><strong>Dependencies:</strong> @CalmRoadmapText(milestone.DependencySummary)</p>
                         </div>
                         @if (milestone.Dependencies.Count > 0)
                         {
@@ -276,7 +285,7 @@
                                 {
                                     <li>
                                         <strong>@($"Milestone {dependency.Id}")</strong>
-                                        <span>@dependency.Title</span>
+                                        <span>@CalmRoadmapText(dependency.Title)</span>
                                         <span class="muted-copy">(@dependency.StatusLabel)</span>
                                     </li>
                                 }
@@ -292,8 +301,8 @@
 <section class="roadmap-frame" id="roadmap-horizons">
     <div class="roadmap-frame__lead">
         <p class="eyebrow">Direction map</p>
-        <h2 class="editorial-title">Public horizons</h2>
-        <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and which live page keeps the promise honest today.</p>
+        <h2 class="editorial-title">Product threads</h2>
+        <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and where to compare the idea against the current product.</p>
     </div>
 
     <div class="roadmap-lanes">
@@ -304,7 +313,7 @@
                 Id = "roadmap-preparing",
                 Eyebrow = PublicSurfaceStatus.PreparingNext,
                 Heading = "Closest to the next public step",
-                Intro = "These horizons are nearest to the current public release and the next outward-facing unlock.",
+                Intro = "These product threads are nearest to the current public release and the next outward-facing unlock.",
                 Items = preparingHorizons
             },
             new
@@ -347,20 +356,16 @@
                                 <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(item.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
                                 <span class="roadmap-horizon-card__audience">@PublicSurfaceStatus.AudienceLabel(item.Card.Audience)</span>
                             </div>
-                            <h4>@item.Card.Title</h4>
-                            <p>@item.Card.Summary</p>
+                            <h4>@CalmRoadmapText(item.Card.Title)</h4>
+                            <p>@CalmRoadmapText(item.Card.Summary)</p>
                             <div class="roadmap-horizon-card__facts">
                                 @if (!string.IsNullOrWhiteSpace(item.Card.Pain))
                                 {
-                                    <p><strong>User pain:</strong> @item.Card.Pain</p>
+                                    <p><strong>User pain:</strong> @CalmRoadmapText(item.Card.Pain)</p>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(item.Card.Payoff))
                                 {
-                                    <p><strong>Expected unlock:</strong> @item.Card.Payoff</p>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(item.Card.ProofNote))
-                                {
-                                    <p><strong>Closest live page:</strong> @item.Card.ProofNote</p>
+                                    <p><strong>Expected unlock:</strong> @CalmRoadmapText(item.Card.Payoff)</p>
                                 }
                             </div>
                             <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
@@ -389,8 +394,8 @@
                             <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(item.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
                             <span class="roadmap-horizon-card__audience">@PublicSurfaceStatus.AudienceLabel(item.Card.Audience)</span>
                         </div>
-                        <h4>@item.Card.Title</h4>
-                        <p>@item.Card.Summary</p>
+                        <h4>@CalmRoadmapText(item.Card.Title)</h4>
+                        <p>@CalmRoadmapText(item.Card.Summary)</p>
                         <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
                     </article>
                 }

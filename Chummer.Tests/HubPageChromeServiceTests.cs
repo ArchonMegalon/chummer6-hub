@@ -79,16 +79,15 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "Get Chummer", "Ledger", "Help"],
+            ["Home", "Get Chummer", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
         Assert.Equal("/downloads", chrome.PrimaryNavigation[1].Href);
-        Assert.Equal("/ledger", chrome.PrimaryNavigation[2].Href);
-        Assert.Equal("/help", chrome.PrimaryNavigation[3].Href);
+        Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
     }
 
     [Fact]
-    public void LedgerPrimaryNavigationRouteExistsInMirroredLandingManifest()
+    public void BlackLedgerRouteExistsButIsNotPrimaryNavigation()
     {
         string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");
         string manifestPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml");
@@ -96,8 +95,7 @@ public sealed class HubPageChromeServiceTests
         string navigation = File.ReadAllText(navigationPath);
         string manifest = File.ReadAllText(manifestPath);
 
-        Assert.Contains("label: Ledger", navigation, StringComparison.Ordinal);
-        Assert.Contains("href: /ledger", navigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("label: Ledger", navigation, StringComparison.Ordinal);
         Assert.Matches(new Regex(@"(?m)^\s*-\s+path:\s+/ledger\s*$"), manifest);
     }
 

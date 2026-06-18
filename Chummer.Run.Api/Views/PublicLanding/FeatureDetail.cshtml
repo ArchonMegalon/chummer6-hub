@@ -37,24 +37,24 @@
 
     var primaryRouteTitle = Model.Family switch
     {
-        "roadmap" => "Take the bounded next step without pretending the whole horizon is already shipped",
-        "live-proof" => "Take the direct next action when this artifact already proved itself",
-        "preview-concept" => "Follow the one truthful next action instead of treating preview copy like a live release",
-        _ => "Take the direct next page once this detail answered the question"
+        "roadmap" => "Take the next practical step",
+        "live-proof" => "Open the next useful page",
+        "preview-concept" => "See what is available now",
+        _ => "Continue from this feature"
     };
     var primaryRouteSummary = Model.Family switch
     {
-        "roadmap" => $"{Model.PrimaryAction.Label} is the current next page for this horizon. Use it when the detail answered the question and you know which bounded action comes next.",
-        "live-proof" => $"{Model.PrimaryAction.Label} stays available because this page is proving one user-visible artifact, not hiding the next action behind vague card copy.",
-        "preview-concept" => $"{Model.PrimaryAction.Label} is the honest next move from this preview concept. It keeps the next step explicit about what is real now versus what is still opening next.",
-        _ => $"{Model.PrimaryAction.Label} is the explicit next page for this feature detail once the bounded question is resolved."
+        "roadmap" => $"{Model.PrimaryAction.Label} opens the next page for this work area.",
+        "live-proof" => $"{Model.PrimaryAction.Label} opens the related product page.",
+        "preview-concept" => $"{Model.PrimaryAction.Label} shows what you can use today.",
+        _ => $"{Model.PrimaryAction.Label} continues from this feature."
     };
     var primaryRouteProof = Model.Family switch
     {
-        "roadmap" => new[] { "Bounded action", "No fake ship claim", "Next step explicit" },
-        "live-proof" => new[] { "User-visible proof", "Direct continuation", "No vague gallery loop" },
-        "preview-concept" => new[] { "Preview stays honest", "Next move explicit", "No fake release claim" },
-        _ => new[] { "Bounded detail", "Single next page", "Next step stays honest" }
+        "roadmap" => new[] { "Next step", "Current status", "Help nearby" },
+        "live-proof" => new[] { "Product page", "Downloads nearby", "Help nearby" },
+        "preview-concept" => new[] { "Available now", "Next step", "Help nearby" },
+        _ => new[] { "Feature detail", "Next page", "Help nearby" }
     };
 
     var compareRoute = Model.Family switch
@@ -62,76 +62,76 @@
         "roadmap" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Compare with current release status instead of treating a horizon as already shipped",
-            Summary: "Roadmap detail keeps direction honest, but what works today still owns current user-available truth.",
-            Proof: new[] { "Current status view", "No fake ship claim", "Install truth stays separate" }),
+            Title: "Check what is available today",
+            Summary: "Use the current status page when you want to know what is ready to use.",
+            Proof: new[] { "Current status", "Download path", "Known limits" }),
         "live-proof" => (
             Href: "/downloads",
             Label: "Open downloads",
-            Title: "Use downloads when the question becomes install or update posture",
-            Summary: "This detail proves one artifact or flow. Downloads still owns build choice, platform posture, and known issues.",
-            Proof: new[] { "Install path", "Known issues nearby", "One calmer device path" }),
+            Title: "Install or update Chummer",
+            Summary: "Use downloads when you need the current Windows or Linux installer.",
+            Proof: new[] { "Installer", "Platform choice", "Help nearby" }),
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Compare with current release status before treating a preview as already available",
-            Summary: "Preview concepts stay explicit about what is still opening next. What works today still answers what a user can start from today.",
-            Proof: new[] { "Preview stays honest", "Current status nearby", "No fake availability" }),
+            Title: "Check what is available today",
+            Summary: "Use the current status page before planning around an upcoming feature.",
+            Proof: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check current release status when availability matters more than the feature brief",
-            Summary: "The feature detail answers one bounded question. What works today still owns current release truth.",
-            Proof: new[] { "Current availability", "Availability first", "No mixed jobs" })
+            Title: "Check what is available today",
+            Summary: "Use the current status page when availability matters more than the feature brief.",
+            Proof: new[] { "Current status", "Downloads", "Help nearby" })
     };
 
     var deeperRoute = Model.SecondaryAction is not null
         ? (
             Href: Model.SecondaryAction.Href,
             Label: Model.SecondaryAction.Label,
-            Title: "Open the deeper brief only when you need the longer rationale",
-            Summary: $"{Model.SecondaryAction.Label} stays available for the larger comparison, fallback, or family context behind this card.",
-            Proof: new[] { "Deeper context", "Fallback nearby", "One layer up" })
+            Title: "Read the longer brief",
+            Summary: $"{Model.SecondaryAction.Label} opens the broader context for this feature.",
+            Proof: new[] { "More context", "Related pages", "Help nearby" })
         : Model.Family switch
         {
             "roadmap" => (
                 Href: "/horizons",
                 Label: "Open horizons",
-                Title: "Open the broader roadmap family only when you need the larger product picture",
-                Summary: "Stay on this detail for the bounded feature question. Move to Horizons when you need the wider upcoming wave.",
-                Proof: new[] { "Broader direction", "One layer up", "Still planned" }),
+                Title: "Open the broader roadmap",
+                Summary: "Move to Horizons when you want the larger product picture.",
+                Proof: new[] { "Roadmap", "Related work", "Current status" }),
             "live-proof" => (
                 Href: "/artifacts",
                 Label: "Open detail view",
-                Title: "Go back to the detail view when you need comparison instead of one isolated card",
-                Summary: "The detail view keeps adjacent publication history, provenance, and comparison together instead of turning this detail page into a dead end.",
-                Proof: new[] { "Detail view", "Comparison nearby", "Same trust family" }),
+                Title: "Open the related detail view",
+                Summary: "Use the detail view when you want nearby items and history together.",
+                Proof: new[] { "Details", "Related items", "History" }),
             "preview-concept" => (
                 Href: "/artifacts",
                 Label: "Open detail view",
-                Title: "Use the detail view when you want adjacent preview and live artifacts together",
-                Summary: "Preview concepts become easier to read when the detail view keeps neighboring publication history and availability context nearby.",
-                Proof: new[] { "Preview and live together", "Detail view", "Comparison nearby" }),
+                Title: "Open the related detail view",
+                Summary: "Use the detail view when you want nearby items and availability context together.",
+                Proof: new[] { "Details", "Related items", "Availability" }),
             _ => (
                 Href: "/roadmap",
                 Label: "Open roadmap",
-                Title: "Move to the larger page family only when the single feature card is not enough",
-                Summary: "This detail page stays bounded on purpose. Open the broader page family when you need surrounding context.",
-                Proof: new[] { "Broader context", "Still first-party", "Bounded detail stays bounded" })
+                Title: "Open the broader roadmap",
+                Summary: "Open the roadmap when you need surrounding context.",
+                Proof: new[] { "Roadmap", "Related pages", "Current status" })
         };
 
     AddRouteChoice("Best next page", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteProof);
-    AddRouteChoice(compareRoute.Title.Contains("install or update posture", StringComparison.Ordinal) ? "Install path" : "Reality check", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
+    AddRouteChoice(compareRoute.Title.Contains("Install or update", StringComparison.Ordinal) ? "Install" : "Status", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
     AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Proof);
     AddRouteChoice(
         "Help",
-        "Leave feature detail for first-party help as soon as the issue becomes support or recovery",
-        "If the question needs private account follow-up, install repair, logs, or campaign-specific recovery, stop using the feature brief as a support surface and move to help immediately.",
+        "Get help if this becomes a setup or account issue",
+        "Use help for private account follow-up, install repair, logs, or campaign-specific recovery.",
         "/help",
         "Open help",
-        "Support-owned",
+        "Support",
         "Private follow-up",
-        "No page confusion");
+        "Setup help");
 }
 
 <section class="story-cinematic">
@@ -162,8 +162,8 @@
 <section class="editorial-block" id="feature-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Keep feature detail, downloads, installs, and help on their own pages.</h2>
-        <p class="editorial-copy">This page should answer the bounded question behind one feature card. It should not pretend to be the whole roadmap, the install page, or private support.</p>
+        <h2 class="editorial-title">Where to go next.</h2>
+        <p class="editorial-copy">Pick the next page for the job: install, check status, read more, or get help.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-18T10:29:44Z",
+  "generated_at_utc": "2026-06-18T15:00:27Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "external_required": false,
   "distribution_resilience_status": "optional_external_mirrors_degraded",
@@ -22,44 +22,23 @@
           "id": "avalonia-linux-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-linux-x64-installer.deb",
-          "size": 36865078,
-          "sha256": "fd7a0772ab0f01e09bcfe200f4d391e392abafe6b2235ab5dbb63c33d18347da",
-          "status": "pass"
-        },
-        {
-          "id": "avalonia-win-x64-installer",
-          "exists": true,
-          "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64-installer.exe",
-          "size": 98934813,
-          "sha256": "581f37f5f72483c1753435f5666c8ab224fd77f593cd7507d9c613ec86db11ab",
+          "size": 36864148,
+          "sha256": "188d224ca56781e2876fc743b3ca002753453d582f0a8c6d6f49c4bee6600cae",
           "status": "pass"
         }
       ]
     },
     "public_edge": {
       "status": "pass",
-      "base_url": "https://chummer.run",
+      "base_url": "http://127.0.0.1:8091",
       "artifacts": [
         {
           "id": "avalonia-linux-x64-installer",
-          "url": "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+          "url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
           "access_class": "open_public",
           "status_code": 206,
-          "final_url": "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-          "content_range": "bytes 0-0/36865078",
-          "content_length": 1,
-          "streamed_size": null,
-          "streamed_sha256": "",
-          "posture": "direct_download_bytes",
-          "status": "pass"
-        },
-        {
-          "id": "avalonia-win-x64-installer",
-          "url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "access_class": "open_public",
-          "status_code": 206,
-          "final_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "content_range": "bytes 0-0/98934813",
+          "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+          "content_range": "bytes 0-0/36864148",
           "content_length": 1,
           "streamed_size": null,
           "streamed_sha256": "",
@@ -91,20 +70,6 @@
               "status": "fail"
             }
           ]
-        },
-        {
-          "id": "avalonia-win-x64-installer",
-          "file_name": "chummer-avalonia-win-x64-installer.exe",
-          "status": "fail",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/pcloud/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64-installer.exe",
-              "size": 101138617,
-              "sha256": "c9aa9e23cac7423e5954d8f24067f9f7fdb37db2b09c7c084055ebef03c71464",
-              "status": "fail"
-            }
-          ]
         }
       ]
     },
@@ -127,20 +92,6 @@
               "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-linux-x64-installer.deb",
               "size": 42855330,
               "sha256": "158294957a9456ddfb561325d5e503f22879ff1ff4036a360f2812099d7fc475",
-              "status": "fail"
-            }
-          ]
-        },
-        {
-          "id": "avalonia-win-x64-installer",
-          "file_name": "chummer-avalonia-win-x64-installer.exe",
-          "status": "fail",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64-installer.exe",
-              "size": 101138617,
-              "sha256": "c9aa9e23cac7423e5954d8f24067f9f7fdb37db2b09c7c084055ebef03c71464",
               "status": "fail"
             }
           ]

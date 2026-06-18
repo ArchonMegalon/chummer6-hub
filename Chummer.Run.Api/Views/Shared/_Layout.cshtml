@@ -43,7 +43,6 @@
             "/what-is-chummer" => string.Equals(normalizedCurrentPath, "/what-is-chummer", StringComparison.OrdinalIgnoreCase),
             "/downloads" => normalizedCurrentPath is "/downloads" || normalizedCurrentPath.StartsWith("/downloads/", StringComparison.OrdinalIgnoreCase),
             "/now" => string.Equals(normalizedCurrentPath, "/now", StringComparison.OrdinalIgnoreCase),
-            "/ledger" => normalizedCurrentPath is "/ledger" || normalizedCurrentPath.StartsWith("/ledger/", StringComparison.OrdinalIgnoreCase),
             "/horizons" => normalizedCurrentPath is "/horizons" or "/roadmap" || normalizedCurrentPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase),
             "/artifacts" => normalizedCurrentPath is "/artifacts" || normalizedCurrentPath.StartsWith("/artifacts/", StringComparison.OrdinalIgnoreCase),
             "/participate" => normalizedCurrentPath is "/participate" || normalizedCurrentPath.StartsWith("/participate/", StringComparison.OrdinalIgnoreCase),
@@ -83,7 +82,7 @@
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
     var compactProductLinks = productLinks
-        .Where(link => link.Href is "/" or "/downloads" or "/now" or "/ledger")
+        .Where(link => link.Href is "/" or "/downloads" or "/now")
         .ToArray();
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
@@ -95,7 +94,6 @@
     {
         new PublicNavigationLink("Home", "/"),
         new PublicNavigationLink("Get Chummer", "/downloads"),
-        new PublicNavigationLink("Ledger", "/ledger"),
         new PublicNavigationLink("Help", "/help")
     };
     var compactDrawerLinks = chrome.PrimaryNavigation
@@ -161,21 +159,12 @@
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
     var requestPathIsRoot = string.Equals(normalizedRequestPath, "/", StringComparison.Ordinal);
     var requestPathIndexable = requestPathIsRoot
-        || normalizedRequestPath is "/now" or "/downloads" or "/status" or "/changelog" or "/what-is-chummer" or "/help" or "/faq" or "/contact" or "/privacy" or "/terms" or "/ledger" or "/ledger/map" or "/ledger/factions" or "/ledger/newsroom"
+        || normalizedRequestPath is "/now" or "/downloads" or "/status" or "/changelog" or "/what-is-chummer" or "/help" or "/faq" or "/contact" or "/privacy" or "/terms"
         || routeKey is "landing" or "what-is-chummer" or "now" or "downloads" or "changelog" || routeKey is "help" or "faq" || routeKey is "contact" or "privacy" or "terms" or "status"
         || routeKey is "horizons" or "roadmap" or "artifacts" || routeKey is "participate" or "feedback";
-    var newsroomEpisodeIndexable = requestPathSegments.StartsWith("/ledger/newsroom/".AsSpan(), StringComparison.OrdinalIgnoreCase)
-        && !requestPathSegments.EndsWith("/transcript".AsSpan(), StringComparison.OrdinalIgnoreCase)
-        && !requestPathSegments.EndsWith("/receipts".AsSpan(), StringComparison.OrdinalIgnoreCase);
-    var requestPathLedgerEpisode = !requestPathIndexable
-        && requestPathSegments.StartsWith("/ledger/".AsSpan(), StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalizedRequestPath, "/ledger", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalizedRequestPath, "/ledger/map", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalizedRequestPath, "/ledger/factions", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalizedRequestPath, "/ledger/newsroom", StringComparison.OrdinalIgnoreCase);
     var indexablePublicRoute = !authSurface
         && !chrome.Authenticated
-        && (requestPathIndexable || newsroomEpisodeIndexable || requestPathLedgerEpisode || routeKey.StartsWith("ledger", StringComparison.Ordinal));
+        && requestPathIndexable;
     var rybbitEligible = !authSurface
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(rybbitSiteId)
@@ -199,19 +188,7 @@
     object? publicSchema = null;
     if (indexablePublicRoute)
     {
-        if (routeKey.StartsWith("ledger", StringComparison.Ordinal))
-        {
-            publicSchema = new Dictionary<string, object?>
-            {
-                ["@context"] = "https://schema.org",
-                ["@type"] = "WebApplication",
-                ["name"] = pageTitle,
-                ["url"] = canonicalUrl,
-                ["description"] = chrome.Description,
-                ["applicationCategory"] = "GameApplication"
-            };
-        }
-        else if (routeKey is "landing" or "what-is-chummer" or "downloads")
+        if (routeKey is "landing" or "what-is-chummer" or "downloads")
         {
             publicSchema = new Dictionary<string, object?>
             {

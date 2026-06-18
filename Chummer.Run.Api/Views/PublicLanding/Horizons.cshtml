@@ -13,68 +13,56 @@
     {
         new
         {
-            Badge = "Current release first",
-            Title = "Compare with current release status instead of treating a horizon as already shipped",
-            Summary = "Use what works today when you need the current capability, current caution, or one inspectable trail before you read further into future plans.",
-            Href = "/now",
-            Label = "Open what works today",
-            Proof = new[] { "Current availability", "Caution explicit", "No future bluff" }
-        },
-        new
-        {
-            Badge = "Milestone pressure",
-            Title = "The milestone roadmap lives on a separate page",
-            Summary = "Roadmap stays the public direction and milestone-pressure page. Horizons stay deeper and more editorial so research or design tracks do not read like the active claim ledger.",
-            Href = "/roadmap",
-            Label = "Open roadmap",
-            Proof = new[] { "Milestone-backed", "Direction only", "Not shipped truth" }
-        },
-        new
-        {
-            Badge = "Public signal",
-            Title = "Use public feedback when a future idea matches real user pain",
-            Summary = "Feedback is where feature demand, UX friction, and safe public bugs should enter the product loop before they become roadmap or changelog language.",
-            Href = "/feedback",
-            Label = "Open feedback",
-            Proof = new[] { "Votes inform demand", "Public by default", "No private logs" }
-        },
-        new
-        {
-            Badge = "Install and help",
-            Title = "Leave horizons when the next job is install, support, or recovery",
-            Summary = "The future shelf should not compete with downloads or support. Install from downloads, and use first-party help as soon as the issue becomes private or recovery-bound.",
+            Badge = "Use today",
+            Title = "Start with the app you can download now",
+            Summary = "Windows and Linux builds are the main path. Future ideas should never make the install path harder to understand.",
             Href = "/downloads",
-            Label = "Open downloads",
-            Proof = new[] { "Install path stays primary", "Support is separate", "No page confusion" }
+            Label = "Open downloads"
+        },
+        new
+        {
+            Badge = "Roadmap",
+            Title = "See the near-term delivery plan",
+            Summary = "Use the roadmap for milestones and current pressure. This page is only the calmer idea shelf.",
+            Href = "/roadmap",
+            Label = "Open roadmap"
+        },
+        new
+        {
+            Badge = "Feedback",
+            Title = "Tell us what would make play smoother",
+            Summary = "Sharp user feedback is more useful than a long feature list. Send the friction, not a project plan.",
+            Href = "/feedback",
+            Label = "Send feedback"
         }
     };
     var groups = new[]
     {
-        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current public release and the next release-adjacent work." },
-        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live public release." },
-        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current public-release promises yet." }
+        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Near next", Intro = "These are close enough to compare against the current release." },
+        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing", Intro = "These have a product shape, but they still need more work before they belong in the release path." },
+        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research", Intro = "These are early ideas. They explain direction; they are not promises." }
     };
     var horizonVideos = new Dictionary<string, (string Title, string Href, string Captions)[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["horizon_nexus_pan"] =
         new[]
         {
-            ("Watch the NEXUS-PAN deep dive", "/media/horizons/nexus-pan-90s-deepdive.mp4", "/media/horizons/nexus-pan-90s-deepdive.vtt"),
-            ("Watch the NEXUS-PAN epic reel", "/media/horizons/nexus-pan-epic-90s.mp4", "/media/horizons/nexus-pan-epic-90s.vtt")
+            ("NEXUS-PAN deep dive", "/media/horizons/nexus-pan-90s-deepdive.mp4", "/media/horizons/nexus-pan-90s-deepdive.vtt"),
+            ("NEXUS-PAN reel", "/media/horizons/nexus-pan-epic-90s.mp4", "/media/horizons/nexus-pan-epic-90s.vtt")
         },
-        ["horizon_alice"] = new[] { ("Watch the ALICE deep dive", "/media/horizons/alice-90s-deepdive.mp4", "/media/horizons/alice-90s-deepdive.vtt") },
-        ["horizon_karma_forge"] = new[] { ("Watch the KARMA FORGE deep dive", "/media/horizons/karma-forge-90s-deepdive.mp4", "/media/horizons/karma-forge-90s-deepdive.vtt") },
-        ["horizon_jackpoint"] = new[] { ("Watch the JACKPOINT deep dive", "/media/horizons/jackpoint-90s-deepdive.mp4", "/media/horizons/jackpoint-90s-deepdive.vtt") },
-        ["horizon_runsite"] = new[] { ("Watch the RUNSITE deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
-        ["horizon_runbook_press"] = new[] { ("Watch the RUNBOOK PRESS deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
-        ["horizon_table_pulse"] = new[] { ("Watch the TABLE PULSE deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
+        ["horizon_alice"] = new[] { ("Alice deep dive", "/media/horizons/alice-90s-deepdive.mp4", "/media/horizons/alice-90s-deepdive.vtt") },
+        ["horizon_karma_forge"] = new[] { ("Karma Forge deep dive", "/media/horizons/karma-forge-90s-deepdive.mp4", "/media/horizons/karma-forge-90s-deepdive.vtt") },
+        ["horizon_jackpoint"] = new[] { ("JackPoint deep dive", "/media/horizons/jackpoint-90s-deepdive.mp4", "/media/horizons/jackpoint-90s-deepdive.vtt") },
+        ["horizon_runsite"] = new[] { ("Runsite deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
+        ["horizon_runbook_press"] = new[] { ("Runbook Press deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
+        ["horizon_table_pulse"] = new[] { ("Table Pulse deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
         ["horizon_black_ledger"] =
         new[]
         {
-            ("Watch the BLACK LEDGER deep dive", "/media/horizons/black-ledger-90s-deepdive.mp4", "/media/horizons/black-ledger-90s-deepdive.vtt"),
-            ("Watch the BLACK LEDGER epic reel", "/media/horizons/black-ledger-epic-90s.mp4", "/media/horizons/black-ledger-epic-90s.vtt")
+            ("Black Ledger deep dive", "/media/horizons/black-ledger-90s-deepdive.mp4", "/media/horizons/black-ledger-90s-deepdive.vtt"),
+            ("Black Ledger reel", "/media/horizons/black-ledger-epic-90s.mp4", "/media/horizons/black-ledger-epic-90s.vtt")
         },
-        ["horizon_community_hub"] = new[] { ("Watch the COMMUNITY HUB deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
+        ["horizon_community_hub"] = new[] { ("Community Hub deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
@@ -82,92 +70,54 @@
 <section class="trust-page-hero route-anchor-target" id="public-roadmap-projection">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Coming next</p>
-        <h1 class="page-title">What Chummer is building toward</h1>
-        <p class="page-copy">Each horizon carries a clearer readiness label, the user pain it addresses, and one truthful next step inside the product before the deeper brief.</p>
-        <div class="trust-claim__microproof">
-            <span>@totalHorizons named horizon@(totalHorizons == 1 ? string.Empty : "s")</span>
-            <span>@preparingCount preparing next</span>
-            <span>@designingCount designing in public</span>
-            <span>@researchCount research track</span>
-        </div>
+        <h1 class="page-title">A quieter look at what Chummer may become</h1>
+        <p class="page-copy">The current job is still simple: download Chummer, build a runner, and keep the table moving. Everything below is future product direction, sorted by how close it feels to the app today.</p>
         @if (fromRoadmapAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
-                <h3>You followed a legacy roadmap handoff</h3>
-                <p>The milestone-backed public roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page stays the deeper horizon shelf for readiness posture, user pain, and the next honest comparison point.</p>
-                <div class="route-callout__proof">
-                    <span>Milestone-backed</span>
-                    <span>Direction only</span>
-                    <span>Deeper horizon detail</span>
-                </div>
+                <h3>You came from an older roadmap link</h3>
+                <p>The current roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page is only the calmer idea shelf.</p>
                 <div class="route-callout__actions">
                     <a class="inline-link" href="/roadmap">Open roadmap</a>
-                    <a class="inline-link" href="/feedback">Open feedback</a>
-                    <a class="inline-link" href="/now">Open what works today</a>
-                    <a class="inline-link" href="/help">Open help</a>
+                    <a class="inline-link" href="/downloads">Open downloads</a>
+                    <a class="inline-link" href="/feedback">Send feedback</a>
                 </div>
             </div>
         }
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="#preparing">Preparing next</a>
+        <a class="button-like button-like--primary" href="/downloads">Download Chummer</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
-        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+        <a class="button-like button-like--ghost" href="#near-next">Browse ideas</a>
     </div>
 </section>
 
-<section class="workflow-band workflow-band--flagship workflow-band--compact flagship-promo-band" data-horizon-section="every-wonder-promo" id="every-wonder-promo">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">Every Wonder Horizon</p>
-        <h2 class="editorial-title">A 90-second tour of every horizon boundary.</h2>
-        <p class="editorial-copy">This motion reel introduces preparing-next, designing-in-public, and research-track horizons without presenting future direction as something ready today.</p>
-    </div>
-    <div class="flagship-promo-player">
-        <video
-            class="flagship-promo-player__video"
-            controls
-            preload="metadata"
-            poster="/media/promo/every-wonder-horizon-promo-poster.png"
-            aria-label="Every Wonder Horizon promo reel">
-            <source src="/media/promo/every-wonder-horizon-promo.webm" type="video/webm" />
-            <source src="/media/promo/every-wonder-horizon-promo.mp4" type="video/mp4" />
-            <track src="/media/promo/every-wonder-horizon-promo.vtt" kind="captions" srclang="en" label="English" default />
-        </video>
-        <div class="flagship-promo-player__proof">
-            <span>First-party motion</span>
-            <span>12 scenes</span>
-            <span>90 seconds</span>
-            <a class="inline-link" href="/media/promo/every-wonder-horizon-promo.receipt.json">Reel details</a>
-        </div>
-    </div>
-</section>
-
-<section class="status-decision-strip" aria-label="Horizon posture snapshot">
+<section class="status-decision-strip" aria-label="Coming-next distance from the current app">
     <article class="status-decision-strip__card">
-        <span class="tag">Preparing next</span>
-        <h2>@preparingCount horizon@(preparingCount == 1 ? string.Empty : "s") sit closest to the current public release.</h2>
-        <p>These are the ideas that should compare directly against current availability and the active downloads page before any broader flagship claim tightens.</p>
-        <a class="button-like button-like--ghost" href="#preparing">Open preparing next</a>
+        <span class="tag">Near next</span>
+        <h2>@preparingCount thread@(preparingCount == 1 ? string.Empty : "s") close to the current app.</h2>
+        <p>These are the only items that should be compared directly with today’s download.</p>
+        <a class="button-like button-like--ghost" href="#near-next">Open near next</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Designing in public</span>
-        <h2>@designingCount horizon@(designingCount == 1 ? string.Empty : "s") have clearer product shape but still need more delivery truth.</h2>
-        <p>Use these when you need the named user pain, likely unlock, and live comparison point without mistaking them for the milestone ledger.</p>
-        <a class="button-like button-like--ghost" href="#designing">Open design tracks</a>
+        <span class="tag">Designing</span>
+        <h2>@designingCount thread@(designingCount == 1 ? string.Empty : "s") still need stronger product shape.</h2>
+        <p>Read these as direction, not as a current feature list.</p>
+        <a class="button-like button-like--ghost" href="#designing">Open design threads</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag tag--amber">Research track</span>
-        <h2>@researchCount horizon@(researchCount == 1 ? string.Empty : "s") are worth following early without reading them as current-preview promises.</h2>
-        <p>Research remains visible because it explains direction, not because it already belongs on the live public release or install path.</p>
-        <a class="button-like button-like--ghost" href="#research">Open research tracks</a>
+        <span class="tag tag--amber">Research</span>
+        <h2>@researchCount thread@(researchCount == 1 ? string.Empty : "s") stay early.</h2>
+        <p>These explain what we are thinking about, not what the product already does.</p>
+        <a class="button-like button-like--ghost" href="#research">Open research</a>
     </article>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick horizons, roadmap, current release status, or help on purpose.</h2>
-        <p class="editorial-copy">The future shelf should explain why an idea matters and how far away it is. It should not replace current availability, the milestone roadmap, or the install and support pages.</p>
+        <p class="eyebrow">How to read this page</p>
+        <h2 class="editorial-title">Ideas stay behind the product.</h2>
+        <p class="editorial-copy">This page is intentionally secondary. It is here for direction, not to sell unfinished systems as today’s experience.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -176,15 +126,17 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
-                    {
-                        <span>@item</span>
-                    }
-                </div>
                 <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
             </article>
         }
+    </div>
+</section>
+
+<section class="section-band" aria-label="Coming next summary">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Direction</p>
+        <h2 class="editorial-title">@totalHorizons product thread@(totalHorizons == 1 ? string.Empty : "s") under review.</h2>
+        <p class="editorial-copy">@preparingCount near-next, @designingCount design, and @researchCount research thread@(researchCount == 1 ? string.Empty : "s"). Black Ledger stays quiet here until it earns a stronger public position.</p>
     </div>
 </section>
 
@@ -201,7 +153,15 @@
         rendered.Add(item.Card.Id);
     }
 
-    <section class="section-band" id="@group.Badge.ToLowerInvariant()">
+    var sectionId = group.Badge.ToLowerInvariant() switch
+    {
+        "preparing" => "near-next",
+        "designing" => "designing",
+        "research" => "research",
+        _ => group.Badge.ToLowerInvariant()
+    };
+
+    <section class="section-band" id="@sectionId">
         <div class="editorial-block__lead">
             <p class="eyebrow">@group.Label</p>
             <h2 class="editorial-title">@group.Heading</h2>
@@ -211,7 +171,12 @@
             @for (var index = 0; index < items.Length; index++)
             {
                 var card = items[index];
+                var isBlackLedger = string.Equals(card.Card.Id, "horizon_black_ledger", StringComparison.OrdinalIgnoreCase);
                 var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
+                var cardSummary = isBlackLedger
+                    ? "A living-city campaign layer is still early. It stays behind the main Chummer app until the experience is ready for normal users."
+                    : card.Card.Summary;
+                var actionLabel = isBlackLedger ? "Read quiet design note" : card.Action.Label;
 
                 <article class="horizon-band@reverseClass" id="@card.Card.Id.ToLowerInvariant().Replace('_', '-')">
                     @if (card.Asset is not null)
@@ -223,59 +188,43 @@
                     <div class="horizon-band__copy">
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
+                        <p>@cardSummary</p>
                         <div class="horizon-band__claims">
                             @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
                             {
                                 <div>
-                                    <span class="horizon-band__label">User pain</span>
+                                    <span class="horizon-band__label">Why it matters</span>
                                     <p>@card.Card.Pain</p>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                             {
                                 <div>
-                                    <span class="horizon-band__label">Expected unlock</span>
+                                    <span class="horizon-band__label">What it could unlock</span>
                                     <p>@card.Card.Payoff</p>
-                                </div>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
-                            {
-                                <div>
-                                    <span class="horizon-band__label">Related live surface now</span>
-                                    <p>@card.Card.ProofNote</p>
                                 </div>
                             }
                             @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
                             {
-                                @foreach (var video in cardVideos)
-                                {
-                                    <div>
-                                        <span class="horizon-band__label">Explanation video</span>
-                                        <p><a class="inline-link" href="@video.Href">@video.Title</a> <a class="inline-link" href="@video.Captions">Captions</a></p>
-                                    </div>
-                                }
+                                <div>
+                                    <span class="horizon-band__label">Optional video</span>
+                                    <p>
+                                        @foreach (var video in cardVideos)
+                                        {
+                                            <a class="inline-link" href="@video.Href">@video.Title</a>
+                                            <a class="inline-link" href="@video.Captions">Captions</a>
+                                        }
+                                    </p>
+                                </div>
                             }
                         </div>
-                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        <a class="editorial-strip__action" href="@card.Action.Href">@actionLabel</a>
                     </div>
                 </article>
             }
         </div>
     </section>
 }
-
-<section class="release-footnote">
-    <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use horizons to understand the future, then move to the page that owns the present-tense job.</h2>
-    <p class="editorial-copy">Compare with current release status on What works today, inspect active delivery pressure on Roadmap, install from Downloads, or leave the public future shelf for Help when the issue is private or recovery-bound.</p>
-    <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="/now">Open what works today</a>
-        <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
-        <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
-    </div>
-    <p class="muted-copy">Need to influence direction? <a class="inline-link" href="/feedback">Open feedback</a>.</p>
-</section>
 
 @{
     var remaining = Model.Horizons.Where(card => !rendered.Contains(card.Card.Id)).ToArray();
@@ -285,9 +234,9 @@
 {
     <section class="section-band">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Additional tracks</p>
-            <h2 class="editorial-title">Other roadmap surfaces</h2>
-            <p class="editorial-copy">These horizons stay on the roadmap, but they do not fit the main maturity buckets above.</p>
+            <p class="eyebrow">More</p>
+            <h2 class="editorial-title">Other product threads</h2>
+            <p class="editorial-copy">These are kept visible for continuity, but they are not part of the main public path.</p>
         </div>
         <div class="horizon-longscroll">
             @for (var index = 0; index < remaining.Length; index++)
@@ -306,18 +255,6 @@
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
-                        @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
-                        {
-                            <div class="horizon-band__claims">
-                                @foreach (var video in cardVideos)
-                                {
-                                    <div>
-                                        <span class="horizon-band__label">Explanation video</span>
-                                        <p><a class="inline-link" href="@video.Href">@video.Title</a> <a class="inline-link" href="@video.Captions">Captions</a></p>
-                                    </div>
-                                }
-                            </div>
-                        }
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
                 </article>
@@ -325,3 +262,20 @@
         </div>
     </section>
 }
+
+<section class="release-footnote">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use the current app first.</h2>
+    <p class="editorial-copy">Download Chummer, try the character flow, and send feedback when something feels rough. The future shelf can wait.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
+        <a class="cta-link cta-link--secondary" href="/feedback">Send feedback</a>
+        <a class="cta-link cta-link--ghost" href="/now">What works today</a>
+    </div>
+</section>
+
+@* _PublicTrustPulsePanel.cshtml remains part of the Horizons model contract, but the calm public page does not render the operational trust pulse. *@
+
+<section class="release-footnote">
+    @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+</section>

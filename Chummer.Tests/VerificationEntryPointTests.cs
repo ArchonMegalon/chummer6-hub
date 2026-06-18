@@ -616,8 +616,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("AutoStartDownload", viewModel, StringComparison.Ordinal);
         Assert.Contains("ClaimExchangeUrl", viewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("downloads-quicknav", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Advanced download options", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("copy the Terminal command", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Advanced options", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Platform downloads", downloadsView, StringComparison.Ordinal);
         Assert.Contains("BuildMacBootstrapTerminalCommand", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveClaimTicketForDownload", controller, StringComparison.Ordinal);
         Assert.Contains("CopyCommandLabel", controller, StringComparison.Ordinal);
@@ -627,12 +627,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CompactDispatchLayout", dispatchView, StringComparison.Ordinal);
         Assert.Contains("BootstrapFeatureCards", dispatchView, StringComparison.Ordinal);
         Assert.Contains("CurrentReleaseSummary", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("Fallbacks and recovery", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Recovery options", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Setup highlights", dispatchView, StringComparison.Ordinal);
         Assert.Contains("dispatch-inline-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("data-install-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Install details", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("enter the support or recovery code inside setup instead of copying one from this page", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Use claim-code fallback only when Chummer explicitly says it is in recovery mode.", dispatchView, StringComparison.Ordinal);
         Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
         Assert.Contains("if (autoStartDownload)", dispatchView, StringComparison.Ordinal);
@@ -3543,7 +3543,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Request.Headers.UserAgent.ToString()", controller, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.ActionLabel", service, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.DispatchHref", service, StringComparison.Ordinal);
-        Assert.Contains("Open Black Ledger", landingView, StringComparison.Ordinal);
+        Assert.Contains("Build the runner. Run the night.", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open Black Ledger", landingView, StringComparison.Ordinal);
         Assert.Contains("Download Chummer", landingView, StringComparison.Ordinal);
         Assert.Contains("Open downloads", landingView, StringComparison.Ordinal);
         Assert.Contains("Open play shell", landingView, StringComparison.Ordinal);

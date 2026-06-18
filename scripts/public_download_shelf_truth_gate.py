@@ -85,7 +85,7 @@ def main() -> int:
         "summary": (
             "fail: review-required desktop proof language is still live"
             if review_required
-            else "pass: public-stable download shelf truth is aligned"
+            else "pass: current download shelf truth is aligned"
         ),
     }
     for out_path in OUT_PATHS:

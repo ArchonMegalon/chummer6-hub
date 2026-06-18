@@ -136,8 +136,6 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def validate_entries(entries: list[dict[str, Any]]) -> tuple[list[str], dict[str, Any]]:
     failures: list[str] = []
     expected_pairs = {
-        ("/", "desktop"),
-        ("/", "mobile"),
         ("/ledger/map", "desktop"),
         ("/ledger/map", "mobile"),
         ("/ledger/newsroom", "desktop"),
@@ -236,7 +234,6 @@ def main() -> int:
         "baseUrl": base_url,
         "outputRoot": str(SCREENSHOT_ROOT),
         "routes": [
-            {"path": "/", "label": "home", "needles": ["Open Black Ledger", "Black Ledger command deck", "Turn 1"]},
             {"path": "/ledger/map", "label": "ledger-map", "needles": ["command map", "Emerald Sprawl", "Pressure"]},
             {"path": "/ledger/newsroom", "label": "ledger-newsroom", "needles": ["Black Ledger Newsroom", "Transcript", "Published:"]},
             {"path": "/ledger/factions/ashline-circle/promo", "label": "ledger-faction-promo", "needles": ["Ashline Circle", "Open watch page", "Open captions"]},

@@ -1,6 +1,6 @@
 # Public Landing Surface
 
-`chummer.run` is the public product front door, proof shelf, and invitation surface for Chummer.
+`chummer.run` is the public product front door, download surface, and help entry for Chummer.
 
 ## Canonical split
 
@@ -11,7 +11,7 @@
 
 ## Current hosted routes
 
-Front-door and proof rails:
+Front-door and current-build routes:
 
 - `/`
 - `/what-is-chummer`
@@ -40,14 +40,12 @@ Front-door and proof rails:
 - `/join/concierge`
 - `/join/primer`
 
-Direction, signal, and shipped-closeout rails:
+Direction, feedback, and release-history routes:
 
 - `/horizons` for the deeper readiness shelf
 - `/roadmap` for milestone-backed public direction
 - `/feedback` for safe public signal and votes
 - `/changelog` for shipped closeout
-- `/ledger`
-- `/black-ledger`
 - `/alice`
 - `/table-pulse`
 - `/quicksilver`
@@ -86,13 +84,14 @@ Package routes are intentionally split across public browser, account tracking, 
 `/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
 Discoverable publication pages may still open bounded creator or moderated public-validation follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
-`/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
+`/ledger` and `/black-ledger` are intentionally direct-access lab routes until Black Ledger clears the normal-user visual and behavior bar.
+`/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness view, while roadmap stays the public milestone and direction rail.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped updates do not collapse into one vague route family.
 
-## Route family posture
+## Route Families
 
-- `packages`: launch-present public browser routes with live strict proof required before flagship claims.
-- `mobile_pwa_play`: preview-present public install and play projection routes with live strict proof required before flagship claims.
+- `packages`: public browser routes for packages and bundles.
+- `mobile_pwa_play`: public install and play projection routes.
 - `account_packages`: registered-only package tracking routes that stay out of public launch claims.
 - `admin_packages`: operator-only package summary route that stays out of public manifest claims.
 
@@ -119,7 +118,7 @@ The raster-only campaign rule applies to public front-door imagery, not to gener
 Public visitors get:
 
 - product story
-- proof shelf
+- current-build status
 - progress report
 - shipped closeout
 - horizons

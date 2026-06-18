@@ -247,7 +247,7 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertEqual(
             environment.get("CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER"),
             "${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-true}",
-            msg="public edge should promote the Windows installer onto the main downloads shelf",
+            msg="preview public edge should keep the rolling Windows/Linux nightly shelf visible",
         )
         self.assertEqual(
             environment.get("CHUMMER_PUBLIC_CANON_ROOT"),

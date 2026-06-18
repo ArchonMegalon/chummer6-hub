@@ -59,7 +59,7 @@
 <section class="release-stage">
     <div class="release-stage__lead">
         <h1 class="page-title">Install Chummer</h1>
-        <p class="page-copy">Get the latest Windows or Linux installer.</p>
+<p class="page-copy">Choose the latest build for Windows or Linux. Release notes and known issues stay beside each build so the download is inspectable before install.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
             <a class="button-like button-like--secondary" href="@stableHref">Stable</a>
@@ -106,7 +106,7 @@ else
                     {
                         <span>@release.Recommended.SizeLabel</span>
                     }
-                    <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
+                        <span>@(recommendedIsInstaller ? "Installer" : "Download")</span>
                     <span>@release.Display.BuildLabel</span>
                     <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
@@ -123,7 +123,7 @@ else
                         <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See platforms">See platforms</a>
                     </div>
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Notes</summary>
+                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes">Release notes</summary>
                         <div class="release-accordion__body">
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Release notes</a>
@@ -136,7 +136,7 @@ else
                 @if (!requestedPlatformUnavailable)
                 {
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Notes">Notes</summary>
+                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes">Release notes</summary>
                         <div class="release-accordion__body">
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Release notes</a>
@@ -185,8 +185,6 @@ else
                         <select id="download-type" name="type">
                             <option value="">All types</option>
                             <option value="installer">Installers</option>
-                            <option value="archive">Archives</option>
-                            <option value="manual">Manual packages</option>
                         </select>
                     </div>
                     <button class="button-like button-like--secondary" type="submit">Apply</button>
@@ -213,7 +211,7 @@ else
                                     <span class="platform-pill">@platform.StatusLabel</span>
                                     <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
                                     <p>@platform.Summary</p>
-                                    <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
+                                    <p class="muted-copy">@platform.PrimaryPackageLabel</p>
                                 </article>
                             }
                         </div>

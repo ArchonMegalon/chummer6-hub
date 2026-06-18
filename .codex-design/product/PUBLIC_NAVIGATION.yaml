@@ -6,8 +6,6 @@ primary_nav:
     href: /
   - label: Get Chummer
     href: /downloads
-  - label: Ledger
-    href: /ledger
   - label: Help
     href: /help
 public_signal_nav:

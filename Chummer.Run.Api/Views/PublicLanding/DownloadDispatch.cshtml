@@ -12,48 +12,48 @@
     {
         new
         {
-            Badge = "Current handoff",
-            Title = "Stay on this install handoff while this device finishes setup",
-            Summary = "This page exists for one signed-in device continuation. Keep using it while the installer download, guided setup, or linked install handoff finishes for this copy.",
+            Badge = "This device",
+            Title = "Finish setup here",
+            Summary = "Keep this page open while the installer starts and this copy connects to your account.",
             Href = "#signed-in-download",
-            Label = "Stay on this handoff",
-            Proof = new[] { Model.PlatformLabel, Model.Display.BuildLabel, "One device continuation" }
+            Label = "Continue setup",
+            Proof = new[] { Model.PlatformLabel, Model.Display.BuildLabel, "This device" }
         },
         new
         {
             Badge = "Downloads",
-            Title = "Return to downloads when you need platform choice or a different installer",
-            Summary = "The main downloads page owns platform comparison, known issues, and the clean entry point for a fresh device. This page is not a general installer catalog.",
+            Title = "Pick another installer",
+            Summary = "Use downloads when you need Windows, Linux, or a clean install for another machine.",
             Href = "/downloads",
             Label = "Back to downloads",
-            Proof = new[] { "Platform list", "Known issues nearby", "General install path" }
+            Proof = new[] { "Windows", "Linux", "Fresh install" }
         },
         new
         {
-            Badge = "Devices and access",
-            Title = "Open Devices and access only when this copy needs relink or reclaim help",
-            Summary = "Use the account-owned device page when the install needs relinking, reclaim, or continuity cleanup. Do not use this handoff page as a substitute account center.",
+            Badge = "Account",
+            Title = "Manage linked devices",
+            Summary = "Use your account when you need to relink, reclaim, or remove an old install.",
             Href = Model.AccountHref,
             Label = Model.AccountLabel,
-            Proof = new[] { "Claimed install history", "Relink and reclaim", "Account-owned continuity" }
+            Proof = new[] { "Linked installs", "Recovery", "Account settings" }
         },
         new
         {
-            Badge = "Reality check",
-            Title = "Open what works today when the question is release status, not this device handoff",
-            Summary = "The install handoff is for one device. Use what works today when you need broader release posture or current cautions before continuing.",
+            Badge = "Status",
+            Title = "Check the current build",
+            Summary = "Use status when you want to confirm the published build and platform availability.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Current availability", "User-visible caution", "No mixed jobs" }
+            Proof = new[] { "Current build", "Platform status", "Known limits" }
         },
         new
         {
             Badge = "Recovery",
-            Title = "Leave the handoff for support as soon as setup becomes a recovery problem",
-            Summary = "If setup breaks, logs are needed, or private follow-up starts, move to support immediately instead of treating this page like a troubleshooting maze.",
+            Title = "Get help when setup stalls",
+            Summary = "If the installer or account connection gets stuck, open support with this install context preserved.",
             Href = Model.SupportHref,
             Label = Model.SupportLabel,
-            Proof = new[] { "Tracked follow-up", "Install context preserved", "Private help" }
+            Proof = new[] { "Install context", "Private help", "Follow-up" }
         }
     };
     @* Support stays on the same install rail while this handoff resolves linked install truth. *@
@@ -112,7 +112,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Finish this install.</h2>
-        <p class="editorial-copy">Use this page only for the linked install on this device.</p>
+        <p class="editorial-copy">Start the installer, then let Chummer connect this copy to your account.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -145,7 +145,7 @@
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
                 </div>
-                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the default linked-install path.</p>
+                <p class="muted-copy">Use this direct installer only when support asks for it. The guided setup below is the normal path.</p>
                 <details class="release-disclosure">
                     <summary>Guided setup assistant</summary>
                     <div class="release-disclosure__body">
@@ -213,9 +213,9 @@
                 </div>
             }
             <details class="release-disclosure">
-                <summary>Fallbacks and recovery</summary>
+                <summary>Recovery options</summary>
                 <div class="release-disclosure__body">
-                    <p class="muted-copy">Support stays on the same install rail when this linked setup needs recovery, rollback, or guided help.</p>
+                    <p class="muted-copy">Use these options if setup stalls or this install needs account recovery.</p>
                     <p class="muted-copy">@Model.ArtifactSupportLine</p>
                     @if (Model.Steps.Count > 0)
                     {

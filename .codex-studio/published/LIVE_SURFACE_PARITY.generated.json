@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-18T10:29:25Z",
+  "generated_at_utc": "2026-06-18T15:00:07Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -11,10 +11,10 @@
       "final_url": "https://chummer.run/",
       "status_code": 200,
       "required_texts": [
-        "Black Ledger",
-        "The city is moving.",
-        "Install, play, or open the city.",
-        "Get Chummer"
+        "Build the runner. Run the night.",
+        "Download Chummer",
+        "Desktop",
+        "Character workbench"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
@@ -42,7 +42,7 @@
       "status_code": 200,
       "required_texts": [
         "Install Chummer",
-        "Windows and Linux always point at the newest published installers.",
+        "Choose the latest build for Windows or Linux.",
         "Nightly",
         "Stable"
       ],
@@ -73,7 +73,7 @@
       "status_code": 200,
       "required_texts": [
         "Release status",
-        "Current published build for the public shelf.",
+        "The build currently available from Chummer.",
         "Release",
         "Open downloads",
         "Open support"
@@ -135,7 +135,7 @@
     {
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
-      "final_url": "https://chummer.run/ledger/newsroom/turn-1-newsreel",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "status_code": 200,
       "required_texts": [
         "Black Ledger Newsroom",

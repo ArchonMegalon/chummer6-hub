@@ -61,12 +61,12 @@
         @if (fromChangelogAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
-                <h3>You followed a legacy shipped handoff</h3>
-                <p>The shipped update stream now lives on <code class="mono-receipt">/changelog</code>. This page stays the quick install reality check: what is ready now, what you can verify yourself, and where to go when a device needs help first.</p>
+                <h3>You followed an old link</h3>
+                <p>Release notes now live on <code class="mono-receipt">/changelog</code>. This page gives you the quick answer: install now, wait, or get help first.</p>
                 <div class="route-callout__proof">
-                    <span>User-available</span>
-                    <span>Release-linked</span>
-                    <span>Install reality</span>
+                    <span>Available now</span>
+                    <span>Current build</span>
+                    <span>Setup help</span>
                 </div>
                 <div class="route-callout__actions">
                     <a class="inline-link" href="/changelog">Open changelog</a>
@@ -101,27 +101,27 @@
     <article class="status-decision-strip__card">
         <span class="tag">Ready to install?</span>
         <h2>Start from downloads when you want the current Windows or Linux build.</h2>
-        <p>Downloads stays the primary install surface, with the current package, known issues, and the shortest path to a real first launch.</p>
+        <p>Downloads has the current package, known issues, and the shortest path to a real first launch.</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">What you can check now</span>
-        <h2>The checks below should answer the normal trust questions without forcing a roadmap tour.</h2>
-        <p>Use them when you want one concrete result, one visible trail, and one clear next step before you commit a device.</p>
+        <h2>The checks below answer the normal questions before you commit a device.</h2>
+        <p>Use them when you want one concrete result and one clear next step.</p>
         <a class="button-like button-like--ghost" href="#now-proof">Open quick checks</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Need caution</span>
         <h2>Known issues, install help, and support stay close to downloads.</h2>
-        <p>Wait, route around, or ask for help from Chummer support instead of decoding internal product language or public planning pages.</p>
+        <p>Wait, work around it, or ask Chummer support for help.</p>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </article>
 </section>
 
 <section class="release-footnote">
     <div class="route-callout" role="status" aria-live="polite">
-        <h3>Need the release trail?</h3>
-        <p>Use the concierge only when you want the extra trail. Downloads remains the main install surface.</p>
+        <h3>Need more release detail?</h3>
+        <p>Use the extra release view only when you want more detail. Downloads remains the main install page.</p>
         <div class="route-callout__actions">
             <a class="inline-link" href="/now/concierge">Open release concierge</a>
             <a class="inline-link" href="/changelog">Open changelog</a>
@@ -178,8 +178,8 @@
 <section class="workflow-band" id="now-proof">
     <div class="workflow-band__lead">
         <p class="eyebrow">What you can check now</p>
-        <h2 class="editorial-title">Three quick checks that show what works beyond the landing page</h2>
-        <p class="editorial-copy">These cards stay focused on real product behavior: builder results, explanation trail, and continuity under drift.</p>
+        <h2 class="editorial-title">Three quick checks beyond the landing page</h2>
+        <p class="editorial-copy">These cards focus on real product behavior: builder results, rule explanations, and saved work after changes.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.ProofModules)

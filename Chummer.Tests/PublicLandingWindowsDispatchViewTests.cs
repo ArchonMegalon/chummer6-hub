@@ -39,11 +39,11 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Main platform downloads", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Signed-in Windows builds", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Open signed-in Windows build", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Platform downloads", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Windows installers", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Latest Windows install paths available to this account.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Windows verification and support path", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Open Windows verification page", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Open installer", downloadsView, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string text, string needle)

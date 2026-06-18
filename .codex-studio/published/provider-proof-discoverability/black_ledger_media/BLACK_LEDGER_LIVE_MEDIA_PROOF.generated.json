@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
-  "generated_at_utc": "2026-06-18T09:29:38Z",
+  "generated_at_utc": "2026-06-18T14:55:53Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
@@ -16,11 +16,6 @@
     }
   ],
   "screenshots": [
-    {
-      "route": "/",
-      "viewport": "desktop",
-      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/home.png"
-    },
     {
       "route": "/ledger/map",
       "viewport": "desktop",
@@ -40,11 +35,6 @@
       "route": "/ledger/map?replay=turn-1",
       "viewport": "desktop",
       "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-replay-turn-1.png"
-    },
-    {
-      "route": "/",
-      "viewport": "mobile",
-      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/home.png"
     },
     {
       "route": "/ledger/map",
@@ -70,7 +60,6 @@
   "media_quality": {
     "screenshot_min_bytes": 100000,
     "routes_checked": [
-      "/",
       "/ledger/factions/ashline-circle/promo",
       "/ledger/map",
       "/ledger/map?replay=turn-1",

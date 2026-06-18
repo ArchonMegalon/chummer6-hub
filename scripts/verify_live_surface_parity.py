@@ -21,10 +21,10 @@ SURFACES = [
     {
         "path": "/",
         "required_texts": [
-            "Black Ledger",
-            "The city is moving.",
-            "Install, play, or open the city.",
-            "Get Chummer",
+            "Build the runner. Run the night.",
+            "Download Chummer",
+            "Desktop",
+            "Character workbench",
         ],
         "forbidden_texts": [
             "Next move",
@@ -44,7 +44,7 @@ SURFACES = [
         "path": "/downloads",
         "required_texts": [
             "Install Chummer",
-            "Windows and Linux always point at the newest published installers.",
+            "Choose the latest build for Windows or Linux.",
             "Nightly",
             "Stable",
         ],
@@ -67,7 +67,7 @@ SURFACES = [
         "path": "/status",
         "required_texts": [
             "Release status",
-            "Current published build for the public shelf.",
+            "The build currently available from Chummer.",
             "Release",
             "Open downloads",
             "Open support",

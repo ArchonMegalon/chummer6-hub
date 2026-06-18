@@ -12,9 +12,9 @@ public sealed class BlackLedgerFactionTests
         string publicLanding = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string ledgerView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
 
-        Assert.Contains("The city is moving.", landing, StringComparison.Ordinal);
-        Assert.Contains("Open a file, read the pressure, or replay Turn 1 without touching private table state.", landing, StringComparison.Ordinal);
-        Assert.Contains("Open Black Ledger", landing, StringComparison.Ordinal);
+        Assert.Contains("Build the runner. Run the night.", landing, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open Black Ledger", landing, StringComparison.Ordinal);
+        Assert.DoesNotContain("Replay Turn 1", landing, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("Open faction file", ledgerView, StringComparison.Ordinal);

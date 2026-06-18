@@ -3,102 +3,88 @@
     ViewData["Title"] = "Chummer — Shadowrun character and campaign companion";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
-    var ledgerHref = "/ledger";
     var buildHref = "/downloads";
     var playHref = "/play";
     var statusHref = "/status";
-    var replayTurnOneHref = "/ledger/map?replay=turn-1";
-    var ledgerStats = (Model.BlackLedgerStats ?? Array.Empty<BlackLedgerPublicStatViewModel>()).Take(3).ToArray();
-    var ledgerWorld = Model.BlackLedgerWorld;
-    var factions = (ledgerWorld?.Factions ?? Array.Empty<BlackLedgerFactionViewModel>()).Take(6).ToArray();
-    var latestDispatch = Model.LatestBlackLedgerDispatch;
-    var newsreelStatus = latestDispatch is null ? "pending" : "sent";
+    var nowHref = "/now";
     var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
     var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
     var starterFirstPlayableSessionHref = starterWorkspace is null
         ? "/home/work"
         : $"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session";
-    Func<string, string> factionSlug = id => id.Replace('_', '-');
-    Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
-    Func<string, string> backgroundHref = id => $"/media/ledger/factions/{factionSlug(id)}-bg.svg";
-    Func<string, string> posterHref = id => $"/media/ledger/factions/{factionSlug(id)}-promo-poster.png";
 }
 
-<section class="launch-hero launch-hero--ledger" data-homepage-section="hero">
+<section class="launch-hero launch-hero--product" data-homepage-section="hero">
     <div class="launch-hero__shell">
         <div class="launch-hero__copy">
-            <h1 class="launch-hero__title">The city is moving.</h1>
-            <p class="launch-hero__support">Watch pressure move. Pick a house. Step into the city.</p>
+            <h1 class="launch-hero__title">Build the runner. Run the night.</h1>
+            <p class="launch-hero__support">Chummer is a Shadowrun character builder and campaign companion for tables that want less admin and more play.</p>
             <div class="launch-hero__actions">
-                <a class="button-like button-like--primary" href="@ledgerHref" data-analytics-event="homepage_open_ledger" data-analytics-surface="landing_hero" data-analytics-label="Open Black Ledger">Open Black Ledger</a>
-                <a class="button-like button-like--secondary" href="@buildHref" data-analytics-event="homepage_open_downloads" data-analytics-surface="landing_hero" data-analytics-label="Download Chummer">Download Chummer</a>
+                <a class="button-like button-like--primary" href="@buildHref" data-analytics-event="homepage_open_downloads" data-analytics-surface="landing_hero" data-analytics-label="Download Chummer">Download Chummer</a>
+                <a class="button-like button-like--secondary" href="@nowHref" data-analytics-event="homepage_open_now" data-analytics-surface="landing_hero" data-analytics-label="See what works today">See what works today</a>
             </div>
-            <div class="launch-hero__metric-strip" aria-label="Ledger score strip">
-                @foreach (var stat in ledgerStats)
-                {
-                    <article class="launch-hero__metric">
-                        <span>@stat.Title</span>
-                        <strong>@stat.Value</strong>
-                    </article>
-                }
+            <div class="launch-hero__metric-strip" aria-label="Product highlights">
+                <article class="launch-hero__metric">
+                    <span>Desktop</span>
+                    <strong>Windows + Linux</strong>
+                </article>
+                <article class="launch-hero__metric">
+                    <span>Builder</span>
+                    <strong>SR4, SR5, SR6</strong>
+                </article>
+                <article class="launch-hero__metric">
+                    <span>Table</span>
+                    <strong>Local first</strong>
+                </article>
             </div>
         </div>
-        <div class="launch-hero__stage" aria-label="Black Ledger geoscape teaser">
-            <div
-                class="launch-hero__geoscape"
-                data-black-ledger-geoscape-root
-                data-variant="teaser"
-                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
-                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
-                data-auto-replay="true"></div>
+        <div class="launch-hero__stage" aria-label="Chummer product preview">
+            <figure class="launch-hero__render">
+                <img src="/media/promo/chummer6-flagship-promo-poster.png" alt="Runner dossier shown on a cinematic desktop setup" loading="eager" decoding="async" />
+                <figcaption>
+                    <span>Character workbench</span>
+                    <strong>Build sheets, check rules, and keep session context in one place.</strong>
+                </figcaption>
+            </figure>
         </div>
     </div>
 </section>
-<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
 
-<section class="workflow-band workflow-band--flagship workflow-band--compact cinematic-band" data-homepage-section="score-strip" id="score-strip">
+<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="product" id="product">
     <div class="workflow-band__lead">
-        <h2 class="editorial-title">Three live signals.</h2>
+        <h2 class="editorial-title">Everything your table reaches for first.</h2>
     </div>
-    <div class="ledger-stats-grid ledger-stats-grid--hero">
-        @foreach (var stat in ledgerStats)
-        {
-            <article class="ledger-stat-card ledger-stat-card--compact">
-                <span>@stat.Title</span>
-                <strong>@stat.Value</strong>
-                <p>@stat.Period</p>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="factions" id="factions">
-    <div class="workflow-band__lead">
-        <h2 class="editorial-title">Six houses. One moving city.</h2>
-    </div>
-    <div class="faction-identity-strip">
-        @foreach (var faction in factions)
-        {
-            <article class="faction-identity-card">
-                <div class="faction-identity-card__backdrop" style="background-image:url('@backgroundHref(faction.Id)')"></div>
-                <img class="faction-identity-card__poster" src="@posterHref(faction.Id)" alt="" loading="lazy" />
-                <div class="faction-identity-card__body">
-                    <img class="faction-identity-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
-                    <div class="faction-identity-card__copy">
-                        <span class="tag">@faction.Type</span>
-                        <h3>@faction.PublicName</h3>
-                        <p>@string.Join(" · ", faction.PublicSignals.Take(2))</p>
-                    </div>
-                    <a class="editorial-strip__action" href="/ledger/factions/@factionSlug(faction.Id)" data-analytics-event="homepage_open_faction_file" data-analytics-surface="landing_factions" data-analytics-label="@faction.PublicName">Open faction file</a>
-                </div>
-            </article>
-        }
+    <div class="product-image-grid">
+        <article class="product-image-card">
+            <div class="product-image-card__media">
+                <img src="/media/promo/chummer6-flagship-promo-poster.png" alt="" loading="lazy" decoding="async" />
+            </div>
+            <div class="product-image-card__body">
+                <span class="tag">Build</span>
+                <h3>Character sheets without spreadsheet anxiety.</h3>
+                <p>Create, import, edit, and understand the choices that shape a runner.</p>
+            </div>
+        </article>
+        <article class="product-image-card product-image-card--quiet">
+            <div class="product-image-card__body">
+                <span class="tag">Explain</span>
+                <h3>Rules help that shows its work.</h3>
+                <p>Use explanations to understand options before you commit to a build.</p>
+            </div>
+        </article>
+        <article class="product-image-card product-image-card--quiet">
+            <div class="product-image-card__body">
+                <span class="tag">Run</span>
+                <h3>Campaign context close at hand.</h3>
+                <p>Keep the character, notes, and table handoff together between sessions.</p>
+            </div>
+        </article>
     </div>
 </section>
 
 <section class="workflow-band workflow-band--flagship workflow-band--compact flagship-promo-band" data-homepage-section="flagship-promo" id="flagship-promo">
     <div class="workflow-band__lead">
-        <h2 class="editorial-title">Build the runner. Run the table. Move the city.</h2>
+        <h2 class="editorial-title">A short look at the product.</h2>
     </div>
     <div class="flagship-promo-player">
         <video
@@ -116,7 +102,7 @@
 
 <section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="play-downloads" id="play-downloads">
     <div class="workflow-band__lead">
-        <h2 class="editorial-title">Install, play, or open the city.</h2>
+        <h2 class="editorial-title">Start where you need to.</h2>
     </div>
     <div class="flagship-gateway-grid flagship-gateway-grid--compact">
         <article class="gateway-card">
@@ -124,7 +110,7 @@
                 <span class="tag">Downloads</span>
                 <h3>Desktop build</h3>
             </div>
-            <p>Install the current desktop build.</p>
+            <p>Get the latest Windows or Linux build.</p>
             <a class="editorial-strip__action" href="@buildHref" data-analytics-event="homepage_gateway_downloads" data-analytics-surface="landing_gateway" data-analytics-label="Desktop build">Open downloads</a>
         </article>
         <article class="gateway-card">
@@ -132,23 +118,15 @@
                 <span class="tag">Play</span>
                 <h3>Mobile play shell</h3>
             </div>
-            <p>Open play when your table is live.</p>
+            <p>Use the mobile view during a session.</p>
             <a class="editorial-strip__action" href="@playHref" data-analytics-event="homepage_gateway_play" data-analytics-surface="landing_gateway" data-analytics-label="Mobile play shell">Open play shell</a>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
             <h3>Status</h3>
             </div>
-            <p>Check the current build.</p>
-            <a class="editorial-strip__action" href="@statusHref" data-analytics-event="homepage_gateway_status" data-analytics-surface="landing_gateway" data-analytics-label="Release posture">Open status</a>
-        </article>
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag">Replay</span>
-                <h3>Turn 1</h3>
-            </div>
-            <p>Replay the first public tick.</p>
-            <a class="editorial-strip__action" href="@replayTurnOneHref" data-analytics-event="homepage_gateway_replay" data-analytics-surface="landing_gateway" data-analytics-label="Replay Turn 1">Replay Turn 1</a>
+            <p>See which build is published now.</p>
+            <a class="editorial-strip__action" href="@statusHref" data-analytics-event="homepage_gateway_status" data-analytics-surface="landing_gateway" data-analytics-label="Release status">Open status</a>
         </article>
     </div>
 </section>
@@ -157,7 +135,7 @@
 {
     <section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="starter-lane" id="starter-lane">
         <div class="workflow-band__lead">
-            <h2 class="editorial-title">Keep the first playable session close.</h2>
+            <h2 class="editorial-title">Open your first session fast.</h2>
             <p class="editorial-copy">
                 @(starterFirstPlayableSession is null
                     ? "Your starter workspace is ready to open on Home."
@@ -170,15 +148,15 @@
                     <span class="tag">Home</span>
                     <h3>Starter lane</h3>
                 </div>
-                <p>Open Home when you want the signed-in starter lane without hunting for the first workspace route.</p>
-                <a class="editorial-strip__action" href="/home/work">Open starter lane on Home</a>
+                <p>Open Home and return to your starter workspace.</p>
+                <a class="editorial-strip__action" href="/home/work">Open Home</a>
             </article>
             <article class="gateway-card">
                 <div class="gateway-card__header">
                     <span class="tag">Session</span>
                     <h3>First session</h3>
                 </div>
-                <p>Jump directly into the first playable session drawer for the starter workspace.</p>
+                <p>Jump directly into the session your table can play first.</p>
                 <a class="editorial-strip__action" href="@starterFirstPlayableSessionHref">Open first playable session</a>
             </article>
             <article class="gateway-card">
@@ -186,7 +164,7 @@
                     <span class="tag">Support</span>
                     <h3>Install help</h3>
                 </div>
-                <p>Keep install help nearby so recovery and support stay easy to reach.</p>
+                <p>Get setup help without digging through project pages.</p>
                 <a class="editorial-strip__action" href="/contact?kind=install_help">Open install support</a>
             </article>
         </div>
@@ -195,7 +173,7 @@
 
 <section class="access-band access-band--compact" data-public-section="footer" id="footer">
     <div class="access-band__copy">
-        <h2 class="editorial-title">Help stays close.</h2>
+        <h2 class="editorial-title">Help is one click away.</h2>
     </div>
     <div class="access-band__actions">
         <a class="button-like button-like--primary" href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="landing_footer" data-analytics-label="Open help">Open help</a>

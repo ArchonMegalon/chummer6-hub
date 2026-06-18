@@ -173,7 +173,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit 94dd7d42 tightens M102 compressed base32/base85 helper proof guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
-    '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
+    '      - dotnet test --project Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
 ]
 REGISTRY_102_1_LINES = [
     "milestones:",
@@ -338,7 +338,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit 0a007077 tightens M102 compressed helper proof guard.",
     "          - /docker/chummercomplete/chummer6-hub commit 94dd7d42 tightens M102 compressed base32/base85 helper proof guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
-    '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
+    '          - dotnet test --project Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
 ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer6-hub/"
 

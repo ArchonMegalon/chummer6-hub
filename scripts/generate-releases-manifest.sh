@@ -732,6 +732,9 @@ fi
 if to_bool "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" && [[ "$materializer_help" == *"--skip-startup-smoke-filter"* ]]; then
   materialize_args+=(--skip-startup-smoke-filter)
 fi
+if [[ "$materializer_help" == *"--required-desktop-platforms"* ]]; then
+  materialize_args+=(--required-desktop-platforms "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-linux,windows,macos}")
+fi
 
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" "${materialize_args[@]}" >/dev/null
 normalize_preview_install_access_classes "$CANONICAL_MANIFEST_PATH" "$RELEASE_CHANNEL"
