@@ -10,33 +10,11 @@ public static partial class PublicFacingCopyHumanizer
         ("AI-generated", "created"),
         ("AI generated", "created"),
         ("Unmixr AI", "Unmixr"),
-        ("ALICE", "Alice"),
-        ("Black Ledger", "campaign city"),
         ("source packet", "source"),
-        ("source-backed", "checked"),
-        ("source-aware", "checked"),
-        ("first-party", "Chummer"),
-        ("microproof", "note"),
-        ("proof receipts", "checks"),
-        ("proof receipt", "check"),
-        ("proof shelf", "checks"),
-        ("proof", "check"),
-        ("receipts", "records"),
-        ("receipt", "record"),
-        ("operator view", "account view"),
+        ("proof trail", "checks"),
         ("operator-facing", "private"),
-        ("operator", "user"),
-        ("grounded", "current"),
-        ("governed", "reviewed"),
-        ("canonical", "current"),
-        ("handoff", "next step"),
+        ("operator view", "account view"),
         ("starter lane", "starter path"),
-        ("world lanes", "campaign extras"),
-        ("lanes", "paths"),
-        ("lane", "path"),
-        ("rails", "paths"),
-        ("rail", "path"),
-        ("generated", "created"),
     ];
 
     public static string Clean(string? value)
@@ -52,7 +30,6 @@ public static partial class PublicFacingCopyHumanizer
             cleaned = cleaned.Replace(from, to, StringComparison.OrdinalIgnoreCase);
         }
 
-        cleaned = StandaloneAiRegex().Replace(cleaned, "assistant");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         return cleaned.Trim();
@@ -64,9 +41,6 @@ public static partial class PublicFacingCopyHumanizer
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .ToArray()
            ?? Array.Empty<string>();
-
-    [GeneratedRegex(@"\bAI\b", RegexOptions.CultureInvariant)]
-    private static partial Regex StandaloneAiRegex();
 
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
     private static partial Regex DuplicateWhitespaceRegex();

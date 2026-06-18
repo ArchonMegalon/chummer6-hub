@@ -62,6 +62,9 @@
         ["horizon_community_hub"] = new[] { ("Community Hub deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    static string QuietFutureCopy(string? value)
+        => (value ?? string.Empty).Replace("Black Ledger", "campaign-city", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero route-anchor-target" id="public-roadmap-projection">
@@ -180,20 +183,20 @@
                     <div class="horizon-band__copy">
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
+                        <p>@QuietFutureCopy(card.Card.Summary)</p>
                         <div class="horizon-band__claims">
                             @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
                             {
                                 <div>
                                     <span class="horizon-band__label">Why it matters</span>
-                                    <p>@card.Card.Pain</p>
+                                    <p>@QuietFutureCopy(card.Card.Pain)</p>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                             {
                                 <div>
                                     <span class="horizon-band__label">What it could unlock</span>
-                                    <p>@card.Card.Payoff</p>
+                                    <p>@QuietFutureCopy(card.Card.Payoff)</p>
                                 </div>
                             }
                             @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
@@ -246,7 +249,7 @@
                     <div class="horizon-band__copy">
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
+                        <p>@QuietFutureCopy(card.Card.Summary)</p>
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
                 </article>
