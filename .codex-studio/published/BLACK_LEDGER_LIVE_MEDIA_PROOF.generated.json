@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
-  "generated_at_utc": "2026-06-18T18:38:20Z",
+  "generated_at_utc": "2026-06-18T19:01:32Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
@@ -21,7 +21,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/map",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-map.png",
-      "screenshotBytes": 4940820,
+      "screenshotBytes": 4942704,
       "visualSignals": {
         "textLength": 11962,
         "blackLedgerMentions": 0,
@@ -38,7 +38,7 @@
         "geoscapePanelCount": 2,
         "geoscapeControlCount": 2,
         "geoscapeSignalRailCount": 2,
-        "largestMediaArea": 747496,
+        "largestMediaArea": 728853,
         "viewportArea": 1296000
       }
     },
@@ -47,7 +47,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-newsroom.png",
-      "screenshotBytes": 4616555,
+      "screenshotBytes": 4617574,
       "visualSignals": {
         "textLength": 12510,
         "blackLedgerMentions": 0,
@@ -73,7 +73,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/factions/ashline-circle/promo",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-faction-promo.png",
-      "screenshotBytes": 1801345,
+      "screenshotBytes": 1801396,
       "visualSignals": {
         "textLength": 7112,
         "blackLedgerMentions": 0,
@@ -99,7 +99,7 @@
       "viewport": "desktop",
       "finalUrl": "https://chummer.run/ledger/map?replay=turn-1",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/desktop/ledger-replay-turn-1.png",
-      "screenshotBytes": 4939223,
+      "screenshotBytes": 4935052,
       "visualSignals": {
         "textLength": 11953,
         "blackLedgerMentions": 0,
@@ -125,14 +125,14 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/map",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-map.png",
-      "screenshotBytes": 2669251,
+      "screenshotBytes": 2669207,
       "visualSignals": {
-        "textLength": 10171,
+        "textLength": 10522,
         "blackLedgerMentions": 0,
         "commandMapMentions": 6,
-        "globeMentions": 4,
-        "factionMentions": 26,
-        "pressureMentions": 33,
+        "globeMentions": 5,
+        "factionMentions": 24,
+        "pressureMentions": 36,
         "newsreelMentions": 4,
         "videoMentions": 6,
         "mediaElementCount": 19,
@@ -151,7 +151,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-newsroom.png",
-      "screenshotBytes": 2652843,
+      "screenshotBytes": 2652881,
       "visualSignals": {
         "textLength": 12352,
         "blackLedgerMentions": 0,
@@ -177,7 +177,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/factions/ashline-circle/promo",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-faction-promo.png",
-      "screenshotBytes": 1059288,
+      "screenshotBytes": 1059279,
       "visualSignals": {
         "textLength": 6980,
         "blackLedgerMentions": 0,
@@ -194,7 +194,7 @@
         "geoscapePanelCount": 0,
         "geoscapeControlCount": 0,
         "geoscapeSignalRailCount": 0,
-        "largestMediaArea": 57315,
+        "largestMediaArea": 4624,
         "viewportArea": 329160
       }
     },
@@ -203,7 +203,7 @@
       "viewport": "mobile",
       "finalUrl": "https://chummer.run/ledger/map?replay=turn-1",
       "screenshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/black-ledger-live-media/mobile/ledger-replay-turn-1.png",
-      "screenshotBytes": 2669670,
+      "screenshotBytes": 2669902,
       "visualSignals": {
         "textLength": 10513,
         "blackLedgerMentions": 0,

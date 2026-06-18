@@ -1,6 +1,6 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-18T18:40:12Z
+- Generated: 2026-06-18T19:03:23Z
 - Version: `run-20260618-142358`
 - Channel: `stable`
 - Published: `2026-06-18T14:26:04Z`
@@ -15,7 +15,7 @@
 ## Checks
 - PASS `design_quality_gate`: `pass`
 - PASS `external_distribution_mirror_proof`: `pass`
-- PASS `final_gold_janitor`: `pass` (operator context, not release-blocking)
+- INFO `final_gold_janitor`: `fail` (operator context, not release-blocking)
 - PASS `google_oauth_linking_proof`: `pass` (operator context, not release-blocking)
 - PASS `public_copy_leak_gate`: `pass`
 - PASS `release_channel`: `published`
