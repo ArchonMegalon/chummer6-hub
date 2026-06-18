@@ -92,6 +92,42 @@ async function fillPrompt(page, prompt) {
   await page.waitForTimeout(800);
 }
 
+async function clickGenerate(page) {
+  const buttonIndex = await page.locator('button').evaluateAll((nodes) => {
+    const candidates = nodes
+      .map((node, index) => {
+        const rect = node.getBoundingClientRect();
+        const style = window.getComputedStyle(node);
+        const text = (node.innerText || node.textContent || '').trim();
+        return {
+          index,
+          text,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+          disabled: node.disabled || node.getAttribute('aria-disabled') === 'true',
+          visible: rect.width > 20 && rect.height > 20 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity || '1') > 0.2,
+          background: style.backgroundColor || '',
+        };
+      })
+      .filter((item) => item.visible && !item.disabled)
+      .filter((item) => item.text.length <= 2 || /^[+x×-]?\d*$/.test(item.text))
+      .sort((left, right) => {
+        const leftGreen = /rgb\((?:1[0-9]{2}|[89][0-9]),\s*(?:1[3-9][0-9]|2[0-5][0-9]),/.test(left.background) ? 1 : 0;
+        const rightGreen = /rgb\((?:1[0-9]{2}|[89][0-9]),\s*(?:1[3-9][0-9]|2[0-5][0-9]),/.test(right.background) ? 1 : 0;
+        return rightGreen - leftGreen || right.bottom - left.bottom || right.right - left.right;
+      });
+    return candidates[0]?.index ?? -1;
+  });
+  if (buttonIndex < 0) throw new Error('Unable to locate MagicFit generate button');
+  const button = page.locator('button').nth(buttonIndex);
+  await button.scrollIntoViewIfNeeded().catch(() => {});
+  await button.click({ timeout: 30000, force: true });
+}
+
 function download(url, file) {
   return new Promise((resolve, reject) => {
     const out = fs.createWriteStream(file);
@@ -185,9 +221,8 @@ async function renderScene(page, asset, scene) {
     const fullPrompt = `${scene.prompt} Negative constraints: ${scene.negative_prompt || ''}`;
     await fillPrompt(page, fullPrompt);
     await page.screenshot({ path: scenePath(asset, scene, '.before-submit.png'), fullPage: true });
-    const submit = page.locator('form button').last();
     const submittedAtMs = Date.now();
-    await submit.click({ timeout: 30000 });
+    await clickGenerate(page);
     console.log(`submitted ${asset.asset_id}/${scene.id}`);
     await page.waitForTimeout(3000);
 

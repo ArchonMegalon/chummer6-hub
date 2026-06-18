@@ -40,6 +40,7 @@ HORIZON_VOICE: dict[str, str] = {
     "TABLE PULSE": DOCUMENTARY_VOICE,
     "BLACK LEDGER": DOCUMENTARY_VOICE,
     "COMMUNITY HUB": DOCUMENTARY_VOICE,
+    "ORIGIN DOSSIER": DOCUMENTARY_VOICE,
 }
 
 CUSTOM_NARRATION: dict[str, list[str]] = {
@@ -78,6 +79,18 @@ CUSTOM_NARRATION: dict[str, list[str]] = {
         "When the player adjusts the build, the sheet should feel like a coach beside them, not a judge above them.",
         "By the end, the runner still belongs to the player. It is just sharper, cleaner, and less likely to fold on the first serious job.",
         "ALICE is build mentoring for crews who want cool characters that are also ready for play.",
+    ],
+    "origin_dossier_90s_deepdive": [
+        "A runner can be legal and still feel unfinished. Origin Dossier starts where the numbers need a person behind them.",
+        "The GM can add the campaign pressure: clinic debt, restricted ware, hard requirements, and the reason this story belongs at this table.",
+        "Chummer turns the build and the steer into a grounded origin draft, not a hidden rule change.",
+        "The player and GM approve canon before it becomes part of the dossier. Review is the feature.",
+        "The approved origin becomes a bundle root: canon, PDF, portraits, scenes, narration, storyboard, and render requests.",
+        "Portraits, scenes, and video make the runner easier to remember. They do not become character authority.",
+        "Later, ALICE can use the approved origin to explain better next steps without pretending story prose outranks mechanics.",
+        "The clinic favor can explain a debt. It cannot auto-apply ware, nuyen, qualities, magic, or legality.",
+        "The runner now has history, obligations, and a clean handoff into campaign memory.",
+        "Origin Dossier gives Chummer a way to make characters feel human while the rules engine stays honest.",
     ],
     "karma_forge_90s_deepdive": [
         "Every table has house rules. The problem is remembering which ones are real, which ones were jokes, and which ones quietly broke the campaign.",
@@ -180,6 +193,7 @@ CUSTOM_NARRATION: dict[str, list[str]] = {
 
 HORIZON_INTROS: dict[str, str] = {
     "ALICE": "ALICE is for the player who has a cool runner idea and needs to know if it survives contact with the table.",
+    "ORIGIN DOSSIER": "ORIGIN DOSSIER is for turning an approved runner origin into durable canon, media packets, and later ALICE context.",
     "KARMA FORGE": "KARMA FORGE is for house rules: the good ones, the risky ones, and the ones everyone forgot they agreed to.",
     "JACKPOINT": "JACKPOINT is for the night after the run, when the table needs a clean recap instead of six contradictory memories.",
     "RUNSITE": "RUNSITE is for mission spaces that should feel playable before the first door opens.",
@@ -665,10 +679,17 @@ def write_audit(manifest: dict[str, Any], selected: list[dict[str, Any]], receip
 
 
 def main() -> int:
+    global MANIFEST, CLIPS, OUT
     parser = argparse.ArgumentParser(description="Compose flagship-quality Horizon reels from rendered MagicFit clips.")
     parser.add_argument("--all", action="store_true", help="Compose all assets in the refined manifest.")
     parser.add_argument("--asset", action="append", default=[], help="Compose one asset id; may be repeated.")
+    parser.add_argument("--manifest", default=str(MANIFEST), help="Render manifest JSON to compose.")
+    parser.add_argument("--clips-root", default=str(CLIPS), help="Root directory containing MagicFit clips by asset id.")
+    parser.add_argument("--out-root", default=str(OUT), help="Output root for composited reels.")
     args = parser.parse_args()
+    MANIFEST = Path(args.manifest)
+    CLIPS = Path(args.clips_root)
+    OUT = Path(args.out_root)
     OUT.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     selected_ids = {item for item in args.asset if item}

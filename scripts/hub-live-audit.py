@@ -11946,16 +11946,25 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "The city is moving.",
+            "Build the runner. Run the night.",
             required_texts=(
-                "Black Ledger",
-                "Build the runner. Run the table. Move the city.",
-                "Six houses. One moving city.",
-                "Install, play, or open the city.",
+                "Chummer is a Shadowrun character builder and campaign companion",
+                "Download Chummer",
+                "See what works today",
+                "Windows + Linux",
+                "SR4, SR5, SR6",
+                "Character workbench",
+                "Everything your table reaches for first.",
+                "A short look at the product.",
                 "Desktop build",
                 "Mobile play shell",
-                "Status",
-                "Get Chummer"),
+                "Open downloads"),
+            forbidden_texts=(
+                "The city is moving.",
+                "Six houses. One moving city.",
+                "Open Black Ledger",
+                "Origin Dossier",
+                "Alice"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
@@ -11974,28 +11983,34 @@ def main() -> int:
                 "Current release",
                 "Known issues and install help",
                 "Update path",
-                "Three quick checks that show what works beyond the landing page"),
+                "Three quick checks beyond the landing page"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Main platform downloads",
+                "Choose the latest build for Windows or Linux.",
+                "Nightly",
+                "Stable",
+                "Build run-",
                 "Windows",
                 "Linux",
                 "macOS",
-                "Install help"),
+                "install help"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
             "/status",
             "Release",
             required_texts=(
-                "Current release build",
+                "Build run-",
+                "Stable",
+                "Released",
+                "Last verified",
+                "Validation Passed",
                 "Open downloads",
                 "Open support",
-                "Known issues stay on downloads.",
                 "Windows",
                 "Linux",
                 "macOS"),
@@ -12023,8 +12038,13 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/horizons",
-            "What Chummer is building toward",
-            required_texts=("Preparing next", "Research track", "Compare with current release status"),
+            "A quieter look at what Chummer may become",
+            required_texts=(
+                "The current job is still simple: download Chummer, build a runner, and keep the table moving.",
+                "Near next",
+                "Designing",
+                "Research",
+                "Ideas stay behind the product."),
             forbidden_texts=("Research tracks",),
             expects_header_count=1),
         AuditRoute(
@@ -12155,7 +12175,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Current release build", "Release", "Open downloads", "Open support"):
+    for snippet in ("Build run-", "Release", "Open downloads", "Open support"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

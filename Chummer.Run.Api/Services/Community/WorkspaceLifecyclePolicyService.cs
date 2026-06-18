@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
@@ -34,6 +35,7 @@ public sealed class WorkspaceLifecyclePolicyService
 {
     private static readonly JsonSerializerOptions ComparisonJsonOptions = new(JsonSerializerDefaults.Web);
     private readonly WorkspaceLifecyclePolicyOptions _options;
+    private sealed record RestoreReceiptCarryForward(DateTimeOffset ObservedAtUtc, ReceiptEnvelope? Envelope);
 
     public WorkspaceLifecyclePolicyService(IConfiguration configuration)
     {
@@ -106,11 +108,11 @@ public sealed class WorkspaceLifecyclePolicyService
             return null;
         }
 
-        Dictionary<string, DateTimeOffset> existingObservedById = BuildProvenanceObservationMap(existing);
+        Dictionary<string, RestoreReceiptCarryForward> existingObservedById = BuildProvenanceObservationMap(existing);
 
         return candidate
-            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveProvenanceReceiptObservationKeys(item), out DateTimeOffset observedAtUtc)
-                ? item with { ObservedAtUtc = observedAtUtc }
+            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveProvenanceReceiptObservationKeys(item), out RestoreReceiptCarryForward carryForward)
+                ? item with { ObservedAtUtc = carryForward.ObservedAtUtc, Envelope = carryForward.Envelope }
                 : item)
             .ToArray();
     }
@@ -124,74 +126,75 @@ public sealed class WorkspaceLifecyclePolicyService
             return null;
         }
 
-        Dictionary<string, DateTimeOffset> existingObservedById = BuildConflictObservationMap(existing);
+        Dictionary<string, RestoreReceiptCarryForward> existingObservedById = BuildConflictObservationMap(existing);
 
         return candidate
-            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveConflictReceiptObservationKeys(item), out DateTimeOffset observedAtUtc)
-                ? item with { ObservedAtUtc = observedAtUtc }
+            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveConflictReceiptObservationKeys(item), out RestoreReceiptCarryForward carryForward)
+                ? item with { ObservedAtUtc = carryForward.ObservedAtUtc, Envelope = carryForward.Envelope }
                 : item)
             .ToArray();
     }
 
-    private static Dictionary<string, DateTimeOffset> BuildProvenanceObservationMap(
+    private static Dictionary<string, RestoreReceiptCarryForward> BuildProvenanceObservationMap(
         IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? existing)
     {
-        Dictionary<string, DateTimeOffset> observedByKey = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, RestoreReceiptCarryForward> observedByKey = new(StringComparer.OrdinalIgnoreCase);
         foreach (WorkspaceRestoreProvenanceReceipt receipt in existing ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
         {
-            AddObservationKeys(observedByKey, ResolveProvenanceReceiptObservationKeys(receipt), receipt.ObservedAtUtc);
+            AddObservationKeys(observedByKey, ResolveProvenanceReceiptObservationKeys(receipt), new RestoreReceiptCarryForward(receipt.ObservedAtUtc, receipt.Envelope));
         }
 
         return observedByKey;
     }
 
-    private static Dictionary<string, DateTimeOffset> BuildConflictObservationMap(
+    private static Dictionary<string, RestoreReceiptCarryForward> BuildConflictObservationMap(
         IReadOnlyList<WorkspaceRestoreConflictReceipt>? existing)
     {
-        Dictionary<string, DateTimeOffset> observedByKey = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, RestoreReceiptCarryForward> observedByKey = new(StringComparer.OrdinalIgnoreCase);
         foreach (WorkspaceRestoreConflictReceipt receipt in existing ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
         {
-            AddObservationKeys(observedByKey, ResolveConflictReceiptObservationKeys(receipt), receipt.ObservedAtUtc);
+            AddObservationKeys(observedByKey, ResolveConflictReceiptObservationKeys(receipt), new RestoreReceiptCarryForward(receipt.ObservedAtUtc, receipt.Envelope));
         }
 
         return observedByKey;
     }
 
     private static void AddObservationKeys(
-        Dictionary<string, DateTimeOffset> observedByKey,
+        Dictionary<string, RestoreReceiptCarryForward> observedByKey,
         IEnumerable<string> keys,
-        DateTimeOffset observedAtUtc)
+        RestoreReceiptCarryForward carryForward)
     {
         foreach (string key in keys)
         {
-            if (observedByKey.TryGetValue(key, out DateTimeOffset existingObservedAtUtc))
+            if (observedByKey.TryGetValue(key, out RestoreReceiptCarryForward? existingCarryForward))
             {
-                if (observedAtUtc < existingObservedAtUtc)
+                if (carryForward.ObservedAtUtc < existingCarryForward.ObservedAtUtc)
                 {
-                    observedByKey[key] = observedAtUtc;
+                    observedByKey[key] = carryForward;
                 }
 
                 continue;
             }
 
-            observedByKey[key] = observedAtUtc;
+            observedByKey[key] = carryForward;
         }
     }
 
     private static bool TryResolveExistingObservation(
-        IReadOnlyDictionary<string, DateTimeOffset> observedByKey,
+        IReadOnlyDictionary<string, RestoreReceiptCarryForward> observedByKey,
         IEnumerable<string> keys,
-        out DateTimeOffset observedAtUtc)
+        out RestoreReceiptCarryForward carryForward)
     {
         foreach (string key in keys)
         {
-            if (observedByKey.TryGetValue(key, out observedAtUtc))
+            if (observedByKey.TryGetValue(key, out RestoreReceiptCarryForward? foundCarryForward))
             {
+                carryForward = foundCarryForward;
                 return true;
             }
         }
 
-        observedAtUtc = default;
+        carryForward = new RestoreReceiptCarryForward(default, null);
         return false;
     }
 

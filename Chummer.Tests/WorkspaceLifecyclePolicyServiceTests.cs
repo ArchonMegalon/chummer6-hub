@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,20 @@ public sealed class WorkspaceLifecyclePolicyServiceTests
         WorkspaceLifecyclePolicyService lifecycle = new(configuration);
         DateTimeOffset baselineGeneratedAtUtc = DateTimeOffset.UtcNow.AddHours(-12);
         DateTimeOffset baselineObservedAtUtc = baselineGeneratedAtUtc.AddMinutes(5);
+        ReceiptEnvelope existingEnvelope = new(
+            ReceiptKind: "workspace_restore_provenance",
+            OwnerScope: "community.workspace_restore",
+            ProvenanceClass: ReceiptProvenanceClasses.Runtime,
+            ExposureClass: ReceiptExposureClasses.SignedIn,
+            LifecycleState: ReceiptLifecycleStates.Verified,
+            CapturedAtUtc: baselineObservedAtUtc.AddSeconds(1),
+            EvidenceRef: "install-01",
+            ReviewState: "claimed_installation");
+        ReceiptEnvelope candidateEnvelope = existingEnvelope with
+        {
+            CapturedAtUtc = DateTimeOffset.UtcNow,
+            ReviewState = "claimed_installation_candidate"
+        };
 
         WorkspaceRestoreProjection existing = BuildRestoreProjection("usr_receipt", baselineGeneratedAtUtc) with
         {
@@ -33,7 +48,8 @@ public sealed class WorkspaceLifecyclePolicyServiceTests
                     Surface: "workspace_restore",
                     Summary: "Restore packet retains the claimed install lane.",
                     Proof: "artifact:avalonia-linux",
-                    ObservedAtUtc: baselineObservedAtUtc)
+                    ObservedAtUtc: baselineObservedAtUtc,
+                    Envelope: existingEnvelope)
             ],
             ConflictReceipts =
             [
@@ -53,7 +69,11 @@ public sealed class WorkspaceLifecyclePolicyServiceTests
             GeneratedAtUtc = DateTimeOffset.UtcNow,
             ProvenanceReceipts =
             [
-                existing.ProvenanceReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow }
+                existing.ProvenanceReceipts![0] with
+                {
+                    ObservedAtUtc = DateTimeOffset.UtcNow,
+                    Envelope = candidateEnvelope
+                }
             ],
             ConflictReceipts =
             [
@@ -65,6 +85,7 @@ public sealed class WorkspaceLifecyclePolicyServiceTests
 
         Assert.Equal(existing.GeneratedAtUtc.ToString("O"), finalized.GeneratedAtUtc.ToString("O"));
         Assert.Equal(existing.ProvenanceReceipts![0].ObservedAtUtc.ToString("O"), finalized.ProvenanceReceipts![0].ObservedAtUtc.ToString("O"));
+        Assert.Equal(existingEnvelope, finalized.ProvenanceReceipts![0].Envelope);
         Assert.Equal(existing.ConflictReceipts![0].ObservedAtUtc.ToString("O"), finalized.ConflictReceipts![0].ObservedAtUtc.ToString("O"));
     }
 

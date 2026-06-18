@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -91,6 +92,13 @@ REELS: list[dict[str, str]] = [
         "output": "community-hub-90s-deepdive.mp4",
         "caption": "COMMUNITY HUB takes open runs from public board to roster, scheduling, venue handoff, and closeout.",
     },
+    {
+        "horizon_id": "origin-dossier",
+        "title": "ORIGIN DOSSIER 90-second deep dive",
+        "source": "origin_dossier_90s_deepdive.mp4",
+        "output": "origin-dossier-90s-deepdive.mp4",
+        "caption": "ORIGIN DOSSIER turns approved runner origin canon into dossier media while keeping mechanics truth in Chummer.",
+    },
 ]
 
 
@@ -166,15 +174,41 @@ def publish_reel(row: dict[str, str]) -> dict[str, Any]:
 
 
 def main() -> int:
+    global SOURCE_ROOT
+    parser = argparse.ArgumentParser(description="Publish composed horizon deep-dive reels into public static media.")
+    parser.add_argument("--source-root", default=str(SOURCE_ROOT), help="Directory containing composited MP4 reels.")
+    parser.add_argument("--only", action="append", default=[], help="Horizon id or output filename to publish; may be repeated.")
+    args = parser.parse_args()
+    SOURCE_ROOT = Path(args.source_root)
+    only = {item for value in args.only for item in value.split(",") if item}
+    rows = [
+        row
+        for row in REELS
+        if not only or row["horizon_id"] in only or row["output"] in only or row["source"] in only
+    ]
+    if not rows:
+        raise SystemExit("no reels selected")
     PUBLIC_ROOT.mkdir(parents=True, exist_ok=True)
-    assets = [publish_reel(row) for row in REELS]
+    assets = [publish_reel(row) for row in rows]
+    existing_assets = []
+    if MANIFEST_PATH.is_file() and only:
+        try:
+            existing_manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+            existing_assets = [
+                item
+                for item in existing_manifest.get("assets", [])
+                if isinstance(item, dict) and str(item.get("horizon_id") or "") not in {row["horizon_id"] for row in rows}
+            ]
+        except (OSError, json.JSONDecodeError):
+            existing_assets = []
+    merged_assets = existing_assets + assets
     manifest = {
         "contract_name": "chummer.public_horizon_video_manifest",
         "generated_at_utc": now_iso(),
         "publication_posture": "first_party_static_media_assets_with_audio; not standalone proof that every horizon is shipped",
         "audio_required": True,
         "source_root": str(SOURCE_ROOT),
-        "assets": assets,
+        "assets": merged_assets,
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"published": len(assets), "manifest": str(MANIFEST_PATH)}, indent=2))

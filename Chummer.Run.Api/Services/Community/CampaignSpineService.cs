@@ -3199,14 +3199,10 @@ public sealed class CampaignSpineService
                 memberDossiers,
                 run,
                 continuity);
-            IReadOnlyList<CampaignConsequenceProjection> mergedConsequences = baselineConsequences;
-            if (existingCampaign?.Consequences is { Count: > 0 } persistedConsequences)
-            {
-                foreach (CampaignConsequenceProjection persistedConsequence in persistedConsequences)
-                {
-                    mergedConsequences = UpsertGovernedCampaignConsequence(mergedConsequences, persistedConsequence);
-                }
-            }
+            IReadOnlyList<CampaignConsequenceProjection> mergedConsequences =
+                MergeCampaignConsequencesWithReceiptCarryForward(
+                    baselineConsequences,
+                    existingCampaign?.Consequences);
 
             var campaign = new CampaignProjection(
                 CampaignId: sponsorCampaign.CampaignId,
@@ -3762,6 +3758,8 @@ public sealed class CampaignSpineService
         }
 
         return receipts
+            .GroupBy(static receipt => receipt.ReceiptId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
             .Select(receipt => receipt with
             {
                 Envelope = ReceiptEnvelopeFactory.Runtime(
@@ -7515,6 +7513,87 @@ public sealed class CampaignSpineService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
     }
+
+    private static IReadOnlyList<CampaignConsequenceProjection> MergeCampaignConsequencesWithReceiptCarryForward(
+        IReadOnlyList<CampaignConsequenceProjection> baselineConsequences,
+        IReadOnlyList<CampaignConsequenceProjection>? persistedConsequences)
+    {
+        if (persistedConsequences is not { Count: > 0 })
+        {
+            return baselineConsequences
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+        }
+
+        Dictionary<string, CampaignConsequenceProjection> persistedByKind = persistedConsequences
+            .GroupBy(static item => item.Kind, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.Last(), StringComparer.OrdinalIgnoreCase);
+
+        HashSet<string> baselineKinds = new(StringComparer.OrdinalIgnoreCase);
+        List<CampaignConsequenceProjection> merged = [];
+        foreach (CampaignConsequenceProjection baselineConsequence in baselineConsequences)
+        {
+            baselineKinds.Add(baselineConsequence.Kind);
+            if (!persistedByKind.TryGetValue(baselineConsequence.Kind, out CampaignConsequenceProjection? persistedConsequence))
+            {
+                merged.Add(baselineConsequence);
+                continue;
+            }
+
+            CampaignConsequenceProjection winningConsequence = HasGovernedConsequenceUpdateReceipt(persistedConsequence)
+                ? persistedConsequence
+                : baselineConsequence;
+            merged.Add(winningConsequence with
+            {
+                EvidenceLines = FinalizeLines(baselineConsequence.EvidenceLines.Concat(persistedConsequence.EvidenceLines)),
+                Receipts = MergeCampaignConsequenceReceiptsWithCarryForward(baselineConsequence.Receipts, persistedConsequence.Receipts)
+            });
+        }
+
+        merged.AddRange(persistedConsequences
+            .Where(consequence => !baselineKinds.Contains(consequence.Kind)));
+
+        return merged
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CampaignConsequenceReceipt> MergeCampaignConsequenceReceiptsWithCarryForward(
+        IReadOnlyList<CampaignConsequenceReceipt> baselineReceipts,
+        IReadOnlyList<CampaignConsequenceReceipt> persistedReceipts)
+    {
+        Dictionary<string, CampaignConsequenceReceipt> persistedByKey = persistedReceipts
+            .GroupBy(ResolveCampaignConsequenceReceiptKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.Last(), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> baselineKeys = new(StringComparer.OrdinalIgnoreCase);
+
+        CampaignConsequenceReceipt[] mergedBaselineReceipts = baselineReceipts
+            .Select(receipt =>
+            {
+                string key = ResolveCampaignConsequenceReceiptKey(receipt);
+                baselineKeys.Add(key);
+                return persistedByKey.TryGetValue(key, out CampaignConsequenceReceipt? persistedReceipt)
+                    ? persistedReceipt
+                    : receipt;
+            })
+            .ToArray();
+
+        return mergedBaselineReceipts
+            .Concat(persistedReceipts.Where(receipt => !baselineKeys.Contains(ResolveCampaignConsequenceReceiptKey(receipt))))
+            .GroupBy(ResolveCampaignConsequenceReceiptKey, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .ToArray();
+    }
+
+    private static bool HasGovernedConsequenceUpdateReceipt(CampaignConsequenceProjection consequence)
+        => consequence.Receipts.Any(static receipt =>
+            string.Equals(receipt.SourceKind, GovernedConsequenceUpdateSourceKind, StringComparison.OrdinalIgnoreCase));
+
+    private static string ResolveCampaignConsequenceReceiptKey(CampaignConsequenceReceipt receipt)
+        => $"{NormalizeReceiptKeyPart(receipt.SourceKind)}|{NormalizeReceiptKeyPart(receipt.ReceiptId)}|{NormalizeReceiptKeyPart(receipt.Summary)}";
+
+    private static string NormalizeReceiptKeyPart(string value)
+        => string.Join(" ", value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static IReadOnlyList<string> BuildGovernedConsequenceReturnLoopEvidenceLines(
         IEnumerable<CampaignConsequenceProjection> consequences)
