@@ -72,3 +72,20 @@ test('core public pages do not expose AI or repo-process copy', async ({ page })
     }
   }
 });
+
+test('future ideas keep unfinished campaign layers out of the public path', async ({ page, request }) => {
+  await page.goto(`${baseUrl}/horizons`, { waitUntil: 'domcontentloaded' });
+  const horizonsText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+
+  expect(horizonsText).not.toContain('Black Ledger');
+  expect(horizonsText).not.toContain('Open Black Ledger');
+  expect(horizonsText).toContain('Early campaign-city work stays behind the main app');
+
+  const llmsResponse = await request.get(`${baseUrl}/llms.txt`);
+  expect(llmsResponse.ok()).toBeTruthy();
+  const llmsText = await llmsResponse.text();
+  expect(llmsText).not.toContain('/ledger :');
+  expect(llmsText).not.toContain('/black-ledger');
+  expect(llmsText).not.toContain('Black Ledger');
+  expect(llmsText).toContain('/alice : character helper entry');
+});

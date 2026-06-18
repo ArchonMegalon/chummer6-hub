@@ -5,10 +5,13 @@
     ViewData["SurfaceClass"] = "surface-horizons";
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
     var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
-    var totalHorizons = Model.Horizons.Count;
-    var preparingCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Preparing", StringComparison.OrdinalIgnoreCase));
-    var designingCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Designing", StringComparison.OrdinalIgnoreCase));
-    var researchCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Research", StringComparison.OrdinalIgnoreCase));
+    var visibleHorizons = Model.Horizons
+        .Where(card => !string.Equals(card.Card.Id, "horizon_black_ledger", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+    var totalHorizons = visibleHorizons.Length;
+    var preparingCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Preparing", StringComparison.OrdinalIgnoreCase));
+    var designingCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Designing", StringComparison.OrdinalIgnoreCase));
+    var researchCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Research", StringComparison.OrdinalIgnoreCase));
     var routeChoices = new[]
     {
         new
@@ -56,12 +59,6 @@
         ["horizon_runsite"] = new[] { ("Runsite deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
         ["horizon_runbook_press"] = new[] { ("Runbook Press deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
         ["horizon_table_pulse"] = new[] { ("Table Pulse deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
-        ["horizon_black_ledger"] =
-        new[]
-        {
-            ("Black Ledger deep dive", "/media/horizons/black-ledger-90s-deepdive.mp4", "/media/horizons/black-ledger-90s-deepdive.vtt"),
-            ("Black Ledger reel", "/media/horizons/black-ledger-epic-90s.mp4", "/media/horizons/black-ledger-epic-90s.vtt")
-        },
         ["horizon_community_hub"] = new[] { ("Community Hub deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -136,13 +133,13 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Direction</p>
         <h2 class="editorial-title">@totalHorizons product thread@(totalHorizons == 1 ? string.Empty : "s") under review.</h2>
-        <p class="editorial-copy">@preparingCount near-next, @designingCount design, and @researchCount research thread@(researchCount == 1 ? string.Empty : "s"). Black Ledger stays quiet here until it earns a stronger public position.</p>
+        <p class="editorial-copy">@preparingCount near-next, @designingCount design, and @researchCount research thread@(researchCount == 1 ? string.Empty : "s"). Early campaign-city work stays behind the main app until it earns a stronger public position.</p>
     </div>
 </section>
 
 @foreach (var group in groups)
 {
-    var items = Model.Horizons.Where(card => string.Equals(card.Card.Badge, group.Badge, StringComparison.OrdinalIgnoreCase)).ToArray();
+    var items = visibleHorizons.Where(card => string.Equals(card.Card.Badge, group.Badge, StringComparison.OrdinalIgnoreCase)).ToArray();
     if (items.Length == 0)
     {
         continue;
@@ -171,12 +168,7 @@
             @for (var index = 0; index < items.Length; index++)
             {
                 var card = items[index];
-                var isBlackLedger = string.Equals(card.Card.Id, "horizon_black_ledger", StringComparison.OrdinalIgnoreCase);
                 var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
-                var cardSummary = isBlackLedger
-                    ? "A living-city campaign layer is still early. It stays behind the main Chummer app until the experience is ready for normal users."
-                    : card.Card.Summary;
-                var actionLabel = isBlackLedger ? "Read quiet design note" : card.Action.Label;
 
                 <article class="horizon-band@reverseClass" id="@card.Card.Id.ToLowerInvariant().Replace('_', '-')">
                     @if (card.Asset is not null)
@@ -188,7 +180,7 @@
                     <div class="horizon-band__copy">
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
-                        <p>@cardSummary</p>
+                        <p>@card.Card.Summary</p>
                         <div class="horizon-band__claims">
                             @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
                             {
@@ -218,7 +210,7 @@
                                 </div>
                             }
                         </div>
-                        <a class="editorial-strip__action" href="@card.Action.Href">@actionLabel</a>
+                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
                 </article>
             }
@@ -227,7 +219,7 @@
 }
 
 @{
-    var remaining = Model.Horizons.Where(card => !rendered.Contains(card.Card.Id)).ToArray();
+    var remaining = visibleHorizons.Where(card => !rendered.Contains(card.Card.Id)).ToArray();
 }
 
 @if (remaining.Length > 0)
