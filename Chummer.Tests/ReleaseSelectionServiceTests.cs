@@ -315,7 +315,7 @@ platforms:
         Assert.False(string.IsNullOrWhiteSpace(experience.PlatformShelfNoticeTitle));
         var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
         Assert.False(windows.PubliclyAvailable);
-        Assert.Contains("outside the current downloads page", windows.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not on the public downloads page", windows.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("unavailable", windows.Summary, StringComparison.OrdinalIgnoreCase);
     }
 

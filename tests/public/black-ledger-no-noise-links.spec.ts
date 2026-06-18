@@ -8,19 +8,16 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   const hero = page.locator('[data-homepage-section="hero"]');
-  await expect(hero).toContainText('The city is moving.');
-  await expect(hero.locator('[data-black-ledger-geoscape-root]')).toBeVisible();
+  await expect(hero).toContainText('Build the runner. Run the night.');
+  await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveCount(0);
   await expect(hero.getByRole('link')).toHaveCount(2);
-  await expect(hero.getByRole('link', { name: 'Open Black Ledger' })).toHaveAttribute('href', '/ledger');
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
-
-  const factions = page.locator('[data-homepage-section="factions"]');
-  await expect(factions).toContainText('Six seeded houses are already pushing on the same city.');
-  await expect(factions).toContainText('Open a file, read the pressure, or replay Turn 1 without touching private table state.');
+  await expect(hero.getByRole('link', { name: 'See what works today' })).toHaveAttribute('href', '/now');
 
   const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
   await expect(playDownloads.getByRole('link', { name: 'Open downloads' })).toHaveAttribute('href', '/downloads');
-  await expect(playDownloads.getByRole('link', { name: 'Replay Turn 1' })).toHaveAttribute('href', '/ledger/map?replay=turn-1');
+  await expect(playDownloads.getByRole('link', { name: 'Open play shell' })).toHaveAttribute('href', '/play');
+  await expect(playDownloads.getByRole('link', { name: 'Open status' })).toHaveAttribute('href', '/status');
 
   const badLinks = await page.locator('a[href="#"], a[href=""], a[href^="javascript:void"]').evaluateAll((items) =>
     items.map((item) => (item as HTMLAnchorElement).outerHTML),

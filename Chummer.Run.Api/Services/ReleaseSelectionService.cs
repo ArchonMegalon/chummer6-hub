@@ -970,8 +970,8 @@ public sealed class ReleaseSelectionService
                 Summary: publiclyAvailable
                     ? BuildAvailablePlatformSummary(promotedDownload!, platform)
                     : BuildUnavailablePlatformSummary(label, platform),
-                PrimaryPackageLabel: $"Primary package: {PrimaryPackageLabel(platform)}",
-                SupportabilityLabel: $"Support posture: {SupportabilityLabel(platform)}",
+                PrimaryPackageLabel: PrimaryPackageLabel(platform),
+                SupportabilityLabel: $"Support: {SupportabilityLabel(platform)}",
                 PubliclyAvailable: publiclyAvailable,
                 CurrentDevice: currentDevice);
         }).ToArray();
@@ -983,12 +983,12 @@ public sealed class ReleaseSelectionService
     {
         if (UsesMacBootstrapFlow(promotedDownload))
         {
-            return "The current downloads page publishes the Mac DMG directly, and the account-assisted install path stays available when you want sign-in and support linked from the first launch.";
+            return "macOS is available through guided setup only.";
         }
 
-        var packageKind = PackageKindLabel(promotedDownload.Kind);
-        var supportability = SupportabilityLabel(platform);
-        return $"The current downloads page publishes {promotedDownload.Platform} as the live {packageKind} path. Support posture is {supportability}.";
+        var packageKind = PackageKindLabel(platform?.PrimaryPackageKind ?? promotedDownload.Kind);
+        var platformLabel = RequestedPlatformLabel(PlatformFamily(promotedDownload)) ?? promotedDownload.Platform;
+        return $"Download the current {platformLabel} {packageKind}.";
     }
 
     private static string BuildUnavailablePlatformSummary(
@@ -997,15 +997,15 @@ public sealed class ReleaseSelectionService
     {
         if (platform is null)
         {
-            return $"The current downloads page does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform.";
+            return $"{platformLabel} is not on the public downloads page right now.";
         }
 
         return NormalizePlatformId(platform.Id) switch
         {
-            "macos" => "macOS is not public today. A signed and notarized DMG is available through guided support only.",
-            "windows" => "The Windows lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Windows setup.",
-            "linux" => "The Linux package lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Linux setup.",
-            _ => $"The current downloads page does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
+            "macos" => "macOS is guided setup only today.",
+            "windows" => "Windows is not on the public downloads page right now.",
+            "linux" => "Linux is not on the public downloads page right now.",
+            _ => $"{platformLabel} is not on the public downloads page right now."
         };
     }
 

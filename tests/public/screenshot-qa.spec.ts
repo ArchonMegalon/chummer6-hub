@@ -26,7 +26,7 @@ const supportingSurfaces = [
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Release', 'Current release build', 'Open downloads'],
+    requiredText: ['Release status', 'Current published build', 'Open downloads'],
   },
   {
     id: 'ledger-map',
@@ -55,15 +55,17 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const heroTitle = page.locator('.launch-hero__title');
     const primaryCta = page.locator('.launch-hero__actions a.button-like').first();
     const footer = page.locator('[data-public-section="footer"]');
-    const factions = page.locator('[data-homepage-section="factions"]');
+    const product = page.locator('[data-homepage-section="product"]');
+    const promo = page.locator('[data-homepage-section="flagship-promo"]');
     const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
     const sidebar = page.locator('.site-sidebar');
     const navLinks = page.locator('[aria-label="Primary navigation"] a, [aria-label="Primary navigation"] .site-sidebar__current');
 
-    await expect(heroTitle).toContainText('The city is moving.');
-    await expect(primaryCta).toContainText('Open Black Ledger');
-    await expect(factions).toContainText('Six seeded houses are already pushing on the same city.');
-    await expect(playDownloads).toContainText('Install, play, or open the city.');
+    await expect(heroTitle).toContainText('Build the runner. Run the night.');
+    await expect(primaryCta).toContainText('Download Chummer');
+    await expect(product).toContainText('Everything your table reaches for first.');
+    await expect(promo).toContainText('A short look at the product.');
+    await expect(playDownloads).toContainText('Start where you need to.');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {
