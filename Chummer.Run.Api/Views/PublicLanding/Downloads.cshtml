@@ -48,12 +48,42 @@
     ReleaseOptionViewModel? ResolvePlatformOption(string platformId)
         => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
 
+    static bool MatchesReleaseLane(PublicReleaseArtifactDto artifact, params string[] laneIds)
+    {
+        var artifactLaneIds = new[]
+        {
+            artifact.ChannelId,
+            artifact.Channel
+        };
+        return artifactLaneIds.Any(candidate =>
+            !string.IsNullOrWhiteSpace(candidate)
+            && laneIds.Any(lane => string.Equals(candidate.Trim(), lane, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    string? recommendedPlatformId = release.Recommended?.Artifact is null
+        ? null
+        : new[] { "windows", "linux", "macos" }
+            .FirstOrDefault(platformId => MatchesPlatform(release.Recommended.Artifact, platformId));
+
+    bool MatchesRecommendedPlatform(ReleaseOptionViewModel option)
+        => string.IsNullOrWhiteSpace(recommendedPlatformId) || MatchesPlatform(option.Artifact, recommendedPlatformId);
+
+    ReleaseOptionViewModel? ResolveLaneOption(params string[] laneIds)
+        => optionPool
+            .Where(static option => option.Installer)
+            .Where(MatchesRecommendedPlatform)
+            .FirstOrDefault(option => MatchesReleaseLane(option.Artifact, laneIds));
+
     var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
     var currentDownloadHref = requestedPlatformUnavailable
         ? "#platform-shelf"
         : release.Recommended!.DispatchHref;
-    var nightlyHref = currentDownloadHref;
-    var stableHref = currentDownloadHref;
+    var nightlyOption = ResolveLaneOption("nightly", "preview", "public_preview") ?? release.Recommended;
+    var stableOption = ResolveLaneOption("stable", "public_stable") ?? release.Recommended;
+    var nightlyHref = requestedPlatformUnavailable ? "#platform-shelf" : nightlyOption?.DispatchHref ?? currentDownloadHref;
+    var stableHref = requestedPlatformUnavailable ? "#platform-shelf" : stableOption?.DispatchHref ?? currentDownloadHref;
+    var nightlyLabel = nightlyOption?.Artifact.Version ?? Model.Manifest.Version;
+    var stableLabel = stableOption?.Artifact.Version ?? Model.Manifest.Version;
 }
 
 <section class="release-stage">
@@ -61,8 +91,8 @@
         <h1 class="page-title">Install Chummer</h1>
 <p class="page-copy">Choose the latest build for Windows or Linux. Release notes and known issues stay beside each build so the download is inspectable before install.</p>
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
-            <a class="button-like button-like--secondary" href="@stableHref">Stable</a>
+            <a class="button-like button-like--primary" href="@nightlyHref" data-release-lane="nightly" aria-label="Download the latest published Chummer build, @nightlyLabel">Nightly</a>
+            <a class="button-like button-like--secondary" href="@stableHref" data-release-lane="stable" aria-label="Download the current stable Chummer build, @stableLabel">Stable</a>
         </div>
     </div>
 </section>

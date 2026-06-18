@@ -25,6 +25,8 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
 
   expect(downloads).toContain('Nightly');
   expect(downloads).toContain('Stable');
+  expect(downloads).toContain('data-release-lane="nightly"');
+  expect(downloads).toContain('data-release-lane="stable"');
   expect(downloads).toContain('Choose the latest build for Windows or Linux.');
   expect(downloads).not.toContain('Create account to install</a>');
 });
