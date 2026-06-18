@@ -621,19 +621,19 @@
       </div>
       <div class="route-grid">
 
-      <article class="route-card route-card-preview">
+      <article class="route-card route-card-implemented">
         <div class="route-card-head">
           <div>
             <div class="route-card-path">/downloads</div>
             <h3>Downloads and install truth</h3>
           </div>
-          <span class="proof-badge proof-badge-preview">Preview bounded</span>
+          <span class="proof-badge proof-badge-implemented">Implemented</span>
         </div>
         <div class="route-semantic">supportable_install</div>
         <p>Package compatibility, install, update, rollback, and revoke claims are published from the current release shelf instead of helper folklore.</p>
-        <div class="route-detail">0 compatible installer tuple(s) are published. Rollout state is promoted_preview, support posture is review_required, and rollback stays watch.</div>
-        <div class="route-proof-meta"><span>Compatibility: 0/2 installer tuples</span><span>Rollback: watch</span><span>Revoke: not_revoked</span></div>
-        <ul class="route-evidence"><li>Release channel: published</li><li>Release proof: review_required</li><li>Install journey: ready</li><li>Fix availability: Verify fix availability against the live channel artifact before closing support loops.</li></ul>
+        <div class="route-detail">2 compatible installer tuple(s) are published. Rollout state is promoted_preview, support posture is preview_supported, and rollback stays armed.</div>
+        <div class="route-proof-meta"><span>Compatibility: 2/2 installer tuples</span><span>Rollback: armed</span><span>Revoke: not_revoked</span></div>
+        <ul class="route-evidence"><li>Release channel: published</li><li>Release proof: passed</li><li>Install journey: ready</li><li>Fix availability: Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.</li></ul>
       </article>
       <article class="route-card route-card-stable">
         <div class="route-card-head">
@@ -645,7 +645,7 @@
         </div>
         <div class="route-semantic">desktop_flagship</div>
         <p>The public route only claims the flagship workbench when executable proof and veteran-familiar desktop signals agree.</p>
-        <div class="route-detail">Feature parity, desktop layout familiarity, and executable flagship proof are all green.</div>
+        <div class="route-detail">{&#x27;ready_count&#x27;: 8, &#x27;warning_count&#x27;: 0, &#x27;missing_count&#x27;: 0, &#x27;scoped_warning_count&#x27;: 0, &#x27;scoped_missing_count&#x27;: 0, &#x27;deferred_warning_count&#x27;: 0, &#x27;history_snapshot_count&#x27;: 40}</div>
         
         <ul class="route-evidence"><li>Flagship readiness: ready</li><li>Desktop executable gate: pass</li><li>Workbench route proof: present</li></ul>
       </article>
@@ -691,19 +691,19 @@
         
         <ul class="route-evidence"><li>Workflow ready: yes</li><li>Discovery system ready: yes</li><li>Candidate count: 0</li></ul>
       </article>
-      <article class="route-card route-card-stable">
+      <article class="route-card route-card-preview">
         <div class="route-card-head">
           <div>
             <div class="route-card-path">/roadmap</div>
             <h3>Governance and rollout posture</h3>
           </div>
-          <span class="proof-badge proof-badge-stable">Public stable</span>
+          <span class="proof-badge proof-badge-preview">Preview bounded</span>
         </div>
         <div class="route-semantic">governance</div>
         <p>Governance cards describe launch, canary, rollback, and claim-safety posture. They do not imply immediate rollout just because a proposal exists.</p>
-        <div class="route-detail">trusted completion receipt plus whole-product release proof and Linux desktop exit gate are ready</div>
+        <div class="route-detail">linux desktop exit gate proof is stale (444394s old)</div>
         
-        <ul class="route-evidence"><li>Completion audit: pass</li><li>Launch expand: blocked</li><li>Freeze launch: active</li><li>Canary: ready</li><li>Rollback: watch</li><li>Journey summary: ready</li></ul>
+        <ul class="route-evidence"><li>Completion audit: fail</li><li>Launch expand: blocked</li><li>Freeze launch: active</li><li>Canary: ready</li><li>Rollback: armed</li><li>Journey summary: ready</li></ul>
       </article>
       </div>
     </section>
