@@ -17,10 +17,21 @@ OUT = WORKSPACE / "_completion" / "refined_magicfit_promo_plans_20260531"
 DETAILED_ZIP = Path("/home/tibor/jammer6_each_horizon_detailed_screenplays_magicfit_20260531.zip")
 EPIC_ZIP = Path("/home/tibor/jammer6_epic_rewrite_blackledger_nexuspan_magicfit_20260531.zip")
 
+HUMANIZED_CAPTURE_STYLE = (
+    "Humanized capture style: ground this like a practical live-action tabletop/product documentary clip, "
+    "not a synthetic AI trailer. Use natural lens behavior, believable handheld or tripod camera movement, "
+    "slight actor asymmetry, real skin texture, ordinary clothing mixed with restrained cyberpunk props, "
+    "messy tabletop details, practical reflections, imperfect focus pulls, and diegetic screens that can be "
+    "blurred or replaced later. Keep AR/UI overlays sparse, secondary, and clearly added in post. Prefer one "
+    "clear human action over abstract neon spectacle."
+)
+
 GLOBAL_NEGATIVE = (
     "flat vector, SVG, static poster, slideshow, generic corporate SaaS ad, no people, dead frame, "
-    "plastic faces, broken hands, unreadable generated text, official Shadowrun logos, official corporate/faction marks, "
-    "sourcebook art, sourcebook page layout, real celebrity likeness, watermark, cheap cosplay, cartoonish metahumans, cluttered HUD"
+    "plastic faces, waxy skin, over-smoothed faces, uncanny symmetry, identical faces, broken hands, extra fingers, "
+    "warped eyes, rubber mouths, unreadable generated text, fake readable UI text, floating HUD clutter, excessive neon fog, "
+    "over-sharpened AI trailer look, synthetic bokeh, official Shadowrun logos, official corporate/faction marks, "
+    "sourcebook art, sourcebook page layout, real celebrity likeness, watermark, cheap cosplay, cartoonish metahumans"
 )
 
 
@@ -91,16 +102,51 @@ def parse_scene_blocks(text: str, heading_prefix: str) -> list[tuple[str, str, s
     return blocks
 
 
+def humanize_render_prompt(prompt: str) -> str:
+    replacements = {
+        "Photoreal cinematic cyberpunk product trailer, realistic metahuman cast, dramatic but premium lighting, practical neon, shallow depth of field, live-action feeling, expressive faces, grounded action, premium production value, humor through performance, real props, table play mixed with elegant futuristic UI overlays added in post.": HUMANIZED_CAPTURE_STYLE,
+        "Photoreal cinematic cyberpunk product trailer scene": "Grounded live-action product-documentary scene",
+        "Photoreal cinematic cyberpunk epic trailer scene": "Grounded live-action campaign-documentary scene",
+        "premium production value": "credible small-crew production value",
+        "dramatic but premium lighting": "motivated practical lighting",
+        "elegant futuristic UI overlays": "restrained replaceable UI plates",
+        "floating data": "subtle screen reflection and practical interface light",
+        "translucent data strands": "brief restrained interface reflections",
+        "hero push": "measured camera push",
+    }
+    result = prompt
+    for old, new in replacements.items():
+        result = result.replace(old, new)
+    return " ".join(result.split())
+
+
 def normalize_render_prompt(prompt: str, fallback_parts: list[str]) -> str:
-    base = prompt.strip() or ". ".join(part for part in fallback_parts if part)
+    base = humanize_render_prompt(prompt.strip() or ". ".join(part for part in fallback_parts if part))
     refinements = [
-        "Refined render plan: render this as a single cinematic live-action feeling clip, not a slideshow.",
-        "Show at least one clearly acting metahuman character; include visible cyberware or AR lenses when plausible.",
-        "Use abstract UI plates only; exact readable product labels, captions, and logos are added in post.",
-        "Keep motion obvious through camera movement, hand action, character reaction, or environmental change.",
+        HUMANIZED_CAPTURE_STYLE,
+        "Refined render plan: render this as one grounded shot or a simple two-shot sequence, not a slideshow or glossy montage.",
+        "Show at least one clearly acting person; metahuman traits should be subtle makeup or wardrobe cues, not cartoon prosthetics.",
+        "Do not ask the model to generate exact readable UI, captions, logos, or product text; those are added in post.",
+        "Keep motion obvious through a hand action, eye-line change, object movement, or camera move that a small crew could actually shoot.",
+        "Avoid perfect symmetry, mannequin faces, clean empty rooms, overdesigned HUDs, and surreal neon abstraction.",
         "Public-safe IP boundary: no official Shadowrun logos, no canonical named characters, no sourcebook art.",
     ]
     return " ".join([base, *refinements])
+
+
+def normalize_negative_prompt(negative: str) -> str:
+    terms: list[str] = []
+    seen: set[str] = set()
+    for part in [negative.strip(), GLOBAL_NEGATIVE]:
+        if not part:
+            continue
+        for term in [item.strip() for item in part.split(",") if item.strip()]:
+            key = term.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            terms.append(term)
+    return ", ".join(terms)
 
 
 def detailed_horizon_assets(root: Path) -> list[dict[str, Any]]:
@@ -114,7 +160,7 @@ def detailed_horizon_assets(root: Path) -> list[dict[str, Any]]:
         for scene_no, title, block in parse_scene_blocks(text, "###"):
             meta = parse_scene_meta(block)
             prompt = extract_fenced_after(block, "MagicFit render prompt")
-            negative = extract_fenced_after(block, "MagicFit negative prompt") or GLOBAL_NEGATIVE
+            negative = normalize_negative_prompt(extract_fenced_after(block, "MagicFit negative prompt"))
             timecode = str(meta.get("timecode") or "00:00-00:09")
             scene_id = f"{horizon.lower().replace('-', '_').replace(' ', '_')}_{scene_no}_{str(meta.get('scene_slug') or title).lower().replace(' ', '_').replace('-', '_')}"
             fallback = [
@@ -160,7 +206,7 @@ def epic_assets(root: Path) -> list[dict[str, Any]]:
         for scene_no, title, block in parse_scene_blocks(text, "##"):
             meta = parse_scene_meta(block)
             prompt = extract_fenced_after(block, "MagicFit prompt")
-            negative = GLOBAL_NEGATIVE
+            negative = normalize_negative_prompt("")
             timecode = str(meta.get("timecode") or "00:00-00:09")
             scene_id = f"{horizon.lower().replace(' ', '_')}_epic_{scene_no}_{title.lower().replace(' ', '_').replace('-', '_')}"
             fallback = [
@@ -212,6 +258,11 @@ def main() -> int:
         "source_zips": [str(DETAILED_ZIP), str(EPIC_ZIP)],
         "provider": "MagicFit",
         "render_method": "one_clip_per_scene_then_post_composite",
+        "render_style_policy": {
+            "goal": "reduce AI-generated visual tells while preserving the Chummer6 horizon story",
+            "positive_style": HUMANIZED_CAPTURE_STYLE,
+            "negative_style": GLOBAL_NEGATIVE,
+        },
         "asset_count": len(assets),
         "scene_count": total_scenes,
         "claim_boundary": "These are refined render manifests and scene renders; final public release still requires human creative review.",

@@ -12,42 +12,42 @@
         new
         {
             Badge = "Reality check",
-            Title = "Start on what works today when you need shipped truth",
-            Summary = "Use the current-status page when the real question is whether something is already usable, supported, or still under caution right now.",
+            Title = "See what you can use today",
+            Summary = "Use this when you want to know whether something is ready now, needs care, or is still coming next.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Shipped truth", "Current caution", "Current availability" }
+            Proof = new[] { "Ready now", "Needs care", "Coming next" }
         },
         new
         {
             Badge = "Downloads",
-            Title = "Open downloads when the answer depends on install posture",
-            Summary = accessPosture?.AvailabilitySummary ?? "Package type, account handoff, known issues, and the current support path belong on downloads, not buried inside a long answer.",
+            Title = "Open downloads when you want to install",
+            Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package, known issues, and setup help without making you read a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "One downloads page", "Account return", "Known issues nearby" }
+            Proof = new[] { "Latest build", "Setup help", "Known issues" }
         },
         new
         {
             Badge = "Account value",
             Title = Model.Chrome.Authenticated
-                ? "Account keeps recovery, devices, and support on one calmer path"
-                : "Create an account when you want recovery, linked installs, and tracked support",
+                ? "Account keeps recovery, devices, and support together"
+                : "Create an account when you want recovery and support history",
             Summary = Model.Chrome.Authenticated
-                ? "Return to account when the question is about devices, recovery identities, or support history instead of public product posture."
-                : accessPosture?.AccountValueSummary ?? "The binary stays the same. The value is the calmer return path for linked installs, recovery, and tracked support once you want it.",
+                ? "Return to Account for devices, recovery, and support history."
+                : accessPosture?.AccountValueSummary ?? "The download stays the same. An account helps you find linked installs, recovery, and support history later.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
             Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
-            Proof = new[] { "Linked installs", "Devices & access", "Tracked support history" }
+            Proof = new[] { "Linked installs", "Devices", "Support history" }
         },
         new
         {
             Badge = "Private help",
-            Title = "Leave the FAQ as soon as the issue needs logs, recovery, or private detail",
-            Summary = "Install failures, crashes, account issues, and private campaign detail should move to first-party help instead of staying in public copy or a search box.",
+            Title = "Use support when the issue needs logs or account detail",
+            Summary = "Install failures, crashes, account issues, and private campaign details belong in support, not in a public search box.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "First-party help", "Private by default", "No GitHub required" }
+            Proof = new[] { "Private by default", "No GitHub required", "Tracked follow-up" }
         }
     };
 
@@ -113,9 +113,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Fast answer map</p>
+        <p class="eyebrow">Fast answers</p>
         <h2 class="editorial-title">Get the answer or leave with the right next page.</h2>
-        <p class="editorial-copy">FAQ should answer the normal objections quickly, then hand you to the correct product page before the question turns into guesswork or private support.</p>
+        <p class="editorial-copy">Use the FAQ for normal questions. Use support when the answer depends on your device, account, logs, or campaign.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in faqRouteChoices)
@@ -138,12 +138,12 @@
 
 <section class="faq-stack">
     <div class="trust-page-section">
-        <p class="eyebrow">Search the answer deck</p>
+        <p class="eyebrow">Search</p>
         <h2>Plain answers first, deeper help right behind them</h2>
         <p>Use the search when you know the topic, or scan the grouped sections below when the question is still broad.</p>
         <label class="field" for="faqFilter">
             <span>Search the FAQ</span>
-            <input id="faqFilter" type="search" placeholder="preview, account, install, recovery" data-faq-filter />
+            <input id="faqFilter" type="search" placeholder="account, install, update, recovery" data-faq-filter />
         </label>
     </div>
     @foreach (var faqSection in Model.Sections)
@@ -173,7 +173,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Still stuck?</p>
     <h2 class="editorial-title">Open support instead of guessing</h2>
-    <p class="editorial-copy">If the FAQ answered part of the question but not enough to move forward, use the first-party support intake and keep the case attached to the product surface.</p>
+    <p class="editorial-copy">If the FAQ answered only part of the question, open support and keep the case in one place.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/contact#support-intake">Still stuck? Open support</a>
         <a class="button-like button-like--ghost" href="/help">Open help</a>

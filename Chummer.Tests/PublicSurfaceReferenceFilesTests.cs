@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -134,6 +135,67 @@ public sealed class PublicSurfaceReferenceFilesTests
     }
 
     [Fact]
+    public void PublicHorizonVideosAreCaptionedAudioBackedAndLinkedFromTheHorizonPage()
+    {
+        string manifestPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "media", "horizons", "horizon-video-manifest.json");
+        string horizonViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml");
+        string horizonView = File.ReadAllText(horizonViewPath);
+
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        JsonElement root = manifest.RootElement;
+
+        Assert.Equal("chummer.public_horizon_video_manifest", root.GetProperty("contract_name").GetString());
+        Assert.True(root.GetProperty("audio_required").GetBoolean());
+        Assert.Contains("with_audio", root.GetProperty("publication_posture").GetString() ?? string.Empty, StringComparison.Ordinal);
+
+        int assetCount = 0;
+        HashSet<string> horizonIds = new(StringComparer.Ordinal);
+        foreach (JsonElement asset in root.GetProperty("assets").EnumerateArray())
+        {
+            string title = asset.GetProperty("title").GetString() ?? "Untitled horizon video";
+            string publicMp4 = asset.GetProperty("public_mp4").GetString() ?? string.Empty;
+            string publicCaptions = asset.GetProperty("public_captions").GetString() ?? string.Empty;
+
+            Assert.StartsWith("/media/horizons/", publicMp4, StringComparison.Ordinal);
+            Assert.EndsWith(".mp4", publicMp4, StringComparison.Ordinal);
+            Assert.StartsWith("/media/horizons/", publicCaptions, StringComparison.Ordinal);
+            Assert.EndsWith(".vtt", publicCaptions, StringComparison.Ordinal);
+            Assert.True(asset.GetProperty("has_video").GetBoolean(), $"{title} must retain a video stream.");
+            Assert.True(asset.GetProperty("has_audio").GetBoolean(), $"{title} must retain an audio stream.");
+            Assert.Equal("h264", asset.GetProperty("video_codec").GetString());
+            Assert.Equal("aac", asset.GetProperty("audio_codec").GetString());
+
+            string mp4Path = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", publicMp4.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            string captionsPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", publicCaptions.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(mp4Path), $"Missing published MP4 for {title}: {publicMp4}");
+            Assert.True(File.Exists(captionsPath), $"Missing captions for {title}: {publicCaptions}");
+            Assert.StartsWith("WEBVTT", File.ReadAllText(captionsPath), StringComparison.Ordinal);
+            Assert.Contains(publicMp4, horizonView, StringComparison.Ordinal);
+            Assert.Contains(publicCaptions, horizonView, StringComparison.Ordinal);
+
+            horizonIds.Add(asset.GetProperty("horizon_id").GetString() ?? string.Empty);
+            assetCount++;
+        }
+
+        Assert.Equal(11, assetCount);
+        foreach (string expectedHorizon in new[]
+        {
+            "nexus-pan",
+            "alice",
+            "karma-forge",
+            "jackpoint",
+            "runsite",
+            "runbook-press",
+            "table-pulse",
+            "black-ledger",
+            "community-hub",
+        })
+        {
+            Assert.Contains(expectedHorizon, horizonIds);
+        }
+    }
+
+    [Fact]
     public void HorizonRegistryMatchesTheShippedPortfolioForImplementedHorizons()
     {
         string registryPath = RepoPaths.FromRoot(".codex-design", "product", "HORIZON_REGISTRY.yaml");
@@ -248,7 +310,6 @@ public sealed class PublicSurfaceReferenceFilesTests
             ("horizon_run_control", "/run-control", "Shipped MVP"),
             ("horizon_local_co_processor", "/local-co-processor", "Shipped MVP"),
             ("horizon_runbook_press", "/runbook", "Shipped MVP"),
-            ("horizon_black_ledger", "/ledger", "Shipped MVP"),
             ("horizon_quicksilver", "/quicksilver", "Shipped MVP"),
         };
 
@@ -266,5 +327,12 @@ public sealed class PublicSurfaceReferenceFilesTests
             Assert.DoesNotContain("badge: Research", block, StringComparison.Ordinal);
             Assert.DoesNotContain("badge: Preview lane", block, StringComparison.Ordinal);
         }
+
+        int blackLedgerStart = registry.IndexOf("- id: horizon_black_ledger", StringComparison.Ordinal);
+        Assert.True(blackLedgerStart >= 0, "Missing public feature card for horizon_black_ledger.");
+        int blackLedgerNext = registry.IndexOf("\n  - id: ", blackLedgerStart + "- id: horizon_black_ledger".Length, StringComparison.Ordinal);
+        string blackLedgerBlock = blackLedgerNext >= 0 ? registry[blackLedgerStart..blackLedgerNext] : registry[blackLedgerStart..];
+        Assert.Contains("href: /ledger", blackLedgerBlock, StringComparison.Ordinal);
+        Assert.Contains("badge: Lab preview", blackLedgerBlock, StringComparison.Ordinal);
     }
 }

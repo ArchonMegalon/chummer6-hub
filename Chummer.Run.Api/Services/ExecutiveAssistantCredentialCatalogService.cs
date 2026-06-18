@@ -31,7 +31,14 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             BuildMagicfitSessionEntry(),
             BuildPromptArchitectsEntry(),
             BuildPayFunnelsEntry(),
-            BuildUnmixrEntry()
+            BuildUnmixrEntry(),
+            BuildInventoryOnlyEntry("joggai", "4", "tracked_in_discovery"),
+            BuildInventoryOnlyEntry("dadan", "candidate", "inventory_only"),
+            BuildSingleKeyEntry("rybbit", "analytics", "RYBBIT_CHUMMER_RUN_SCRIPT_URL", false, "bounded_public_and_desktop_analytics_lane"),
+            BuildSingleKeyEntry("clickrank", "visibility", "CLICKRANK_AI_CHUMMER_RUN_SITE_ID", false, "bounded_public_visibility_lane"),
+            BuildInventoryOnlyEntry("neuronwriter", "candidate", "bounded_source_packet_seo_lane"),
+            BuildInventoryOnlyEntry("rafter", "qa", "auxiliary_release_qa_lane"),
+            BuildInventoryOnlyEntry("pixefy", "qa", "auxiliary_visual_qa_lane")
         };
 
         return new ExecutiveAssistantCredentialCatalogResult(
@@ -180,6 +187,45 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             MirrorsDefault: true,
             Status: hasRuntimeVoice ? "configured" : hasEaLogin || hasProviderLogin ? "login_only" : "missing");
     }
+
+    private ExecutiveAssistantCredentialEntry BuildSingleKeyEntry(
+        string toolId,
+        string tier,
+        string key,
+        bool mirrorsDefault,
+        string configuredStatus)
+    {
+        bool configured = !string.IsNullOrWhiteSpace(GetValue(key));
+        return new ExecutiveAssistantCredentialEntry(
+            ToolId: toolId,
+            Tier: tier,
+            EmailKey: key,
+            PasswordKey: string.Empty,
+            PasswordAltKey: null,
+            EmailMasked: null,
+            EmailConfigured: configured,
+            PasswordConfigured: false,
+            PasswordAltConfigured: false,
+            MirrorsDefault: mirrorsDefault,
+            Status: configured ? configuredStatus : "missing");
+    }
+
+    private static ExecutiveAssistantCredentialEntry BuildInventoryOnlyEntry(
+        string toolId,
+        string tier,
+        string status)
+        => new(
+            ToolId: toolId,
+            Tier: tier,
+            EmailKey: string.Empty,
+            PasswordKey: string.Empty,
+            PasswordAltKey: null,
+            EmailMasked: null,
+            EmailConfigured: false,
+            PasswordConfigured: false,
+            PasswordAltConfigured: false,
+            MirrorsDefault: false,
+            Status: status);
 
     private string BuildStatus(params string[] keys)
     {

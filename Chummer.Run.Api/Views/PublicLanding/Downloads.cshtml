@@ -54,21 +54,16 @@
         : release.Recommended!.DispatchHref;
     var nightlyHref = currentDownloadHref;
     var stableHref = currentDownloadHref;
-    var sameLaneNote = string.Equals(nightlyHref, stableHref, StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <h1 class="page-title">Install Chummer</h1>
-        <p class="page-copy">Windows and Linux always point at the newest published installers.</p>
+        <p class="page-copy">Get the latest Windows or Linux installer.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
             <a class="button-like button-like--secondary" href="@stableHref">Stable</a>
         </div>
-        @if (sameLaneNote)
-        {
-            <p class="muted-copy">If both lanes currently point to the same published build, both buttons start the same installer.</p>
-        }
     </div>
 </section>
 
@@ -125,7 +120,7 @@ else
                 @if (requestedPlatformUnavailable)
                 {
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See other platforms">See other platforms</a>
+                        <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See platforms">See platforms</a>
                     </div>
                     <details class="release-accordion">
                         <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes, known issues, and requirements">Notes</summary>
@@ -165,7 +160,7 @@ else
                 }
                 @if (hasAdvancedPanels)
                 {
-                    <p class="downloads-advanced-link"><a class="inline-link" href="#advanced-downloads">More download options</a></p>
+                    <p class="downloads-advanced-link"><a class="inline-link" href="#advanced-downloads">More details</a></p>
                 }
             </div>
         </article>
@@ -205,11 +200,11 @@ else
     {
         <section class="release-shelf" id="platform-shelf">
             <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_platform_shelf" data-analytics-surface="downloads_platforms" data-analytics-label="Other supported platforms">Other supported platforms</summary>
+            <summary data-analytics-event="downloads_open_platform_shelf" data-analytics-surface="downloads_platforms" data-analytics-label="Platforms">Platforms</summary>
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h2 class="downloads-subheading">Platform downloads</h2>
-                        <p class="muted-copy">Current installers for each supported platform.</p>
+                        <p class="muted-copy">Current installers by platform.</p>
                         <div class="downloads-platform-grid">
                             @foreach (var platform in release.PlatformAvailability)
                             {
@@ -232,14 +227,14 @@ else
     {
         <section class="release-shelf release-shelf--manual" id="advanced-downloads">
             <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_advanced_options" data-analytics-surface="downloads_advanced" data-analytics-label="Advanced download options">Advanced download options</summary>
+            <summary data-analytics-event="downloads_open_advanced_options" data-analytics-surface="downloads_advanced" data-analytics-label="Advanced options">Advanced options</summary>
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Install notes</h3>
                         <div class="downloads-facts">
                             <article class="downloads-fact">
                                 <span>Detected device</span>
-                                <strong>@deviceLabel gets the default path on this page.</strong>
+                                <strong>This page picks the best download for @deviceLabel.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
@@ -247,7 +242,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>
-                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in only if you want recovery and support tied to this install.")</strong>
+                                <strong>@(Model.Chrome.Authenticated ? "This install can be found again from your account." : "Sign in only if you want recovery and support tied to this install.")</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">
@@ -259,18 +254,18 @@ else
 
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Need more detail?</h3>
-                        <p class="muted-copy">Use Status for release dates, verification, and platform coverage.</p>
+                        <p class="muted-copy">Use Status for release dates and platform coverage.</p>
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="/status">Open status</a>
-                            <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+                            <a class="button-like button-like--ghost" href="/now">See what works today</a>
                         </div>
                     </div>
 
                     @if (hasSignedInWindowsBuilds)
                     {
                         <div class="downloads-advanced-group" id="signed-in-windows-builds">
-                            <h3 class="downloads-subheading">Signed-in Windows builds</h3>
-                            <p class="muted-copy">Windows is not available to guests right now, but signed-in users can still open the latest Windows install path here.</p>
+                            <h3 class="downloads-subheading">Windows installers</h3>
+                            <p class="muted-copy">Latest Windows install paths available to this account.</p>
                             <div class="evidence-row-list">
                                 @foreach (var option in signedInWindowsBuilds)
                                 {
@@ -295,8 +290,8 @@ else
                     @if (hasWindowsProofRail)
                     {
                         <div class="downloads-advanced-group" id="windows-verification-rail">
-                            <h3 class="downloads-subheading">Windows verification and support path</h3>
-                            <p class="muted-copy">These direct Windows installers stay available for verification and support when a proof or support flow points to a specific build beyond the main platform list.</p>
+                            <h3 class="downloads-subheading">Windows support installers</h3>
+                            <p class="muted-copy">Windows verification and support path. Use these only when support sends you to a specific Windows build.</p>
                             <div class="evidence-row-list">
                                 @foreach (var proofInstaller in windowsProofInstallers)
                                 {
@@ -306,7 +301,7 @@ else
                                     <article class="evidence-row evidence-row--download">
                                         <div class="evidence-row__copy">
                                             <h3>@headLabel Windows x64 installer</h3>
-                                            <p>Direct Windows installer for verification and support. Use this when a proof or support flow points to this specific build.</p>
+                                            <p>Direct Windows installer for a support case or a specific build check.</p>
                                         </div>
                                         <div class="download-row__meta">
                                             <span class="platform-pill">Support path</span>

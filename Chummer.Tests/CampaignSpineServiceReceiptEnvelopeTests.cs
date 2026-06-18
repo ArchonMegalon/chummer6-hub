@@ -71,10 +71,7 @@ public sealed class CampaignSpineServiceReceiptEnvelopeTests
     [Fact]
     public void Campaign_spine_service_routes_campaign_consequence_receipts_through_shared_helper()
     {
-        string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-        string source = File.ReadAllText(Path.Combine(
-            repoRoot,
-            "Chummer.Run.Api/Services/Community/CampaignSpineService.cs"));
+        string source = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "CampaignSpineService.cs"));
 
         Assert.Contains("private static CampaignConsequenceReceipt CampaignConsequence(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("new CampaignConsequenceReceipt(", source, StringComparison.Ordinal);

@@ -470,7 +470,7 @@ public sealed class BlackLedgerPublicStatsService
                 : Array.Empty<string>(),
             DispatchUrl: latest.Href,
             SourceReceiptUrl: latest.SourceReceiptHref,
-            PrivacyNote: "From a public dispatch.");
+            PrivacyNote: "From a public-safe dispatch.");
     }
 
     private static IReadOnlyList<BlackLedgerDispatch> BuildDispatchRecords(BlackLedgerWorldPreviewViewModel world)

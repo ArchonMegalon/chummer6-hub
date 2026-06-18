@@ -54,6 +54,28 @@
         new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live public release." },
         new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current public-release promises yet." }
     };
+    var horizonVideos = new Dictionary<string, (string Title, string Href, string Captions)[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["horizon_nexus_pan"] =
+        new[]
+        {
+            ("Watch the NEXUS-PAN deep dive", "/media/horizons/nexus-pan-90s-deepdive.mp4", "/media/horizons/nexus-pan-90s-deepdive.vtt"),
+            ("Watch the NEXUS-PAN epic reel", "/media/horizons/nexus-pan-epic-90s.mp4", "/media/horizons/nexus-pan-epic-90s.vtt")
+        },
+        ["horizon_alice"] = new[] { ("Watch the ALICE deep dive", "/media/horizons/alice-90s-deepdive.mp4", "/media/horizons/alice-90s-deepdive.vtt") },
+        ["horizon_karma_forge"] = new[] { ("Watch the KARMA FORGE deep dive", "/media/horizons/karma-forge-90s-deepdive.mp4", "/media/horizons/karma-forge-90s-deepdive.vtt") },
+        ["horizon_jackpoint"] = new[] { ("Watch the JACKPOINT deep dive", "/media/horizons/jackpoint-90s-deepdive.mp4", "/media/horizons/jackpoint-90s-deepdive.vtt") },
+        ["horizon_runsite"] = new[] { ("Watch the RUNSITE deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
+        ["horizon_runbook_press"] = new[] { ("Watch the RUNBOOK PRESS deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
+        ["horizon_table_pulse"] = new[] { ("Watch the TABLE PULSE deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
+        ["horizon_black_ledger"] =
+        new[]
+        {
+            ("Watch the BLACK LEDGER deep dive", "/media/horizons/black-ledger-90s-deepdive.mp4", "/media/horizons/black-ledger-90s-deepdive.vtt"),
+            ("Watch the BLACK LEDGER epic reel", "/media/horizons/black-ledger-epic-90s.mp4", "/media/horizons/black-ledger-epic-90s.vtt")
+        },
+        ["horizon_community_hub"] = new[] { ("Watch the COMMUNITY HUB deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
+    };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -98,7 +120,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Every Wonder Horizon</p>
         <h2 class="editorial-title">A 90-second tour of every horizon boundary.</h2>
-        <p class="editorial-copy">This first-party motion reel introduces preparing-next, designing-in-public, and research-track horizons without converting future direction into current release truth.</p>
+        <p class="editorial-copy">This motion reel introduces preparing-next, designing-in-public, and research-track horizons without presenting future direction as something ready today.</p>
     </div>
     <div class="flagship-promo-player">
         <video
@@ -224,6 +246,16 @@
                                     <p>@card.Card.ProofNote</p>
                                 </div>
                             }
+                            @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
+                            {
+                                @foreach (var video in cardVideos)
+                                {
+                                    <div>
+                                        <span class="horizon-band__label">Explanation video</span>
+                                        <p><a class="inline-link" href="@video.Href">@video.Title</a> <a class="inline-link" href="@video.Captions">Captions</a></p>
+                                    </div>
+                                }
+                            }
                         </div>
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
@@ -274,6 +306,18 @@
                         <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
+                        @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
+                        {
+                            <div class="horizon-band__claims">
+                                @foreach (var video in cardVideos)
+                                {
+                                    <div>
+                                        <span class="horizon-band__label">Explanation video</span>
+                                        <p><a class="inline-link" href="@video.Href">@video.Title</a> <a class="inline-link" href="@video.Captions">Captions</a></p>
+                                    </div>
+                                }
+                            </div>
+                        }
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
                 </article>

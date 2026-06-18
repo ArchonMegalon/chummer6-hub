@@ -1,0 +1,7 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:08.000
+NEXUS-PAN 90-second deep dive
+
+00:00:08.000 --> 00:01:30.000
+NEXUS-PAN keeps device handoffs, reconnects, and shared state honest when table tech drifts.
