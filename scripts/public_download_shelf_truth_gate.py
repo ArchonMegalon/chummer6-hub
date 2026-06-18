@@ -33,12 +33,25 @@ def main() -> int:
     base = args.base_url.rstrip("/")
     downloads = requests.get(f"{base}/downloads", timeout=30)
     status = requests.get(f"{base}/status", timeout=30)
+    live_releases_response = requests.get(f"{base}/downloads/releases.json", timeout=30)
+    try:
+        live_releases = live_releases_response.json()
+    except ValueError:
+        live_releases = {}
     download_doc = DOWNLOAD_DOC.read_text(encoding="utf-8")
     status_doc = STATUS_DOC.read_text(encoding="utf-8") if STATUS_DOC.exists() else ""
     release_channel_payload = json.loads(RELEASE_CHANNEL.read_text(encoding="utf-8")) if RELEASE_CHANNEL.exists() else {}
 
     live_download_text = downloads.text.lower()
     live_status_text = status.text.lower()
+    live_download_copy_text = (
+        live_download_text.replace("max-image-preview", "max-image-robots-directive")
+        .replace("max-video-preview", "max-video-robots-directive")
+    )
+    live_status_copy_text = (
+        live_status_text.replace("max-image-preview", "max-image-robots-directive")
+        .replace("max-video-preview", "max-video-robots-directive")
+    )
     doc_text = download_doc.lower() + "\n" + status_doc.lower()
 
     windows_live = "windows" in live_download_text
@@ -48,22 +61,64 @@ def main() -> int:
     review_required = "review-required" in live_status_text or "review required" in live_status_text
     rollout_state = str(release_channel_payload.get("rolloutState") or release_channel_payload.get("channelId") or "").strip()
     supportability_state = str(release_channel_payload.get("supportabilityState") or "").strip()
-    public_stable = rollout_state == "public_stable"
+    live_channel = str(live_releases.get("channel") or live_releases.get("channelId") or "").strip()
+    live_rollout_state = str(live_releases.get("rolloutState") or "").strip()
+    live_supportability_state = str(live_releases.get("supportabilityState") or "").strip()
+    live_download_channels = sorted(
+        {
+            str(download.get("channel") or download.get("channelId") or "").strip()
+            for download in live_releases.get("downloads") or []
+            if isinstance(download, dict)
+        }
+    )
+    release_rollout_states = {"public_stable", "stable"}
+    public_stable = rollout_state in release_rollout_states
     gold_supported = supportability_state == "gold_supported"
+    live_public_stable = live_channel in release_rollout_states or live_rollout_state in release_rollout_states
+    live_gold_supported = live_supportability_state == "gold_supported"
+    preview_machine_truth = any(
+        value in {"preview", "promoted_preview", "preview_supported"}
+        for value in [
+            str(release_channel_payload.get("channelId") or "").strip(),
+            str(release_channel_payload.get("channel") or "").strip(),
+            rollout_state,
+            supportability_state,
+            live_channel,
+            live_rollout_state,
+            live_supportability_state,
+            *live_download_channels,
+        ]
+    )
+    failures = []
+    if review_required:
+        failures.append("review-required desktop proof language is still live")
+    if not public_stable or not gold_supported:
+        failures.append("local release channel is not public_stable/gold_supported")
+    if not live_public_stable or not live_gold_supported:
+        failures.append("live releases.json is not public_stable/gold_supported")
+    if preview_machine_truth:
+        failures.append("public download machine truth still contains preview posture")
+    if not windows_live or not linux_live:
+        failures.append("live downloads page does not mention both Windows and Linux")
 
     payload = {
         "generated_at_utc": now_iso(),
         "contract_name": "chummer.public_download_shelf_truth",
         "base_url": base,
-        "status": "fail" if review_required else "pass",
+        "status": "fail" if failures else "pass",
         "live": {
             "downloads_status_code": downloads.status_code,
             "status_status_code": status.status_code,
+            "releases_status_code": live_releases_response.status_code,
             "windows_mentioned": windows_live,
             "linux_mentioned": linux_live,
             "mac_mentioned": mac_live,
-            "preview_mentioned": "preview" in live_download_text or "preview" in live_status_text,
+            "preview_mentioned": "preview" in live_download_copy_text or "preview" in live_status_copy_text,
             "review_required_mentioned": review_required,
+            "releases_channel": live_channel,
+            "releases_rollout_state": live_rollout_state,
+            "releases_supportability_state": live_supportability_state,
+            "download_channels": live_download_channels,
         },
         "docs": {
             "download_doc_exists": DOWNLOAD_DOC.exists(),
@@ -79,14 +134,13 @@ def main() -> int:
         },
         "alignment": {
             "public_release_truth_aligned": public_stable and gold_supported,
+            "live_public_release_truth_aligned": live_public_stable and live_gold_supported,
+            "preview_machine_truth_absent": not preview_machine_truth,
             "windows_linux_truth_aligned": windows_live and linux_live,
             "mac_truth_aligned": mac_live or public_stable,
         },
-        "summary": (
-            "fail: review-required desktop proof language is still live"
-            if review_required
-            else "pass: current download shelf truth is aligned"
-        ),
+        "failures": failures,
+        "summary": "pass: current download shelf truth is aligned" if not failures else "fail: " + "; ".join(failures),
     }
     for out_path in OUT_PATHS:
         out_path.parent.mkdir(parents=True, exist_ok=True)

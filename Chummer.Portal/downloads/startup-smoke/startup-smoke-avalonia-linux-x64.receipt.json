@@ -3,7 +3,7 @@
   "headId": "avalonia",
   "version": "run-20260618-142358",
   "releaseVersion": "run-20260618-142358",
-  "channelId": "preview",
+  "channelId": "stable",
   "platform": "linux",
   "arch": "x64",
   "rid": "linux-x64",
@@ -34,5 +34,5 @@
   "artifactRelativePath": "files/chummer-avalonia-linux-x64-installer.deb",
   "artifactSha256": "188d224ca56781e2876fc743b3ca002753453d582f0a8c6d6f49c4bee6600cae",
   "artifactId": "avalonia-linux-x64-installer",
-  "channel": "preview"
+  "channel": "stable"
 }
