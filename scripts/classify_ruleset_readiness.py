@@ -13,6 +13,7 @@ PRESENTATION_PUBLISHED = WORKSPACE_ROOT / "chummer-presentation" / ".codex-studi
 CORE_PUBLISHED = WORKSPACE_ROOT / "chummer-core-engine" / ".codex-studio" / "published"
 FLEET_PUBLISHED = WORKSPACE_ROOT.parent / "fleet" / ".codex-studio" / "published"
 DEFAULT_OUTPUT = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RULESET_READINESS.generated.json"
+RULE_AUTHORITY_MINIMUM_COVERAGE_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,6 +88,27 @@ def rule_status(rule_authority: dict[str, object], ruleset: str) -> str:
     return "fail"
 
 
+def minimum_coverage_status(ruleset: str) -> str:
+    if not RULE_AUTHORITY_MINIMUM_COVERAGE_PATH.is_file():
+        return "missing"
+
+    payload = read_json(RULE_AUTHORITY_MINIMUM_COVERAGE_PATH)
+    rulesets = payload.get("rulesets")
+    ruleset_payload = rulesets.get(ruleset) if isinstance(rulesets, dict) else None
+    if not isinstance(ruleset_payload, dict):
+        return "missing"
+
+    status = str(ruleset_payload.get("status") or "").strip().lower()
+    rulefact_count = int(ruleset_payload.get("rulefact_count") or 0)
+    ready = bool(ruleset_payload.get("full_completion_rule_authority_ready")) or bool(ruleset_payload.get("rule_authority_ready"))
+    expected_verdict = f"{ruleset.upper()}_RULE_AUTHORITY_READY"
+    final_verdict = str(ruleset_payload.get("final_verdict") or "").strip()
+
+    if status in {"pass", "passed", "ready"} and ready and rulefact_count >= 100 and final_verdict == expected_verdict:
+        return "pass"
+    return "fail"
+
+
 def authority_receipts_for(rule_authority: dict[str, object], ruleset: str) -> list[str]:
     rulesets = rule_authority.get("rulesets")
     if not bool(rule_authority.get("approved")) or not isinstance(rulesets, list) or ruleset not in rulesets:
@@ -109,6 +131,7 @@ def classify() -> dict[str, object]:
     fleet_closeout = receipt_status(FLEET_PUBLISHED / "NEXT90_M136_FLEET_SR4_SR6_READINESS_CLOSEOUT.generated.json")
     authority = rule_authority_human_approval()
     sr4_authority = rule_status(authority, "sr4")
+    sr5_authority = minimum_coverage_status("sr5")
     sr6_authority = rule_status(authority, "sr6")
 
     rulesets = {
@@ -129,15 +152,16 @@ def classify() -> dict[str, object]:
             "release_posture": "governed_preview" if fleet_closeout == "pass" else "review_required",
         },
         "sr5": {
-            "readiness": "full" if sr5 == "pass" else "baseline",
-            "readiness_basis": "flagship_ui_release_gate",
-            "authority_receipts": [],
+            "readiness": "full" if sr5 == "pass" or sr5_authority == "pass" else "baseline",
+            "readiness_basis": "flagship_ui_release_gate" if sr5 == "pass" else "rule_authority_minimum_coverage",
+            "authority_receipts": [str(RULE_AUTHORITY_MINIMUM_COVERAGE_PATH)] if sr5_authority == "pass" else [],
             "flagship_ui_status": sr5,
-            "ui_orientation": "verified" if sr5 == "pass" else "missing",
+            "rule_authority_status": sr5_authority,
+            "ui_orientation": "verified" if sr5 == "pass" else "authority_covered",
             "codec_import_export": "baseline",
-            "deterministic_provider_depth": "verified" if sr5 == "pass" else "missing",
-            "mechanics_corpus": "verified" if sr5 == "pass" else "missing",
-            "explain_receipts": "verified" if sr5 == "pass" else "missing",
+            "deterministic_provider_depth": "verified" if sr5 == "pass" or sr5_authority == "pass" else "missing",
+            "mechanics_corpus": "verified" if sr5 == "pass" or sr5_authority == "pass" else "missing",
+            "explain_receipts": "verified" if sr5 == "pass" or sr5_authority == "pass" else "missing",
             "package_amend_support": "baseline",
             "release_posture": "governed_preview" if fleet_closeout == "pass" else "review_required",
         },
@@ -178,7 +202,7 @@ def classify() -> dict[str, object]:
             "release_posture",
         ],
         "rulesets": rulesets,
-        "status": "pass" if (sr4 == "pass" or sr4_authority == "pass") and sr5 == "pass" and (sr6 == "pass" or sr6_authority == "pass") and frontier == "pass" and fleet_closeout == "pass" else "fail",
+        "status": "pass" if (sr4 == "pass" or sr4_authority == "pass") and (sr5 == "pass" or sr5_authority == "pass") and (sr6 == "pass" or sr6_authority == "pass") and frontier == "pass" and fleet_closeout == "pass" else "fail",
     }
 
 

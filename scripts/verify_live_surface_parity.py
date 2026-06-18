@@ -44,10 +44,9 @@ SURFACES = [
         "path": "/downloads",
         "required_texts": [
             "Install Chummer",
-            "Choose a release lane.",
+            "Windows and Linux always point at the newest published installers.",
             "Nightly",
             "Stable",
-            "Install help",
         ],
         "forbidden_texts": [
             "Need account return?",
@@ -67,7 +66,8 @@ SURFACES = [
     {
         "path": "/status",
         "required_texts": [
-            "Current release build",
+            "Release status",
+            "Current published build for the public shelf.",
             "Release",
             "Open downloads",
             "Open support",

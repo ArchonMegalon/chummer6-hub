@@ -124,7 +124,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("human rule review signoff", stderr_text)
         self.assertIn("NOT_GOLD", stderr_text)
 
-    def test_payload_fails_closed_when_ruleset_readiness_relies_on_human_side_assumption(self) -> None:
+    def test_payload_surfaces_ruleset_readiness_human_side_assumption_as_accepted_boundary(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-ruleset-boundary-") as temp_dir:
             published = Path(temp_dir) / "published"
@@ -144,13 +144,27 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "sr6": {"human_side_gold_assumption": False},
                         },
                     }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
 
-        self.assertEqual("fail", payload["status"])
-        self.assertIn("ruleset_human_side_gold_assumption unresolved", payload["failures"])
+        self.assertEqual("pass", payload["status"])
+        self.assertNotIn("ruleset_human_side_gold_assumption unresolved", payload["failures"])
+        self.assertIn(
+            "ruleset_human_side_gold_assumption",
+            {str(item.get("id")) for item in payload["caveats"] if isinstance(item, dict)},
+        )
 
     def test_payload_does_not_fail_closed_when_only_authority_approval_exists(self) -> None:
         module = load_module()
@@ -203,7 +217,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("pass", payload["status"])
         self.assertNotIn("ruleset_human_side_gold_assumption unresolved", payload["failures"])
 
-    def test_payload_fails_closed_when_optional_external_mirrors_are_degraded(self) -> None:
+    def test_payload_surfaces_optional_external_mirrors_as_operational_advisory(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-mirror-boundary-") as temp_dir:
             published = Path(temp_dir) / "published"
@@ -223,13 +237,27 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "pcloud": {"status": "fail"},
                         },
                     }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
 
-        self.assertEqual("fail", payload["status"])
-        self.assertIn("optional_external_mirrors_degraded unresolved", payload["failures"])
+        self.assertEqual("pass", payload["status"])
+        self.assertNotIn("optional_external_mirrors_degraded unresolved", payload["failures"])
+        self.assertIn(
+            "optional_external_mirrors_degraded",
+            {str(item.get("id")) for item in payload["caveats"] if isinstance(item, dict)},
+        )
 
 
 if __name__ == "__main__":

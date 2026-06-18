@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-17T17:01:18Z",
+  "generated_at_utc": "2026-06-18T09:29:41Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "external_required": false,
   "distribution_resilience_status": "optional_external_mirrors_degraded",
@@ -22,39 +22,31 @@
           "id": "avalonia-linux-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-linux-x64-installer.deb",
-          "size": 35414826,
-          "sha256": "2b178e15826f1bcb54f506bc039f51287e9579b9e5e85dc9d40b7d66a4a810ed",
+          "size": 36865216,
+          "sha256": "3efe66c1a09c97d167956fde32b6e8f6893469fa6289fb8c48c281a4b29fcf50",
           "status": "pass"
         },
         {
           "id": "avalonia-win-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64-installer.exe",
-          "size": 97484167,
-          "sha256": "22b53cef366afbc1d10c203c6184864ced1c3ab4e0eb6f9a27e63e5108b5bf56",
-          "status": "pass"
-        },
-        {
-          "id": "avalonia-win-x64-archive",
-          "exists": true,
-          "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64.zip",
-          "size": 45636400,
-          "sha256": "1be992a75f5632308e89b456e82af8a9508a508d99eefeff78b708924373f3c4",
+          "size": 98935000,
+          "sha256": "fae1dd6becf381804e4d87b5a8078da33aeb546a87e6d49db636c8df40f1050f",
           "status": "pass"
         }
       ]
     },
     "public_edge": {
       "status": "pass",
-      "base_url": "https://chummer.run",
+      "base_url": "http://127.0.0.1:8091",
       "artifacts": [
         {
           "id": "avalonia-linux-x64-installer",
-          "url": "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+          "url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
           "access_class": "open_public",
           "status_code": 206,
-          "final_url": "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-          "content_range": "bytes 0-0/35414826",
+          "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+          "content_range": "bytes 0-0/36865216",
           "content_length": 1,
           "streamed_size": null,
           "streamed_sha256": "",
@@ -63,24 +55,11 @@
         },
         {
           "id": "avalonia-win-x64-installer",
-          "url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+          "url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-win-x64-installer.exe",
           "access_class": "open_public",
           "status_code": 206,
-          "final_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "content_range": "bytes 0-0/97484167",
-          "content_length": 1,
-          "streamed_size": null,
-          "streamed_sha256": "",
-          "posture": "direct_download_bytes",
-          "status": "pass"
-        },
-        {
-          "id": "avalonia-win-x64-archive",
-          "url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64.zip",
-          "access_class": "open_public",
-          "status_code": 206,
-          "final_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64.zip",
-          "content_range": "bytes 0-0/45636400",
+          "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-win-x64-installer.exe",
+          "content_range": "bytes 0-0/98935000",
           "content_length": 1,
           "streamed_size": null,
           "streamed_sha256": "",
@@ -126,20 +105,6 @@
               "status": "fail"
             }
           ]
-        },
-        {
-          "id": "avalonia-win-x64-archive",
-          "file_name": "chummer-avalonia-win-x64.zip",
-          "status": "fail",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/pcloud/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64.zip",
-              "size": 49292098,
-              "sha256": "ac19fcf4c6233f12abd2c77c9c2dff89541a097704eb8af8307fc3237ba2972e",
-              "status": "fail"
-            }
-          ]
         }
       ]
     },
@@ -176,20 +141,6 @@
               "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64-installer.exe",
               "size": 101138617,
               "sha256": "c9aa9e23cac7423e5954d8f24067f9f7fdb37db2b09c7c084055ebef03c71464",
-              "status": "fail"
-            }
-          ]
-        },
-        {
-          "id": "avalonia-win-x64-archive",
-          "file_name": "chummer-avalonia-win-x64.zip",
-          "status": "fail",
-          "candidates": [
-            {
-              "exists": true,
-              "path": "/mnt/onedrive/Documents/codex-audit/chummer/files/chummer-avalonia-win-x64.zip",
-              "size": 49292098,
-              "sha256": "ac19fcf4c6233f12abd2c77c9c2dff89541a097704eb8af8307fc3237ba2972e",
               "status": "fail"
             }
           ]

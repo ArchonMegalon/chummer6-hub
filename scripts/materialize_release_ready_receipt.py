@@ -21,6 +21,7 @@ def now_iso() -> str:
 def main() -> int:
     env = os.environ.copy()
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
+    env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
     completed = subprocess.run(
         ["bash", str(VERIFY_SCRIPT)],
         cwd=ROOT,

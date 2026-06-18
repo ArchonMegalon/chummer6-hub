@@ -1,10 +1,10 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-17T17:02:13Z
-- Version: `run-20260617-190001`
-- Channel: `preview`
-- Published: `2026-06-17T16:03:00Z`
-- Supportability: `preview_supported`
+- Generated: 2026-06-18T09:31:16Z
+- Version: `run-20260618-085258`
+- Channel: `stable`
+- Published: `2026-06-18T08:56:41Z`
+- Supportability: `gold_supported`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 
 ## Rulesets

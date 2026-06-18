@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-17T16:52:31Z",
+  "generated_at_utc": "2026-06-18T09:29:17Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -42,10 +42,9 @@
       "status_code": 200,
       "required_texts": [
         "Install Chummer",
-        "Choose a release lane.",
+        "Windows and Linux always point at the newest published installers.",
         "Nightly",
-        "Stable",
-        "Install help"
+        "Stable"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [
@@ -73,7 +72,8 @@
       "final_url": "https://chummer.run/status",
       "status_code": 200,
       "required_texts": [
-        "Current release build",
+        "Release status",
+        "Current published build for the public shelf.",
         "Release",
         "Open downloads",
         "Open support"
