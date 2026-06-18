@@ -957,11 +957,16 @@ public sealed class ReleaseSelectionService
             var promotedDownload = publishedDownloads.FirstOrDefault();
             var publiclyAvailable = promotedDownload is not null;
             var label = RequestedPlatformLabel(platformId) ?? platformId;
+            var normalizedPlatformId = NormalizePlatformId(platformId);
 
             return new ReleasePlatformAvailabilityViewModel(
                 PlatformId: platformId,
                 PlatformLabel: label,
-                StatusLabel: publiclyAvailable ? (currentDevice ? "Available on this device" : "Available now") : "Not on downloads page",
+                StatusLabel: publiclyAvailable
+                    ? (currentDevice ? "Available on this device" : "Available now")
+                    : normalizedPlatformId == "macos"
+                        ? "Guided support only"
+                        : "Not on downloads page",
                 Summary: publiclyAvailable
                     ? BuildAvailablePlatformSummary(promotedDownload!, platform)
                     : BuildUnavailablePlatformSummary(label, platform),
@@ -997,7 +1002,7 @@ public sealed class ReleaseSelectionService
 
         return NormalizePlatformId(platform.Id) switch
         {
-            "macos" => "The Mac setup lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for guided Mac setup.",
+            "macos" => "macOS is not public today. A signed and notarized DMG is available through guided support only.",
             "windows" => "The Windows lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Windows setup.",
             "linux" => "The Linux package lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Linux setup.",
             _ => $"The current downloads page does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."

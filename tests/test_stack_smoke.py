@@ -370,6 +370,19 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('bash "$SCRIPT_DIR/generate-releases-manifest.sh"', script_text)
         self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"', script_text)
 
+    def test_latest_nightly_publisher_requires_release_handoff_and_proves_deployed_version_match(self):
+        script_path = REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-latest-nightly-to-downloads.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('latest_stage/RELEASE_CHANNEL.generated.json', script_text)
+        self.assertIn('latest_stage/RELEASE_BUILD_HANDOFF.generated.json', script_text)
+        self.assertIn('Nightly stage is missing RELEASE_BUILD_HANDOFF.generated.json', script_text)
+        self.assertIn('expected_version="$(', script_text)
+        self.assertIn('Nightly stage manifest is missing a non-empty version.', script_text)
+        self.assertIn('python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" "$expected_version"', script_text)
+        self.assertIn("Published downloads shelf version mismatch", script_text)
+        self.assertIn("Verified published downloads shelf version:", script_text)
+
     def test_mac_bootstrap_remote_ui_publish_path_uses_hardened_bundle_publisher(self):
         bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
         bootstrap_text = bootstrap_path.read_text(encoding="utf-8")

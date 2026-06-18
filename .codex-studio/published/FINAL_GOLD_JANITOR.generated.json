@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-15T20:07:43Z",
+  "generated_at_utc": "2026-06-18T04:03:11Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,7 +14,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:09:35Z",
+      "generated_at_utc": "2026-06-17T16:52:10Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -22,13 +22,13 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-12T10:57:39Z",
+      "generated_at_utc": "2026-06-17T17:02:00Z",
       "fresh_within_hours": null,
       "pass": true,
       "rulesets": {
         "sr4": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
-          "rulefact_count": 285,
+          "rulefact_count": 449,
           "final_verdict": "SR4_RULE_AUTHORITY_READY",
           "expected_ready_verdict": "SR4_RULE_AUTHORITY_READY",
           "full_completion_rule_authority_ready": true,
@@ -66,7 +66,7 @@
         },
         "sr6": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
-          "rulefact_count": 301,
+          "rulefact_count": 447,
           "final_verdict": "SR6_RULE_AUTHORITY_READY",
           "expected_ready_verdict": "SR6_RULE_AUTHORITY_READY",
           "full_completion_rule_authority_ready": true,
@@ -90,7 +90,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T12:13:49.132374Z",
+      "generated_at_utc": "2026-06-17T17:02:13.313534Z",
       "fresh_within_hours": null,
       "pass": true,
       "workflow_assumed_rulesets": [],
@@ -158,7 +158,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T09:47:19Z",
+      "generated_at_utc": "2026-06-17T16:52:31Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -166,7 +166,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESKTOP_NATIVE_MODEL_DEPTH.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T14:41:17Z",
+      "generated_at_utc": "2026-06-17T16:52:31Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -174,7 +174,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T20:07:16Z",
+      "generated_at_utc": "2026-06-17T16:52:47Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -182,7 +182,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T09:47:20Z",
+      "generated_at_utc": "2026-06-17T16:52:47Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -190,7 +190,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:09:51.740584Z",
+      "generated_at_utc": "2026-06-17T16:52:30.316994Z",
       "fresh_within_hours": 24,
       "pass": true,
       "summary": {
@@ -214,7 +214,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T20:06:33Z",
+      "generated_at_utc": "2026-06-17T16:52:31Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -222,7 +222,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T08:54:57Z",
+      "generated_at_utc": "2026-06-17T16:56:01Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -230,24 +230,27 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T12:13:52Z",
+      "generated_at_utc": "2026-06-17T17:01:18Z",
       "fresh_within_hours": null,
       "pass": true,
       "external_required": false,
-      "distribution_resilience_status": "full_external_mirror_ready",
-      "advisory_external_failures": [],
+      "distribution_resilience_status": "optional_external_mirrors_degraded",
+      "advisory_external_failures": [
+        "onedrive",
+        "pcloud"
+      ],
       "providers": {
         "local_registry": "pass",
         "public_edge": "pass",
-        "pcloud": "pass",
-        "onedrive": "pass"
+        "pcloud": "fail",
+        "onedrive": "fail"
       }
     },
     "public_copy_leak_gate": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:11:03Z",
+      "generated_at_utc": "2026-06-17T16:53:58Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -255,7 +258,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T20:07:43Z",
+      "generated_at_utc": "2026-06-17T16:57:15Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -263,7 +266,7 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-14T20:10:02Z",
+      "generated_at_utc": "2026-06-17T16:57:14Z",
       "fresh_within_hours": null,
       "pass": true
     },
@@ -271,17 +274,17 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-15T13:13:11Z",
+      "generated_at_utc": "2026-06-17T17:02:13Z",
       "fresh_within_hours": null,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
-        "version": "run-20260612-121055",
-        "published_at": "2026-06-13T18:49:54Z",
-        "channel": "public_stable",
-        "rollout_state": "public_stable",
-        "supportability_state": "gold_supported",
+        "version": "run-20260617-190001",
+        "published_at": "2026-06-17T16:03:00Z",
+        "channel": "preview",
+        "rollout_state": "promoted_preview",
+        "supportability_state": "preview_supported",
         "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
       }
     },
@@ -388,6 +391,16 @@
       "stderr": ""
     }
   ],
-  "caveats": [],
+  "caveats": [
+    {
+      "id": "optional_external_mirrors_degraded",
+      "severity": "operational_advisory",
+      "summary": "Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.",
+      "providers": [
+        "onedrive",
+        "pcloud"
+      ]
+    }
+  ],
   "failures": []
 }

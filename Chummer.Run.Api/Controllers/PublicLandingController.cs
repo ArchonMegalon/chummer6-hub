@@ -296,9 +296,11 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads")]
+    [HttpHead("/downloads")]
     [Produces("text/html")]
     public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
+        ApplyNoStoreHeaders(Response.Headers);
         var surface = _landing.LoadSurface();
         var rawManifest = _releases.LoadManifest();
         var manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
@@ -4091,6 +4093,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/status")]
+    [HttpHead("/status")]
     [Produces("text/html")]
     public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
     {
@@ -9033,8 +9036,12 @@ Boundary:
                         && generatedAtElement.ValueKind == JsonValueKind.String
                         && DateTimeOffset.TryParse(generatedAtElement.GetString(), out DateTimeOffset parsedGeneratedAt))
                     {
-                        effective = parsedGeneratedAt;
-                        return effective.ToUniversalTime().ToString("yyyy-MM-dd");
+                        if (parsedGeneratedAt > effective)
+                        {
+                            effective = parsedGeneratedAt;
+                        }
+
+                        break;
                     }
                 }
             }

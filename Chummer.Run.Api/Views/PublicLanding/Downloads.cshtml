@@ -18,8 +18,6 @@
     var showPlatformShelf = release.PlatformAvailability.Count > 0;
     var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
     var accessPosture = Model.AccessPosture;
-    var returningUserLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
-    var returningUserHref = Model.Chrome.Authenticated ? "/account/access" : "/auth/google/start?next=%2Fdownloads";
     var verifiedLabel = Model.VerifiedAtLabel
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
             .ToUniversalTime()
@@ -51,24 +49,26 @@
         => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
 
     var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
-    var nightlyHref = requestedPlatformUnavailable
+    var currentDownloadHref = requestedPlatformUnavailable
         ? "#platform-shelf"
         : release.Recommended!.DispatchHref;
-    var stableHref = "/status";
+    var nightlyHref = currentDownloadHref;
+    var stableHref = currentDownloadHref;
+    var sameLaneNote = string.Equals(nightlyHref, stableHref, StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <h1 class="page-title">Install Chummer</h1>
-        <p class="page-copy">
-            @(requestedPlatformUnavailable
-                ? $"{deviceLabel} is not publicly available from this browser right now."
-                : $"This browser looks like {deviceLabel}. Choose a release lane.")
-        </p>
+        <p class="page-copy">Windows and Linux always point at the newest published installers.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@nightlyHref">Nightly</a>
             <a class="button-like button-like--secondary" href="@stableHref">Stable</a>
         </div>
+        @if (sameLaneNote)
+        {
+            <p class="muted-copy">If both lanes currently point to the same published build, both buttons start the same installer.</p>
+        }
     </div>
 </section>
 
@@ -116,6 +116,12 @@ else
                     <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
                     <span>Last verified @verifiedLabel</span>
                 </div>
+                @if (!requestedPlatformUnavailable)
+                {
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
+                    </div>
+                }
                 @if (requestedPlatformUnavailable)
                 {
                     <div class="stacked-actions">
@@ -135,20 +141,6 @@ else
                 @if (!requestedPlatformUnavailable)
                 {
                     <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help">Help</summary>
-                        <div class="release-accordion__body">
-                            <div class="route-callout" role="status" aria-live="polite">
-                                <h3>Install help</h3>
-                                <p>Open setup help only when blocked.</p>
-                                <div class="route-callout__actions">
-                                    <a class="inline-link" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
-                                    <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
-                                </div>
-                            </div>
-                            <p class="downloads-inline-note">Account return <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
-                        </div>
-                    </details>
-                    <details class="release-accordion">
                         <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Notes">Notes</summary>
                         <div class="release-accordion__body">
                             <div class="stacked-actions">
@@ -164,15 +156,10 @@ else
                     <details class="release-accordion">
                         <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help">Help</summary>
                         <div class="release-accordion__body">
-                            <div class="route-callout" role="status" aria-live="polite">
-                                <h3>Install help</h3>
-                                <p>Open setup help only when blocked.</p>
-                                <div class="route-callout__actions">
-                                    <a class="inline-link" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
-                                    <a class="inline-link" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
-                                </div>
+                            <div class="stacked-actions">
+                                <a class="button-like button-like--ghost" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
+                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
                             </div>
-                            <p class="downloads-inline-note">Account return <a class="inline-link" href="@returningUserHref" data-analytics-event="downloads_open_account_return" data-analytics-surface="downloads_help_notes" data-analytics-label="@returningUserLabel">@returningUserLabel</a>.</p>
                         </div>
                     </details>
                 }
@@ -221,8 +208,8 @@ else
             <summary data-analytics-event="downloads_open_platform_shelf" data-analytics-surface="downloads_platforms" data-analytics-label="Other supported platforms">Other supported platforms</summary>
                 <div class="release-accordion__body">
                     <div class="downloads-advanced-group">
-                        <h2 class="downloads-subheading">Main platform downloads</h2>
-                        <p class="muted-copy">Current installers for each supported platform stay here, but the first decision stays focused on one install path.</p>
+                        <h2 class="downloads-subheading">Platform downloads</h2>
+                        <p class="muted-copy">Current installers for each supported platform.</p>
                         <div class="downloads-platform-grid">
                             @foreach (var platform in release.PlatformAvailability)
                             {
@@ -256,11 +243,11 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
-                                <strong>Open Home or Horizons if you want a quick tour before you build from scratch.</strong>
+                                <strong>The current build should open cleanly and let you start working without extra setup detours.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>
-                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery and support tied to this install.")</strong>
+                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in only if you want recovery and support tied to this install.")</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">
@@ -272,7 +259,7 @@ else
 
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Need more detail?</h3>
-                        <p class="muted-copy">Use Status when you want the deeper release trail.</p>
+                        <p class="muted-copy">Use Status for release dates, verification, and platform coverage.</p>
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="/status">Open status</a>
                             <a class="button-like button-like--ghost" href="/now">Open what works today</a>

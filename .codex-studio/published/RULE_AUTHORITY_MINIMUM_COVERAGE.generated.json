@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-12T10:57:39Z",
+  "generated_at_utc": "2026-06-17T17:02:00Z",
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
   "operator_gold_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json",
@@ -8,7 +8,7 @@
   "rulesets": {
     "sr4": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
-      "rulefact_count": 285,
+      "rulefact_count": 449,
       "final_verdict": "SR4_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR4_RULE_AUTHORITY_READY",
       "full_completion_rule_authority_ready": true,
@@ -46,7 +46,7 @@
     },
     "sr6": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
-      "rulefact_count": 301,
+      "rulefact_count": 447,
       "final_verdict": "SR6_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR6_RULE_AUTHORITY_READY",
       "full_completion_rule_authority_ready": true,

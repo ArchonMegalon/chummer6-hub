@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.black_ledger_live_media_proof",
-  "generated_at_utc": "2026-06-14T20:09:59Z",
+  "generated_at_utc": "2026-06-15T20:07:16Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
@@ -27,6 +27,21 @@
       "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-map.png"
     },
     {
+      "route": "/ledger/newsroom",
+      "viewport": "desktop",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-newsroom.png"
+    },
+    {
+      "route": "/ledger/factions/ashline-circle/promo",
+      "viewport": "desktop",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-faction-promo.png"
+    },
+    {
+      "route": "/ledger/map?replay=turn-1",
+      "viewport": "desktop",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-replay-turn-1.png"
+    },
+    {
       "route": "/",
       "viewport": "mobile",
       "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/home.png"
@@ -35,13 +50,31 @@
       "route": "/ledger/map",
       "viewport": "mobile",
       "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/ledger-map.png"
+    },
+    {
+      "route": "/ledger/newsroom",
+      "viewport": "mobile",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/ledger-newsroom.png"
+    },
+    {
+      "route": "/ledger/factions/ashline-circle/promo",
+      "viewport": "mobile",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/ledger-faction-promo.png"
+    },
+    {
+      "route": "/ledger/map?replay=turn-1",
+      "viewport": "mobile",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/ledger-replay-turn-1.png"
     }
   ],
   "media_quality": {
     "screenshot_min_bytes": 100000,
     "routes_checked": [
       "/",
-      "/ledger/map"
+      "/ledger/factions/ashline-circle/promo",
+      "/ledger/map",
+      "/ledger/map?replay=turn-1",
+      "/ledger/newsroom"
     ],
     "viewports_checked": [
       "desktop",
@@ -51,7 +84,10 @@
     "faction_markers_visible": true,
     "pressure_signals_visible": true,
     "newsreel_or_video_surface_visible": true,
-    "geoscape_controls_visible": true
+    "geoscape_controls_visible": true,
+    "newsroom_route_verified": true,
+    "faction_promo_verified": true,
+    "replay_route_verified": true
   },
   "human_creative_review": {
     "path": "/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md",

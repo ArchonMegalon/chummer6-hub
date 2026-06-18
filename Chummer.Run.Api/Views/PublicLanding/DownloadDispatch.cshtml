@@ -13,8 +13,8 @@
         new
         {
             Badge = "Current handoff",
-            Title = "Stay on this install handoff while this device finishes its claim-aware setup",
-            Summary = "This page exists for one signed-in device continuation. Keep using it when the job is finishing the guided setup assistant, the installer download, or the linked claim handoff for this copy.",
+            Title = "Stay on this install handoff while this device finishes setup",
+            Summary = "This page exists for one signed-in device continuation. Keep using it while the installer download, guided setup, or linked install handoff finishes for this copy.",
             Href = "#signed-in-download",
             Label = "Stay on this handoff",
             Proof = new[] { Model.PlatformLabel, Model.Display.BuildLabel, "One device continuation" }
@@ -22,8 +22,8 @@
         new
         {
             Badge = "Downloads",
-            Title = "Return to downloads when the job is choosing a platform or installer shape",
-            Summary = "The main downloads page still owns platform comparison, known issues, and the calmer entry point for a fresh device. This page should not become a general installer catalog.",
+            Title = "Return to downloads when you need platform choice or a different installer",
+            Summary = "The main downloads page owns platform comparison, known issues, and the clean entry point for a fresh device. This page is not a general installer catalog.",
             Href = "/downloads",
             Label = "Back to downloads",
             Proof = new[] { "Platform list", "Known issues nearby", "General install path" }
@@ -40,8 +40,8 @@
         new
         {
             Badge = "Reality check",
-            Title = "Open what works today when the question is current release status, not this device handoff",
-            Summary = "The install handoff is for one device. Use what works today when you need the broader release posture, user-visible cautions, or current confidence before continuing.",
+            Title = "Open what works today when the question is release status, not this device handoff",
+            Summary = "The install handoff is for one device. Use what works today when you need broader release posture or current cautions before continuing.",
             Href = "/now",
             Label = "Open what works today",
             Proof = new[] { "Current availability", "User-visible caution", "No mixed jobs" }
@@ -49,8 +49,8 @@
         new
         {
             Badge = "Recovery",
-            Title = "Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound",
-            Summary = "If setup breaks, logs are needed, or private follow-up starts, move to the support/help page immediately instead of treating this page like a troubleshooting maze.",
+            Title = "Leave the handoff for support as soon as setup becomes a recovery problem",
+            Summary = "If setup breaks, logs are needed, or private follow-up starts, move to support immediately instead of treating this page like a troubleshooting maze.",
             Href = Model.SupportHref,
             Label = Model.SupportLabel,
             Proof = new[] { "Tracked follow-up", "Install context preserved", "Private help" }
@@ -110,8 +110,8 @@
 <section class="editorial-block" id="dispatch-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Keep install handoff, platform choice, release status, and recovery on separate pages.</h2>
-        <p class="editorial-copy">This page should finish one signed-in device handoff. It should not replace the general downloads page, the account-owned device page, or first-party support.</p>
+        <h2 class="editorial-title">Finish this install.</h2>
+        <p class="editorial-copy">Use this page only for the linked install on this device.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -144,7 +144,7 @@
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
                 </div>
-                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the linked-install default when this page is active.</p>
+                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the default linked-install path.</p>
                 <details class="release-disclosure">
                     <summary>Guided setup assistant</summary>
                     <div class="release-disclosure__body">
@@ -254,7 +254,7 @@
     </div>
 </section>
 
-<iframe id="signedInDownloadFrame" title="Signed-in download" hidden></iframe>
+<iframe id="signedInDownloadFrame" title="Download handoff" hidden></iframe>
 
 @section Scripts {
 <script>

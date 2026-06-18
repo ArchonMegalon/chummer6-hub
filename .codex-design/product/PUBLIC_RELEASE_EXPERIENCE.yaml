@@ -26,7 +26,7 @@ release_label_resolver_rules:
   - Known-issue and fix words must resolve from KNOWN_ISSUE_AND_FIX_STATUS_LANGUAGE.md before public help, status, or support copy is emitted.
 desktop_flagship_head: Chummer.Avalonia
 desktop_fallback_head: Chummer.Blazor.Desktop
-desktop_cut_summary: The current desktop wave treats Avalonia as the primary public desktop head, keeps Blazor Desktop as the bounded compatibility fallback only while Avalonia remains the promoted primary route, and resolves successful mainline Windows/Linux builds into the latest rolling preview shelf automatically.
+desktop_cut_summary: The current desktop wave treats Avalonia as the primary public desktop head, keeps Blazor Desktop as the bounded compatibility fallback only while Avalonia remains the promoted primary route, and resolves successful mainline Windows/Linux builds into the latest rolling public shelf automatically.
 supported_locale_targets:
   - en-US
   - de-DE
@@ -79,8 +79,8 @@ guest_gate_heading: Public access
 guest_gate_summary: Open downloads first. Create a Chummer account only when the current release requires a linked handoff, recovery path, or support history from the first launch.
 guest_gate_primary_label: Open downloads
 guest_gate_secondary_label: Already have an account? Sign in
-signed_in_dispatch_heading: Keep this install linked from the first launch
-signed_in_dispatch_summary: Start the same published download from the signed-in handoff page and follow the platform-specific guided install path that keeps the install linked to your account from the first successful launch.
+signed_in_dispatch_heading: Signed-in install
+signed_in_dispatch_summary: Start the published installer from the signed-in handoff page. The install links back automatically after first launch.
 signed_in_dispatch_steps:
   - Start from the signed-in handoff page for the platform you are installing.
   - Follow the platform-specific guided install path; when macOS needs the setup lane, that path begins with a short-lived Terminal install command.
@@ -104,10 +104,9 @@ windows_requirements:
   - 64-bit Windows 10 or newer.
   - Enough free disk space for the installed release plus future updates.
   - A normal user install path; no custom runtime selection needed for the recommended build.
-  - Portable `.exe` handoff is a bounded fallback, not the primary public CTA.
 linux_requirements:
   - 64-bit Linux with the currently published package support.
-  - Use the current public package when available; use manual packages only for advanced or support-directed setup.
+  - Use the current public package when available.
   - Linux remains inside the current rolling public release scope and should always point at the newest successful public package lane.
 macos_requirements:
   - The public downloads page may expose a macOS guided setup lane when needed, but the promoted shelf route is the signed, notarized DMG installer.

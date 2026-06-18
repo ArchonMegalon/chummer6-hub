@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-14T20:09:35Z",
+  "generated_at_utc": "2026-06-17T16:52:10Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -20,8 +20,8 @@
       "path": "/",
       "url": "https://chummer.run/",
       "status_code": 200,
-      "sha256": "7305358633f66c7abf54c2723bda81000c167dfcfb8edf4f374cb4e9484d3bc0",
-      "excerpt": "Chummer \u2014 Shadowrun Campaign OS \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Windows, Linux, macOS\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run\",\"description\":\"Download Chummer, open or import a character, and keep sessions moving with explainable rules math, durable local state, and clear recovery paths.\"} (function () { var doNotTrack = window.doNotTrack === \"1\"",
+      "sha256": "a45e95f4830e2de6a49c8687d2b016f6af6850bc32da550a53ca2fc80463832f",
+      "excerpt": "Chummer \u2014 Shadowrun character and campaign companion \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Windows, Linux, macOS\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run\",\"description\":\"Download Chummer, open or import a character, and keep sessions moving with explainable rules math, durable local state, and clear recovery paths.\"} (function () { var doNotTrack = window.doNotTrack",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -29,7 +29,7 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "8652ad3d94560563bee382934ba153f0ab93215a39445e46232c3f893af81c94",
+      "sha256": "a509387ea86c8fe0fed798d3364421e8ceb7c93617e1d2e74871a241587e02ba",
       "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current release status, recent checks, and the next safe step on one calmer route.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -38,8 +38,8 @@
       "path": "/downloads",
       "url": "https://chummer.run/downloads",
       "status_code": 200,
-      "sha256": "30c76052c79f6a03f7b917b057ff1a1deabd4ca4f92b275644caa7c00b099c77",
-      "excerpt": "Downloads \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Windows, Linux, macOS\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/downloads\",\"description\":\"Install the current public release, compare package types, and keep release integrity in view.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true;",
+      "sha256": "12f10a39331ba82064930db5bdfdc3d9d55389e6a47af132ee77ce68acdf2a2e",
+      "excerpt": "Downloads \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Windows, Linux, macOS\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/downloads\",\"description\":\"Install the current release build, compare package types, and keep release integrity in view.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true;",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -47,8 +47,8 @@
       "path": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
-      "sha256": "95c02b37fbfa30fe6398c74ae1510c00c9f5528905c91e1e6a7f7b8adbf1437d",
-      "excerpt": "Emerald Sprawl: First Pressure command map \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Emerald Sprawl: First Pressure command map\",\"url\":\"https://chummer.run/ledger/map\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure",
+      "sha256": "90a34eac26b374f38626a9e875d255d3b4011346b318eb8c93129da8a0b530a7",
+      "excerpt": "Black Ledger command map \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger command map\",\"url\":\"https://chummer.run/ledger/map\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Menu Sign in Install Chummer on Windows Black Ledger command map Close Menu Home",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -56,8 +56,8 @@
       "path": "/ledger/map",
       "url": "https://chummer.run/ledger/map",
       "status_code": 200,
-      "sha256": "95c02b37fbfa30fe6398c74ae1510c00c9f5528905c91e1e6a7f7b8adbf1437d",
-      "excerpt": "Emerald Sprawl: First Pressure command map \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Emerald Sprawl: First Pressure command map\",\"url\":\"https://chummer.run/ledger/map\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation Emerald Sprawl: First Pressure",
+      "sha256": "90a34eac26b374f38626a9e875d255d3b4011346b318eb8c93129da8a0b530a7",
+      "excerpt": "Black Ledger command map \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger command map\",\"url\":\"https://chummer.run/ledger/map\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Menu Sign in Install Chummer on Windows Black Ledger command map Close Menu Home",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -65,8 +65,8 @@
       "path": "/ledger/factions",
       "url": "https://chummer.run/ledger/factions",
       "status_code": 200,
-      "sha256": "47f4a8b0dc62493abbd6eda373d55c3c6e068f1f6d0108eb431f7b945b2caca1",
-      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger factions \\u00B7 Emerald Sprawl: First Pressure\",\"url\":\"https://chummer.run/ledger/factions\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation",
+      "sha256": "2a7e49f8a2b036bd008d3ca21a2904f8a16cb777bc4108639aade10bf8fa2a31",
+      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger factions \\u00B7 Emerald Sprawl: First Pressure\",\"url\":\"https://chummer.run/ledger/factions\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Menu Sign in Install Chummer on",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -74,8 +74,8 @@
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
       "status_code": 200,
-      "sha256": "fbcd8ef719e4846f11bec89c14a8a72d5bc79dd35d0af7f0248b1ba0697d3721",
-      "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger newsroom \\u00B7 Turn 2 anchor package\",\"url\":\"https://chummer.run/ledger/newsroom/turn-2-newsreel\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Panel Sign in Open downloads Navigation",
+      "sha256": "53f0417dc3fc7556cad5854efd10431aaf77e9a3a3384ff7374d52efa14baacc",
+      "excerpt": "Black Ledger newsroom \u00b7 Turn 1 anchor package \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebApplication\",\"name\":\"Black Ledger newsroom \\u00B7 Turn 1 anchor package\",\"url\":\"https://chummer.run/ledger/newsroom/turn-1-newsreel\",\"description\":\"Fictional campaign pressure, package heat, and closeout movement.\",\"applicationCategory\":\"GameApplication\"} Skip to content CHUMMER Shadowrun character and campaign companion Menu Sign in Install Chummer on",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     }

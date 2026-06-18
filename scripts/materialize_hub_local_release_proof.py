@@ -898,6 +898,9 @@ def main() -> int:
                     "/downloads/install/avalonia-linux-x64-installer",
                     "/artifacts/release-bundles/avalonia-linux-x64-installer",
                     "/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card",
+                    "/downloads/install/avalonia-win-x64-installer",
+                    "/artifacts/release-bundles/avalonia-win-x64-installer",
+                    "/artifacts/release-bundles/avalonia-win-x64-installer/preview_card",
                 ],
                 "surfaces": [
                     "artifact_factory:orchestration",

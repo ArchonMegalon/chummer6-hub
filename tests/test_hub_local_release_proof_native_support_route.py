@@ -99,6 +99,37 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
             receipts["desktop_client_readiness:bounded_routes"]["surfaces"],
         )
 
+    def test_materialized_release_bundle_receipt_covers_public_windows_and_linux_installers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        receipts = {receipt.get("receipt_id"): receipt for receipt in proof["proof_receipts"]}
+        release_bundle_receipt = receipts["public_proof_shelf:release_bundles"]
+        self.assertIn("/downloads/install/avalonia-linux-x64-installer", release_bundle_receipt["routes"])
+        self.assertIn("/artifacts/release-bundles/avalonia-linux-x64-installer", release_bundle_receipt["routes"])
+        self.assertIn("/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card", release_bundle_receipt["routes"])
+        self.assertIn("/downloads/install/avalonia-win-x64-installer", release_bundle_receipt["routes"])
+        self.assertIn("/artifacts/release-bundles/avalonia-win-x64-installer", release_bundle_receipt["routes"])
+        self.assertIn("/artifacts/release-bundles/avalonia-win-x64-installer/preview_card", release_bundle_receipt["routes"])
+
     def test_materialized_m102_proof_includes_native_support_route(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"

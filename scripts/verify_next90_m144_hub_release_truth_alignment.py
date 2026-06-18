@@ -284,6 +284,26 @@ def verify_local_and_served_proof(errors: list[str]) -> None:
         if receipt_ids.count(required_receipt_id) != 1:
             errors.append(f"receipt id {required_receipt_id} must appear exactly once in proof_receipts")
 
+    release_bundle_receipts = [
+        item
+        for item in proof_receipts
+        if isinstance(item, dict) and normalize(item.get("receipt_id")) == "public_proof_shelf:release_bundles"
+    ]
+    if len(release_bundle_receipts) != 1:
+        errors.append("receipt id public_proof_shelf:release_bundles must appear exactly once in proof_receipts")
+    else:
+        release_bundle_routes = {
+            normalize(route)
+            for route in release_bundle_receipts[0].get("routes", [])
+            if normalize(route)
+        }
+        for required_route in (
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/downloads/install/avalonia-win-x64-installer",
+        ):
+            if required_route not in release_bundle_routes:
+                errors.append(f"public_proof_shelf:release_bundles receipt missing required route {required_route}")
+
     route_set = {normalize(route) for route in proof_routes}
     for required_route in ("/downloads", "/downloads/install/avalonia-win-x64-installer"):
         if required_route not in route_set:

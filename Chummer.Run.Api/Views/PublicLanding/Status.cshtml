@@ -66,11 +66,11 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <h1 class="page-title">What works now</h1>
-        <p class="page-copy">Current build.</p>
+        <h1 class="page-title">Release status</h1>
+        <p class="page-copy">Current published build for the public shelf.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
-            <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
+            <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
             <span>Released @publishedLabel</span>
             <span>Last verified @verifiedLabel</span>
             <span>Validation @validationState</span>
@@ -86,7 +86,6 @@
         <span class="tag">Release</span>
         <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
         <p>@Model.ReleaseSummary</p>
-        <p>@Model.CautionSummary</p>
     </article>
     <div class="stacked-actions" aria-label="Status next actions">
         @foreach (var action in nextActions)

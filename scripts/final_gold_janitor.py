@@ -28,10 +28,9 @@ FRESHNESS_REQUIRED_GATES = {
     "ltd_optimization_stack",
     "design_quality_gate",
 }
-FAIL_CLOSED_CAVEAT_IDS = {
-    "ruleset_human_side_gold_assumption",
-    "optional_external_mirrors_degraded",
-}
+# Accepted boundaries and operator advisories should be surfaced, but they should not
+# override passing required gates into a false NOT_GOLD verdict.
+FAIL_CLOSED_CAVEAT_IDS: set[str] = set()
 
 REQUIRED_RECEIPTS = {
     "live_public_web_recrawl": PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json",

@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-17T16:03:00Z",
+  "generatedAt": "2026-06-18T04:48:46Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,43 +9,28 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.G2jTQjWDJ5/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.WykNSEZiq3/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "2b178e15826f1bcb54f506bc039f51287e9579b9e5e85dc9d40b7d66a4a810ed",
-      "artifactSizeBytes": 35414826,
+      "artifactSha256": "4de6da31ad858b19e30e0f40c150287b3e0721d2371f2b86c9d912a025b21490",
+      "artifactSizeBytes": 36852660,
       "kind": "installer"
     },
     {
       "artifactId": "avalonia-win-x64-installer",
       "fileName": "chummer-avalonia-win-x64-installer.exe",
       "platform": "windows",
-      "promotionStatus": "pass",
+      "promotionStatus": "fail",
       "startupSmokeStatus": "skipped_incompatible_host",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.G2jTQjWDJ5/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.WykNSEZiq3/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
-      "signingStatus": "skipped_preview",
+      "signingStatus": "fail",
       "notarizationStatus": null,
-      "artifactSha256": "22b53cef366afbc1d10c203c6184864ced1c3ab4e0eb6f9a27e63e5108b5bf56",
-      "artifactSizeBytes": 97484167,
+      "artifactSha256": "df0cc8f014ada4ff29c7dea6d2d97a7bc254509bab66182b3231a33ffac951b8",
+      "artifactSizeBytes": 98927470,
       "kind": "installer"
-    },
-    {
-      "artifactId": "avalonia-win-x64-archive",
-      "fileName": "chummer-avalonia-win-x64.zip",
-      "platform": "windows",
-      "promotionStatus": "pass",
-      "startupSmokeStatus": "pass",
-      "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "",
-      "signingReceiptPath": "",
-      "signingStatus": "skipped_preview",
-      "notarizationStatus": null,
-      "artifactSha256": "1be992a75f5632308e89b456e82af8a9508a508d99eefeff78b708924373f3c4",
-      "artifactSizeBytes": 45636400,
-      "kind": "archive"
     }
   ]
 }

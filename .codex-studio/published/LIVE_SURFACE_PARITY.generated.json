@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-17T16:03:20Z",
-  "base_url": "http://127.0.0.1:8091",
+  "generated_at_utc": "2026-06-17T16:52:31Z",
+  "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
   "results": [
     {
       "path": "/",
-      "url": "http://127.0.0.1:8091/",
-      "final_url": "http://127.0.0.1:8091/",
+      "url": "https://chummer.run/",
+      "final_url": "https://chummer.run/",
       "status_code": 200,
       "required_texts": [
         "Black Ledger",
@@ -37,8 +37,8 @@
     },
     {
       "path": "/downloads",
-      "url": "http://127.0.0.1:8091/downloads",
-      "final_url": "http://127.0.0.1:8091/downloads",
+      "url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/downloads",
       "status_code": 200,
       "required_texts": [
         "Install Chummer",
@@ -69,8 +69,8 @@
     },
     {
       "path": "/status",
-      "url": "http://127.0.0.1:8091/status",
-      "final_url": "http://127.0.0.1:8091/status",
+      "url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/status",
       "status_code": 200,
       "required_texts": [
         "Current release build",
@@ -105,8 +105,8 @@
     },
     {
       "path": "/ledger",
-      "url": "http://127.0.0.1:8091/ledger",
-      "final_url": "http://127.0.0.1:8091/ledger/map",
+      "url": "https://chummer.run/ledger",
+      "final_url": "https://chummer.run/ledger/map",
       "status_code": 200,
       "required_texts": [
         "Black Ledger command map",
@@ -134,8 +134,8 @@
     },
     {
       "path": "/ledger/newsroom",
-      "url": "http://127.0.0.1:8091/ledger/newsroom",
-      "final_url": "http://127.0.0.1:8091/ledger/newsroom/turn-1-newsreel",
+      "url": "https://chummer.run/ledger/newsroom",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-1-newsreel",
       "status_code": 200,
       "required_texts": [
         "Black Ledger Newsroom",
