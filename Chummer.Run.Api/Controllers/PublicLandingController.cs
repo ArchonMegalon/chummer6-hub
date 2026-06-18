@@ -9335,7 +9335,7 @@ Boundary:
             Heading: "Open a first-party support case",
             Intro: authenticated
                 ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
-                : "Use the first-party intake here when you want help without a GitHub account. Create an account later if you want tracked follow-up inside Chummer.",
+                : "Use the first-party intake here when you want help without another account. Create an account later if you want tracked follow-up inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",

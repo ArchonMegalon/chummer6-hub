@@ -42,12 +42,12 @@ trust_pages:
           - "Devices and access stay separate from identity recovery."
       - id: product-bug
         eyebrow: "Product bug"
-        heading: "Product help should become a support case, not a rumor"
-        body: "Use Contact first for install trouble, product bugs, and practical feedback. GitHub is there when you want a public bug thread, not as the normal support door."
+        heading: "Product help should start in the right place"
+        body: "Use Contact first for install trouble, product bugs, and practical feedback. Public issue threads are optional for technical bugs you intentionally want public."
         bullets:
           - "Use Contact for install trouble, product bugs, or UX friction."
           - "Use Account > Support if you want your support history saved in one place."
-          - "Use GitHub only when you want a public bug thread."
+          - "Choose a public issue thread only when the bug should be public."
       - id: product-question
         eyebrow: "Product question or UX confusion"
         heading: "Ask from inside Chummer first"
@@ -55,7 +55,7 @@ trust_pages:
         bullets:
           - "FAQ answers the normal preview and product questions in plain language."
           - "Support cases stay separate from optional participation."
-          - "You do not need a GitHub account to ask for help."
+          - "You do not need another account to ask for help."
   - id: privacy
     eyebrow: "Privacy"
     heading: "What Chummer stores, and what it does not"
@@ -154,11 +154,11 @@ trust_pages:
       - id: tracked-support
         eyebrow: "Tracked follow-up"
         heading: "Create an account when you want support history inside Chummer"
-        body: "You can submit help here without a GitHub account. Create a Chummer account if you want to see your support history later in one place."
+        body: "You can submit help here without another account. Create a Chummer account if you want to see your support history later in one place."
       - id: public-issues
-        eyebrow: "Advanced public issues"
-        heading: "GitHub is the advanced public bug path, not the main support door"
-        body: "Use the public issue tracker only when you want a public bug thread. Most people should start with Help or Contact."
+        eyebrow: "Public issue threads"
+        heading: "Use public issue threads only when the report should be public"
+        body: "Most people should start with Help or Contact. A public issue thread is only for technical reports you want discussed in public."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"
@@ -178,9 +178,9 @@ faq_pages:
       - title: "Using Chummer"
         entries:
           - question: "Can I actually use Chummer right now?"
-            answer: "Yes, as an honest early-access preview. There is a current public download, a real proof trail, and explicit labels for what is live, inspectable, or still opening next."
-          - question: "Why would I trust it more than an opaque assistant?"
-            answer: "Because the product is trying to keep the result, the trail, and the current release picture visible together instead of asking you to trust mystery math."
+            answer: "Yes. There is a current public download, clear platform labels, and a direct help path when something goes wrong."
+          - question: "Why would I trust what Chummer shows me?"
+            answer: "Because Chummer keeps the result, the calculation, and the current release state visible in the product."
           - question: "What does account creation give me right away?"
             answer: "Account creation gives you recovery, support history in Account, and a cleaner return path when linked downloads or account-aware preview features are available."
       - title: "Downloads and installs"
@@ -190,10 +190,10 @@ faq_pages:
           - question: "Do I get a personalized download?"
             answer: "No. The published package stays the same for everyone. Any account-aware receipt or handoff is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
-            answer: "Start with Downloads, then use Contact or Account > Support. GitHub is the advanced public issue path, not the default support door."
+            answer: "Start with Downloads, then use Contact or Account > Support. Public issue threads are optional and not the default support door."
       - title: "Participation and support"
         entries:
           - question: "Do I need to participate to help or report a bug?"
             answer: "No. Support and feedback stand on their own. Participation is optional and separate from the normal customer help path."
-          - question: "Can I get help without a GitHub account?"
+          - question: "Can I get help without another account?"
             answer: "Yes. The first-party support intake is the default help path. Create a Chummer account if you want tracked support history inside your account."

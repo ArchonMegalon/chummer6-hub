@@ -4,15 +4,17 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
-    ViewData["ContextSidebarHeading"] = "Page sections";
-    ViewData["ContextSidebarSummary"] = "Jump between the current trust sections from the shared side panel.";
-    ViewData["ContextSidebarLinks"] = Model.Sections
-        .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
-        .ToArray();
     var helpPage = string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase);
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
+    ViewData["ContextSidebarHeading"] = helpPage ? "Help" : "Page sections";
+    ViewData["ContextSidebarSummary"] = helpPage
+        ? "Jump to the help path that matches the problem."
+        : "Jump between the current trust sections from the shared side panel.";
+    ViewData["ContextSidebarLinks"] = Model.Sections
+        .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
+        .ToArray();
     var deferSupportPanels = helpPage || contactPage;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
@@ -77,7 +79,7 @@
                 Summary: pageSection.Body,
                 Href: ContextualPreviewHref(routeAction.Href),
                 Label: routeAction.Label,
-                Proof: (pageSection.Bullets ?? Array.Empty<string>()).Take(3).ToArray()));
+                Proof: Array.Empty<string>()));
         }
     }
 
@@ -116,7 +118,7 @@
             Summary: "Guest submissions are allowed, but account-backed follow-up keeps the case, recovery state, and later replies attached to the same Chummer return path.",
             Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
             Label: Model.SupportIntake.AccountSupportLabel,
-            Proof: new[] { "Guest allowed", "History in Account", "No GitHub required" }));
+            Proof: new[] { "Guest allowed", "History in Account", "No outside account required" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
             Badge: "Account return",
@@ -146,7 +148,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate))
+        @if (!helpPage && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
         {
             <div class="trust-claim__microproof">
                 @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate))
@@ -159,7 +161,7 @@
                 }
             </div>
         }
-        @if (!policyPage && Model.SummaryPoints is { Count: > 0 })
+        @if (!policyPage && !helpPage && Model.SummaryPoints is { Count: > 0 })
         {
             <div class="trust-claim__microproof">
                 @foreach (var point in Model.SummaryPoints)
@@ -220,9 +222,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Help choices</p>
-            <h2 class="editorial-title">Choose the next safe help path.</h2>
-            <p class="editorial-copy">Downloads, recovery, product questions, and private support are separate jobs. Start on the right page so the fix path stays short and the next step stays attached.</p>
+            <p class="eyebrow">Help</p>
+            <h2 class="editorial-title">Choose the right path.</h2>
+            <p class="editorial-copy">Pick the page that matches the problem. Chummer keeps installs, recovery, bugs, and product questions on separate paths so the next step stays clear.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var choice in helpRouteChoices)
@@ -310,7 +312,7 @@ else if (!contactPage)
     </section>
 }
 
-@if (Model.SupportIntake is not null)
+@if (Model.SupportIntake is not null && contactPage)
 {
     <section class="trust-page-sections" id="support-intake">
         <article class="trust-page-section trust-page-section--form">
@@ -466,17 +468,5 @@ else if (!contactPage)
 {
     <section class="release-footnote">
         @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-    </section>
-}
-
-@if (Model.PrivacyBoundary is not null && deferSupportPanels)
-{
-    <section class="editorial-block">
-        <details class="details-drawer">
-            <summary>@(helpPage ? "Privacy and retention for help" : "Privacy and retention for support")</summary>
-            <div class="stacked-copy">
-                @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
-            </div>
-        </details>
     </section>
 }

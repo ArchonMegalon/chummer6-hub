@@ -47,7 +47,7 @@
             Summary = "Install failures, crashes, account issues, and private campaign details belong in support, not in a public search box.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "Private by default", "No GitHub required", "Tracked follow-up" }
+            Proof = new[] { "Private by default", "No outside account required", "Tracked follow-up" }
         }
     };
 
@@ -66,7 +66,7 @@
     {
         var combined = $"{sectionTitle} {question}".ToLowerInvariant();
         if (combined.Contains("account creation", StringComparison.Ordinal)
-            || combined.Contains("github account", StringComparison.Ordinal))
+            || combined.Contains("outside account", StringComparison.Ordinal))
         {
             return authenticated
                 ? new TrustPageActionViewModel("Open account", "/account", "secondary")
