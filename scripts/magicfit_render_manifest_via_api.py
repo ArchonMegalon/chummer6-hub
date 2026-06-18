@@ -208,7 +208,12 @@ const { chromium } = require('playwright');
             last_body = self.fetch_session_raw(session_id)
             urls = collect_urls(last_body, ("png", "webp", "jpg", "jpeg"))
             if urls:
-                return {"status": "COMPLETED", "output_url": urls[0], "generation_id": self.extract_generation_id(last_body) or "image"}
+                return {
+                    "status": "COMPLETED",
+                    "output_url": urls[0],
+                    "generation_id": self.extract_generation_id_for_url(last_body, urls[0]) or self.extract_generation_id(last_body) or "image",
+                    "session_payload": last_body,
+                }
             if '"status","FAILED"' in last_body or '"FAILED"' in last_body:
                 raise RuntimeError(f"MagicFit image generation failed for session {session_id}")
             time.sleep(5)
@@ -224,6 +229,27 @@ const { chromium } = require('playwright');
         ):
             match = re.search(pattern, payload)
             if match:
+                return match.group(1)
+        return None
+
+    @staticmethod
+    def extract_generation_id_for_url(payload: str, output_url: str) -> str | None:
+        escaped_url = re.escape(output_url).replace("/", r"(?:\\/|/)")
+        patterns = (
+            rf'"([a-z0-9]{{8,}})".{{0,1200}}{escaped_url}',
+            rf'{escaped_url}.{{0,1200}}"([a-z0-9]{{8,}})"',
+        )
+        for pattern in patterns:
+            match = re.search(pattern, payload, flags=re.S)
+            if match:
+                candidate = match.group(1)
+                if candidate not in {"outputUrl", "imageUrl", "generationId"}:
+                    return candidate
+        for match in re.finditer(r'"([a-z0-9]{8,})"', payload):
+            start = max(match.start() - 800, 0)
+            end = min(match.end() + 800, len(payload))
+            window = payload[start:end].replace("\\/", "/")
+            if output_url in window:
                 return match.group(1)
         return None
 
@@ -318,10 +344,28 @@ def render_scene(client: MagicFitClient, job: SceneJob, out_root: Path, *, force
     print(f"[image] {asset['asset_id']}/{scene['id']} submit", flush=True)
     session_id = client.create_image_session(full_prompt)
     image = client.wait_for_image(session_id, timeout_seconds=image_timeout)
+    scene_path(out_root, asset, scene, ".image-session.txt").write_text(
+        image.get("session_payload", ""),
+        encoding="utf-8",
+    )
     image_path = scene_path(out_root, asset, scene, ".source-image")
     image_suffix = Path(image["output_url"].split("?", 1)[0]).suffix or ".png"
     image_path = image_path.with_suffix(image_suffix)
     client.download(image["output_url"], image_path)
+    scene_path(out_root, asset, scene, ".image.magicfit.json").write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "image_generation_id": image.get("generation_id"),
+                "image_output_url": image.get("output_url"),
+                "image_file": str(image_path),
+                "captured_at_utc": utc_now(),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     motion_prompt = (
         f"{scene.get('prompt') or ''} "
