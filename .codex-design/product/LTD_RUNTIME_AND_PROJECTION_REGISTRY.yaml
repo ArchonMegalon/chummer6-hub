@@ -37,11 +37,16 @@ capability_slots:
   artifact_rendering:
     primary:
       - vidBoard
+      - Subscribr.ai
       - MarkupGo
       - PeekShot
       - Soundmadeseen
       - Taja
     boundary: approved_source_packet_only
+  creator_video_preproduction:
+    primary: Subscribr.ai
+    vendor_plan_tier: 7
+    boundary: approved_source_packet_only; no repo credentials; scripts, hooks, metadata, and thumbnail briefs return to Chummer-owned review before publication
   discovery_research:
     primary:
       - Icanpreneur
@@ -67,6 +72,7 @@ product_systems:
     tools:
       - ClickRank
       - NeuronWriter
+      - Subscribr.ai
       - Rybbit
       - Katteb
       - ProductLift
@@ -99,6 +105,7 @@ product_systems:
   artifact_factory:
     tools:
       - vidBoard
+      - Subscribr.ai
       - MarkupGo
       - PeekShot
       - Taja

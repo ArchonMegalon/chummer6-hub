@@ -76,6 +76,7 @@ Current known external-tool inventory includes:
 * PeekShot
 * ProductLift
 * Signitic
+* Subscribr.ai
 * Taja
 * Teable
 * Unmixr AI
@@ -97,6 +98,7 @@ Important current distinctions:
 * Paperguide - workspace integration Tier 3, vendor license plan Tier 4
 * Prompt Architects - workspace integration Tier 3, vendor license plan Tier 4
 * PayFunnels - workspace integration Tier 3 until test-billing receipts and entitlement-event simulation gates are complete
+* Subscribr.ai - workspace integration Tier 3, vendor license plan Tier 7; high-capacity creator preproduction lane only, not publication truth
 
 Chummer routing, rollout, and architectural ownership should follow workspace integration tier and system-of-record safety rules, not marketing or license-plan tier labels.
 
@@ -131,6 +133,7 @@ Current public-surface posture:
 * public concierge flows may use `vidBoard`, `MarkupGo`, `PeekShot`, and `Soundmadeseen` as sibling explainer and artifact lanes, but those companions remain downstream of Chummer-owned release, support, invite, and publication truth
 * public feature ideas, votes, roadmap projection, changelog projection, and voter closeout may use `ProductLift` only as a projection of Chummer-owned design, milestone, release, and closeout truth
 * public guide readability, SEO, AI-search visibility, and article-draft work may use `Katteb` only against approved source packets; accepted changes must flow upstream into `chummer6-design` or public-guide source registries before generated guide output changes
+* public tutorial, creator, and launch-video preproduction may use `Subscribr.ai` only against approved source packets; scripts, hooks, descriptions, tags, and thumbnail briefs must return to Chummer-owned review before publication
 * public site crawl health, technical SEO, metadata/schema coverage, broken-link checks, internal-link suggestions, and AI-search visibility measurement may use `ClickRank` only as audit and recommendation output; accepted changes still patch Chummer-owned source first
 
 ## Classification model

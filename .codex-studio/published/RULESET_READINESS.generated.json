@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ruleset_readiness",
-  "generated_at_utc": "2026-06-18T15:00:08.086328Z",
+  "generated_at_utc": "2026-06-18T15:12:34.001561Z",
   "fleet_closeout_status": "pass",
   "frontier_receipts": {
     "ui_sr4_sr6_desktop_parity_frontier": "pass",

@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-18T15:01:49Z",
+  "generated_at_utc": "2026-06-18T15:16:31Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "summary": {
     "route_count": 15,
     "failed_route_count": 0,
-    "forbidden_pattern_count": 57,
+    "forbidden_pattern_count": 59,
     "failed_routes": []
   },
   "forbidden_patterns": [
@@ -32,6 +32,8 @@
     "\\bTeable\\b",
     "\\bSignitic\\b",
     "\\bMagicFit\\b",
+    "\\bSubscribr\\b",
+    "\\bSubscribr\\.ai\\b",
     "\\bgovernor truth\\b",
     "\\bjourney proofs\\b",
     "\\bopen-public artifacts\\b",

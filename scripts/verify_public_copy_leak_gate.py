@@ -58,6 +58,8 @@ FORBIDDEN_PATTERNS = [
     r"\bTeable\b",
     r"\bSignitic\b",
     r"\bMagicFit\b",
+    r"\bSubscribr\b",
+    r"\bSubscribr\.ai\b",
     r"\bgovernor truth\b",
     r"\bjourney proofs\b",
     r"\bopen-public artifacts\b",
