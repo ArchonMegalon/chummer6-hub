@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-06-18T15:20:53.769409Z",
+  "generated_at_utc": "2026-06-18T17:48:15.219951Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -2200,7 +2200,7 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=FaXmqRi-1FPO3Mpz04Q-sVvjwz7NFJyY&nonce=4LeeiOImpylq-3-KfkX2EUW1bbb03RWJ&code_challenge=M0CvLeQnm8psuA57Kq8sQoi5JjvCpWZAtaeINWD0vZY&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=Z9eP77Hg_bvzNz1RVYaVM1pxFEL-plmW&nonce=TDpxPuupxvug_4AMqP4WZviyi7_DsZ0W&code_challenge=c3GDm2tMUrzvEs1cBDpbN76Ja3_BmvWMUDC6f8mLSnM&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },

@@ -27,42 +27,42 @@ public sealed class PublicLandingService
             Product: manifest.Product,
             Surface: manifest.Surface,
             Version: manifest.Version,
-            Headline: RequireText(manifest.Headline, "headline"),
-            Subhead: RequireText(manifest.Subhead, "subhead"),
-            ProofLine: RequireText(manifest.ProofLine, "proof_line"),
+            Headline: RequirePublicText(manifest.Headline, "headline"),
+            Subhead: RequirePublicText(manifest.Subhead, "subhead"),
+            ProofLine: RequirePublicText(manifest.ProofLine, "proof_line"),
             NoProviderNames: manifest.NoProviderNames,
             NoLtdNames: manifest.NoLtdNames,
             HeroCtas: (manifest.HeroCtas ?? new List<PublicLandingActionDocument>())
-                .Select(static action => new PublicLandingActionDto(action.Label, action.Href, action.Emphasis))
+                .Select(static action => new PublicLandingActionDto(CleanPublicText(action.Label), action.Href, action.Emphasis))
                 .ToArray(),
             GuestShellActions: (manifest.GuestShellActions ?? new List<PublicLandingActionDocument>())
-                .Select(static action => new PublicLandingActionDto(action.Label, action.Href, action.Emphasis))
+                .Select(static action => new PublicLandingActionDto(CleanPublicText(action.Label), action.Href, action.Emphasis))
                 .ToArray(),
-            SecondaryHighlights: manifest.SecondaryHighlights ?? new List<string>(),
-            ProductProofEyebrow: manifest.ProductProofEyebrow,
-            ProductProofIntro: manifest.ProductProofIntro,
-            ProductProofPrimaryLabel: manifest.ProductProofPrimaryLabel,
+            SecondaryHighlights: CleanPublicLines(manifest.SecondaryHighlights),
+            ProductProofEyebrow: CleanPublicText(manifest.ProductProofEyebrow),
+            ProductProofIntro: CleanPublicText(manifest.ProductProofIntro),
+            ProductProofPrimaryLabel: CleanPublicText(manifest.ProductProofPrimaryLabel),
             ProductProofPrimaryHref: manifest.ProductProofPrimaryHref,
-            ProductProofSecondaryLabel: manifest.ProductProofSecondaryLabel,
+            ProductProofSecondaryLabel: CleanPublicText(manifest.ProductProofSecondaryLabel),
             ProductProofSecondaryHref: manifest.ProductProofSecondaryHref,
-            ProductProofToplineLabel: manifest.ProductProofToplineLabel,
-            ProductProofResultTitle: manifest.ProductProofResultTitle,
-            ProductProofResultSummary: manifest.ProductProofResultSummary,
-            ProductProofTrail: manifest.ProductProofTrail ?? new List<string>(),
+            ProductProofToplineLabel: CleanPublicText(manifest.ProductProofToplineLabel),
+            ProductProofResultTitle: CleanPublicText(manifest.ProductProofResultTitle),
+            ProductProofResultSummary: CleanPublicText(manifest.ProductProofResultSummary),
+            ProductProofTrail: CleanPublicLines(manifest.ProductProofTrail),
             PublicRoutes: (manifest.PublicRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
+                .Select(static route => new PublicLandingRouteDto(route.Path, CleanPublicText(route.Title), route.Audience, CleanPublicText(route.Purpose), route.RequiresAuth, CleanPublicText(route.GuestFallback), route.MustExist, route.PlaceholderAllowed, CleanPublicText(route.PlaceholderRequirements), route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             AuthRoutes: (manifest.AuthRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
+                .Select(static route => new PublicLandingRouteDto(route.Path, CleanPublicText(route.Title), route.Audience, CleanPublicText(route.Purpose), route.RequiresAuth, CleanPublicText(route.GuestFallback), route.MustExist, route.PlaceholderAllowed, CleanPublicText(route.PlaceholderRequirements), route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             RegisteredRoutes: (manifest.RegisteredRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
+                .Select(static route => new PublicLandingRouteDto(route.Path, CleanPublicText(route.Title), route.Audience, CleanPublicText(route.Purpose), route.RequiresAuth, CleanPublicText(route.GuestFallback), route.MustExist, route.PlaceholderAllowed, CleanPublicText(route.PlaceholderRequirements), route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             Sections: (manifest.Sections ?? new List<PublicLandingSectionDocument>())
-                .Select(static section => new PublicLandingSectionDto(section.Id, section.Eyebrow, section.Title, section.Intro, section.Audience, section.Route, section.AssetSlot))
+                .Select(static section => new PublicLandingSectionDto(section.Id, CleanPublicText(section.Eyebrow), CleanPublicText(section.Title), CleanPublicText(section.Intro), section.Audience, section.Route, section.AssetSlot))
                 .ToArray(),
             RegisteredOverlays: (manifest.RegisteredOverlays ?? new List<PublicLandingOverlayDocument>())
-                .Select(static overlay => new PublicLandingOverlayDto(overlay.Id, overlay.Path, overlay.Title, overlay.Summary))
+                .Select(static overlay => new PublicLandingOverlayDto(overlay.Id, overlay.Path, CleanPublicText(overlay.Title), CleanPublicText(overlay.Summary)))
                 .ToArray(),
             Assets: (assets.Assets ?? new List<PublicLandingAssetDocument>())
                 .Select(static asset => new PublicLandingAssetDto(
@@ -76,21 +76,21 @@ public sealed class PublicLandingService
                     asset.MobilePosterAvifUrl,
                     asset.MobilePosterWebpUrl,
                     asset.LoopUrl,
-                    asset.Alt,
-                    asset.Caption,
+                    CleanPublicText(asset.Alt),
+                    CleanPublicText(asset.Caption),
                     asset.MotionPolicy,
                     asset.FallbackStyle))
                 .ToArray(),
-            FooterCanonicalSource: manifest.FooterCanonicalSource,
-            FooterGeneratedNote: manifest.FooterGeneratedNote,
+            FooterCanonicalSource: CleanPublicText(manifest.FooterCanonicalSource),
+            FooterGeneratedNote: CleanPublicText(manifest.FooterGeneratedNote),
             FeatureCards: (features.Cards ?? new List<PublicFeatureCardDocument>())
                 .Select(static card => new PublicFeatureCardDto(
                     card.Id,
                     card.Bucket,
-                    card.Title,
-                    card.Summary,
+                    CleanPublicText(card.Title),
+                    CleanPublicText(card.Summary),
                     card.Href,
-                    card.Badge,
+                    CleanPublicText(card.Badge),
                     card.Audience,
                     card.ImageFamily,
                     card.AssetSlot ?? $"scene_{card.ImageFamily}",
@@ -103,13 +103,13 @@ public sealed class PublicLandingService
                     card.RegisteredHref,
                     card.ExternalOk,
                     card.SelfLinkAllowed,
-                    card.ActionLabel,
+                    CleanPublicText(card.ActionLabel),
                     card.DetailPrimaryHref,
-                    card.DetailPrimaryLabel,
-                    card.ProofNote,
-                    card.Microproof,
-                    card.Pain,
-                    card.Payoff))
+                    CleanPublicText(card.DetailPrimaryLabel),
+                    CleanPublicText(card.ProofNote),
+                    CleanPublicText(card.Microproof),
+                    CleanPublicText(card.Pain),
+                    CleanPublicText(card.Payoff)))
                 .ToArray());
 
         ValidateSurface(surface, repoRoot);
@@ -295,6 +295,15 @@ public sealed class PublicLandingService
         => string.IsNullOrWhiteSpace(value)
             ? throw new InvalidOperationException($"required landing scalar missing: {name}")
             : value;
+
+    private static string RequirePublicText(string? value, string name)
+        => CleanPublicText(RequireText(value, name));
+
+    private static string CleanPublicText(string? value)
+        => PublicFacingCopyHumanizer.Clean(value);
+
+    private static IReadOnlyList<string> CleanPublicLines(IEnumerable<string>? values)
+        => PublicFacingCopyHumanizer.CleanLines(values);
 
     private static void ValidateAssets(PublicLandingSurfaceDto surface, string repoRoot)
     {

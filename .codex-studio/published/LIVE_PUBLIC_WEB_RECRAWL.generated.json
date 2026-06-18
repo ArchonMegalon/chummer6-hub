@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-18T15:20:37Z",
+  "generated_at_utc": "2026-06-18T17:47:59Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -29,7 +29,7 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "d52943104cb9f3313b9e71f9d5995fcb56a9f4df81a7e6a7ae1094c67810a388",
+      "sha256": "2a167295c318ef3c665ca39c129be48bbf60d1880e05bf55bac059f074b29908",
       "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current release status, recent checks, and the next safe step on one calmer route.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []

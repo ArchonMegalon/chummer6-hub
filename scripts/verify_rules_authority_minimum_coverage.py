@@ -7,6 +7,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from datetime import UTC, datetime
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,10 @@ def load_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def main() -> int:
@@ -112,7 +117,11 @@ def main() -> int:
 
     result = {
         "contract_name": "chummer.rule_authority_minimum_coverage",
-        "generated_at_utc": completion_payload.get("generated_at_utc") or operator_gold_payload.get("generated_at_utc") or "",
+        "generated_at_utc": now_iso(),
+        "source_generated_at_utc": {
+            "full_completion": completion_payload.get("generated_at_utc") or "",
+            "operator_gold": operator_gold_payload.get("generated_at_utc") or "",
+        },
         "minimum_rulefacts_required": args.min_rulefacts,
         "full_completion_path": str(FULL_COMPLETION_PATH),
         "operator_gold_path": str(OPERATOR_GOLD_PATH),

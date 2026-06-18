@@ -1,6 +1,10 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-17T17:02:00Z",
+  "generated_at_utc": "2026-06-18T17:48:16Z",
+  "source_generated_at_utc": {
+    "full_completion": "2026-06-17T17:02:00Z",
+    "operator_gold": "2026-06-12T10:56:51Z"
+  },
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
   "operator_gold_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json",

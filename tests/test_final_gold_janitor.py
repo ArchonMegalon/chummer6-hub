@@ -56,6 +56,25 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertIn("live_public_web_recrawl stale", payload["failures"])
 
+    def test_payload_fails_on_stale_rule_authority_receipt(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-rules-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            stale_time = "2020-01-01T00:00:00Z"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                generated_at = stale_time if key == "rule_authority_minimum_coverage" else module.now_iso()
+                (published / path.name).write_text(
+                    json.dumps({"status": "pass", "generated_at_utc": generated_at}),
+                    encoding="utf-8",
+                )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertIn("rule_authority_minimum_coverage stale", payload["failures"])
+
     def test_payload_surfaces_rule_authority_blocker_details(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-rules-") as temp_dir:

@@ -469,16 +469,17 @@ request_json() {
 
 verify_route() {
   local url="$1"
-  curl -fsSL -o /dev/null "$url"
+  curl -fsSL --range 0-0 -o /dev/null "$url"
   echo "Verified route: $url"
 }
 
 build_default_verify_routes() {
   cat <<EOF
-$PUBLIC_BASE_URL/downloads/install/avalonia-osx-arm64-installer
+$PUBLIC_BASE_URL/downloads/
+$PUBLIC_BASE_URL/downloads/install/avalonia-linux-x64-installer
 $PUBLIC_BASE_URL/downloads/install/avalonia-win-x64-installer
-$PUBLIC_BASE_URL/downloads/install/avalonia-win-x64-installer/proof
-$PUBLIC_BASE_URL/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe
+$PUBLIC_BASE_URL/downloads/files/chummer-avalonia-linux-x64-installer.deb
+$PUBLIC_BASE_URL/downloads/files/chummer-avalonia-win-x64-installer.exe
 EOF
 }
 

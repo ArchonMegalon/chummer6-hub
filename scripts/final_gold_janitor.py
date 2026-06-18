@@ -22,11 +22,21 @@ DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chumme
 RECRAWL_MAX_AGE_HOURS = 24
 FRESHNESS_REQUIRED_GATES = {
     "live_public_web_recrawl",
+    "rule_authority_minimum_coverage",
+    "ruleset_readiness",
     "public_route_proof",
     "provider_proof_discoverability",
+    "desktop_native_model_depth",
+    "black_ledger_live_media_proof",
     "table_pulse_scenario_replay",
+    "live_surface_parity",
     "ltd_optimization_stack",
+    "external_distribution_mirror_proof",
+    "public_copy_leak_gate",
     "design_quality_gate",
+    "ui_layout_exit_gate",
+    "operator_release_dashboard",
+    "release_ready",
 }
 # Accepted boundaries and operator advisories should be surfaced, but they should not
 # override passing required gates into a false NOT_GOLD verdict.

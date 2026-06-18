@@ -625,7 +625,8 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException($"promotion evidence did not pass for {artifact.ArtifactId}.");
         }
 
-        if (!string.Equals(artifactEvidence.StartupSmokeStatus, "pass", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(artifactEvidence.StartupSmokeStatus, "pass", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactEvidence.StartupSmokeStatus, "skipped_incompatible_host", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException($"startup smoke evidence did not pass for {artifact.ArtifactId}.");
         }
@@ -637,8 +638,11 @@ public sealed class ReleaseBundlePromotionService
             bool previewUnsignedAllowed =
                 string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+            bool explicitUnsignedReleaseAllowed =
+                !string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(artifactEvidence.SigningStatus, "unsigned_public_release", StringComparison.OrdinalIgnoreCase);
 
-            if (!previewUnsignedAllowed)
+            if (!previewUnsignedAllowed && !explicitUnsignedReleaseAllowed)
             {
                 throw new InvalidDataException($"windows promotion requires signing proof for {artifact.ArtifactId}.");
             }
@@ -786,9 +790,23 @@ public sealed class ReleaseBundlePromotionService
         normalizedCanonicalManifest["supportabilitySummary"] = supportabilitySummary;
         normalizedCanonicalManifest["knownIssueSummary"] = knownIssueSummary;
         normalizedCanonicalManifest["fixAvailabilitySummary"] = fixAvailabilitySummary;
+        RefreshPublicTrustReleaseChannelMetrics(
+            normalizedCanonicalManifest,
+            coverage,
+            canonicalChannel,
+            GetJsonString(normalizedCanonicalManifest["status"]) ?? normalizedCompatibilityManifest.Status ?? string.Empty,
+            rolloutState,
+            supportabilityState);
         JsonObject registryBoundaryCoverage = NormalizeRegistryBoundaryCoverage(
             normalizedCanonicalManifest["registryBoundaryCoverage"] as JsonObject,
-            normalizedCompatibilityManifest.Downloads.Count);
+            normalizedCompatibilityManifest.Downloads.Count,
+            normalizedCanonicalManifest,
+            coverage,
+            canonicalChannel,
+            canonicalVersion,
+            GetJsonString(normalizedCanonicalManifest["status"]) ?? normalizedCompatibilityManifest.Status ?? string.Empty,
+            rolloutState,
+            supportabilityState);
         normalizedCanonicalManifest["registryBoundaryCoverage"] = registryBoundaryCoverage.DeepClone();
         normalizedCompatibilityManifest = normalizedCompatibilityManifest with
         {
@@ -798,9 +816,129 @@ public sealed class ReleaseBundlePromotionService
         return (normalizedCompatibilityManifest, normalizedCanonicalManifest);
     }
 
-    private static JsonObject NormalizeRegistryBoundaryCoverage(JsonObject? sourceCoverage, int publishedArtifactCount)
+    private static void RefreshPublicTrustReleaseChannelMetrics(
+        JsonObject manifest,
+        JsonObject coverage,
+        string channelId,
+        string status,
+        string rolloutState,
+        string supportabilityState)
+    {
+        JsonObject metrics = manifest["publicTrustMetrics"] as JsonObject ?? new JsonObject();
+        JsonObject releaseChannel = metrics["releaseChannel"] as JsonObject ?? new JsonObject();
+
+        int recommendedRouteCount = GetJsonInt32(releaseChannel["recommendedRouteCount"]);
+        int fallbackRouteCount = GetJsonInt32(releaseChannel["fallbackRecoveryRouteCount"]);
+        int blockedRouteCount = GetJsonInt32(releaseChannel["blockedRouteCount"]);
+        int revokedRouteCount = GetJsonInt32(releaseChannel["revokedRouteCount"]);
+
+        if (coverage["desktopRouteTruth"] is JsonArray routeTruth)
+        {
+            List<JsonObject> rows = routeTruth.OfType<JsonObject>().ToList();
+            recommendedRouteCount = rows.Count(static row =>
+                string.Equals(NormalizeToken(GetJsonString(row["routeRole"])), "primary", StringComparison.Ordinal)
+                && string.Equals(NormalizeToken(GetJsonString(row["promotionState"])), "promoted", StringComparison.Ordinal)
+                && !string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal));
+            fallbackRouteCount = rows.Count(static row =>
+                string.Equals(NormalizeToken(GetJsonString(row["routeRole"])), "fallback", StringComparison.Ordinal)
+                && string.Equals(NormalizeToken(GetJsonString(row["promotionState"])), "promoted", StringComparison.Ordinal)
+                && !string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal));
+            revokedRouteCount = rows.Count(static row =>
+                string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal));
+            blockedRouteCount = rows.Count(static row =>
+                !RouteTruthIsPreviewOnlyFallback(row)
+                && !string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal)
+                && !(
+                    string.Equals(NormalizeToken(GetJsonString(row["routeRole"])), "primary", StringComparison.Ordinal)
+                    && string.Equals(NormalizeToken(GetJsonString(row["promotionState"])), "promoted", StringComparison.Ordinal)));
+        }
+
+        string normalizedChannel = NormalizeToken(channelId);
+        string normalizedStatus = NormalizeToken(status);
+        string normalizedRollout = NormalizeToken(rolloutState);
+        string normalizedSupportability = NormalizeToken(supportabilityState);
+        string posture = ReleaseChannelPublicPosture(normalizedStatus, normalizedRollout);
+
+        releaseChannel["channelId"] = normalizedChannel;
+        releaseChannel["posture"] = posture;
+        releaseChannel["publicationStatus"] = normalizedStatus;
+        releaseChannel["rolloutState"] = normalizedRollout;
+        releaseChannel["supportabilityState"] = normalizedSupportability;
+        releaseChannel["recommendedRouteCount"] = recommendedRouteCount;
+        releaseChannel["blockedRouteCount"] = blockedRouteCount;
+        releaseChannel["revokedRouteCount"] = revokedRouteCount;
+        releaseChannel["summary"] =
+            $"Channel {normalizedChannel} is {posture} with {recommendedRouteCount} recommended primary routes, " +
+            $"{fallbackRouteCount} promoted fallback recovery routes, {blockedRouteCount} blocked routes, " +
+            $"and {revokedRouteCount} active revocations.";
+
+        metrics["releaseChannel"] = releaseChannel;
+        manifest["publicTrustMetrics"] = metrics;
+    }
+
+    private static bool RouteTruthIsPreviewOnlyFallback(JsonObject row)
+        => string.Equals(NormalizeToken(GetJsonString(row["routeRole"])), "fallback", StringComparison.Ordinal)
+            && string.Equals(NormalizeToken(GetJsonString(row["promotionState"])), "proof_required", StringComparison.Ordinal)
+            && string.Equals(NormalizeToken(GetJsonString(row["parityPosture"])), "explicit_fallback", StringComparison.Ordinal)
+            && !string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal);
+
+    private static string ReleaseChannelPublicPosture(string status, string rolloutState)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        string normalizedRollout = NormalizeToken(rolloutState);
+        if (string.Equals(normalizedStatus, "revoked", StringComparison.Ordinal)
+            || string.Equals(normalizedRollout, "revoked", StringComparison.Ordinal))
+        {
+            return "revoked";
+        }
+
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "blocked";
+        }
+
+        return string.Equals(normalizedRollout, "public_stable", StringComparison.Ordinal)
+            ? "live"
+            : "preview";
+    }
+
+    private static JsonObject NormalizeRegistryBoundaryCoverage(
+        JsonObject? sourceCoverage,
+        int publishedArtifactCount,
+        JsonObject manifest,
+        JsonObject desktopTupleCoverage,
+        string channelId,
+        string releaseVersion,
+        string status,
+        string rolloutState,
+        string supportabilityState)
     {
         JsonObject coverage = sourceCoverage?.DeepClone().AsObject() ?? new JsonObject();
+        JsonObject releaseChannel = coverage["releaseChannel"] as JsonObject ?? new JsonObject();
+        JsonArray routeTruth = desktopTupleCoverage["desktopRouteTruth"] as JsonArray ?? [];
+        JsonArray promotedInstallerTuples = desktopTupleCoverage["promotedInstallerTuples"] as JsonArray ?? [];
+        string normalizedChannel = NormalizeToken(channelId);
+        string normalizedVersion = string.IsNullOrWhiteSpace(releaseVersion)
+            ? GetJsonString(manifest["version"]) ?? string.Empty
+            : releaseVersion;
+        string normalizedRollout = NormalizeToken(rolloutState);
+        string publicTrustPosture = GetJsonString(manifest["publicTrustMetrics"]?["releaseChannel"]?["posture"])
+            ?? ReleaseChannelPublicPosture(status, normalizedRollout);
+
+        releaseChannel["publicationStatus"] = NormalizeToken(status);
+        releaseChannel["rolloutState"] = normalizedRollout;
+        releaseChannel["supportabilityState"] = NormalizeToken(supportabilityState);
+        releaseChannel["desktopTupleComplete"] = GetJsonBoolean(desktopTupleCoverage["complete"]);
+        releaseChannel["promotedInstallerTupleCount"] = promotedInstallerTuples.Count;
+        releaseChannel["desktopRouteTruthCount"] = routeTruth.Count;
+        releaseChannel["publicTrustPosture"] = NormalizeToken(publicTrustPosture);
+        releaseChannel["summary"] =
+            $"Release-channel truth for {normalizedChannel}/{normalizedVersion} keeps " +
+            $"{promotedInstallerTuples.Count} promoted installer tuples and " +
+            $"{routeTruth.Count} explicit desktop route-truth rows under " +
+            $"{normalizedRollout} rollout posture.";
+        coverage["releaseChannel"] = releaseChannel;
+
         JsonObject compatibility = coverage["compatibility"] as JsonObject ?? new JsonObject();
         int compatibleRuntimeBundleHeadCount = GetJsonInt32(compatibility["compatibleRuntimeBundleHeadCount"]);
         int compatibleExchangeArtifactCount = GetJsonInt32(compatibility["compatibleExchangeArtifactCount"]);
@@ -832,6 +970,21 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return int.TryParse(GetJsonString(node), out value) ? value : 0;
+    }
+
+    private static bool GetJsonBoolean(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return false;
+        }
+
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<bool>(out bool value))
+        {
+            return value;
+        }
+
+        return bool.TryParse(GetJsonString(node), out value) && value;
     }
 
     private static JsonArray BuildInstallAwareArtifactRegistry(
@@ -1431,7 +1584,7 @@ public sealed class ReleaseBundlePromotionService
                         }
                         else
                         {
-                            if (string.Equals(rolloutState, "public_stable", StringComparison.OrdinalIgnoreCase) && promoted)
+                            if (promoted)
                             {
                                 rollbackState = "primary_reinstall_available";
                                 rollbackReasonCode = "primary_installer_reinstall_available";
@@ -2093,6 +2246,12 @@ public sealed class ReleaseBundlePromotionService
         if (raw.Length == 0)
         {
             return "/";
+        }
+
+        if (Uri.TryCreate(raw, UriKind.Absolute, out Uri? absoluteUri))
+        {
+            string pathAndQuery = absoluteUri.PathAndQuery;
+            return string.IsNullOrWhiteSpace(pathAndQuery) ? "/" : pathAndQuery;
         }
 
         return raw.StartsWith("/") ? raw : $"/{raw}";

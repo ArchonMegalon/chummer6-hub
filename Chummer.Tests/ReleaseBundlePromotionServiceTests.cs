@@ -298,6 +298,38 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncAllowsExplicitUnsignedWindowsReleaseArtifactWhenEvidenceMarksUnsignedPublicRelease()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260618-142358",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-stable"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "unsigned_public_release",
+                    StartupSmokeStatusOverride: "skipped_incompatible_host")
+            ],
+            channel: "stable");
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260618-142358", result.Version);
+        Assert.Contains("avalonia-win-x64-installer", result.PromotedArtifactIds);
+        Assert.Contains("https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe", result.DirectFileUrls);
+        Assert.DoesNotContain(result.DirectFileUrls, static url => url.Contains("https://chummer.run/https://", StringComparison.OrdinalIgnoreCase));
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-win-x64-installer.exe")));
+    }
+
+    [Fact]
     public async Task PromoteAsyncCopiesWindowsProofPayloadWhenBundleProvidesIt()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -570,6 +602,61 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncMarksPromotedPrimaryInstallerAsReinstallRecoveryWhenFallbackIsMissing()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260618-142358",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux-stable"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ],
+            channel: "stable");
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+        JsonElement primary = canonical.RootElement
+            .GetProperty("desktopTupleCoverage")
+            .GetProperty("desktopRouteTruth")
+            .EnumerateArray()
+            .Single(row => row.GetProperty("tupleId").GetString() == "avalonia:linux:linux-x64");
+
+        Assert.Equal("promoted", primary.GetProperty("promotionState").GetString());
+        Assert.Equal("primary_reinstall_available", primary.GetProperty("rollbackState").GetString());
+        Assert.Equal("primary_installer_reinstall_available", primary.GetProperty("rollbackReasonCode").GetString());
+        Assert.Contains("avalonia-linux-x64-installer", primary.GetProperty("rollbackReason").GetString());
+
+        JsonElement releaseChannel = canonical.RootElement
+            .GetProperty("publicTrustMetrics")
+            .GetProperty("releaseChannel");
+        Assert.Equal("live", releaseChannel.GetProperty("posture").GetString());
+        Assert.Equal("public_stable", releaseChannel.GetProperty("rolloutState").GetString());
+        Assert.Equal("gold_supported", releaseChannel.GetProperty("supportabilityState").GetString());
+        Assert.Equal(1, releaseChannel.GetProperty("recommendedRouteCount").GetInt32());
+
+        JsonElement boundaryReleaseChannel = canonical.RootElement
+            .GetProperty("registryBoundaryCoverage")
+            .GetProperty("releaseChannel");
+        Assert.Equal("published", boundaryReleaseChannel.GetProperty("publicationStatus").GetString());
+        Assert.Equal("public_stable", boundaryReleaseChannel.GetProperty("rolloutState").GetString());
+        Assert.Equal("gold_supported", boundaryReleaseChannel.GetProperty("supportabilityState").GetString());
+        Assert.True(boundaryReleaseChannel.GetProperty("desktopTupleComplete").GetBoolean());
+        Assert.Equal(1, boundaryReleaseChannel.GetProperty("promotedInstallerTupleCount").GetInt32());
+        Assert.Equal("live", boundaryReleaseChannel.GetProperty("publicTrustPosture").GetString());
+    }
+
+    [Fact]
     public async Task PromoteAsyncRebuildsInstallAwareRegistryFromNormalizedRouteTruth()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -832,7 +919,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             bool includePromotionEvidence = true,
             IReadOnlyList<ProofArtifact>? proofArtifacts = null,
             string publishedAt = "2026-04-01T20:00:00Z",
-            string proofGeneratedAt = "2026-04-01T20:00:00Z")
+            string proofGeneratedAt = "2026-04-01T20:00:00Z",
+            string channel = "preview")
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -898,7 +986,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                     FileName: artifact.FileName,
                     Platform: artifact.Platform,
                     PromotionStatus: "pass",
-                    StartupSmokeStatus: "pass",
+                    StartupSmokeStatus: artifact.StartupSmokeStatusOverride ?? "pass",
                     SigningStatus: artifact.SigningStatusOverride ?? (artifact.RequiresSigning ? "pass" : null),
                     NotarizationStatus: artifact.NotarizationStatusOverride ?? (artifact.RequiresNotarization ? "pass" : null)));
             }
@@ -908,13 +996,15 @@ public sealed class ReleaseBundlePromotionServiceTests
                 version,
                 compatibilityArtifacts,
                 publishedAt,
-                proofGeneratedAt);
+                proofGeneratedAt,
+                channel);
             WriteCanonicalManifest(
                 Path.Combine(bundleRoot, "RELEASE_CHANNEL.generated.json"),
                 version,
                 canonicalArtifacts,
                 publishedAt,
-                proofGeneratedAt);
+                proofGeneratedAt,
+                channel);
 
             if (includePromotionEvidence)
             {
@@ -995,14 +1085,15 @@ public sealed class ReleaseBundlePromotionServiceTests
             string version,
             IReadOnlyList<CompatibilityArtifact> downloads,
             string publishedAt = "2026-04-01T20:00:00Z",
-            string proofGeneratedAt = "2026-04-01T20:00:00Z")
+            string proofGeneratedAt = "2026-04-01T20:00:00Z",
+            string channel = "preview")
         {
             File.WriteAllText(
                 path,
                 JsonSerializer.Serialize(new
                 {
                     version,
-                    channel = "preview",
+                    channel,
                     publishedAt,
                     releaseProof = new
                     {
@@ -1021,7 +1112,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             string version,
             IReadOnlyList<CanonicalArtifact> artifacts,
             string publishedAt = "2026-04-01T20:00:00Z",
-            string proofGeneratedAt = "2026-04-01T20:00:00Z")
+            string proofGeneratedAt = "2026-04-01T20:00:00Z",
+            string channel = "preview")
         {
             string[] proofRoutes = artifacts
                 .Select(static artifact => $"/downloads/install/{artifact.ArtifactId}")
@@ -1033,7 +1125,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 {
                     schemaVersion = 1,
                     product = "chummer",
-                    channelId = "preview",
+                    channelId = channel,
                     version,
                     publishedAt,
                     status = "published",
@@ -1080,6 +1172,7 @@ public sealed class ReleaseBundlePromotionServiceTests
         bool RequiresNotarization,
         string? SigningStatusOverride = null,
         string? NotarizationStatusOverride = null,
+        string? StartupSmokeStatusOverride = null,
         bool UseArtifactSha256ReceiptField = false,
         string? ReceiptPlatformOverride = null);
 
