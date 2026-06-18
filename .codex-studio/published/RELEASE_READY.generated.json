@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-06-18T17:50:52Z",
+  "generated_at_utc": "2026-06-18T18:35:39Z",
   "status": "pass",
   "verdict": "RELEASE_READY",
   "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash /docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
