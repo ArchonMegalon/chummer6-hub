@@ -10,12 +10,6 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
-            <span>Entry surface: @Model.EntrySurfaceLabel</span>
-            <span>Locale: @Model.Locale</span>
-            <span>@(Model.LocaleFallbackUsed ? "Locale fell back to default" : "Locale kept from request")</span>
-            <span>@Model.Widget.StatusLabel</span>
-        </div>
     </div>
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
@@ -27,39 +21,42 @@
 
 <section class="continuity-band trust-doc-band">
     <div class="continuity-band__copy">
-        <p class="eyebrow">Wrapper status</p>
-        <h2 class="editorial-title">Optional guidance, bounded trust, visible fallback.</h2>
-        <p class="editorial-copy">@Model.Widget.Summary</p>
+        <p class="eyebrow">Instant help</p>
+        <h2 class="editorial-title">Answer first. Show the path. Fix or report.</h2>
+        <p class="editorial-copy">Start with the shortest useful answer. If it is still unclear, open the exact page or send a private support note.</p>
     </div>
     <div class="continuity-band__panel">
-        @foreach (var point in Model.ProofPoints)
-        {
-            <article class="continuity-band__fact">
-                <span>Proof</span>
-                <strong>@point</strong>
-                <p>Chummer keeps the route choice, fallback links, and receipt correlation first-party.</p>
-            </article>
-        }
+        <article class="continuity-band__fact">
+            <span>Step 1</span>
+            <strong>Get the answer</strong>
+            <p>Pick the closest issue below and use the direct Chummer page first.</p>
+        </article>
+        <article class="continuity-band__fact">
+            <span>Step 2</span>
+            <strong>Open the right place</strong>
+            <p>Downloads, release notes, account return, and private support stay separate.</p>
+        </article>
+        <article class="continuity-band__fact">
+            <span>Step 3</span>
+            <strong>Send context if blocked</strong>
+            <p>Use support when setup, updates, or account return still fail.</p>
+        </article>
     </div>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Model.Widget.IframeHref))
 {
     <section class="release-shelf">
-        <details class="release-accordion" open>
-            <summary>Optional guided widget</summary>
+        <details class="release-accordion">
+            <summary>Show guided help</summary>
             <div class="release-accordion__body">
-                <p class="muted-copy">The embedded guide is optional. If it fails or gets disabled, the first-party branch cards below stay valid.</p>
+                <p class="muted-copy">If this panel does not load, use the choices below.</p>
                 <iframe
                     src="@Model.Widget.IframeHref"
                     title="@Model.Heading"
                     loading="lazy"
                     referrerpolicy="strict-origin-when-cross-origin"
                     style="width:100%;min-height:480px;border:1px solid rgba(255,255,255,.12);border-radius:1rem;background:rgba(9,14,19,.72);"></iframe>
-                @if (!string.IsNullOrWhiteSpace(Model.Widget.HostLabel))
-                {
-                    <p class="muted-copy">Embedded host: @Model.Widget.HostLabel</p>
-                }
             </div>
         </details>
     </section>
@@ -67,9 +64,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Choose a route</p>
-        <h2 class="editorial-title">Every branch still lands on a Chummer-owned next step or a bounded handoff with a visible fallback.</h2>
-        <p class="editorial-copy">Pick the closest match, and this wrapper will mint a first-party receipt before it redirects.</p>
+        <p class="eyebrow">Choose one</p>
+        <h2 class="editorial-title">Pick the next step that matches the problem.</h2>
+        <p class="editorial-copy">Use the direct path first. Keep private logs, account issues, and table details out of public feedback.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var branch in Model.Branches)
@@ -85,7 +82,7 @@
 </section>
 
 <section class="release-footnote">
-    <p class="eyebrow">First-party boundary</p>
-    <h2 class="editorial-title">Support, install, account, and publication truth remain on Hub-owned rails.</h2>
-    <p class="editorial-copy">This page can shorten the choice. It does not replace the downloads shelf, support case truth, account ownership, or publication governance.</p>
+    <p class="eyebrow">Still blocked?</p>
+    <h2 class="editorial-title">Send the issue with enough context to reproduce it.</h2>
+    <p class="editorial-copy">For setup problems, include platform, build, and what happened right before the failure.</p>
 </section>

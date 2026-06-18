@@ -63,7 +63,7 @@ test('core public pages do not expose AI or repo-process copy', async ({ page })
     'GitHub',
   ];
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
@@ -88,4 +88,26 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   expect(llmsText).not.toContain('/black-ledger');
   expect(llmsText).not.toContain('Black Ledger');
   expect(llmsText).toContain('/alice : character helper entry');
+});
+
+test('downloads concierge reads like instant support, not internal governance', async ({ page }) => {
+  await page.goto(`${baseUrl}/downloads/concierge`, { waitUntil: 'domcontentloaded' });
+  const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+
+  expect(bodyText).toContain('Answer first. Show the path. Fix or report.');
+  for (const term of [
+    'Wrapper status',
+    'Proof',
+    'receipt',
+    'bounded handoff',
+    'first-party boundary',
+    'mint',
+    'booking',
+    'setup clinic',
+    'help session',
+    'call',
+    'Lunacal',
+  ]) {
+    expect(bodyText, `/downloads/concierge should not expose "${term}"`).not.toContain(term);
+  }
 });
