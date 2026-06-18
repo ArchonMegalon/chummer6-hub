@@ -35,7 +35,8 @@ public sealed class PublicSignalProjectionBridgeViewTests
         Assert.Contains("var signalProjection = Model.SignalProjection;", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", changelogView, StringComparison.Ordinal);
         Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", feedbackView, StringComparison.Ordinal);
-        Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Model.SignalLoop", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("milestoneFollowUp", roadmapView, StringComparison.Ordinal);
         Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", changelogView, StringComparison.Ordinal);
     }
 

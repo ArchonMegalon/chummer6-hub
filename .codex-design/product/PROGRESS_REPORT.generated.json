@@ -1,9 +1,9 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-06-17T18:19:23Z",
-  "as_of": "2026-06-17",
-  "history_snapshot_count": 40,
+  "generated_at": "2026-06-18T23:44:01Z",
+  "as_of": "2026-06-18",
+  "history_snapshot_count": 42,
   "brand": "Chummer6",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
@@ -21,7 +21,7 @@
   "top_risks": [
     {
       "key": "completion_frontier",
-      "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate proof is stale (444394s old)"
+      "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate primary .deb install/remove verification is invalid"
     },
     {
       "key": "full_product_queue",
@@ -30,7 +30,7 @@
   ],
   "flagship_readiness": {
     "status": "ready",
-    "summary": "{'ready_count': 8, 'warning_count': 0, 'missing_count': 0, 'scoped_warning_count': 0, 'scoped_missing_count': 0, 'deferred_warning_count': 0, 'history_snapshot_count': 40}",
+    "summary": "Published flagship readiness proof is green across 8 checked areas.",
     "feature_parity_proven": true,
     "layout_familiarity_proven": true,
     "desktop_executable_gate_status": "pass",
@@ -48,7 +48,7 @@
   },
   "release_readiness": {
     "status": "warning",
-    "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate proof is stale (444394s old). Mapped public parts are at zero open milestone weight, but there are still 1 open milestones in the full-product frontier. The current supervisor ETA is scoped to Completion review and proof recovery, so it should not be read as a full-product parity ETA.",
+    "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate primary .deb install/remove verification is invalid. Mapped public parts are at zero open milestone weight, but there are still 1 open milestones in the full-product frontier. The current supervisor ETA is scoped to Completion review and proof recovery, so it should not be read as a full-product parity ETA.",
     "blocking_parts": []
   },
   "parity": {
@@ -75,7 +75,7 @@
         "tone": "implemented"
       },
       "summary": "Package compatibility, install, update, rollback, and revoke claims are published from the current release shelf instead of helper folklore.",
-      "detail": "2 compatible installer tuple(s) are published. Rollout state is promoted_preview, support posture is preview_supported, and rollback stays armed.",
+      "detail": "2 compatible installer tuple(s) are published. Rollout state is stable, support posture is gold_supported, and rollback stays armed.",
       "evidence": [
         "Release channel: published",
         "Release proof: passed",
@@ -85,12 +85,12 @@
       "package_claims": {
         "compatible_installer_count": 2,
         "published_installer_count": 2,
-        "rollout_state": "promoted_preview",
-        "supportability_state": "preview_supported",
+        "rollout_state": "stable",
+        "supportability_state": "gold_supported",
         "rollback_state": "armed",
         "revoke_state": "not_revoked",
         "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage.",
-        "supportability_summary": "Current preview release is supported on the promoted routes. Recent checks cover install guidance, session recovery, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up."
+        "supportability_summary": "Current public release is supported on the promoted routes. Recent checks cover install guidance, session recovery, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up."
       }
     },
     {
@@ -105,7 +105,7 @@
         "tone": "stable"
       },
       "summary": "The public route only claims the flagship workbench when executable proof and veteran-familiar desktop signals agree.",
-      "detail": "{'ready_count': 8, 'warning_count': 0, 'missing_count': 0, 'scoped_warning_count': 0, 'scoped_missing_count': 0, 'deferred_warning_count': 0, 'history_snapshot_count': 40}",
+      "detail": "Published flagship readiness proof is green across 8 checked areas.",
       "evidence": [
         "Flagship readiness: ready",
         "Desktop executable gate: pass",
@@ -143,7 +143,7 @@
         "tone": "stable"
       },
       "summary": "Support is a closure lane tied to install and release receipts. It is not the same thing as votes, proposals, or roadmap wishes.",
-      "detail": "0 open packet(s); 0 waiting on release truth. Current source refresh is degraded: support source refresh requires operator authentication",
+      "detail": "0 open packet(s); 0 waiting on release truth.",
       "evidence": [
         "Support packets artifact: present",
         "Open packets: 0",
@@ -181,7 +181,7 @@
         "tone": "preview"
       },
       "summary": "Governance cards describe launch, canary, rollback, and claim-safety posture. They do not imply immediate rollout just because a proposal exists.",
-      "detail": "linux desktop exit gate proof is stale (444394s old)",
+      "detail": "linux desktop exit gate primary .deb install/remove verification is invalid",
       "evidence": [
         "Completion audit: fail",
         "Launch expand: blocked",
@@ -256,7 +256,7 @@
           "body": "A boring, auditable core runtime with no hidden legacy cargo."
         }
       ],
-      "recent_commit_count_7d": 22,
+      "recent_commit_count_7d": 24,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -288,7 +288,7 @@
           "repo_slug": "chummer6-core",
           "path": "/docker/chummercomplete/chummer6-core",
           "lifecycle": "live",
-          "recent_commit_count_7d": 22,
+          "recent_commit_count_7d": 24,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -342,7 +342,7 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 93,
+      "recent_commit_count_7d": 116,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -375,13 +375,13 @@
           "repo_slug": "chummer6-ui",
           "path": "/docker/chummercomplete/chummer6-ui",
           "lifecycle": "live",
-          "recent_commit_count_7d": 92,
+          "recent_commit_count_7d": 114,
           "design_total_weight": 56,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-17T18:17:49.085788Z",
+            "published_at": "2026-06-18T23:10:00.485230Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -465,7 +465,7 @@
           "repo_slug": "chummer6-ui-kit",
           "path": "/docker/chummercomplete/chummer-ui-kit",
           "lifecycle": "scaffold",
-          "recent_commit_count_7d": 1,
+          "recent_commit_count_7d": 2,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -518,7 +518,7 @@
           "body": "A reliable session shell that survives weak networks and resumes cleanly."
         }
       ],
-      "recent_commit_count_7d": 1,
+      "recent_commit_count_7d": 2,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -550,7 +550,7 @@
           "repo_slug": "chummer6-mobile",
           "path": "/docker/chummercomplete/chummer6-mobile",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 1,
+          "recent_commit_count_7d": 2,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -607,7 +607,7 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 125,
+      "recent_commit_count_7d": 180,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -640,13 +640,13 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 106,
+          "recent_commit_count_7d": 143,
           "design_total_weight": 60,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-17T18:05:43.106956Z",
+            "published_at": "2026-06-18T23:14:27.604789Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -710,13 +710,13 @@
           "repo_slug": "chummer6-hub-registry",
           "path": "/docker/chummercomplete/chummer-hub-registry",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 15,
+          "recent_commit_count_7d": 32,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-17T17:07:42.308284Z",
+            "published_at": "2026-06-18T23:10:01.802224Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -740,7 +740,7 @@
           "repo_slug": "chummer6-media-factory",
           "path": "/docker/fleet/repos/chummer-media-factory",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 4,
+          "recent_commit_count_7d": 5,
           "design_total_weight": 54,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -794,7 +794,7 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 37,
+      "recent_commit_count_7d": 64,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -827,7 +827,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 23,
+          "recent_commit_count_7d": 39,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -854,7 +854,7 @@
           "repo_slug": "Chummer6",
           "path": "/docker/chummercomplete/Chummer6",
           "lifecycle": "signoff_only",
-          "recent_commit_count_7d": 14,
+          "recent_commit_count_7d": 25,
           "design_total_weight": 1,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -921,7 +921,7 @@
       "Mapped public milestones are complete, but the full-product frontier remains open with 1 milestone(s). Full completion requires full frontier closure.",
       "The current supervisor ETA is tactical or otherwise not yet calendar-grade enough for a full-product parity forecast, so the public surface tracks the remaining frontier without publishing a parity date band."
     ],
-    "history_snapshot_count": 40
+    "history_snapshot_count": 42
   },
   "eta_scope": "full_product_queue_unestimated",
   "full_product_queue": {
@@ -948,14 +948,6 @@
       "remaining_not_started_milestones": 0
     },
     "active_runs": [
-      {
-        "run_id": "20260613T160606Z-shard-1",
-        "shard": "shard-1",
-        "frontier_count": 1,
-        "frontier_ids": [
-          1239074135
-        ]
-      },
       {
         "run_id": "20260613T162729Z-shard-2",
         "shard": "shard-2",

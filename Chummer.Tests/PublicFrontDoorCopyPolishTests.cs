@@ -49,6 +49,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains(@"\bBlack Ledger\b", script, StringComparison.Ordinal);
         Assert.Contains(@"\bproof\b", script, StringComparison.Ordinal);
         Assert.Contains(@"\breceipt\b", script, StringComparison.Ordinal);
+        Assert.Contains(@"\bprovider\b", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -56,7 +57,20 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("ALICE generated an AI proof receipt for the Black Ledger operator lane.");
 
-        Assert.Equal("Alice created an assistant check for the campaign city user path.", cleaned);
+        Assert.Equal("Alice created a check for the campaign city user path.", cleaned);
+        Assert.DoesNotContain("AI", cleaned, StringComparison.Ordinal);
+        Assert.DoesNotContain("assistant", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Auth_entry_avoids_internal_install_link_language()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
+        string visibleText = ExtractVisibleText(view);
+
+        Assert.DoesNotContain("handoff", visibleText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("callback", visibleText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Keep this install attached to your account.", visibleText, StringComparison.Ordinal);
     }
 
     private static readonly string[] ForbiddenVisibleMarkers =

@@ -35,7 +35,7 @@ public sealed class PublicConciergeServiceTests
         Assert.Contains("First-party fallback stays visible", page.ProofPoints, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(4, page.Branches.Count);
         Assert.Contains(page.Branches, branch => branch.BranchId == "download_now" && branch.ActionHref.Contains("/downloads/concierge/download_now", StringComparison.Ordinal));
-        Assert.Contains(page.Branches, branch => branch.BranchId == "human_setup_call" && branch.DestinationLabel.Contains("Human escalation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(page.Branches, branch => branch.BranchId == "human_setup_call" && branch.DestinationLabel.Contains("Support follow-up", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class PublicConciergeServiceTests
         Assert.StartsWith("https://book.example.invalid/setup", resolution.RedirectHref, StringComparison.Ordinal);
         Assert.Contains("concierge_flow_id=downloads_concierge", resolution.RedirectHref, StringComparison.Ordinal);
         Assert.Contains("locale=en-US", resolution.RedirectHref, StringComparison.Ordinal);
-        Assert.Equal("Human escalation with first-party fallback", resolution.DestinationLabel);
+        Assert.Equal("Support follow-up", resolution.DestinationLabel);
 
         PublicConciergeBranchReceipt receipt = Assert.Single(store.BranchReceiptsById.Values);
         Assert.Equal(resolution.ReceiptId, receipt.ReceiptId);

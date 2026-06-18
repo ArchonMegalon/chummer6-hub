@@ -32,6 +32,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
                 ["PROMPT_ARCHITECTS_DATA_RETENTION_REVIEWED"] = "true",
                 ["PROMPT_ARCHITECTS_TEAM_PERMISSIONS_REVIEWED"] = "true",
                 ["PAYFUNNELS_WEBHOOK_SECRET"] = "pf-webhook-secret",
+                ["SUBSCRIBR_API_TOKEN"] = "subscribr-api-secret",
+                ["SUBSCRIBR_WEBHOOK_SECRET"] = "subscribr-webhook-secret",
+                ["SUBSCRIBR_TEAM_ID"] = "team-7",
+                ["SUBSCRIBR_INTEGRATION_CHANNEL_ID"] = "channel-integration",
                 ["CHUMMER_EA_UNMIXR_TIER"] = "4",
                 ["CHUMMER_EA_UNMIXR_EMAIL"] = "voice@example.com",
                 ["CHUMMER_EA_UNMIXR_PASSWORD"] = "unmixr-login-secret",
@@ -61,6 +65,13 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.True(payFunnels.EmailConfigured);
         Assert.Equal("configured", payFunnels.Status);
 
+        ExecutiveAssistantCredentialEntry subscribr = Assert.Single(result.Entries, static entry => entry.ToolId == "subscribr");
+        Assert.Equal("7", subscribr.Tier);
+        Assert.True(subscribr.EmailConfigured);
+        Assert.True(subscribr.PasswordConfigured);
+        Assert.True(subscribr.PasswordAltConfigured);
+        Assert.Equal("tracked_video_script_preproduction_lane", subscribr.Status);
+
         ExecutiveAssistantCredentialEntry magicfitSession = Assert.Single(result.Entries, static entry => entry.ToolId == "magicfit_session");
         Assert.Equal("5", magicfitSession.Tier);
         Assert.Equal("s***@e***", magicfitSession.EmailMasked);
@@ -81,6 +92,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.DoesNotContain("session-rangersofB5", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("pa-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("pf-webhook-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("subscribr-api-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("subscribr-webhook-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("team-7", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("channel-integration", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("unmixr-login-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("unmixr-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("voice-123", serialized, StringComparison.Ordinal);
@@ -111,6 +126,9 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
 
         ExecutiveAssistantCredentialEntry payfunnels = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "payfunnels");
         Assert.Equal("missing", payfunnels.Status);
+
+        ExecutiveAssistantCredentialEntry subscribr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "subscribr");
+        Assert.Equal("missing", subscribr.Status);
 
         ExecutiveAssistantCredentialEntry magicfitSession = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicfit_session");
         Assert.Equal("missing", magicfitSession.Status);

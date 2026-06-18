@@ -16,7 +16,7 @@ public sealed class RoadmapMilestoneProjectionViewTests
         Assert.Contains("Votes inform demand", source, StringComparison.Ordinal);
         Assert.Contains("Open changelog", source, StringComparison.Ordinal);
         Assert.Contains("Model.Milestones", source, StringComparison.Ordinal);
-        Assert.Contains("Milestone ledger", source, StringComparison.Ordinal);
+        Assert.Contains("roadmap-milestones", source, StringComparison.Ordinal);
         Assert.Contains("Difficulty:", source, StringComparison.Ordinal);
         Assert.Contains("Claimed:", source, StringComparison.Ordinal);
         Assert.Contains("Dependencies:", source, StringComparison.Ordinal);

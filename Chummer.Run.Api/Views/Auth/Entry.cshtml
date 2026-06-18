@@ -44,7 +44,7 @@
         <div class="auth-value-strip" aria-label="Immediate account value">
             <article class="auth-value-strip__fact">
                 <span>Linked installs</span>
-                <strong>Keep the handoff attached to this return path.</strong>
+                <strong>Keep this install attached to your account.</strong>
             </article>
             <article class="auth-value-strip__fact">
                 <span>Devices and access</span>
@@ -90,8 +90,8 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If the local callback stalls, use the button again from the same browser."
-                    : "The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.")</p>
+                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If it stalls, use the button again from the same browser."
+                    : "The next page opens Chummer to finish linking this install. If the browser blocks it, use the manual open button.")</p>
             }
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
@@ -132,8 +132,8 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If the local callback stalls, use the button again from the same browser."
-                    : "The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.")</p>
+                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If it stalls, use the button again from the same browser."
+                    : "The next page opens Chummer to finish linking this install. If the browser blocks it, use the manual open button.")</p>
             }
 
             <form class="auth-form" method="post" action="/auth/email/start">

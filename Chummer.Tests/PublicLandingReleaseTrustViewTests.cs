@@ -466,8 +466,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("tracked history", packages, StringComparison.Ordinal);
         Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
 
-        Assert.Contains("next step stays attached", trustPage, StringComparison.Ordinal);
-        Assert.DoesNotContain("follow-through stays attached", trustPage, StringComparison.Ordinal);
+        Assert.Contains("support follow-up separate", trustPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("human escalation", trustPage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Browser handoff", trustPage, StringComparison.Ordinal);
 
         Assert.Contains("support history", faq, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", faq, StringComparison.Ordinal);
@@ -844,7 +845,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open the related detail view", view, StringComparison.Ordinal);
         Assert.Contains("Install or update Chummer", view, StringComparison.Ordinal);
         Assert.Contains("Get help if this becomes a setup or account issue", view, StringComparison.Ordinal);
-        Assert.Contains("Pick the next page for the job: install, check status, read more, or get help.", view, StringComparison.Ordinal);
+        Assert.Contains("Pick the next page for the job: install, check status, check detail, or get help.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", view, StringComparison.Ordinal);
     }
 
@@ -883,7 +884,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
         Assert.Contains("The next page finishes linking this install with your running Chummer app in this browser tab.", view, StringComparison.Ordinal);
-        Assert.Contains("If the local callback stalls, use the button again from the same browser.", view, StringComparison.Ordinal);
+        Assert.Contains("If it stalls, use the button again from the same browser.", view, StringComparison.Ordinal);
     }
 
     [Fact]

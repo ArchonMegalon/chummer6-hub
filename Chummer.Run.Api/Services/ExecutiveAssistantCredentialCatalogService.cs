@@ -31,6 +31,7 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             BuildMagicfitSessionEntry(),
             BuildPromptArchitectsEntry(),
             BuildPayFunnelsEntry(),
+            BuildSubscribrEntry(),
             BuildUnmixrEntry(),
             BuildInventoryOnlyEntry("joggai", "4", "tracked_in_discovery"),
             BuildInventoryOnlyEntry("dadan", "candidate", "inventory_only"),
@@ -157,6 +158,32 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordAltConfigured: false,
             MirrorsDefault: false,
             Status: string.IsNullOrWhiteSpace(GetValue(webhookSecret)) ? "missing" : "configured");
+    }
+
+    private ExecutiveAssistantCredentialEntry BuildSubscribrEntry()
+    {
+        const string apiTokenKey = "SUBSCRIBR_API_TOKEN";
+        const string webhookSecretKey = "SUBSCRIBR_WEBHOOK_SECRET";
+        const string teamIdKey = "SUBSCRIBR_TEAM_ID";
+        const string channelIdKey = "SUBSCRIBR_INTEGRATION_CHANNEL_ID";
+
+        bool apiConfigured = !string.IsNullOrWhiteSpace(GetValue(apiTokenKey));
+        bool webhookConfigured = !string.IsNullOrWhiteSpace(GetValue(webhookSecretKey));
+        bool mapped = !string.IsNullOrWhiteSpace(GetValue(teamIdKey))
+            && !string.IsNullOrWhiteSpace(GetValue(channelIdKey));
+
+        return new ExecutiveAssistantCredentialEntry(
+            ToolId: "subscribr",
+            Tier: "7",
+            EmailKey: apiTokenKey,
+            PasswordKey: webhookSecretKey,
+            PasswordAltKey: channelIdKey,
+            EmailMasked: null,
+            EmailConfigured: apiConfigured,
+            PasswordConfigured: webhookConfigured,
+            PasswordAltConfigured: mapped,
+            MirrorsDefault: false,
+            Status: apiConfigured && mapped ? "tracked_video_script_preproduction_lane" : "missing");
     }
 
     private ExecutiveAssistantCredentialEntry BuildUnmixrEntry()

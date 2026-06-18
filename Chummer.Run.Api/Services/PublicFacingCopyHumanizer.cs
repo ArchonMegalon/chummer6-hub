@@ -15,6 +15,8 @@ public static partial class PublicFacingCopyHumanizer
         ("generated", "created"),
         ("Unmixr AI", "Unmixr"),
         ("source packet", "source"),
+        ("provider", "service"),
+        ("LTD", "tool"),
         ("proof trail", "checks"),
         ("proof", "check"),
         ("receipt", "check"),
@@ -37,7 +39,8 @@ public static partial class PublicFacingCopyHumanizer
             cleaned = cleaned.Replace(from, to, StringComparison.OrdinalIgnoreCase);
         }
 
-        cleaned = StandaloneAiRegex().Replace(cleaned, "assistant");
+        cleaned = ArticleAiRegex().Replace(cleaned, "a");
+        cleaned = StandaloneAiRegex().Replace(cleaned, "help");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         return cleaned.Trim();
@@ -58,4 +61,7 @@ public static partial class PublicFacingCopyHumanizer
 
     [GeneratedRegex(@"\bAI\b", RegexOptions.CultureInvariant)]
     private static partial Regex StandaloneAiRegex();
+
+    [GeneratedRegex(@"\ban\s+AI\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ArticleAiRegex();
 }

@@ -14,7 +14,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback", doc, StringComparison.Ordinal);
         Assert.Contains("/changelog", doc, StringComparison.Ordinal);
-        Assert.Contains("/ledger", doc, StringComparison.Ordinal);
+        Assert.Contains("direct-access lab routes until Black Ledger clears the normal-user visual and behavior bar", doc, StringComparison.Ordinal);
         Assert.Contains("/alice", doc, StringComparison.Ordinal);
         Assert.Contains("/table-pulse", doc, StringComparison.Ordinal);
         Assert.Contains("/quicksilver", doc, StringComparison.Ordinal);
@@ -42,7 +42,9 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
-        Assert.Contains("/ledger", llms, StringComparison.Ordinal);
+        Assert.DoesNotContain("/ledger", llms, StringComparison.Ordinal);
+        Assert.DoesNotContain("/ledger", ai, StringComparison.Ordinal);
+        Assert.DoesNotContain("/black-ledger", llms, StringComparison.Ordinal);
         Assert.Contains("/alice", llms, StringComparison.Ordinal);
         Assert.Contains("/table-pulse", llms, StringComparison.Ordinal);
         Assert.Contains("/quicksilver", llms, StringComparison.Ordinal);
@@ -170,8 +172,16 @@ public sealed class PublicSurfaceReferenceFilesTests
             Assert.True(File.Exists(mp4Path), $"Missing published MP4 for {title}: {publicMp4}");
             Assert.True(File.Exists(captionsPath), $"Missing captions for {title}: {publicCaptions}");
             Assert.StartsWith("WEBVTT", File.ReadAllText(captionsPath), StringComparison.Ordinal);
-            Assert.Contains(publicMp4, horizonView, StringComparison.Ordinal);
-            Assert.Contains(publicCaptions, horizonView, StringComparison.Ordinal);
+            if (string.Equals(asset.GetProperty("horizon_id").GetString(), "black-ledger", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain(publicMp4, horizonView, StringComparison.Ordinal);
+                Assert.DoesNotContain(publicCaptions, horizonView, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Contains(publicMp4, horizonView, StringComparison.Ordinal);
+                Assert.Contains(publicCaptions, horizonView, StringComparison.Ordinal);
+            }
 
             horizonIds.Add(asset.GetProperty("horizon_id").GetString() ?? string.Empty);
             assetCount++;
@@ -254,11 +264,11 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "runbook-press.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "table-pulse.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "community-hub.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "onramp.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "edition-studio.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "run-control.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "local-co-processor.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "quicksilver.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "origin-dossier.md"),
         };
 
         string combined = string.Join("\n", shippedGuideFiles.Select(File.ReadAllText));
@@ -276,13 +286,13 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "knowledge-fabric.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runbook-press.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "table-pulse.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "onramp.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "edition-studio.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "run-control.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "local-co-processor.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "jackpoint.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runsite.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "quicksilver.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "origin-dossier.md"),
         };
 
         string combined = string.Join("\n", shippedHorizonDocs.Select(File.ReadAllText));
