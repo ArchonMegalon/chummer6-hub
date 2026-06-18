@@ -23,9 +23,9 @@ test('public homepage stays readable across flagship responsive viewports', asyn
   for (const viewport of viewports) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.launch-hero__title')).toContainText('The city is moving.');
-    await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Black Ledger');
-    await expect(page.locator('[data-homepage-section="flagship-promo"]')).toContainText('Build the runner. Run the table. Move the city.');
+    await expect(page.locator('.launch-hero__title')).toContainText('Build the runner. Run the night.');
+    await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Download Chummer');
+    await expect(page.locator('[data-homepage-section="flagship-promo"]')).toContainText('A short look at the product.');
 
     const overflow = await page.evaluate(() => {
       const root = document.documentElement;

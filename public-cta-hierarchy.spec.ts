@@ -12,17 +12,19 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
   const landing = readFileSync(landingViewPath, 'utf8');
   const downloads = readFileSync(downloadsViewPath, 'utf8');
 
-  expect(manifest).toContain('- label: Open downloads');
+  expect(manifest).toContain('- label: Download Chummer');
   expect(manifest).toContain('- label: Create account');
-  expect(manifest).toContain('product_proof_primary_label: Open downloads');
+  expect(manifest).toContain('product_proof_primary_label: Download Chummer');
 
   expect(landing).toContain('Open downloads');
-  expect(landing).toContain('Open Black Ledger');
   expect(landing).toContain('Download Chummer');
   expect(landing).toContain('Open play shell');
   expect(landing).toContain('Open status');
-  expect(landing).toContain('Ledger for the city. Downloads for the build. Play for the shell. Status for release health.');
+  expect(landing).toContain('Start where you need to.');
+  expect(landing).not.toContain('Open Black Ledger');
 
-  expect(downloads).toContain('Open downloads');
+  expect(downloads).toContain('Nightly');
+  expect(downloads).toContain('Stable');
+  expect(downloads).toContain('Choose the latest build for Windows or Linux.');
   expect(downloads).not.toContain('Create account to install</a>');
 });

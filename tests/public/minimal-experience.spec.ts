@@ -15,8 +15,8 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (navPanelOpen) {
     failures.push('homepage: navigation panel is open by default');
   }
-  await expect(desktop.locator('.launch-hero__actions a.button-like').first()).toContainText('Open Black Ledger');
-  await expect(desktop.locator('[data-homepage-section="play-downloads"]')).toContainText('Install, play, or open the city.');
+  await expect(desktop.locator('.launch-hero__actions a.button-like').first()).toContainText('Download Chummer');
+  await expect(desktop.locator('[data-homepage-section="play-downloads"]')).toContainText('Start where you need to.');
   const homeVideo = desktop.locator('.flagship-promo-player__video');
   await expect(homeVideo).toBeVisible();
   const homePlayback = await homeVideo.evaluate(async (node) => {
@@ -135,7 +135,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: nav closed by default, recommended install before filters, one status decision card plus one next-action rail, no public ledger provenance wording.',
+      '- Checks: nav closed by default, homepage starts with downloads, recommended install before filters, one status decision card plus one next-action rail, no public ledger provenance wording.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),
