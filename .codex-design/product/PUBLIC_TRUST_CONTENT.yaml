@@ -83,7 +83,7 @@ trust_pages:
       - id: install-linking
         eyebrow: "Install linking"
         heading: "The download file is the same for everyone"
-        body: "When Chummer publishes a download, everyone gets the same file. Chummer does not build a private installer just for your account. If account linking is available, the account-aware piece is the short-lived code that reconnects a local copy back to your account."
+        body: "When Chummer publishes a download, everyone gets the same file. Chummer does not build a private installer just for your account. If account linking is available, the account step is a short-lived code that reconnects a local copy back to your account."
       - id: not-in-hub
         eyebrow: "What stays out"
         heading: "Temporary sign-in tokens and raw secrets stay out of your account record"
@@ -185,7 +185,7 @@ faq_pages:
         entries:
           - question: "Do I need an account to download the current release?"
             answer: "No. The current Linux package is open public. Create an account when you want recovery, tracked support, and a cleaner return path when linked downloads are available."
-          - question: "Do I get a personalized download?"
+          - question: "Does the account change the download file?"
             answer: "No. The published package stays the same for everyone. Account linking is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
             answer: "Start with Downloads, then use Contact or Account > Support. Public issue threads are optional and not the default support door."

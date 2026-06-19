@@ -12042,12 +12042,12 @@ def main() -> int:
         AuditRoute(
             "/help",
             "Get help without guessing",
-            required_texts=("Choose the next safe help path.", "Open support intake", "Keep access and recovery on one calm path"),
+            required_texts=("Choose the right path.", "Open support intake", "Start with Downloads"),
             expects_header_count=1),
         AuditRoute(
             "/faq",
             "Plain answers before you spend more time",
-            required_texts=("Open downloads", "Open support instead of guessing", "Create an account"),
+            required_texts=("Open downloads", "Open support intake", "Create account"),
             expects_header_count=1),
         AuditRoute(
             "/contact",
@@ -12061,8 +12061,8 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/terms",
-            "Preview terms in plain language",
-            required_texts=("The product is real, but still early access", "Use the current public download first"),
+            "Terms in plain language",
+            required_texts=("Labels should say what you can install", "Use the current public download first"),
             expects_header_count=1),
         AuditRoute(
             "/robots.txt",
