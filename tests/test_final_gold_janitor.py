@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -21,7 +22,9 @@ def load_module():
 
 class FinalGoldJanitorTests(unittest.TestCase):
     def test_payload_uses_current_v20_root(self) -> None:
-        module = load_module()
+        with mock.patch.dict(os.environ, {}, clear=True):
+            module = load_module()
+        self.assertEqual("full_product_reaudit_v20", module.ARTIFACT_ROOT_NAME)
         with tempfile.TemporaryDirectory(prefix="gold-janitor-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
@@ -34,7 +37,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
 
-        self.assertEqual(payload["artifact_root"], f"_completion/{module.ARTIFACT_ROOT_NAME}")
+        self.assertEqual(payload["artifact_root"], "_completion/full_product_reaudit_v20")
         self.assertEqual(payload["scope"], "full_estate_v20")
 
     def test_payload_fails_on_stale_recrawl(self) -> None:
