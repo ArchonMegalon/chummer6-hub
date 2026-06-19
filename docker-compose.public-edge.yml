@@ -239,6 +239,7 @@ services:
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
+      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
