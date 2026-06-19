@@ -8022,13 +8022,13 @@ body {
 
 /* Minimal public front door, June 2026 redesign. */
 .surface-minimal {
-  --minimal-page: #f4f1ea;
-  --minimal-surface: #fffdf8;
-  --minimal-ink: #171717;
-  --minimal-muted: #676057;
-  --minimal-line: rgba(23, 23, 23, 0.12);
-  --minimal-accent: #0f766e;
-  --minimal-amber: #9b6b20;
+  --minimal-page: #f7f6f2;
+  --minimal-surface: #fffefa;
+  --minimal-ink: #151515;
+  --minimal-muted: #5f5b52;
+  --minimal-line: rgba(21, 21, 21, 0.14);
+  --minimal-accent: #2f5f4b;
+  --minimal-soft: #ece8df;
   background: var(--minimal-page);
   color: var(--minimal-ink);
 }
@@ -8060,13 +8060,13 @@ body {
 }
 
 .surface-minimal .site-main {
-  width: min(1120px, calc(100% - 2rem));
+  width: min(1060px, calc(100% - 2rem));
   padding-top: 2rem;
 }
 
 .surface-minimal.route-landing .site-main {
-  width: min(1180px, calc(100% - 2rem));
-  padding-top: 2rem;
+  width: min(1120px, calc(100% - 2rem));
+  padding-top: clamp(1rem, 3vw, 2rem);
 }
 
 .surface-minimal .button-like,
@@ -8075,6 +8075,7 @@ body {
   border-radius: 0;
   box-shadow: none;
   font-weight: 700;
+  letter-spacing: 0;
 }
 
 .surface-minimal .button-like:hover,
@@ -8120,20 +8121,20 @@ body {
 
 .minimal-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.86fr) minmax(320px, 1fr);
-  gap: clamp(2rem, 6vw, 5rem);
+  grid-template-columns: minmax(0, 0.78fr) minmax(320px, 1fr);
+  gap: clamp(2rem, 6vw, 4.75rem);
   align-items: center;
-  min-height: min(720px, calc(100vh - 8rem));
-  padding: clamp(3rem, 7vw, 6.5rem) 0;
+  min-height: min(620px, calc(100vh - 7rem));
+  padding: clamp(2.6rem, 6vw, 5.75rem) 0;
 }
 
 .minimal-kicker {
   margin: 0 0 0.9rem;
   color: var(--minimal-accent);
   font-size: 0.86rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .minimal-hero h1,
@@ -8142,8 +8143,8 @@ body {
   max-width: 12ch;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(4rem, 12vw, 9rem);
-  line-height: 0.9;
+  font-size: clamp(3.8rem, 10vw, 7.6rem);
+  line-height: 0.92;
   letter-spacing: 0;
 }
 
@@ -8155,11 +8156,11 @@ body {
 .minimal-hero__lead,
 .minimal-page-hero p,
 .minimal-section__lead p {
-  max-width: 42rem;
+  max-width: 39rem;
   margin: 1.1rem 0 0;
   color: var(--minimal-muted);
-  font-size: clamp(1.05rem, 2.1vw, 1.35rem);
-  line-height: 1.45;
+  font-size: clamp(1.06rem, 1.8vw, 1.28rem);
+  line-height: 1.5;
 }
 
 .minimal-actions {
@@ -8178,7 +8179,7 @@ body {
 .minimal-hero__visual {
   margin: 0;
   border: 1px solid var(--minimal-line);
-  background: #111;
+  background: var(--minimal-soft);
   overflow: hidden;
 }
 
@@ -8188,8 +8189,20 @@ body {
   object-fit: cover;
 }
 
+.minimal-hero__visual--screenshot {
+  aspect-ratio: 6 / 5;
+}
+
+.minimal-hero__visual--screenshot img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: left top;
+}
+
 .minimal-section {
-  padding: clamp(2.5rem, 6vw, 5rem) 0;
+  padding: clamp(2.35rem, 5vw, 4.5rem) 0;
 }
 
 .minimal-section--tight {
@@ -8199,7 +8212,7 @@ body {
 .minimal-section__lead {
   display: grid;
   gap: 0.55rem;
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.2rem;
 }
 
 .minimal-section h2,
@@ -8207,8 +8220,8 @@ body {
   margin: 0;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 0.98;
+  font-size: clamp(1.8rem, 4vw, 3.4rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -8241,7 +8254,7 @@ body {
 .minimal-platform-list article,
 .minimal-facts article,
 .minimal-empty {
-  padding: clamp(1rem, 3vw, 1.6rem);
+  padding: clamp(1rem, 2.8vw, 1.55rem);
 }
 
 .minimal-three h3,
@@ -8249,7 +8262,7 @@ body {
 .minimal-facts h3 {
   margin: 0;
   color: var(--minimal-ink);
-  font-size: 1.2rem;
+  font-size: 1.08rem;
   letter-spacing: 0;
 }
 
@@ -8260,7 +8273,7 @@ body {
 .minimal-facts p {
   margin: 0.65rem 0 0;
   color: var(--minimal-muted);
-  line-height: 1.5;
+  line-height: 1.52;
 }
 
 .minimal-download-strip {
@@ -8270,7 +8283,7 @@ body {
 .minimal-download-strip__item {
   display: grid;
   gap: 0.55rem;
-  min-height: 9rem;
+  min-height: 8.2rem;
   color: var(--minimal-ink);
 }
 
