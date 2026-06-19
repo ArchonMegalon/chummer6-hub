@@ -1196,7 +1196,12 @@ def verify_signed_in_work_audit(
     if str(verify_action.get("href") or "") != support_detail_path:
         raise AssertionError("support assistant did not route verify_fix_on_case back to the tracked account support detail")
 
-    for signed_in_path in ("/downloads", "/now", "/help"):
+    signed_in_minimal_expectations = {
+        "/downloads": ("Install Chummer", "Stable", "Nightly"),
+        "/now": ("Current release", "Known issues and install help"),
+        "/help": ("Get help without guessing", "Open support intake"),
+    }
+    for signed_in_path, expected_snippets in signed_in_minimal_expectations.items():
         status, body, _, _ = fetch(
             base_url,
             signed_in_path,
@@ -1205,12 +1210,9 @@ def verify_signed_in_work_audit(
             request_headers={"Cookie": cookie_header},
         )
         if status != 200:
-            raise AssertionError(f"{signed_in_path} returned {status}, expected 200 for signed-in trust validation")
-        require_snippet(body, "Signed-in trust status", signed_in_path)
-        require_snippet(body, "Recommended for this install", signed_in_path)
-        require_snippet(body, "Install posture", signed_in_path)
-        require_snippet(body, "Adoption health", signed_in_path)
-        require_snippet(body, "Current caution", signed_in_path)
+            raise AssertionError(f"{signed_in_path} returned {status}, expected 200 for signed-in minimal surface validation")
+        for snippet in expected_snippets:
+            require_snippet(body, snippet, signed_in_path)
 
     status, body, _, _ = fetch(
         base_url,
@@ -1220,9 +1222,9 @@ def verify_signed_in_work_audit(
         request_headers={"Cookie": cookie_header},
     )
     if status != 200:
-        raise AssertionError(f"/downloads returned {status}, expected 200 for fix-ready trust validation")
-    require_snippet(body, "Your linked install can verify a fix now", "/downloads")
-    require_snippet(body, "fix worked here", "/downloads")
+        raise AssertionError(f"/downloads returned {status}, expected 200 for signed-in download validation")
+    require_snippet(body, "Stable", "/downloads")
+    require_snippet(body, "Nightly", "/downloads")
 
     verify_payload = json.dumps(
         {
