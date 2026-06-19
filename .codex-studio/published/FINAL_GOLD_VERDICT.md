@@ -1,6 +1,6 @@
 # GOLD_READY
 
-Generated: 2026-06-19T06:41:17Z
+Generated: 2026-06-19T19:04:52Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -14,7 +14,7 @@ Accepted boundaries: yes
 - PASS `live_surface_parity`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json`
 - PASS `ltd_optimization_stack`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json`
 - PASS `operator_release_dashboard`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
-  - release: run-20260619-024645 on public_stable
+  - release: run-20260619-182618 on public_stable
 - PASS `provider_proof_discoverability`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json`
 - PASS `public_copy_leak_gate`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json`
 - PASS `public_route_proof`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`

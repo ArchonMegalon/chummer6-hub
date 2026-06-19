@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-19T06:38:47Z",
+  "generated_at_utc": "2026-06-19T19:01:59Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -11,10 +11,10 @@
       "final_url": "https://chummer.run/",
       "status_code": 200,
       "required_texts": [
-        "Build the runner. Run the night.",
-        "Download Chummer",
-        "Desktop",
-        "Character workbench"
+        "Build and maintain Shadowrun characters without losing the details between sessions.",
+        "Stable",
+        "Nightly",
+        "What it does"
       ],
       "missing_required_texts": [],
       "forbidden_texts": [

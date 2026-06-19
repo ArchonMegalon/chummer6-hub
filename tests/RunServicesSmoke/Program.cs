@@ -2641,12 +2641,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
     Assert(statusSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "status should reuse the shared public trust pulse instead of inventing a second pulse renderer.");
     Assert(statusSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "status should reuse the shared signed-in trust panel instead of inventing another install-specific rail.");
-    Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should stay collapsed to one decision surface before deeper platform details.");
+    Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");
     Assert(statusSource.Contains("Caution.", StringComparison.Ordinal), "status should keep the caution inside the one public decision surface.");
     Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
-    Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep the deeper report as a secondary step.");
-    Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep a direct route to the deeper weighted delivery report.");
-    Assert(statusSource.Contains("<summary>Other platform details</summary>", StringComparison.Ordinal), "status should keep platform specifics behind one secondary disclosure instead of in the main summary.");
+    Assert(statusSource.Contains("Open support", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
+    Assert(statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should keep platform specifics visible without adding another release drawer.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
     Assert(liveProofDetailSource.Contains("Model.Chrome.Authenticated", StringComparison.Ordinal), "live proof detail should conditionally surface signed-in artifact continuity instead of treating all visitors the same.");

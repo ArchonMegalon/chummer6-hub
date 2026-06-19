@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-06-19T06:38:46.686559Z",
+  "generated_at_utc": "2026-06-19T19:01:58.565117Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -101,7 +101,7 @@
     {
       "path": "/horizons",
       "audience": "public",
-      "purpose": "horizon_summary",
+      "purpose": "maintenance_redirect",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/horizons",
@@ -119,7 +119,7 @@
     {
       "path": "/roadmap",
       "audience": "public",
-      "purpose": "horizon_summary",
+      "purpose": "roadmap_summary",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/roadmap",
@@ -1533,7 +1533,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?v=1780548550",
+      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?v=1781877871",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -2200,7 +2200,7 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=HuASzMWV2GRDkSnIkmmHlPZ1evhcOhqq&nonce=rLq1c98M_CtktUMDYtOaQHzDd4fXEIBS&code_challenge=UxeSTToaVrwk02ssZps-HWHRDJUaV0yQni3JgL9CJho&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=eao1Oi6EJ0JmeEMs1uFgf2yi4Z533cO8&nonce=jCFyy9l8I-LPB8N97ZCyKTMFYXj1p7x9&code_challenge=8kYmrl0BZsPH-ofw4EjTpZJAHDnTrbdhRshi5LkMes8&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },

@@ -154,7 +154,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
 }
 SOURCE_MARKERS = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
-        'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current release status, recent checks, and the next safe step on one calmer route.", "/status", cancellationToken),',
+        'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release, platform availability, and install help in one place.", "/status", cancellationToken),',
         "LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),",
         'new("Live", BuildLiveLaunchSummary(manifest)),',
         'new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),',
@@ -180,18 +180,17 @@ SOURCE_MARKERS = {
         "IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
-        "Current release",
+        "Release status",
         'data-status-surface="decision-surface"',
         "Open downloads",
         "Open support",
         'aria-label="Status next actions"',
-        "Open progress",
-        "Other platform details</summary>",
+        "Platforms",
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'Assert(statusSource.Contains("data-status-surface=\\"decision-surface\\"", StringComparison.Ordinal), "status should stay collapsed to one decision surface before deeper platform details.");',
+        'Assert(statusSource.Contains("data-status-surface=\\"decision-surface\\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");',
         'Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");',
-        'Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep the deeper report as a secondary step.");',
+        'Assert(statusSource.Contains("Open support", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         '"package_id": "next90-m120-hub-public-launch-health"',
