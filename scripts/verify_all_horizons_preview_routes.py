@@ -79,14 +79,14 @@ def main() -> int:
     )
     (COMPLETION / "FINAL_ALL_HORIZONS_FLAGSHIP_VERDICT.md").write_text(
         f"{verdict}\n\n"
-        f"Checked {len(ROUTES)} horizon routes against controller and public manifest.\n"
-        + ("" if not failures else f"\nRemaining failing horizons: {', '.join(failures)}.\n"),
+        f"Checked {len(ROUTES)} product-area and expansion routes against controller and public manifest.\n"
+        + ("" if not failures else f"\nRemaining failing routes: {', '.join(failures)}.\n"),
         encoding="utf-8",
     )
     (COMPLETION / "ALL_HORIZONS_IMPLEMENTATION_REPORT.md").write_text(
-        "# All Horizons Implementation Report\n\n"
-        "This pass verifies the current shipped horizon estate against the first-party public controller and canonical public manifest.\n\n"
-        "Implemented now:\n\n"
+        "# Product Areas And Expansion Routes Implementation Report\n\n"
+        "This pass verifies the current shipped product-area and expansion-route estate against the first-party public controller and canonical public manifest.\n\n"
+        "Implemented or represented now:\n\n"
         "- Ready for Tonight shipped MVP\n"
         "- NEXUS-PAN continuity shipped MVP\n"
         "- ALICE build compare shipped MVP\n"
@@ -99,7 +99,7 @@ def main() -> int:
         "- Creator OS shipped MVP\n"
         "- GHOSTWIRE shipped MVP\n"
         "- RUN CONTROL shipped MVP\n"
-        "- ONRAMP shipped MVP\n"
+        "- first-session starter help shipped MVP\n"
         "- EDITION STUDIO shipped MVP\n"
         "- LOCAL CO-PROCESSOR shipped MVP\n"
         "- QUICKSILVER shipped MVP\n"

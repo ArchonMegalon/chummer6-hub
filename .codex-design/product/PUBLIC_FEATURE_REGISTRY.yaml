@@ -12,7 +12,7 @@ cards:
     image_family: solo_operator
     asset_slot: capability_build_runner
     action_label: Open downloads
-    proof_note: "Proof: a real preview build exists now, not just a story about one."
+    proof_note: "A current build exists now, not just a story about one."
     pain: Clean dossiers, visible tradeoffs, and no hidden modifier stack.
     payoff: Deterministic totals stay readable before you ever take the character to the table.
   - id: see_whats_real
@@ -25,8 +25,8 @@ cards:
     image_family: simulation_bench
     asset_slot: capability_check_rules
     action_label: See a rules explanation
-    proof_note: "Proof: modifier trail, source trace, and repeatable output stay visible together."
-    pain: Follow receipts, source traces, and modifier trails instead of arguing from vibes.
+    proof_note: "Modifier trail, source trace, and repeatable output stay visible together."
+    pain: Follow source traces and modifier trails instead of arguing from vibes.
     payoff: The answer stays inspectable when somebody asks where the number came from.
   - id: get_the_poc
     bucket: start_here
@@ -37,20 +37,20 @@ cards:
     audience: public
     image_family: streetfront
     action_label: See continuity in preview
-    proof_note: "Proof: continuity survives device drift without hiding the current product limits."
+    proof_note: "Continuity survives device drift without hiding the current product limits."
     pain: Carry the same dossier, ledger, and session state across devices without losing trust.
     payoff: Receipt-backed continuity keeps the table moving even when the network does not cooperate.
   - id: publish_grounded_artifacts
     bucket: start_here
     title: Exchange
-    summary: Move dossiers, recaps, packets, and support proof across tools without severing provenance.
+    summary: Move dossiers, recaps, packets, and support context across tools without losing where they came from.
     href: /artifacts
     badge: Workflow
     audience: public
     image_family: prop_cluster
     asset_slot: lane_creator
     action_label: See portable outputs
-    proof_note: "Proof: exchange and publication are now governed by manifests, previews, and provenance rules instead of copy-paste folklore."
+    proof_note: "Exchange and publication now use manifests, previews, and provenance rules instead of copy-paste folklore."
     pain: Export, support, and creator handoff usually lose context right when you need trust the most.
     payoff: Portable outputs stay tied to manifests, compatibility, and receipts.
   - id: improve_the_product
@@ -68,7 +68,7 @@ cards:
   - id: deterministic_truth
     bucket: why_trust_it
     title: Deterministic rules truth
-    summary: No fuzzy math. Core-owned receipts stay attached to the answer.
+    summary: No fuzzy math. The explanation stays attached to the answer.
     href: /what-is-chummer
     badge: Trust
     audience: public
@@ -76,10 +76,10 @@ cards:
     microproof: Deterministic engine|Repeatable totals|Clean audit trail
     pain: Engine-backed modifiers
     payoff: Repeatable totals and clean audits
-  - id: receipts_and_provenance
+  - id: records_and_provenance
     bucket: why_trust_it
-    title: Receipts and provenance
-    summary: Every answer stays tied to visible receipts and provenance.
+    title: Records and provenance
+    summary: Every answer stays tied to visible records and provenance.
     href: /now
     badge: Proof
     audience: public
@@ -107,7 +107,7 @@ cards:
     audience: public
     image_family: solo_operator
     asset_slot: lane_player
-    action_label: Start with the preview build
+    action_label: Start with the current build
   - id: lane_gm
     bucket: choose_your_lane
     title: GM
@@ -171,7 +171,7 @@ cards:
   - id: real_package_browser
     bucket: whats_real_now
     title: Package browser
-    summary: Browse public package routes and generated proof bundles without severing first-party Chummer provenance.
+    summary: Browse public package routes and review bundles without losing Chummer provenance.
     href: /packages
     badge: Live now
     audience: public
@@ -179,8 +179,8 @@ cards:
     action_label: Browse packages
   - id: real_release_shelf
     bucket: whats_real_now
-    title: Preview releases, channels, and notes
-    summary: Preview releases, update channels, notes, and integrity details stay together.
+    title: Releases, channels, and notes
+    summary: Release builds, update channels, notes, and integrity details stay together.
     href: /downloads#recommended-download
     badge: Live now
     audience: public
@@ -224,6 +224,25 @@ cards:
     external_ok: true
     pain: We only discover weak builds after they explode in public.
     payoff: Compare grounded tradeoffs with receipts instead of guesswork.
+  - id: horizon_origin_dossier
+    bucket: coming_next
+    title: ORIGIN DOSSIER
+    summary: Turn approved origin canon into contacts, debts, scars, secrets, media packets, and later ALICE context.
+    href: https://chummer.run/media/horizons/origin-dossier-90s-deepdive.mp4
+    badge: Shipped MVP
+    audience: public
+    image_family: dossier_desk
+    render_mode: external_explainer
+    action_label: Watch the narrated overview
+    detail_primary_href: https://chummer.run/media/horizons/origin-dossier-90s-deepdive.mp4
+    detail_primary_label: Watch the narrated overview
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/origin-dossier.md
+    fallback_label: Read the horizon brief
+    external_ok: true
+    pain: A runner can be legal and still feel unfinished.
+    payoff: The table gets approved identity canon without letting story prose rewrite the sheet.
+    proof_note: "Proof: Origin Dossier is a reviewed canon and media-bundle lane; mechanics stay in Chummer."
+    microproof: Approved canon|Media downstream|No silent mechanics
   - id: horizon_table_pulse
     bucket: coming_next
     title: TABLE PULSE
@@ -342,8 +361,8 @@ cards:
     payoff: The current run, continuity, and next safe action stay visible without leaving Chummer-owned truth.
     proof_note: "Proof: RUN CONTROL now has a named public route, public-safe session and continuity packets, a signed-in control desk, and typed GM-control APIs instead of only future horizon copy."
     microproof: Control receipt|Signed-in desk|Typed GM-control APIs
-  - id: horizon_onramp
-    bucket: coming_next
+  - id: onramp
+    bucket: supporting_reads
     title: ONRAMP
     summary: Starter workspace, recovery posture, and first-session continuity without fake automation.
     href: /onramp
@@ -352,7 +371,7 @@ cards:
     image_family: boulevard_of_futures
     detail_route: /onramp
     render_mode: external_explainer
-    action_label: Open ONRAMP
+    action_label: Open the first-session guide
     detail_primary_href: /onramp/receipts/guided-starter.json
     detail_primary_label: Inspect the starter receipt
     fallback_route: /onramp

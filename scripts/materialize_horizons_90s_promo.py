@@ -49,29 +49,29 @@ SCENES: list[dict[str, Any]] = [
         "id": "02_nexus_pan_shared_state",
         "timecode": "00:06-00:14",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "core_product",
         "horizon": "NEXUS-PAN",
         "title": "Reconnect without losing the table",
         "overlay": "NEXUS-PAN - Shared State",
-        "voiceover": "NEXUS-PAN keeps shared state steady when devices drift, drop, and return.",
+        "voiceover": "NEXUS-PAN keeps shared state steady when devices drift, drop, and return. It is continuity, not a separate promise to decode.",
         "prompt": "A player phone reconnects, session state snaps into sync across laptop tablet and mobile, bright AR data strands align over the table, ork decker with datajack and AR lenses, troll street samurai with cyberarm, relieved mixed-metahuman character reactions, practical neon table light.",
     },
     {
         "id": "03_alice_build_tradeoffs",
         "timecode": "00:14-00:22",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "base_feature",
         "horizon": "ALICE",
         "title": "Legal is not the same as good",
-        "overlay": "ALICE - What-if Builds",
-        "voiceover": "ALICE compares builds, catches role traps, and explains tradeoffs with receipts.",
+        "overlay": "ALICE - Base Workbench Help",
+        "voiceover": "ALICE is base product help: it compares builds, catches role traps, and explains tradeoffs with receipts.",
         "prompt": "AR build lab above a tabletop, two generic cyberpunk runner builds compared as clean holographic silhouettes and risk badges, ork decker with AR lenses reacts, elf mage smirks, visible cyberware reflections, no dense text, premium product trailer closeup.",
     },
     {
         "id": "04_karma_forge_governed_rules",
         "timecode": "00:22-00:30",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "KARMA FORGE",
         "title": "House rules without fork chaos",
         "overlay": "KARMA FORGE - Governed Rules",
@@ -82,18 +82,18 @@ SCENES: list[dict[str, Any]] = [
         "id": "05_jackpoint_dossiers_recaps",
         "timecode": "00:30-00:38",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "JACKPOINT",
-        "title": "Briefings that remember where facts came from",
-        "overlay": "JACKPOINT - Dossiers & Recaps",
-        "voiceover": "JACKPOINT turns campaign truth into briefings, dossiers, and recaps without making things up.",
+        "title": "Campaign memory that remembers where facts came from",
+        "overlay": "JACKPOINT - Campaign Memory",
+        "voiceover": "JACKPOINT is campaign memory: briefings, dossiers, and recaps without making things up.",
         "prompt": "Cyberpunk evidence room, rough mission notes become a polished player-safe AR dossier packet, source trails glow under claims, stylish human fixer with subtle cybernetic eye reacts, ork decker and elf mage nearby, noir push-in, no readable paragraphs.",
     },
     {
         "id": "06_runsite_spatial_prep",
         "timecode": "00:38-00:46",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "RUNSITE",
         "title": "Understand the space before it explodes",
         "overlay": "RUNSITE - Spatial Prep",
@@ -104,7 +104,7 @@ SCENES: list[dict[str, Any]] = [
         "id": "07_runbook_press_campaign_books",
         "timecode": "00:46-00:54",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "RUNBOOK PRESS",
         "title": "Turn a season into a book",
         "overlay": "RUNBOOK PRESS - Campaign Books",
@@ -115,18 +115,18 @@ SCENES: list[dict[str, Any]] = [
         "id": "08_table_pulse_live_heat",
         "timecode": "00:54-01:02",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "base_feature",
         "horizon": "TABLE PULSE",
         "title": "The run pushes back",
-        "overlay": "TABLE PULSE - Live Heat",
-        "voiceover": "TABLE PULSE turns live heat into bounded reactions, remote choices, and GM-approved fallout.",
+        "overlay": "TABLE PULSE - Campaign Operations",
+        "voiceover": "TABLE PULSE is campaign operations: bounded reactions, remote choices, and GM-approved fallout.",
         "prompt": "Tabletop session in motion with mixed metahuman crew, GM screen receives a subtle AR heat alert, remote player chooses a bounded reaction on phone, ork decker with AR lenses and troll cyberarm visible, cast reacts to fallout, warm table light and cyberpunk accents.",
     },
     {
         "id": "09_black_ledger_living_world",
         "timecode": "01:02-01:12",
         "duration_seconds": 10,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "BLACK LEDGER",
         "title": "The city remembers",
         "overlay": "BLACK LEDGER - Living World",
@@ -137,7 +137,7 @@ SCENES: list[dict[str, Any]] = [
         "id": "10_community_hub_open_runs",
         "timecode": "01:12-01:20",
         "duration_seconds": 8,
-        "role": "horizon",
+        "role": "expansion_bet",
         "horizon": "COMMUNITY HUB",
         "title": "Find the table. Close the loop.",
         "overlay": "COMMUNITY HUB - Open Runs",
@@ -150,10 +150,10 @@ SCENES: list[dict[str, Any]] = [
         "duration_seconds": 10,
         "role": "finale",
         "horizon": "all",
-        "title": "All Horizons, one table",
+        "title": "One product spine",
         "overlay": "Build the runner. Run the table. Shape the world.",
-        "voiceover": "Build the runner. Run the table. Shape the world. Jammer6.",
-        "prompt": "All nine Horizon AR cards circle above the tabletop and become a living city interface, recurring mixed metahuman cast stands together: human GM, ork decker, elf mage, dwarf rigger, troll street samurai with cyberarm, visible cyberware, final product logo space left clean for post, heroic trailer finish.",
+        "voiceover": "Build the runner. Run the table. Remember consequences. Chummer6.",
+        "prompt": "Product-area AR cards and a few future-bet cards circle above the tabletop and become a living city interface, recurring mixed metahuman cast stands together: human GM, ork decker, elf mage, dwarf rigger, troll street samurai with cyberarm, visible cyberware, final product logo space left clean for post, heroic trailer finish.",
     },
 ]
 
@@ -229,8 +229,8 @@ def write_outputs() -> int:
     rendered_count = sum(1 for receipt in receipts if receipt["status"] == "rendered")
     scene_count = len(SCENES)
     total_duration = sum(scene["duration_seconds"] for scene in SCENES)
-    horizons = [scene["horizon"] for scene in SCENES if scene["role"] == "horizon"]
-    required_horizons = [
+    covered_surfaces = [scene["horizon"] for scene in SCENES if scene["role"] in {"core_product", "base_feature", "expansion_bet"}]
+    required_surfaces = [
         "NEXUS-PAN",
         "ALICE",
         "KARMA FORGE",
@@ -241,7 +241,7 @@ def write_outputs() -> int:
         "BLACK LEDGER",
         "COMMUNITY HUB",
     ]
-    horizon_coverage_pass = horizons == required_horizons
+    surface_coverage_pass = covered_surfaces == required_surfaces
     all_rendered = rendered_count == scene_count
     composite_path = PUBLIC_ASSET_BASE / f"{ASSET_ID}.mp4"
     caption_path = PUBLIC_ASSET_BASE / f"{ASSET_ID}.vtt"
@@ -254,15 +254,15 @@ def write_outputs() -> int:
     human_reviewed = "Verdict: PASS" in human_review_text
     public_safe_plan = True
     post_composite_complete = composite_exists and caption_exists and poster_exists
-    ready = all_rendered and provider_verified and horizon_coverage_pass and total_duration == 90 and post_composite_complete and human_reviewed
+    ready = all_rendered and provider_verified and surface_coverage_pass and total_duration == 90 and post_composite_complete and human_reviewed
 
     plan = {
-        "contract_name": "chummer.horizons_90s_promo.magicfit_render_plan",
+        "contract_name": "chummer.campaign_tools_90s_promo.magicfit_render_plan",
         "generated_at_utc": generated_at,
         "source_zip": str(SOURCE_ZIP),
         "source_root": str(SOURCE_ROOT),
         "asset_id": ASSET_ID,
-        "title": "Jammer6: The Table Wakes Up",
+        "title": "Chummer6: The Table Wakes Up",
         "duration_seconds": total_duration,
         "scene_count": scene_count,
         "render_method": {
@@ -278,11 +278,11 @@ def write_outputs() -> int:
             "name": "MagicFit",
             "verification_status": provider.get("status"),
             "verification_receipt": provider.get("path"),
-            "claim_boundary": "Provider capability is verified, but this Horizon reel is not ready until every scene has its own MagicFit render receipt.",
+            "claim_boundary": "Provider capability is verified, but this campaign-tools reel is not ready until every scene has its own render receipt.",
         },
         "global_positive_prompt": GLOBAL_POSITIVE,
         "global_negative_prompt": GLOBAL_NEGATIVE,
-        "required_horizons": required_horizons,
+        "required_surfaces": required_surfaces,
         "scenes": [
             {
                 **scene,
@@ -295,7 +295,7 @@ def write_outputs() -> int:
     (OUT / "MAGICFIT_RENDER_PLAN.generated.yaml").write_text(yaml.safe_dump(plan, sort_keys=False), encoding="utf-8")
 
     receipts_payload = {
-        "contract_name": "chummer.horizons_90s_promo.magicfit_scene_receipts",
+        "contract_name": "chummer.campaign_tools_90s_promo.magicfit_scene_receipts",
         "generated_at_utc": generated_at,
         "asset_id": ASSET_ID,
         "provider": "MagicFit",
@@ -309,14 +309,14 @@ def write_outputs() -> int:
     (OUT / "MAGICFIT_SCENE_RECEIPTS.generated.json").write_text(json.dumps(receipts_payload, indent=2), encoding="utf-8")
 
     metadata = {
-        "contract_name": "chummer.horizons_90s_promo.asset_metadata",
+        "contract_name": "chummer.campaign_tools_90s_promo.asset_metadata",
         "generated_at_utc": generated_at,
         "asset_id": ASSET_ID,
-        "title": "Jammer6: The Table Wakes Up",
+        "title": "Chummer6: The Table Wakes Up",
         "duration_seconds": total_duration,
         "scene_count": scene_count,
-        "required_horizons": required_horizons,
-        "horizon_coverage_pass": horizon_coverage_pass,
+        "required_surfaces": required_surfaces,
+        "surface_coverage_pass": surface_coverage_pass,
         "composite_expected_path": str(composite_path),
         "caption_expected_path": str(caption_path),
         "poster_expected_path": str(poster_path),
@@ -333,7 +333,7 @@ def write_outputs() -> int:
     (OUT / "PROMO_VIDEO_ASSET_METADATA.generated.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     motion_score = {
-        "contract_name": "chummer.horizons_90s_promo.motion_score",
+        "contract_name": "chummer.campaign_tools_90s_promo.motion_score",
         "generated_at_utc": generated_at,
         "status": "fail" if not all_rendered else "pending_human_review",
         "score": 0 if not all_rendered else None,
@@ -342,16 +342,16 @@ def write_outputs() -> int:
             "action_every_scene": None if all_rendered else False,
             "not_static_slideshow": None if all_rendered else False,
             "cinematic_character_driven": None if all_rendered else False,
-            "unique_visual_metaphor_per_horizon": horizon_coverage_pass,
+            "unique_visual_metaphor_per_surface": surface_coverage_pass,
         },
         "reason": "Rendered MagicFit clips and post composite are present; human review must confirm motion quality before public release."
         if all_rendered
-        else "No rendered MagicFit scene clips are present for this 11-scene Horizon reel.",
+        else "No rendered scene clips are present for this 11-scene campaign-tools reel.",
     }
     (OUT / "PROMO_VIDEO_MOTION_SCORE.generated.json").write_text(json.dumps(motion_score, indent=2), encoding="utf-8")
 
     safety = {
-        "contract_name": "chummer.horizons_90s_promo.public_safety",
+        "contract_name": "chummer.campaign_tools_90s_promo.public_safety",
         "generated_at_utc": generated_at,
         "status": "pending_human_review" if all_rendered else "plan_pass_render_pending",
         "ip_boundary_pass": public_safe_plan,
@@ -363,7 +363,7 @@ def write_outputs() -> int:
             "canonical named characters",
             "real celebrity likeness",
         ],
-        "claim_boundary": "Do not claim Horizons are fully shipped today; this is a directional teaser.",
+        "claim_boundary": "Do not claim expansion bets are fully shipped today; this is a directional product-spine teaser.",
         "render_review_required": True,
         "render_review_reason": "Rendered MagicFit clips must be inspected by a human before public-safe final approval.",
     }
@@ -381,8 +381,8 @@ Verdict: NOT HUMAN-REVIEWED FOR FINAL RELEASE
 This package has a complete 11-scene MagicFit render plan, rendered MagicFit scene clips, per-scene MagicFit job receipts, and a 90-second post-composited MP4. It is still not marked release-ready because human creative review has not been recorded.
 
 Creative notes:
-- The 11-scene structure is valid: opener, nine Horizons, finale.
-- The nine Horizons are each introduced once.
+- The 11-scene structure is valid: opener, core product areas, expansion bets, finale.
+- The required product surfaces are each introduced once.
 - The plan correctly keeps VO, captions, UI labels, and logo work in post.
 - The post composite, caption file, and poster asset exist.
 - The IP boundary is explicit and public-safe at the prompt level.
@@ -401,7 +401,7 @@ Summary:
 - Provider capability verified: {provider_verified}
 - Scene plan count: {scene_count}
 - Required duration: {total_duration}s
-- Required Horizons covered once: {horizon_coverage_pass}
+- Required product surfaces covered once: {surface_coverage_pass}
 - Rendered MagicFit scene receipts: {rendered_count}/{scene_count}
 - Post composite present: {post_composite_complete}
 - Human creative review passed: {human_reviewed}
@@ -418,7 +418,7 @@ Final readiness requires provider verification, 11 rendered scenes, 90-second co
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Materialize the All Horizons 90s MagicFit promo plan and fail-closed verdict.")
+    parser = argparse.ArgumentParser(description="Materialize the Chummer6 product threads 90s MagicFit promo plan and fail-closed verdict.")
     parser.add_argument("--strict-ready", action="store_true", help="Exit non-zero unless the final verdict is ready.")
     args = parser.parse_args()
     result = write_outputs()

@@ -4,7 +4,7 @@
   "provider_requested": "MagicFit",
   "provider_status": "not_claimed_for_this_asset",
   "render_mode": "first_party_raster_video_fallback",
-  "generated_at_utc": "2026-05-31T06:12:08.734528Z",
+  "generated_at_utc": "2026-06-19T03:15:33Z",
   "duration_seconds": 14,
   "loopable": true,
   "resolution": "1280x720",
@@ -12,7 +12,9 @@
     "mp4": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
     "webm": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
     "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png",
-    "tour_exports_manifest": "/media/ledger/tours/black-ledger-tour-exports.manifest.json"
+    "tour_exports_manifest": "/media/ledger/tours/black-ledger-tour-exports.manifest.json",
+    "mp4_audio": "aac ambient bed present",
+    "webm_audio": "opus ambient bed present"
   },
   "tour_exports": {
     "status": "provider_demo_exports_available",
@@ -25,7 +27,8 @@
       "duration_seconds": 60.233,
       "resolution": "1280x720",
       "codec": "h264",
-      "audio": "none"
+      "audio": "first_party_subtle_ambient_bed_present",
+      "audio_claim_boundary": "Ambient bed only; this remains a provider sample capture, not Chummer-authored tactical or campaign truth."
     },
     "exports": [
       {
@@ -51,6 +54,10 @@
     "public_safety_status": "pass",
     "overlay_truth_status": "chummer_owned_canvas_overlay",
     "magicfit_claim_allowed": false,
-    "first_party_video_claim_allowed": true
-  }
+    "first_party_video_claim_allowed": true,
+    "audio_stream_status": "pass",
+    "audio_claim_boundary": "Ambient tracks are present for public playback polish; they do not strengthen provider or gameplay claims."
+  },
+  "audio_status": "present",
+  "audio_mode": "first_party_subtle_ambient_bed"
 }

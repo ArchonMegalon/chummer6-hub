@@ -286,7 +286,7 @@ public sealed class PublicLandingController : Controller
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new HorizonsPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Coming Next", "The named horizons, their pain, and the payoff they are aiming for.", "/horizons", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Campaign Tools", "The larger table story around the current character builder.", "/horizons", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"),

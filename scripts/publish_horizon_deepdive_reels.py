@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import subprocess
 import argparse
@@ -10,13 +12,17 @@ from pathlib import Path
 from typing import Any
 
 
-SOURCE_ROOT = Path("/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/composited_reels")
-PUBLIC_ROOT = Path("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons")
+SOURCE_ROOT = Path(os.environ.get("CHUMMER_HORIZON_REEL_SOURCE_ROOT") or "/docker/chummercomplete/_completion/horizon_flagship_reels_20260602/videos")
+PUBLIC_ROOT = Path(os.environ.get("CHUMMER_HORIZON_PUBLIC_MEDIA_ROOT") or "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons")
 MANIFEST_PATH = PUBLIC_ROOT / "horizon-video-manifest.json"
+VOLUME_RE = re.compile(r"(?P<kind>mean|max)_volume:\s*(?P<value>-?inf|-?\d+(?:\.\d+)?)\s*dB")
+MIN_MAX_VOLUME_DB = -50.0
+MIN_MEAN_VOLUME_DB = -80.0
 
 REELS: list[dict[str, str]] = [
     {
         "horizon_id": "nexus-pan",
+        "surface_class": "core_product",
         "title": "NEXUS-PAN 90-second deep dive",
         "source": "nexus_pan_90s_deepdive.mp4",
         "output": "nexus-pan-90s-deepdive.mp4",
@@ -24,6 +30,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "nexus-pan",
+        "surface_class": "core_product",
         "title": "NEXUS-PAN epic 90-second reel",
         "source": "nexus-pan_epic_90s.mp4",
         "output": "nexus-pan-epic-90s.mp4",
@@ -31,6 +38,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "alice",
+        "surface_class": "core_product",
         "title": "ALICE 90-second deep dive",
         "source": "alice_90s_deepdive.mp4",
         "output": "alice-90s-deepdive.mp4",
@@ -38,6 +46,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "karma-forge",
+        "surface_class": "expansion_bet",
         "title": "KARMA FORGE 90-second deep dive",
         "source": "karma_forge_90s_deepdive.mp4",
         "output": "karma-forge-90s-deepdive.mp4",
@@ -45,6 +54,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "jackpoint",
+        "surface_class": "expansion_bet",
         "title": "JACKPOINT 90-second deep dive",
         "source": "jackpoint_90s_deepdive.mp4",
         "output": "jackpoint-90s-deepdive.mp4",
@@ -52,6 +62,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "runsite",
+        "surface_class": "expansion_bet",
         "title": "RUNSITE 90-second deep dive",
         "source": "runsite_90s_deepdive.mp4",
         "output": "runsite-90s-deepdive.mp4",
@@ -59,6 +70,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "runbook-press",
+        "surface_class": "expansion_bet",
         "title": "RUNBOOK PRESS 90-second deep dive",
         "source": "runbook_press_90s_deepdive.mp4",
         "output": "runbook-press-90s-deepdive.mp4",
@@ -66,6 +78,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "table-pulse",
+        "surface_class": "core_product",
         "title": "TABLE PULSE 90-second deep dive",
         "source": "table_pulse_90s_deepdive.mp4",
         "output": "table-pulse-90s-deepdive.mp4",
@@ -73,6 +86,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "black-ledger",
+        "surface_class": "expansion_bet",
         "title": "BLACK LEDGER 90-second deep dive",
         "source": "black_ledger_90s_deepdive.mp4",
         "output": "black-ledger-90s-deepdive.mp4",
@@ -80,6 +94,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "black-ledger",
+        "surface_class": "expansion_bet",
         "title": "BLACK LEDGER epic 90-second reel",
         "source": "black_ledger_epic_90s.mp4",
         "output": "black-ledger-epic-90s.mp4",
@@ -87,6 +102,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "community-hub",
+        "surface_class": "expansion_bet",
         "title": "COMMUNITY HUB 90-second deep dive",
         "source": "community_hub_90s_deepdive.mp4",
         "output": "community-hub-90s-deepdive.mp4",
@@ -94,6 +110,7 @@ REELS: list[dict[str, str]] = [
     },
     {
         "horizon_id": "origin-dossier",
+        "surface_class": "core_product",
         "title": "ORIGIN DOSSIER 90-second deep dive",
         "source": "origin_dossier_90s_deepdive.mp4",
         "output": "origin-dossier-90s-deepdive.mp4",
@@ -124,6 +141,35 @@ def probe(path: Path) -> dict[str, Any]:
     )
 
 
+def volume_stats(path: Path) -> dict[str, float]:
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(path),
+            "-af",
+            "volumedetect",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg volumedetect failed for {path}: {result.stderr.strip()[-500:]}")
+    stats: dict[str, float] = {}
+    for match in VOLUME_RE.finditer(result.stderr):
+        value = match.group("value")
+        stats[f"{match.group('kind')}_volume_db"] = float("-inf") if value == "-inf" else float(value)
+    if "mean_volume_db" not in stats or "max_volume_db" not in stats:
+        raise RuntimeError(f"ffmpeg volumedetect did not report audio volume for {path}")
+    return stats
+
+
 def write_vtt(path: Path, title: str, caption: str) -> None:
     path.write_text(
         "\n".join(
@@ -150,15 +196,30 @@ def publish_reel(row: dict[str, str]) -> dict[str, Any]:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
     vtt = target.with_suffix(".vtt")
-    write_vtt(vtt, row["title"], row["caption"])
+    source_vtt = source.with_suffix(".vtt")
+    if source_vtt.is_file():
+        shutil.copy2(source_vtt, vtt)
+    else:
+        write_vtt(vtt, row["title"], row["caption"])
     metadata = probe(target)
     streams = metadata.get("streams", [])
     has_video = any(stream.get("codec_type") == "video" for stream in streams)
     has_audio = any(stream.get("codec_type") == "audio" for stream in streams)
     if not has_video or not has_audio:
         raise RuntimeError(f"{target} must have both video and audio streams")
+    audio_stats = volume_stats(target)
+    if (
+        audio_stats["max_volume_db"] <= MIN_MAX_VOLUME_DB
+        or audio_stats["mean_volume_db"] <= MIN_MEAN_VOLUME_DB
+    ):
+        raise RuntimeError(
+            f"{target} audio is silent or placeholder-level "
+            f"(mean={audio_stats['mean_volume_db']:.1f}dB, max={audio_stats['max_volume_db']:.1f}dB)"
+        )
     return {
         "horizon_id": row["horizon_id"],
+        "surface_id": row["horizon_id"],
+        "surface_class": row.get("surface_class", "future_horizon"),
         "title": row["title"],
         "public_mp4": f"/media/horizons/{target.name}",
         "public_captions": f"/media/horizons/{vtt.name}",
@@ -168,6 +229,8 @@ def publish_reel(row: dict[str, str]) -> dict[str, Any]:
         "size_bytes": int(metadata["format"].get("size") or target.stat().st_size),
         "has_video": has_video,
         "has_audio": has_audio,
+        "audio_mean_volume_db": audio_stats["mean_volume_db"],
+        "audio_max_volume_db": audio_stats["max_volume_db"],
         "video_codec": next((stream.get("codec_name") for stream in streams if stream.get("codec_type") == "video"), ""),
         "audio_codec": next((stream.get("codec_name") for stream in streams if stream.get("codec_type") == "audio"), ""),
     }
@@ -203,9 +266,9 @@ def main() -> int:
             existing_assets = []
     merged_assets = existing_assets + assets
     manifest = {
-        "contract_name": "chummer.public_horizon_video_manifest",
+        "contract_name": "chummer.public_product_video_manifest",
         "generated_at_utc": now_iso(),
-        "publication_posture": "first_party_static_media_assets_with_audio; not standalone proof that every horizon is shipped",
+        "publication_posture": "first_party_static_media_assets_with_audio; legacy /media/horizons path is retained for URL compatibility; surface_class distinguishes core product areas from expansion bets",
         "audio_required": True,
         "source_root": str(SOURCE_ROOT),
         "assets": merged_assets,

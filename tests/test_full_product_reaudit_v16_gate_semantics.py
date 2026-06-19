@@ -70,6 +70,18 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
 
         self.assertTrue(all(check["status"] == "pass" for check in checks), checks)
 
+    def test_public_guide_release_truth_passes_on_current_no_installer_shelf(self) -> None:
+        checks = MODULE.public_guide_release_truth_checks(
+            {
+                "available_platforms": [],
+                "missing_platforms": ["Windows", "Linux"],
+                "shelf_truth_line": "No promoted installer downloads are posted right now; Windows and Linux still need installer proof.",
+            },
+            "macOS currently has archive previews only. Use the posted guidance before treating it as your main install path.",
+        )
+
+        self.assertTrue(all(check["status"] == "pass" for check in checks), checks)
+
     def test_journey_gate_truth_fails_on_blocked_current_truth(self) -> None:
         blocked = MODULE.journey_gate_truth_check({"current_truth": {"state": "blocked", "blocked_count": 1}})
         ready = MODULE.journey_gate_truth_check({"current_truth": {"state": "ready", "blocked_count": 0}})
@@ -77,16 +89,14 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
         self.assertEqual(blocked["status"], "fail")
         self.assertEqual(ready["status"], "pass")
 
-    def test_every_wonder_horizon_receipt_fails_false_magicfit_claims(self) -> None:
+    def test_product_spine_receipt_fails_stale_horizon_sprawl_copy(self) -> None:
         receipt = self.valid_horizon_receipt()
-        receipt["provider_claim"] = "MagicFit"
-        receipt["magicfit_claim_allowed"] = True
-        receipt["proof_constraints"] = []
+        receipt["scene_narration"] = [{"caption": "Nine horizons. One promise."}]
 
         checks = MODULE.every_wonder_horizon_receipt_checks(receipt, self.valid_probe())
 
         self.assertEqual(
-            statuses(checks)["Every Wonder Horizon promo stays proof-bounded and does not fake MagicFit rendering"],
+            statuses(checks)["Product spine promo separates core product areas from expansion bets"],
             "fail",
         )
 
@@ -97,7 +107,7 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
         checks = MODULE.every_wonder_horizon_receipt_checks(receipt, self.valid_probe())
 
         self.assertEqual(
-            statuses(checks)["Every Wonder Horizon promo receipt proves the required 12-scene production sheet"],
+            statuses(checks)["Product spine promo receipt proves the required 12-scene production sheet"],
             "fail",
         )
 
@@ -157,13 +167,13 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
     def valid_horizon_receipt(self):
         return {
             "status": "published",
+            "title": "Chummer6 Product Spine Promo",
             "scene_count": 12,
-            "production_scenes": [{"id": scene_id} for scene_id in MODULE.REQUIRED_HORIZON_PROMO_SCENE_IDS],
-            "horizon_claim_boundary": "directional_future_shelf_not_current_release_truth",
-            "magicfit_claim_allowed": False,
+            "production_scenes": [{"id": scene_id} for scene_id in MODULE.REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS],
+            "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
             "provider_claim": "none",
             "proof_constraints": [
-                "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard"
+                "core product areas and expansion bets are clearly separated"
             ],
         }
 

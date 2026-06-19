@@ -4,9 +4,12 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status";
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var validationState = HumanizeStatusToken(
+    var releaseCheckState = HumanizeStatusToken(
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
+    var releaseChecksLabel = releaseCheckState.Contains("Passed", StringComparison.OrdinalIgnoreCase)
+        ? "Checks passed"
+        : "Checks unavailable";
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
     var verifiedLabel = Model.VerifiedAtLabel
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
@@ -74,7 +77,7 @@
             <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
             <span>Released @publishedLabel</span>
             <span>Last verified @verifiedLabel</span>
-            <span>Validation @validationState</span>
+            <span>@releaseChecksLabel</span>
         </div>
     </div>
 </section>

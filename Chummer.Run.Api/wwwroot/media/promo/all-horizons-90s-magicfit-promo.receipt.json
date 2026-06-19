@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-06-03T08:10:23Z",
+  "generated_at_utc": "2026-06-19T06:25:35Z",
   "status": "published",
   "asset_id": "all-horizons-90s-magicfit-promo",
-  "title": "All Horizons 90s MagicFit Promo",
+  "title": "Chummer6 Product Threads 90s MagicFit Promo",
   "render_mode": "magicfit_per_scene_rebuild_with_spoken_narration",
-  "source_claim": "11 MagicFit-rendered Horizon scene clips rebuilt with cleaner spoken narration",
+  "source_claim": "11 MagicFit-rendered product-thread scene clips rebuilt with cleaner spoken narration and simplified Horizon taxonomy",
   "visual_source": "MagicFit scene clips only",
   "narration_provider": "edge-tts",
-  "voice": "en-US-AndrewNeural",
+  "voice": "en-GB-ThomasNeural",
   "scene_count": 11,
   "duration_seconds": 90.0,
   "continuous_audio_track": "spoken_narration_plus_low_music_bed",
@@ -15,68 +15,68 @@
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/01_cold_open_table_chaos.mp4",
       "duration_seconds": 6.0,
-      "caption": "The table is alive, but the tools are fighting the table.",
-      "narration": "The table is alive, but the tools are fighting it. Chummer6 turns that chaos into one campaign operating surface."
+      "caption": "The table is alive. Chummer6 keeps the work in one place.",
+      "narration": "The table is alive, but the tools are fighting it. Chummer6 brings the runner, the rules, and the campaign back into one product spine."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/02_nexus_pan_shared_state.mp4",
       "duration_seconds": 8.0,
-      "caption": "NEXUS-PAN keeps shared state steady across devices.",
-      "narration": "NEXUS-PAN keeps shared state steady when devices drift, drop, and return mid-session."
+      "caption": "NEXUS-PAN is continuity and recovery for devices at the table.",
+      "narration": "NEXUS-PAN belongs in the product story: shared state, reconnects, and recovery when the campaign spans devices."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/03_alice_build_tradeoffs.mp4",
       "duration_seconds": 8.0,
-      "caption": "ALICE explains build tradeoffs before they break play.",
-      "narration": "ALICE compares builds, catches role traps, and explains tradeoffs with receipts before play starts."
+      "caption": "ALICE is a base workbench feature for build help and rules explanation.",
+      "narration": "ALICE belongs in the product itself. It compares builds, catches role traps, and explains tradeoffs before play starts."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/04_karma_forge_governed_rules.mp4",
       "duration_seconds": 8.0,
-      "caption": "KARMA FORGE makes house rules governed and reversible.",
-      "narration": "KARMA FORGE turns house rules into governed packages with impact, history, and rollback."
+      "caption": "KARMA FORGE is the expansion bet for governed rule evolution.",
+      "narration": "KARMA FORGE stays on the expansion shelf: house rules with impact, history, review, and rollback instead of chat-log folklore."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/05_jackpoint_dossiers_recaps.mp4",
       "duration_seconds": 8.0,
-      "caption": "JACKPOINT turns table memory into sharp briefings.",
-      "narration": "JACKPOINT turns what happened at the table into briefings, dossiers, and recaps players actually want to read."
+      "caption": "JACKPOINT joins the campaign-memory lane.",
+      "narration": "JACKPOINT is easier to understand as campaign memory: briefings, dossiers, and recaps players actually want to read."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/06_runsite_spatial_prep.mp4",
       "duration_seconds": 8.0,
-      "caption": "RUNSITE makes mission spaces legible before danger starts.",
-      "narration": "RUNSITE makes mission spaces explorable and legible before the action starts."
+      "caption": "RUNSITE is a specialized play mode for readable mission spaces.",
+      "narration": "RUNSITE is a specialized play mode. It makes mission spaces legible before the action starts without becoming the whole product."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/07_runbook_press_campaign_books.mp4",
       "duration_seconds": 8.0,
-      "caption": "RUNBOOK PRESS turns campaign material into books.",
-      "narration": "RUNBOOK PRESS turns campaign material into primers, guides, modules, and season books the table can carry forward."
+      "caption": "RUNBOOK PRESS joins the publish/share lane.",
+      "narration": "RUNBOOK PRESS belongs with publishing: primers, guides, modules, and season books the table can carry forward."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/08_table_pulse_live_heat.mp4",
       "duration_seconds": 8.0,
-      "caption": "TABLE PULSE turns heat into bounded GM-approved reactions.",
-      "narration": "TABLE PULSE turns live heat into bounded reactions, remote choices, and GM-approved fallout."
+      "caption": "TABLE PULSE is campaign operations, not a random extra brand.",
+      "narration": "TABLE PULSE is the campaign layer: live heat, bounded reactions, remote choices, and GM-approved fallout."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/09_black_ledger_living_world.mp4",
       "duration_seconds": 10.0,
-      "caption": "BLACK LEDGER makes the city remember consequences.",
-      "narration": "BLACK LEDGER makes the city remember: factions, heat, missions, newsreels, and consequences."
+      "caption": "BLACK LEDGER remains the big living-city expansion bet.",
+      "narration": "BLACK LEDGER stays the big campaign expansion bet: factions, heat, missions, newsreels, and consequences the city remembers."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/10_community_hub_open_runs.mp4",
       "duration_seconds": 8.0,
-      "caption": "COMMUNITY HUB helps players find runs and close the loop.",
-      "narration": "COMMUNITY HUB helps players find runs, pass preflight, get scheduled, and feed outcomes back into the world."
+      "caption": "COMMUNITY HUB joins the social and open-run lane.",
+      "narration": "COMMUNITY HUB is the social lane: open runs, preflight, scheduling, and outcomes that feed back into Chummer truth."
     },
     {
       "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/11_finale_all_horizons.mp4",
       "duration_seconds": 10.0,
-      "caption": "All Horizons return to one table and one campaign.",
-      "narration": "All Horizons point back to the same table: build the runner, run the scene, shape the world, and make the next session easier to start."
+      "caption": "One product spine: build, explain, run, remember, publish.",
+      "narration": "One product spine: build the runner, explain the choices, run the table, remember the consequences, and publish only what the table approves."
     }
   ],
   "public_files": {
@@ -103,7 +103,82 @@
     ],
     "format": {
       "duration": "90.000000",
-      "size": "47708448"
+      "size": "47727125"
     }
-  }
+  },
+  "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
+  "provider_claim": "magicfit_source_clips_rebuilt_with_new_audio",
+  "proof_constraints": [
+    "Core product areas and expansion bets are separated in captions, narration, and receipt.",
+    "The public asset uses existing MagicFit-rendered source clips rebuilt with new narration and captions.",
+    "The receipt must not claim all listed surfaces are current shipped features."
+  ],
+  "production_scenes": [
+    {
+      "id": "opener_product_spine",
+      "duration_seconds": 6.0,
+      "caption": "The table is alive. Chummer6 keeps the work in one place.",
+      "narration": "The table is alive, but the tools are fighting it. Chummer6 brings the runner, the rules, and the campaign back into one product spine."
+    },
+    {
+      "id": "nexus_pan_core_continuity",
+      "duration_seconds": 8.0,
+      "caption": "NEXUS-PAN is continuity and recovery for devices at the table.",
+      "narration": "NEXUS-PAN belongs in the product story: shared state, reconnects, and recovery when the campaign spans devices."
+    },
+    {
+      "id": "alice_base_workbench",
+      "duration_seconds": 8.0,
+      "caption": "ALICE is a base workbench feature for build help and rules explanation.",
+      "narration": "ALICE belongs in the product itself. It compares builds, catches role traps, and explains tradeoffs before play starts."
+    },
+    {
+      "id": "karma_forge_future_rules",
+      "duration_seconds": 8.0,
+      "caption": "KARMA FORGE is the expansion bet for governed rule evolution.",
+      "narration": "KARMA FORGE stays on the expansion shelf: house rules with impact, history, review, and rollback instead of chat-log folklore."
+    },
+    {
+      "id": "jackpoint_campaign_memory",
+      "duration_seconds": 8.0,
+      "caption": "JACKPOINT joins the campaign-memory lane.",
+      "narration": "JACKPOINT is easier to understand as campaign memory: briefings, dossiers, and recaps players actually want to read."
+    },
+    {
+      "id": "runsite_specialized_play_mode",
+      "duration_seconds": 8.0,
+      "caption": "RUNSITE is a specialized play mode for readable mission spaces.",
+      "narration": "RUNSITE is a specialized play mode. It makes mission spaces legible before the action starts without becoming the whole product."
+    },
+    {
+      "id": "runbook_press_publish_share",
+      "duration_seconds": 8.0,
+      "caption": "RUNBOOK PRESS joins the publish/share lane.",
+      "narration": "RUNBOOK PRESS belongs with publishing: primers, guides, modules, and season books the table can carry forward."
+    },
+    {
+      "id": "table_pulse_campaign_operations",
+      "duration_seconds": 8.0,
+      "caption": "TABLE PULSE is campaign operations, not a random extra brand.",
+      "narration": "TABLE PULSE is the campaign layer: live heat, bounded reactions, remote choices, and GM-approved fallout."
+    },
+    {
+      "id": "black_ledger_living_city",
+      "duration_seconds": 10.0,
+      "caption": "BLACK LEDGER remains the big living-city expansion bet.",
+      "narration": "BLACK LEDGER stays the big campaign expansion bet: factions, heat, missions, newsreels, and consequences the city remembers."
+    },
+    {
+      "id": "community_hub_open_run_lane",
+      "duration_seconds": 8.0,
+      "caption": "COMMUNITY HUB joins the social and open-run lane.",
+      "narration": "COMMUNITY HUB is the social lane: open runs, preflight, scheduling, and outcomes that feed back into Chummer truth."
+    },
+    {
+      "id": "finale_product_spine",
+      "duration_seconds": 10.0,
+      "caption": "One product spine: build, explain, run, remember, publish.",
+      "narration": "One product spine: build the runner, explain the choices, run the table, remember the consequences, and publish only what the table approves."
+    }
+  ]
 }

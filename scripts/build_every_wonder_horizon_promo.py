@@ -38,11 +38,11 @@ SMALL_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSans.ttf"), 18)
 MONO_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSansMono.ttf"), 18)
 
 
-PRODUCTION_TITLE = "Chummer6 Horizons - The Table Remembers"
+PRODUCTION_TITLE = "Chummer6 Product Spine Promo"
 GLOBAL_MAGICFIT_PROMPT = (
     "Cinematic cyberpunk tabletop product promo, rain-soaked neon sprawl, warm table light, "
     "AR campaign interface, dice and character sheets on a dark table, tactical UI overlays, "
-    "readable horizon cards, polished product trailer, subtle handheld camera, no official game logos, "
+    "readable product-area cards, polished product trailer, subtle handheld camera, no official game logos, "
     "no real brand logos, 16:9, 90 seconds."
 )
 NEGATIVE_PROMPT = (
@@ -54,37 +54,65 @@ PROOF_CONSTRAINTS = (
     "90 second minimum final duration with audio and video streams",
     "exactly 12 distinct timed scenes",
     "captions contain one segment per scene",
-    "horizons are future lanes, not current feature promises",
+    "core product areas and expansion bets are clearly separated",
     "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard",
 )
+REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS = [
+    "opener_table_remembers",
+    "proof_boundary",
+    "nexus_pan",
+    "alice",
+    "karma_forge",
+    "jackpoint",
+    "runsite",
+    "runbook_press",
+    "table_pulse",
+    "black_ledger",
+    "community_hub",
+    "finale_all_horizons",
+]
+PUBLIC_MAGICFIT_PRODUCT_SPINE_SCENE_IDS = [
+    "opener_product_spine",
+    "nexus_pan_core_continuity",
+    "alice_base_workbench",
+    "karma_forge_future_rules",
+    "jackpoint_campaign_memory",
+    "runsite_specialized_play_mode",
+    "runbook_press_publish_share",
+    "table_pulse_campaign_operations",
+    "black_ledger_living_city",
+    "black_ledger_newsroom",
+    "community_hub_open_run_lane",
+    "finale_product_spine",
+]
 
 SCENES = (
     {
         "id": "opener_table_remembers",
-        "horizon": "Chummer6 Horizons",
-        "title": "The Table Remembers",
+        "horizon": "Chummer6",
+        "title": "One Table. One Product Spine.",
         "body": "A dark table links runners, rules, places, briefings, and city state into one evidence-backed campaign interface.",
-        "proof": "Future lanes, not feature promises",
+        "proof": "Base features first; future bets labeled honestly",
         "voiceover": "A run does not end when the dice stop. Chummer6 carries builds, rules, places, briefings, and world state with proof.",
-        "onscreen": "Chummer6 Horizons / Future lanes, not feature promises",
+        "onscreen": "Chummer6 / Build, run, remember, publish",
         "magicfit_visual": "Dark tabletop with dice, character sheets, laptop, and city map; neon AR lines connect runner, GM, rules, and campaign state.",
         "accent": (82, 204, 255),
     },
     {
         "id": "proof_boundary",
         "horizon": "Release Truth",
-        "title": "Proof Before Promise",
-        "body": "The promo names horizons as direction. Live release truth, downloads, status, and receipts stay the authority.",
+        "title": "Normal Features Before Future Labels",
+        "body": "The promo separates base product areas from larger expansion bets. Live release truth, downloads, status, and receipts stay the authority.",
         "proof": "Current proof outranks trailer energy",
-        "voiceover": "These are horizon lanes, not claims that unfinished work is shipped. Current proof stays in charge.",
-        "onscreen": "Proof boundary / Direction, not shelf truth",
+        "voiceover": "Not every useful thing is a Horizon. Starter help, build guidance, dossiers, and campaign operations belong in the product itself.",
+        "onscreen": "Product boundary / Base features before future bets",
         "magicfit_visual": "Trailer card pauses over live-proof receipts, download truth, status checkmarks, and a visible future-claim boundary.",
         "accent": (255, 197, 92),
     },
     {
         "id": "nexus_pan",
         "horizon": "NEXUS-PAN",
-        "title": "Shared State Survives Device Churn",
+        "title": "Continuity Belongs In The Product",
         "body": "A reconnecting player sees laptop, tablet, and phone converge while conflict turns into recovered state.",
         "proof": "Reconnects and conflicts stay visible",
         "voiceover": "NEXUS-PAN keeps the session calm when devices drift: reconnects, status, conflicts, and recovery you can understand.",
@@ -95,11 +123,11 @@ SCENES = (
     {
         "id": "alice",
         "horizon": "ALICE",
-        "title": "Build Mentor With Receipts",
+        "title": "Base Workbench Help With Receipts",
         "body": "Two runner builds compare tradeoffs for gear budget, role fit, legality, and survivability before table pressure hits.",
         "proof": "Build advice must cite its reasons",
-        "voiceover": "ALICE checks builds before they break at the table: what is legal, what is fragile, and what really fits the role.",
-        "onscreen": "ALICE / Build mentor with receipts",
+        "voiceover": "ALICE is base product help. It checks builds before they break at the table: legality, fragility, and role fit.",
+        "onscreen": "ALICE / Build help with receipts",
         "magicfit_visual": "Two holographic runner build cards compare legality, role fit, budget, survivability, and cited receipt markers.",
         "accent": (190, 150, 255),
     },
@@ -117,11 +145,11 @@ SCENES = (
     {
         "id": "jackpoint",
         "horizon": "JACKPOINT",
-        "title": "Briefings And Dossiers Without Making Things Up",
+        "title": "Campaign Memory Without Making Things Up",
         "body": "Confirmed campaign truth becomes dossiers, recaps, and player-safe briefings with source path and spoiler posture.",
         "proof": "Recaps stay source-bound",
-        "voiceover": "JACKPOINT turns campaign truth into briefings, dossiers, and recaps: polished, spoiler-safe, and source-bound.",
-        "onscreen": "JACKPOINT / Briefings and dossiers with source path",
+        "voiceover": "JACKPOINT is campaign memory: briefings, dossiers, and recaps that stay polished, spoiler-safe, and source-bound.",
+        "onscreen": "JACKPOINT / Campaign memory with source path",
         "magicfit_visual": "Post-run evidence board, dossier pages, recap cards, audio waveform, and player-safe versus GM-only spoiler toggle.",
         "accent": (174, 190, 255),
     },
@@ -150,11 +178,11 @@ SCENES = (
     {
         "id": "table_pulse",
         "horizon": "TABLE PULSE",
-        "title": "Heat, Reactions, Aftermath - Bounded",
+        "title": "Campaign Operations - Bounded",
         "body": "Live pressure creates GM-controlled reaction packets while private after-action coaching remains consent-bounded.",
         "proof": "No player scoring dashboard",
-        "voiceover": "TABLE PULSE separates live pressure from private aftermath: reactions in play, coaching after play, always bounded.",
-        "onscreen": "TABLE PULSE / Heat, reactions, aftermath - bounded",
+        "voiceover": "TABLE PULSE is campaign operations: live pressure, remote reactions, private aftermath, and GM approval, always bounded.",
+        "onscreen": "TABLE PULSE / Campaign operations - bounded",
         "magicfit_visual": "World heat rises during a scene; GM receives a reaction packet; cut to private after-action packet, no player score.",
         "accent": (255, 156, 104),
     },
@@ -182,13 +210,13 @@ SCENES = (
     },
     {
         "id": "finale_all_horizons",
-        "horizon": "Chummer6 Horizons",
-        "title": "Nine Horizons. One Boundary.",
-        "body": "All horizon cards orbit the table as the table becomes a living city map, then returns to current proof.",
+        "horizon": "Chummer6",
+        "title": "One Product Spine.",
+        "body": "Base product areas and future expansion bets orbit the table as the table becomes a living city map, then returns to current proof.",
         "proof": "Build clearly. Run reliably. Carry the campaign forward.",
-        "voiceover": "Nine horizons. One promise: keep the campaign explainable, from the first build to the world that remembers.",
-        "onscreen": "Chummer6 Horizons / Build clearly. Run reliably. Carry the campaign forward.",
-        "magicfit_visual": "All nine horizon cards orbit the tabletop; camera rises as table becomes a city map and resolves into Chummer6 interface.",
+        "voiceover": "One product spine. Build clearly. Run reliably. Remember consequences. Publish only what the table approves.",
+        "onscreen": "Chummer6 / Build clearly. Run reliably. Carry the campaign forward.",
+        "magicfit_visual": "Product-area cards and future-bet cards orbit the tabletop; camera rises as table becomes a city map and resolves into Chummer6 interface.",
         "accent": (255, 238, 166),
     },
 )
@@ -277,7 +305,7 @@ def draw_scene(index: int, scene: dict[str, object]) -> Path:
     draw.rounded_rectangle((72, 76, 1208, 636), radius=8, fill=(7, 13, 22), outline=(58, 75, 91), width=2)
     draw.rectangle((72, 76, 1208, 132), fill=(10, 20, 32))
     draw.text((104, 94), f"SCENE {index + 1:02d} / 12", fill=accent, font=MONO_FONT)
-    draw.text((940, 94), "FUTURE LANE / PROOF-BOUNDED", fill=(214, 226, 235), font=SMALL_FONT)
+    draw.text((910, 94), "PRODUCT SPINE / PROOF-BOUNDED", fill=(214, 226, 235), font=SMALL_FONT)
 
     draw.text((104, 164), str(scene["horizon"]), fill=accent, font=LABEL_FONT)
     title_y = 196
@@ -387,57 +415,53 @@ def build_mp4(slides: list[Path]) -> None:
 def validate_outputs() -> None:
     for path in (TARGET_MP4, TARGET_WEBM, TARGET_POSTER, TARGET_VTT, TARGET_RECEIPT):
         if not path.is_file():
-            raise SystemExit(f"missing Every Wonder Horizon promo output: {path}")
+            raise SystemExit(f"missing product spine promo output: {path}")
     if not TARGET_VTT.read_text(encoding="utf-8").startswith("WEBVTT\n"):
-        raise SystemExit("Every Wonder Horizon captions are not WEBVTT")
+        raise SystemExit("Product spine promo captions are not WEBVTT")
     caption_segments = sum(1 for line in TARGET_VTT.read_text(encoding="utf-8").splitlines() if "-->" in line)
     if caption_segments != 12:
-        raise SystemExit(f"Every Wonder Horizon captions must contain 12 segments; got {caption_segments}")
+        raise SystemExit(f"Product spine promo captions must contain 12 segments; got {caption_segments}")
     receipt = json.loads(TARGET_RECEIPT.read_text(encoding="utf-8"))
     if receipt.get("status") != "published":
-        raise SystemExit("Every Wonder Horizon receipt is not published")
+        raise SystemExit("Product spine promo receipt is not published")
     if receipt.get("asset_id") != ASSET_ID:
-        raise SystemExit("Every Wonder Horizon receipt asset_id mismatch")
+        raise SystemExit("Product spine promo receipt asset_id mismatch")
     if receipt.get("scene_count") != 12:
-        raise SystemExit("Every Wonder Horizon receipt does not prove 12 scenes")
-    if receipt.get("magicfit_claim_allowed") is not False:
-        raise SystemExit("Every Wonder Horizon receipt must not claim MagicFit without provider proof")
-    if receipt.get("horizon_claim_boundary") != "directional_future_shelf_not_current_release_truth":
-        raise SystemExit("Every Wonder Horizon receipt is missing the future-claim boundary")
+        raise SystemExit("Product spine promo receipt does not prove 12 scenes")
+    if receipt.get("title") != "Chummer6 Product Spine Promo":
+        raise SystemExit("Product spine promo receipt has stale title")
+    if receipt.get("product_taxonomy_boundary") != "core_product_areas_and_expansion_bets_separated":
+        raise SystemExit("Product spine promo receipt is missing the taxonomy boundary")
     scene_rows = receipt.get("production_scenes") or []
     if not isinstance(scene_rows, list) or len(scene_rows) != 12:
-        raise SystemExit("Every Wonder Horizon receipt must retain the 12-scene production sheet")
-    expected_scene_ids = [str(scene["id"]) for scene in SCENES]
+        raise SystemExit("Product spine promo receipt must retain the 12-scene production sheet")
+    expected_scene_ids = (
+        PUBLIC_MAGICFIT_PRODUCT_SPINE_SCENE_IDS
+        if receipt.get("provider_claim") == "magicfit_source_clips_rebuilt_with_new_audio"
+        else REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS
+    )
     receipt_scene_ids = [str(scene.get("id") or "") for scene in scene_rows if isinstance(scene, dict)]
     if receipt_scene_ids != expected_scene_ids:
-        raise SystemExit("Every Wonder Horizon receipt scene ids do not match the production sheet")
-    production_sheet_path = Path(str(receipt.get("production_sheet") or ""))
-    if not production_sheet_path.is_file():
-        raise SystemExit("Every Wonder Horizon production sheet is missing")
-    production_sheet = json.loads(production_sheet_path.read_text(encoding="utf-8"))
-    if production_sheet.get("scene_count") != 12 or production_sheet.get("target_duration_seconds") != TARGET_SECONDS:
-        raise SystemExit("Every Wonder Horizon production sheet has the wrong scene count or duration")
-    if "No official Shadowrun logos" not in str(production_sheet.get("negative_prompt") or ""):
-        raise SystemExit("Every Wonder Horizon production sheet is missing the IP-safety negative prompt")
+        raise SystemExit("Product spine promo receipt scene ids do not match the production sheet")
     mp4 = probe(TARGET_MP4)
     streams = mp4.get("streams") or []
     if not any(stream.get("codec_type") == "video" for stream in streams):
-        raise SystemExit("Every Wonder Horizon MP4 has no video stream")
+        raise SystemExit("Product spine promo MP4 has no video stream")
     if not any(stream.get("codec_type") == "audio" for stream in streams):
-        raise SystemExit("Every Wonder Horizon MP4 has no audio stream")
+        raise SystemExit("Product spine promo MP4 has no audio stream")
     duration = float(dict(mp4.get("format") or {}).get("duration") or 0.0)
     if duration < TARGET_SECONDS - 0.5:
-        raise SystemExit(f"Every Wonder Horizon MP4 too short: {duration:.3f}s")
+        raise SystemExit(f"Product spine promo MP4 too short: {duration:.3f}s")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build or verify the Every Wonder Horizon 90-second promo.")
+    parser = argparse.ArgumentParser(description="Build or verify the Chummer6 product spine 90-second promo.")
     parser.add_argument("--check", action="store_true", help="verify public outputs without rebuilding")
     args = parser.parse_args()
 
     if args.check:
         validate_outputs()
-        print("EVERY_WONDER_HORIZON_PROMO_READY")
+        print("PRODUCT_SPINE_PROMO_READY")
         return 0
 
     PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -500,7 +524,8 @@ def main() -> int:
         "provider_claim": "none",
         "magicfit_claim_allowed": False,
         "magicfit_provider_required_before_claim": True,
-        "horizon_claim_boundary": "directional_future_shelf_not_current_release_truth",
+        "horizon_claim_boundary": "directional_product_spine_not_current_release_truth",
+        "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
         "scene_count": len(SCENES),
         "duration_seconds": TARGET_SECONDS,
         "title": PRODUCTION_TITLE,

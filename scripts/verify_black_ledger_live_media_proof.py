@@ -29,19 +29,25 @@ const { chromium } = require("playwright");
 
 async function main() {
   const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+    ],
+  });
   const entries = [];
   try {
     for (const viewport of config.viewports) {
-      const context = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        isMobile: !!viewport.mobile,
-        hasTouch: !!viewport.mobile,
-        userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-      });
-      const page = await context.newPage();
-      page.setDefaultNavigationTimeout(90000);
       for (const route of config.routes) {
+        const context = await browser.newContext({
+          viewport: { width: viewport.width, height: viewport.height },
+          isMobile: !!viewport.mobile,
+          hasTouch: !!viewport.mobile,
+          userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        });
+        const page = await context.newPage();
+        page.setDefaultNavigationTimeout(90000);
         const url = `${config.baseUrl}${route.path}`;
         let response = null;
         let lastError = null;
@@ -59,7 +65,8 @@ async function main() {
         if (!response || response.status() !== 200) {
           throw new Error(`Unexpected status ${response ? response.status() : "none"} for ${url}`);
         }
-        const bodyText = await page.locator("body").innerText();
+        await page.waitForTimeout(750);
+        const bodyText = await page.evaluate(() => document.body ? document.body.innerText : "");
         const matchedNeedle = route.needles.find((needle) => bodyText.includes(needle));
         if (!matchedNeedle) {
           throw new Error(`Expected one of [${route.needles.join(", ")}] on ${url}`);
@@ -96,7 +103,7 @@ async function main() {
         });
         const screenshotPath = path.join(config.outputRoot, viewport.name, `${route.label}.png`);
         fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
-        await page.screenshot({ path: screenshotPath, fullPage: true });
+        await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled", scale: "css" });
         const screenshotBytes = fs.statSync(screenshotPath).size;
         entries.push({
           route: route.path,
@@ -106,8 +113,8 @@ async function main() {
           screenshotBytes,
           visualSignals,
         });
+        await context.close();
       }
-      await context.close();
     }
   } finally {
     await browser.close();
@@ -304,6 +311,11 @@ def main() -> int:
             payload["failures"] = failures
             if failures:
                 payload["status"] = "fail"
+        elif completed:
+            payload["failures"] = [
+                "Black Ledger browser capture failed after "
+                f"{len(attempts)} attempt(s): {completed.stderr.strip().splitlines()[0] if completed.stderr.strip() else 'no stderr'}"
+            ]
 
     write_json(OUTPUT_PATH, payload)
     if payload["status"] != "pass":

@@ -36,7 +36,7 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("Participation loop snapshot", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
         Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
-        Assert.Contains("Browse horizons", view, StringComparison.Ordinal);
+        Assert.Contains("Browse campaign tools", view, StringComparison.Ordinal);
         Assert.Contains("Open shipped updates", view, StringComparison.Ordinal);
     }
 

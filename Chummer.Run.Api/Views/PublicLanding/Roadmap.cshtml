@@ -46,8 +46,11 @@
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
             .Replace("provider", "external service", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizons", "product threads", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizon", "product thread", StringComparison.OrdinalIgnoreCase);
+            .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizon", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("implementation tranche", "implementation slice", StringComparison.OrdinalIgnoreCase);
     }
 
     var signalLanes = new[]
@@ -56,9 +59,9 @@
         {
             Badge = "Planning view",
             Title = "See what might come next without assuming it already shipped",
-            Summary = "Use this page to see likely next steps, milestone pressure, and public direction. Use what works today before treating any roadmap note as already available.",
+            Summary = "Use this page to see likely next steps, active maintenance, and public direction. Use what works today before treating any roadmap note as already available.",
             Href = "#roadmap-horizons",
-            Label = "Browse product threads",
+            Label = "Browse planned work",
             Notes = new[] { "Planned", "Milestone-backed", "Not shipped yet" }
         },
         new
@@ -95,10 +98,10 @@
     <div class="roadmap-hero__copy">
         <p class="eyebrow">Roadmap</p>
         <h1 class="page-title">What looks likely next, and what is still only planned</h1>
-        <p class="page-copy">Product threads explain what Chummer is trying to unlock next. Milestones show the slices already in motion and the work still being lined up.</p>
+        <p class="page-copy">Roadmap tracks explain what Chummer is trying to unlock next. Milestones show the slices already in motion and the work still being lined up.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestones</a>
-            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse product threads</a>
+            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse planned work</a>
             <a class="button-like button-like--ghost" href="/now">Open what works today</a>
         </div>
     </div>
@@ -106,7 +109,7 @@
         <p class="roadmap-hero__kicker">Quick read</p>
         <ul class="roadmap-hero__notes">
             <li>Milestones show the work in motion.</li>
-            <li>Product threads show direction, not a shipping promise.</li>
+            <li>Planned work shows direction, not a shipping promise.</li>
             <li>Use the changelog or what works today when you need current availability.</li>
         </ul>
     </aside>
@@ -249,7 +252,7 @@
         <article class="roadmap-empty">
             <span class="tag tag--quiet">Temporarily unavailable</span>
             <h3>Milestone detail is not loaded right now</h3>
-            <p>The roadmap view could not read the milestone registry on this request. The product threads below still reflect the broader direction.</p>
+            <p>The roadmap view could not read the milestone registry on this request. The planned work below still reflects the broader direction.</p>
         </article>
     }
     else
@@ -301,7 +304,7 @@
 <section class="roadmap-frame" id="roadmap-horizons">
     <div class="roadmap-frame__lead">
         <p class="eyebrow">Direction map</p>
-        <h2 class="editorial-title">Product threads</h2>
+        <h2 class="editorial-title">Planned work</h2>
         <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and where to compare the idea against the current product.</p>
     </div>
 
@@ -313,7 +316,7 @@
                 Id = "roadmap-preparing",
                 Eyebrow = PublicSurfaceStatus.PreparingNext,
                 Heading = "Closest to the next public step",
-                Intro = "These product threads are nearest to the current public release and the next outward-facing unlock.",
+                Intro = "These items are nearest to the current public release and the next outward-facing unlock.",
                 Items = preparingHorizons
             },
             new

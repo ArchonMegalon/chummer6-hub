@@ -474,6 +474,57 @@ def build_reel(reel: Reel) -> dict[str, Any]:
         },
         "mp4_probe": mp4_probe,
     }
+    taxonomy_scene_ids = {
+        "all-horizons-90s-magicfit-promo": [
+            "opener_product_spine",
+            "nexus_pan_core_continuity",
+            "alice_base_workbench",
+            "karma_forge_future_rules",
+            "jackpoint_campaign_memory",
+            "runsite_specialized_play_mode",
+            "runbook_press_publish_share",
+            "table_pulse_campaign_operations",
+            "black_ledger_living_city",
+            "community_hub_open_run_lane",
+            "finale_product_spine",
+        ],
+        "every-wonder-horizon-promo": [
+            "opener_product_spine",
+            "nexus_pan_core_continuity",
+            "alice_base_workbench",
+            "karma_forge_future_rules",
+            "jackpoint_campaign_memory",
+            "runsite_specialized_play_mode",
+            "runbook_press_publish_share",
+            "table_pulse_campaign_operations",
+            "black_ledger_living_city",
+            "black_ledger_newsroom",
+            "community_hub_open_run_lane",
+            "finale_product_spine",
+        ],
+    }
+    scene_ids = taxonomy_scene_ids.get(reel.asset_id)
+    if scene_ids:
+        receipt.update(
+            {
+                "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
+                "provider_claim": "magicfit_source_clips_rebuilt_with_new_audio",
+                "proof_constraints": [
+                    "Core product areas and expansion bets are separated in captions, narration, and receipt.",
+                    "The public asset uses existing MagicFit-rendered source clips rebuilt with new narration and captions.",
+                    "The receipt must not claim all listed surfaces are current shipped features.",
+                ],
+                "production_scenes": [
+                    {
+                        "id": scene_ids[index],
+                        "duration_seconds": scene.duration,
+                        "caption": scene.caption,
+                        "narration": scene.narration,
+                    }
+                    for index, scene in enumerate(reel.scenes)
+                ],
+            }
+        )
     target_receipt.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     return receipt
 
@@ -548,17 +599,17 @@ def flagship_reel() -> Reel:
 def horizons_reel(asset_id: str, title: str, source_claim: str) -> Reel:
     src = WORKSPACE / "_completion" / "horizons_90s_promo" / "magicfit_clips"
     rows = [
-        ("01_cold_open_table_chaos.mp4", 6, "The table is alive, but the tools are fighting the table.", "The table is alive, but the tools are fighting it. Chummer6 turns that chaos into one campaign operating surface."),
-        ("02_nexus_pan_shared_state.mp4", 8, "NEXUS-PAN keeps shared state steady across devices.", "NEXUS-PAN keeps shared state steady when devices drift, drop, and return mid-session."),
-        ("03_alice_build_tradeoffs.mp4", 8, "ALICE explains build tradeoffs before they break play.", "ALICE compares builds, catches role traps, and explains tradeoffs with receipts before play starts."),
-        ("04_karma_forge_governed_rules.mp4", 8, "KARMA FORGE makes house rules governed and reversible.", "KARMA FORGE turns house rules into governed packages with impact, history, and rollback."),
-        ("05_jackpoint_dossiers_recaps.mp4", 8, "JACKPOINT turns table memory into sharp briefings.", "JACKPOINT turns what happened at the table into briefings, dossiers, and recaps players actually want to read."),
-        ("06_runsite_spatial_prep.mp4", 8, "RUNSITE makes mission spaces legible before danger starts.", "RUNSITE makes mission spaces explorable and legible before the action starts."),
-        ("07_runbook_press_campaign_books.mp4", 8, "RUNBOOK PRESS turns campaign material into books.", "RUNBOOK PRESS turns campaign material into primers, guides, modules, and season books the table can carry forward."),
-        ("08_table_pulse_live_heat.mp4", 8, "TABLE PULSE turns heat into bounded GM-approved reactions.", "TABLE PULSE turns live heat into bounded reactions, remote choices, and GM-approved fallout."),
-        ("09_black_ledger_living_world.mp4", 10, "BLACK LEDGER makes the city remember consequences.", "BLACK LEDGER makes the city remember: factions, heat, missions, newsreels, and consequences."),
-        ("10_community_hub_open_runs.mp4", 8, "COMMUNITY HUB helps players find runs and close the loop.", "COMMUNITY HUB helps players find runs, pass preflight, get scheduled, and feed outcomes back into the world."),
-        ("11_finale_all_horizons.mp4", 10, "All Horizons return to one table and one campaign.", "All Horizons point back to the same table: build the runner, run the scene, shape the world, and make the next session easier to start."),
+        ("01_cold_open_table_chaos.mp4", 6, "The table is alive. Chummer6 keeps the work in one place.", "The table is alive, but the tools are fighting it. Chummer6 brings the runner, the rules, and the campaign back into one product spine."),
+        ("02_nexus_pan_shared_state.mp4", 8, "NEXUS-PAN is continuity and recovery for devices at the table.", "NEXUS-PAN belongs in the product story: shared state, reconnects, and recovery when the campaign spans devices."),
+        ("03_alice_build_tradeoffs.mp4", 8, "ALICE is a base workbench feature for build help and rules explanation.", "ALICE belongs in the product itself. It compares builds, catches role traps, and explains tradeoffs before play starts."),
+        ("04_karma_forge_governed_rules.mp4", 8, "KARMA FORGE is the expansion bet for governed rule evolution.", "KARMA FORGE stays on the expansion shelf: house rules with impact, history, review, and rollback instead of chat-log folklore."),
+        ("05_jackpoint_dossiers_recaps.mp4", 8, "JACKPOINT joins the campaign-memory lane.", "JACKPOINT is easier to understand as campaign memory: briefings, dossiers, and recaps players actually want to read."),
+        ("06_runsite_spatial_prep.mp4", 8, "RUNSITE is a specialized play mode for readable mission spaces.", "RUNSITE is a specialized play mode. It makes mission spaces legible before the action starts without becoming the whole product."),
+        ("07_runbook_press_campaign_books.mp4", 8, "RUNBOOK PRESS joins the publish/share lane.", "RUNBOOK PRESS belongs with publishing: primers, guides, modules, and season books the table can carry forward."),
+        ("08_table_pulse_live_heat.mp4", 8, "TABLE PULSE is campaign operations, not a random extra brand.", "TABLE PULSE is the campaign layer: live heat, bounded reactions, remote choices, and GM-approved fallout."),
+        ("09_black_ledger_living_world.mp4", 10, "BLACK LEDGER remains the big living-city expansion bet.", "BLACK LEDGER stays the big campaign expansion bet: factions, heat, missions, newsreels, and consequences the city remembers."),
+        ("10_community_hub_open_runs.mp4", 8, "COMMUNITY HUB joins the social and open-run lane.", "COMMUNITY HUB is the social lane: open runs, preflight, scheduling, and outcomes that feed back into Chummer truth."),
+        ("11_finale_all_horizons.mp4", 10, "One product spine: build, explain, run, remember, publish.", "One product spine: build the runner, explain the choices, run the table, remember the consequences, and publish only what the table approves."),
     ]
     return Reel(
         asset_id=asset_id,
@@ -572,24 +623,24 @@ def horizons_reel(asset_id: str, title: str, source_claim: str) -> Reel:
 def every_wonder_reel() -> Reel:
     src = WORKSPACE / "_completion" / "refined_magicfit_promo_plans_20260531" / "magicfit_clips"
     rows = [
-        ("nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4", 7, "Every Wonder starts when split screens start slowing the table.", "Every Wonder Horizon starts with the real table problem: split devices, split notes, and a scene that should already be moving."),
-        ("nexus_pan_90s_deepdive/nexus_pan_08_rejoin_cleanly.mp4", 7, "NEXUS-PAN recovers session state when players reconnect.", "NEXUS-PAN keeps reconnects calm. Players return with visible state, conflict status, and a clean handoff."),
-        ("alice_90s_deepdive/alice_02_variant_compare.mp4", 7, "ALICE compares runner choices before they become table problems.", "ALICE turns build advice into explainable tradeoffs: role fit, survivability, legality, and cost."),
-        ("karma_forge_90s_deepdive/karma_forge_03_impact_preview.mp4", 7, "KARMA FORGE previews house-rule impact before approval.", "KARMA FORGE makes house rules inspectable. The GM sees impact before the table commits."),
-        ("jackpoint_90s_deepdive/jackpoint_04_dossier_build.mp4", 8, "JACKPOINT turns table events into clean dossiers.", "JACKPOINT turns table events into dossiers, briefings, recaps, and player-safe handouts."),
-        ("runsite_90s_deepdive/runsite_02_site_unfolds.mp4", 8, "RUNSITE makes mission spaces readable before contact.", "RUNSITE opens the site before the run starts: routes, hotspots, layers, and GM-only context."),
-        ("runbook_press_90s_deepdive/runbook_press_03_book_structure.mp4", 8, "RUNBOOK PRESS shapes campaign material into books.", "RUNBOOK PRESS turns campaign material into structured guides, season books, and handoff-ready exports."),
-        ("table_pulse_90s_deepdive/table_pulse_04_remote_packet.mp4", 8, "TABLE PULSE turns heat into governed remote reaction packets.", "TABLE PULSE keeps pressure bounded: live heat, remote packets, opt-outs, and GM approval."),
-        ("black_ledger_epic_90s/black_ledger_epic_02_the_globe_wakes.mp4", 8, "BLACK LEDGER lets the world wake up after the run.", "BLACK LEDGER makes the city remember. Factions move, districts heat up, and new jobs emerge."),
-        ("black_ledger_90s_deepdive/black_ledger_07_newsroom.mp4", 7, "Newsreels make consequences feel like the city is watching.", "Newsroom clips turn fallout into rumors, pressure, jokes, and hooks the GM can bring back to the table."),
-        ("community_hub_90s_deepdive/community_hub_02_open_run_board.mp4", 7, "COMMUNITY HUB brings players to vetted open runs.", "COMMUNITY HUB helps players find tables, pass preflight, schedule cleanly, and close the loop."),
-        ("community_hub_90s_deepdive/community_hub_10_community_hero.mp4", 8, "Every Wonder returns to one table and one campaign.", "Every Wonder Horizon is the promise that the campaign can grow without losing the people, scenes, and choices that made it matter."),
+        ("nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4", 7, "The product starts with one table, not a shelf of labels.", "Chummer6 should feel like one table that keeps its memory: runners, rules, scenes, people, and consequences in reach."),
+        ("nexus_pan_90s_deepdive/nexus_pan_08_rejoin_cleanly.mp4", 7, "NEXUS-PAN is campaign continuity for device drift.", "NEXUS-PAN belongs in the product story. Its job is calm reconnects, visible conflicts, and a clean handoff across devices."),
+        ("alice_90s_deepdive/alice_02_variant_compare.mp4", 7, "ALICE belongs in the base workbench.", "ALICE is normal product help: build advice, explainable tradeoffs, role fit, survivability, legality, and cost."),
+        ("karma_forge_90s_deepdive/karma_forge_03_impact_preview.mp4", 7, "KARMA FORGE is governed rule evolution.", "KARMA FORGE is the rules-evolution expansion bet: house rules with impact preview, history, review, and rollback before the table commits."),
+        ("jackpoint_90s_deepdive/jackpoint_04_dossier_build.mp4", 8, "JACKPOINT is campaign memory.", "JACKPOINT is easier to understand as campaign memory: sourced dossiers, briefings, recaps, and player-safe handouts."),
+        ("runsite_90s_deepdive/runsite_02_site_unfolds.mp4", 8, "RUNSITE is a specialized play mode.", "RUNSITE opens mission spaces before the run starts: routes, hotspots, layers, and GM-only context without becoming the whole product."),
+        ("runbook_press_90s_deepdive/runbook_press_03_book_structure.mp4", 8, "RUNBOOK PRESS belongs to publish and share.", "RUNBOOK PRESS turns approved campaign material into structured guides, season books, and handoff-ready exports."),
+        ("table_pulse_90s_deepdive/table_pulse_04_remote_packet.mp4", 8, "TABLE PULSE is campaign operations.", "TABLE PULSE keeps pressure bounded: live heat, remote packets, opt-outs, private aftermath, and GM approval."),
+        ("black_ledger_epic_90s/black_ledger_epic_02_the_globe_wakes.mp4", 8, "BLACK LEDGER is the living-city expansion bet.", "BLACK LEDGER stays the big living-world bet. Factions move, districts heat up, and new jobs emerge from what happened."),
+        ("black_ledger_90s_deepdive/black_ledger_07_newsroom.mp4", 7, "Newsreels turn consequences into table fuel.", "Newsroom clips turn fallout into rumor, pressure, jokes, and hooks the GM can bring back to the table."),
+        ("community_hub_90s_deepdive/community_hub_02_open_run_board.mp4", 7, "COMMUNITY HUB is the open-run lane.", "COMMUNITY HUB helps players find tables, pass preflight, schedule cleanly, and close the loop."),
+        ("community_hub_90s_deepdive/community_hub_10_community_hero.mp4", 8, "One product spine: build, run, remember, publish.", "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."),
     ]
     return Reel(
         asset_id="every-wonder-horizon-promo",
-        title="Every Wonder Horizon Promo",
+        title="Chummer6 Product Spine Promo",
         render_mode="magicfit_refined_deepdive_montage_with_spoken_narration",
-        source_claim="12 curated MagicFit-rendered refined deep-dive clips; distinct from the All Horizons teaser",
+        source_claim="12 curated MagicFit-rendered refined deep-dive clips retitled around the product spine and simplified Horizon taxonomy",
         scenes=tuple(Scene(src / clip, float(duration), caption, narration) for clip, duration, caption, narration in rows),
     )
 
@@ -616,7 +667,7 @@ def write_summary(receipts: list[dict[str, Any]]) -> None:
         "contract_name": "chummer.promo_video_rework_20260602",
         "generated_at_utc": utc_now(),
         "status": "pass",
-        "reason": "The middle Every Wonder Horizon reel now uses MagicFit scene clips instead of local UI cards, and all rebuilt reels carry spoken feature narration plus a music bed.",
+        "reason": "The middle product-spine reel now uses MagicFit scene clips instead of local UI cards, and all rebuilt reels carry spoken feature narration plus a music bed.",
         "assets": [
             {
                 "asset_id": receipt["asset_id"],
@@ -643,8 +694,8 @@ def main() -> int:
         every_wonder_reel(),
         horizons_reel(
             "all-horizons-90s-magicfit-promo",
-            "All Horizons 90s MagicFit Promo",
-            "11 MagicFit-rendered Horizon scene clips rebuilt with cleaner spoken narration",
+            "Chummer6 Product Threads 90s MagicFit Promo",
+            "11 MagicFit-rendered product-thread scene clips rebuilt with cleaner spoken narration and simplified Horizon taxonomy",
         ),
     ]
     if args.only:

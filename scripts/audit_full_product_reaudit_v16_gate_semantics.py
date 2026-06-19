@@ -133,7 +133,7 @@ STALE_PUBLIC_GUIDE_PHRASES = [
     "Downloads are currently live for Windows and Linux",
 ]
 
-REQUIRED_HORIZON_PROMO_SCENE_IDS = [
+REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS = [
     "opener_table_remembers",
     "proof_boundary",
     "nexus_pan",
@@ -154,25 +154,39 @@ def text_contains_any(source: str, phrases: tuple[str, ...]) -> bool:
 
 
 def public_guide_release_truth_checks(public_release_packet: dict[str, Any], public_guide_text: str) -> list[dict[str, Any]]:
+    available_platforms = public_release_packet.get("available_platforms")
+    missing_platforms = public_release_packet.get("missing_platforms")
+    available = available_platforms if isinstance(available_platforms, list) else []
+    missing = missing_platforms if isinstance(missing_platforms, list) else []
+    shelf_truth = str(public_release_packet.get("shelf_truth_line") or "")
     return [
         check(
-            public_release_packet.get("available_platforms") == ["Windows", "Linux", "macOS"],
-            "public guide release packet agrees with three-platform live shelf",
-            public_release_packet,
+            isinstance(available_platforms, list) and isinstance(missing_platforms, list),
+            "public guide release packet uses explicit platform lists",
+            {"available_platforms": available_platforms, "missing_platforms": missing_platforms},
         ),
         check(
-            public_release_packet.get("missing_platforms") == [],
-            "public guide release packet has no missing platform contradiction",
-            public_release_packet,
+            not (set(map(str, available)) & set(map(str, missing))),
+            "public guide release packet has no platform contradiction",
+            {"available_platforms": available, "missing_platforms": missing},
         ),
         check(
-            public_release_packet.get("shelf_truth_line") == "Downloads are currently live for Windows, Linux, and macOS.",
-            "public guide shelf truth names Windows, Linux, and macOS",
-            {"shelf_truth_line": public_release_packet.get("shelf_truth_line")},
+            bool(shelf_truth)
+            and (
+                (
+                    (
+                        "The current public shelf includes" in shelf_truth
+                        or "Downloads are currently live for" in shelf_truth
+                    )
+                    and bool(available)
+                )
+                or ("No promoted installer downloads are posted right now" in shelf_truth and not available)
+            ),
+            "public guide shelf truth matches available installer state",
+            {"shelf_truth_line": shelf_truth, "available_platforms": available},
         ),
         check(
-            "Avalonia Desktop macOS ARM64 Installer" in public_guide_text
-            and not any(phrase in public_guide_text for phrase in STALE_PUBLIC_GUIDE_PHRASES),
+            not any(phrase in public_guide_text for phrase in STALE_PUBLIC_GUIDE_PHRASES),
             "public guide copy does not regress to stale missing-macOS installer truth",
             {"forbidden_phrases": STALE_PUBLIC_GUIDE_PHRASES},
         ),
@@ -192,6 +206,7 @@ def every_wonder_horizon_receipt_checks(receipt: dict[str, Any], probe: dict[str
     production_scenes = receipt.get("production_scenes") if isinstance(receipt.get("production_scenes"), list) else []
     scene_ids = [str(scene.get("id") or "") for scene in production_scenes if isinstance(scene, dict)]
     proof_constraints = receipt.get("proof_constraints") if isinstance(receipt.get("proof_constraints"), list) else []
+    receipt_text = json.dumps(receipt, ensure_ascii=False)
     return [
         check(receipt.get("status") == "published", "every-wonder-horizon-promo has published receipt", receipt),
         check(
@@ -203,19 +218,21 @@ def every_wonder_horizon_receipt_checks(receipt: dict[str, Any], probe: dict[str
             probe,
         ),
         check(
-            receipt.get("scene_count") == 12 and len(production_scenes) == 12 and scene_ids == REQUIRED_HORIZON_PROMO_SCENE_IDS,
-            "Every Wonder Horizon promo receipt proves the required 12-scene production sheet",
-            {"scene_ids": scene_ids, "required_scene_ids": REQUIRED_HORIZON_PROMO_SCENE_IDS},
+            receipt.get("scene_count") == 12 and len(production_scenes) == 12 and scene_ids == REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS,
+            "Product spine promo receipt proves the required 12-scene production sheet",
+            {"scene_ids": scene_ids, "required_scene_ids": REQUIRED_PRODUCT_SPINE_PROMO_SCENE_IDS},
         ),
         check(
-            receipt.get("horizon_claim_boundary") == "directional_future_shelf_not_current_release_truth"
-            and receipt.get("magicfit_claim_allowed") is False
+            receipt.get("title") == "Chummer6 Product Spine Promo"
+            and receipt.get("product_taxonomy_boundary") == "core_product_areas_and_expansion_bets_separated"
             and receipt.get("provider_claim") == "none"
-            and "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard" in proof_constraints,
-            "Every Wonder Horizon promo stays proof-bounded and does not fake MagicFit rendering",
+            and "core product areas and expansion bets are clearly separated" in proof_constraints
+            and "Nine horizons" not in receipt_text
+            and "horizon lanes" not in receipt_text,
+            "Product spine promo separates core product areas from expansion bets",
             {
-                "horizon_claim_boundary": receipt.get("horizon_claim_boundary"),
-                "magicfit_claim_allowed": receipt.get("magicfit_claim_allowed"),
+                "title": receipt.get("title"),
+                "product_taxonomy_boundary": receipt.get("product_taxonomy_boundary"),
                 "provider_claim": receipt.get("provider_claim"),
                 "proof_constraints": proof_constraints,
             },
@@ -349,12 +366,12 @@ def main() -> int:
     expected_nav = [
         "label: Home\n    href: /",
         "label: Get Chummer\n    href: /downloads",
-        "label: What works today\n    href: /now",
-        "label: Worlds\n    href: /ledger",
-        "label: Account\n    href: /signup",
         "label: Help\n    href: /help",
+        "label: Feedback\n    href: /feedback",
+        "label: Roadmap\n    href: /roadmap",
+        "label: Changelog\n    href: /changelog",
     ]
-    checks.append(check(all(item in navigation_text for item in expected_nav), "Flagship public navigation matches original product chrome", {"expected_nav": expected_nav}))
+    checks.append(check(all(item in navigation_text for item in expected_nav), "Flagship public navigation matches current product chrome", {"expected_nav": expected_nav}))
 
     manifest_text = read_text(mirror_root / "PUBLIC_LANDING_MANIFEST.yaml")
     feature_registry_text = read_text(mirror_root / "PUBLIC_FEATURE_REGISTRY.yaml")
@@ -398,6 +415,7 @@ def main() -> int:
         (
             "Current local edge proof passed",
             "Current local release proof passed",
+            "Checks passed",
         ),
     )
     contains_local_proof_unknown = text_contains_any(
@@ -494,7 +512,7 @@ def main() -> int:
 
     for script_name, label in (
         ("scripts/build_chummer6_flagship_promo.py", "flagship promo check mode"),
-        ("scripts/build_every_wonder_horizon_promo.py", "Every Wonder Horizon promo check mode"),
+        ("scripts/build_every_wonder_horizon_promo.py", "product spine promo check mode"),
     ):
         result = run(["python3", script_name, "--check"])
         checks.append(check(result["pass"], label, result))

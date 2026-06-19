@@ -54,9 +54,32 @@ test('public UI elements are not cut off by their frames outside intentional scr
   const pageResults: Array<Record<string, unknown>> = [];
 
   for (const viewport of viewports) {
-    const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: viewport.width, height: viewport.height } });
-
     for (const route of routes) {
+      const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: viewport.width, height: viewport.height } });
+      await page.route('**/*', async (requestRoute) => {
+        const resourceType = requestRoute.request().resourceType();
+        if (resourceType === 'media') {
+          await requestRoute.abort();
+          return;
+        }
+
+        await requestRoute.continue();
+      });
+      await page.addInitScript(() => {
+        const originalGetContext = HTMLCanvasElement.prototype.getContext as unknown as (
+          this: HTMLCanvasElement,
+          type: string,
+          ...args: unknown[]
+        ) => RenderingContext | null;
+        HTMLCanvasElement.prototype.getContext = function getContext(type: string, ...args: unknown[]) {
+          if (String(type).toLowerCase().includes('webgl')) {
+            return null;
+          }
+
+          return originalGetContext.call(this, type, ...args);
+        } as unknown as typeof HTMLCanvasElement.prototype.getContext;
+      });
+
       const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -70,6 +93,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
           reason: `route returned HTTP ${status}`,
           element: { x: 0, y: 0, width: 0, height: 0, right: 0, bottom: 0 },
         });
+        await page.close().catch(() => {});
         continue;
       }
 
@@ -399,9 +423,8 @@ test('public UI elements are not cut off by their frames outside intentional scr
         status,
         failure_count: routeFailureCount,
       });
+      await page.close().catch(() => {});
     }
-
-    await page.close();
   }
 
   const payload = {

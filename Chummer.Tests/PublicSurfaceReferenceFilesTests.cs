@@ -146,7 +146,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
         JsonElement root = manifest.RootElement;
 
-        Assert.Equal("chummer.public_horizon_video_manifest", root.GetProperty("contract_name").GetString());
+        Assert.Equal("chummer.public_product_video_manifest", root.GetProperty("contract_name").GetString());
         Assert.True(root.GetProperty("audio_required").GetBoolean());
         Assert.Contains("with_audio", root.GetProperty("publication_posture").GetString() ?? string.Empty, StringComparison.Ordinal);
 
@@ -187,7 +187,7 @@ public sealed class PublicSurfaceReferenceFilesTests
             assetCount++;
         }
 
-        Assert.Equal(11, assetCount);
+        Assert.Equal(12, assetCount);
         foreach (string expectedHorizon in new[]
         {
             "nexus-pan",
@@ -197,6 +197,7 @@ public sealed class PublicSurfaceReferenceFilesTests
             "runsite",
             "runbook-press",
             "table-pulse",
+            "origin-dossier",
             "black-ledger",
             "community-hub",
         })
@@ -214,27 +215,26 @@ public sealed class PublicSurfaceReferenceFilesTests
         string registry = File.ReadAllText(registryPath);
         string statusMatrix = File.ReadAllText(statusMatrixPath);
 
-        string[] shippedIds =
+        (string id, string currentState)[] shippedRows =
         {
-            "nexus-pan",
-            "alice",
-            "karma-forge",
-            "knowledge-fabric",
-            "jackpoint",
-            "black-ledger",
-            "community-hub",
-            "runsite",
-            "runbook-press",
-            "onramp",
-            "edition-studio",
-            "run-control",
-            "local-co-processor",
-            "ghostwire",
-            "table-pulse",
-            "quicksilver"
+            ("nexus-pan", "shipped_mvp"),
+            ("alice", "shipped_mvp"),
+            ("karma-forge", "shipped_mvp"),
+            ("knowledge-fabric", "shipped_mvp"),
+            ("jackpoint", "signed_in_command_lane_live"),
+            ("black-ledger", "signed_in_command_lane_live"),
+            ("community-hub", "signed_in_command_lane_live"),
+            ("runsite", "signed_in_command_lane_live"),
+            ("runbook-press", "shipped_mvp"),
+            ("edition-studio", "shipped_mvp"),
+            ("run-control", "shipped_mvp"),
+            ("local-co-processor", "shipped_mvp"),
+            ("ghostwire", "shipped_mvp"),
+            ("table-pulse", "signed_in_command_lane_live"),
+            ("quicksilver", "shipped_mvp")
         };
 
-        foreach (string shippedId in shippedIds)
+        foreach ((string shippedId, string currentState) in shippedRows)
         {
             string marker = $"- id: {shippedId}";
             int start = registry.IndexOf(marker, StringComparison.Ordinal);
@@ -243,7 +243,7 @@ public sealed class PublicSurfaceReferenceFilesTests
             string block = next >= 0 ? registry[start..next] : registry[start..];
 
             Assert.Contains("status: shipped_mvp", block, StringComparison.Ordinal);
-            Assert.Contains("current_state: shipped_mvp", block, StringComparison.Ordinal);
+            Assert.Contains($"current_state: {currentState}", block, StringComparison.Ordinal);
             Assert.Contains($"{shippedId.Replace('-', '_')}", statusMatrix.Replace('-', '_'), StringComparison.OrdinalIgnoreCase);
         }
 
@@ -315,7 +315,6 @@ public sealed class PublicSurfaceReferenceFilesTests
             ("horizon_nexus_pan", "/play/continuity", "Shipped MVP"),
             ("horizon_knowledge_fabric", "/rules", "Shipped MVP"),
             ("horizon_karma_forge", "/participate/karma-forge", "Shipped MVP"),
-            ("horizon_onramp", "/onramp", "Shipped MVP"),
             ("horizon_edition_studio", "/edition-studio", "Shipped MVP"),
             ("horizon_run_control", "/run-control", "Shipped MVP"),
             ("horizon_local_co_processor", "/local-co-processor", "Shipped MVP"),

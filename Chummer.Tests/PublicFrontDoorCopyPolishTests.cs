@@ -9,6 +9,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     [Theory]
     [InlineData("Landing.cshtml")]
     [InlineData("Downloads.cshtml")]
+    [InlineData("Now.cshtml")]
+    [InlineData("Roadmap.cshtml")]
     [InlineData("Status.cshtml")]
     [InlineData("ProductStory.cshtml")]
     public void Public_front_door_views_avoid_internal_ai_and_proof_language(string viewName)
@@ -85,7 +87,11 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         "Black Ledger",
         "Starter lane",
         "world lanes",
-        "account-assisted install"
+        "account-assisted install",
+        "Open horizons",
+        "Home or Horizons",
+        "product thread",
+        "product threads"
     ];
 
     private static string ExtractVisibleText(string view)

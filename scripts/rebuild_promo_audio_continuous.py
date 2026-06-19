@@ -46,20 +46,20 @@ SCRIPTS: dict[str, str] = {
         "From desktop to tablet to phone, from home table to remote night, Chummer6 is for crews who want the world to remember what they did and still be ready when the next door blows open."
     ),
     "all-horizons-90s-magicfit-promo": (
-        "The Horizons are not separate fantasies. They are one answer told from nine angles. What happens when the campaign grows larger than the tools trying to hold it. "
-        "NEXUS-PAN keeps the crew connected when devices drift and players return mid-scene. ALICE turns a cool runner idea into a build that can survive contact with the table. "
-        "KARMA FORGE gives house rules a governed shape. JACKPOINT gives memory a voice. RUNSITE turns dangerous locations into spaces the crew can actually read before the breach. "
-        "RUNBOOK PRESS turns seasons of campaign truth into artifacts worth keeping. TABLE PULSE governs pressure, reaction, and aftermath without stealing the room. "
-        "BLACK LEDGER lets the city remember who touched it and what that cost. COMMUNITY HUB helps the right people find the right run and carry the result forward. "
-        "Taken together, the Horizons are not noise around the campaign. They are its support systems, its memory, its pressure, its continuity, and its broadcast back into the world. "
-        "Nine Horizons. One direction. Less friction, more momentum, and a campaign that keeps getting bigger without losing the human pulse that made it matter."
+        "Chummer6 should not feel like a shelf of future brands. It should feel like one product spine. "
+        "Start with the workbench. Build the runner, inspect the numbers, understand the sources, and keep the dense rhythm that veteran users expect. "
+        "ALICE is part of that base product: build help, rules explanation, tradeoff warnings, and a clearer path from a cool idea to a runner who can survive the table. "
+        "Origin Dossier belongs beside it, turning the life behind the stats into contacts, debts, enemies, scars, secrets, and approved canon the campaign can remember. "
+        "Ready for Tonight, Runner Passport, Knowledge Fabric, Table Pulse, and GM Cockpit are product areas, not a pile of disconnected Horizons. They help the table return, explain, run, and remember. "
+        "The future shelf should be saved for bigger bets: Karma Forge, Black Ledger, publishing, community, and specialized play modes. NEXUS-PAN is continuity and recovery, so it belongs in the product story. "
+        "That is the cleaner promise. Build clearly. Run reliably. Remember consequences. Publish only what the table approves."
     ),
     "every-wonder-horizon-promo": (
-        "Every Wonder is the promise that scale does not have to cost intimacy. A campaign can spread across devices, sessions, factions, recaps, handoffs, locations, and consequences without losing the feeling of a real table making real choices together. "
-        "That kind of growth should feel electrifying, not fragile. The player who returns should know where the scene is. The GM should know what changed, what is private, and what can safely move into the light. "
-        "A house rule should earn trust before it lands. A mission site should feel playable before it becomes lethal. A recap should pull the crew back into the story instead of burying them under archive noise. "
-        "And after the run, the world should not go still. The city should wake up, react, and begin shaping the next invitation. "
-        "Every Wonder is the larger direction behind the Horizons: let the campaign become richer, stranger, and more alive, while the people around the table still feel like they can reach in and play."
+        "Chummer6 should not ask players to memorize a shelf of labels before they know why the product matters. It starts with one table: runners, rules, scenes, people, and consequences in reach. "
+        "Some areas are base product workbenches. ALICE helps with builds and tradeoffs. Origin Dossier turns the life behind the stats into contacts, enemies, debts, scars, and secrets. Table Pulse keeps campaign pressure bounded and playable. "
+        "Some ideas are expansion bets, and they should be named honestly. NEXUS-PAN is device continuity. KARMA FORGE is governed rule evolution. BLACK LEDGER is the living city. "
+        "Other lanes are clearer when they are called what they are: campaign memory, mission-space prep, publishing, community, and specialized play modes. "
+        "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     ),
     "nexus_pan_90s_deepdive": (
         "A session never breaks because the fiction failed. It breaks because reality intruded first. A tablet sleeps. A laptop wakes crooked. A player reconnects into a scene already moving. "
@@ -470,8 +470,8 @@ def plans(selected: set[str] | None) -> list[AudioPlan]:
         AudioPlan(asset, PUBLIC / f"{asset}.mp4", title, SCRIPTS[asset], voice=VOICE_BY_ASSET[asset])
         for asset, title in [
             ("chummer6-flagship-promo", "Chummer6 Flagship Promo v5 Continuous Audio"),
-            ("all-horizons-90s-magicfit-promo", "All Horizons 90s Public Teaser v5 Continuous Audio"),
-            ("every-wonder-horizon-promo", "Every Wonder Horizon Promo v5 Continuous Audio"),
+            ("all-horizons-90s-magicfit-promo", "Chummer6 Product Threads Public Teaser v5 Continuous Audio"),
+            ("every-wonder-horizon-promo", "Chummer6 Product Spine Promo v5 Continuous Audio"),
         ]
     ]
     for asset in [

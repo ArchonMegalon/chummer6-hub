@@ -307,7 +307,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Choose the latest build for Windows or Linux.", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Home or Horizons", nowView, StringComparison.Ordinal);
+        Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("@release.InstallHelpLabel", downloadsView, StringComparison.Ordinal);
@@ -318,7 +318,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("start from Home or Horizons after the first launch", nowView, StringComparison.Ordinal);
+        Assert.Contains("start from Home or Roadmap after the first launch", nowView, StringComparison.Ordinal);
         Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
     }

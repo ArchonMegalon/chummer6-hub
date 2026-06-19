@@ -80,7 +80,7 @@ const SCENES = [
   {
     id: '03_alice_build_tradeoffs',
     horizon: 'ALICE',
-    title: 'Legal is not the same as good',
+    title: 'Base workbench help with receipts',
     duration: 8,
     prompt: 'AR build lab above a tabletop, two generic cyberpunk runner builds compared as clean holographic silhouettes and risk badges, ork decker with AR lenses reacts, elf mage smirks, visible cyberware reflections, no dense text, premium product trailer closeup.',
   },
@@ -94,7 +94,7 @@ const SCENES = [
   {
     id: '05_jackpoint_dossiers_recaps',
     horizon: 'JACKPOINT',
-    title: 'Briefings that remember where facts came from',
+    title: 'Campaign memory that remembers where facts came from',
     duration: 8,
     prompt: 'Cyberpunk evidence room, rough mission notes become a polished player-safe AR dossier packet, source trails glow under claims, stylish human fixer with subtle cybernetic eye reacts, ork decker and elf mage nearby, noir push-in, no readable paragraphs.',
   },
@@ -115,7 +115,7 @@ const SCENES = [
   {
     id: '08_table_pulse_live_heat',
     horizon: 'TABLE PULSE',
-    title: 'The run pushes back',
+    title: 'Campaign operations under pressure',
     duration: 8,
     prompt: 'Tabletop session in motion with mixed metahuman crew, GM screen receives a subtle AR heat alert, remote player chooses a bounded reaction on phone, ork decker with AR lenses and troll cyberarm visible, cast reacts to fallout, warm table light and cyberpunk accents.',
   },
@@ -136,9 +136,9 @@ const SCENES = [
   {
     id: '11_finale_all_horizons',
     horizon: 'all',
-    title: 'All Horizons, one table',
+    title: 'One product spine',
     duration: 10,
-    prompt: 'All nine Horizon AR cards circle above the tabletop and become a living city interface, recurring mixed metahuman cast stands together: human GM, ork decker, elf mage, dwarf rigger, troll street samurai with cyberarm, visible cyberware, final product logo space left clean for post, heroic trailer finish.',
+    prompt: 'Product-area AR cards and a few future-bet cards circle above the tabletop and become a living city interface, recurring mixed metahuman cast stands together: human GM, ork decker, elf mage, dwarf rigger, troll street samurai with cyberarm, visible cyberware, final product logo space left clean for post, heroic trailer finish.',
   },
 ];
 

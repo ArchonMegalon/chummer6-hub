@@ -7,18 +7,22 @@
     var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
     var visibleHorizons = Model.Horizons
         .Where(card => !string.Equals(card.Card.Id, "horizon_black_ledger", StringComparison.OrdinalIgnoreCase))
+        .Where(card => !string.Equals(card.Card.Id, "onramp", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var totalHorizons = visibleHorizons.Length;
-    var preparingCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Preparing", StringComparison.OrdinalIgnoreCase));
-    var designingCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Designing", StringComparison.OrdinalIgnoreCase));
-    var researchCount = visibleHorizons.Count(card => string.Equals(card.Card.Badge, "Research", StringComparison.OrdinalIgnoreCase));
+    var totalItems = visibleHorizons.Length;
+    var coreProductIds = new[] { "horizon_nexus_pan", "horizon_alice", "horizon_origin_dossier", "horizon_table_pulse" };
+    var expansionIds = new[] { "horizon_karma_forge", "horizon_jackpoint", "horizon_runsite", "horizon_runbook_press", "horizon_community_hub" };
+    var quietIds = new[] { "horizon_knowledge_fabric", "horizon_run_control", "horizon_edition_studio", "horizon_runner_passport", "horizon_quicksilver", "horizon_anarchy", "horizon_ghostwire", "horizon_local_co_processor" };
+    var coreCount = visibleHorizons.Count(card => coreProductIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
+    var expansionCount = visibleHorizons.Count(card => expansionIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
+    var quietCount = visibleHorizons.Count(card => quietIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
     var routeChoices = new[]
     {
         new
         {
             Badge = "Use today",
             Title = "Start with the app you can download now",
-            Summary = "Windows and Linux builds are the main path. Future ideas should never make the install path harder to understand.",
+            Summary = "Windows and Linux builds are the main path. Campaign ideas should make that path clearer, not harder.",
             Href = "/downloads",
             Label = "Open downloads"
         },
@@ -26,7 +30,7 @@
         {
             Badge = "Roadmap",
             Title = "See the near-term delivery plan",
-            Summary = "Use the roadmap for milestones and current pressure. This page is only the calmer idea shelf.",
+            Summary = "Use the roadmap for milestones and current pressure. This page explains the larger table story.",
             Href = "/roadmap",
             Label = "Open roadmap"
         },
@@ -41,11 +45,11 @@
     };
     var groups = new[]
     {
-        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Near next", Intro = "These are close enough to compare against the current release." },
-        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing", Intro = "These have a product shape, but they still need more work before they belong in the release path." },
-        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research", Intro = "These are early ideas. They explain direction; they are not promises." }
+        new { Anchor = "product-areas", Label = "Product areas", Heading = "Part of Chummer", Intro = "These should feel like normal Chummer6 around the builder and campaign layer.", Ids = coreProductIds },
+        new { Anchor = "expansion-bets", Label = "Expansion bets", Heading = "Bigger campaign ideas", Intro = "These are useful directions, but they should not compete with the current build path.", Ids = expansionIds },
+        new { Anchor = "quiet-infrastructure", Label = "Quiet infrastructure", Heading = "Folded into the app", Intro = "These ideas are better as supporting behavior than as a brand shelf.", Ids = quietIds }
     };
-    var horizonVideos = new Dictionary<string, (string Title, string Href, string Captions)[]>(StringComparer.OrdinalIgnoreCase)
+    var threadVideos = new Dictionary<string, (string Title, string Href, string Captions)[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["horizon_nexus_pan"] =
         new[]
@@ -59,6 +63,7 @@
         ["horizon_runsite"] = new[] { ("Runsite deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
         ["horizon_runbook_press"] = new[] { ("Runbook Press deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
         ["horizon_table_pulse"] = new[] { ("Table Pulse deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
+        ["horizon_origin_dossier"] = new[] { ("Origin Dossier deep dive", "/media/horizons/origin-dossier-90s-deepdive.mp4", "/media/horizons/origin-dossier-90s-deepdive.vtt") },
         ["horizon_community_hub"] = new[] { ("Community Hub deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -69,14 +74,14 @@
 
 <section class="trust-page-hero route-anchor-target" id="public-roadmap-projection">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">Coming next</p>
-        <h1 class="page-title">A quieter look at what Chummer may become</h1>
-        <p class="page-copy">The current job is still simple: download Chummer, build a runner, and keep the table moving. Everything below is future product direction, sorted by how close it feels to the app today.</p>
+        <p class="eyebrow">Campaign tools</p>
+        <h1 class="page-title">Campaign tools without the brand shelf</h1>
+        <p class="page-copy">The current job is still simple: download Chummer, build a runner, and keep the table moving. This page shows the larger campaign layer without asking you to decode a wall of internal names.</p>
         @if (fromRoadmapAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You came from an older roadmap link</h3>
-                <p>The current roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page is only the calmer idea shelf.</p>
+                <p>The current roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page is the campaign-tools guide.</p>
                 <div class="route-callout__actions">
                     <a class="inline-link" href="/roadmap">Open roadmap</a>
                     <a class="inline-link" href="/downloads">Open downloads</a>
@@ -88,36 +93,36 @@
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/downloads">Download Chummer</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
-        <a class="button-like button-like--ghost" href="#near-next">Browse ideas</a>
+        <a class="button-like button-like--ghost" href="#product-areas">Browse campaign tools</a>
     </div>
 </section>
 
 <section class="status-decision-strip" aria-label="Coming-next distance from the current app">
     <article class="status-decision-strip__card">
-        <span class="tag">Near next</span>
-        <h2>@preparingCount thread@(preparingCount == 1 ? string.Empty : "s") close to the current app.</h2>
-        <p>These are the only items that should be compared directly with today’s download.</p>
-        <a class="button-like button-like--ghost" href="#near-next">Open near next</a>
+        <span class="tag">Product areas</span>
+        <h2>@coreCount area@(coreCount == 1 ? string.Empty : "s") should feel like Chummer.</h2>
+        <p>Build help, continuity, origin canon, and campaign operations belong near the main product story.</p>
+        <a class="button-like button-like--ghost" href="#product-areas">Open product areas</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Designing</span>
-        <h2>@designingCount thread@(designingCount == 1 ? string.Empty : "s") still need stronger product shape.</h2>
-        <p>Read these as direction, not as a current feature list.</p>
-        <a class="button-like button-like--ghost" href="#designing">Open design threads</a>
+        <span class="tag">Expansion</span>
+        <h2>@expansionCount larger bet@(expansionCount == 1 ? string.Empty : "s") stay clearly labeled.</h2>
+        <p>Publishing, campaign memory, venues, community, and rule evolution can be exciting without crowding the installer path.</p>
+        <a class="button-like button-like--ghost" href="#expansion-bets">Open expansion bets</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag tag--amber">Research</span>
-        <h2>@researchCount thread@(researchCount == 1 ? string.Empty : "s") stay early.</h2>
-        <p>These explain what we are thinking about, not what the product already does.</p>
-        <a class="button-like button-like--ghost" href="#research">Open research</a>
+        <span class="tag tag--amber">Folded in</span>
+        <h2>@quietCount support idea@(quietCount == 1 ? string.Empty : "s") should stop shouting.</h2>
+        <p>Some concepts are stronger when they quietly improve rules, speed, recovery, or edition behavior.</p>
+        <a class="button-like button-like--ghost" href="#quiet-infrastructure">Open folded-in ideas</a>
     </article>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">How to read this page</p>
-        <h2 class="editorial-title">Ideas stay behind the product.</h2>
-        <p class="editorial-copy">This page is intentionally secondary. It is here for direction, not to sell unfinished systems as today’s experience.</p>
+        <h2 class="editorial-title">The product comes first.</h2>
+        <p class="editorial-copy">The names below only matter if they help a player or GM answer a real question: can I build, explain, run, recover, remember, or publish the campaign more calmly?</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -135,14 +140,14 @@
 <section class="section-band" aria-label="Coming next summary">
     <div class="editorial-block__lead">
         <p class="eyebrow">Direction</p>
-        <h2 class="editorial-title">@totalHorizons product thread@(totalHorizons == 1 ? string.Empty : "s") under review.</h2>
-        <p class="editorial-copy">@preparingCount near-next, @designingCount design, and @researchCount research thread@(researchCount == 1 ? string.Empty : "s"). Early campaign-city work stays behind the main app until it earns a stronger public position.</p>
+        <h2 class="editorial-title">@totalItems campaign tool@(totalItems == 1 ? string.Empty : "s") in the public guide.</h2>
+        <p class="editorial-copy">@coreCount product area@(coreCount == 1 ? string.Empty : "s"), @expansionCount expansion bet@(expansionCount == 1 ? string.Empty : "s"), and @quietCount folded-in support idea@(quietCount == 1 ? string.Empty : "s"). The current download remains the first thing to trust.</p>
     </div>
 </section>
 
 @foreach (var group in groups)
 {
-    var items = visibleHorizons.Where(card => string.Equals(card.Card.Badge, group.Badge, StringComparison.OrdinalIgnoreCase)).ToArray();
+    var items = visibleHorizons.Where(card => group.Ids.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase)).ToArray();
     if (items.Length == 0)
     {
         continue;
@@ -153,13 +158,7 @@
         rendered.Add(item.Card.Id);
     }
 
-    var sectionId = group.Badge.ToLowerInvariant() switch
-    {
-        "preparing" => "near-next",
-        "designing" => "designing",
-        "research" => "research",
-        _ => group.Badge.ToLowerInvariant()
-    };
+    var sectionId = group.Anchor;
 
     <section class="section-band" id="@sectionId">
         <div class="editorial-block__lead">
@@ -199,10 +198,10 @@
                                     <p>@QuietFutureCopy(card.Card.Payoff)</p>
                                 </div>
                             }
-                            @if (horizonVideos.TryGetValue(card.Card.Id, out var cardVideos))
+                            @if (threadVideos.TryGetValue(card.Card.Id, out var cardVideos))
                             {
                                 <div>
-                                    <span class="horizon-band__label">Optional video</span>
+                                    <span class="horizon-band__label">Watch</span>
                                     <p>
                                         @foreach (var video in cardVideos)
                                         {
@@ -230,7 +229,7 @@
     <section class="section-band">
         <div class="editorial-block__lead">
             <p class="eyebrow">More</p>
-            <h2 class="editorial-title">Other product threads</h2>
+            <h2 class="editorial-title">Other planned work</h2>
             <p class="editorial-copy">These are kept visible for continuity, but they are not part of the main public path.</p>
         </div>
         <div class="horizon-longscroll">
@@ -261,7 +260,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
     <h2 class="editorial-title">Use the current app first.</h2>
-    <p class="editorial-copy">Download Chummer, try the character flow, and send feedback when something feels rough. The future shelf can wait.</p>
+    <p class="editorial-copy">Download Chummer, try the character flow, and send feedback when something feels rough. The expansion ideas can wait.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
         <a class="cta-link cta-link--secondary" href="/feedback">Send feedback</a>
