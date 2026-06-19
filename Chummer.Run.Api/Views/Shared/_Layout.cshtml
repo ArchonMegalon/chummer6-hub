@@ -6,8 +6,10 @@
         ? "landing"
         : chrome.CurrentPath.Trim('/').Replace("/", "-", StringComparison.Ordinal).Replace("?", "-", StringComparison.Ordinal).Replace("&", "-", StringComparison.Ordinal).Replace("=", "-", StringComparison.Ordinal).Replace(".", "-", StringComparison.Ordinal);
     var surfaceClass = ViewData["SurfaceClass"] as string ?? string.Empty;
+    var surfaceTokens = surfaceClass.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var minimalSurface = surfaceTokens.Contains("surface-minimal", StringComparer.Ordinal);
     var authSurface = string.Equals(surfaceClass, "surface-auth", StringComparison.Ordinal);
-    var headerClass = routeKey is "landing" or "login" or "signup" ? "site-header site-header--immersive" : "site-header";
+    var headerClass = !minimalSurface && (routeKey is "landing" or "login" or "signup") ? "site-header site-header--immersive" : "site-header";
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
     var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
@@ -82,7 +84,7 @@
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
     var compactProductLinks = productLinks
-        .Where(link => link.Href is "/" or "/downloads" or "/now")
+        .Where(link => minimalSurface ? link.Href is "/" or "/downloads" : link.Href is "/" or "/downloads" or "/now")
         .ToArray();
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
@@ -562,6 +564,7 @@
         </footer>
     }
 
+    <script src="~/js/public-copy-humanizer.js" asp-append-version="true" defer></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script>
         (function () {

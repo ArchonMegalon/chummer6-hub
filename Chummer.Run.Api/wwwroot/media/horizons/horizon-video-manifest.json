@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.public_product_video_manifest",
   "generated_at_utc": "2026-06-19T11:11:08Z",
-  "publication_posture": "first_party_static_media_assets_with Unmixr-regenerated narration tracks; legacy /media/horizons path is retained for URL compatibility; surface_class distinguishes core product areas from expansion bets",
+  "publication_posture": "first_party_static_media_assets_with audio-backed Unmixr-regenerated narration tracks; legacy /media/horizons path is retained for URL compatibility; surface_class distinguishes core product areas from expansion bets",
   "audio_required": true,
   "source_root": "/docker/chummercomplete/_completion/horizon_flagship_reels_20260602/videos",
   "assets": [
