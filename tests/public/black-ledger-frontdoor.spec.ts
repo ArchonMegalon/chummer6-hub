@@ -7,14 +7,15 @@ test('homepage stays product-first while ledger remains off the primary path', a
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const hero = page.locator('[data-homepage-section="hero"]');
-  await expect(hero).toContainText('Build the runner. Run the night.');
-  await expect(hero).toContainText('Shadowrun character builder and campaign companion');
+  await expect(hero).toContainText('Chummer');
+  await expect(hero).toContainText('Build and maintain Shadowrun characters on your desktop.');
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveCount(0);
+  await expect(page.getByText('Black Ledger')).toHaveCount(0);
 
   const heroLinks = hero.getByRole('link');
   await expect(heroLinks).toHaveCount(2);
-  await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
-  await expect(hero.getByRole('link', { name: 'See what works today' })).toHaveAttribute('href', '/now');
+  await expect(hero.getByRole('link', { name: 'Stable' })).toHaveAttribute('href', '/downloads#stable');
+  await expect(hero.getByRole('link', { name: 'Nightly' })).toHaveAttribute('href', '/downloads#nightly');
 
   writeJsonArtifact('BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json', {
     generated_at_utc: new Date().toISOString(),
