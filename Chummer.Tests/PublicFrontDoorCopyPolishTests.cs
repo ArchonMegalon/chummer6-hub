@@ -9,6 +9,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     [Theory]
     [InlineData("Landing.cshtml")]
     [InlineData("Downloads.cshtml")]
+    [InlineData("Faq.cshtml")]
+    [InlineData("Horizons.cshtml")]
     [InlineData("Now.cshtml")]
     [InlineData("Roadmap.cshtml")]
     [InlineData("Status.cshtml")]
@@ -34,6 +36,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("Black Ledger", firstImpression, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Real product proof", firstImpression, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Projection compiled", firstImpression, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("horizon_summary", manifest, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("public horizon set", manifest, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Download Chummer", firstImpression, StringComparison.Ordinal);
     }
 
