@@ -7,5 +7,14 @@ Disallow: /campaigns/
 Disallow: /billing/
 Disallow: /api/
 Disallow: /support/private/
+Disallow: /alice
+Disallow: /ledger
+Disallow: /ledger/
+Disallow: /participate
+Disallow: /participate/
+Disallow: /table-pulse
+Disallow: /quicksilver
+Disallow: /local-co-processor
+Disallow: /karma-forge
 
 Sitemap: https://chummer.run/sitemap.xml

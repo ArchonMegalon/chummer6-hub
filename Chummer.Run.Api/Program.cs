@@ -255,6 +255,10 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/sitemap.xml", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/ai.txt", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
 }
 

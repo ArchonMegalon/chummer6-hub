@@ -169,6 +169,13 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   const sitemapText = await sitemapResponse.text();
   expect(sitemapText).not.toContain('/ledger');
   expect(sitemapText).not.toContain('/alice');
+
+  const robotsResponse = await request.get(`${baseUrl}/robots.txt?public-route-guard=1`);
+  expect(robotsResponse.ok()).toBeTruthy();
+  const robotsText = await robotsResponse.text();
+  for (const path of ['/alice', '/ledger', '/participate', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
+    expect(robotsText).toContain(`Disallow: ${path}`);
+  }
 });
 
 test('downloads concierge reads like instant support, not internal governance', async ({ page }) => {
