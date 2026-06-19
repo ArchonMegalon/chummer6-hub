@@ -62,8 +62,10 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CommunityStore>();
         services.AddSingleton<TeableUserProjectionService>();
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
+        services.AddSingleton<TeableHeyyScamChatService>();
         services.AddHostedService<TeableUserProjectionSyncWorker>();
         services.AddHostedService<TeableBlackLedgerWorldTickSyncWorker>();
+        services.AddHostedService<TeableHeyyScamChatSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();
@@ -77,6 +79,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
         services.AddHttpClient<ParticipationOperatorNotificationService>();
+        services.AddHttpClient<HeyyScamChatService>();
+        services.AddHostedService<HeyyScamChatDigestWorker>();
         services.AddSingleton<BlackLedgerNewsRecipientResolver>();
         services.AddHttpClient<BlackLedgerTickNewsNotificationService>();
         services.AddHttpClient<BlackLedgerAdvisoryService>();

@@ -54,6 +54,10 @@ public sealed class CommunityStore
     public List<DispatchGateReceipt> BlackLedgerDispatchGateReceipts { get; } = new();
     public List<DispatchApprovalReceipt> BlackLedgerDispatchApprovalReceipts { get; } = new();
     public List<DispatchPublicationReceipt> BlackLedgerDispatchPublicationReceipts { get; } = new();
+    public List<HeyyScamChatConversationState> HeyyScamChatConversations { get; } = new();
+    public List<HeyyScamChatDigestReceipt> HeyyScamChatDigestReceipts { get; } = new();
+    public List<HeyyScamChatApprovalReceipt> HeyyScamChatApprovalReceipts { get; } = new();
+    public List<HeyyScamChatOperatorSummaryReceipt> HeyyScamChatOperatorSummaryReceipts { get; } = new();
     public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -128,6 +132,18 @@ public sealed class CommunityStore
                 .ToArray(),
             BlackLedgerDispatchPublicationReceipts: BlackLedgerDispatchPublicationReceipts
                 .OrderByDescending(static item => item.PublishedAtUtc, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            HeyyScamChatConversations: HeyyScamChatConversations
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray(),
+            HeyyScamChatDigestReceipts: HeyyScamChatDigestReceipts
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            HeyyScamChatApprovalReceipts: HeyyScamChatApprovalReceipts
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            HeyyScamChatOperatorSummaryReceipts: HeyyScamChatOperatorSummaryReceipts
+                .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
             Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -208,6 +224,10 @@ public sealed class CommunityStore
         BlackLedgerDispatchGateReceipts.Clear();
         BlackLedgerDispatchApprovalReceipts.Clear();
         BlackLedgerDispatchPublicationReceipts.Clear();
+        HeyyScamChatConversations.Clear();
+        HeyyScamChatDigestReceipts.Clear();
+        HeyyScamChatApprovalReceipts.Clear();
+        HeyyScamChatOperatorSummaryReceipts.Clear();
         DossiersById.Clear();
         CrewsById.Clear();
         CampaignSpinesById.Clear();
@@ -291,6 +311,10 @@ public sealed class CommunityStore
         BlackLedgerDispatchGateReceipts.AddRange(snapshot.BlackLedgerDispatchGateReceipts ?? Array.Empty<DispatchGateReceipt>());
         BlackLedgerDispatchApprovalReceipts.AddRange(snapshot.BlackLedgerDispatchApprovalReceipts ?? Array.Empty<DispatchApprovalReceipt>());
         BlackLedgerDispatchPublicationReceipts.AddRange(snapshot.BlackLedgerDispatchPublicationReceipts ?? Array.Empty<DispatchPublicationReceipt>());
+        HeyyScamChatConversations.AddRange(snapshot.HeyyScamChatConversations ?? Array.Empty<HeyyScamChatConversationState>());
+        HeyyScamChatDigestReceipts.AddRange(snapshot.HeyyScamChatDigestReceipts ?? Array.Empty<HeyyScamChatDigestReceipt>());
+        HeyyScamChatApprovalReceipts.AddRange(snapshot.HeyyScamChatApprovalReceipts ?? Array.Empty<HeyyScamChatApprovalReceipt>());
+        HeyyScamChatOperatorSummaryReceipts.AddRange(snapshot.HeyyScamChatOperatorSummaryReceipts ?? Array.Empty<HeyyScamChatOperatorSummaryReceipt>());
 
         foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
         {
@@ -431,6 +455,10 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<DispatchGateReceipt>? BlackLedgerDispatchGateReceipts = null,
     IReadOnlyList<DispatchApprovalReceipt>? BlackLedgerDispatchApprovalReceipts = null,
     IReadOnlyList<DispatchPublicationReceipt>? BlackLedgerDispatchPublicationReceipts = null,
+    IReadOnlyList<HeyyScamChatConversationState>? HeyyScamChatConversations = null,
+    IReadOnlyList<HeyyScamChatDigestReceipt>? HeyyScamChatDigestReceipts = null,
+    IReadOnlyList<HeyyScamChatApprovalReceipt>? HeyyScamChatApprovalReceipts = null,
+    IReadOnlyList<HeyyScamChatOperatorSummaryReceipt>? HeyyScamChatOperatorSummaryReceipts = null,
     IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
