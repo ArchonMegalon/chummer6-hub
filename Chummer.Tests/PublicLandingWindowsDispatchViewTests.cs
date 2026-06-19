@@ -45,6 +45,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("Current stable build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Latest published build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Need help?", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Release notes", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Known issues", downloadsView, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string text, string needle)

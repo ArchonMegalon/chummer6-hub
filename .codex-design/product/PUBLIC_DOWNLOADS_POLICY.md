@@ -4,12 +4,13 @@
 
 This file defines the public copy and shelf rules for `/downloads`.
 
-The downloads surface is a proof shelf first:
+The downloads surface is a download shelf first:
 
 * one current recommended install path
 * honest platform coverage
 * clear release posture
 * no archive-collector framing on the front path
+* no public portable-build framing when an installer or package lane exists
 
 ## Download authority
 
@@ -23,11 +24,12 @@ Allowed primary CTA labels include:
 
 * `Nightly`
 * `Stable`
-* `Open account-assisted install`
+* `Claim your copy`
 * `Open Mac install path`
 * `Install the current preview`
 * `Download for Windows`
 * `Download for Linux`
+* `Install on Arch`
 * `Open Mac install command`
 
 Forbidden primary labels include:
@@ -44,7 +46,7 @@ The public shelf must:
 * show visible `Nightly` and `Stable` lane buttons when both lanes are published
 * serve official client downloads only from `chummer.run` routes backed by registry truth
 * show channel and version clearly
-* separate installer media from advanced fallback assets
+* keep public installer/package lanes separate from support-only fallback assets
 * distinguish posted proof from whole-product flagship status
 * keep artifact-factory explainers, packet siblings, and proof-gallery links subordinate to the posted install shelf instead of treating them as equivalent route authority
 * explain when a platform is not currently available
@@ -62,6 +64,7 @@ The public shelf must not:
 * bury the recommended build beneath archives
 * imply sign-in is required for open public installers
 * pretend portable archives are the default when canon says installer-first
+* expose portable builds on the normal public shelf
 * let artifact previews or proof cards read like the recommended install path
 * let artifact-factory cards, packet siblings, or proof-gallery bundles become the authority over what someone should download first
 * let preview proof wording imply whole-product flagship status
@@ -91,6 +94,7 @@ Download-facing copy must say:
 * what current proof actually covers
 * what platforms are supported today
 * whether a second app or package is fallback-only
+* when an Arch/AUR package is available or still pending
 * whether a route is the recommended install path, an inspectable proof artifact, or a bounded fallback/recovery path
 * when the user should expect in-app updates versus reinstall/install handoff
 * when macOS begins with a Terminal command because that is the safest unsigned-preview path
@@ -101,6 +105,7 @@ Download-facing copy must not say:
 * per-user installer
 * personalized build
 * download from GitHub
+* portable as the normal public route
 * instant fix availability from merged code
 * auto-update guarantees that outrun registry or UI truth
 * tell users to double-click an unsigned downloaded `.command` when the actual supported path is a copy-paste Terminal command

@@ -13,6 +13,7 @@ sources:
   public_guide_policy: products/chummer/PUBLIC_GUIDE_POLICY.md
   public_feature_registry: products/chummer/PUBLIC_FEATURE_REGISTRY.yaml
   public_user_model: products/chummer/PUBLIC_USER_MODEL.md
+  onramp_starter_lane: products/chummer/ONRAMP_STARTER_LANE.md
   participation_workflow: products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md
   public_media_policy: products/chummer/PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md
   public_guide_image_curation: products/chummer/PUBLIC_GUIDE_IMAGE_CURATION.yaml
@@ -22,19 +23,24 @@ sources:
   public_signal_pipeline: products/chummer/PUBLIC_SIGNAL_TO_CANON_PIPELINE.md
   public_feedback_registry: products/chummer/PUBLIC_FEEDBACK_AND_CONTENT_REGISTRY.yaml
   public_feedback_taxonomy: products/chummer/PUBLIC_FEEDBACK_TAXONOMY.yaml
+  instant_help_maintenance: products/chummer/INSTANT_HELP_MAINTENANCE_MODEL.md
+  subscribr_script_factory: products/chummer/SUBSCRIBR_SCRIPT_FACTORY_PROVIDER_BOUNDARY.md
   public_guide_new_section_verdict: products/chummer/PUBLIC_GUIDE_NEW_SECTION_VERDICT.yaml
 rules:
 - Downstream generators must not define or retain a private hardcoded horizon catalog.
 - Downstream generators must source horizon existence, ordering, and enable/disable state from HORIZON_REGISTRY.yaml.
 - The root `products/chummer/HORIZON_REGISTRY.yaml` is the authority for horizon eligibility; `products/chummer/horizons/HORIZON_REGISTRY.yaml` is only a derived guide-routing index and must not widen, reorder, or otherwise reshape the public set. It must preserve the root registry order exactly.
 - Only horizons with public_guide.enabled == true may appear in Chummer6.
+- "Public guide output must preserve `public_guide.group`: `core_product` lanes read as normal Chummer6 product areas, `expansion_bet` lanes read as future/large campaign bets, and `folded_into_product` lanes stay quiet instead of competing with first-contact product value."
 - Retired or disabled horizons must disappear from the guide on the next generation pass.
 - Horizon detail pages may elaborate in human language, but may not invent new horizons, owners, or delivery promises.
 - Downstream generators must source non-horizon page classes from PUBLIC_GUIDE_PAGE_REGISTRY.yaml.
 - Public part pages must source their human-facing explanation from PUBLIC_PART_REGISTRY.yaml rather than raw implementation-scope bullets.
 - FAQ/help pages must source required participation/privacy/free-later language from PUBLIC_FAQ_REGISTRY.yaml and PUBLIC_HELP_COPY.md.
 - New large feature or redesign sections must either route through an explicit public-guide verdict in PUBLIC_GUIDE_NEW_SECTION_VERDICT.yaml or stay out of generated output with a machine-readable omission receipt.
-- Downstream generators must emit a proof artifact showing whether Table Pulse, BeHuman GM sessions, Answerly support, Signal Deck, Runner Passport, and Living World engagement are represented, omitted intentionally, or blocked by canon posture.
+- Downstream generators must emit a proof artifact showing whether Table Pulse, BeHuman GM sessions, Chummer Instant Help, Answerly support, Signal Deck, Runner Passport, and Living World engagement are represented, omitted intentionally, or blocked by canon posture.
+- Chummer Instant Help is a support and maintenance page family, not a horizon; horizon generators must not add it to any horizon catalog.
+- Subscribr is a private script/pre-production provider lane, not a horizon or public runtime surface; public guide output must not expose it as a user-facing feature or publication authority.
 - Deep-source pages may link to repo scopes and implementation detail, but first-contact pages must not.
 - Downstream media lanes must treat PUBLIC_GUIDE_IMAGE_CURATION.yaml manual editorial-cover source overrides as the strongest local canon unless an explicit reopen path is requested.
 - ProductLift-backed `/feedback`, `/roadmap`, and `/changelog` pages are public projections only; they must keep first-party fallback paths and may not become support, release, or roadmap truth.

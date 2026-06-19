@@ -124,6 +124,7 @@ These are user-facing first-install artifacts:
 * Windows installer `.exe`
 * macOS installer `.dmg`
 * Linux installer `.deb`
+* Arch/AUR package metadata when the Arch lane is promoted
 
 ### Machine update payloads
 
@@ -173,20 +174,35 @@ Forbidden posture:
 7. Desktop clients poll registry-backed channel/feed truth and apply updates through UI-owned helpers.
 8. `Chummer6` and other downstream guide surfaces read registry-backed release projections; they do not become build authorities.
 
-## Rolling release rule
+## Scheduled rolling release rule
 
-For the current public shelf, every successful mainline Windows `win-x64` and Linux `linux-x64` build is a release.
+For the current public shelf, Windows `win-x64` and Linux `linux-x64` remain rolling-release lanes, but publication is scheduled.
 
 Required posture:
 
-* the mainline desktop workflow resolves those builds to `public_stable` automatically
-* the newest successful bundle replaces the older public shelf automatically
+* normal publication happens once per day at 08:00 Europe/Vienna
+* only the platform needed for a concrete test or fix should be built outside that cadence
+* the scheduled job promotes the newest successful qualified bundle for each public platform
 * public downloads must always point at the latest promoted Windows/Linux bundle
-* stale older builds left on `chummer.run` after a newer successful mainline bundle are a release-pipeline failure
+* stale older builds left on `chummer.run` after the scheduled promotion completes are a release-pipeline failure
+* emergency publishes require an explicit release reason and must not become the default cadence
 
 Bounded exception:
 
 * macOS may continue to build and publish as a bounded lane, but it must not block the Windows/Linux rolling shelf while macOS promotion remains outside the current public promotion scope
+
+## Arch/AUR package rule
+
+Arch-based users should not be asked to rely on converted `.deb` packages as the normal path.
+
+The Linux publication lane should add an AUR package projection once the Debian package, install paths, updater posture, and package ownership are stable enough to keep the AUR recipe boring.
+
+Required posture:
+
+* AUR package metadata points back to `chummer.run` release truth.
+* The package recipe does not make GitHub a binary download authority.
+* The package name, desktop file, MIME registration, and update behavior match the Linux desktop lane.
+* The AUR package is listed on `/downloads` only after install and update smoke proof exists on an Arch-based environment.
 
 ## Canonical release-manifest rule
 

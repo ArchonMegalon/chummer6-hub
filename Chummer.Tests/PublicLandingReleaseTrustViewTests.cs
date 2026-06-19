@@ -15,6 +15,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current stable build", view, StringComparison.Ordinal);
         Assert.Contains("Latest published build", view, StringComparison.Ordinal);
         Assert.Contains("Need help?", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes", view, StringComparison.Ordinal);
+        Assert.Contains("Known issues", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes and install requirements stay on this page.", view, StringComparison.Ordinal);
     }
 
@@ -83,6 +85,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
         Assert.Contains("Use this when you want the newest Windows or Linux release.", view, StringComparison.Ordinal);
         Assert.Contains("Need help?", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes", view, StringComparison.Ordinal);
+        Assert.Contains("Known issues", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
         Assert.Contains("AUR-compatible package source for Arch-based distributions.", view, StringComparison.Ordinal);

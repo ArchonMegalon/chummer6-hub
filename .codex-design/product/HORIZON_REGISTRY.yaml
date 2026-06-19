@@ -73,7 +73,7 @@ horizons:
     order: 20
     group: core_product
   pain_label: We only discover weak builds after they explode in public.
-  wow_promise: Builders get clear what-if checks instead of black-box advice.
+  wow_promise: Builders get grounded what-if checks instead of vague assistant advice.
   table_scene: A player compares two builds and sees the tradeoffs, the math, and the likely trouble spots before the session starts.
   build_path:
     intent: eventual_product_lane
@@ -113,7 +113,7 @@ horizons:
     order: 25
     group: core_product
   pain_label: A runner can start as math before they feel like a person.
-  wow_promise: The player gets approved origin canon, dossier media, and later ALICE context without letting story prose rewrite the sheet.
+  wow_promise: The player gets an accepted origin story, portraits, narration, and later ALICE context without letting backstory prose rewrite the sheet.
   table_scene: A player drafts a troll decker, the GM adds a clinic-favor constraint, and Chummer turns the approved origin into a dossier bundle that ALICE can use later.
   build_path:
     intent: eventual_product_lane

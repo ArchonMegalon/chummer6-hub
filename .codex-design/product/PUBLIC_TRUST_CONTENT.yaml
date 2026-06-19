@@ -49,7 +49,7 @@ trust_pages:
           - "Choose a public issue thread only when the bug should be public."
       - id: product-question
         eyebrow: "Product question or UX confusion"
-        heading: "Ask from inside Chummer first"
+        heading: "Ask Chummer first"
         body: "FAQ and Help should answer the normal questions without making you dig through project details."
         bullets:
           - "FAQ answers normal product questions in plain language."

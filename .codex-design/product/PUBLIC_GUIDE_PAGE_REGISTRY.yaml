@@ -148,8 +148,8 @@ page_types:
     max_technical_depth: medium
     visual_density_profile: page_index
     must_show_semantic_anchors:
-    - branching futures
-    - differentiated lane identities
+    - product areas separated from expansion bets
+    - folded infrastructure kept quieter than user value
     - multiple grounded clues instead of one sign
     allowed_sources:
     - products/chummer/HORIZON_REGISTRY.yaml
@@ -158,8 +158,9 @@ page_types:
     - products/chummer/projects/*.md
     - products/chummer/horizons/HORIZON_REGISTRY.yaml
     required_topics:
+    - product area versus expansion bet split
     - table pain
-    - future lane posture
+    - compatibility path for older deep links
     - public-enabled horizon set only
   horizon_detail:
     audience: deeper_public

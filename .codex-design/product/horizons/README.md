@@ -6,7 +6,7 @@ Each file defines a bounded future lane, the table pain it targets, the likely o
 
 ## Video shelf
 
-The public horizon overview reel lives at [Every Wonder Horizon](https://chummer.run/media/promo/every-wonder-horizon-promo.mp4), with captions at [every-wonder-horizon-promo.vtt](https://chummer.run/media/promo/every-wonder-horizon-promo.vtt).
+The public horizon overview reel lives at [Every Wonder Horizon](https://chummer.run/media/promo/every-wonder-horizon-promo.mp4). Captions: [every-wonder-horizon-promo.vtt](https://chummer.run/media/promo/every-wonder-horizon-promo.vtt).
 
 Per-horizon explanation reels that passed the audio probe live under [the horizon video manifest](https://chummer.run/media/horizons/horizon-video-manifest.json). Link only those manifest-backed files from individual horizon docs so the public copy does not point at scratch render folders or silent candidate exports.
 

@@ -2,8 +2,8 @@
 
 ## Explanation videos
 
-* [Watch the NEXUS-PAN 90-second deep dive](https://chummer.run/media/horizons/nexus-pan-90s-deepdive.mp4) - MP4 with AAC audio. [Captions](https://chummer.run/media/horizons/nexus-pan-90s-deepdive.vtt).
-* [Watch the NEXUS-PAN epic reel](https://chummer.run/media/horizons/nexus-pan-epic-90s.mp4) - MP4 with AAC audio. [Captions](https://chummer.run/media/horizons/nexus-pan-epic-90s.vtt).
+* [Watch the NEXUS-PAN 90-second deep dive](https://chummer.run/media/horizons/nexus-pan-90s-deepdive.mp4). [Captions](https://chummer.run/media/horizons/nexus-pan-90s-deepdive.vtt).
+* [Watch the NEXUS-PAN epic reel](https://chummer.run/media/horizons/nexus-pan-epic-90s.mp4). [Captions](https://chummer.run/media/horizons/nexus-pan-epic-90s.vtt).
 
 ## The problem
 

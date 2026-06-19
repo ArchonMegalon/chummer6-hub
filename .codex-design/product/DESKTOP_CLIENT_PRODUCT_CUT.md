@@ -72,6 +72,8 @@ It must prove:
 * startup, install, update, crash-recovery, and support flows that feel boring on the promoted path
 * dense-data builder, compare, and explain flows that stay fast and readable under expert use
 * the flagship shell still feels recognizably like Chummer to Chummer5a users: desktop menu, quick-action toolstrip, dense workbench center, and compact trust strip all survive in modern form
+* attribute editing uses compact `-` / `+` steppers with visible Base, Karma, Total, and Limit context instead of duplicate opaque spinner columns
+* text-entry surfaces use the shell theme in both light and dark mode and never show duplicate overlapping hover text
 * authored SR4, SR5, and SR6 interactions where edition differences materially change the user's reasoning
 * active ruleset, preset, and amend-package state that never turns rule drift into mystery local cargo
 * import, claim, feedback, and release-help surfaces that agree with the public shelf and support truth
@@ -82,13 +84,13 @@ It must prove:
 
 Windows is the primary promoted desktop preview lane.
 
-The normal public CTA is installer-first. A portable `.exe` may be published as an advanced or support-directed fallback, but it must not outrank the recommended installer when the installer lane is healthy.
+The normal public CTA is installer-first. Portable builds are not part of the normal public shelf. If a portable artifact exists for support or recovery, it must stay support-directed and must not appear as an equal public download.
 
 ### Linux
 
 Linux is the secondary desktop preview lane.
 
-The target public install surface is installer-first through a `.deb` package, with bounded manual or archive-style fallback allowed only when support or platform reality still requires it.
+The target public install surface is installer-first through a `.deb` package, with an AUR package as the Arch-family target once that lane passes smoke proof. Manual or archive-style fallback is support-only and must not become the normal public path.
 
 ### macOS
 
@@ -107,10 +109,10 @@ Until that gate closes:
 The desktop wave distinguishes artifact roles explicitly:
 
 * installer artifact: the recommended public install path for a promoted platform
-* portable artifact: a support, advanced-user, or bounded fallback path that does not replace installer-first public posture
+* portable artifact: a support-only or recovery artifact that does not appear on the normal public shelf
 * machine update payload: the updater-consumable delivery unit used after install
 
-Portable artifacts are valid product artifacts. They are not allowed to silently replace the recommended installer in public copy.
+Portable artifacts are valid support artifacts. They are not normal public acquisition paths.
 
 ## Release rule
 
@@ -128,6 +130,6 @@ For the current wave:
 
 * flagship head: `Chummer.Avalonia`
 * compatibility/fallback head: `Chummer.Blazor.Desktop`
-* Windows public lane: installer-first with portable `.exe` fallback allowed
-* Linux public lane: `.deb` first, bounded manual fallback allowed when the installer lane is not yet boring enough
+* Windows public lane: installer-first, no public portable CTA
+* Linux public lane: `.deb` first, AUR target next, bounded manual fallback only for support
 * macOS lane: public archive preview may stay visible, but promoted installer-first release waits for signed/notarized `.dmg` promotion, startup-smoke proof, and release-truth close
