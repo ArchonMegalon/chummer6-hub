@@ -36,7 +36,7 @@ public sealed class BlackLedgerPublicSeedTests
         Assert.Contains("[HttpGet(\"worlds/{worldId}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/turns/{turn:int}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/dispatches\")]", ledgerApi, StringComparison.Ordinal);
-        Assert.Contains("Build the runner. Run the night.", landing, StringComparison.Ordinal);
+        Assert.Contains("Build and maintain Shadowrun characters without losing the details between sessions.", landing, StringComparison.Ordinal);
         Assert.DoesNotContain("Replay Turn 1", landing, StringComparison.Ordinal);
     }
 

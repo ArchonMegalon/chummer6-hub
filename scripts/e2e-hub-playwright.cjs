@@ -330,7 +330,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
-    await expectVisible(page, 'text=Build and maintain Shadowrun characters on your desktop.');
+    await expectVisible(page, 'text=Build and maintain Shadowrun characters without losing the details between sessions.');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=What it does');

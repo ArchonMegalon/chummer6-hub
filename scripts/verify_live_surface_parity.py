@@ -21,10 +21,10 @@ SURFACES = [
     {
         "path": "/",
         "required_texts": [
-            "Build the runner. Run the night.",
-            "Download Chummer",
-            "Desktop",
-            "Character workbench",
+            "Build and maintain Shadowrun characters without losing the details between sessions.",
+            "Stable",
+            "Nightly",
+            "What it does",
         ],
         "forbidden_texts": [
             "Next move",

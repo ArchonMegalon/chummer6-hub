@@ -2,7 +2,7 @@
   "name": "Chummer",
   "short_name": "Chummer",
   "id": "/mobile",
-  "description": "Shadowrun character and campaign companion with first-party package, mobile, play, and support rails.",
+  "description": "Shadowrun character manager for desktop character work.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/mobile",
@@ -50,7 +50,7 @@
       "url": "/mobile"
     },
     {
-      "name": "Open play shell",
+      "name": "Open play",
       "short_name": "Play",
       "url": "/play"
     },

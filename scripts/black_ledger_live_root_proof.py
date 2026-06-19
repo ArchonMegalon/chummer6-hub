@@ -16,7 +16,11 @@ def main() -> int:
     response.raise_for_status()
     body = response.text
 
-    homepage_tokens_present = all(token in body for token in ["Build the runner. Run the night.", "Download Chummer"])
+    homepage_tokens_present = all(token in body for token in [
+        "Build and maintain Shadowrun characters without losing the details between sessions.",
+        "Stable",
+        "Nightly",
+    ])
     black_ledger_hidden = "Open Black Ledger" not in body and "Enter Black Ledger" not in body
 
     payload = {
@@ -25,9 +29,9 @@ def main() -> int:
         "route": "/",
         "status_code": response.status_code,
         "checks": {
-            "builder_first_headline": "Build the runner. Run the night." in body,
+            "builder_first_headline": "Build and maintain Shadowrun characters without losing the details between sessions." in body,
             "black_ledger_not_promoted": black_ledger_hidden,
-            "download_chummer_cta": "Download Chummer" in body,
+            "stable_and_nightly_ctas": "Stable" in body and "Nightly" in body,
         },
     }
 

@@ -15,7 +15,7 @@ public sealed class BlackLedgerStatsViewTests
 
         Assert.DoesNotContain("Model.BlackLedgerStats", landingView, System.StringComparison.Ordinal);
         Assert.DoesNotContain("The city is moving.", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("Build the runner. Run the night.", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("Build and maintain Shadowrun characters without losing the details between sessions.", landingView, System.StringComparison.Ordinal);
         Assert.Contains("Scope: \"Public aggregate\"", service, System.StringComparison.Ordinal);
         Assert.Contains("PrivacyNote:", service, System.StringComparison.Ordinal);
         Assert.Contains("ListPublicStats(int? requestedTurn = null)", service, System.StringComparison.Ordinal);

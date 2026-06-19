@@ -17,7 +17,7 @@ CRITICAL_NO_WRAP_SELECTORS = (
     "site-brand__wordmark",
     "site-footer__wordmark",
     "hero-brand",
-    "launch-hero__title",
+    "minimal-hero h1",
     "home-hero__title",
     "page-title",
     "editorial-title",

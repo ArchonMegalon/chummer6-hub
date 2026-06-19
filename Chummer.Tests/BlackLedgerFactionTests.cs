@@ -12,7 +12,7 @@ public sealed class BlackLedgerFactionTests
         string publicLanding = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string ledgerView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
 
-        Assert.Contains("Build the runner. Run the night.", landing, StringComparison.Ordinal);
+        Assert.Contains("Build and maintain Shadowrun characters without losing the details between sessions.", landing, StringComparison.Ordinal);
         Assert.DoesNotContain("Open Black Ledger", landing, StringComparison.Ordinal);
         Assert.DoesNotContain("Replay Turn 1", landing, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions\")]", publicLanding, StringComparison.Ordinal);

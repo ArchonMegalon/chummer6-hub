@@ -8,7 +8,7 @@ test('homepage stays product-first while ledger remains off the primary path', a
 
   const hero = page.locator('[data-homepage-section="hero"]');
   await expect(hero).toContainText('Chummer');
-  await expect(hero).toContainText('Build and maintain Shadowrun characters on your desktop.');
+  await expect(hero).toContainText('Build and maintain Shadowrun characters without losing the details between sessions.');
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveCount(0);
   await expect(page.getByText('Black Ledger')).toHaveCount(0);
 

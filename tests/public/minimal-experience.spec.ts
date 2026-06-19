@@ -16,7 +16,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     failures.push('homepage: navigation panel is open by default');
   }
   await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
-  await expect(desktop.locator('.minimal-hero__lead')).toContainText('Build and maintain Shadowrun characters');
+  await expect(desktop.locator('.minimal-hero__lead')).toContainText('without losing the details between sessions');
   const heroActions = await desktop.locator('.minimal-hero .minimal-actions a.button-like').allTextContents();
   if (heroActions.map((text) => text.trim()).join('|') !== 'Stable|Nightly') {
     failures.push(`homepage: expected Stable then Nightly hero actions, found ${heroActions.join(', ')}`);

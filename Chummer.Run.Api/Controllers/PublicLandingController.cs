@@ -217,7 +217,7 @@ public sealed class PublicLandingController : Controller
                 Request.Headers.UserAgent.ToString(),
                 authenticated);
         var model = new LandingPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character tools for Shadowrun.", "/", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character manager for Shadowrun.", "/", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,

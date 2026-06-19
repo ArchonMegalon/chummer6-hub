@@ -15,11 +15,9 @@ if (forwardedProto) {
 
 const requiredLandingLinks = [
   '/downloads',
-  '/participate',
+  '/help',
+  '/status',
   '/contact',
-  '/what-is-chummer',
-  '/artifacts',
-  '/faq'
 ];
 
 const checks = [
@@ -27,15 +25,20 @@ const checks = [
     url: `${baseUrl}/`,
     assert: text =>
       text.includes('Chummer') &&
-      text.includes('Open downloads') &&
+      text.includes('Stable') &&
+      text.includes('Nightly') &&
+      text.includes('What it does') &&
       requiredLandingLinks.every(link => text.includes(link))
   },
   {
     url: `${baseUrl}/downloads/`,
     assert: text =>
-      text.includes('Install the current public release')
-      && text.includes('Chummer for Windows')
-      && text.includes('Recommended desktop build for Linux')
+      text.includes('Install Chummer')
+      && text.includes('Choose Stable or Nightly. Windows and Linux installers are published here.')
+      && text.includes('Current stable build')
+      && text.includes('Latest published build')
+      && text.includes('Windows')
+      && text.includes('Linux')
   },
   {
     url: `${baseUrl}/downloads/releases.json`,
@@ -81,25 +84,26 @@ const checks = [
     url: `${baseUrl}/blazor/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Install the current public release')
+      && text.includes('Install Chummer')
   },
   {
     url: `${baseUrl}/avalonia/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Install the current public release')
+      && text.includes('Install Chummer')
   },
   {
     url: `${baseUrl}/session/`,
     assert: (text, response) =>
-      /\/participate\/?$/.test(response.url)
-      && text.includes('Participate')
+      /\/play\/?$/.test(response.url)
+      && text.includes('Player entry')
   },
   {
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
-      /\/now\/?$/.test(response.url)
-      && text.includes('What Is Real Now')
+      /\/status\/?$/.test(response.url)
+      && text.includes('Current release')
+      && text.includes('Checks passed')
   }
 ];
 

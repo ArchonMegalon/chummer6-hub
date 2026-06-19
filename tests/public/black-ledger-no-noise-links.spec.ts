@@ -8,7 +8,7 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   const hero = page.locator('[data-homepage-section="hero"]');
-  await expect(hero).toContainText('Build and maintain Shadowrun characters on your desktop.');
+  await expect(hero).toContainText('Build and maintain Shadowrun characters without losing the details between sessions.');
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveCount(0);
   await expect(page.getByText('Black Ledger')).toHaveCount(0);
   await expect(hero.getByRole('link')).toHaveCount(2);

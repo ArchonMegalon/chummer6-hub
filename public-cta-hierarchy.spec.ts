@@ -16,17 +16,16 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
   expect(manifest).toContain('- label: Create account');
   expect(manifest).toContain('product_proof_primary_label: Download Chummer');
 
-  expect(landing).toContain('Open downloads');
-  expect(landing).toContain('Download Chummer');
-  expect(landing).toContain('Open play shell');
-  expect(landing).toContain('Open status');
-  expect(landing).toContain('Start where you need to.');
+  expect(landing).toContain('Stable</a>');
+  expect(landing).toContain('Nightly</a>');
+  expect(landing).toContain('Get the app');
+  expect(landing).toContain('Need help?');
   expect(landing).not.toContain('Open Black Ledger');
 
   expect(downloads).toContain('Nightly');
   expect(downloads).toContain('Stable');
   expect(downloads).toContain('data-release-lane="nightly"');
   expect(downloads).toContain('data-release-lane="stable"');
-  expect(downloads).toContain('Choose the latest build for Windows or Linux.');
+  expect(downloads).toContain('Choose Stable or Nightly. Windows and Linux installers are published here.');
   expect(downloads).not.toContain('Create account to install</a>');
 });

@@ -377,23 +377,27 @@
                     }
                     @foreach (var action in nonBuildHeaderActions)
                     {
+                        var renderedActionLabel = routeKey is "landing"
+                            && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+                            ? "Download"
+                            : action.Label;
                         if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                         {
                             <form method="post" action="/logout" class="action-form">
                                 @Html.AntiForgeryToken()
-                                <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                                <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                             </form>
                         }
                         else if (action.Current)
                         {
-                            <span class="action-pill action-pill--current">@action.Label</span>
+                            <span class="action-pill action-pill--current">@renderedActionLabel</span>
                         }
                         else
                         {
                             var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
                                 ? "site-actions__link"
                                 : $"action-pill action-pill--{action.Tone}";
-                            <a class="@actionClass" href="@action.Href">@action.Label</a>
+                            <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
                         }
                     }
                     @if (buildAction is not null)
@@ -465,23 +469,27 @@
                         <div class="site-sidebar__actions" role="group" aria-label="Account actions">
                             @foreach (var action in nonBuildHeaderActions)
                             {
+                                var renderedActionLabel = routeKey is "landing"
+                                    && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+                                    ? "Download"
+                                    : action.Label;
                                 if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                                 {
                                     <form method="post" action="/logout" class="action-form">
                                         @Html.AntiForgeryToken()
-                                        <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                                        <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                                     </form>
                                 }
                                 else if (action.Current)
                                 {
-                                    <span class="action-pill action-pill--current">@action.Label</span>
+                                    <span class="action-pill action-pill--current">@renderedActionLabel</span>
                                 }
                                 else
                                 {
                                     var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
                                         ? "site-actions__link"
                                         : $"action-pill action-pill--{action.Tone}";
-                                    <a class="@actionClass" href="@action.Href">@action.Label</a>
+                                    <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
                                 }
                             }
                             @if (buildAction is not null)
@@ -512,7 +520,7 @@
             <div class="site-footer__inner">
                 <div class="site-footer__brand">
                     <a class="site-footer__wordmark" href="/">CHUMMER</a>
-                    <p class="site-footer__copy">Shadowrun companion.</p>
+                    <p class="site-footer__copy">Shadowrun character manager.</p>
                 </div>
                 <nav class="site-footer__nav" aria-label="Footer navigation">
                     <div class="site-footer__link-group">

@@ -8121,7 +8121,7 @@ body {
 
 .minimal-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 0.96fr) minmax(320px, 1fr);
   gap: clamp(2rem, 6vw, 4.75rem);
   align-items: center;
   min-height: min(620px, calc(100vh - 7rem));
@@ -8143,7 +8143,7 @@ body {
   max-width: 12ch;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(3.8rem, 10vw, 7.6rem);
+  font-size: clamp(3.6rem, 8vw, 6.4rem);
   line-height: 0.92;
   letter-spacing: 0;
 }

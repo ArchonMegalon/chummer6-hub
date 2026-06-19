@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { completionPath, writeMarkdownArtifact } from './tests/public/ux-artifacts';
 
-const baseUrl = 'https://chummer.run';
+const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const viewports = [
   { width: 390, height: 844 },
   { width: 412, height: 915 },
@@ -23,9 +23,9 @@ test('public homepage stays readable across flagship responsive viewports', asyn
   for (const viewport of viewports) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.launch-hero__title')).toContainText('Build the runner. Run the night.');
-    await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Download Chummer');
-    await expect(page.locator('[data-homepage-section="flagship-promo"]')).toContainText('A short look at the product.');
+    await expect(page.locator('.minimal-hero h1')).toContainText('Chummer');
+    await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Stable');
+    await expect(page.locator('[data-homepage-section="workflow"]')).toContainText('Create');
 
     const overflow = await page.evaluate(() => {
       const root = document.documentElement;
