@@ -74,8 +74,8 @@
         <h2 class="editorial-title">Vote or follow on first-party routes.</h2>
         <p class="editorial-copy">
             @(Model.CanInteract
-                ? "These actions emit Chummer-owned receipts so package interest stays attached to the package, not to an external board name."
-                : "Public package detail stays readable without an account. Sign in only when you want your package receipts tracked on the account rail.")
+                ? "These actions keep package interest attached to the package, not to an external board name."
+                : "Public package detail stays readable without an account. Sign in only when you want your package history tracked on the account rail.")
         </p>
     </div>
     <div class="route-choice-grid">
@@ -138,16 +138,16 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Recent receipts</p>
-        <h2 class="editorial-title">Package receipts stay attached to this package route.</h2>
+        <p class="eyebrow">Recent records</p>
+        <h2 class="editorial-title">Package history stays attached to this package route.</h2>
     </div>
     <section class="compact-rail">
         @if (Model.RecentReceipts.Count == 0)
         {
             <article class="compact-rail__item">
                 <div class="compact-rail__copy">
-                    <h3>No receipts yet</h3>
-                    <p>Use the vote or follow action to create the first first-party receipt for this package.</p>
+                    <h3>No records yet</h3>
+                    <p>Use the vote or follow action to create the first history entry for this package.</p>
                 </div>
             </article>
         }
@@ -161,7 +161,7 @@
                         <p>@receipt.RouteSummary</p>
                         <p>@receipt.RecordedAtLabel</p>
                     </div>
-                    <a class="editorial-strip__action" href="@receipt.Href">Open receipt</a>
+                    <a class="editorial-strip__action" href="@receipt.Href">Open record</a>
                 </article>
             }
         }

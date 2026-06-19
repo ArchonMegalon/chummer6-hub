@@ -438,9 +438,9 @@ public sealed class PublicConciergeService
             ("campaign-invite", "continue_join") => new ConciergeBranchPresentation(
                 "Continue the invite",
                 authenticated
-                    ? "Stay on the signed-in community rail so governed join-code follow-through remains attached to your account and return path."
-                    : "Create the account only when you are ready to continue the governed invite and keep the return path attached.",
-                authenticated ? "Open invite tools" : "Create account to continue",
+                    ? "Stay signed in so the join code remains attached to your account and return path."
+                    : "Claim your copy only when you are ready to continue the invite and keep the return path attached.",
+                authenticated ? "Open invite tools" : "Claim your copy",
                 "primary",
                 authenticated ? "Signed-in invite follow-through" : "First-party account entry"),
             ("campaign-invite", "watch_primer") => new ConciergeBranchPresentation(

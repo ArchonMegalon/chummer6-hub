@@ -15,15 +15,15 @@
         <h1 class="editorial-title">@Model.Heading</h1>
         <p class="editorial-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
-            <span>Provider: @Model.Promo.ProviderStatus</span>
-            <span>Render mode: @Model.Promo.RenderMode</span>
+            <span>Status: @Model.Promo.ProviderStatus</span>
+            <span>Format: @Model.Promo.RenderMode</span>
             <span>Fallback: @Model.Promo.FallbackRenderMode</span>
             <span>Safety: public</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@($"{Model.Promo.HtmlHref}?autoplay=1#promo-player")">Open watch page</a>
             <a class="button-like button-like--secondary" href="#promo-player">Play inline here</a>
-            <a class="button-like button-like--secondary" href="@Model.Promo.JsonHref">Open JSON brief</a>
+            <a class="button-like button-like--secondary" href="@Model.Promo.JsonHref">Open details</a>
         </div>
     </div>
 </section>
@@ -105,8 +105,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Formats</p>
-        <h2 class="editorial-title">Public-safe deliverables</h2>
-        <p class="editorial-copy">Every faction video route now includes real motion-video files, a JSON brief, a caption file, and a storyboard fallback that still reads like a command bulletin instead of an empty shell.</p>
+        <h2 class="editorial-title">Included files</h2>
+        <p class="editorial-copy">Every faction video route includes video files, captions, and a storyboard fallback.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var format in Model.Promo.FormatLabels)
@@ -121,9 +121,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Human Review</p>
-        <h2 class="editorial-title">Flagship signoff checklist</h2>
-        <p class="editorial-copy">Machine checks can prove route health, duration, captions, audio, and motion. Flagship release still requires a human reviewer to confirm that the promo plays like a real animated scene instead of a dressed-up motion card.</p>
+        <p class="eyebrow">Review</p>
+        <h2 class="editorial-title">Quality checklist</h2>
+        <p class="editorial-copy">Before this is promoted, the promo should play like a real scene: clear motion, clear captions, clean audio, and no private material.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         <article class="route-choice-card">
@@ -144,11 +144,11 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Safety</span>
-            <p>No provider watermark, no private material, and no sourcebook leakage may appear.</p>
+            <p>No watermark, private material, or sourcebook leakage may appear.</p>
         </article>
         <article class="route-choice-card">
             <span class="tag">Approval</span>
-            <p>The cinematic lane is not flagship-ready until a named human reviewer signs the final creative receipt.</p>
+            <p>The video is not ready until a named reviewer approves it.</p>
         </article>
     </div>
 </section>
@@ -224,7 +224,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Safety notes</p>
-        <h2 class="editorial-title">Provider and lore boundaries</h2>
+        <h2 class="editorial-title">Content boundaries</h2>
     </div>
         <div class="route-choice-grid route-choice-grid--three">
         @foreach (var note in Model.DeliveryNotes)
@@ -236,6 +236,6 @@
         }
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open validation</a>
+        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open checks</a>
     </div>
 </section>

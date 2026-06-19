@@ -43,7 +43,7 @@
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
                     <span class="tag">Tab</span>
                     <strong>@tab.Label</strong>
-                    <p>@(tab.Current ? "Current authenticated workspace lane." : "Open this faction lane on the internal board.")</p>
+                <p>@(tab.Current ? "Current signed-in workspace." : "Open this faction workspace section.")</p>
                 </a>
             }
         </div>
@@ -53,7 +53,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Workspace tabs</p>
-        <h2 class="editorial-title">Faction management stays on authenticated routes.</h2>
+        <h2 class="editorial-title">Faction management stays signed in.</h2>
         <p class="editorial-copy">@Model.PrivacyNote</p>
     </div>
     <div class="trust-claim__microproof" aria-label="Faction workspace tabs">
@@ -131,7 +131,7 @@
                 <article class="route-choice-card">
                     <span class="tag">Private label</span>
                     <h3>@label</h3>
-                    <p>Available only behind account-aware faction routes and non-projecting overlay receipts.</p>
+                    <p>Available only on signed-in faction routes.</p>
                 </article>
             }
             @foreach (var note in Model.PrivateLoreNotes)
@@ -149,8 +149,8 @@ else if (string.Equals(Model.CurrentSection, "stewards", StringComparison.Ordina
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Stewardship</p>
-            <h2 class="editorial-title">AI and human roles stay explicit.</h2>
-            <p class="editorial-copy">Public summary roles, campaign stewardship, and human override do not blur together here.</p>
+            <h2 class="editorial-title">Roles stay explicit.</h2>
+            <p class="editorial-copy">Public summary roles, campaign stewardship, and override paths do not blur together here.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -164,7 +164,7 @@ else if (string.Equals(Model.CurrentSection, "stewards", StringComparison.Ordina
                 <p>Keeps scenario movement bounded to the faction lane without turning public copy into private narrative state.</p>
             </article>
             <article class="route-choice-card">
-                <span class="tag">Intel provider</span>
+                <span class="tag">Intel role</span>
                 <h3>@Model.Faction.IntelProvider</h3>
                 <p>Redacts, summarizes, and routes dispatch context without leaking private labels or operator details.</p>
             </article>
@@ -176,8 +176,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Management</p>
-            <h2 class="editorial-title">Faction management stays route-backed.</h2>
-            <p class="editorial-copy">Spend action points, sponsor package pressure, challenge districts, or publish a clean dispatch. Every action needs a receipt.</p>
+            <h2 class="editorial-title">Faction management stays reviewable.</h2>
+            <p class="editorial-copy">Spend action points, sponsor package pressure, challenge districts, or publish a clean dispatch. Recent decisions stay easy to review.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -192,8 +192,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
             </article>
             <article class="route-choice-card">
                 <span class="tag">Overlay API</span>
-                <h3>Private lore receipt path exists</h3>
-                <p>The faction overlay route is available through the authenticated API and remains non-projecting by contract.</p>
+                <h3>Private lore path exists</h3>
+                <p>The faction overlay route is available through the signed-in API and stays off public pages.</p>
             </article>
         </div>
         @if (Model.Allegiance is not null && Model.AvailableActions is not null)
@@ -226,7 +226,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                         <span class="tag">@receipt.ActionLabel</span>
                         <h3>@receipt.ReceiptId</h3>
                         <p>@receipt.ResultSummary</p>
-                        <a class="editorial-strip__action" href="@receipt.Href">View receipt</a>
+                        <a class="editorial-strip__action" href="@receipt.Href">View record</a>
                     </article>
                 }
             </div>

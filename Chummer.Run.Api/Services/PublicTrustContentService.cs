@@ -82,7 +82,7 @@ public sealed class PublicTrustContentService
                         || string.Equals(normalized, "/home", StringComparison.OrdinalIgnoreCase))
                     {
                         href = $"/signup?next={Uri.EscapeDataString(action.Href)}";
-                        label = "Create account";
+                        label = "Claim your copy";
                     }
                 }
 

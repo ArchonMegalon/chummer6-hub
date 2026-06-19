@@ -171,7 +171,7 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Dossiers, recaps, and release details belong on an inspectable page, not in a vague gallery. Use this page for publication lineage and provenance, then go back to downloads when you actually want the build.</p>
+        <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and source context, then go back to downloads when you actually want the build.</p>
         <div class="trust-claim__microproof">
             <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
             <span>@previewItems.Length opening next</span>
@@ -181,7 +181,7 @@
             }
             @if (Model.Chrome.Authenticated)
             {
-                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) signed-in return card(s)</span>
+                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) signed-in history card(s)</span>
             }
         </div>
     </div>
@@ -195,8 +195,8 @@
 <section class="editorial-block" id="artifact-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick details, downloads, signed-in account return, or help without mixing their jobs.</h2>
-        <p class="editorial-copy">The detail view should make outputs and provenance tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
+        <h2 class="editorial-title">Pick details, downloads, signed-in history, or help without mixing their jobs.</h2>
+        <p class="editorial-copy">The detail view should make outputs and source context tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -229,8 +229,8 @@
                 <article class="route-callout">
                     <span class="tag">Limited public claims</span>
                     <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
-                    <p>You can inspect the publication, provenance, and trust posture today. The remaining boundary is about how broadly the public page should claim parity, not whether the publication exists.</p>
-                    <p>Public parity claims remain review-required until current direct parity proof receipts are green.</p>
+                    <p>You can inspect the publication, source context, and trust posture today. The remaining boundary is about how broadly the public page should claim parity, not whether the publication exists.</p>
+                    <p>Public parity claims remain review-required until the current direct checks are green.</p>
                     <div class="route-callout__proof">
                         <span>Discoverable now</span>
                         <span>Comparison still reviewed</span>
@@ -334,7 +334,7 @@
                     : null;
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
-                        <span class="tag">Signed-in return view</span>
+                        <span class="tag">Signed-in history</span>
                         <h3>@item.Label</h3>
                         <p>@item.Summary</p>
                         <div class="trust-claim__microproof">

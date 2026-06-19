@@ -10,15 +10,15 @@
         <p class="eyebrow">Signed-in notification rail</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">Inbox is not a dead list. It should open on the world board, show the turn posture, and only then drop you into delivery truth.</p>
+        <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
         <div class="trust-claim__microproof">
             <span>Status: @Model.Status.StatusLabel</span>
             <span>Policy: @Model.Status.Policy</span>
-            <span>Receipts: @Model.Status.ReceiptCount</span>
+            <span>Records: @Model.Status.ReceiptCount</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open validation packet</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn check</a>
             <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory lane</a>
             <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
         </div>
@@ -35,7 +35,7 @@
                 data-tick-headline="Newsreel pressure live."
                 data-primary-label="Open Turn 1"
                 data-primary-href="@Model.Status.TurnHref"
-                data-secondary-label="Open validation"
+                data-secondary-label="Open turn check"
                 data-secondary-href="/account/ledger/worldtick/validation"></div>
         </div>
         <div class="ledger-flagship__nav" aria-label="Notification command lanes">
@@ -45,9 +45,9 @@
                 <p>Jump from the globe straight into the current turn and the route-backed world state.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
-                <span class="tag">Validation</span>
-                <strong>Review the packet</strong>
-                <p>Every inbox line should trace back to a packet you can validate and hand off.</p>
+                <span class="tag">Checks</span>
+                <strong>Review the turn</strong>
+                <p>Every inbox line should trace back to the same world turn.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger">
                 <span class="tag">Home</span>
@@ -148,7 +148,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Entry</span>
-                <p>Use the inbox route as the Table Pulse Live packet, not a dead notification shelf.</p>
+                <p>Use the inbox route as the Table Pulse Live entry point, not a static notification list.</p>
                 <div class="route-choice-card__proof">
                     <a href="@Model.TablePulsePacket.EntryHref">Open Table Pulse Live lane</a>
                 </div>
@@ -157,9 +157,9 @@
         @if (Model.TablePulsePacket.ReactionOptions.Count > 0)
         {
             <div class="editorial-block__lead">
-                <p class="eyebrow">Remote reaction adjudication</p>
-                <h3 class="editorial-title">Bounded minigame prompts</h3>
-                <p class="editorial-copy">These prompts write into the governed campaign consequence lane instead of inventing a side-channel minigame log.</p>
+                <p class="eyebrow">Remote reactions</p>
+                <h3 class="editorial-title">Small choices for players away from the table</h3>
+                <p class="editorial-copy">These choices feed back into the campaign instead of creating a separate side game.</p>
             </div>
             <div class="route-choice-grid route-choice-grid--three">
                 @foreach (var option in Model.TablePulsePacket.ReactionOptions)
@@ -289,7 +289,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Inbox queue</p>
         <h2 class="editorial-title">Actual messages, not just status</h2>
-        <p class="editorial-copy">The signed-in lane now shows the turn packet, validation handoff, leader digest, and faction promo as discrete inbox items.</p>
+        <p class="editorial-copy">The signed-in lane now shows the turn, current checks, leader digest, and faction promo as separate inbox items.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var message in Model.InboxMessages)
@@ -309,7 +309,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Delivery truth</p>
+        <p class="eyebrow">Delivery status</p>
         <h2 class="editorial-title">@Model.Status.StatusLabel</h2>
         <p class="editorial-copy">@Model.Status.Summary</p>
     </div>
@@ -328,9 +328,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Stored receipts</p>
+            <p class="eyebrow">Stored records</p>
             <h2 class="editorial-title">Recent delivery attempts</h2>
-            <p class="editorial-copy">Receipt-backed delivery or suppression posture for the seeded Turn 1 newsreel.</p>
+            <p class="editorial-copy">Delivery or suppression history for the seeded Turn 1 newsreel.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in Model.Status.Receipts)
@@ -361,7 +361,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Validation packet</p>
+            <p class="eyebrow">Turn checks</p>
             <h2 class="editorial-title">Send this for review</h2>
             <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
         </div>

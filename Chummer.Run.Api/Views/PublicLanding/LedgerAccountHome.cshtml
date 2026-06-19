@@ -43,7 +43,7 @@
             <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">
                 <span class="tag">Workspace</span>
                 <strong>Faction command deck</strong>
-                <p>Management, receipts, action points, and private posture stay on the authenticated lane.</p>
+                <p>Management, action points, and private notes stay on the signed-in route.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')/leader-briefing">
                 <span class="tag">Leader</span>
@@ -52,13 +52,13 @@
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
                 <span class="tag">Validation</span>
-                <strong>World-tick packet</strong>
-                <p>Receipt-backed validation for the current world turn, ready for review and signoff.</p>
+                <strong>World turn check</strong>
+                <p>Review the current turn before it moves further.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/notifications">
                 <span class="tag">Inbox</span>
                 <strong>Newsreel inbox</strong>
-                <p>See what actually shipped to your mailbox, with delivery posture and receipts.</p>
+                <p>See what reached your mailbox and what still needs attention.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/advisory">
                 <span class="tag">Advisory</span>
@@ -83,9 +83,9 @@
             <span>Recipients sent: @Model.NewsreelStatus.RecipientCount</span>
         </div>
         <div class="stacked-actions">
-            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification receipts</a>
+            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification history</a>
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open validation packet</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn check</a>
         </div>
     </section>
 }
@@ -162,7 +162,7 @@
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="/account/ledger/factions/@Model.LeaderDigest.FactionId/leader-briefing">Open leader brief</a>
-            <a class="button-like button-like--secondary" href="@Model.LeaderDigest.ValidationHref">Open leader JSON</a>
+            <a class="button-like button-like--secondary" href="@Model.LeaderDigest.ValidationHref">Open leader details</a>
         </div>
     </section>
 }
@@ -241,15 +241,15 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Faction promo artifact</p>
-            <h2 class="editorial-title">First-party motion video lane</h2>
+            <p class="eyebrow">Faction promo</p>
+            <h2 class="editorial-title">Faction video draft</h2>
             <p class="editorial-copy">@Model.PromoArtifact.CampaignHook</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">@Model.PromoArtifact.ProviderStatus</span>
                 <h3>@Model.PromoArtifact.PublicName</h3>
-                <p>Render mode: @Model.PromoArtifact.RenderMode</p>
+                <p>Format: @Model.PromoArtifact.RenderMode</p>
                 <p>@Model.PromoArtifact.AudiencePromise</p>
                 <div class="route-choice-card__proof">
                     @foreach (var format in Model.PromoArtifact.FormatLabels)
@@ -259,8 +259,8 @@
                 </div>
                 <div class="stacked-actions">
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.HtmlHref">Open promo brief</a>
-                    <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open JSON brief</a>
-                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open validation</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open details</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open checks</a>
                 </div>
             </article>
         </div>
@@ -291,9 +291,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Recent receipts</p>
+            <p class="eyebrow">Recent activity</p>
             <h2 class="editorial-title">Action trail</h2>
-            <p class="editorial-copy">Every action needs a receipt.</p>
+            <p class="editorial-copy">Recent decisions stay easy to review.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in Model.RecentActionReceipts)
@@ -302,7 +302,7 @@
                     <span class="tag">@receipt.ActionLabel</span>
                     <h3>@receipt.ReceiptId</h3>
                     <p>@receipt.ResultSummary</p>
-                    <a class="editorial-strip__action" href="@receipt.Href">View receipt</a>
+                    <a class="editorial-strip__action" href="@receipt.Href">View record</a>
                 </article>
             }
         </div>

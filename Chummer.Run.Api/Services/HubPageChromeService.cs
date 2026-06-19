@@ -40,7 +40,7 @@ public sealed class HubPageChromeService
             ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
         var createAccountAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
-            ?? new PublicLandingActionDto("Create account", "/signup?next=/home", "primary");
+            ?? new PublicLandingActionDto("Claim your copy", "/signup?next=/home", "primary");
         var contextualSignInHref = BuildContextualSignInHref(normalizedCurrentPath, signInAction.Href);
         var primaryHeaderAction = downloadsSurface
             ? null

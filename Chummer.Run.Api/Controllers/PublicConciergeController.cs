@@ -136,7 +136,7 @@ public sealed class PublicConciergeController : Controller
                         "The wrapper can be replayed safely if the first pass is interrupted."
                     ],
                     PrimaryAction: new TrustPageActionViewModel(
-                        chrome.Authenticated ? "Open invite tools" : "Create account to continue",
+                        chrome.Authenticated ? "Open invite tools" : "Claim your copy",
                         continueInviteHref,
                         "primary"),
                     SecondaryAction: new TrustPageActionViewModel("Back to invite concierge", inviteWrapperHref, "secondary")),
@@ -181,7 +181,7 @@ public sealed class PublicConciergeController : Controller
             Actions:
             [
                 new TrustPageActionViewModel("Back to invite concierge", inviteWrapperHref, "primary"),
-                new TrustPageActionViewModel(chrome.Authenticated ? "Open account work" : "Create account to continue", continueInviteHref, "secondary"),
+                new TrustPageActionViewModel(chrome.Authenticated ? "Open account work" : "Claim your copy", continueInviteHref, "secondary"),
                 new TrustPageActionViewModel("Open downloads", "/downloads", "ghost")
             ]);
         return View("~/Views/PublicLanding/JoinPrimer.cshtml", model);

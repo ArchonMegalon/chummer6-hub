@@ -135,7 +135,7 @@ public sealed class PublicActionResolver
             "choose_your_lane" => "See the lane fit",
             "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Authorize contribution access",
             "participate" when href.Contains("/account/participation", StringComparison.OrdinalIgnoreCase) || href.Contains("/account/settings", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
-            "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Create account to continue",
+            "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Claim your copy",
             "participate" when href.Contains("/login", StringComparison.OrdinalIgnoreCase) => "Sign in to continue",
             "participate" => "Open the participation path",
             _ => "See the next product step"

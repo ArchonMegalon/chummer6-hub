@@ -123,7 +123,7 @@
         <h3>Need more release detail?</h3>
         <p>Use the extra release view only when you want more detail. Downloads remains the main install page.</p>
         <div class="route-callout__actions">
-            <a class="inline-link" href="/now/concierge">Open release concierge</a>
+            <a class="inline-link" href="/now/concierge">Open release detail</a>
             <a class="inline-link" href="/changelog">Open changelog</a>
         </div>
     </div>
@@ -231,9 +231,9 @@
 }
 
 <section class="release-footnote">
-    <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Keep the return path attached when one install is not enough</h2>
-    <p class="editorial-copy">Use the account path when you want devices, support updates, and follow-up history attached to the same return surface without turning signup into the main public decision.</p>
+    <p class="eyebrow">Claim your copy</p>
+    <h2 class="editorial-title">Keep devices and support history together</h2>
+    <p class="editorial-copy">Use an account when you want installs, support updates, and follow-up history attached to you.</p>
     @if (signedInBenefits.Length > 0)
     {
         <div class="trust-claim__microproof">
@@ -245,7 +245,7 @@
     }
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
-            @(Model.Chrome.Authenticated ? "Open home" : "Create account")
+            @(Model.Chrome.Authenticated ? "Open home" : "Claim your copy")
         </a>
         @if (!Model.Chrome.Authenticated)
         {

@@ -34,9 +34,9 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("Controlled signal lane", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml")), StringComparison.Ordinal);
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
         Assert.Contains("Signed-in notification rail", notificationsView, StringComparison.Ordinal);
-        Assert.Contains("Open notification receipts", accountView, StringComparison.Ordinal);
-        Assert.Contains("Open validation packet", accountView, StringComparison.Ordinal);
-        Assert.Contains("Open validation packet", notificationsView, StringComparison.Ordinal);
+        Assert.Contains("Open notification history", accountView, StringComparison.Ordinal);
+        Assert.Contains("Open turn check", accountView, StringComparison.Ordinal);
+        Assert.Contains("Open turn check", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Inbox queue", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Actual messages, not just status", notificationsView, StringComparison.Ordinal);
         Assert.Contains("pressure, not people", ledgerView, StringComparison.Ordinal);

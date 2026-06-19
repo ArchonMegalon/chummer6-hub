@@ -8150,7 +8150,7 @@ Boundary:
             var kind when kind.Contains("replay", StringComparison.Ordinal) => "Signed-in replay packet",
             var kind when kind.Contains("downtime", StringComparison.Ordinal) => "Signed-in downtime packet",
             var kind when kind.Contains("aftermath", StringComparison.Ordinal) => "Signed-in aftermath packet",
-            _ => "Signed-in return shelf packet"
+            _ => "Signed-in history packet"
         };
 
     private static string BuildCreatorPublicationCaption(CreatorPublicationProjection publication, bool publicOnly)

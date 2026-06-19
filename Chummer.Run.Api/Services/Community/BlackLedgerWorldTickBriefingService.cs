@@ -295,10 +295,10 @@ public sealed class BlackLedgerWorldTickBriefingService
                 NarratorLine: BuildStateSummary(world)),
             new(
                 SceneId: $"turn-{tick.Turn}-validation-close",
-                Label: "Validation Close",
+                Label: "Board Close",
                 DurationLabel: "00:06",
                 Purpose: "Close on the board state and keep the bulletin anchored to what changed this turn.",
-                VisualDirection: "Validation packet, turn summary, and captions route remain visible in frame.",
+                VisualDirection: "Turn summary and captions remain visible in frame.",
                 NarratorLine: "The bulletin can be dramatic, but the turn summary still gets the last word.")
         ];
 
@@ -351,7 +351,7 @@ public sealed class BlackLedgerWorldTickBriefingService
                     BeatLabel: string.IsNullOrWhiteSpace(beat.BeatLabel) ? "Visible move" : beat.BeatLabel,
                     ActionSummary: beat.ActionSummary,
                     Stakes: beat.Stakes,
-                    ProofNote: beat.ProofNote,
+                    ProofNote: HumanizeBoardNote(beat.ProofNote),
                     VisualHook: string.IsNullOrWhiteSpace(beat.VisualHook) ? $"Focus {beat.ActorLabel} pressure on the live globe." : beat.VisualHook,
                     CommandIntent: string.IsNullOrWhiteSpace(beat.CommandIntent) ? $"Track {beat.BeatLabel} as a live board move." : beat.CommandIntent,
                     ConsequenceLine: string.IsNullOrWhiteSpace(beat.ConsequenceLine) ? beat.Stakes : beat.ConsequenceLine))
@@ -367,11 +367,26 @@ public sealed class BlackLedgerWorldTickBriefingService
                 BeatLabel: effect.Metric,
                 ActionSummary: effect.PublicReason,
                 Stakes: $"{world.PublicName} visible pressure moved on the city board.",
-                ProofNote: $"On the board: {tick.ReceiptId}.",
+                ProofNote: $"Board id: {tick.ReceiptId}.",
                 VisualHook: $"Flash {effect.Target} across the globe while {effect.Metric} moves.",
                 CommandIntent: $"Push {effect.Target} onto the command board as a live {effect.Metric} shift.",
                 ConsequenceLine: $"{effect.Target} now changes what players and GMs have to answer next."))
             .ToArray();
+    }
+
+    private static string HumanizeBoardNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return "Board note available.";
+        }
+
+        return note
+            .Replace("proof trail", "board trail", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Trim();
     }
 
     private static string BuildVersionedMediaHref(string relativePath)
