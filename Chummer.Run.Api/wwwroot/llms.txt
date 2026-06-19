@@ -13,23 +13,13 @@ Primary routes
 - /docs : help documents
 - /docs/chummer6-quickstart : quickstart guide
 - /docs/chummer6-quickstart/download.pdf : quickstart PDF
-- /join/primer : campaign invite primer
 - /status : current release
-- /progress : progress notes
-- /testimonials/concierge : testimonial follow-up
 
-Direction and feedback routes
+Maintenance and feedback routes
 - /horizons : maintenance page
 - /roadmap : planned work
 - /feedback : public feedback
 - /changelog : shipped closeout and release-backed updates
-- /alice : character helper entry
-- /table-pulse : Table Pulse live and aftermath public split
-- /quicksilver : Quicksilver expert-speed command deck and jump-target lane
-- /local-co-processor : Local Co-Processor hosted-first optional-acceleration lane
-- /participate : broader participation entry
-- /karma-forge : discovery intake
-- /participate/karma-forge : discovery intake for table pain and house-rule demand
 
 Help and account routes
 - /help : help entry

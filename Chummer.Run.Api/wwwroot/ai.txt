@@ -6,10 +6,8 @@ Fast split
 - Current release surfaces: /downloads, /status, /changelog
 - Help documents: /docs, /docs/chummer6-quickstart, /docs/chummer6-quickstart/download.pdf
 - Guided help: /downloads/concierge, /contact/concierge
-- Invite orientation: /join/primer
-- Testimonials: /testimonials/concierge
 - Planned work: /roadmap, /horizons
-- Public routes: /feedback, /alice, /table-pulse, /quicksilver, /local-co-processor, /karma-forge, /participate/karma-forge
+- Public feedback: /feedback
 - Private help: /help, /contact
 - Signed-in follow-through: /home, /account
 

@@ -139,7 +139,25 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   expect(llmsText).not.toContain('/ledger :');
   expect(llmsText).not.toContain('/black-ledger');
   expect(llmsText).not.toContain('Black Ledger');
-  expect(llmsText).toContain('/alice : character helper entry');
+  expect(llmsText).not.toContain('/alice');
+  expect(llmsText).not.toContain('/table-pulse');
+  expect(llmsText).not.toContain('/quicksilver');
+  expect(llmsText).not.toContain('/local-co-processor');
+
+  const aiResponse = await request.get(`${baseUrl}/ai.txt`);
+  expect(aiResponse.ok()).toBeTruthy();
+  const aiText = await aiResponse.text();
+  expect(aiText).not.toContain('/alice');
+  expect(aiText).not.toContain('/table-pulse');
+  expect(aiText).not.toContain('/quicksilver');
+  expect(aiText).not.toContain('/local-co-processor');
+  expect(aiText).not.toContain('AI helper');
+
+  const sitemapResponse = await request.get(`${baseUrl}/sitemap.xml`);
+  expect(sitemapResponse.ok()).toBeTruthy();
+  const sitemapText = await sitemapResponse.text();
+  expect(sitemapText).not.toContain('/ledger');
+  expect(sitemapText).not.toContain('/alice');
 });
 
 test('downloads concierge reads like instant support, not internal governance', async ({ page }) => {
