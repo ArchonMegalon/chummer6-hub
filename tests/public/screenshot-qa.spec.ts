@@ -20,13 +20,19 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Stable', 'Nightly'],
+    requiredText: ['Install Chummer', 'Choose the latest build for Windows or Linux.', 'Stable', 'Nightly'],
   },
   {
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Current release', 'Downloads', 'Help'],
+    requiredText: ['Release status', 'The build currently available from Chummer.', 'Open downloads', 'Open support'],
+  },
+  {
+    id: 'ledger-map',
+    route: '/ledger/map',
+    screenshotPrefix: 'ledger-map',
+    requiredText: ['campaign city command map', 'Track who is moving first.', 'Turn 2'],
   },
   {
     id: 'help',
@@ -59,7 +65,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     await expect(primaryCta).toContainText('Stable');
     await expect(workflow).toContainText('What it does');
     await expect(downloads).toContainText('Get the app');
-    await expect(help).toContainText('Need help?');
+    await expect(help).toContainText('Help');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {

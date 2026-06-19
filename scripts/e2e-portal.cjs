@@ -34,7 +34,7 @@ const checks = [
     url: `${baseUrl}/downloads/`,
     assert: text =>
       text.includes('Install Chummer')
-      && text.includes('Choose Stable or Nightly. Windows and Linux installers are published here.')
+      && text.includes('Choose the latest build for Windows or Linux.')
       && text.includes('Current stable build')
       && text.includes('Latest published build')
       && text.includes('Windows')
