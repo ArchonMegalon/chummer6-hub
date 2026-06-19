@@ -915,6 +915,7 @@ public sealed record DownloadsPageViewModel(
     FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
     IReadOnlyList<WindowsProofInstallerRecord>? WindowsProofInstallers = null,
+    IReadOnlyList<AurPackageEntry>? AurPackages = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     PublicAccessPostureViewModel? AccessPosture = null);

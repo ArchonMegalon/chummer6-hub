@@ -882,6 +882,15 @@ canonicalize_release_channel_registries "$generated_root/releases.json"
 canonicalize_release_channel_registries "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json"
 canonicalize_release_channel_registries "$OUTPUT_ROOT/releases.json"
 
+if [[ -f "$SCRIPT_DIR/materialize-aur-package.py" ]]; then
+  python3 "$SCRIPT_DIR/materialize-aur-package.py" \
+    --manifest "$OUTPUT_ROOT/releases.json" \
+    --files-root "$OUTPUT_ROOT/files" \
+    --output-root "$OUTPUT_ROOT" \
+    --downloads-prefix "${CHUMMER_PUBLIC_DOWNLOADS_PREFIX:-https://chummer.run/downloads/files}" \
+    --optional >/dev/null
+fi
+
 python3 - "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" <<'PY'
 import json
 import sys

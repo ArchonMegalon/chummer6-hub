@@ -649,6 +649,25 @@ for artifact_path in files_root.glob("chummer-*"):
 PY
 }
 
+materialize_aur_sidecar() {
+  local output_root="${1:-}"
+  local manifest_path="${2:-}"
+  local files_root="${3:-}"
+  if [[ -z "$output_root" || -z "$manifest_path" || -z "$files_root" || ! -f "$manifest_path" || ! -d "$files_root" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$SCRIPT_DIR/materialize-aur-package.py" ]]; then
+    return 0
+  fi
+
+  python3 "$SCRIPT_DIR/materialize-aur-package.py" \
+    --manifest "$manifest_path" \
+    --files-root "$files_root" \
+    --output-root "$output_root" \
+    --downloads-prefix "$DOWNLOADS_PREFIX" \
+    --optional >/dev/null
+}
+
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
@@ -742,6 +761,7 @@ normalize_preview_install_access_classes "$MANIFEST_PATH" "$RELEASE_CHANNEL"
 canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
 canonicalize_release_channel_registries "$MANIFEST_PATH"
 filter_files_to_manifest_truth "$DOWNLOADS_DIR" "$CANONICAL_MANIFEST_PATH"
+materialize_aur_sidecar "$(dirname "$MANIFEST_PATH")" "$MANIFEST_PATH" "$DOWNLOADS_DIR"
 promoted_file_names=()
 while IFS= read -r file_name; do
   [[ -n "$file_name" ]] || continue
@@ -803,6 +823,7 @@ else
   if [[ "${#portal_artifacts[@]}" -gt 0 ]]; then
     cp "${portal_artifacts[@]}" "$portal_files_dir"/
     filter_files_to_manifest_truth "$portal_files_dir" "$PORTAL_CANONICAL_MANIFEST_PATH"
+    materialize_aur_sidecar "$PORTAL_DOWNLOADS_DIR" "$PORTAL_MANIFEST_PATH" "$portal_files_dir"
     echo "synced ${#portal_artifacts[@]} local portal artifact(s) -> $portal_files_dir"
   else
     echo "no local desktop artifacts found in $DOWNLOADS_DIR for portal file sync"

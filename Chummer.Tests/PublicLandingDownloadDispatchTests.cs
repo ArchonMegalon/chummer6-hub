@@ -974,6 +974,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 personalizedInstallScripts: PersonalizedInstallScripts,
                 releaseUploadTickets: null!,
                 windowsProofInstallers: new WindowsProofInstallerService(Configuration),
+                aurPackages: new AurPackageCatalogService(Configuration),
                 webHostEnvironment: null!,
                 logger: NullLogger<PublicLandingController>.Instance);
         }

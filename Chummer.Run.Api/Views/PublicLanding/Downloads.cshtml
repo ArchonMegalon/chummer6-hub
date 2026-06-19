@@ -19,6 +19,7 @@
     var platforms = new[] { ("windows", "Windows"), ("linux", "Linux") };
     var stableLaneIds = new[] { "stable", "public_stable" };
     var nightlyLaneIds = new[] { "nightly", "preview", "public_preview", "public_stable" };
+    var aurPackages = Model.AurPackages ?? Array.Empty<AurPackageEntry>();
 
     static bool MatchesPlatform(PublicReleaseArtifactDto artifact, string platformId)
     {
@@ -57,7 +58,7 @@
     <div>
         <p class="minimal-kicker">Downloads</p>
         <h1>Install Chummer</h1>
-        <p>Choose Stable or Nightly. Windows and Linux installers are published here.</p>
+        <p>Choose Stable or Nightly. Windows, Linux, and Arch-compatible Linux options are published here.</p>
     </div>
     <div class="minimal-status-pill" aria-label="Current release">
         <span>@release.Display.ChannelLabel</span>
@@ -129,6 +130,30 @@ else
             </details>
         </article>
     </section>
+
+    @if (aurPackages.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight" id="arch-linux">
+            <div class="minimal-section__lead">
+                <h2>Arch Linux</h2>
+                <p>AUR-compatible package source for Arch-based distributions.</p>
+            </div>
+            <div class="minimal-platform-list">
+                @foreach (var package in aurPackages)
+                {
+                    <article>
+                        <h3>@package.PlatformLabel</h3>
+                        <p>@package.Summary</p>
+                        <div class="minimal-actions">
+                            <a class="button-like button-like--secondary" href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
+                            <a class="button-like button-like--ghost" href="@package.PkgbuildUrl">PKGBUILD</a>
+                            <a class="button-like button-like--ghost" href="@package.SrcinfoUrl">.SRCINFO</a>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
 
     <section class="minimal-section minimal-section--tight" id="platforms">
         <div class="minimal-section__lead">

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,9 +11,80 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MATERIALIZER = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
+AUR_MATERIALIZER = REPO_ROOT / "scripts" / "materialize-aur-package.py"
 
 
 class PublicDownloadsBundleTests(unittest.TestCase):
+    def test_aur_package_materializer_derives_arch_sidecar_from_linux_deb(self):
+        if not AUR_MATERIALIZER.exists():
+            self.skipTest(f"missing AUR materializer: {AUR_MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-aur-materializer-") as temp_root:
+            root = Path(temp_root)
+            files_root = root / "files"
+            files_root.mkdir(parents=True)
+            deb_path = files_root / "chummer-avalonia-linux-x64-installer.deb"
+            deb_path.write_bytes(b"fake deb for sidecar materializer")
+            deb_sha = subprocess.check_output(["sha256sum", str(deb_path)], text=True).split()[0]
+            manifest_path = root / "releases.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "version": "run-20260619-101500",
+                        "channel": "public_stable",
+                        "downloads": [
+                            {
+                                "id": "avalonia-linux-x64-installer",
+                                "artifactId": "avalonia-linux-x64-installer",
+                                "platform": "Avalonia Desktop Linux X64 Installer",
+                                "platformId": "linux",
+                                "arch": "x64",
+                                "kind": "installer",
+                                "fileName": deb_path.name,
+                                "url": f"https://chummer.run/downloads/files/{deb_path.name}",
+                                "sha256": deb_sha,
+                                "sizeBytes": deb_path.stat().st_size,
+                                "channel": "public_stable",
+                                "version": "run-20260619-101500",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(AUR_MATERIALIZER),
+                    "--manifest",
+                    str(manifest_path),
+                    "--files-root",
+                    str(files_root),
+                    "--output-root",
+                    str(root),
+                ],
+                cwd=REPO_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            catalog = json.loads((root / "aur-packages.json").read_text(encoding="utf-8"))
+            package = catalog["packages"][0]
+            self.assertEqual(package["packageName"], "chummer6-bin")
+            self.assertEqual(package["packageVersion"], "20260619.101500")
+            self.assertEqual(package["upstreamArtifactSha256"], deb_sha)
+            self.assertTrue((files_root / "chummer6-bin.PKGBUILD").is_file())
+            self.assertTrue((files_root / "chummer6-bin.SRCINFO").is_file())
+            archive_path = files_root / "chummer6-bin-aur-source.tar.gz"
+            self.assertTrue(archive_path.is_file())
+            with tarfile.open(archive_path, "r:gz") as archive:
+                names = set(archive.getnames())
+            self.assertIn("chummer6-bin/PKGBUILD", names)
+            self.assertIn("chummer6-bin/.SRCINFO", names)
+
     def test_materializer_publishes_linux_startup_smoke_with_stable_companion_evidence(self):
         if not MATERIALIZER.exists():
             self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
@@ -33,6 +105,14 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
 
             releases_payload = json.loads((output_root / "releases.json").read_text(encoding="utf-8"))
+            aur_catalog_path = output_root / "aur-packages.json"
+            if (output_root / "files" / "chummer-avalonia-linux-x64-installer.deb").is_file():
+                self.assertTrue(aur_catalog_path.is_file(), "Linux bundles should publish an Arch/AUR sidecar catalog")
+                aur_payload = json.loads(aur_catalog_path.read_text(encoding="utf-8"))
+                self.assertIn("chummer6-bin", {str(item.get("packageName") or "") for item in aur_payload.get("packages") or []})
+                self.assertTrue((output_root / "files" / "chummer6-bin-aur-source.tar.gz").is_file())
+                self.assertTrue((output_root / "files" / "chummer6-bin.PKGBUILD").is_file())
+                self.assertTrue((output_root / "files" / "chummer6-bin.SRCINFO").is_file())
             downloads = releases_payload.get("downloads") or []
             linux_installer = next(
                 (item for item in downloads if str(item.get("id") or "") == "avalonia-linux-x64-installer"),

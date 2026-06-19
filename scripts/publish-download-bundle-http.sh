@@ -420,6 +420,7 @@ collect_upload_files() {
   local bundle_root="$1"
   [[ -f "$MANIFEST_PATH" ]] && printf '%s\n' "$MANIFEST_PATH"
   [[ -f "$CANONICAL_MANIFEST_PATH" ]] && printf '%s\n' "$CANONICAL_MANIFEST_PATH"
+  [[ -f "$bundle_root/aur-packages.json" ]] && printf '%s\n' "$bundle_root/aur-packages.json"
   [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
   if [[ -d "$bundle_root/files" ]]; then
     find "$bundle_root/files" -type f | sort

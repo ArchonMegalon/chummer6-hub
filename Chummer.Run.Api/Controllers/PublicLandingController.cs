@@ -85,6 +85,7 @@ public sealed class PublicLandingController : Controller
     private readonly PersonalizedInstallScriptService _personalizedInstallScripts;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
     private readonly WindowsProofInstallerService _windowsProofInstallers;
+    private readonly AurPackageCatalogService _aurPackages;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
 
@@ -137,6 +138,7 @@ public sealed class PublicLandingController : Controller
         PersonalizedInstallScriptService personalizedInstallScripts,
         ReleaseUploadTicketService releaseUploadTickets,
         WindowsProofInstallerService windowsProofInstallers,
+        AurPackageCatalogService aurPackages,
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger)
     {
@@ -192,6 +194,7 @@ public sealed class PublicLandingController : Controller
         _personalizedInstallScripts = personalizedInstallScripts;
         _releaseUploadTickets = releaseUploadTickets;
         _windowsProofInstallers = windowsProofInstallers;
+        _aurPackages = aurPackages;
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
@@ -330,6 +333,7 @@ public sealed class PublicLandingController : Controller
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             SignedInWindowsBuilds: signedInWindowsBuilds,
             WindowsProofInstallers: windowsProofInstallers,
+            AurPackages: _aurPackages.LoadCatalog().Packages,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             AccessPosture: accessPosture);

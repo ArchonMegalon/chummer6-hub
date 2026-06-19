@@ -15,6 +15,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     private readonly PublicReleaseManifestService _releases;
     private readonly WindowsProofInstallerService _windowsProofInstallers;
+    private readonly AurPackageCatalogService _aurPackages;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
@@ -27,6 +28,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     public DownloadsCompatibilityController(
         PublicReleaseManifestService releases,
         WindowsProofInstallerService windowsProofInstallers,
+        AurPackageCatalogService aurPackages,
         ReleaseSelectionService releaseSelection,
         InstallLinkingService installLinking,
         InstallBootstrapTicketService installBootstrapTickets,
@@ -36,6 +38,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     {
         _releases = releases;
         _windowsProofInstallers = windowsProofInstallers;
+        _aurPackages = aurPackages;
         _releaseSelection = releaseSelection;
         _installLinking = installLinking;
         _installBootstrapTickets = installBootstrapTickets;
@@ -61,6 +64,10 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             ? NotFound()
             : Content(filteredManifest, "application/json; charset=utf-8");
     }
+
+    [HttpGet("/downloads/aur-packages.json")]
+    public IActionResult AurPackagesManifest()
+        => Ok(_aurPackages.LoadCatalog());
 
     [HttpGet("/downloads/proof/windows")]
     public IActionResult WindowsProofInstallers()
@@ -278,7 +285,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         var (manifest, artifact) = ResolvePublicManifestArtifactByPath(path);
         if (artifact is null)
         {
-            return NotFound();
+            return DownloadAurPackageFile(path);
         }
 
         var filePath = _releases.ResolveDownloadFilePath(path);
@@ -344,6 +351,31 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             "/downloads/files/{**path}",
             $"/downloads/install/{encodedArtifactId}");
         return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+    }
+
+    private IActionResult DownloadAurPackageFile(string? path)
+    {
+        AurPackageEntry? package = _aurPackages.FindByFileName(path);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        string fileName = Path.GetFileName((path ?? string.Empty).Trim());
+        string? filePath = _aurPackages.ResolvePackageFilePath(fileName);
+        if (filePath is null)
+        {
+            return NotFound();
+        }
+
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the Arch package sidecar output route.",
+            "/downloads/files/{**path}",
+            "/downloads");
+        Response.Headers["X-Chummer-Install-Tier"] = "arch-sidecar";
+        Response.Headers["X-Chummer-Upstream-Artifact-Id"] = package.UpstreamArtifactId;
+        return PhysicalFile(filePath, "application/octet-stream", fileName, enableRangeProcessing: true);
     }
 
     private void ApplyRouteProofHeaders(

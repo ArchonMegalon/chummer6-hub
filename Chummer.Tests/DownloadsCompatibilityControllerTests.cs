@@ -581,6 +581,7 @@ public sealed class DownloadsCompatibilityControllerTests
             Controller = new DownloadsCompatibilityController(
                 ManifestService,
                 windowsProofInstallers,
+                new AurPackageCatalogService(Configuration),
                 ReleaseSelection,
                 InstallLinking,
                 InstallBootstrapTickets,

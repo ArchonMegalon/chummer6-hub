@@ -63,6 +63,11 @@ payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
 downloads = payload.get("downloads") or []
 failures: list[str] = []
 seen: set[str] = set()
+sidecars = {
+    "chummer6-bin-aur-source.tar.gz",
+    "chummer6-bin.PKGBUILD",
+    "chummer6-bin.SRCINFO",
+}
 
 for artifact in downloads:
     if not isinstance(artifact, dict):
@@ -88,6 +93,8 @@ for artifact in downloads:
 
 for file_path in sorted(files_root.iterdir()):
     if not file_path.is_file():
+        continue
+    if file_path.name in sidecars:
         continue
     if file_path.name not in seen:
         failures.append(f"bundle contains extra file not present in manifest: {file_path.name}")
@@ -212,6 +219,11 @@ sync_live_downloads_mirror_dir() {
   mkdir -p "$target_dir"
   cp "$DEPLOY_DIR/releases.json" "$target_dir/releases.json"
   cp "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" "$target_dir/RELEASE_CHANNEL.generated.json"
+  if [[ -f "$DEPLOY_DIR/aur-packages.json" ]]; then
+    cp "$DEPLOY_DIR/aur-packages.json" "$target_dir/aur-packages.json"
+  else
+    rm -f "$target_dir/aur-packages.json"
+  fi
 
   startup_smoke_dir="$target_dir/startup-smoke"
   mkdir -p "$startup_smoke_dir"
@@ -222,6 +234,10 @@ sync_live_downloads_mirror_dir() {
 
   files_dir="$target_dir/files"
   mkdir -p "$files_dir"
+  rm -f \
+    "$files_dir"/chummer6-bin-aur-source.tar.gz \
+    "$files_dir"/chummer6-bin.PKGBUILD \
+    "$files_dir"/chummer6-bin.SRCINFO
   find "$files_dir" -maxdepth 1 -type f \
     \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
        -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
@@ -242,6 +258,12 @@ sync_live_downloads_mirror_dir() {
       exit 1
     fi
     cp "$source_path" "$files_dir/"
+  done
+  for file_name in chummer6-bin-aur-source.tar.gz chummer6-bin.PKGBUILD chummer6-bin.SRCINFO; do
+    source_path="$DEPLOY_DIR/files/$file_name"
+    if [[ -f "$source_path" ]]; then
+      cp "$source_path" "$files_dir/"
+    fi
   done
 
   bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$target_dir/RELEASE_CHANNEL.generated.json" >/dev/null

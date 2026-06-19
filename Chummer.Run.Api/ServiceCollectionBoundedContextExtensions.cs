@@ -51,6 +51,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CampaignOsLocalProofService>();
         services.AddSingleton<PublicReleaseManifestService>();
         services.AddSingleton<WindowsProofInstallerService>();
+        services.AddSingleton<AurPackageCatalogService>();
         services.AddSingleton<ReleaseSelectionService>();
         services.AddSingleton<SignedInTrustStatusService>();
         return services;

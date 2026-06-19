@@ -22,6 +22,7 @@ on:
       - 'docs/examples/self-hosted-downloads.env.example'
       - 'global.json'
       - 'scripts/generate-releases-manifest.sh'
+      - 'scripts/materialize-aur-package.py'
       - 'scripts/publish-download-bundle.sh'
       - 'scripts/publish-download-bundle-s3.sh'
       - 'scripts/verify-releases-manifest.sh'
