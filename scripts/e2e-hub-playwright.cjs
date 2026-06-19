@@ -330,29 +330,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
-    await expectVisible(page, 'text=Build the runner. Run the night.');
-    await expectVisible(page, 'text=Chummer is a Shadowrun character builder and campaign companion');
-    await expectVisible(page, 'text=Download Chummer');
-    await expectVisible(page, 'text=Character workbench');
-    await expectVisible(page, 'text=A short look at the product.');
-    await expectVisible(page, 'text=Open downloads');
+    await expectVisible(page, 'text=Build and maintain Shadowrun characters on your desktop.');
+    await expectVisible(page, 'text=Stable');
+    await expectVisible(page, 'text=Nightly');
+    await expectVisible(page, 'text=What it does');
+    await expectVisible(page, 'text=Get the app');
     assert.equal(await page.locator('text=Open Black Ledger').count(), 0, 'Landing should not expose Black Ledger as the public front-door CTA.');
+    assert.equal(await page.locator('text=Black Ledger').count(), 0, 'Landing should keep Black Ledger off the front door.');
     await assertNoBannedCopy(page, 'Landing');
   });
 
   await gotoAndAssert(page, pageErrors, '/what-is-chummer', async () => {
-    await expectVisible(page, 'text=Build a runner. Check the answer. Get back to the table.');
-    await expectVisible(page, 'text=What it is');
-    await expectVisible(page, 'text=A character and campaign companion.');
-    await expectVisible(page, 'text=What to know first');
-    await expectVisible(page, 'text=Four decisions, not a brochure');
-    await expectVisible(page, 'text=Players, GMs, and returning groups');
-    assert.equal(await readFirstHref(page, 'a[href="/now"]', '/what-is-chummer now link'), '/now');
+    await expectVisible(page, 'text=Character tools for Shadowrun.');
+    await expectVisible(page, 'text=Downloads first');
+    await expectVisible(page, 'text=Use it for');
+    await expectVisible(page, 'text=Where to start');
     signupNext = resolveInstallNextFromHref(
-      await readFirstHref(page, 'a:has-text("Open downloads")', '/what-is-chummer downloads link'),
+      await readFirstHref(page, 'a:has-text("Downloads")', '/what-is-chummer downloads link'),
       '/what-is-chummer downloads link'
     );
     assert.equal(await readFirstHref(page, 'a[href="/help"]', '/what-is-chummer help link'), '/help');
+    assert.equal(await readFirstHref(page, 'a[href="/status"]', '/what-is-chummer status link'), '/status');
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
@@ -373,9 +371,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Plain answers before you spend more time');
     await expectVisible(page, 'input[data-faq-filter]');
     await expectVisible(page, 'text=Search the FAQ');
-    await expectVisible(page, 'text=Still stuck? Open support');
+    await expectVisible(page, 'text=Get the answer or leave with the right next page.');
     const faqDownloadsNext = resolveInstallNextFromHref(
-      await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/faq downloads link'),
+      await readFirstHref(page, 'a:has-text("Open downloads")', '/faq downloads link'),
       '/faq downloads link'
     );
     assert.equal(
@@ -383,17 +381,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       true,
       `/faq downloads link should stay on a bounded install or signed-in return route, got ${faqDownloadsNext}.`
     );
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/faq now link'), '/now');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/faq footer support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a[href="/signup?next=/home"]', '/faq account link'), '/signup?next=/home');
     await assertNoBannedCopy(page, '/faq');
   });
 
   await gotoAndAssert(page, pageErrors, '/privacy', async () => {
     await expectVisible(page, 'text=What Chummer stores, and what it does not');
-    await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
+    await expectVisible(page, 'text=Privacy boundary');
     await expectVisible(page, 'text=Your account keeps sign-in, preferences, and support together');
-    await expectVisible(page, 'text=Read the trust boundary first, then the full policy.');
+    await expectVisible(page, 'text=The download file stays the same for everyone');
     assert.equal(
       await readFirstHref(page, 'a.button-like:has-text("Create account")', '/privacy create-account link'),
       '/signup?next=%2Faccount'
@@ -405,11 +402,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/terms', async () => {
-    await expectVisible(page, 'text=Preview terms in plain language');
-    await expectVisible(page, 'text=These are the plain rules for the current preview: early access, honest labels, real downloads, and straightforward support.');
+    await expectVisible(page, 'text=Terms in plain language');
+    await expectVisible(page, 'text=These are the plain rules for the current app: honest labels, real downloads, and straightforward support.');
     await expectVisible(page, 'text=Open downloads');
     await expectVisible(page, 'text=Current downloads when available');
-    await expectVisible(page, 'text=Expect real pages, current downloads, visible proof, and explicit preview labels when support, compatibility, or breadth are still moving.');
+    await expectVisible(page, 'text=Labels should say what you can install');
     const termsDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/terms downloads link'),
       '/terms downloads link'
@@ -426,8 +423,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
     await expectVisible(page, 'text=First-party help comes first');
-    await expectBodyText(page, 'Choose the next safe help path.', '/help');
-    await expectBodyText(page, 'Downloads, recovery, product questions, and private support are separate jobs.', '/help');
+    await expectBodyText(page, 'Choose the right path.', '/help');
+    await expectBodyText(page, 'Start with Downloads', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/help downloads link'),
       '/help downloads link'
@@ -439,7 +436,6 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     );
     assert.equal(await readFirstHref(page, 'a[href="/faq"]', '/help faq link'), '/faq');
     assert.equal(await readFirstHref(page, 'a[href="/contact#support-intake"]', '/help support link'), '/contact#support-intake');
-    assert.equal(await readFirstHref(page, 'a[href="/now"]', '/help now link'), '/now');
     await assertNoBannedCopy(page, '/help');
   });
 
@@ -465,9 +461,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Install Chummer');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Choose the latest build for Windows or Linux.');
+    await expectVisible(page, 'text=Choose Stable or Nightly.');
     await expectVisible(page, 'text=Build run-');
-    await expectVisible(page, 'text=Release notes');
+    await expectVisible(page, 'text=Platforms');
     await assertNoBannedCopy(page, 'Downloads');
   });
 
@@ -517,13 +513,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/horizons', async () => {
-    await expectVisible(page, 'text=A quieter look at what Chummer may become');
-    await expectVisible(page, 'text=Near next');
-    await expectVisible(page, 'text=Designing');
-    await expectVisible(page, 'text=Research');
-    await expectVisible(page, 'text=Ideas stay behind the product.');
+    await expectVisible(page, 'text=Not the front door');
+    await expectVisible(page, 'text=Use the app first');
+    await expectVisible(page, 'text=Later work');
     const bodyText = await page.locator('body').innerText();
-    assert.equal(bodyText.includes('Research tracks'), false, 'Horizons should use the unified research-track label.');
+    assert.equal(bodyText.includes('Black Ledger'), false, 'Maintenance page should keep Black Ledger hidden.');
+    assert.equal(bodyText.includes('Research tracks'), false, 'Maintenance page should avoid internal research labels.');
     await assertNoBannedCopy(page, 'Horizons');
   });
 
@@ -759,26 +754,21 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
-    await expectVisible(page, 'text=Signed-in trust status');
-    await expectVisible(page, 'text=Recommended for this install');
-    await expectVisible(page, 'text=Install posture');
-    await expectVisible(page, 'text=Adoption health');
+    await expectVisible(page, 'text=Install Chummer');
+    await expectVisible(page, 'text=Stable');
+    await expectVisible(page, 'text=Nightly');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
-    await expectVisible(page, 'text=Signed-in trust status');
-    await expectVisible(page, 'text=Recommended for this install');
-    await expectVisible(page, 'text=Install posture');
-    await expectVisible(page, 'text=Adoption health');
+    await expectVisible(page, 'text=Current release');
+    await expectVisible(page, 'text=Known issues and install help');
     await assertNoBannedCopy(page, 'Signed-in /now');
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
-    await expectVisible(page, 'text=Signed-in trust status');
-    await expectVisible(page, 'text=Recommended for this install');
-    await expectVisible(page, 'text=Install posture');
-    await expectVisible(page, 'text=Adoption health');
+    await expectVisible(page, 'text=Get help without guessing');
+    await expectVisible(page, 'text=Open support intake');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });
 
