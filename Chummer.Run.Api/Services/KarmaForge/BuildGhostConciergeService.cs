@@ -53,19 +53,19 @@ public sealed class BuildGhostConciergeService
             RulesetId: "build_ghost",
             AnswerType: "support_question",
             Authority: "chummer6-build-ghost-boundary",
-            SafeSummary: "Build Ghost is a guided experiment lane. A public concierge can greet and route a builder into the right intake. A bounded explainer can paraphrase what the experiment means in plain language. Chummer still owns the actual ghost spawn, compare, receipts, legality explanation, and apply decision.",
+            SafeSummary: "The character helper is a guided preview. A short intake can route a builder into the right Chummer path. A plain-language explainer can describe what the preview means. Chummer still owns draft creation, comparison, checks, legality explanation, and the final apply decision.",
             CalculationSteps:
             [
                 new RuleSafeCalculationStep("Entry", "Public concierge asks what changed and what the builder wants to compare", "facepop_concierge_boundary"),
-                new RuleSafeCalculationStep("Explain", "Bounded explainer summarizes the experiment without becoming mechanics truth", "answerly_humanizer_boundary"),
-                new RuleSafeCalculationStep("Truth", "First-party Build Ghost lab spawns, compares, receipts, and applies only reviewed variants", "alice_build_ghost_lab")
+                new RuleSafeCalculationStep("Explain", "Plain-language explainer summarizes the preview without becoming mechanics truth", "answerly_humanizer_boundary"),
+                new RuleSafeCalculationStep("Truth", "Chummer creates drafts, compares them, checks them, and applies only reviewed variants", "alice_build_ghost_lab")
             ],
             SourceAnchors: Array.Empty<RuleSafeSourceAnchor>(),
             ReceiptIds: ["build_ghost_lab", "alice_horizon"],
             Confidence: "bounded",
             ForbiddenToAnswerly: ["mechanics_truth", "legality_truth", "apply_truth", "runner_mutation"],
-            HumanizerInstruction: "Explain the Build Ghost concierge split in plain language without claiming runtime truth.",
-            FallbackMessage: "A public concierge can greet the builder, Answerly can explain the experiment within the bounded explainer lane, and Chummer still owns the actual Build Ghost compare and apply truth.");
+            HumanizerInstruction: "Explain the character-helper split in plain language without claiming runtime truth.",
+            FallbackMessage: "A short intake can greet the builder, the explainer can clarify the preview, and Chummer still owns the actual compare and apply decision.");
         RuleSafeOutputGateResult humanized = _humanizer.Humanize(packet);
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
             ? "Bounded explainer fail-closed"
@@ -76,10 +76,10 @@ public sealed class BuildGhostConciergeService
         return new BuildGhostConciergeProjection(
             FacePopEntryHref: facePopHref,
             FacePopStatus: "Public concierge only",
-            AnswerlyStatus: answerlyStatus,
+            AnswerlyStatus: answerlyStatus.Replace("Bounded", "Limited", StringComparison.OrdinalIgnoreCase),
             EngineStatus: "First-party compare/apply only",
             HumanizedSummary: packet.FallbackMessage,
-            CanonicalLane: "Public concierge greeting -> bounded explanation -> Chummer Build Ghost compare bench",
+            CanonicalLane: "Short intake -> plain-language explanation -> Chummer character compare bench",
             RuntimeBoundary: "Neither the public concierge nor the bounded explainer may compute legality, mutate the runner, or become apply truth.",
             FacePopResponsibilities:
             [
@@ -97,28 +97,28 @@ public sealed class BuildGhostConciergeService
             [
                 "Spawn temporary build ghosts from canonical runner truth.",
                 "Compare deltas with receipts and explicit tradeoff notes.",
-                "Apply only the reviewed variant through first-party contracts."
+                "Apply only the reviewed variant through Chummer."
             ],
             CompareArtifacts:
             [
-                "Build ghost compare brief",
-                "What-if receipt packet",
-                "Apply receipt or discard receipt"
+                "Draft compare brief",
+                "What-if check packet",
+                "Apply check or discard check"
             ],
             ClientReportHref: clientReportHref,
             PublicFeedbackHref: publicFeedbackHref,
             Actions:
             [
                 new BuildGhostConciergeActionProjection(
-                    "Open Build Ghost intake",
+                    "Open character intake",
                     "/participate/karma-forge?track=player_trust_track",
                     "primary",
                     "Start the first-party intake that can feed a future ghost-comparison packet."),
                 new BuildGhostConciergeActionProjection(
-                    "Open ALICE",
-                    "/alice",
+                    "Open signed-in helper",
+                    "/account/alice/open",
                     "secondary",
-                    "Open the public ALICE route and inspect the bounded compare lane before jumping into a signed-in handoff."),
+                    "Open the signed-in helper and inspect the limited compare path."),
                 new BuildGhostConciergeActionProjection(
                     "Open public concierge",
                     facePopHref,

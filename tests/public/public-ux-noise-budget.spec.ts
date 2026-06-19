@@ -74,13 +74,24 @@ test('public user pages do not expose AI or repo-process copy', async ({ page })
     'artifact',
   ];
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/roadmap', '/changelog', '/horizons']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
     for (const term of blockedTerms) {
       expect(bodyText, `${path} should not expose "${term}"`).not.toContain(term);
     }
+  }
+});
+
+test('direct character helper route stays private-preview and human-readable', async ({ page }) => {
+  await page.goto(`${baseUrl}/alice`, { waitUntil: 'domcontentloaded' });
+  const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+
+  await expect(page.locator('h1')).toContainText('Character helper');
+  expect(bodyText).toContain('This preview is kept off the main public path');
+  for (const term of ['ALICE', 'Build Ghost', 'build-ghost', 'receipt', 'proof', 'artifact', 'governed', 'operator']) {
+    expect(bodyText, `/alice should not expose "${term}"`).not.toContain(term);
   }
 });
 
