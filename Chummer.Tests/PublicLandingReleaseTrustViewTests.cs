@@ -952,6 +952,39 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void PublicFormsDeclareControlColorsForKdeDarkModeInsteadOfDependingOnNativeDefaults()
+    {
+        string cssPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css");
+        string contrastAuditPath = RepoPaths.FromRoot("tests", "public", "contrast-audit.spec.ts");
+
+        string css = File.ReadAllText(cssPath);
+        string contrastAudit = File.ReadAllText(contrastAuditPath);
+
+        Assert.Contains("color-scheme: dark;", css, StringComparison.Ordinal);
+        Assert.Contains(".field input,", css, StringComparison.Ordinal);
+        Assert.Contains(".field select,", css, StringComparison.Ordinal);
+        Assert.Contains(".field textarea", css, StringComparison.Ordinal);
+        Assert.Contains("caret-color: var(--ink-strong);", css, StringComparison.Ordinal);
+        Assert.Contains("color-scheme: dark;", css, StringComparison.Ordinal);
+        Assert.Contains(".field input:hover,", css, StringComparison.Ordinal);
+        Assert.Contains(".field select:hover,", css, StringComparison.Ordinal);
+        Assert.Contains(".field textarea:hover,", css, StringComparison.Ordinal);
+        Assert.Contains(".field input:focus,", css, StringComparison.Ordinal);
+        Assert.Contains(".field select:focus,", css, StringComparison.Ordinal);
+        Assert.Contains(".field textarea:focus", css, StringComparison.Ordinal);
+        Assert.Contains(".field select option,", css, StringComparison.Ordinal);
+        Assert.Contains("background: #111a28;", css, StringComparison.Ordinal);
+        Assert.Contains("color: #f3f7fc;", css, StringComparison.Ordinal);
+        Assert.Contains(".surface-minimal .field input,", css, StringComparison.Ordinal);
+        Assert.Contains(".surface-minimal .field select,", css, StringComparison.Ordinal);
+        Assert.Contains(".surface-minimal .field textarea", css, StringComparison.Ordinal);
+        Assert.Contains("color-scheme: light;", css, StringComparison.Ordinal);
+        Assert.Contains(".surface-minimal .field select option,", css, StringComparison.Ordinal);
+
+        Assert.Contains("a, button, input, select, textarea, summary", contrastAudit, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LayoutKeepsQuickActionsInHeaderAndFooterInsteadOfAStickyBottomBanner()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");

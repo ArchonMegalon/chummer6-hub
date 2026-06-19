@@ -4509,6 +4509,7 @@ td {
 /* Dark product design pack overrides */
 
 :root[data-theme="hub-front-door"] {
+  color-scheme: dark;
   --site-max: 1280px;
   --bg-canvas: #060b12;
   --bg-canvas-1: #0b1320;
@@ -4740,12 +4741,42 @@ body.nav-sheet-open {
   border: 1px solid rgba(146, 176, 217, 0.18);
   background: rgba(8, 14, 22, 0.78);
   color: var(--ink-strong);
+  caret-color: var(--ink-strong);
+  color-scheme: dark;
+  accent-color: var(--accent-cyan);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.field input:hover,
+.field select:hover,
+.field textarea:hover,
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: rgba(57, 198, 255, 0.46);
+  background: rgba(12, 22, 34, 0.96);
+  color: var(--ink-strong);
+  outline: none;
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled {
+  border-color: rgba(146, 176, 217, 0.1);
+  background: rgba(8, 14, 22, 0.42);
+  color: var(--ink-quiet);
+}
+
+.field select option,
+.field select optgroup {
+  background: #111a28;
+  color: #f3f7fc;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
   color: var(--ink-quiet);
+  opacity: 1;
 }
 
 .launch-hero {
@@ -8029,7 +8060,44 @@ body {
   --minimal-line: rgba(21, 21, 21, 0.14);
   --minimal-accent: #2f5f4b;
   --minimal-soft: #ece8df;
+  color-scheme: light;
   background: var(--minimal-page);
+  color: var(--minimal-ink);
+}
+
+.surface-minimal .field input,
+.surface-minimal .field select,
+.surface-minimal .field textarea {
+  border-color: var(--minimal-line);
+  background: var(--minimal-surface);
+  color: var(--minimal-ink);
+  caret-color: var(--minimal-ink);
+  color-scheme: light;
+  accent-color: var(--minimal-accent);
+  box-shadow: none;
+}
+
+.surface-minimal .field input:hover,
+.surface-minimal .field select:hover,
+.surface-minimal .field textarea:hover,
+.surface-minimal .field input:focus,
+.surface-minimal .field select:focus,
+.surface-minimal .field textarea:focus {
+  border-color: var(--minimal-ink);
+  background: #ffffff;
+  color: var(--minimal-ink);
+  outline: none;
+}
+
+.surface-minimal .field input::placeholder,
+.surface-minimal .field textarea::placeholder {
+  color: var(--minimal-muted);
+  opacity: 1;
+}
+
+.surface-minimal .field select option,
+.surface-minimal .field select optgroup {
+  background: var(--minimal-surface);
   color: var(--minimal-ink);
 }
 

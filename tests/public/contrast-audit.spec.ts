@@ -45,7 +45,7 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
     await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
 
     const collect = async (state: 'normal' | 'hover' | 'focus') => {
-      const rows = await page.locator('a, button, .button-like, h1, h2, h3, h4, p, li, label, .muted-copy, .proof-chip, .site-sidebar__nav a').evaluateAll((elements, currentState) => {
+      const rows = await page.locator('a, button, input, select, textarea, summary, .button-like, h1, h2, h3, h4, p, li, label, .muted-copy, .proof-chip, .site-sidebar__nav a, .site-actions__link').evaluateAll((elements, currentState) => {
         function parseColor(raw: string): [number, number, number, number] | null {
           const match = raw.match(/rgba?\\(([^)]+)\\)/i);
           if (!match) return null;
@@ -160,7 +160,7 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
 
     await collect('normal');
 
-    const firstInteractive = page.locator('a, button, .button-like').filter({ hasNotText: 'Skip to content' }).first();
+    const firstInteractive = page.locator('a, button, input, select, textarea, .button-like').filter({ hasNotText: 'Skip to content' }).first();
     if (await firstInteractive.count() > 0) {
       await firstInteractive.hover({ force: true, timeout: 5000 });
       await collect('hover');
