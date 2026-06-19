@@ -3,24 +3,49 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-packages";
+
+    static string PublicPackageText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("Governed", "Reviewed", StringComparison.OrdinalIgnoreCase)
+            .Replace("governance", "review", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipts", "checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
+            .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
+            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
+            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
+            .Replace("rail", "path", StringComparison.OrdinalIgnoreCase)
+            .Replace("lane", "path", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicPackageText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicPackageText(Model.Heading)</h1>
+        <p class="page-copy">@PublicPackageText(Model.Intro)</p>
         <div class="trust-claim__microproof">
             <span>@Model.Packages.Count package(s)</span>
             <span>@Model.Classes.Count package class(es)</span>
-            <span>@Model.ScopeLabel</span>
+            <span>@PublicPackageText(Model.ScopeLabel)</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicPackageText(Model.PrimaryAction.Label)</a>
         @if (Model.SecondaryAction is not null)
         {
-            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@PublicPackageText(Model.SecondaryAction.Label)</a>
         }
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
@@ -28,21 +53,21 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Package class model</p>
-        <h2 class="editorial-title">Install packages, rules packages, amendments, artifacts, and proposals stay distinct.</h2>
-        <p class="editorial-copy">The package browser should explain what kind of package you are looking at before it asks you to install it, follow it, or compare it with another rail.</p>
+        <p class="eyebrow">Package types</p>
+        <h2 class="editorial-title">Know what you are looking at before you install anything.</h2>
+        <p class="editorial-copy">Downloads, rules data, add-ons, and ideas are different things. This page keeps those choices separate.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var packageClass in Model.Classes)
         {
             <article class="route-choice-card">
-                <span class="tag">Class</span>
-                <h3>@packageClass.Label</h3>
-                <p>@packageClass.Summary</p>
+                <span class="tag">Type</span>
+                <h3>@PublicPackageText(packageClass.Label)</h3>
+                <p>@PublicPackageText(packageClass.Summary)</p>
                 <div class="route-choice-card__proof">
                     @foreach (var rule in packageClass.Rules)
                     {
-                        <span>@rule</span>
+                        <span>@PublicPackageText(rule)</span>
                     }
                 </div>
             </article>
@@ -52,70 +77,57 @@
 
 <section class="editorial-block" id="package-browser">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Package browser</p>
-        <h2 class="editorial-title">Browse the current package lanes without blurring their ownership.</h2>
-        <p class="editorial-copy">Public package routes explain class, compatibility, and governance posture. Downloads still owns acquisition, and account routes only add tracked history after you choose to sign in.</p>
+        <p class="eyebrow">Available paths</p>
+        <h2 class="editorial-title">Start with the package that matches the job.</h2>
+        <p class="editorial-copy">Use Downloads for the app. Use rules data and add-ons only when you know they fit the character or table you are working on.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var package in Model.Packages)
         {
             <article class="route-choice-card">
-                <span class="tag">@package.ClassLabel</span>
-                <h3>@package.Title</h3>
-                <p>@package.Summary</p>
+                <span class="tag">@PublicPackageText(package.ClassLabel)</span>
+                <h3>@PublicPackageText(package.Title)</h3>
+                <p>@PublicPackageText(package.Summary)</p>
                 <div class="route-choice-card__proof">
-                    <span>@package.StatusLabel</span>
+                    <span>@PublicPackageText(package.StatusLabel)</span>
                     <span>@package.VoteCount vote(s)</span>
                     <span>@package.FollowCount follow(s)</span>
                 </div>
-                <p><strong>Compatibility:</strong> @package.CompatibilitySummary</p>
-                <p><strong>Governance:</strong> @package.GovernanceSummary</p>
-                <p><strong>Evidence:</strong> @package.EvidenceSummary</p>
+                <p><strong>Works with:</strong> @PublicPackageText(package.CompatibilitySummary)</p>
+                <p><strong>Review:</strong> @PublicPackageText(package.GovernanceSummary)</p>
+                <p><strong>Notes:</strong> @PublicPackageText(package.EvidenceSummary)</p>
                 <a class="editorial-strip__action" href="@package.DetailHref">Open package detail</a>
             </article>
         }
     </div>
 </section>
 
+@if (Model.SignedInScope && Model.Receipts.Count > 0)
+{
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Receipt rail</p>
-        <h2 class="editorial-title">Votes and follows emit first-party receipts.</h2>
-        <p class="editorial-copy">
-            @(Model.Receipts.Count == 0
-                ? "No package receipts have been recorded on this runtime yet. The route stays ready, and the account rail will pick them up as soon as someone votes or follows."
-                : "Recent receipts stay inside Chummer-owned routes so package interest does not disappear into a vague external board or a private queue.")
-        </p>
+        <p class="eyebrow">Recent activity</p>
+        <h2 class="editorial-title">Your recent package records</h2>
+        <p class="editorial-copy">Recent votes and follows stay with your account so you can return to them later.</p>
     </div>
     <section class="compact-rail">
-        @if (Model.Receipts.Count == 0)
+        @foreach (var receipt in Model.Receipts)
         {
             <article class="compact-rail__item">
                 <div class="compact-rail__copy">
-                    <h3>Quiet receipt state</h3>
-                    <p>Use the package detail page to record the first vote or follow receipt.</p>
+                    <h3>@PublicPackageText(receipt.ActionLabel) · @PublicPackageText(receipt.PackageTitle)</h3>
+                    <p>@PublicPackageText(receipt.RouteSummary)</p>
+                    <p><strong>@receipt.ActorLabel</strong> · @receipt.RecordedAtLabel</p>
                 </div>
+                <a class="editorial-strip__action" href="@receipt.Href">Open record</a>
             </article>
-        }
-        else
-        {
-            @foreach (var receipt in Model.Receipts)
-            {
-                <article class="compact-rail__item">
-                    <div class="compact-rail__copy">
-                        <h3>@receipt.ActionLabel · @receipt.PackageTitle</h3>
-                        <p>@receipt.RouteSummary</p>
-                        <p><strong>@receipt.ActorLabel</strong> · @receipt.RecordedAtLabel</p>
-                    </div>
-                    <a class="editorial-strip__action" href="@receipt.Href">Open receipt</a>
-                </article>
-            }
         }
     </section>
 </section>
+}
 
 <section class="release-footnote">
-    <p class="eyebrow">Route split</p>
-    <h2 class="editorial-title">Use Downloads for builds, Packages for class and compatibility, and Help when the issue turns private.</h2>
-    <p class="editorial-copy">The package browser should clarify what a package is. It should not replace the install shelf, support intake, or signed-in account rail.</p>
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Install from Downloads. Use Help when something does not behave.</h2>
+    <p class="editorial-copy">Packages should clarify choices, not replace the install page or support path.</p>
 </section>

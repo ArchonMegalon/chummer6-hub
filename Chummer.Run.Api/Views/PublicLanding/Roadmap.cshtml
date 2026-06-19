@@ -46,6 +46,13 @@
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
             .Replace("provider", "external service", StringComparison.OrdinalIgnoreCase)
+            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
+            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
+            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
+            .Replace("Alice", "character helper", StringComparison.OrdinalIgnoreCase)
+            .Replace("Black Ledger", "campaign city", StringComparison.OrdinalIgnoreCase)
             .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
@@ -219,7 +226,7 @@
                                 <h3>@CalmRoadmapText(card.Card.Title)</h3>
                                 <p>@CalmRoadmapText(card.Card.Summary)</p>
                             </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@CalmRoadmapText(card.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -371,7 +378,7 @@
                                     <p><strong>Expected unlock:</strong> @CalmRoadmapText(item.Card.Payoff)</p>
                                 }
                             </div>
-                            <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
+                            <a class="editorial-strip__action" href="@item.Action.Href">@CalmRoadmapText(item.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -399,7 +406,7 @@
                         </div>
                         <h4>@CalmRoadmapText(item.Card.Title)</h4>
                         <p>@CalmRoadmapText(item.Card.Summary)</p>
-                        <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
+                        <a class="editorial-strip__action" href="@item.Action.Href">@CalmRoadmapText(item.Action.Label)</a>
                     </article>
                 }
             </div>

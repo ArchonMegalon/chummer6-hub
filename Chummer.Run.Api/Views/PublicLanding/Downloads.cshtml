@@ -145,9 +145,8 @@ else
                         <h3>@package.PlatformLabel</h3>
                         <p>@package.Summary</p>
                         <div class="minimal-actions">
-                            <a class="button-like button-like--secondary" href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
-                            <a class="button-like button-like--ghost" href="@package.PkgbuildUrl">PKGBUILD</a>
-                            <a class="button-like button-like--ghost" href="@package.SrcinfoUrl">.SRCINFO</a>
+                            <a href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
+                            <a href="@package.PkgbuildUrl">PKGBUILD</a>
                         </div>
                     </article>
                 }
@@ -170,7 +169,7 @@ else
         </div>
     </section>
 
-    <section class="minimal-section minimal-section--tight">
+    <div class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Need help?</h2>
             <p>Use Help if install or update does not behave as expected.</p>
@@ -179,5 +178,5 @@ else
             <a class="button-like button-like--primary" href="/help">Help</a>
             <a class="button-like button-like--ghost" href="/status">Status</a>
         </div>
-    </section>
+    </div>
 }
