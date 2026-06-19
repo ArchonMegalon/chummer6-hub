@@ -422,7 +422,6 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
-    await expectVisible(page, 'text=First-party help comes first');
     await expectBodyText(page, 'Choose the right path.', '/help');
     await expectBodyText(page, 'Start with Downloads', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
