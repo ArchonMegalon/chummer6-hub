@@ -2,8 +2,7 @@
 @{
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-status";
-    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+    ViewData["SurfaceClass"] = "surface-status surface-minimal";
     var releaseCheckState = HumanizeStatusToken(
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
@@ -15,40 +14,6 @@
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
             .ToUniversalTime()
             .ToString("yyyy-MM-dd");
-    string ContextualPreviewHref(string? href)
-    {
-        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
-        if (
-            guestNeedsInstallGate
-            && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
-        }
-
-        return resolvedHref;
-    }
-    var nextActions = new[]
-    {
-        new
-        {
-            Label = "Open downloads",
-            Href = "/downloads",
-            Tone = "primary",
-        },
-        new
-        {
-            Label = "Open support",
-            Href = Model.ReleaseExperience.KnownIssuesHref,
-            Tone = "secondary",
-        },
-        new
-        {
-            Label = "Open progress",
-            Href = "/progress",
-            Tone = "ghost",
-        }
-    };
 }
 
 @functions {
@@ -67,63 +32,60 @@
     }
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
-        <h1 class="page-title">Release status</h1>
-        <p class="page-copy">The build currently available from Chummer.</p>
-        <div class="trust-claim__microproof">
-            <span>Current release</span>
-            <span>@Model.ReleaseExperience.Display.BuildLabel</span>
-            <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
-            <span>Released @publishedLabel</span>
-            <span>Last verified @verifiedLabel</span>
-            <span>@releaseChecksLabel</span>
-        </div>
+<section class="minimal-page-hero">
+    <div>
+        <p class="minimal-kicker">Status</p>
+        <h1>Current release</h1>
+        <p>The build currently published on Chummer.</p>
+    </div>
+    <div class="minimal-status-pill" aria-label="Current release">
+        <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
+        <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
+        <span>Released @publishedLabel</span>
     </div>
 </section>
 
-<section class="editorial-block" data-status-surface="decision-surface">
-    <div class="editorial-block__lead">
-        <h2 class="editorial-title">Release</h2>
+<section class="minimal-section minimal-section--tight" data-status-surface="decision-surface">
+    <div class="minimal-facts">
+        <article class="route-choice-card">
+            <span class="tag">Release</span>
+            <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
+            <p>@Model.ReleaseSummary</p>
+        </article>
+        <article>
+            <span>Build</span>
+            <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
+        </article>
+        <article>
+            <span>Last checked</span>
+            <strong>@verifiedLabel</strong>
+        </article>
+        <article>
+            <span>Checks</span>
+            <strong>@releaseChecksLabel</strong>
+        </article>
     </div>
-    <article class="route-choice-card">
-        <span class="tag">Release</span>
-        <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
-        <p>@Model.ReleaseSummary</p>
-    </article>
-    <div class="stacked-actions" aria-label="Status next actions">
-        @foreach (var action in nextActions)
-        {
-            var href = string.Equals(action.Href, "/downloads", StringComparison.OrdinalIgnoreCase)
-                ? ContextualPreviewHref(action.Href)
-                : action.Href;
-            <a class="button-like button-like--@action.Tone" href="@href" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="@action.Label">@action.Label</a>
-        }
+    <div class="minimal-actions" aria-label="Status next actions">
+        <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
+        <a class="button-like button-like--secondary" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>
+        <a class="button-like button-like--ghost" href="/contact" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Contact">Contact</a>
     </div>
 </section>
 
 @if (Model.ReleaseExperience.PlatformAvailability.Count > 0)
 {
-    <section class="release-shelf release-shelf--manual">
-        <details class="release-accordion">
-            <summary data-analytics-event="status_open_platform_details" data-analytics-surface="status_details" data-analytics-label="Other platform details">Other platform details</summary>
-            <div class="release-accordion__body">
-                <div class="evidence-row-list">
-                    @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)
-                    {
-                        <article class="evidence-row evidence-row--download" id="status-platform-@platform.PlatformId">
-                            <div class="evidence-row__copy">
-                                <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this device)" : string.Empty)</h3>
-                                <p>@platform.Summary</p>
-                            </div>
-                            <div class="download-row__meta">
-                                <span class="platform-pill">@platform.StatusLabel</span>
-                                <span class="muted-copy">@platform.PrimaryPackageLabel</span>
-                            </div>
-                        </article>
-                    }
-                </div>
-            </div>
-        </details>
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Platforms</h2>
+        </div>
+        <div class="minimal-platform-list">
+            @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)
+            {
+                <article id="status-platform-@platform.PlatformId">
+                    <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this device)" : string.Empty)</h3>
+                    <p>@platform.Summary</p>
+                </article>
+            }
+        </div>
     </section>
 }

@@ -2,22 +2,9 @@
 @{
     ViewData["Title"] = "Downloads";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-downloads";
+    ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
     var release = Model.ReleaseExperience;
-    var guestGateRequired = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
-    var recommendedIsInstaller = release.Recommended?.Installer == true;
-    var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
-    var requestedPlatformUnavailable = platformShelfNotice && !release.RequestedPlatformHasPublicDownload;
-    var deviceLabel = release.RequestedPlatformLabel ?? "this device";
-    var signedInWindowsBuilds = Model.SignedInWindowsBuilds ?? Array.Empty<ReleaseOptionViewModel>();
-    var hasSignedInWindowsBuilds = Model.Chrome.Authenticated && signedInWindowsBuilds.Count > 0;
-    var windowsProofInstallers = Model.WindowsProofInstallers ?? Array.Empty<WindowsProofInstallerRecord>();
-    var hasWindowsProofRail = windowsProofInstallers.Count > 0;
-    var requestedWindowsUnavailable = requestedPlatformUnavailable && string.Equals(deviceLabel, "Windows", StringComparison.OrdinalIgnoreCase);
-    var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0;
-    var showPlatformShelf = release.PlatformAvailability.Count > 0;
-    var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
-    var accessPosture = Model.AccessPosture;
+    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
     var verifiedLabel = Model.VerifiedAtLabel
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
             .ToUniversalTime()
@@ -26,7 +13,12 @@
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
         .Concat(release.ManualPackages)
+        .GroupBy(option => option.Artifact.Id, StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
         .ToArray();
+    var platforms = new[] { ("windows", "Windows"), ("linux", "Linux") };
+    var stableLaneIds = new[] { "stable", "public_stable" };
+    var nightlyLaneIds = new[] { "nightly", "preview", "public_preview", "public_stable" };
 
     static bool MatchesPlatform(PublicReleaseArtifactDto artifact, string platformId)
     {
@@ -38,367 +30,129 @@
                 || candidatePlatform.Contains("Windows", StringComparison.OrdinalIgnoreCase),
             "linux" => candidatePlatformId.Contains("linux", StringComparison.OrdinalIgnoreCase)
                 || candidatePlatform.Contains("Linux", StringComparison.OrdinalIgnoreCase),
-            "macos" => candidatePlatformId.Contains("osx", StringComparison.OrdinalIgnoreCase)
-                || candidatePlatformId.Contains("mac", StringComparison.OrdinalIgnoreCase)
-                || candidatePlatform.Contains("mac", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
     }
 
-    ReleaseOptionViewModel? ResolvePlatformOption(string platformId)
-        => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
-
-    static bool MatchesReleaseLane(PublicReleaseArtifactDto artifact, params string[] laneIds)
+    static bool MatchesReleaseLane(PublicReleaseArtifactDto artifact, IReadOnlyList<string> laneIds)
     {
-        var artifactLaneIds = new[]
-        {
-            artifact.ChannelId,
-            artifact.Channel
-        };
+        var artifactLaneIds = new[] { artifact.ChannelId, artifact.Channel };
         return artifactLaneIds.Any(candidate =>
             !string.IsNullOrWhiteSpace(candidate)
             && laneIds.Any(lane => string.Equals(candidate.Trim(), lane, StringComparison.OrdinalIgnoreCase)));
     }
 
-    string? recommendedPlatformId = release.Recommended?.Artifact is null
-        ? null
-        : new[] { "windows", "linux", "macos" }
-            .FirstOrDefault(platformId => MatchesPlatform(release.Recommended.Artifact, platformId));
-
-    bool MatchesRecommendedPlatform(ReleaseOptionViewModel option)
-        => string.IsNullOrWhiteSpace(recommendedPlatformId) || MatchesPlatform(option.Artifact, recommendedPlatformId);
-
-    ReleaseOptionViewModel? ResolveLaneOption(params string[] laneIds)
-        => optionPool
-            .Where(static option => option.Installer)
-            .Where(MatchesRecommendedPlatform)
-            .FirstOrDefault(option => MatchesReleaseLane(option.Artifact, laneIds));
-
-    var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
-    var currentDownloadHref = requestedPlatformUnavailable
-        ? "#platform-shelf"
-        : release.Recommended!.DispatchHref;
-    var nightlyOption = ResolveLaneOption("nightly", "preview", "public_preview") ?? release.Recommended;
-    var stableOption = ResolveLaneOption("stable", "public_stable") ?? release.Recommended;
-    var nightlyHref = requestedPlatformUnavailable ? "#platform-shelf" : nightlyOption?.DispatchHref ?? currentDownloadHref;
-    var stableHref = requestedPlatformUnavailable ? "#platform-shelf" : stableOption?.DispatchHref ?? currentDownloadHref;
-    var nightlyLabel = nightlyOption?.Artifact.Version ?? Model.Manifest.Version;
-    var stableLabel = stableOption?.Artifact.Version ?? Model.Manifest.Version;
+    ReleaseOptionViewModel? ResolveLanePlatformOption(string platformId, IReadOnlyList<string> laneIds, bool allowFallback)
+    {
+        var platformOptions = optionPool
+            .Where(option => option.Installer)
+            .Where(option => MatchesPlatform(option.Artifact, platformId))
+            .ToArray();
+        return platformOptions.FirstOrDefault(option => MatchesReleaseLane(option.Artifact, laneIds))
+            ?? (allowFallback ? platformOptions.FirstOrDefault() : null);
+    }
 }
 
-<section class="release-stage">
-    <div class="release-stage__lead">
-        <h1 class="page-title">Install Chummer</h1>
-<p class="page-copy">Choose the latest build for Windows or Linux. Release notes and known issues stay beside each build so the download is inspectable before install.</p>
-        <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@nightlyHref" data-release-lane="nightly" aria-label="Download the latest published Chummer build, @nightlyLabel">Nightly</a>
-            <a class="button-like button-like--secondary" href="@stableHref" data-release-lane="stable" aria-label="Download the current stable Chummer build, @stableLabel">Stable</a>
-        </div>
+<section class="minimal-page-hero">
+    <div>
+        <p class="minimal-kicker">Downloads</p>
+        <h1>Install Chummer</h1>
+        <p>Choose Stable or Nightly. Windows and Linux installers are published here.</p>
+    </div>
+    <div class="minimal-status-pill" aria-label="Current release">
+        <span>@release.Display.ChannelLabel</span>
+        <strong>@release.Display.BuildLabel</strong>
+        <span>Released @publishedLabel</span>
     </div>
 </section>
 
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
-    <section class="release-shelf">
-        <article class="release-empty">
-            <h2>No published build is available yet</h2>
-            <p>@Model.Manifest.Message</p>
-            <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="@release.NoBuildPrimaryHref">@release.NoBuildPrimaryLabel</a>
-                <a class="button-like button-like--secondary" href="/now">See what works today</a>
-            </div>
-        </article>
+    <section class="minimal-empty">
+        <h2>No download is available right now</h2>
+        <p>@Model.Manifest.Message</p>
+        <a class="button-like button-like--primary" href="/status">Open status</a>
     </section>
 }
 else
 {
-    <section class="recommended-download" id="recommended-download">
-        <article class="recommended-download__card">
-            <div class="recommended-download__copy">
-                <span class="tag">
-                    @(requestedPlatformUnavailable
-                        ? $"No public {deviceLabel} build"
-                        : release.RequestedPlatformLabel is null
-                            ? "Recommended"
-                            : $"Recommended for {deviceLabel}")
-                </span>
-                <h2>@(requestedPlatformUnavailable ? $"This browser looks like {deviceLabel}" : release.Recommended.Title)</h2>
-                <p>
-                    @(requestedPlatformUnavailable
-                        ? release.PlatformShelfNoticeSummary
-                        : guestGateRequired
-                            ? "Use the main install path for this platform."
-                            : "Use the main install path for this platform.")
-                </p>
-                <div class="recommended-download__meta">
-                    <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
-                    @if (!requestedPlatformUnavailable)
+    <section class="minimal-lane-grid" aria-label="Download lanes">
+        <article class="minimal-lane-card" id="stable">
+            <div class="minimal-lane-card__head">
+                <span>Stable</span>
+                <h2>Current stable build</h2>
+                <p>The default choice for regular play.</p>
+            </div>
+            <div class="minimal-platform-actions">
+                @foreach (var platform in platforms)
+                {
+                    var option = ResolveLanePlatformOption(platform.Item1, stableLaneIds, allowFallback: true);
+                    if (option is not null)
                     {
-                        <span>@release.Recommended.SizeLabel</span>
+                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.Item1">@platform.Item2</a>
                     }
-                        <span>@(recommendedIsInstaller ? "Installer" : "Download")</span>
-                    <span>@release.Display.BuildLabel</span>
-                    <span>@release.Display.PublishedLabel.Replace("Published", "Released", StringComparison.OrdinalIgnoreCase)</span>
-                    <span>Last verified @verifiedLabel</span>
-                </div>
-                @if (!requestedPlatformUnavailable)
-                {
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref" data-analytics-event="downloads_primary_install" data-analytics-surface="downloads_recommended" data-analytics-label="@release.Recommended.ActionLabel">@release.Recommended.ActionLabel</a>
-                    </div>
-                }
-                @if (requestedPlatformUnavailable)
-                {
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="#platform-shelf" data-analytics-event="downloads_open_platforms" data-analytics-surface="downloads_recommended" data-analytics-label="See platforms">See platforms</a>
-                    </div>
-                    <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes">Release notes</summary>
-                        <div class="release-accordion__body">
-                            <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="/now">Release notes</a>
-                                <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                            </div>
-                        </div>
-                    </details>
-                }
-                @if (!requestedPlatformUnavailable)
-                {
-                    <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_release_requirements" data-analytics-surface="downloads_recommended" data-analytics-label="Release notes">Release notes</summary>
-                        <div class="release-accordion__body">
-                            <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="/now">Release notes</a>
-                                <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                            </div>
-                        </div>
-                    </details>
-                }
-                else
-                {
-                    <details class="release-accordion">
-                        <summary data-analytics-event="downloads_open_help_notes" data-analytics-surface="downloads_recommended" data-analytics-label="Help">Help</summary>
-                        <div class="release-accordion__body">
-                            <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="/downloads/concierge" data-analytics-event="downloads_open_concierge" data-analytics-surface="downloads_help_notes" data-analytics-label="Get setup help">Get setup help</a>
-                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref" data-analytics-event="downloads_open_install_help" data-analytics-surface="downloads_help_notes" data-analytics-label="@release.InstallHelpLabel">@release.InstallHelpLabel</a>
-                            </div>
-                        </div>
-                    </details>
-                }
-                @if (hasAdvancedPanels)
-                {
-                    <p class="downloads-advanced-link"><a class="inline-link" href="#advanced-downloads">More details</a></p>
                 }
             </div>
+            <details class="minimal-details">
+                <summary>Details</summary>
+                <dl>
+                    <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
+                    <div><dt>Released</dt><dd>@publishedLabel</dd></div>
+                    <div><dt>Checked</dt><dd>@verifiedLabel</dd></div>
+                </dl>
+            </details>
+        </article>
+
+        <article class="minimal-lane-card" id="nightly">
+            <div class="minimal-lane-card__head">
+                <span>Nightly</span>
+                <h2>Latest published build</h2>
+                <p>Use this when you want the newest Windows or Linux release.</p>
+            </div>
+            <div class="minimal-platform-actions">
+                @foreach (var platform in platforms)
+                {
+                    var option = ResolveLanePlatformOption(platform.Item1, nightlyLaneIds, allowFallback: true);
+                    if (option is not null)
+                    {
+                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.Item1">@platform.Item2</a>
+                    }
+                }
+            </div>
+            <details class="minimal-details">
+                <summary>Details</summary>
+                <dl>
+                    <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
+                    <div><dt>Released</dt><dd>@publishedLabel</dd></div>
+                    <div><dt>Checked</dt><dd>@verifiedLabel</dd></div>
+                </dl>
+            </details>
         </article>
     </section>
 
-    <section class="release-shelf" aria-label="Download filters">
-        <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_filters" data-analytics-surface="downloads_filters" data-analytics-label="Filters">Filters</summary>
-            <div class="release-accordion__body">
-                <form class="downloads-filter-bar" method="get" action="/downloads">
-                    <div class="field">
-                        <label for="download-platform">Platform</label>
-                        <select id="download-platform" name="platform">
-                            <option value="">All platforms</option>
-                            <option value="windows">Windows</option>
-                            <option value="macos">macOS</option>
-                            <option value="linux">Linux</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label for="download-type">Package type</label>
-                        <select id="download-type" name="type">
-                            <option value="">All types</option>
-                            <option value="installer">Installers</option>
-                        </select>
-                    </div>
-                    <button class="button-like button-like--secondary" type="submit">Apply</button>
-                    <a class="button-like button-like--ghost" href="/downloads">Reset</a>
-                </form>
-            </div>
-        </details>
+    <section class="minimal-section minimal-section--tight" id="platforms">
+        <div class="minimal-section__lead">
+            <h2>Platforms</h2>
+        </div>
+        <div class="minimal-platform-list">
+            @foreach (var platform in release.PlatformAvailability.Where(item => item.PlatformId is "windows" or "linux" or "macos"))
+            {
+                <article>
+                    <h3>@platform.PlatformLabel</h3>
+                    <p>@platform.Summary</p>
+                </article>
+            }
+        </div>
     </section>
 
-    @if (showPlatformShelf)
-    {
-        <section class="release-shelf" id="platform-shelf">
-            <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_platform_shelf" data-analytics-surface="downloads_platforms" data-analytics-label="Platforms">Platforms</summary>
-                <div class="release-accordion__body">
-                    <div class="downloads-advanced-group">
-                        <h2 class="downloads-subheading">Platform downloads</h2>
-                        <p class="muted-copy">Current installers by platform.</p>
-                        <div class="downloads-platform-grid">
-                            @foreach (var platform in release.PlatformAvailability)
-                            {
-                                var platformOption = ResolvePlatformOption(platform.PlatformId);
-                                <article class="downloads-platform-card">
-                                    <span class="platform-pill">@platform.StatusLabel</span>
-                                    <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
-                                    <p>@platform.Summary</p>
-                                    <p class="muted-copy">@platform.PrimaryPackageLabel</p>
-                                </article>
-                            }
-                        </div>
-                    </div>
-                </div>
-            </details>
-        </section>
-    }
-
-    @if (hasAdvancedPanels)
-    {
-        <section class="release-shelf release-shelf--manual" id="advanced-downloads">
-            <details class="release-accordion">
-            <summary data-analytics-event="downloads_open_advanced_options" data-analytics-surface="downloads_advanced" data-analytics-label="Advanced options">Advanced options</summary>
-                <div class="release-accordion__body">
-                    <div class="downloads-advanced-group">
-                        <h3 class="downloads-subheading">Install notes</h3>
-                        <div class="downloads-facts">
-                            <article class="downloads-fact">
-                                <span>Detected device</span>
-                                <strong>This page picks the best download for @deviceLabel.</strong>
-                            </article>
-                            <article class="downloads-fact">
-                                <span>First launch</span>
-                                <strong>The current build should open cleanly and let you start working without extra setup detours.</strong>
-                            </article>
-                            <article class="downloads-fact">
-                                <span>Support path</span>
-                                <strong>@(Model.Chrome.Authenticated ? "This install can be found again from your account." : "Sign in only if you want recovery and support tied to this install.")</strong>
-                            </article>
-                        </div>
-                        <div class="stacked-actions">
-                            <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                            <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                            <a class="button-like button-like--ghost" href="/status">Open status</a>
-                        </div>
-                    </div>
-
-                    <div class="downloads-advanced-group">
-                        <h3 class="downloads-subheading">Need more detail?</h3>
-                        <p class="muted-copy">Use Status for release dates and platform coverage.</p>
-                        <div class="stacked-actions">
-                            <a class="button-like button-like--ghost" href="/status">Open status</a>
-                            <a class="button-like button-like--ghost" href="/now">See what works today</a>
-                        </div>
-                    </div>
-
-                    @if (hasSignedInWindowsBuilds)
-                    {
-                        <div class="downloads-advanced-group" id="signed-in-windows-builds">
-                            <h3 class="downloads-subheading">Windows installers</h3>
-                            <p class="muted-copy">Latest Windows install paths available to this account.</p>
-                            <div class="evidence-row-list">
-                                @foreach (var option in signedInWindowsBuilds)
-                                {
-                                    <article class="evidence-row evidence-row--download">
-                                        <div class="evidence-row__copy">
-                                            <h3>@option.Title</h3>
-                                            <p>@option.SupportLine</p>
-                                        </div>
-                                        <div class="download-row__meta">
-                                            <span class="platform-pill">Signed-in only</span>
-                                            <span class="muted-copy">@option.PlatformLabel</span>
-                                            <span class="muted-copy">@option.HeadLabel</span>
-                                            <code class="mono-receipt">@option.SizeLabel</code>
-                                        </div>
-                                        <a class="button-like button-like--ghost" href="@option.DispatchHref">@option.ActionLabel</a>
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-
-                    @if (hasWindowsProofRail)
-                    {
-                        <div class="downloads-advanced-group" id="windows-verification-rail">
-                            <h3 class="downloads-subheading">Windows support installers</h3>
-                            <p class="muted-copy">Windows verification and support path. Use these only when support sends you to a specific Windows build.</p>
-                            <div class="evidence-row-list">
-                                @foreach (var proofInstaller in windowsProofInstallers)
-                                {
-                                    var headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
-                                        ? "Blazor Desktop"
-                                        : "Avalonia Desktop";
-                                    <article class="evidence-row evidence-row--download">
-                                        <div class="evidence-row__copy">
-                                            <h3>@headLabel Windows x64 installer</h3>
-                                            <p>Direct Windows installer for a support case or a specific build check.</p>
-                                        </div>
-                                        <div class="download-row__meta">
-                                            <span class="platform-pill">Support path</span>
-                                            <span class="muted-copy">Windows x64</span>
-                                            <code class="mono-receipt">SHA @proofInstaller.Sha256[..Math.Min(proofInstaller.Sha256.Length, 16)]...</code>
-                                        </div>
-                                        <a class="button-like button-like--ghost" href="/downloads/install/@Uri.EscapeDataString(proofInstaller.ArtifactId)">Open installer</a>
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-
-                    @if (release.Alternatives.Count > 0)
-                    {
-                        <div class="downloads-advanced-group">
-                            <h3 class="downloads-subheading">More options for @release.Recommended.PlatformLabel</h3>
-                            <div class="evidence-row-list">
-                                @foreach (var download in release.Alternatives)
-                                {
-                                    <article class="evidence-row evidence-row--download">
-                                        <div class="evidence-row__copy">
-                                            <h3>@download.Title</h3>
-                                            <p>@download.SupportLine</p>
-                                        </div>
-                                        <div class="download-row__meta">
-                                            <span class="platform-pill">@download.HeadLabel</span>
-                                            <span class="muted-copy">@download.SizeLabel</span>
-                                            @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
-                                            {
-                                                <code class="mono-receipt">@download.ShaPreview</code>
-                                            }
-                                        </div>
-                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-
-                    @if (release.OtherPlatforms.Count > 0)
-                    {
-                        <div class="downloads-advanced-group">
-                            <h3 class="downloads-subheading">Other platforms</h3>
-                            <div class="evidence-row-list">
-                                @foreach (var download in release.OtherPlatforms)
-                                {
-                                    <article class="evidence-row evidence-row--download">
-                                        <div class="evidence-row__copy">
-                                            <h3>@download.Title</h3>
-                                            <p>@download.SupportLine</p>
-                                        </div>
-                                        <div class="download-row__meta">
-                                            <span class="platform-pill">@download.PlatformLabel</span>
-                                            <span class="muted-copy">@download.SizeLabel</span>
-                                        </div>
-                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-                </div>
-            </details>
-        </section>
-    }
-
-    @if (Model.SignedInStatus is not null)
-    {
-        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-    }
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Need help?</h2>
+            <p>Use Help if install or update does not behave as expected.</p>
+        </div>
+        <div class="minimal-actions">
+            <a class="button-like button-like--primary" href="/help">Help</a>
+            <a class="button-like button-like--ghost" href="/status">Status</a>
+        </div>
+    </section>
 }

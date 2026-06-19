@@ -1,275 +1,64 @@
 @model HorizonsPageViewModel
 @{
-    ViewData["Title"] = "Coming Next";
+    ViewData["Title"] = "Maintenance";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-horizons";
-    var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
-    var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
-    var visibleHorizons = Model.Horizons
-        .Where(card => !string.Equals(card.Card.Id, "horizon_black_ledger", StringComparison.OrdinalIgnoreCase))
-        .Where(card => !string.Equals(card.Card.Id, "onramp", StringComparison.OrdinalIgnoreCase))
-        .ToArray();
-    var totalItems = visibleHorizons.Length;
-    var coreProductIds = new[] { "horizon_nexus_pan", "horizon_alice", "horizon_origin_dossier", "horizon_table_pulse" };
-    var expansionIds = new[] { "horizon_karma_forge", "horizon_jackpoint", "horizon_runsite", "horizon_runbook_press", "horizon_community_hub" };
-    var quietIds = new[] { "horizon_knowledge_fabric", "horizon_run_control", "horizon_edition_studio", "horizon_runner_passport", "horizon_quicksilver", "horizon_anarchy", "horizon_ghostwire", "horizon_local_co_processor" };
-    var coreCount = visibleHorizons.Count(card => coreProductIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
-    var expansionCount = visibleHorizons.Count(card => expansionIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
-    var quietCount = visibleHorizons.Count(card => quietIds.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase));
-    var routeChoices = new[]
-    {
-        new
-        {
-            Badge = "Use today",
-            Title = "Start with the app you can download now",
-            Summary = "Windows and Linux builds are the main path. Campaign ideas should make that path clearer, not harder.",
-            Href = "/downloads",
-            Label = "Open downloads"
-        },
-        new
-        {
-            Badge = "Roadmap",
-            Title = "See the near-term delivery plan",
-            Summary = "Use the roadmap for milestones and current pressure. This page explains the larger table story.",
-            Href = "/roadmap",
-            Label = "Open roadmap"
-        },
-        new
-        {
-            Badge = "Feedback",
-            Title = "Tell us what would make play smoother",
-            Summary = "Sharp user feedback is more useful than a long feature list. Send the friction, not a project plan.",
-            Href = "/feedback",
-            Label = "Send feedback"
-        }
-    };
-    var groups = new[]
-    {
-        new { Anchor = "product-areas", Label = "Product areas", Heading = "Part of Chummer", Intro = "These should feel like normal Chummer6 around the builder and campaign layer.", Ids = coreProductIds },
-        new { Anchor = "expansion-bets", Label = "Expansion bets", Heading = "Bigger campaign ideas", Intro = "These are useful directions, but they should not compete with the current build path.", Ids = expansionIds },
-        new { Anchor = "quiet-infrastructure", Label = "Quiet infrastructure", Heading = "Folded into the app", Intro = "These ideas are better as supporting behavior than as a brand shelf.", Ids = quietIds }
-    };
-    var threadVideos = new Dictionary<string, (string Title, string Href, string Captions)[]>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["horizon_nexus_pan"] =
-        new[]
-        {
-            ("NEXUS-PAN deep dive", "/media/horizons/nexus-pan-90s-deepdive.mp4", "/media/horizons/nexus-pan-90s-deepdive.vtt"),
-            ("NEXUS-PAN reel", "/media/horizons/nexus-pan-epic-90s.mp4", "/media/horizons/nexus-pan-epic-90s.vtt")
-        },
-        ["horizon_alice"] = new[] { ("Alice deep dive", "/media/horizons/alice-90s-deepdive.mp4", "/media/horizons/alice-90s-deepdive.vtt") },
-        ["horizon_karma_forge"] = new[] { ("Karma Forge deep dive", "/media/horizons/karma-forge-90s-deepdive.mp4", "/media/horizons/karma-forge-90s-deepdive.vtt") },
-        ["horizon_jackpoint"] = new[] { ("JackPoint deep dive", "/media/horizons/jackpoint-90s-deepdive.mp4", "/media/horizons/jackpoint-90s-deepdive.vtt") },
-        ["horizon_runsite"] = new[] { ("Runsite deep dive", "/media/horizons/runsite-90s-deepdive.mp4", "/media/horizons/runsite-90s-deepdive.vtt") },
-        ["horizon_runbook_press"] = new[] { ("Runbook Press deep dive", "/media/horizons/runbook-press-90s-deepdive.mp4", "/media/horizons/runbook-press-90s-deepdive.vtt") },
-        ["horizon_table_pulse"] = new[] { ("Table Pulse deep dive", "/media/horizons/table-pulse-90s-deepdive.mp4", "/media/horizons/table-pulse-90s-deepdive.vtt") },
-        ["horizon_origin_dossier"] = new[] { ("Origin Dossier deep dive", "/media/horizons/origin-dossier-90s-deepdive.mp4", "/media/horizons/origin-dossier-90s-deepdive.vtt") },
-        ["horizon_community_hub"] = new[] { ("Community Hub deep dive", "/media/horizons/community-hub-90s-deepdive.mp4", "/media/horizons/community-hub-90s-deepdive.vtt") }
-    };
-    var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-    static string QuietFutureCopy(string? value)
-        => (value ?? string.Empty).Replace("Black Ledger", "campaign-city", StringComparison.OrdinalIgnoreCase);
+    ViewData["SurfaceClass"] = "surface-horizons surface-minimal";
 }
 
-<section class="trust-page-hero route-anchor-target" id="public-roadmap-projection">
-    <div class="trust-page-hero__copy">
-        <p class="eyebrow">Campaign tools</p>
-        <h1 class="page-title">Campaign tools without the brand shelf</h1>
-        <p class="page-copy">The current job is still simple: download Chummer, build a runner, and keep the table moving. This page shows the larger campaign layer without asking you to decode a wall of internal names.</p>
-        @if (fromRoadmapAlias)
-        {
-            <div class="route-callout" role="status" aria-live="polite">
-                <h3>You came from an older roadmap link</h3>
-                <p>The current roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page is the campaign-tools guide.</p>
-                <div class="route-callout__actions">
-                    <a class="inline-link" href="/roadmap">Open roadmap</a>
-                    <a class="inline-link" href="/downloads">Open downloads</a>
-                    <a class="inline-link" href="/feedback">Send feedback</a>
-                </div>
-            </div>
-        }
+<section class="minimal-page-hero">
+    <div>
+        <p class="minimal-kicker">Maintenance</p>
+        <h1>Not the front door</h1>
+        <p>Early campaign work stays behind the main app. Start with Downloads, Help, or Status.</p>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/downloads">Download Chummer</a>
-        <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
-        <a class="button-like button-like--ghost" href="#product-areas">Browse campaign tools</a>
+    <div class="minimal-status-pill" aria-label="Page posture">
+        <span>Public path</span>
+        <strong>Downloads first</strong>
+        <span>Campaign experiments stay quiet</span>
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Coming-next distance from the current app">
-    <article class="status-decision-strip__card">
-        <span class="tag">Product areas</span>
-        <h2>@coreCount area@(coreCount == 1 ? string.Empty : "s") should feel like Chummer.</h2>
-        <p>Build help, continuity, origin canon, and campaign operations belong near the main product story.</p>
-        <a class="button-like button-like--ghost" href="#product-areas">Open product areas</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag">Expansion</span>
-        <h2>@expansionCount larger bet@(expansionCount == 1 ? string.Empty : "s") stay clearly labeled.</h2>
-        <p>Publishing, campaign memory, venues, community, and rule evolution can be exciting without crowding the installer path.</p>
-        <a class="button-like button-like--ghost" href="#expansion-bets">Open expansion bets</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag tag--amber">Folded in</span>
-        <h2>@quietCount support idea@(quietCount == 1 ? string.Empty : "s") should stop shouting.</h2>
-        <p>Some concepts are stronger when they quietly improve rules, speed, recovery, or edition behavior.</p>
-        <a class="button-like button-like--ghost" href="#quiet-infrastructure">Open folded-in ideas</a>
-    </article>
-</section>
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">How to read this page</p>
-        <h2 class="editorial-title">The product comes first.</h2>
-        <p class="editorial-copy">The names below only matter if they help a player or GM answer a real question: can I build, explain, run, recover, remember, or publish the campaign more calmly?</p>
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <h2>Use the app first</h2>
+        <p>The current job is simple: install Chummer, build a character, and report friction when the workflow gets in your way.</p>
     </div>
-    <div class="route-choice-grid">
-        @foreach (var choice in routeChoices)
-        {
-            <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
-            </article>
-        }
+    <div class="minimal-download-strip">
+        <a class="minimal-download-strip__item" href="/downloads">
+            <span>Install</span>
+            <strong>Open Downloads</strong>
+        </a>
+        <a class="minimal-download-strip__item" href="/help">
+            <span>Support</span>
+            <strong>Open Help</strong>
+        </a>
+        <a class="minimal-download-strip__item" href="/status">
+            <span>Release</span>
+            <strong>Open Status</strong>
+        </a>
     </div>
 </section>
 
-<section class="section-band" aria-label="Coming next summary">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Direction</p>
-        <h2 class="editorial-title">@totalItems campaign tool@(totalItems == 1 ? string.Empty : "s") in the public guide.</h2>
-        <p class="editorial-copy">@coreCount product area@(coreCount == 1 ? string.Empty : "s"), @expansionCount expansion bet@(expansionCount == 1 ? string.Empty : "s"), and @quietCount folded-in support idea@(quietCount == 1 ? string.Empty : "s"). The current download remains the first thing to trust.</p>
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <h2>What belongs here</h2>
     </div>
-</section>
-
-@foreach (var group in groups)
-{
-    var items = visibleHorizons.Where(card => group.Ids.Contains(card.Card.Id, StringComparer.OrdinalIgnoreCase)).ToArray();
-    if (items.Length == 0)
-    {
-        continue;
-    }
-
-    foreach (var item in items)
-    {
-        rendered.Add(item.Card.Id);
-    }
-
-    var sectionId = group.Anchor;
-
-    <section class="section-band" id="@sectionId">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">@group.Label</p>
-            <h2 class="editorial-title">@group.Heading</h2>
-            <p class="editorial-copy">@group.Intro</p>
-        </div>
-        <div class="horizon-longscroll">
-            @for (var index = 0; index < items.Length; index++)
-            {
-                var card = items[index];
-                var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
-
-                <article class="horizon-band@reverseClass" id="@card.Card.Id.ToLowerInvariant().Replace('_', '-')">
-                    @if (card.Asset is not null)
-                    {
-                        <div class="horizon-band__media">
-                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                        </div>
-                    }
-                    <div class="horizon-band__copy">
-                        <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                        <h3>@card.Card.Title</h3>
-                        <p>@QuietFutureCopy(card.Card.Summary)</p>
-                        <div class="horizon-band__claims">
-                            @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
-                            {
-                                <div>
-                                    <span class="horizon-band__label">Why it matters</span>
-                                    <p>@QuietFutureCopy(card.Card.Pain)</p>
-                                </div>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
-                            {
-                                <div>
-                                    <span class="horizon-band__label">What it could unlock</span>
-                                    <p>@QuietFutureCopy(card.Card.Payoff)</p>
-                                </div>
-                            }
-                            @if (threadVideos.TryGetValue(card.Card.Id, out var cardVideos))
-                            {
-                                <div>
-                                    <span class="horizon-band__label">Watch</span>
-                                    <p>
-                                        @foreach (var video in cardVideos)
-                                        {
-                                            <a class="inline-link" href="@video.Href">@video.Title</a>
-                                            <a class="inline-link" href="@video.Captions">Captions</a>
-                                        }
-                                    </p>
-                                </div>
-                            }
-                        </div>
-                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                    </div>
-                </article>
-            }
-        </div>
-    </section>
-}
-
-@{
-    var remaining = visibleHorizons.Where(card => !rendered.Contains(card.Card.Id)).ToArray();
-}
-
-@if (remaining.Length > 0)
-{
-    <section class="section-band">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">More</p>
-            <h2 class="editorial-title">Other planned work</h2>
-            <p class="editorial-copy">These are kept visible for continuity, but they are not part of the main public path.</p>
-        </div>
-        <div class="horizon-longscroll">
-            @for (var index = 0; index < remaining.Length; index++)
-            {
-                var card = remaining[index];
-                var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
-
-                <article class="horizon-band@reverseClass" id="@card.Card.Id.ToLowerInvariant().Replace('_', '-')">
-                    @if (card.Asset is not null)
-                    {
-                        <div class="horizon-band__media">
-                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                        </div>
-                    }
-                    <div class="horizon-band__copy">
-                        <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                        <h3>@card.Card.Title</h3>
-                        <p>@QuietFutureCopy(card.Card.Summary)</p>
-                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                    </div>
-                </article>
-            }
-        </div>
-    </section>
-}
-
-<section class="release-footnote">
-    <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use the current app first.</h2>
-    <p class="editorial-copy">Download Chummer, try the character flow, and send feedback when something feels rough. The expansion ideas can wait.</p>
-    <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
-        <a class="cta-link cta-link--secondary" href="/feedback">Send feedback</a>
-        <a class="cta-link cta-link--ghost" href="/now">What works today</a>
+    <div class="minimal-three">
+        <article>
+            <h3>Roadmap</h3>
+            <p>Direction that is useful to track, but not part of the install decision.</p>
+        </article>
+        <article>
+            <h3>Feedback</h3>
+            <p>Places where players and GMs can tell us what slows the table down.</p>
+        </article>
+        <article>
+            <h3>Later work</h3>
+            <p>Ideas that should improve the main app quietly before they become public surfaces.</p>
+        </article>
     </div>
-</section>
-
-@* _PublicTrustPulsePanel.cshtml remains part of the Horizons model contract, but the calm public page does not render the operational trust pulse. *@
-
-<section class="release-footnote">
-    @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+    <div class="minimal-actions">
+        <a class="button-like button-like--primary" href="/roadmap">Roadmap</a>
+        <a class="button-like button-like--secondary" href="/feedback">Feedback</a>
+    </div>
 </section>

@@ -16,14 +16,11 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
-    const heroActions = page.locator('.launch-hero__actions a.button-like');
-    const heroClass = (await page.locator('.launch-hero').first().getAttribute('class')) ?? '';
-    expect(heroClass, `${viewport.name} hero posture class`).toContain('launch-hero--product');
-    expect(heroClass, `${viewport.name} retired hero posture class`).not.toContain('launch-hero--pregold');
+    const heroActions = page.locator('.minimal-hero .minimal-actions a.button-like');
 
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
-    const expected = ['Download Chummer', 'See what works today'];
+    const expected = ['Stable', 'Nightly'];
     expect(normalized.slice(0, 2), `${viewport.name} hero CTA order`).toEqual(expected);
 
     const heroBoxes = [];
@@ -45,7 +42,6 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
     results.push({
       viewport: viewport.name,
-      hero_class: heroClass,
       hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
       support_primary_top: supportPrimaryTop,
@@ -68,8 +64,8 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps two ranked CTAs: `Download Chummer`, `See what works today`.',
-      '- Homepage remains on the four-section model: hero, product, flagship-promo, play-downloads.',
+      '- Hero keeps two ranked CTAs: `Stable`, `Nightly`.',
+      '- Homepage remains on the four-section model: hero, workflow, downloads, help.',
       '- Release posture stays off the first screen and lives on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),

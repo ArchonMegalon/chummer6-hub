@@ -217,7 +217,7 @@ public sealed class PublicLandingController : Controller
                 Request.Headers.UserAgent.ToString(),
                 authenticated);
         var model = new LandingPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character tools for Shadowrun.", "/", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,
@@ -286,7 +286,7 @@ public sealed class PublicLandingController : Controller
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new HorizonsPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Campaign Tools", "The larger table story around the current character builder.", "/horizons", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Maintenance", "Future work stays behind the main app.", "/horizons", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"),
@@ -316,7 +316,7 @@ public sealed class PublicLandingController : Controller
             .ToArray();
         var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
             surfacedWindowsArtifactIds);
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current release build, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Stable and Nightly installers for Windows and Linux.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var verifiedAtLabel = BuildLiveVerificationLabel(manifest);
@@ -4105,7 +4105,7 @@ public sealed class PublicLandingController : Controller
         var releaseSummary = BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse);
         var cautionSummary = BuildPublicStatusCautionSummary(manifest, pulse);
         var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current release status, recent checks, and the next safe step on one calmer route.", "/status", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "The current Chummer release.", "/status", cancellationToken),
             Manifest: manifest,
             VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
@@ -4469,7 +4469,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> HelpPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Help", "How to get help, what participation means, and where to go when something goes wrong.", "/help", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Help", "Install help, account recovery, and support.", "/help", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View(
@@ -4486,7 +4486,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> FaqPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("FAQ", "Plain answers about preview status, participation, privacy, and what is already usable.", "/faq", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("FAQ", "Short answers about downloads, accounts, and support.", "/faq", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);

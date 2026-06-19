@@ -19,6 +19,8 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   expect(heroText.toLowerCase()).not.toContain('proof');
   expect(heroText.toLowerCase()).not.toContain('artifact');
   expect(heroText.toLowerCase()).not.toContain('repo');
+  expect(heroText).toContain('Stable');
+  expect(heroText).toContain('Nightly');
 
   writeMarkdownArtifact(
     'FINAL_PUBLIC_UX_REDESIGN_VERDICT.md',
@@ -61,6 +63,9 @@ test('core public pages do not expose AI or repo-process copy', async ({ page })
     'mystery math',
     'chummer6-hub',
     'GitHub',
+    'governed',
+    'operator',
+    'artifact',
   ];
 
   for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge']) {
@@ -79,7 +84,10 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
 
   expect(horizonsText).not.toContain('Black Ledger');
   expect(horizonsText).not.toContain('Open Black Ledger');
-  expect(horizonsText).toContain('Early campaign-city work stays behind the main app');
+  expect(horizonsText).toContain('Early campaign work stays behind the main app');
+  expect(horizonsText).toContain('Not the front door');
+  expect(horizonsText).not.toContain('Watch');
+  expect(horizonsText).not.toContain('deep dive');
 
   const llmsResponse = await request.get(`${baseUrl}/llms.txt`);
   expect(llmsResponse.ok()).toBeTruthy();

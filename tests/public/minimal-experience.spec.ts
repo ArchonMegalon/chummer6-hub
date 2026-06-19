@@ -15,50 +15,48 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (navPanelOpen) {
     failures.push('homepage: navigation panel is open by default');
   }
-  await expect(desktop.locator('.launch-hero__actions a.button-like').first()).toContainText('Download Chummer');
-  await expect(desktop.locator('[data-homepage-section="play-downloads"]')).toContainText('Start where you need to.');
-  const homeVideo = desktop.locator('.flagship-promo-player__video');
-  await expect(homeVideo).toBeVisible();
-  const homePlayback = await homeVideo.evaluate(async (node) => {
-    const video = node as HTMLVideoElement;
-    video.muted = true;
-    video.currentTime = 0;
-    await video.play();
-    await new Promise((resolve) => window.setTimeout(resolve, 1200));
-    video.pause();
-    return {
-      source_count: video.querySelectorAll('source').length,
-      track_count: video.querySelectorAll('track').length,
-      current_time: video.currentTime,
-      poster: video.poster,
-    };
-  });
-  if (homePlayback.source_count < 2 || homePlayback.track_count < 1 || homePlayback.current_time <= 0) {
-    failures.push('homepage: flagship reel does not expose working playback with sources, captions, and advancing time');
+  await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
+  await expect(desktop.locator('.minimal-hero__lead')).toContainText('Build and maintain Shadowrun characters');
+  const heroActions = await desktop.locator('.minimal-hero .minimal-actions a.button-like').allTextContents();
+  if (heroActions.map((text) => text.trim()).join('|') !== 'Stable|Nightly') {
+    failures.push(`homepage: expected Stable then Nightly hero actions, found ${heroActions.join(', ')}`);
   }
-  results.push({ surface: 'home', nav_panel_open: navPanelOpen, media_playback: homePlayback });
+  const heroImage = desktop.locator('.minimal-hero__visual img');
+  await expect(heroImage).toBeVisible();
+  const heroImageComplete = await heroImage.evaluate((node) => {
+    const image = node as HTMLImageElement;
+    return image.complete && image.naturalWidth > 400 && image.naturalHeight > 200;
+  });
+  if (!heroImageComplete) {
+    failures.push('homepage: hero image did not load with useful dimensions');
+  }
+  await expect(desktop.locator('[data-homepage-section="downloads"]')).toContainText('Get the app');
+  results.push({ surface: 'home', nav_panel_open: navPanelOpen, hero_image_loaded: heroImageComplete });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
-  const recommendedCard = desktop.locator('#recommended-download');
-  const filterAccordion = desktop.locator('[aria-label="Download filters"] details.release-accordion').first();
-  const recommendedTop = (await recommendedCard.boundingBox())?.y ?? Number.POSITIVE_INFINITY;
-  const filterTop = (await filterAccordion.boundingBox())?.y ?? Number.POSITIVE_INFINITY;
-  const filtersOpen = await filterAccordion.evaluate((node) => (node as HTMLDetailsElement).open);
-  if (filterTop <= recommendedTop) {
-    failures.push('downloads: filter controls appear before the recommended install path');
+  const stableLane = desktop.locator('#stable');
+  const nightlyLane = desktop.locator('#nightly');
+  await expect(stableLane).toBeVisible();
+  await expect(nightlyLane).toBeVisible();
+  await expect(stableLane.getByRole('link', { name: 'Windows' })).toBeVisible();
+  await expect(stableLane.getByRole('link', { name: 'Linux' })).toBeVisible();
+  await expect(nightlyLane.getByRole('link', { name: 'Windows' })).toBeVisible();
+  await expect(nightlyLane.getByRole('link', { name: 'Linux' })).toBeVisible();
+  const downloadsText = await desktop.locator('body').innerText();
+  for (const forbidden of ['Signed-in download', 'portable', 'recommended download', 'proof', 'receipt']) {
+    if (downloadsText.toLowerCase().includes(forbidden.toLowerCase())) {
+      failures.push(`downloads: contains retired copy "${forbidden}"`);
+    }
   }
-  if (filtersOpen) {
-    failures.push('downloads: filter controls are open by default');
-  }
-  results.push({ surface: 'downloads', recommended_top: recommendedTop, filter_top: filterTop, filters_open: filtersOpen });
+  results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true });
 
   await desktop.goto(`${baseUrl}/status`, { waitUntil: 'domcontentloaded' });
   const decisionSurface = desktop.locator('[data-status-surface="decision-surface"]');
   const decisionCards = decisionSurface.locator('.route-choice-card');
-  const nextActions = decisionSurface.locator('.stacked-actions a.button-like');
+  const nextActions = decisionSurface.locator('.minimal-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
   await expect(decisionSurface).toContainText('Release');
-  await expect(decisionSurface).toContainText('Open downloads');
+  await expect(decisionSurface).toContainText('Downloads');
   const cardCount = await decisionCards.count();
   if (cardCount !== 1) {
     failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);
@@ -74,48 +72,6 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     }
   }
   results.push({ surface: 'status', decision_card_count: cardCount, next_action_count: nextActionCount });
-
-  await desktop.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
-  const ledgerText = await desktop.locator('body').innerText();
-  const newsroomLinks = desktop.getByRole('link', { name: 'Open newsroom' });
-  const newsroomLinkCount = await newsroomLinks.count();
-  if (newsroomLinkCount !== 1) {
-    failures.push(`ledger: expected exactly 1 "Open newsroom" link, found ${newsroomLinkCount}`);
-  }
-  const emptyEditorialParagraphs = await desktop.locator('p.editorial-copy').evaluateAll((nodes) =>
-    nodes.filter((node) => !(node.textContent || '').trim()).length,
-  );
-  if (emptyEditorialParagraphs > 0) {
-    failures.push(`ledger: found ${emptyEditorialParagraphs} empty editorial paragraphs`);
-  }
-  for (const forbidden of ['Board signal:', 'Turn source:', 'Production notes', 'City note:', 'City pulse:', 'Built from', 'deterministic board', 'Linked through', 'Turn record:', 'Scene notes']) {
-    if (ledgerText.includes(forbidden)) {
-      failures.push(`ledger: contains provenance language "${forbidden}"`);
-    }
-  }
-  results.push({ surface: 'ledger-map', cleaned_language: true, newsroom_link_count: newsroomLinkCount, empty_editorial_paragraphs: emptyEditorialParagraphs });
-
-  await desktop.goto(`${baseUrl}/ledger/newsroom`, { waitUntil: 'domcontentloaded' });
-  const newsroomVideo = desktop.locator('.ledger-newsreel-broadcast__video');
-  await expect(newsroomVideo).toBeVisible();
-  const newsroomPlayback = await newsroomVideo.evaluate(async (node) => {
-    const video = node as HTMLVideoElement;
-    video.muted = true;
-    video.currentTime = 0;
-    await video.play();
-    await new Promise((resolve) => window.setTimeout(resolve, 1200));
-    video.pause();
-    return {
-      source_count: video.querySelectorAll('source').length,
-      track_count: video.querySelectorAll('track').length,
-      current_time: video.currentTime,
-      poster: video.poster,
-    };
-  });
-  if (newsroomPlayback.source_count < 2 || newsroomPlayback.track_count < 1 || newsroomPlayback.current_time <= 0) {
-    failures.push('ledger-newsroom: broadcast video does not expose working playback with sources, captions, and advancing time');
-  }
-  results.push({ surface: 'ledger-newsroom', media_playback: newsroomPlayback });
 
   await desktop.close();
 
@@ -135,7 +91,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: nav closed by default, homepage starts with downloads, recommended install before filters, one status decision card plus one next-action rail, no public ledger provenance wording.',
+      '- Checks: nav closed by default, homepage starts with Stable and Nightly, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

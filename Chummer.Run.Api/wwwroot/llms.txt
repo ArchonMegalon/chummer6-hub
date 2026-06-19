@@ -1,57 +1,49 @@
 Chummer public route guide
 
 Overview
-- Chummer is the public front door and support-aware release rail for the Shadowrun character and campaign companion.
-- This hosted surface keeps current release status, future direction, feedback, and private support on separate routes.
-- Signed-in account overlays exist for account return, support return, and follow-up, but the public pages remain readable without an account.
+- Chummer is the public front door for the Shadowrun desktop character tools.
+- The main public routes are Downloads, Help, Status, and Contact.
+- Signed-in account pages exist for recovery and support history, but the public pages remain readable without an account.
 
 Primary routes
 - / : landing and product entry
 - /what-is-chummer : product story
-- /now : what works today right now
-- /now/concierge : bounded release routing wrapper
-- /downloads : install and release rail
-- /downloads/concierge : bounded setup routing wrapper
-- /docs : governed document portal
-- /docs/chummer6-quickstart : first bounded quickstart guide route
-- /docs/chummer6-quickstart/receipts/publication.json : quickstart publication record
-- /docs/chummer6-quickstart/download.pdf : quickstart fallback PDF route
-- /join/concierge : bounded invite and primer routing wrapper
-- /join/primer : first-party campaign invite primer
-- /status : short current release and support posture
-- /progress : public telemetry and progress shelf
-- /artifacts : public artifact shelf
-- /artifacts/publications/{publicationId}/concierge : creator consult and packet-routing wrapper
-- /testimonials/concierge : moderated public-validation wrapper
+- /downloads : Stable and Nightly installers
+- /downloads/concierge : guided install help
+- /docs : help documents
+- /docs/chummer6-quickstart : quickstart guide
+- /docs/chummer6-quickstart/download.pdf : quickstart PDF
+- /join/primer : campaign invite primer
+- /status : current release
+- /progress : progress notes
+- /testimonials/concierge : testimonial follow-up
 
 Direction and feedback routes
-- /horizons : quiet future-ideas shelf
-- /roadmap : milestone-backed public direction
-- /feedback : public signal and safe public bugs
-- /feedback/operations : bounded public operations artifact for the feedback loop
+- /horizons : maintenance page
+- /roadmap : planned work
+- /feedback : public feedback
 - /changelog : shipped closeout and release-backed updates
 - /alice : character helper entry
 - /table-pulse : Table Pulse live and aftermath public split
 - /quicksilver : Quicksilver expert-speed command deck and jump-target lane
 - /local-co-processor : Local Co-Processor hosted-first optional-acceleration lane
 - /participate : broader participation entry
-- /karma-forge : short alias for governed discovery intake
-- /participate/karma-forge : governed discovery intake for table pain and house-rule demand
+- /karma-forge : discovery intake
+- /participate/karma-forge : discovery intake for table pain and house-rule demand
 
 Help and account routes
-- /help : first-party help entry
+- /help : help entry
 - /faq : public FAQ
 - /contact : private support and follow-up
-- /contact/concierge : bounded support-routing wrapper
 - /home : signed-in return surface
 - /account : signed-in account, account return, and follow settings
 
 Reading rules
-- Do not treat /roadmap or /horizons as shipped truth.
-- Use /now, /downloads, /status, and /changelog when the question is what is actually available or supportable now.
-- Use /feedback for public demand and safe public bugs.
+- Treat /roadmap and /horizons as planned or maintenance pages.
+- Use /downloads, /status, and /changelog when the question is what is available now.
+- Use /feedback for public requests and safe public bugs.
 - Use /contact or /help when the issue is private, recovery-bound, or account-specific.
 
 Boundary notes
-- The site is a projection of mirrored Chummer design canon, not a second source of product truth.
-- Public signal, roadmap projection, and shipped closeout remain separate on purpose.
+- Downloads is the public install page.
+- Help and Contact are the public support paths.

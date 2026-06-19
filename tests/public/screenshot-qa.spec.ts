@@ -20,25 +20,19 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Recommended'],
+    requiredText: ['Install Chummer', 'Stable', 'Nightly'],
   },
   {
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Release status', 'Current published build', 'Open downloads'],
+    requiredText: ['Current release', 'Downloads', 'Help'],
   },
   {
-    id: 'ledger-map',
-    route: '/ledger/map',
-    screenshotPrefix: 'ledger-map',
-    requiredText: ['Open newsroom', 'Turn 1 board'],
-  },
-  {
-    id: 'ledger-newsroom',
-    route: '/ledger/newsroom',
-    screenshotPrefix: 'ledger-newsroom',
-    requiredText: ['Black Ledger Newsroom', 'Transcript', 'Published:'],
+    id: 'help',
+    route: '/help',
+    screenshotPrefix: 'help',
+    requiredText: ['Get help without guessing', 'Choose the right path.'],
   },
 ] as const;
 
@@ -52,20 +46,20 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
-    const heroTitle = page.locator('.launch-hero__title');
-    const primaryCta = page.locator('.launch-hero__actions a.button-like').first();
+    const heroTitle = page.locator('.minimal-hero h1');
+    const primaryCta = page.locator('.minimal-hero .minimal-actions a.button-like').first();
     const footer = page.locator('[data-public-section="footer"]');
-    const product = page.locator('[data-homepage-section="product"]');
-    const promo = page.locator('[data-homepage-section="flagship-promo"]');
-    const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
+    const workflow = page.locator('[data-homepage-section="workflow"]');
+    const downloads = page.locator('[data-homepage-section="downloads"]');
+    const help = page.locator('[data-homepage-section="help"]');
     const sidebar = page.locator('.site-sidebar');
     const navLinks = page.locator('[aria-label="Primary navigation"] a, [aria-label="Primary navigation"] .site-sidebar__current');
 
-    await expect(heroTitle).toContainText('Build the runner. Run the night.');
-    await expect(primaryCta).toContainText('Download Chummer');
-    await expect(product).toContainText('Everything your table reaches for first.');
-    await expect(promo).toContainText('A short look at the product.');
-    await expect(playDownloads).toContainText('Start where you need to.');
+    await expect(heroTitle).toContainText('Chummer');
+    await expect(primaryCta).toContainText('Stable');
+    await expect(workflow).toContainText('What it does');
+    await expect(downloads).toContainText('Get the app');
+    await expect(help).toContainText('Need help?');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {
