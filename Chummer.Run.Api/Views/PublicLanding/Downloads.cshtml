@@ -89,7 +89,7 @@ else
                     var option = ResolveLanePlatformOption(platform.Item1, stableLaneIds, allowFallback: true);
                     if (option is not null)
                     {
-                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.Item1">@platform.Item2</a>
+                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.Item1" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.Item2">@platform.Item2</a>
                     }
                 }
             </div>
@@ -115,7 +115,7 @@ else
                     var option = ResolveLanePlatformOption(platform.Item1, nightlyLaneIds, allowFallback: true);
                     if (option is not null)
                     {
-                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.Item1">@platform.Item2</a>
+                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.Item1" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.Item2">@platform.Item2</a>
                     }
                 }
             </div>

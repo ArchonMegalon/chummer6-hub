@@ -33,8 +33,10 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         ledger = (REPO_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Ledger.cshtml").read_text(encoding="utf-8")
         self.assertIn("window.ChummerAnalyticsQueue", site_js)
         self.assertIn("ChummerUi.trackPublicEvent", site_js)
-        self.assertIn('data-analytics-event="homepage_open_ledger"', landing)
-        self.assertIn('data-analytics-event="downloads_primary_install"', downloads)
+        self.assertIn('data-analytics-event="homepage_open_stable"', landing)
+        self.assertIn('data-analytics-event="homepage_open_nightly"', landing)
+        self.assertIn('data-analytics-event="downloads_stable_install"', downloads)
+        self.assertIn('data-analytics-event="downloads_nightly_install"', downloads)
         self.assertIn('data-analytics-event="status_next_action"', status)
         self.assertIn('data-analytics-event="ledger_primary_action"', ledger)
 

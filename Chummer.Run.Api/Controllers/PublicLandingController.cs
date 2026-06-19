@@ -4105,7 +4105,7 @@ public sealed class PublicLandingController : Controller
         var releaseSummary = BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse);
         var cautionSummary = BuildPublicStatusCautionSummary(manifest, pulse);
         var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "The current Chummer release.", "/status", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release, platform availability, and install help in one place.", "/status", cancellationToken),
             Manifest: manifest,
             VerifiedAtLabel: verifiedAtLabel,
             ReleaseExperience: releaseExperience,
