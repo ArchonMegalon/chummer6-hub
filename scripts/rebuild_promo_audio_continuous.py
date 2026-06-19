@@ -24,6 +24,17 @@ OUT = WORKSPACE / "_completion" / "promo_audio_continuous_20260602"
 TTS_PYTHON = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_venv" / "bin" / "python"
 DOCUMENTARY_VOICE = "en-GB-ThomasNeural"
 UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
+UNMIXR_PROMO_VOICE_ENV_KEYS = (
+    "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
+    "UNMIXR_NARRATOR_VOICE_ID",
+    "UNMIXR_VOICE_ID",
+)
+HIGH_TONE_CLEANUP_FILTER = "equalizer=f=11730:width_type=h:width=420:g=-48,lowpass=f=10000"
+ENV_FILES = (
+    WORKSPACE / "chummer.run-services" / ".env",
+    Path("/docker/EA/.env"),
+    Path("/docker/EA/ea/.env"),
+)
 
 
 @dataclass(frozen=True)
@@ -183,18 +194,37 @@ def duration(path: Path) -> float:
     return float((probe(path).get("format") or {}).get("duration") or 0.0)
 
 
+def env_or_file(key: str) -> str:
+    value = os.environ.get(key, "").strip()
+    if value:
+        return value
+    prefix = f"{key}="
+    for env_file in ENV_FILES:
+        if not env_file.is_file():
+            continue
+        for raw_line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or not line.startswith(prefix):
+                continue
+            raw_value = line.split("=", 1)[1].strip()
+            if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] and raw_value[0] in {"'", '"'}:
+                raw_value = raw_value[1:-1]
+            return raw_value.strip()
+    return ""
+
+
 def unmixr_config() -> dict[str, str] | None:
-    api_key = os.environ.get("UNMIXR_API_KEY", "").strip()
-    voice_id = os.environ.get("UNMIXR_VOICE_ID", "").strip()
+    api_key = env_or_file("UNMIXR_API_KEY")
+    voice_id = next((env_or_file(key) for key in UNMIXR_PROMO_VOICE_ENV_KEYS if env_or_file(key)), "")
     if not api_key or not voice_id:
         return None
     return {
         "api_key": api_key,
         "voice_id": voice_id,
-        "language": os.environ.get("UNMIXR_LANGUAGE", "en-US").strip() or "en-US",
-        "speaking_rate": os.environ.get("UNMIXR_SPEAKING_RATE", "medium").strip() or "medium",
-        "speaking_pitch": os.environ.get("UNMIXR_SPEAKING_PITCH", "low").strip() or "low",
-        "speaking_volume": os.environ.get("UNMIXR_SPEAKING_VOLUME", "medium").strip() or "medium",
+        "language": env_or_file("UNMIXR_LANGUAGE") or "en-US",
+        "speaking_rate": env_or_file("UNMIXR_PROMO_SPEAKING_RATE") or env_or_file("UNMIXR_SPEAKING_RATE") or "slow",
+        "speaking_pitch": env_or_file("UNMIXR_SPEAKING_PITCH") or "low",
+        "speaking_volume": env_or_file("UNMIXR_SPEAKING_VOLUME") or "medium",
     }
 
 
@@ -330,7 +360,7 @@ def normalize_beat(source: Path, output: Path) -> None:
         "-i",
         str(source),
         "-af",
-        "afade=t=in:st=0:d=0.03,highpass=f=60,lowpass=f=12000,alimiter=limit=0.96",
+        f"afade=t=in:st=0:d=0.03,highpass=f=60,{HIGH_TONE_CLEANUP_FILTER},alimiter=limit=0.96",
         "-ar",
         "48000",
         "-ac",
@@ -415,7 +445,7 @@ def audio_filter_for(narration: Path, target_duration: float) -> str:
         "acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0];"
         f"[vo0]adelay=1200|1200,apad,atrim=0:{target_duration:.3f},volume=1.10[vo];"
         f"{cinematic_bed_filter(target_duration)};"
-        "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.91[a]"
+        f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,{HIGH_TONE_CLEANUP_FILTER},alimiter=limit=0.91[a]"
         f" # {fit_mode}"
     )
 
@@ -516,6 +546,11 @@ def rebuild(plan: AudioPlan) -> dict[str, Any]:
         "audio_mode": "stitched_cinematic_narration_track",
         "narration_provider": provider,
         "voice": voice_used,
+        "voice_posture": "premium_unmixr_narrator_preferred",
+        "audio_artifact_cleanup": {
+            "high_tone_notch_hz": 11730,
+            "lowpass_hz": 10000,
+        },
         "no_scene_audio_cuts": True,
         "beat_count": len(split_script_into_beats(plan.script)),
         "script": plan.script,
