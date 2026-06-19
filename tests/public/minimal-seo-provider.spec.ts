@@ -54,6 +54,12 @@ test('ClickRank and NeuronWriter optimization stays metadata-only and minimal', 
         failures.push(`${route.path}: visible body copy exposes "${term}"`);
       }
     }
+    const pageSource = await page.content();
+    for (const term of ['data-clickrank-ai', 'clickRankAi', 'public-copy-humanizer']) {
+      if (pageSource.includes(term)) {
+        failures.push(`${route.path}: page source exposes stale provider marker "${term}"`);
+      }
+    }
 
     results.push({
       route: route.path,

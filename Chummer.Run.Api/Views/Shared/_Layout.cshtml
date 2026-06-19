@@ -296,22 +296,22 @@
                     || navigator.doNotTrack === "1"
                     || navigator.msDoNotTrack === "1"
                     || navigator.globalPrivacyControl === true;
-                if (doNotTrack || document.querySelector("script[data-clickrank-ai='seo']")) {
+                if (doNotTrack || document.querySelector("script[data-clickrank='seo']")) {
                     return;
                 }
 
                 var loadClickRank = function () {
-                    if (document.querySelector("script[data-clickrank-ai='seo']")) {
+                    if (document.querySelector("script[data-clickrank='seo']")) {
                         return;
                     }
 
-                    var clickRankAi = document.createElement("script");
-                    clickRankAi.src = "https://js.clickrank.ai/seo/@clickRankSiteId/script";
-                    clickRankAi.async = true;
-                    clickRankAi.defer = true;
-                    clickRankAi.dataset.clickrankAi = "seo";
-                    clickRankAi.referrerPolicy = "strict-origin-when-cross-origin";
-                    document.head.appendChild(clickRankAi);
+                    var clickRankScript = document.createElement("script");
+                    clickRankScript.src = "https://js.clickrank.ai/seo/@clickRankSiteId/script";
+                    clickRankScript.async = true;
+                    clickRankScript.defer = true;
+                    clickRankScript.dataset.clickrank = "seo";
+                    clickRankScript.referrerPolicy = "strict-origin-when-cross-origin";
+                    document.head.appendChild(clickRankScript);
                 };
 
                 if ("requestIdleCallback" in window) {
@@ -563,7 +563,6 @@
     }
 
     <script src="~/js/site.js" asp-append-version="true"></script>
-    <script src="~/js/public-copy-humanizer.js" asp-append-version="true"></script>
     <script>
         (function () {
             if (!("serviceWorker" in navigator)) {
