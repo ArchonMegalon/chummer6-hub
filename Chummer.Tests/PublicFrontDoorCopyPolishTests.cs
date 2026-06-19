@@ -38,12 +38,13 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
-    public void Shared_layout_runs_public_copy_humanizer_without_touching_code_blocks()
+    public void Shared_layout_runs_public_copy_polish_without_touching_code_blocks()
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
-        string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "public-copy-humanizer.js"));
+        string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "public-copy-polish.js"));
 
-        Assert.Contains("public-copy-humanizer.js", layout, StringComparison.Ordinal);
+        Assert.Contains("public-copy-polish.js", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("public-copy-humanizer.js", layout, StringComparison.Ordinal);
         Assert.Contains("SHOW_TEXT", script, StringComparison.Ordinal);
         Assert.Contains("tagName === \"CODE\"", script, StringComparison.Ordinal);
         Assert.Contains("tagName === \"PRE\"", script, StringComparison.Ordinal);
