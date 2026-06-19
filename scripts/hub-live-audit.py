@@ -11966,13 +11966,16 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
-            "Build a runner. Check the answer. Get back to the table.",
+            "Character tools for Shadowrun.",
             required_texts=(
-                "A character and campaign companion.",
-                "Players, GMs, and returning groups.",
-                "Start with Downloads",
-                "Open account-assisted install",
-                "Open What Works Today"),
+                "Downloads first",
+                "Account optional",
+                "Use it for",
+                "Characters",
+                "Maintenance",
+                "Explanations",
+                "Where to start",
+                "Install the app first."),
             expects_header_count=1),
         AuditRoute(
             "/now",
