@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-19T18:28:46Z",
+  "generatedAt": "2026-06-19T19:27:30Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,28 +9,43 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.169kWHBquh/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.tR6lAU9zN4/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "dc27498e5d520b9b47111152f27dccfd95dd02bcc8479e85e31d68c3cc548030",
-      "artifactSizeBytes": 36890650,
+      "artifactSha256": "22ca04be02d77c7224614fb5603c669dab5a94fb3abd11b6212d061eb199e55a",
+      "artifactSizeBytes": 36871664,
       "kind": "installer"
     },
     {
       "artifactId": "avalonia-win-x64-installer",
       "fileName": "chummer-avalonia-win-x64-installer.exe",
       "platform": "windows",
-      "promotionStatus": "fail",
-      "startupSmokeStatus": "skipped_incompatible_host",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.169kWHBquh/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.tR6lAU9zN4/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
-      "signingStatus": "fail",
+      "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "4bc6e4c9e066f7831eb29dd6ea0cdf1697023909f530704e8edf56a001411e31",
-      "artifactSizeBytes": 98957230,
+      "artifactSha256": "e64e0620c86e39c8bb07f053244995e06d37bfb4571cf9ae8d592b108c665158",
+      "artifactSizeBytes": 98973356,
       "kind": "installer"
+    },
+    {
+      "artifactId": "avalonia-linux-x64-archive",
+      "fileName": "chummer-avalonia-linux-x64.tar.gz",
+      "platform": "linux",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "",
+      "signingReceiptPath": "",
+      "signingStatus": null,
+      "notarizationStatus": null,
+      "artifactSha256": "21978f697a86bca1921beb5e72aa6de5731173d71963fb4114defc293ca4272c",
+      "artifactSizeBytes": 45123142,
+      "kind": "archive"
     }
   ]
 }
