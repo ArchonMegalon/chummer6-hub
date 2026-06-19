@@ -94,9 +94,11 @@ public sealed class HeyyScamChatService
     private const string DeliverySendAction = "delivery.send";
     private const string EmailChannel = "email";
     private const string SmsChannel = "sms";
+    private const string WhatsappChannel = "whatsapp";
     private const string DraftOnlyMode = "draft_only";
     private const string ManualCopyDeliveryMode = "manual_copy";
     private const string OperatorEmailDeliveryMode = "operator_email";
+    private const string WhatsAppApprovedDeliveryMode = "whatsapp_approved";
     private const string PersonaId = "empathetic_slow_typing_old_lady";
     private const int MinimumOldLadyDelaySeconds = 240;
 
@@ -244,6 +246,7 @@ public sealed class HeyyScamChatService
         string idempotencySeed = AccountService.NormalizeOptional(request.ApprovedText) ?? conversation.LatestDraft?.DraftId ?? approvedText;
         string idempotencyKey = AccountService.NormalizeOptional(request.IdempotencyKey)
             ?? $"heyy-scam-chat-approval|{normalizedConversationId}|{deliveryMode}|{HashPrivate("approval", idempotencySeed)[..16]}";
+        string? requestedRecipient = AccountService.NormalizeOptional(request.Recipient);
         lock (_store.Gate)
         {
             existingReceipt = _store.HeyyScamChatApprovalReceipts.FirstOrDefault(item =>
@@ -255,8 +258,7 @@ public sealed class HeyyScamChatService
         }
 
         approvedText = RedactSensitiveText(approvedText);
-        string recipient = AccountService.NormalizeOptional(request.Recipient)
-            ?? ResolveDigestRecipient();
+        string recipient = requestedRecipient ?? ResolveDigestRecipient();
         string recipientMasked = MaskReceiptRecipient(recipient);
         string? deliveryRef = null;
         string? failureReason = null;
@@ -279,6 +281,49 @@ public sealed class HeyyScamChatService
         else if (deliveryMode == ManualCopyDeliveryMode)
         {
             status = "manual_copy_ready";
+        }
+        else if (deliveryMode == WhatsAppApprovedDeliveryMode)
+        {
+            if (!WhatsAppEnabled())
+            {
+                status = "suppressed_whatsapp_disabled";
+                failureReason = "whatsapp_disabled";
+            }
+            else if (string.IsNullOrWhiteSpace(requestedRecipient))
+            {
+                status = "suppressed_whatsapp_recipient_missing";
+                failureReason = "recipient_missing";
+            }
+            else if (!IsWhatsappRecipientAllowed(recipient))
+            {
+                status = "suppressed_whatsapp_recipient_not_allowed";
+                failureReason = "recipient_not_allowed";
+            }
+            else if (!WhatsAppDeliveryConfigured())
+            {
+                status = "suppressed_whatsapp_delivery_unconfigured";
+                failureReason = "real_whatsapp_delivery_unconfigured";
+            }
+            else
+            {
+                try
+                {
+                    deliveryRef = await SendApprovedDraftToWhatsappAsync(
+                        conversation,
+                        approvedText,
+                        recipient,
+                        operatorId,
+                        idempotencyKey,
+                        cancellationToken);
+                    status = "sent_whatsapp_approved";
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or JsonException)
+                {
+                    _logger.LogWarning(ex, "Heyy scam-chat approved draft WhatsApp send failed for {ConversationId}.", conversation.ConversationId);
+                    status = "failed_whatsapp_approved";
+                    failureReason = Truncate(ex.Message, 400);
+                }
+            }
         }
         else if (!DeliveryEaConfigured() || string.IsNullOrWhiteSpace(recipient))
         {
@@ -333,7 +378,10 @@ public sealed class HeyyScamChatService
                 _store.HeyyScamChatApprovalReceipts.RemoveRange(256, _store.HeyyScamChatApprovalReceipts.Count - 256);
             }
 
-            if (request.ConfirmManualApproval && !request.DryRun && (status == "manual_copy_ready" || status == "sent_to_operator_email"))
+            if (request.ConfirmManualApproval && !request.DryRun
+                && (status == "manual_copy_ready"
+                    || status == "sent_to_operator_email"
+                    || status == "sent_whatsapp_approved"))
             {
                 int index = _store.HeyyScamChatConversations.FindIndex(item =>
                     string.Equals(item.ConversationId, conversation.ConversationId, StringComparison.OrdinalIgnoreCase));
@@ -342,7 +390,13 @@ public sealed class HeyyScamChatService
                     HeyyScamChatConversationState current = _store.HeyyScamChatConversations[index];
                     HeyyScamChatMessage approvalMessage = new(
                         MessageId: receipt.ApprovalId,
-                        Direction: status == "manual_copy_ready" ? "approved_manual_copy" : "sent_operator_email",
+                        Direction: status == "manual_copy_ready"
+                            ? "approved_manual_copy"
+                            : status == "sent_to_operator_email"
+                                ? "sent_operator_email"
+                                : status == "sent_whatsapp_approved"
+                                    ? "sent_whatsapp_approved"
+                                    : "approved_pending",
                         Text: approvedText,
                         SafetyLabel: status,
                         PacingHint: receipt.PacingHint,
@@ -736,6 +790,105 @@ public sealed class HeyyScamChatService
         });
 
         return await SendConnectorDispatchAsync(request, cancellationToken);
+    }
+
+    private async Task<string> SendApprovedDraftToWhatsappAsync(
+        HeyyScamChatConversationState conversation,
+        string approvedText,
+        string recipient,
+        string operatorId,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (MetaWhatsAppConfigured())
+        {
+            return await SendApprovedDraftToMetaWhatsappAsync(approvedText, recipient, idempotencyKey, cancellationToken);
+        }
+
+        string apiToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN");
+        string principalId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID");
+        string bindingId = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"])
+            ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
+        string baseUrl = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL").Trim().TrimEnd('/');
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/tools/execute");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Add("x-ea-principal-id", principalId);
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        request.Content = JsonContent.Create(new
+        {
+            tool_name = ConnectorDispatchTool,
+            action_kind = DeliverySendAction,
+            payload_json = new
+            {
+                principal_id = principalId,
+                binding_id = bindingId,
+                channel = WhatsappChannel,
+                recipient,
+                content = approvedText,
+                metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["event_type"] = "heyy_scam_chat_approved_draft",
+                    ["conversation_id"] = conversation.ConversationId,
+                    ["operator_id"] = operatorId,
+                    ["mode"] = DraftOnlyMode,
+                    ["delivery_mode"] = WhatsAppApprovedDeliveryMode,
+                    ["auto_send_allowed"] = false,
+                    ["manual_approval_required"] = true
+                },
+                idempotency_key = idempotencyKey,
+            }
+        });
+
+        return await SendConnectorDispatchAsync(request, cancellationToken);
+    }
+
+    private async Task<string> SendApprovedDraftToMetaWhatsappAsync(
+        string approvedText,
+        string recipient,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        string accessToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN");
+        string phoneNumberId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID");
+        string graphVersion = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"]) ?? "v21.0";
+        string normalizedRecipient = NormalizeMetaWhatsappRecipient(recipient);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"https://graph.facebook.com/{graphVersion}/{Uri.EscapeDataString(phoneNumberId)}/messages");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        request.Content = JsonContent.Create(new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to = normalizedRecipient,
+            type = "text",
+            text = new
+            {
+                preview_url = false,
+                body = approvedText
+            }
+        });
+
+        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"{(int)response.StatusCode}:{Truncate(responseBody, 600)}");
+        }
+
+        using JsonDocument json = JsonDocument.Parse(responseBody);
+        if (json.RootElement.TryGetProperty("messages", out JsonElement messages)
+            && messages.ValueKind == JsonValueKind.Array
+            && messages.GetArrayLength() > 0
+            && messages[0].TryGetProperty("id", out JsonElement idElement)
+            && !string.IsNullOrWhiteSpace(idElement.GetString()))
+        {
+            return idElement.GetString()!;
+        }
+
+        throw new InvalidOperationException("meta_whatsapp_missing_message_id");
     }
 
     private async Task DispatchTurnSummaryIfDueAsync(HeyyScamChatConversationState conversation, CancellationToken cancellationToken)
@@ -1264,6 +1417,7 @@ public sealed class HeyyScamChatService
         {
             ManualCopyDeliveryMode => ManualCopyDeliveryMode,
             OperatorEmailDeliveryMode => OperatorEmailDeliveryMode,
+            WhatsAppApprovedDeliveryMode => WhatsAppApprovedDeliveryMode,
             _ => throw new ArgumentException($"Unsupported Heyy scam-chat delivery mode '{normalized}'.")
         };
     }
@@ -1427,6 +1581,87 @@ public sealed class HeyyScamChatService
         => !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"])
             && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"])
             && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID"]);
+
+    private bool WhatsAppEnabled()
+        => bool.TryParse(_configuration["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"], out bool enabled) && enabled;
+
+    private bool WhatsAppDeliveryConfigured()
+        => MetaWhatsAppConfigured() || RealWhatsAppDeliveryConfigured();
+
+    private bool RealWhatsAppDeliveryConfigured()
+    {
+        string? baseUrl = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"]);
+        if (!WhatsAppEnabled() || !IsValidWhatsAppBindingConfig())
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return false;
+        }
+
+        string normalizedBaseUrl = baseUrl.Trim().TrimEnd('/');
+        return !normalizedBaseUrl.Contains("support-progress-mock", StringComparison.OrdinalIgnoreCase)
+            && !normalizedBaseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            && !normalizedBaseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MetaWhatsAppConfigured()
+        => WhatsAppEnabled()
+            && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"])
+            && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"]);
+
+    private bool IsWhatsappRecipientAllowed(string recipient)
+    {
+        string? normalizedRecipient = NormalizeRecipientForAllowlist(recipient);
+        if (normalizedRecipient is null)
+        {
+            return false;
+        }
+
+        string? allowed = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"]);
+        if (allowed is null)
+        {
+            return false;
+        }
+
+        return allowed
+            .Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(NormalizeRecipientForAllowlist)
+            .Any(allowedRecipient => !string.IsNullOrWhiteSpace(allowedRecipient)
+                && string.Equals(allowedRecipient, normalizedRecipient, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsValidWhatsAppBindingConfig()
+        => !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"])
+            && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"])
+            && (AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"]) is not null
+                || AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID"]) is not null);
+
+    private static string? NormalizeRecipientForAllowlist(string? recipient)
+    {
+        string? normalized = AccountService.NormalizeOptional(recipient);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        string digits = new(normalized.Where(char.IsDigit).ToArray());
+        return digits.Length >= 7 ? digits : null;
+    }
+
+    private static string NormalizeMetaWhatsappRecipient(string value)
+    {
+        string normalized = AccountService.NormalizeRequired(value, nameof(value));
+        string digits = new(normalized.Where(char.IsDigit).ToArray());
+        if (digits.Length < 7)
+        {
+            throw new InvalidOperationException("meta_whatsapp_recipient_invalid");
+        }
+
+        return digits;
+    }
 
     private bool RealPhoneDeliveryConfigured()
     {

@@ -162,6 +162,160 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task ApproveDraftWhatsappModeDryRunReturnsReadyStatusAndDoesNotSend()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436765550423",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-dry-run",
+                CounterpartyHandle: "+436765550423",
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-dry-run",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: "+436765550423",
+                ConfirmManualApproval: true,
+                DryRun: true),
+            CancellationToken.None);
+
+        Assert.Equal("dry_run_whatsapp_approved_ready", approval.Status);
+        Assert.Equal("whatsapp_approved", approval.DeliveryMode);
+        Assert.Empty(fixture.Handler.Requests);
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeIsBlockedWhenRecipientNotAllowed()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436647916419",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-not-allowed",
+                CounterpartyHandle: "+436765550423",
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-not-allowed",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: "+436765550423",
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("suppressed_whatsapp_recipient_not_allowed", approval.Status);
+        Assert.Equal("recipient_not_allowed", approval.FailureReason);
+        Assert.Empty(fixture.Handler.Requests);
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeSendsWhenAllowedAndConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436765550423;+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-sent",
+                CounterpartyHandle: "+436765550423",
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-sent",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: "+436765550423",
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Equal("whatsapp_approved", approval.DeliveryMode);
+        Assert.Equal("ea-delivery-1", approval.DeliveryRef);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        using JsonDocument json = JsonDocument.Parse(request.Body);
+        JsonElement payload = json.RootElement.GetProperty("payload_json");
+        Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
+        Assert.Equal("+436765550423", payload.GetProperty("recipient").GetString());
+        JsonElement metadata = payload.GetProperty("metadata");
+        Assert.Equal("whatsapp_approved", metadata.GetProperty("delivery_mode").GetString());
+        Assert.True(metadata.GetProperty("manual_approval_required").GetBoolean());
+        Assert.False(metadata.GetProperty("auto_send_allowed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeSendsThroughMetaCloudApiWhenConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-meta",
+                CounterpartyHandle: "+436765550423",
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-meta",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: "+436647916419",
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Equal("wamid.meta1", approval.DeliveryRef);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        using JsonDocument json = JsonDocument.Parse(request.Body);
+        Assert.Equal("whatsapp", json.RootElement.GetProperty("messaging_product").GetString());
+        Assert.Equal("436647916419", json.RootElement.GetProperty("to").GetString());
+        Assert.Equal("text", json.RootElement.GetProperty("type").GetString());
+        Assert.False(json.RootElement.GetProperty("text").GetProperty("preview_url").GetBoolean());
+        Assert.NotEmpty(json.RootElement.GetProperty("text").GetProperty("body").GetString() ?? string.Empty);
+    }
+
+    [Fact]
     public async Task FiveIncomingTurnsCreateOperatorSmsSummaryReceiptButDoNotUseMockDelivery()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
@@ -403,6 +557,11 @@ public sealed class HeyyScamChatServiceTests
             if (request.Method == HttpMethod.Post && path == "/v1/tools/execute")
             {
                 return Json(HttpStatusCode.OK, """{"target_ref":"ea-delivery-1"}""");
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/v21.0/1234567890/messages")
+            {
+                return Json(HttpStatusCode.OK, """{"messages":[{"id":"wamid.meta1"}]}""");
             }
 
             if (request.Method == HttpMethod.Get && path == "/api/base/base-demo/table")
