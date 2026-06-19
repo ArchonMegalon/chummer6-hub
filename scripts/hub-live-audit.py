@@ -11948,15 +11948,15 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "Build and maintain Shadowrun characters on your desktop.",
+            "Build and maintain Shadowrun characters without losing the details between sessions.",
             required_texts=(
-                "Desktop character tools",
+                "For Shadowrun",
                 "Stable",
                 "Nightly",
                 "What it does",
                 "Create",
-                "Maintain",
-                "Understand",
+                "Update",
+                "Check",
                 "Get the app",
                 "Need help?"),
             forbidden_texts=(

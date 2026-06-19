@@ -1014,7 +1014,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string layout = File.ReadAllText(layoutPath);
 
         Assert.Contains("<a class=\"quiet-link\" href=\"/downloads\">Get Chummer</a> · <a class=\"quiet-link\" href=\"/status\">Status</a>", layout, StringComparison.Ordinal);
-        Assert.Contains("<p class=\"site-footer__copy\">Shadowrun companion.</p>", layout, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"site-footer__copy\">Shadowrun character manager.</p>", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("Truth boundary", layout, StringComparison.Ordinal);
