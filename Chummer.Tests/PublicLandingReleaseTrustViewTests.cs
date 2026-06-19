@@ -830,8 +830,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("This deterministic turn-two board shows how AI interim stewards stay bounded", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("This deterministic turn-two preview shows how AI interim stewards stay bounded", controller, StringComparison.Ordinal);
+        Assert.Contains("This deterministic turn-two board shows how interim roles stay bounded", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("This deterministic turn-two preview shows how interim roles stay bounded", controller, StringComparison.Ordinal);
     }
 
     [Fact]

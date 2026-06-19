@@ -13170,7 +13170,7 @@ echo "Help: ${HELP_URL}"
                 string.Equals(faction.Id, selectedFactionId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(faction.Id.Replace('_', '-'), selectedFactionId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
-            ? "This deterministic turn-two board shows how AI interim stewards stay bounded while the city reacts to pressure: cleaner routes, harder heat, and faction moves a GM can use."
+            ? "This deterministic turn-two board shows how interim roles stay bounded while the city reacts to pressure: cleaner routes, harder heat, and faction moves a GM can use."
             : "A fictional city board with six factions, visible pressure zones, and bounded dispatches.";
         if (selectedFaction is not null)
         {
@@ -13378,7 +13378,7 @@ echo "Help: ${HELP_URL}"
         string intro = currentSection switch
         {
             "manage" => "Authenticated faction management posture for route-backed campaign stewardship, bounded package pressure, and district coverage.",
-            "stewards" => "Human and AI stewardship posts stay explicit here so public summary roles never get confused with private campaign authority.",
+            "stewards" => "Stewardship posts stay explicit here so public summary roles never get confused with private campaign authority.",
             "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger routes must never render them.",
             _ => "Faction command workspace for the same Black Ledger seed world, with private labels and management posture kept off public routes.",
         };

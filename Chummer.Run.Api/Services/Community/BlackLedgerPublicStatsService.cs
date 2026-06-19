@@ -146,20 +146,20 @@ public sealed class BlackLedgerPublicStatsService
         ],
         StewardshipPosts:
         [
-            new("ledger_gm", "Ledger GM", "ai", "ai ledger architect", "Runs the public world-turn shell until verified human stewards take over.", true),
-            new("public_intel_provider", "Public Intel Provider", "ai", "ai public intel provider", "Turns world movement into public-safe summaries without leaking private administrative data.", true),
-            new("package_pressure_analyst", "Package Pressure Analyst", "ai", "ai package factor", "Explains package demand as governed pressure, not shipped truth.", true),
-            new("privacy_marshal", "Privacy Marshal", "ai", "ai privacy marshal", "Blocks private, identifying, sourcebook, support, or administrative data from public rendering.", true),
-            new("closeout_clerk", "Closeout Clerk", "ai", "ai closeout clerk", "Keeps closeout movement tied to first-party turn records before it appears publicly.", true),
+            new("ledger_gm", "Ledger GM", "interim", "interim ledger architect", "Runs the public world-turn shell until verified human stewards take over.", true),
+            new("public_intel_provider", "Public Intel Provider", "interim", "public intel provider", "Turns world movement into public-safe summaries without leaking private administrative data.", true),
+            new("package_pressure_analyst", "Package Pressure Analyst", "interim", "package factor", "Explains package demand as governed pressure, not shipped truth.", true),
+            new("privacy_marshal", "Privacy Marshal", "interim", "privacy marshal", "Blocks private, identifying, sourcebook, support, or administrative data from public rendering.", true),
+            new("closeout_clerk", "Closeout Clerk", "interim", "closeout clerk", "Keeps closeout movement tied to first-party turn records before it appears publicly.", true),
         ],
         StewardshipTransferPreview: new(
             "stewardship_transfer",
             "ledger_gm",
-            "ai_ledger_architect",
+            "interim_ledger_architect",
             "verified_human_steward_pending",
             "human",
             "2026-05-14T12:00:00Z",
-            "Handoff receipt proves that verified human takeover outranks interim AI stewardship.",
+            "Handoff receipt proves that verified human stewardship outranks interim placeholders.",
             "stewarding_operator",
             "public_safe"),
         LastTick: new(
