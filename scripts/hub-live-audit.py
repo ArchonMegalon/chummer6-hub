@@ -12023,7 +12023,7 @@ def main() -> int:
             required_texts=(
                 "Early campaign work stays behind the main app.",
                 "Use the app first",
-                "Install Chummer, build a character",
+                "install Chummer, build a character",
                 "Roadmap",
                 "Feedback",
                 "Later work"),
