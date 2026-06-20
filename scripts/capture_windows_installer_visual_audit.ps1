@@ -41,7 +41,24 @@ function Read-JsonObject([string]$PathValue) {
     foreach ($key in $converted.Keys) {
         $normalized[$key] = $converted[$key]
     }
-    return $normalized
+    return ,$normalized
+}
+
+function Test-MapHasKey([object]$Map, [string]$Key) {
+    if ($null -eq $Map) {
+        return $false
+    }
+    if ($Map -is [System.Collections.IDictionary]) {
+        return $Map.Contains($Key)
+    }
+    return $null -ne $Map.PSObject.Properties[$Key]
+}
+
+function Get-MapValue([object]$Map, [string]$Key) {
+    if ($Map -is [System.Collections.IDictionary]) {
+        return $Map[$Key]
+    }
+    return $Map.PSObject.Properties[$Key].Value
 }
 
 function Test-IsDefaultDpi([object]$Value) {
@@ -142,8 +159,8 @@ $artifactSha = (Get-FileHash -LiteralPath $installerFullPath -Algorithm SHA256).
 $os = Get-CimInstance Win32_OperatingSystem
 $source = Read-JsonObject $sourcePath
 $existingScreenshots = @()
-if ($source.ContainsKey("screenshots") -and $null -ne $source["screenshots"]) {
-    $existingScreenshots = @($source["screenshots"])
+if ((Test-MapHasKey $source "screenshots") -and $null -ne (Get-MapValue $source "screenshots")) {
+    $existingScreenshots = @(Get-MapValue $source "screenshots")
 }
 
 $screenshots = @($existingScreenshots + $newRows)
@@ -168,14 +185,14 @@ foreach ($item in $screenshots) {
     if (Test-IsDefaultDpi $item.dpiScale) {
         $hasDefaultDpi = $true
         $surfaceName = Normalize-Surface $item.surface
-        if ($surfaceCoverage.ContainsKey($surfaceName)) {
+        if ($surfaceCoverage.Contains($surfaceName)) {
             $surfaceCoverage[$surfaceName].defaultDpi = $true
         }
     }
     else {
         $hasScaledDpi = $true
         $surfaceName = Normalize-Surface $item.surface
-        if ($surfaceCoverage.ContainsKey($surfaceName)) {
+        if ($surfaceCoverage.Contains($surfaceName)) {
             $surfaceCoverage[$surfaceName].scaledDpi = $true
         }
     }

@@ -43,7 +43,24 @@ function Read-JsonObject([string]$PathValue) {
     foreach ($key in $converted.Keys) {
         $normalized[$key] = $converted[$key]
     }
-    return $normalized
+    return ,$normalized
+}
+
+function Test-MapHasKey([object]$Map, [string]$Key) {
+    if ($null -eq $Map) {
+        return $false
+    }
+    if ($Map -is [System.Collections.IDictionary]) {
+        return $Map.Contains($Key)
+    }
+    return $null -ne $Map.PSObject.Properties[$Key]
+}
+
+function Get-MapValue([object]$Map, [string]$Key) {
+    if ($Map -is [System.Collections.IDictionary]) {
+        return $Map[$Key]
+    }
+    return $Map.PSObject.Properties[$Key].Value
 }
 
 $installerFullPath = Resolve-RepoPath $InstallerPath
@@ -54,11 +71,11 @@ if (-not (Test-Path -LiteralPath $installerFullPath)) {
 $downloadsFullRoot = Resolve-RepoPath $DownloadsRoot
 $releaseChannelPath = Join-Path $downloadsFullRoot "RELEASE_CHANNEL.generated.json"
 $releaseChannel = Read-JsonObject $releaseChannelPath
-if ([string]::IsNullOrWhiteSpace($Version) -and $releaseChannel.ContainsKey("version")) {
-    $Version = [string]$releaseChannel["version"]
+if ([string]::IsNullOrWhiteSpace($Version) -and (Test-MapHasKey $releaseChannel "version")) {
+    $Version = [string](Get-MapValue $releaseChannel "version")
 }
-if ([string]::IsNullOrWhiteSpace($ChannelId) -and $releaseChannel.ContainsKey("channelId")) {
-    $ChannelId = [string]$releaseChannel["channelId"]
+if ([string]::IsNullOrWhiteSpace($ChannelId) -and (Test-MapHasKey $releaseChannel "channelId")) {
+    $ChannelId = [string](Get-MapValue $releaseChannel "channelId")
 }
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = "local-windows-proof"
