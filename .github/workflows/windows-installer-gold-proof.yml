@@ -53,17 +53,17 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $args = @("-LaunchInstaller")
-          if ("${{ inputs.auto_capture_visuals }}" -eq "true") {
-            $args += @(
-              "-CaptureVisualAudit",
-              "-AutoCaptureVisualAudit",
-              "-ScaledDpiScale", "${{ inputs.scaled_dpi_scale }}",
-              "-VisualClippingStatus", "review_required",
-              "-VisualReadabilityStatus", "review_required"
-            )
+          $proofArgs = @{
+            LaunchInstaller = $true
           }
-          & .\scripts\capture_windows_installer_gold_proof.ps1 @args
+          if ("${{ inputs.auto_capture_visuals }}" -eq "true") {
+            $proofArgs["CaptureVisualAudit"] = $true
+            $proofArgs["AutoCaptureVisualAudit"] = $true
+            $proofArgs["ScaledDpiScale"] = "${{ inputs.scaled_dpi_scale }}"
+            $proofArgs["VisualClippingStatus"] = "review_required"
+            $proofArgs["VisualReadabilityStatus"] = "review_required"
+          }
+          & .\scripts\capture_windows_installer_gold_proof.ps1 @proofArgs
 
       - name: Verify proof receipt
         id: verify
