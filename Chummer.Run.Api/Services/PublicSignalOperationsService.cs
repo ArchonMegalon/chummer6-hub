@@ -340,11 +340,11 @@ public sealed class PublicSignalOperationsService
             }
 
             return new PublicSignalOperationsDetailViewModel(
-                DetailKindLabel: "Source receipt drilldown",
-                DetailKeyLabel: "Source receipt",
+                DetailKindLabel: "Source record drilldown",
+                DetailKeyLabel: "Source record",
                 DetailKey: sourceReceipt.ReceiptId,
                 Eyebrow: "Feedback operations detail",
-                Heading: $"{NormalizeOptional(sourceReceipt.ItemReference) ?? sourceReceipt.ReceiptId} source receipt",
+                Heading: $"{NormalizeOptional(sourceReceipt.ItemReference) ?? sourceReceipt.ReceiptId} source record",
                 Summary: summary,
                 FilterKey: normalizedFilter,
                 FilterLabel: ResolveDetailFilterLabel(normalizedFilter),
@@ -1130,7 +1130,7 @@ public sealed class PublicSignalOperationsService
         else
         {
             consentStatusLabel = "Consent basis configured";
-            consentSummary = $"A first-party consent or transactional-basis reference is configured for public closeout, and {audience.ProjectedRecipientCount} projected follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently have the required first-party follow setting plus verified email link.";
+            consentSummary = $"A first-party consent or transactional-basis reference is configured for public closeout, and {audience.ProjectedRecipientCount} projected follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently have the required first-party follow setting plus confirmed email link.";
         }
 
         string queueStatusLabel;
@@ -1148,7 +1148,7 @@ public sealed class PublicSignalOperationsService
         else
         {
             queueStatusLabel = "Queue adapter configured";
-            queueSummary = "This instance can hand a public closeout candidate to the Hub-owned EA delivery queue once release proof and governor closeout approval say the message should exist.";
+            queueSummary = "This instance can hand a public closeout candidate to the Hub-owned EA delivery queue once release status and governor closeout approval say the message should exist.";
         }
 
         string governorStatusLabel;
@@ -1168,18 +1168,18 @@ public sealed class PublicSignalOperationsService
         string releaseProofSummary;
         if (!string.IsNullOrWhiteSpace(proofLookup.CurrentnessFailureReason))
         {
-            releaseProofStatusLabel = "Release proof stale";
+            releaseProofStatusLabel = "Release status stale";
             releaseProofSummary = $"Outbox materialization stays blocked because {proofLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')} for {CloseoutProofRoute}.";
         }
         else if (proofReceipt is null)
         {
-            releaseProofStatusLabel = "Release proof pending";
-            releaseProofSummary = $"Outbox materialization stays blocked until {CloseoutProofRoute} has a current first-party local release-proof receipt.";
+            releaseProofStatusLabel = "Release status pending";
+            releaseProofSummary = $"Outbox materialization stays blocked until {CloseoutProofRoute} has a current first-party release status record.";
         }
         else
         {
-            releaseProofStatusLabel = "Release proof current";
-            releaseProofSummary = $"Local release proof currently covers {proofReceipt.MatchedRoute} through receipt {proofReceipt.ReceiptId} in package {proofReceipt.PackageId}.";
+            releaseProofStatusLabel = "Release status current";
+            releaseProofSummary = $"Current release status covers {proofReceipt.MatchedRoute} through record {proofReceipt.ReceiptId} in package {proofReceipt.PackageId}.";
         }
 
         return new CloseoutRuntimeReadiness(
@@ -1294,8 +1294,8 @@ public sealed class PublicSignalOperationsService
                 ProviderKey: "emailit",
                 StatusLabel: emailitSecret is null ? "Pending" : "Configured",
                 Summary: emailitSecret is null
-                    ? "Delivery callback verification is still blocked on this instance, so delivered, bounced, complained, and suppressed events cannot yet return through the first-party ingress."
-                    : "Delivery callback verification is configured. Public closeout mail can now return through the first-party ingress with delivered, soft-bounce, hard-bounce, complaint, and suppression normalization.",
+                    ? "Delivery callback setup is still blocked on this instance, so delivered, bounced, complained, and suppressed events cannot yet return through the first-party ingress."
+                    : "Delivery callback setup is configured. Public closeout mail can now return through the first-party ingress with delivered, soft-bounce, hard-bounce, complaint, and suppression normalization.",
                 SecretHeader: "X-Delivery-Webhook-Secret",
                 Routes: publicDeliveryRoutes),
             new PublicSignalDeliveryOutcomeIngressViewModel(
@@ -1303,8 +1303,8 @@ public sealed class PublicSignalOperationsService
                 ProviderKey: "ea",
                 StatusLabel: eaSecret is null ? "Pending" : "Configured",
                 Summary: eaSecret is null
-                    ? "The Hub outbox callback verification is still blocked on this instance, so retry, dead-letter, and bounded delivery-failure events cannot yet return through the first-party ingress."
-                    : "The Hub outbox callback verification is configured. Public closeout delivery state can now return through the first-party ingress with retry-window and dead-letter normalization.",
+                    ? "The Hub outbox callback setup is still blocked on this instance, so retry, dead-letter, and bounded delivery-failure events cannot yet return through the first-party ingress."
+                    : "The Hub outbox callback setup is configured. Public closeout delivery state can now return through the first-party ingress with retry-window and dead-letter normalization.",
                 SecretHeader: "X-Outbox-Webhook-Secret",
                 Routes: publicOutboxRoutes),
             new PublicSignalDeliveryOutcomeIngressViewModel(
@@ -1919,7 +1919,7 @@ public sealed class PublicSignalOperationsService
         {
             "sent" => "Focus on recipient threads that already reached a first-party sent state.",
             "retrying" => "Focus on retry holds and recovery candidates still waiting for another bounded delivery attempt.",
-            "suppressed" => "Focus on recipients held back by suppression, bounce, or explicit no-send posture.",
+            "suppressed" => "Focus on recipients held back by suppression, bounce, or explicit no-send status.",
             "callback_pending" => "Focus on outbound attempts that still do not have a bounded delivery update receipt.",
             _ => "Reopen the full bounded recipient list for this source receipt."
         };
@@ -2085,7 +2085,7 @@ public sealed class PublicSignalOperationsService
     {
         string matchReason = ResolveLookupMatchReason(
             tokens,
-            ("Source receipt id", sourceReceipt.ReceiptId),
+            ("Source record id", sourceReceipt.ReceiptId),
             ("Provider event id", sourceReceipt.ProviderEventId),
             ("Item reference", sourceReceipt.ItemReference),
             ("Category label", sourceReceipt.CategoryLabel),
@@ -2116,9 +2116,9 @@ public sealed class PublicSignalOperationsService
         }
 
         return new PublicSignalOperationsLookupResultViewModel(
-            ResultKindLabel: "Source receipt",
+            ResultKindLabel: "Source record",
             MatchReason: matchReason,
-            KeyLabel: "Source receipt",
+            KeyLabel: "Source record",
             Key: sourceReceipt.ReceiptId,
             Heading: $"{NormalizeOptional(sourceReceipt.CategoryLabel) ?? "Uncategorized"} · {NormalizeOptional(sourceReceipt.ItemReference) ?? sourceReceipt.ReceiptId}",
             Summary: BuildSourceReceiptDetailSummary(sourceReceipt, dispatchStates.Length, outcomeCount, journeyCount),
@@ -2140,7 +2140,7 @@ public sealed class PublicSignalOperationsService
         string matchReason = ResolveLookupMatchReason(
             tokens,
             ("Dispatch receipt id", dispatchReceipt.ReceiptId),
-            ("Source receipt id", dispatchReceipt.SourceReceiptId),
+            ("Source record id", dispatchReceipt.SourceReceiptId),
             ("Recipient ref", dispatchReceipt.RecipientRef),
             ("Address hash", dispatchReceipt.AddressHash),
             ("Delivery id", dispatchReceipt.DeliveryId),
@@ -2192,7 +2192,7 @@ public sealed class PublicSignalOperationsService
     private static string ResolveLookupScopeLabel(string scope)
         => scope switch
         {
-            "source" => "Source receipts only",
+            "source" => "Source records only",
             "thread" => "Recipient threads only",
             _ => "Sources and threads"
         };
@@ -2707,7 +2707,7 @@ public sealed class PublicSignalOperationsService
             StatusLabel = statusLabel,
             DeliveryState = NormalizeOptional(receipt.DeliveryState) ?? ResolveStoredCloseoutDeliveryState(statusLabel, voterNotificationAllowed),
             DeliveryLane = NormalizeOptional(receipt.DeliveryLane) ?? (deliveryCandidate
-                ? "Changelog, release proof, then first-party voter closeout"
+                ? "Changelog, release status, then first-party voter closeout"
                 : "Changelog first, first-party voter closeout stays blocked"),
             TemplateId = NormalizeOptional(receipt.TemplateId) ?? ResolveStoredCloseoutTemplateId(statusLabel),
             RecipientScopeRef = NormalizeOptional(receipt.RecipientScopeRef) ?? DefaultProjectionSourceRef,
@@ -2983,7 +2983,7 @@ public sealed class PublicSignalOperationsService
             StatusLabel: statusLabel,
             DeliveryState: deliveryState,
             DeliveryLane: deliveryCandidate
-                ? "Changelog, release proof, then first-party voter closeout"
+                ? "Changelog, release status, then first-party voter closeout"
                 : "Changelog first, first-party voter closeout stays blocked",
             TemplateId: templateId,
             RecipientScopeRef: readiness.ProjectionSourceRef,
@@ -3436,9 +3436,9 @@ public sealed class PublicSignalOperationsService
     {
         string summary = status switch
         {
-            "replayed" => $"Replay materialized {dispatchReceiptsCreated} bounded closeout dispatch receipt(s) and {journeyReceiptsRecorded} journey receipt(s) from {replayCandidateCount} ready ProductLift source receipt(s).",
-            "ready_without_new_receipts" => $"Replay inspected {replayCandidateCount} ready ProductLift source receipt(s), but no new bounded dispatch or journey receipts were needed.",
-            _ => $"Replay found no ready ProductLift closeout source receipts that still needed bounded dispatch materialization."
+            "replayed" => $"Replay materialized {dispatchReceiptsCreated} bounded closeout dispatch update(s) and {journeyReceiptsRecorded} journey update(s) from {replayCandidateCount} ready ProductLift source item(s).",
+            "ready_without_new_receipts" => $"Replay inspected {replayCandidateCount} ready ProductLift source item(s), but no new bounded dispatch or journey updates were needed.",
+            _ => $"Replay found no ready ProductLift closeout source items that still needed bounded dispatch materialization."
         };
         ProductLiftReconcileRunReceiptState run = new(
             RunReceiptId: $"plreconcile_{Guid.NewGuid():N}",
@@ -4195,9 +4195,9 @@ public sealed class PublicSignalOperationsService
                 $"Changelog: {ResolvePublicBaseUrl()}{CloseoutProofRoute}",
                 $"Follow settings: {ResolvePublicBaseUrl()}{followSettingsPath}",
                 $"Governor decision: {governorDecisionRef}",
-                $"Release proof receipt: {releaseProofReceiptId}",
+                $"Release status record: {releaseProofReceiptId}",
                 "",
-                "This notice stays first-party and bounded to shipped proof, follow settings, and the Hub-owned notification timeline."
+                "This notice stays first-party and bounded to shipped status, follow settings, and the Hub-owned notification timeline."
             });
 
     private string ResolveCurrentFollowSettingsPath()
@@ -4451,13 +4451,13 @@ public sealed class PublicSignalOperationsService
         {
             return readiness.ReleaseProofStatusLabel switch
             {
-                "Release proof stale" => "The local release-proof package for /changelog is stale, so Hub cannot queue voter closeout yet.",
-                _ => "The public changelog route still lacks a current first-party local release-proof receipt."
+                "Release status stale" => "The release status for /changelog is stale, so Hub cannot queue voter closeout yet.",
+                _ => "The public changelog route still lacks a current first-party release status record."
             };
         }
 
         return readyForOutbox
-            ? "Governor approval, release proof, recipient projection, consent, and the Hub queue bridge are all ready. This candidate can move into the Hub-owned outbox contract without claiming the mail already sent."
+            ? "Governor approval, release status, recipient projection, consent, and the Hub queue bridge are all ready. This candidate can move into the Hub-owned outbox contract without claiming the mail already sent."
             : "The Hub outbox candidate remains blocked until the remaining closeout prerequisites are restored.";
     }
 
@@ -4468,12 +4468,12 @@ public sealed class PublicSignalOperationsService
     {
         if (!readyForOutbox)
         {
-            return $"Webhook receipt {sourceReceipt.ReceiptId} stays on the bounded Hub closeout rail, but the outbox candidate is still blocked until governor approval and current changelog proof line up with the existing delivery prerequisites.";
+            return $"Webhook event {sourceReceipt.ReceiptId} stays on the bounded Hub closeout rail, but the outbox candidate is still blocked until governor approval and current changelog status line up with the existing delivery prerequisites.";
         }
 
         string decisionRef = NormalizeOptional(readiness.GovernorDecisionRef) ?? DefaultGovernorDecisionSourceRef;
-        string proofReceipt = NormalizeOptional(readiness.ReleaseProofReceiptId) ?? "current-proof";
-        return $"Webhook receipt {sourceReceipt.ReceiptId} now has governor decision {decisionRef} plus current {readiness.ReleaseProofRoute} proof receipt {proofReceipt}, so Hub can materialize a bounded outbox candidate for voter closeout without treating provider state as notification truth.";
+        string releaseRecord = NormalizeOptional(readiness.ReleaseProofReceiptId) ?? "current-status";
+        return $"Webhook event {sourceReceipt.ReceiptId} now has governor decision {decisionRef} plus current {readiness.ReleaseProofRoute} status record {releaseRecord}, so Hub can materialize a bounded outbox candidate for voter closeout without treating provider state as notification truth.";
     }
 
     private static string BuildCloseoutQueueReceiptId(
@@ -4613,7 +4613,7 @@ public sealed class PublicSignalOperationsService
         }
 
         return deliveryCandidate
-            ? "Template, recipient projection, consent basis, and queue are ready, but release proof and governor closeout still gate any actual send."
+            ? "Template, recipient projection, consent basis, and queue are ready, but release status and governor closeout still gate any actual send."
             : "First-party closeout is deferred until the remaining delivery prerequisites are restored.";
     }
 
@@ -4629,10 +4629,10 @@ public sealed class PublicSignalOperationsService
     {
         if (category.PrivacySensitive)
         {
-            return $"{category.Label} can drift into private table detail, so webhook receipt {sourceReceipt.ReceiptId} was bounded into a moderation-first Chummer route at {targetPath} instead of staying a public vote thread.";
+            return $"{category.Label} can drift into private table detail, so webhook event {sourceReceipt.ReceiptId} was bounded into a moderation-first Chummer route at {targetPath} instead of staying a public vote thread.";
         }
 
-        return $"{category.Label} is a likely support misroute, so webhook receipt {sourceReceipt.ReceiptId} now points back to {targetPath} instead of being treated as standalone roadmap authority.";
+        return $"{category.Label} is a likely support misroute, so webhook event {sourceReceipt.ReceiptId} now points back to {targetPath} instead of being treated as standalone roadmap authority.";
     }
 
     private static string BuildCloseoutSummary(
@@ -4643,20 +4643,20 @@ public sealed class PublicSignalOperationsService
     {
         if (!closeoutFamilyReady)
         {
-            return $"Webhook receipt {sourceReceipt.ReceiptId} marked {category.Label} as a shipped-closeout candidate, but Chummer still lacks the canonized outbound closeout family required before first-party follow-up can exist.";
+            return $"Webhook event {sourceReceipt.ReceiptId} marked {category.Label} as a shipped-closeout candidate, but Chummer still lacks the canonized outbound closeout family required before first-party follow-up can exist.";
         }
 
         if (!sourceReceipt.VoterNotificationAllowed)
         {
-            return $"Webhook receipt {sourceReceipt.ReceiptId} marked {category.Label} shipped, but ProductLift does not allow voter notification on this item yet, so first-party follow-up stays blocked.";
+            return $"Webhook event {sourceReceipt.ReceiptId} marked {category.Label} shipped, but ProductLift does not allow voter notification on this item yet, so first-party follow-up stays blocked.";
         }
 
         if (!deliveryAdapterConfigured)
         {
-            return $"Webhook receipt {sourceReceipt.ReceiptId} created a bounded first-party closeout candidate for {category.Label}, but the outbound delivery adapter is not configured on this instance yet.";
+            return $"Webhook event {sourceReceipt.ReceiptId} created a bounded first-party closeout candidate for {category.Label}, but the outbound delivery adapter is not configured on this instance yet.";
         }
 
-        return $"Webhook receipt {sourceReceipt.ReceiptId} created a bounded first-party closeout timeline for {category.Label}. Template and adapter readiness are in place, but Hub still needs its own recipient projection, consent basis, and release, route, guide, or artifact proof before any outbound follow-up can be claimed.";
+        return $"Webhook event {sourceReceipt.ReceiptId} created a bounded first-party closeout timeline for {category.Label}. Template and adapter readiness are in place, but Hub still needs its own recipient projection, consent basis, and release, route, guide, or artifact status before any outbound follow-up can be claimed.";
     }
 
     private static string BuildCloseoutDeliveryReason(
@@ -4705,7 +4705,7 @@ public sealed class PublicSignalOperationsService
             return "Recipient projection and consent are ready, but the Hub-owned EA delivery queue bridge is still unconfigured.";
         }
 
-        return "Template, recipient projection, consent basis, and queue are ready, but release proof and governor closeout still gate any actual send.";
+        return "Template, recipient projection, consent basis, and queue are ready, but release status and governor closeout still gate any actual send.";
     }
 
     private static MatchedFeedbackCategory ResolveMatchedCategory(
@@ -4809,12 +4809,12 @@ public sealed class PublicSignalOperationsService
         {
             return snapshot.ReceiptCount > 0
                 ? "Bounded public-feedback receipt history exists, but the callback secret is missing on this instance now. The first-party adapter cannot safely accept new hosted callbacks until the secret is restored."
-                : "Hosted feedback callback verification is not configured here yet, so hosted receipts cannot write back to the first-party loop on this instance.";
+                : "Hosted feedback callback setup is not configured here yet, so hosted records cannot write back to the first-party loop on this instance.";
         }
 
         if (snapshot.ReceiptCount == 0)
         {
-            return "Hosted feedback callback verification is configured here, so hosted receipts can return through a Chummer-owned adapter as soon as the public board starts posting callbacks.";
+            return "Hosted feedback callback setup is configured here, so hosted records can return through a Chummer-owned adapter as soon as the public board starts posting callbacks.";
         }
 
         string lastReceipt = snapshot.LastReceiptAtUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "an unknown time";

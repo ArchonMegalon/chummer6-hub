@@ -104,7 +104,7 @@
             Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public feedback page. Install failures, account issues, logs, and private campaign detail do not.",
             Href: "/feedback",
             Label: "Open feedback",
-            Proof: new[] { "Public by default", "Votes inform demand", "No private logs" }));
+            Proof: new[] { "Public by default", "Votes show demand", "No private logs" }));
         contactRouteChoices.Add((
             Id: "right-lane",
             Badge: "Private support",
@@ -112,7 +112,7 @@
             Summary: "First-party support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs, support history, or a quieter follow-up loop.",
             Href: "#support-intake",
             Label: "Open support intake",
-            Proof: new[] { "Support-owned", "Tracked return", "Private by default" }));
+            Proof: new[] { "Private reply", "Follow-up stays here", "Private by default" }));
         contactRouteChoices.Add((
             Id: "tracked-support",
             Badge: "Tracked return",
@@ -120,7 +120,7 @@
             Summary: "Guest submissions are allowed, but account-backed follow-up keeps the case, recovery state, and later replies attached to the same Chummer return path.",
             Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
             Label: Model.SupportIntake.AccountSupportLabel,
-            Proof: new[] { "Guest allowed", "History in Account", "No outside account required" }));
+            Proof: new[] { "Guest allowed", "History in Account", "No outside account needed" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
             Badge: "Account return",
@@ -131,7 +131,7 @@
             Proof: new[]
             {
                 Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install path",
-                "Devices & access stays calm",
+                "Devices & access stays simple",
                 "Account return, not claim ritual"
             }));
         contactRouteChoices.Add((
@@ -141,7 +141,7 @@
             Summary: "The routing concierge keeps public feedback, private support, install return, and support follow-up separate without replacing any first-party truth lane.",
             Href: "/contact/concierge",
             Label: "Open concierge",
-            Proof: new[] { "Optional", "Kill-switch ready", "Fallback always visible" }));
+            Proof: new[] { "Optional", "Simple fallback", "Help stays visible" }));
     }
 }
 

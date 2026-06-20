@@ -7,7 +7,7 @@
     var helpAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Href, "/help", StringComparison.OrdinalIgnoreCase))
         ?? new TrustPageActionViewModel("Return to help", "/help", "secondary");
     var installAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Tone, "ghost", StringComparison.OrdinalIgnoreCase));
-    var responseRoutes = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var responseRoutes = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
     var helperFacts = new List<(string Heading, string Summary)>();
 
     static string TrustRowValue(
@@ -28,18 +28,18 @@
                 : "Guest follow-up still works on reply email, but an account keeps later support history, linked installs, and recovery on one calmer return path.",
             Href: primaryAction.Href,
             Label: primaryAction.Label,
-            Proof: Model.Chrome.Authenticated
+            Details: Model.Chrome.Authenticated
                 ? new[] { "Same case id", "Tracked updates", "Private by default" }
                 : new[] { "Guest still works", "History in Account", "No personalized binary" }));
     }
 
     responseRoutes.Add((
-        Badge: "Reality check",
-        Title: "Use what works today when you need current public fix truth",
+        Badge: "Current status",
+        Title: "Use what works today when you need the current fix status",
         Summary: "Downloads, status, and known caution stay on the release surfaces when you need to know whether a fix is already user-available instead of merely accepted into support.",
         Href: "/now",
         Label: "Open what works today",
-        Proof: new[] { "Current release", "Known caution", "Release-linked" }));
+        Details: new[] { "Current release", "Known caution", "Release-linked" }));
 
     responseRoutes.Add((
         Badge: "Help",
@@ -47,7 +47,7 @@
         Summary: "Use help when the question turns back into direction: install trouble, account recovery, product questions, or figuring out which first-party page should own the next move.",
         Href: helpAction.Href,
         Label: helpAction.Label,
-        Proof: new[] { "First-party help", "Safe next step", "No outside account required" }));
+        Details: new[] { "First-party help", "Safe next step", "No outside account required" }));
 
     if (installAction is not null)
     {
@@ -59,7 +59,7 @@
             Summary: "The installer or affected copy still owns relink, reclaim, and recovery. This confirmation page should not split the install flow into a browser-only ritual.",
             Href: installAction.Href,
             Label: installAction.Label,
-            Proof: new[] { "Same install page", "Devices & access stays calm", "No browser-only recovery" }));
+            Details: new[] { "Same install page", "Devices & access stays calm", "Same recovery path" }));
     }
 
     if (Model.TrackedCaseSummary is not null)
@@ -69,7 +69,7 @@
         helperFacts.Add(("Follow-up status", Model.TrackedCaseSummary.FollowUpLaneSummary));
         helperFacts.Add(("Release status", Model.TrackedCaseSummary.ReleaseProgressSummary));
         helperFacts.Add(("Linked install state", Model.TrackedCaseSummary.InstallReadinessSummary));
-        helperFacts.Add(("Fix confirmation", Model.TrackedCaseSummary.VerificationSummary));
+        helperFacts.Add(("Fix status", Model.TrackedCaseSummary.VerificationSummary));
         if (!string.IsNullOrWhiteSpace(Model.TrackedCaseSummary.AffectedInstallSummary))
         {
             helperFacts.Add(("Affected install", Model.TrackedCaseSummary.AffectedInstallSummary!));
@@ -140,9 +140,9 @@
                 <h3>@route.Title</h3>
                 <p>@route.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var proof in route.Proof)
+                    @foreach (var detail in route.Details)
                     {
-                        <span>@proof</span>
+                        <span>@detail</span>
                     }
                 </div>
                 <a class="editorial-strip__action" href="@route.Href">@route.Label</a>
@@ -203,7 +203,7 @@
 {
     <section class="editorial-block">
         <details class="details-drawer">
-            <summary>Saved evidence</summary>
+            <summary>Saved files</summary>
             <div class="settings-summary-list">
                 @foreach (var attachment in Model.Attachments)
                 {

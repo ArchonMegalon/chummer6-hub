@@ -13,7 +13,7 @@ param(
     [string]$ScaledDpiScale = "1.5",
     [switch]$AutoCapture,
     [int]$AutoCaptureDelaySeconds = 3,
-    [int]$AutoCaptureTimeoutSeconds = 45
+[int]$AutoCaptureTimeoutSeconds = 45
 )
 
 Set-StrictMode -Version Latest
@@ -176,6 +176,10 @@ if (-not (Test-Path -LiteralPath $installerFullPath)) {
 $outputFullRoot = Resolve-RepoPath $OutputRoot
 New-Item -ItemType Directory -Force -Path $outputFullRoot | Out-Null
 $sourcePath = Join-Path $outputFullRoot "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+$effectiveAutoCaptureTimeoutSeconds = [Math]::Max(1, [Math]::Min($AutoCaptureTimeoutSeconds, 90))
+if ($AutoCapture -and $effectiveAutoCaptureTimeoutSeconds -ne $AutoCaptureTimeoutSeconds) {
+    Write-Host "Auto-capture timeout capped at $effectiveAutoCaptureTimeoutSeconds seconds per surface."
+}
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -347,9 +351,9 @@ foreach ($request in $captureRequests) {
     Write-Host "Put the Windows installer surface to audit on screen, then press Enter."
     Write-Host "Surface: $captureSurface; DPI label: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
     if ($AutoCapture) {
-        Write-Host "Waiting up to $AutoCaptureTimeoutSeconds seconds for the $captureSurface window."
+        Write-Host "Waiting up to $effectiveAutoCaptureTimeoutSeconds seconds for the $captureSurface window."
         try {
-            $window = Wait-ForInstallerSurface $captureSurface $AutoCaptureTimeoutSeconds
+            $window = Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds
         }
         catch {
             $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })

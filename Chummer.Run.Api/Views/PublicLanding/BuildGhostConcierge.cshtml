@@ -32,8 +32,8 @@
             .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
             .Replace("governor", "review", StringComparison.OrdinalIgnoreCase)
             .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
             .Replace("operator", "support", StringComparison.OrdinalIgnoreCase);
     }
@@ -114,15 +114,15 @@
 
 <section class="trust-claims">
     <div class="trust-claims__lead">
-        <p class="eyebrow">Checks</p>
-        <h2 class="editorial-title">The helper should leave clear checks.</h2>
+        <p class="eyebrow">Details</p>
+        <h2 class="editorial-title">The helper should leave clear changes.</h2>
         <p class="editorial-copy">A builder should be able to see what was compared, what changed, and whether the draft was applied or discarded.</p>
     </div>
     <div class="trust-claims__grid">
         @foreach (var artifact in projection.CompareArtifacts)
         {
             <article class="trust-claim">
-                <span class="tag">Check</span>
+                <span class="tag">Detail</span>
                 <h3>@SanitizePublicCopy(artifact)</h3>
                 <p>Chummer output only. No helper is allowed to publish this as truth on its own.</p>
             </article>
@@ -136,7 +136,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Signed-in helper</p>
-            <h2 class="editorial-title">The real compare bench is now a named account lane.</h2>
+            <h2 class="editorial-title">The real compare bench is now a named account path.</h2>
             <p class="editorial-copy">@SanitizePublicCopy(signedInBench.Summary)</p>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="@signedInBench.EntryHref">@SanitizePublicCopy(signedInBench.EntryLabel)</a>
@@ -150,7 +150,7 @@
             <article class="route-choice-card">
                 <span class="tag">@SanitizePublicCopy(signedInBench.StatusLabel)</span>
                 <h3>@SanitizePublicCopy(signedInBench.LeadHandoffTitle ?? "Character helper workbench")</h3>
-                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The signed-in helper keeps tradeoffs, rule differences, and reviewed output history on the account rail.")</p>
+                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The signed-in helper keeps tradeoffs, rule differences, and reviewed output history on the account page.")</p>
                 @if (signedInBench.ProofPoints is { Count: > 0 })
                 {
                     <div class="route-choice-card__proof">
@@ -181,7 +181,7 @@
         <article class="route-choice-card">
             <span class="tag">Public shaping</span>
             <h3>Keep design feedback public</h3>
-            <p>Use the public board when the ask is about lane design, visibility, or workflow polish rather than a private failure.</p>
+            <p>Use the public board when the ask is about workflow design, visibility, or polish rather than a private failure.</p>
             <a class="editorial-strip__action" href="@projection.PublicFeedbackHref">Open public feedback</a>
         </article>
     </div>

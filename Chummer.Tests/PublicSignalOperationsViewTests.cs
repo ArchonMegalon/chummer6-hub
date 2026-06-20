@@ -45,8 +45,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Open detail artifact", detailView, StringComparison.Ordinal);
         Assert.Contains("Open aggregate artifact", detailView, StringComparison.Ordinal);
         Assert.Contains("Drilldown summary", detailView, StringComparison.Ordinal);
-        Assert.Contains("Receipt spine", detailView, StringComparison.Ordinal);
-        Assert.Contains("Source receipt", detailView, StringComparison.Ordinal);
+        Assert.Contains("Activity", detailView, StringComparison.Ordinal);
+        Assert.Contains("source record", detailView, StringComparison.Ordinal);
         Assert.Contains("Saved pivots", detailView, StringComparison.Ordinal);
         Assert.Contains("Current filter", detailView, StringComparison.Ordinal);
         Assert.Contains("Open pivot artifact", detailView, StringComparison.Ordinal);

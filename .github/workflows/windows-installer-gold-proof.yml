@@ -124,6 +124,10 @@ jobs:
             Remove-Item -LiteralPath $visualRoot -Recurse -Force
           }
           New-Item -ItemType Directory -Force -Path $visualRoot | Out-Null
+          $generatedAuditPath = ".codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
+          if (Test-Path -LiteralPath $generatedAuditPath) {
+            Remove-Item -LiteralPath $generatedAuditPath -Force
+          }
           $tracePath = Join-Path $env:TEMP "chummer-desktop-installer-progress.log"
           if (Test-Path -LiteralPath $tracePath) {
             Remove-Item -LiteralPath $tracePath -Force

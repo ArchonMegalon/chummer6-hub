@@ -28,8 +28,8 @@ public sealed class GmSessionVenueIntegrationTests
         Assert.Contains("[HttpGet(\"/account/campaigns/{campaignId}/sessions/{sessionId}/venue/manage\")]", landingController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/campaigns/{campaignId}/sessions/{sessionId}/venue/closeout\")]", landingController, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/GmSessionVenue.cshtml\", model);", landingController, StringComparison.Ordinal);
-        Assert.Contains("Live room integration unavailable. Paste your external room link manually or use another provider.", landingController, StringComparison.Ordinal);
-        Assert.Contains("Create BeHuman venue is unavailable until a verified adapter transport base URL exists.", adapter, StringComparison.Ordinal);
+        Assert.Contains("Live room integration unavailable. Paste your external room link manually or use another service.", landingController, StringComparison.Ordinal);
+        Assert.Contains("Create BeHuman venue is unavailable until service setup and operating status are ready.", adapter, StringComparison.Ordinal);
         Assert.Contains("venue_url host is not an allowed BeHuman domain.", adapter, StringComparison.Ordinal);
         Assert.Contains("venue_url may not include suspicious query payloads.", adapter, StringComparison.Ordinal);
         Assert.Contains("adapter_create_mode", service, StringComparison.Ordinal);
@@ -39,6 +39,6 @@ public sealed class GmSessionVenueIntegrationTests
         Assert.Contains("Attendance sync", venueView, StringComparison.Ordinal);
         Assert.Contains("Create BeHuman room unavailable", venueView, StringComparison.Ordinal);
         Assert.Contains("Provider create available", venueView, StringComparison.Ordinal);
-        Assert.Contains("Create mode stays hidden or unavailable until provider verification and transport are both real.", venueView, StringComparison.Ordinal);
+        Assert.Contains("Create mode stays hidden or unavailable until service setup and transport are both ready.", venueView, StringComparison.Ordinal);
     }
 }

@@ -10,7 +10,7 @@
         <p class="eyebrow">Faction command</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">This is the internal Black Ledger bridgehead: one globe, one board state, one faction posture, and one professional world-turn briefing lane.</p>
+        <p class="ledger-flagship__support">This is the internal campaign city bridgehead: one globe, one board state, one faction posture, and one professional world-turn briefing.</p>
         <div class="trust-claim__microproof">
             <span>Faction: @Model.Faction.PublicName</span>
             <span>Membership: @Model.Allegiance.MembershipType</span>
@@ -39,7 +39,7 @@
                 data-secondary-label="Leader briefing"
                 data-secondary-href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')/leader-briefing"></div>
         </div>
-        <div class="ledger-flagship__nav" aria-label="Black Ledger command lanes">
+        <div class="ledger-flagship__nav" aria-label="Campaign city command paths">
             <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">
                 <span class="tag">Workspace</span>
                 <strong>Faction command deck</strong>
@@ -51,8 +51,8 @@
                 <p>Personalized pressure calls, next moves, and per-faction world-tick interpretation.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
-                <span class="tag">Validation</span>
-                <strong>World turn check</strong>
+                <span class="tag">World state</span>
+                <strong>Turn review</strong>
                 <p>Review the current turn before it moves further.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/notifications">
@@ -79,13 +79,13 @@
         </div>
         <div class="trust-claim__microproof">
             <span>Policy: @Model.NewsreelStatus.Policy</span>
-            <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
+            <span>Records: @Model.NewsreelStatus.ReceiptCount</span>
             <span>Recipients sent: @Model.NewsreelStatus.RecipientCount</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification history</a>
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn check</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn review</a>
         </div>
     </section>
 }
@@ -101,19 +101,19 @@
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Players</span>
-                <p>@Model.AdvisorySummary.PlayerBallots.Count player advisory ballot(s) are open on this lane.</p>
+                <p>@Model.AdvisorySummary.PlayerBallots.Count player advisory ballot(s) are open on this path.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">GMs</span>
-                <p>@Model.AdvisorySummary.GmBallots.Count GM strategy ballot(s) are open on this lane.</p>
+                <p>@Model.AdvisorySummary.GmBallots.Count GM strategy ballot(s) are open on this path.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Executive</span>
-                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive intake summary lane(s) are available.</p>
+                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive intake summary item(s) are available.</p>
             </article>
         </div>
         <div class="stacked-actions">
-            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory lane</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory</a>
             <a class="button-like button-like--secondary" href="@Model.AdvisorySummary.OpenMailHref">Open mail-backed route</a>
         </div>
     </section>
@@ -188,7 +188,7 @@
                 <span class="tag">Living Newsroom</span>
                 <p>@Model.FollowThroughPacket.LivingNewsroomSummary</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.FollowThroughPacket.LivingNewsroomHref">Open watch lane</a>
+                    <a href="@Model.FollowThroughPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
                 </div>
             </article>
@@ -196,7 +196,7 @@
                 <span class="tag">Aftermath</span>
                 <p>@Model.FollowThroughPacket.AftermathSummary</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.FollowThroughPacket.AftermathHref">Open aftermath rail</a>
+                    <a href="@Model.FollowThroughPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
@@ -212,7 +212,7 @@
                     <h3>@cue.StatusLabel</h3>
                     <p>@cue.Summary</p>
                     <div class="route-choice-card__proof">
-                        <a href="@cue.Href">Open lane</a>
+                        <a href="@cue.Href">Open</a>
                     </div>
                 </article>
             }
@@ -260,7 +260,7 @@
                 <div class="stacked-actions">
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.HtmlHref">Open promo brief</a>
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open details</a>
-                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open checks</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open status</a>
                 </div>
             </article>
         </div>
@@ -271,15 +271,15 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Validation</p>
-            <h2 class="editorial-title">Professional world-tick packet</h2>
-            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+            <p class="eyebrow">World state</p>
+            <h2 class="editorial-title">Current world-turn packet</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ValidationPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var check in Model.ValidationPacket.Checks.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">Check</span>
+                    <span class="tag">Detail</span>
                     <p>@check</p>
                 </article>
             }
@@ -292,7 +292,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Recent activity</p>
-            <h2 class="editorial-title">Action trail</h2>
+            <h2 class="editorial-title">Recent activity</h2>
             <p class="editorial-copy">Recent decisions stay easy to review.</p>
         </div>
         <div class="route-choice-grid">

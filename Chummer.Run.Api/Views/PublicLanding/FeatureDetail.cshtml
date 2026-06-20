@@ -21,7 +21,7 @@
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
-    var routeChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var routeChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
     var seenRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     void AddRouteChoice(string badge, string title, string summary, string href, string label, params string[] proof)
@@ -62,7 +62,7 @@
         "roadmap" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check what is available today",
+            Title: "See what is available today",
             Summary: "Use the current status page when you want to know what is ready to use.",
             Proof: new[] { "Current status", "Download path", "Known limits" }),
         "live-proof" => (
@@ -74,13 +74,13 @@
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check what is available today",
+            Title: "See what is available today",
             Summary: "Use the current status page before planning around an upcoming feature.",
             Proof: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check what is available today",
+            Title: "See what is available today",
             Summary: "Use the current status page when availability matters more than the feature brief.",
             Proof: new[] { "Current status", "Downloads", "Help nearby" })
     };
@@ -163,7 +163,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Where to go next.</h2>
-        <p class="editorial-copy">Pick the next page for the job: install, check status, check detail, or get help.</p>
+        <p class="editorial-copy">Pick the next page for the job: install, status, details, or help.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -172,8 +172,8 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                <div class="route-choice-card__details">
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }

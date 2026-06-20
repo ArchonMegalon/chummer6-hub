@@ -24,13 +24,13 @@ public sealed class ImportRouteParityProofGuardService
         {
             return new ImportRouteParityProofGuardSnapshot(
                 false,
-                "the current local release-proof package is unavailable, so direct proof receipts for translator, XML amendment, Hero Lab, and adjacent import routes are not current");
+                "the current release status package is unavailable, so translator, XML amendment, Hero Lab, and adjacent import routes need review");
         }
 
         if (!snapshot.IsCurrent)
         {
             string reason = string.IsNullOrWhiteSpace(snapshot.CurrentnessReason)
-                ? "the current local release-proof package is not current, so direct proof receipts for translator, XML amendment, Hero Lab, and adjacent import routes are not current"
+                ? "the current release status package is not current, so translator, XML amendment, Hero Lab, and adjacent import routes need review"
                 : snapshot.CurrentnessReason!.Trim().TrimEnd('.');
             return new ImportRouteParityProofGuardSnapshot(false, reason);
         }
@@ -47,7 +47,7 @@ public sealed class ImportRouteParityProofGuardService
         {
             return new ImportRouteParityProofGuardSnapshot(
                 false,
-                $"the current local release-proof package does not publish direct proof receipts for translator, XML amendment, Hero Lab, and adjacent import routes: {string.Join(", ", missingReceiptIds)}");
+                $"the current release status package does not include translator, XML amendment, Hero Lab, and adjacent import routes: {string.Join(", ", missingReceiptIds)}");
         }
 
         return new ImportRouteParityProofGuardSnapshot(true, null);

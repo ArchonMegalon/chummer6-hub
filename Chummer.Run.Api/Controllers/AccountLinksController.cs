@@ -151,4 +151,59 @@ public sealed class AccountLinksController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
+
+    [HttpGet("links/channels/{channelKind}/deeplink")]
+    [ProducesResponseType<ChannelDeepLinkResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ChannelDeepLinkResponse>> GetChannelDeeplink(string channelKind, [FromQuery] string? channelHandle, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            return Ok(_links.GetChannelDeepLink(subject.SubjectId, channelKind, channelHandle));
+        }
+        catch (ArgumentException ex)
+        {
+            return ValidationProblem(detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpPost("channels/{channelKind}/executive-assistant")]
+    [ValidateAntiForgeryToken]
+    [ProducesResponseType<ChannelLinkDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ChannelLinkDto>> LinkChannelToExecutiveAssistant(
+        string channelKind,
+        [FromBody] LinkChannelToExecutiveAssistantRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("executive assistant link payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_links.LinkChannelToExecutiveAssistant(channelKind, request with { SubjectId = subject.SubjectId }));
+        }
+        catch (ArgumentException ex)
+        {
+            return ValidationProblem(detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 }

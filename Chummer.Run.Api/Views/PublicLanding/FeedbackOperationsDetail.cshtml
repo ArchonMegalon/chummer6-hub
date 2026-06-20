@@ -77,19 +77,19 @@
 
 <section class="status-decision-strip" aria-label="Drilldown summary">
     <article class="status-decision-strip__card">
-        <span class="tag">Receipt spine</span>
+        <span class="tag">Activity</span>
         <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this drilldown.</h2>
-        <p>@dispatchReceipts.Length dispatch receipt@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey receipt@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
+        <p>@dispatchReceipts.Length dispatch record@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey record@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Queue posture</span>
         <h2>@queueReceipts.Length bounded queue candidate@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this drilldown.</h2>
-        <p>@closeoutReceipts.Length closeout follow-up receipt@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing receipt@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
+        <p>@closeoutReceipts.Length closeout follow-up record@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing record@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Public-safe detail</span>
         <h2>Raw delivery payloads still stay out of first-party storage.</h2>
-        <p>This page only uses bounded receipt metadata, hashed recipient identity, and first-party closeout state.</p>
+        <p>This page only uses bounded metadata, hashed recipient identity, and Chummer closeout state.</p>
     </article>
 </section>
 
@@ -108,8 +108,8 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Source receipt</p>
-            <h2 class="editorial-title">The originating source receipt stays visible as the root of this drilldown.</h2>
+            <p class="eyebrow">Source record</p>
+            <h2 class="editorial-title">The originating source record stays visible as the root of this drilldown.</h2>
             <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, dispatch, outcome, and journey state.</p>
         </div>
         <div class="route-choice-grid">
@@ -162,9 +162,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Receipt spine</p>
-            <h2 class="editorial-title">Routing, closeout posture, and queue readiness stay inspectable before any delivery update lands.</h2>
-            <p class="editorial-copy">This keeps the support boundary, voter-follow-up posture, and outbox readiness explicit on the same page as the later delivery timeline, including recipient threads, dispatch receipts, outcome updates, journey writeback, and saved pivots.</p>
+            <p class="eyebrow">Activity</p>
+            <h2 class="editorial-title">Routing, closeout status, and queue readiness stay clear before any delivery update lands.</h2>
+            <p class="editorial-copy">This keeps support boundaries, voter follow-up, and outbox readiness on the same page as the later delivery timeline, including recipient threads, dispatch updates, outcome updates, journey writeback, and saved pivots.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in routingReceipts)
@@ -231,8 +231,8 @@
                         <span>@receipt.DispatchTool</span>
                         <span>@receipt.DispatchAction</span>
                         <span>@receipt.JourneyEventKey</span>
-                        <span>@receipt.ReleaseProofRoute</span>
-                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? receipt.ReleaseProofReceiptId : "Release proof pending")</span>
+                        <span>@PublicFacingCopyHumanizer.Clean(receipt.ReleaseProofRoute)</span>
+                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.ReadyForOutbox)
@@ -264,7 +264,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Filtered result</p>
             <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this bounded drilldown.</h2>
-            <p class="editorial-copy">Use the saved pivots above to reopen the full source receipt or jump straight to another bounded state without leaving this page.</p>
+            <p class="editorial-copy">Use the saved pivots above to reopen the full source record or jump straight to another bounded state without leaving this page.</p>
         </div>
     </section>
 }
@@ -318,9 +318,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Dispatch receipts</p>
-            <h2 class="editorial-title">Every first-party outbound attempt stays visible as a bounded dispatch receipt.</h2>
-            <p class="editorial-copy">This keeps send posture, suppression state, retry timing, and delivery identity aligned to one dispatch spine.</p>
+            <p class="eyebrow">Dispatch records</p>
+            <h2 class="editorial-title">Every first-party outbound attempt stays visible as a dispatch record.</h2>
+            <p class="editorial-copy">This keeps send status, suppression state, retry timing, and delivery identity aligned to one dispatch view.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in dispatchReceipts)
@@ -342,7 +342,7 @@
                         <span>@receipt.ConsentSourceRef</span>
                         <span>@receipt.SuppressionCheck</span>
                         <span>@receipt.GovernorDecisionRef</span>
-                        <span>@receipt.ReleaseProofReceiptId</span>
+                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         @if (receipt.AcceptedAtUtc is { } acceptedAtUtc)
                         {
@@ -380,8 +380,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Delivery updates</p>
-            <h2 class="editorial-title">Delivery update receipts stay bounded but fully attributable to this drilldown spine.</h2>
-            <p class="editorial-copy">Identity match mode, hashed recipient proof, and delivery state stay visible without storing raw payload bodies.</p>
+            <h2 class="editorial-title">Delivery updates stay bounded and attributable.</h2>
+            <p class="editorial-copy">Identity match mode, recipient matching, and delivery state stay visible without storing raw payload bodies.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in deliveryOutcomes)
@@ -432,7 +432,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Journey writeback</p>
             <h2 class="editorial-title">Journey detail only lands after the first-party closeout timeline actually completes.</h2>
-            <p class="editorial-copy">These rows show the bounded voter-notified evidence tied to the same governor decision and release record used by the dispatch spine.</p>
+            <p class="editorial-copy">These rows show bounded voter notifications tied to the same governor decision and release record used by the dispatch timeline.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in journeyReceipts)
@@ -444,7 +444,7 @@
                     <div class="route-choice-card__proof">
                         <span>@receipt.ReceiptId</span>
                         <span>@receipt.GovernorDecisionRef</span>
-                        <span>@receipt.ReleaseProofReceiptId</span>
+                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>

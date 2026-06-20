@@ -10,7 +10,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Session venue</p>
     <h1 class="page-title">@Model.SessionTitle</h1>
-    <p class="page-copy">@Model.CampaignName keeps the campaign truth. This page only manages the live-room handoff and the return path after the session.</p>
+    <p class="page-copy">@Model.CampaignName keeps the campaign record. This page only manages the live-room handoff and the return path after the session.</p>
     <div class="stacked-actions">
         @if (!string.IsNullOrWhiteSpace(Model.ProviderRoomUrl))
         {
@@ -35,7 +35,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Scheduled time</span>
         <h2>@Model.ScheduledTimeSummary</h2>
-        <p>Keep scheduling visible here without moving campaign or roster truth to the provider.</p>
+        <p>Keep scheduling visible here without moving campaign or roster data to the video service.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Privacy and consent</span>
@@ -47,8 +47,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">What this page must show</p>
-        <h2 class="editorial-title">Session title, campaign name, venue posture, invite return, and closeout stay attached.</h2>
-        <p class="editorial-copy">The page is useful only if the GM and players can see the live-room state without letting the provider become the system of record.</p>
+        <h2 class="editorial-title">Session title, campaign name, venue status, invite return, and closeout stay attached.</h2>
+        <p class="editorial-copy">The page is useful only if the GM and players can see the live-room state without letting the video service become the system of record.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -56,8 +56,8 @@
             <h3>@Model.CampaignName</h3>
             <p>Session id: <code class="mono-receipt">@Model.SessionId</code></p>
             <div class="route-choice-card__proof">
-                <span>Campaign truth stays in Chummer</span>
-                <span>Runner sheets stay out of provider payloads</span>
+                <span>Campaign data stays in Chummer</span>
+                <span>Runner sheets stay out of video-service payloads</span>
                 <span>GM secrets stay private</span>
             </div>
         </article>
@@ -89,14 +89,14 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Manage</p>
-            <h2 class="editorial-title">Create mode stays hidden or unavailable until provider verification and transport are both real.</h2>
-            <p class="editorial-copy">Manual link mode is the required baseline. Provider automation may appear only when the verified adapter boundary is actually ready.</p>
+            <h2 class="editorial-title">Create mode stays hidden or unavailable until service setup and transport are both ready.</h2>
+            <p class="editorial-copy">Manual link mode is the required baseline. Automation may appear only when the connection is actually ready.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">Manual link</span>
                 <h3>Paste BeHuman room URL</h3>
-                <p>Validate the URL, keep the link member-visible only, and log a receipt.</p>
+                <p>Confirm the URL, keep the link member-visible only, and save the room.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Create mode</span>
@@ -112,14 +112,14 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Closeout</p>
-            <h2 class="editorial-title">The room can close without inventing attendance truth.</h2>
-            <p class="editorial-copy">If provider sync is unavailable or not consented, manual closeout remains valid and the campaign can still continue on Chummer-owned rails.</p>
+            <h2 class="editorial-title">The room can close without inventing attendance.</h2>
+            <p class="editorial-copy">If service sync is unavailable or not consented, manual closeout remains valid and the campaign can still continue inside Chummer.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">Attendance</span>
                 <h3>@Model.AttendeeSyncStatus</h3>
-                <p>Sync requires consent before provider attendance can come back into Chummer.</p>
+                <p>Sync requires consent before attendance can come back into Chummer.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Recap</span>

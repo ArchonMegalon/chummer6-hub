@@ -42,8 +42,8 @@ public sealed class BlackLedgerWorldTickBriefingService
         BlackLedgerNewsreelBroadcastViewModel? broadcast = BuildBroadcastPackage(world, tick, transitionLabel, newsreelLead, bullets, actionBeats, ledgerBasePath);
         IReadOnlyList<string> validationChecks =
         [
-            $"Receipt-backed transition: {transitionLabel}",
-            $"Tick receipt: {tick.ReceiptId}",
+            $"Transition: {transitionLabel}",
+            $"Turn record: {tick.ReceiptId}",
             $"Public-safe effects carried: {tick.Effects.Count}",
             $"Dispatch lane: {ledgerBasePath.TrimEnd('/')}/turns/{tick.Turn}/dispatches",
             "No private campaign labels, support records, or sourcebook text are allowed in this packet."
@@ -106,7 +106,7 @@ public sealed class BlackLedgerWorldTickBriefingService
 
         if (pressureCalls.Count == 0)
         {
-            pressureCalls.Add("No private-only data was promoted here, so the digest falls back to public faction signals and the city-wide turn receipt.");
+            pressureCalls.Add("No private-only data was promoted here, so the digest falls back to public faction signals and the city-wide turn record.");
         }
 
         var recommendedActions = new List<string>();
@@ -117,23 +117,23 @@ public sealed class BlackLedgerWorldTickBriefingService
 
         if (coveredDistricts.Any(static district => district.Trend.Contains("rising", StringComparison.OrdinalIgnoreCase)))
         {
-            recommendedActions.Add("Treat rising districts as validation targets: collect receipts before you claim momentum publicly.");
+            recommendedActions.Add("Treat rising districts as test cases: collect the facts before you claim momentum publicly.");
         }
 
         if (relevantEffects.Any(static effect => effect.Delta > 0))
         {
-            recommendedActions.Add("Convert positive turn movement into one public-safe dispatch beat and one internal action receipt, not a vague hype post.");
+            recommendedActions.Add("Convert positive turn movement into one public-safe dispatch beat and one clear next action, not a vague hype post.");
         }
 
         if (recommendedActions.Count == 0)
         {
-            recommendedActions.Add("Use Turn 1 as your first clean benchmark: one pressure claim, one evidence trail, one next action.");
+            recommendedActions.Add("Use Turn 1 as your first clean benchmark: one pressure claim, one reason to believe it, one next action.");
         }
 
-        recommendedActions.Add("Keep all world-tick messaging subordinate to the city receipt and never let the ad lane outrun the actual board state.");
+        recommendedActions.Add("Keep all world-tick messaging tied to the city state and never let the ad lane outrun the actual board.");
 
         string heading = $"{faction.PublicName} leader brief";
-        string summary = $"Personalized digest for {faction.FactionLeader}. This readout turns the public world tick into faction-specific pressure, visible district posture, and bounded next actions.";
+        string summary = $"Personalized digest for {faction.FactionLeader}. This readout turns the public world turn into faction-specific pressure, visible district posture, and bounded next actions.";
         string validationHref = $"{accountBasePath.TrimEnd('/')}/factions/{normalizedFactionId}/leader-briefing.json";
 
         return new BlackLedgerFactionLeaderDigestViewModel(
@@ -163,8 +163,8 @@ public sealed class BlackLedgerWorldTickBriefingService
             ? null
             : BuildLeaderDigest(factionId, requestedTurn, accountBasePath);
         string summary = digest is null
-            ? $"{briefing.TransitionLabel} validation packet for the inbox/newsreel lane."
-            : $"{briefing.TransitionLabel} validation packet plus leader-specific readout for {digest.PublicName}.";
+            ? $"{briefing.TransitionLabel} world-state packet for the inbox/newsreel path."
+            : $"{briefing.TransitionLabel} world-state packet plus leader-specific readout for {digest.PublicName}.";
         List<string> checks =
         [
             ..briefing.ValidationChecks,
@@ -382,8 +382,8 @@ public sealed class BlackLedgerWorldTickBriefingService
         }
 
         return note
-            .Replace("proof trail", "board trail", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof trail", "board history", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
             .Trim();

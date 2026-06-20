@@ -277,8 +277,8 @@ public sealed class HubGoogleAuthService
             return new GoogleAuthCompletionResult(
                 Session: null,
                 NextPath: "/login?next=/home",
-                ErrorTitle: "Google email verification is required",
-                ErrorDetail: "Chummer only accepts Google identities that come back with a verified email address.");
+                ErrorTitle: "Google email confirmation is required",
+                ErrorDetail: "Chummer only accepts Google identities that come back with a confirmed email address.");
         }
 
         if (!string.IsNullOrWhiteSpace(mergeSubjectId))

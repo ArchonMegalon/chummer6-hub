@@ -13,7 +13,7 @@
         <div class="trust-claim__microproof">
             <span>@Model.ScopeLabel</span>
             <span>@Model.VerdictLabel</span>
-            <span>Receipt-backed, not book-text-backed</span>
+            <span>Chummer packet, not book text</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -24,9 +24,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Ruleset posture</p>
+        <p class="eyebrow">Ruleset status</p>
         <h2 class="editorial-title">Not an SR5 skin. Not an SR6 mode.</h2>
-        <p class="editorial-copy">This lane treats Shadowrun Anarchy as its own rules-light profile: fast runner sheets, dispatch-compatible consequence, mobile return, and explainable JSON export without copying sourcebook text into the product.</p>
+        <p class="editorial-copy">This path treats Shadowrun Anarchy as its own rules-light profile: fast runner sheets, dispatch-compatible consequence, mobile return, and explainable JSON export without copying sourcebook text into the product.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -38,7 +38,7 @@
         <article class="route-choice-card">
             <span class="tag">@Model.FeaturedProfile.VerdictLabel</span>
             <h3>Public claim ceiling</h3>
-            <p>Shipped rules-light lane for Black Ledger, dispatches, and mobile play. Not full book-level rules completeness.</p>
+            <p>Shipped rules-light path for campaign city dispatches and mobile play. Not full book-level rules completeness.</p>
         </article>
     </div>
  </section>
@@ -86,7 +86,7 @@
     <div class="trust-claims__lead">
         <p class="eyebrow">Black Ledger integration</p>
         <h2 class="editorial-title">Anarchy turns consequence into readable pressure.</h2>
-        <p class="editorial-copy">The same World Tick receipt can feed a rules-light profile, a dispatch lane, and mobile play without flattening Anarchy into a generic overlay.</p>
+        <p class="editorial-copy">The same World Turn state can feed a rules-light profile, a dispatch path, and mobile play without flattening Anarchy into a generic overlay.</p>
     </div>
     <div class="trust-claims__grid">
         @foreach (var stat in Model.LedgerStats)
@@ -105,9 +105,9 @@
 {
     <section class="editorial-block" id="anarchy-dispatches">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Dispatch-compatible lane</p>
+            <p class="eyebrow">Dispatch-compatible path</p>
             <h2 class="editorial-title">The same public-safe dispatches can power Anarchy play.</h2>
-            <p class="editorial-copy">This route reads Chummer-owned dispatch truth and applies an Anarchy lens. It does not invent separate unsupported fiction.</p>
+            <p class="editorial-copy">This route reads Chummer dispatches and applies an Anarchy lens. It does not invent separate unsupported fiction.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var dispatch in Model.Dispatches)
@@ -116,7 +116,7 @@
                     <span class="tag">@dispatch.Type</span>
                     <h3>@dispatch.Title</h3>
                     <p>@dispatch.Summary</p>
-                    <p class="muted-copy">Generated from @dispatch.SourceReceiptId</p>
+                    <p class="muted-copy">Source: @dispatch.SourceReceiptId</p>
                     <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                 </article>
             }
@@ -127,14 +127,14 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Explain and export</p>
-        <h2 class="editorial-title">Chummer owns the truth, the receipt, and the portable packet.</h2>
+        <h2 class="editorial-title">Chummer owns the portable packet.</h2>
         <p class="editorial-copy">The preview export stays Chummer-owned JSON with provenance attached. Adapters may draft around it later, but they do not become publication authority.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@Model.ExplainReceipt.Status</span>
             <h3>@Model.ExplainReceipt.ReceiptId</h3>
-            <p>Source receipt: @Model.ExplainReceipt.SourceReceiptId</p>
+            <p>Source: @Model.ExplainReceipt.SourceReceiptId</p>
             <div class="route-choice-card__proof">
                 @foreach (var note in Model.ExplainReceipt.ProvenanceNotes)
                 {

@@ -15,20 +15,18 @@ public sealed class PublicLandingIdentityPolishTests
         Assert.DoesNotContain("Normalized packet receipt", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Authenticated faction workspace", controller, StringComparison.Ordinal);
 
-        Assert.Contains("Community Hub operations rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Creator OS publication rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Quicksilver command rail", controller, StringComparison.Ordinal);
-        Assert.Contains("JACKPOINT briefing rail", controller, StringComparison.Ordinal);
-        Assert.Contains("RUNSITE prep rail", controller, StringComparison.Ordinal);
-        Assert.Contains("RUN CONTROL operations rail", controller, StringComparison.Ordinal);
-        Assert.Contains("ONRAMP starter rail", controller, StringComparison.Ordinal);
-        Assert.Contains("EDITION STUDIO edition rail", controller, StringComparison.Ordinal);
-        Assert.Contains("LOCAL CO-PROCESSOR profile rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Runner Passport continuity rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Signal Deck command rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Living World continuity rail", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading: \"Community Hub operations rail\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading: \"Creator OS publication rail\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading: \"Quicksilver command rail\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading: \"JACKPOINT briefing rail\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Heading: \"RUNSITE prep rail\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Community Hub operations", controller, StringComparison.Ordinal);
+        Assert.Contains("Creator OS publication", controller, StringComparison.Ordinal);
+        Assert.Contains("Quicksilver command", controller, StringComparison.Ordinal);
+        Assert.Contains("JACKPOINT briefing", controller, StringComparison.Ordinal);
+        Assert.Contains("RUNSITE prep", controller, StringComparison.Ordinal);
         Assert.Contains("Package record", controller, StringComparison.Ordinal);
-        Assert.Contains("KARMA FORGE intake receipt", controller, StringComparison.Ordinal);
+        Assert.Contains("KARMA FORGE", controller, StringComparison.Ordinal);
         Assert.Contains("Faction command workspace", controller, StringComparison.Ordinal);
     }
 
@@ -37,8 +35,7 @@ public sealed class PublicLandingIdentityPolishTests
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
 
-        Assert.Contains("title: \"ALICE\"", controller, StringComparison.Ordinal);
-        Assert.Contains("heading: \"ALICE\"", controller, StringComparison.Ordinal);
+        Assert.Contains("StatusLabel: \"ALICE compare bench\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: \"TABLE PULSE\"", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"TABLE PULSE\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: \"JACKPOINT\"", controller, StringComparison.Ordinal);
@@ -57,9 +54,9 @@ public sealed class PublicLandingIdentityPolishTests
         Assert.DoesNotContain("title: \"GHOSTWIRE after-action\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("heading: \"GHOSTWIRE after-action\"", controller, StringComparison.Ordinal);
 
-        Assert.Contains("Heading: \"Faction command rail\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Heading: \"Faction command", controller, StringComparison.Ordinal);
         Assert.Contains("Heading: \"Black Ledger inbox\"", controller, StringComparison.Ordinal);
         Assert.Contains("Heading: \"Table Pulse Live\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Heading: \"World-turn validation\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Heading: \"World turn\"", controller, StringComparison.Ordinal);
     }
 }

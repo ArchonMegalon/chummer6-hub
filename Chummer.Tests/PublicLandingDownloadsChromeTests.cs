@@ -137,11 +137,11 @@ public sealed class PublicLandingDownloadsChromeTests
         var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Sign in");
         var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(releaseExperience.GuestGateSecondaryHref, signIn.Href);
-        Assert.Equal(releaseExperience.GuestGatePrimaryHref, primary.Href);
-        Assert.Equal("/downloads", primary.Href);
+        Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
+        Assert.NotNull(releaseExperience.Recommended);
+        Assert.Equal(releaseExperience.Recommended!.DispatchHref, primary.Href);
         Assert.NotNull(rebound.PublicPrimaryCta);
-        Assert.Equal(releaseExperience.GuestGatePrimaryHref, rebound.PublicPrimaryCta!.Href);
+        Assert.Equal(releaseExperience.Recommended.DispatchHref, rebound.PublicPrimaryCta!.Href);
     }
 
     [Fact]
@@ -177,10 +177,10 @@ public sealed class PublicLandingDownloadsChromeTests
         var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal("/login?next=%2Fstatus", signIn.Href);
-        Assert.Equal(releaseExperience.GuestGatePrimaryHref, primary.Href);
-        Assert.Equal("/downloads", primary.Href);
+        Assert.NotNull(releaseExperience.Recommended);
+        Assert.Equal(releaseExperience.Recommended!.DispatchHref, primary.Href);
         Assert.NotNull(rebound.PublicPrimaryCta);
-        Assert.Equal(releaseExperience.GuestGatePrimaryHref, rebound.PublicPrimaryCta!.Href);
+        Assert.Equal(releaseExperience.Recommended.DispatchHref, rebound.PublicPrimaryCta!.Href);
     }
 
     [Fact]

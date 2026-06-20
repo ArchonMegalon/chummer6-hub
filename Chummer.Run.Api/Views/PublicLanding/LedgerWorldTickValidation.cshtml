@@ -7,34 +7,34 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">World-tick validation</p>
+        <p class="eyebrow">World turn</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
             <span>World: @Model.Packet.WorldName</span>
             <span>Turn: @Model.Packet.ToTurn</span>
-            <span>Packet: receipt-backed</span>
+            <span>Packet: current</span>
         </div>
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Open JSON packet</a>
-        <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open inbox lane</a>
+        <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open inbox</a>
         <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
     </div>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Validation summary</p>
-        <h2 class="editorial-title">What this packet proves</h2>
-        <p class="editorial-copy">@Model.Packet.Summary</p>
+        <p class="eyebrow">Turn summary</p>
+        <h2 class="editorial-title">What this packet says</h2>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Packet.Summary)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var item in Model.Packet.Checks)
         {
             <article class="route-choice-card">
-                <span class="tag">Check</span>
-                <p>@item</p>
+                <span class="tag">Detail</span>
+                <p>@PublicFacingCopyHumanizer.Clean(item)</p>
             </article>
         }
     </div>

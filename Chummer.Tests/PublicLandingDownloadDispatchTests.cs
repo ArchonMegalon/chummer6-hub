@@ -518,7 +518,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/ledger/anarchy", payload.RootElement.GetProperty("PlayShell").GetProperty("LedgerHref").GetString());
         Assert.Equal("/anarchy/export/runner.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExportJsonHref").GetString());
         Assert.Equal("/anarchy/receipts/explain.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExplainReceiptHref").GetString());
-        Assert.Equal("Shipped rules-light lane", payload.RootElement.GetProperty("PublicProfile").GetProperty("VerdictLabel").GetString());
+        Assert.Equal("Shipped rules-light path", payload.RootElement.GetProperty("PublicProfile").GetProperty("VerdictLabel").GetString());
         Assert.True(payload.RootElement.GetProperty("DispatchLane").GetProperty("ReceiptAnchored").GetBoolean());
     }
 

@@ -21,7 +21,7 @@ public sealed class PublicSignalProjectionBridgeViewTests
     }
 
     [Fact]
-    public void FeedbackRoadmapAndChangelogRoutesRenderTheSharedProjectionPacket()
+    public void FeedbackRoadmapAndChangelogRoutesCarryTheSharedProjectionPacketWithoutForcingOperationalCopyEverywhere()
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
@@ -37,7 +37,8 @@ public sealed class PublicSignalProjectionBridgeViewTests
         Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Model.SignalLoop", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", changelogView, StringComparison.Ordinal);
+        Assert.Contains("milestoneFollowUp", changelogView, StringComparison.Ordinal);
+        Assert.DoesNotContain("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", changelogView, StringComparison.Ordinal);
     }
 
     [Fact]

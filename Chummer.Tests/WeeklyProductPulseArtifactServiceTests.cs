@@ -57,7 +57,7 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         using JsonDocument document = JsonDocument.Parse(json);
 
         Assert.Equal("2026-04-12", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("review_due").GetString());
-        Assert.Equal("Hold broad promotion until fresh local release proof passes on the public edge.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
+        Assert.Equal("Hold broad promotion until the public release status is current on the public edge.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
     }
 
     private sealed class WeeklyPulseFixture : IDisposable

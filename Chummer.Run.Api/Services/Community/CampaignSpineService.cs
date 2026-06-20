@@ -4228,15 +4228,15 @@ public sealed class CampaignSpineService
                 CueId: StableId("cue", $"{campaign.CampaignId}:consequences"),
                 Severity: "ready",
                 Title: "Consequence ledger is attached",
-                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with receipt-backed evidence and explicit return-loop actions."));
+                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with clear history and explicit return-loop actions."));
         }
         if (rosterTransfers.Length > 0)
         {
             readinessCues.Add(new CampaignReadinessCue(
                 CueId: StableId("cue", $"{campaign.CampaignId}:transfers"),
                 Severity: "ready",
-                Title: "Roster transfer audit is attached",
-                Summary: $"{rosterTransfers.Length} recent dossier move(s) keep source, target, and ownership receipts attached to this campaign view."));
+                Title: "Roster transfer history is attached",
+                Summary: $"{rosterTransfers.Length} recent dossier move(s) keep source, target, and ownership history attached to this campaign view."));
         }
         if (workspacePrepLaunches.Length > 0)
         {
@@ -4244,7 +4244,7 @@ public sealed class CampaignSpineService
                 CueId: StableId("cue", $"{campaign.CampaignId}:prep-launches"),
                 Severity: "ready",
                 Title: "Governed prep binding is attached",
-                Summary: $"{workspacePrepLaunches.Length} recent packet launch receipt(s) keep opposition and scene prep bound to this campaign without recreating local shadow prep notes."));
+                Summary: $"{workspacePrepLaunches.Length} recent packet launch(es) keep opposition and scene prep bound to this campaign without recreating local shadow prep notes."));
         }
         if (workspaceTravelPrefetches.Length > 0)
         {
@@ -6757,7 +6757,7 @@ public sealed class CampaignSpineService
 
         if (leadWorldTick is not null)
         {
-            anchors.Add("BLACK LEDGER world tick");
+            anchors.Add("BLACK LEDGER world turn");
         }
 
         if (leadPlayerSafeNews is not null)

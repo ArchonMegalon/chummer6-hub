@@ -380,7 +380,7 @@ public sealed class PublicLandingController : Controller
             currentPath: $"/packages/{Uri.EscapeDataString(package.PackageId)}",
             scopeLabel: "Public browser",
             secondaryAction: subject is null
-                ? new TrustPageActionViewModel("Open mobile rail", "/mobile", "secondary")
+                ? new TrustPageActionViewModel("Open mobile", "/mobile", "secondary")
                 : new TrustPageActionViewModel("Open account packages", "/account/packages", "secondary"),
             subject,
             user,
@@ -506,11 +506,11 @@ public sealed class PublicLandingController : Controller
             var model = await BuildPackageCatalogPageModel(
                 currentPath: currentPath,
                 chromeTitle: "Account packages",
-                chromeDescription: "Track package follows, votes, and package return posture from the same signed-in rail as installs and support.",
-                eyebrow: "Signed-in package rail",
+                chromeDescription: "Track package follows, votes, and package returns from the same account area as installs and support.",
+                eyebrow: "Account packages",
                 heading: "Account packages",
-                intro: "Votes, follows, and package return posture stay attached to the same account rail that already owns installs, recovery, and support history.",
-                scopeLabel: "Account rail",
+                intro: "Votes, follows, and package returns stay attached to the same account area that already owns installs, recovery, and support history.",
+                scopeLabel: "Account area",
                 signedInScope: true,
                 operatorScope: false,
                 detailBasePath: "/account/packages",
@@ -548,7 +548,7 @@ public sealed class PublicLandingController : Controller
             var model = await BuildPackageDetailPageModel(
                 package,
                 currentPath: currentPath,
-                scopeLabel: "Account rail",
+                scopeLabel: "Account area",
                 secondaryAction: new TrustPageActionViewModel("Open public package browser", "/packages", "secondary"),
                 subject,
                 user,
@@ -1129,10 +1129,10 @@ public sealed class PublicLandingController : Controller
         var model = await BuildMobileProjectionPageModel(
             currentPath: "/mobile",
             chromeTitle: "Mobile and PWA",
-            chromeDescription: "Phone, tablet, and installable play entry with reconnect posture and role-aware routes.",
-            eyebrow: "Mobile public rail",
+            chromeDescription: "Phone, tablet, and installable play entry with reconnect behavior and role-aware routes.",
+            eyebrow: "Mobile",
             heading: "Mobile and PWA entry",
-            intro: "Installability, reconnect posture, and player, GM, or observer entry stay on first-party routes instead of leaking into fallback docs or legacy aliases.",
+            intro: "Installability, reconnect behavior, and player, GM, or observer entry stay on Chummer routes instead of fallback docs or legacy aliases.",
             currentRoleKey: "player",
             primaryAction: new TrustPageActionViewModel("Open play shell", "/play", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
@@ -1159,7 +1159,7 @@ public sealed class PublicLandingController : Controller
             chromeDescription: "Role-aware mobile and tablet entry with reconnect, continuity, and first-party route ownership.",
             eyebrow: "Play shell",
             heading: $"{currentRoleLabel} entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity posture visible without pretending the mobile route replaces installs, support, or deeper campaign work.",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending the mobile route replaces installs, support, or deeper campaign work.",
             currentRoleKey: currentRoleKey,
             primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
@@ -1186,11 +1186,11 @@ public sealed class PublicLandingController : Controller
         var model = await BuildAnarchyPageModel(
             currentPath: "/anarchy",
             currentSection: "overview",
-            eyebrow: "Dedicated ruleset lane",
+            eyebrow: "Dedicated ruleset path",
             heading: "Shadowrun Anarchy",
-            intro: "A shipped rules-light lane for mobile play, dispatches, faction consequence, and fast continuity. Chummer treats Anarchy as its own first-party ruleset profile without claiming full dense-book completeness.",
+            intro: "A shipped rules-light path for mobile play, dispatches, faction consequence, and fast continuity. Chummer treats Anarchy as its own first-party ruleset profile without claiming full dense-book completeness.",
             primaryAction: new TrustPageActionViewModel("Open Anarchy play shell", "/play/anarchy", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open Anarchy ledger lane", "/ledger/anarchy", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open Anarchy ledger", "/ledger/anarchy", "secondary"),
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Anarchy.cshtml", model);
     }
@@ -1204,7 +1204,7 @@ public sealed class PublicLandingController : Controller
             currentSection: "play",
             eyebrow: "Rules-light play shell",
             heading: "Anarchy play shell",
-            intro: "This route keeps a one-page runner sheet, continuity cues, and explainable export in one first-party play lane without pretending to be full dense-builder parity.",
+            intro: "This route keeps a one-page runner sheet, continuity cues, and explainable export in one first-party play path without pretending to be full dense-builder parity.",
             primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
             secondaryAction: new TrustPageActionViewModel("View dispatches through the Anarchy lens", "/ledger/dispatches?ruleset=anarchy", "secondary"),
             cancellationToken: cancellationToken);
@@ -1248,8 +1248,8 @@ public sealed class PublicLandingController : Controller
             PublicProfile = new
             {
                 Handle = profile.Handle,
-                VerdictLabel = "Shipped rules-light lane",
-                ScopeLabel = "Dedicated ruleset lane"
+                VerdictLabel = "Shipped rules-light path",
+                ScopeLabel = "Dedicated ruleset path"
             },
             DispatchLane = new
             {
@@ -2022,7 +2022,7 @@ public sealed class PublicLandingController : Controller
     {
         var model = await BuildParticipatePageModel(
             title: "Participate",
-            description: "Public product signal stays visible here, while signed-in contribution access remains an optional account-linked lane.",
+            description: "Public product signal stays visible here, while signed-in contribution access remains optional and account-linked.",
             currentPath: "/participate",
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
@@ -2036,7 +2036,7 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/alice")]
     [Produces("text/html")]
     public async Task<IActionResult> AlicePage(CancellationToken cancellationToken)
-        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "ALICE", eyebrow: "Shipped compare bench", heading: "ALICE", intro: "ALICE is now the named public entry for Chummer's Build Ghost compare bench. Public-safe intake and explanation stay bounded, while compare, tradeoffs, legality explanation, discard, and apply remain Chummer runtime work." ));
+        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "Character help", eyebrow: "Build help", heading: "Character help", intro: "Use character help when you want a guided build plan, tradeoff notes, legality explanations, or a clean way to discard and apply suggested changes." ));
 
     [HttpGet("/participate/build-ghosts.json")]
     [Produces("application/json")]
@@ -2072,7 +2072,7 @@ public sealed class PublicLandingController : Controller
                 HandoffDetailHrefTemplate = "/account/alice/{handoffId}",
                 HandoffIndexApiHref = "/api/v1/campaign-spine/me/build-handoffs",
                 HandoffDetailApiHrefTemplate = "/api/v1/campaign-spine/me/build-handoffs/{handoffId}",
-                Summary = "Signed-in ALICE opens the first-party build handoff bench, where compare history, planner coverage, tradeoffs, and apply-safe outputs stay on account-owned rails."
+                Summary = "Signed-in character help keeps compare history, planner coverage, tradeoffs, and apply-safe outputs attached to the account."
             }
         });
     }
@@ -2248,18 +2248,18 @@ public sealed class PublicLandingController : Controller
         TrustPageViewModel model = await BuildHorizonPreviewPageModel(
             pageId: "table-pulse",
             title: "TABLE PULSE",
-            description: "Governed live heat and GM-private aftermath stay on separate first-party rails.",
+            description: "Live heat and GM-private aftermath stay separate.",
             currentPath: "/table-pulse",
-            eyebrow: "Shipped split rail",
+            eyebrow: "Live table",
             heading: "TABLE PULSE",
             intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command path. GM-private aftermath packages stay separate so heat, recap, and next steps do not collapse into surveillance or vague drama text.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "table_pulse_live",
-                    "Live rail",
+                    "Live table",
                     "What is live now",
-                    "The live rail is the in-world packet and reaction system.",
+                    "The live view is the in-world packet and reaction system.",
                     [
                         "GM-controlled heat packets on the signed-in ledger notifications route.",
                         "Bounded remote reaction submissions with explicit GM adjudication.",
@@ -2267,29 +2267,29 @@ public sealed class PublicLandingController : Controller
                     ]),
                 new TrustPageSectionViewModel(
                     "table_pulse_aftermath",
-                    "Aftermath rail",
-                    "What the aftermath lane owns",
-                    "The aftermath rail is a separate GM-private recap and carry-forward packet system.",
+                    "Aftermath",
+                    "What aftermath owns",
+                    "Aftermath is a separate GM-private recap and carry-forward packet system.",
                     [
                         "Workspace aftermath recap packages stay attached.",
-                        "Downtime, carry-forward, and campaign-memory cues stay on one governed return lane.",
-                        "The rail is private GM recap and next-step work, not public scoring or moderation truth."
+                        "Downtime, carry-forward, and campaign-memory cues stay in one reviewed return path.",
+                        "Aftermath is private GM recap and next-step work, not public scoring or moderation truth."
                     ]),
                 new TrustPageSectionViewModel(
                     "table_pulse_boundary",
                     "Boundary",
-                    "What this horizon does not claim",
-                    "The live rail and the aftermath rail are deliberately separate.",
+                    "What this feature does not claim",
+                    "The live view and aftermath stay deliberately separate.",
                     [
                         "No automatic canon mutation.",
                         "No player surveillance or public trust scoring.",
-                        "No claim that a provider-side coach outranks first-party campaign truth."
+                        "No claim that an external coach outranks Chummer campaign state."
                     ])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Open live notifications", "/account/ledger/notifications", "primary"),
-                new TrustPageActionViewModel("Open aftermath rail", "/account/work#aftermath-packages", "secondary"),
+                new TrustPageActionViewModel("Open aftermath", "/account/work#aftermath-packages", "secondary"),
                 new TrustPageActionViewModel("Open Black Ledger", "/ledger", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -2297,7 +2297,7 @@ public sealed class PublicLandingController : Controller
             [
                 "Live heat packets are real now",
                 "GM-private aftermath packages are real now",
-                "The two rails stay separate on purpose"
+                "Live play and aftermath stay separate on purpose"
             ]);
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
@@ -2315,7 +2315,7 @@ public sealed class PublicLandingController : Controller
                 Status = "live",
                 NotificationsHref = "/account/ledger/notifications",
                 ReactionPostHref = "/account/ledger/notifications/table-pulse/react",
-                Summary = "GM-controlled heat packets, bounded reactions, and adjudicated fallout stay on the signed-in command lane."
+                Summary = "GM-controlled heat packets, bounded reactions, and adjudicated fallout stay on the signed-in command path."
             },
             AftermathRail = new
             {
@@ -2362,7 +2362,7 @@ public sealed class PublicLandingController : Controller
                 FirstBriefingMarkdownHref = firstBriefingMarkdownHref,
                 FirstBriefingJsonHref = firstBriefingJsonHref,
                 BriefingCount = briefings.Count == 0 ? 2 : briefings.Count,
-                Summary = "Public JACKPOINT keeps player-safe briefing and dossier packets on first-party markdown and JSON rails."
+                Summary = "Public JACKPOINT keeps player-safe briefing and dossier packets on Chummer markdown and JSON."
             },
             SignedInDesk = new
             {
@@ -2372,7 +2372,7 @@ public sealed class PublicLandingController : Controller
                 PublicationIndexApiHref = "/api/v1/campaign-spine/me/publications",
                 PublicationDetailApiHrefTemplate = "/api/v1/campaign-spine/me/publications/{publicationId}",
                 ArtifactDetailHrefTemplate = "/artifacts/publications/{publicationId}",
-                Summary = "Signed-in JACKPOINT keeps publication review, public publication truth, and campaign-return publication history on first-party rails."
+                Summary = "Signed-in JACKPOINT keeps publication review, public publication status, and campaign-return publication history inside Chummer."
             },
             Boundary = new
             {
@@ -2387,12 +2387,12 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/jackpoint/briefings/{briefingId}.md")]
     [Produces("text/markdown")]
     public IActionResult JackpointBriefingMarkdown([FromRoute] string briefingId)
-        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetJackpointBriefing(briefingId), "JACKPOINT", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public rail."), "text/markdown");
+        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetJackpointBriefing(briefingId), "JACKPOINT", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public page."), "text/markdown");
 
     [HttpGet("/jackpoint/briefings/{briefingId}.json")]
     [Produces("application/json")]
     public IActionResult JackpointBriefingJson([FromRoute] string briefingId)
-        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetJackpointBriefing(briefingId), "jackpoint", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public rail."), "application/json");
+        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetJackpointBriefing(briefingId), "jackpoint", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public page."), "application/json");
 
     [HttpGet("/briefings")]
     public IActionResult BriefingsAliasPage()
@@ -2423,7 +2423,7 @@ public sealed class PublicLandingController : Controller
                 FirstPackMarkdownHref = firstPackMarkdownHref,
                 FirstPackJsonHref = firstPackJsonHref,
                 PackCount = packs.Count == 0 ? 2 : packs.Count,
-                Summary = "Public RUNSITE keeps inspectable pack, route, and threat-clock rails visible before any signed-in prep lane opens."
+                Summary = "Public RUNSITE keeps inspectable packs, routes, and threat clocks visible before signed-in prep opens."
             },
             SignedInBench = new
             {
@@ -2435,13 +2435,13 @@ public sealed class PublicLandingController : Controller
                 PrepLibraryApiHrefTemplate = "/api/v1/campaign-spine/me/workspaces/{workspaceId}/prep-library",
                 RunIndexApiHref = "/api/v1/campaign-spine/me/runs",
                 RunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/runs/{runId}",
-                Summary = "Signed-in RUNSITE keeps workspace prep, runboard continuity, and governed prep-library launch on first-party campaign-spine rails."
+                Summary = "Signed-in RUNSITE keeps workspace prep, runboard continuity, and prep-library launch inside Chummer."
             },
             Boundary = new
             {
                 TacticalAuthority = "not_claimed",
                 VttReplacement = "not_claimed",
-                PrepTruth = "first_party_workspace_and_run_rails",
+                PrepTruth = "chummer_workspace_and_run_paths",
                 ProviderTours = "secondary_only"
             }
         });
@@ -2653,10 +2653,10 @@ public sealed class PublicLandingController : Controller
         TrustPageViewModel model = await BuildHorizonPreviewPageModel(
             pageId: "community-run-venue",
             title: "Open-run venue",
-            description: "Public-safe venue posture for an open run without leaking private room truth.",
+            description: "Public-safe venue status for an open run without leaking private room details.",
             currentPath: $"/community/runs/{normalizedRunId}/venue",
             eyebrow: "Community venue",
-            heading: "Open-run venue posture",
+            heading: "Open-run venue status",
             intro: "This page stays public-safe on purpose. Chummer can acknowledge that a run has a live-room handoff without publishing private room links, player emails, or campaign truth.",
             sections:
             [
@@ -2674,7 +2674,7 @@ public sealed class PublicLandingController : Controller
                     "community_run_venue_private_boundary",
                     "Privacy boundary",
                     "What stays out of public view",
-                    "Private session data remains on signed-in Chummer rails.",
+                    "Private session data remains in signed-in Chummer.",
                     [
                         "Private room links for closed tables.",
                         "Runner sheets, campaign spoilers, and GM-only notes.",
@@ -2683,10 +2683,10 @@ public sealed class PublicLandingController : Controller
                 new TrustPageSectionViewModel(
                     "community_run_venue_fallback",
                     "Fallback",
-                    "Fallback when the provider is unavailable",
-                    "Manual venue handoff stays available when provider automation is off.",
+                    "Fallback when the service is unavailable",
+                    "Manual venue handoff stays available when service automation is off.",
                     [
-                        "Live room integration unavailable. Paste your external room link manually or use another provider.",
+                        "Live room integration unavailable. Paste your external room link manually or use another service.",
                         "Chummer keeps the scheduling and closeout truth even when BeHuman create mode is off."
                     ])
             ],
@@ -2699,7 +2699,7 @@ public sealed class PublicLandingController : Controller
             cancellationToken: cancellationToken,
             summaryPoints:
             [
-                "Public-safe venue posture only",
+                "Public-safe venue status only",
                 "No private room disclosure",
                 "Manual fallback stays available"
             ]);
@@ -2837,21 +2837,21 @@ public sealed class PublicLandingController : Controller
         var model = await BuildHorizonPreviewPageModel(
             pageId: "foundry-export-boundary",
             title: "Foundry export boundary",
-            description: "Foundry-facing export remains a bounded interoperability surface, not a separate flagship horizon claim.",
+            description: "Foundry-facing export remains a bounded interoperability surface, not a separate flagship claim.",
             currentPath: "/exports/foundry",
             eyebrow: "Boundary surface",
             heading: "Foundry export boundary",
-            intro: "This route exists to make the interoperability boundary explicit. It documents what Chummer can hand off toward Foundry-style targets without pretending that a separate parked horizon still governs the public product story.",
+            intro: "This route exists to make the interoperability boundary explicit. It documents what Chummer can hand off toward Foundry-style targets without pretending that a separate parked feature still owns the public product story.",
             summaryPoints:
             [
                 "Interop boundary",
-                "No separate public Foundry horizon claim",
+                "No separate public Foundry feature claim",
                 "Export truth stays first-party"
             ],
             sections:
             [
-                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim the export lane", "Foundry-facing export is an interoperability boundary. Packet truth, moderation posture, and active campaign authority stay first-party even when an external VTT target exists.", ["Interop only", "Chummer-owned", "No third-party truth owner"]),
-                new TrustPageSectionViewModel("foundry-next", "Current posture", "Use the live shipped lanes", "The shipped product story now lives on the active native and public horizons. This route remains as a boundary explainer for export targets, not as a parked roadmap promise.", ["Shipped horizons elsewhere", "Boundary stays explicit", "No stale parked claim"])
+                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim export", "Foundry-facing export is an interoperability boundary. Packet truth, moderation status, and active campaign authority stay first-party even when an external VTT target exists.", ["Interop only", "Chummer-owned", "No third-party truth owner"]),
+                new TrustPageSectionViewModel("foundry-next", "Current status", "Use the shipped paths", "The shipped product story now lives on the active native and public features. This route remains as a boundary explainer for export targets, not as a parked roadmap promise.", ["Shipped features elsewhere", "Boundary stays explicit", "No stale parked claim"])
             ],
             actions:
             [
@@ -4875,7 +4875,7 @@ public sealed class PublicLandingController : Controller
         TrustPageActionViewModel? secondaryAction = operatorScope
             ? new TrustPageActionViewModel("Open KARMA FORGE", "/participate/karma-forge", "secondary")
             : authenticated
-                ? new TrustPageActionViewModel("Open mobile rail", "/mobile", "secondary")
+                ? new TrustPageActionViewModel("Open mobile", "/mobile", "secondary")
                 : new TrustPageActionViewModel("Create account for tracked packages", "/signup?next=%2Faccount%2Fpackages", "secondary");
         return new PackageCatalogPageViewModel(
             Chrome: chrome,
@@ -5055,7 +5055,7 @@ public sealed class PublicLandingController : Controller
 
         return new KnowledgeFabricPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Trust horizon",
+            Eyebrow: "Rules help",
             Heading: "Knowledge Fabric",
             Intro: "This page keeps rules trust readable: history, source-safe summaries, and downloadable explanations stay attached without leaking copyrighted text or private campaign state.",
             SummaryPoints:
@@ -5100,20 +5100,20 @@ public sealed class PublicLandingController : Controller
             Heading: heading,
             Intro: intro,
             CurrentRoleLabel: ResolvePlayRoleLabel(currentRoleKey),
-            InstallabilitySummary: $"The public rail names the installable PWA posture, reconnect expectations, and role entry routes without pretending the mobile shell replaces downloads, support, or deeper campaign work. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery rails: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
+            InstallabilitySummary: $"The public mobile page explains installability, reconnect behavior, and role entry without pretending the mobile shell replaces downloads, support, or deeper campaign work. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
-                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect posture already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
-                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return posture visible without dropping back to legacy aliases.", "/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
                 new MobileRoleCardViewModel("Observer", "Join the same bounded play shell in a read-mostly role when the table only needs visibility.", "/observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
             ],
             Capabilities:
             [
-                new MobileCapabilityCardViewModel("Installable PWA posture", "The public route keeps the installable shell, trusted entry point, and fallback posture on first-party routes."),
-                new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next-safe-action posture remain visible before the network starts wobbling."),
+                new MobileCapabilityCardViewModel("Installable PWA", "The public route keeps the installable shell, trusted entry point, and fallback behavior on Chummer routes."),
+                new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next safe action remain visible before the network starts wobbling."),
                 new MobileCapabilityCardViewModel("Role-aware entry", "Player, GM, and observer aliases all converge on the same play shell instead of splitting the product into separate stories."),
                 new MobileCapabilityCardViewModel("Claimed install truth", $"Active claimed installs: {continuitySummary.ActiveInstallationCount}; active grants: {continuitySummary.ActiveGrantCount}; observed platforms: {string.Join(", ", continuitySummary.PlatformLabels.DefaultIfEmpty("none yet"))}."),
-                new MobileCapabilityCardViewModel("Downloads stay separate", "Mobile entry explains play posture; Downloads still owns platform choice, build integrity, and guided acquisition.")
+                new MobileCapabilityCardViewModel("Downloads stay separate", "Mobile entry explains play behavior; Downloads still owns platform choice, build integrity, and guided acquisition.")
             ],
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
@@ -5129,24 +5129,24 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         var summary = _nexusPan.BuildPublicSummary();
         SiteChromeViewModel chrome = subject is not null && user is not null
-            ? _chrome.BuildAuthenticatedChrome("NEXUS-PAN continuity", "Claimed installs, reconnect posture, and public-safe continuity history on a Chummer path.", "/play/continuity", user.DisplayName, user.Email)
-            : await BuildPublicOrAuthenticatedChromeAsync("NEXUS-PAN continuity", "Claimed installs, reconnect posture, and public-safe continuity history on a Chummer path.", "/play/continuity", cancellationToken);
+            ? _chrome.BuildAuthenticatedChrome("NEXUS-PAN continuity", "Claimed installs, reconnect behavior, and public-safe continuity history on a Chummer path.", "/play/continuity", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("NEXUS-PAN continuity", "Claimed installs, reconnect behavior, and public-safe continuity history on a Chummer path.", "/play/continuity", cancellationToken);
 
         string platformSummary = summary.PlatformLabels.Count == 0
             ? "No claimed-install platform labels are public yet, but the route still proves the continuity contract and the public/private boundary."
-            : $"Observed claimed-install platforms on the first-party rail: {string.Join(", ", summary.PlatformLabels)}.";
+            : $"Observed claimed-install platforms: {string.Join(", ", summary.PlatformLabels)}.";
 
         return new NexusPanContinuityPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Continuity horizon",
+            Eyebrow: "Continuity",
             Heading: "NEXUS-PAN continuity",
-            Intro: "This route is no longer vague preview copy. It exposes the real continuity contract: claimed installs, reconnect posture, public-safe history, and the explicit boundary where signed-in runboard state begins.",
-            VerdictSummary: "Continuity is now a first-party MVP surface: the public route shows aggregate install and recovery posture, while deeper device and workspace history stays on signed-in rails.",
+            Intro: "This route is no longer vague preview copy. It shows the continuity contract: claimed installs, reconnect behavior, public-safe history, and the boundary where signed-in runboard state begins.",
+            VerdictSummary: "Continuity is now a Chummer surface: the public route shows aggregate install and recovery status, while deeper device and workspace history stays signed in.",
             PlatformSummary: platformSummary,
             SummaryPoints:
             [
                 "Claimed install truth stays first-party",
-                "Reconnect posture stays inspectable",
+                "Reconnect behavior stays visible",
                 "Signed-in runboard history stays private"
             ],
             ActiveInstallationCount: summary.ActiveInstallationCount,
@@ -5172,9 +5172,9 @@ public sealed class PublicLandingController : Controller
             currentPath: "/jackpoint",
             title: "JACKPOINT",
             description: "Player-safe dossier cards, mission briefs, and first-party publication history.",
-            eyebrow: "Publication horizon",
+            eyebrow: "Briefings",
             heading: "JACKPOINT",
-            intro: "JACKPOINT now ships a real first-party briefing network: public-safe dossier and mission packets stay readable on the open rail, while signed-in publication review and campaign-return publication history stay on named account routes.",
+            intro: "JACKPOINT now ships a real briefing network: public-safe dossier and mission packets stay readable, while signed-in publication review and campaign-return history stay on named account routes.",
             boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
             summaryPoints: ["Dossier cards", "Mission brief packets", "Signed-in publication desk"],
             documents: briefings,
@@ -5192,11 +5192,11 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runsites",
             title: "RUNSITE",
-            description: "Site cards, threat clocks, governed prep rails, and first-party runsite packets.",
-            eyebrow: "Prep horizon",
+            description: "Site cards, threat clocks, prep paths, and Chummer runsite packets.",
+            eyebrow: "Prep",
             heading: "RUNSITE",
-            intro: "RUNSITE now ships as a real prep network: inspectable pack routes stay public-safe, while signed-in workspace prep, runboard continuity, and governed prep-library launch stay on named first-party rails.",
-            boundaryLine: "Spatial-prep packet only. This rail does not claim tactical overlays, live map authority, or full VTT integration.",
+            intro: "RUNSITE now ships as a real prep network: inspectable pack routes stay public-safe, while signed-in workspace prep, runboard continuity, and prep-library launch stay on named Chummer paths.",
+            boundaryLine: "Spatial-prep packet only. This path does not claim tactical overlays, live map authority, or full VTT integration.",
             summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
             documents: packs,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUNSITE" : "Open RUNSITE", subject is null ? "/login?next=%2Faccount%2Frunsites" : "/account/runsites", "primary"),
@@ -5212,10 +5212,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/run-control",
             title: "RUN CONTROL",
-            description: "Session board, active-scene continuity, reconnect posture, and first-party GM operations history.",
-            eyebrow: "GM operations horizon",
+            description: "Session board, active-scene continuity, reconnect behavior, and GM operations history.",
+            eyebrow: "GM operations",
             heading: "RUN CONTROL",
-            intro: "RUN CONTROL now ships a real first-party GM operations lane: public-safe board posture stays readable, while signed-in session control, active-scene continuity, reconnect-safe run history, and recap return stay on named campaign-spine rails.",
+            intro: "RUN CONTROL now ships a real GM operations surface: public-safe board status stays readable, while signed-in session control, active-scene continuity, reconnect-safe run history, and recap return stay on named campaign paths.",
             boundaryLine: "GM-control surface only. RUN CONTROL does not replace the rules engine, become a generic chat suite, or let hidden state outrank campaign truth.",
             summaryPoints: ["Session board packet", "Continuity packet", "Signed-in control desk"],
             documents:
@@ -5226,14 +5226,14 @@ public sealed class PublicLandingController : Controller
                     "Inspect the public-safe session-board contract before treating Run Control like a generic operations console.",
                     "/run-control/packets/session_board.md",
                     "/run-control/packets/session_board.json",
-                    ["Session posture", "Active scene", "Next safe action", "Signed-in desk"]),
+                    ["Session status", "Active scene", "Next safe action", "Signed-in desk"]),
                 new MediaArtifactDocument(
                     "continuity_board",
                     "Continuity packet",
                     "Inspect the reconnect and recovery contract that keeps live GM operations anchored to first-party continuity.",
                     "/run-control/packets/continuity_board.md",
                     "/run-control/packets/continuity_board.json",
-                    ["Reconnect posture", "Runboard continuity", "Recovery boundary"])
+                    ["Reconnect behavior", "Runboard continuity", "Recovery boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUN CONTROL" : "Open RUN CONTROL", subject is null ? "/login?next=%2Faccount%2Frun-control" : "/account/run-control", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open control details", "/run-control/receipts/control-network.json", "secondary"),
@@ -5248,7 +5248,7 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/onramp",
             title: "ONRAMP",
-            description: "Guided first session, recovery posture, and continuity without fake automation.",
+            description: "Guided first session, recovery status, and continuity without fake automation.",
             eyebrow: "Guided start",
             heading: "ONRAMP",
             intro: "ONRAMP keeps first-session setup calm: public starter and recovery packets stay readable, while signed-in workspace, continuity restore, and session history stay attached to your account.",
@@ -5269,7 +5269,7 @@ public sealed class PublicLandingController : Controller
                     "Inspect the restore and continuity contract that keeps guided setup tied to first-party account truth.",
                     "/onramp/packets/recovery_lane.md",
                     "/onramp/packets/recovery_lane.json",
-                    ["Restore posture", "Claimed devices", "Conflict summaries", "Recovery boundary"])
+                    ["Restore status", "Claimed devices", "Conflict summaries", "Recovery boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for ONRAMP" : "Open ONRAMP", subject is null ? "/login?next=%2Faccount%2Fonramp" : "/account/onramp", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open starter details", "/onramp/receipts/guided-starter.json", "secondary"),
@@ -5284,10 +5284,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/edition-studio",
             title: "EDITION STUDIO",
-            description: "Distinct SR4, SR5, and SR6 ruleset-head posture without splitting the product into disconnected apps.",
-            eyebrow: "Edition expression horizon",
+            description: "Distinct SR4, SR5, and SR6 ruleset heads without splitting the product into disconnected apps.",
+            eyebrow: "Edition expression",
             heading: "EDITION STUDIO",
-            intro: "EDITION STUDIO now ships a bounded first-party ruleset-head lane: SR4, SR5, and SR6 head packets stay readable in public, while signed-in edition focus stays attached to the same account-owned workbench.",
+            intro: "EDITION STUDIO now ships a bounded ruleset-head path: SR4, SR5, and SR6 head packets stay readable in public, while signed-in edition focus stays attached to the same account-owned workbench.",
             boundaryLine: "Ruleset-head surface only. EDITION STUDIO does not create three disconnected apps, replace core truth with styling, or claim visual flavor as authority.",
             summaryPoints: ["SR4 head packet", "SR5 head packet", "SR6 head packet"],
             documents:
@@ -5295,24 +5295,24 @@ public sealed class PublicLandingController : Controller
                 new MediaArtifactDocument(
                     "sr4_head",
                     "SR4 head packet",
-                    "Inspect the SR4 posture before treating Edition Studio like decorative theming.",
+                    "Inspect the SR4 status before treating Edition Studio like decorative theming.",
                     "/edition-studio/packets/sr4_head.md",
                     "/edition-studio/packets/sr4_head.json",
-                    ["Legacy muscle memory", "Dense posture", "Signed-in edition focus"]),
+                    ["Legacy muscle memory", "Dense layout", "Signed-in edition focus"]),
                 new MediaArtifactDocument(
                     "sr5_head",
                     "SR5 head packet",
-                    "Inspect the flagship density rail that keeps veteran speed and explainability authored together.",
+                    "Inspect the flagship density path that keeps veteran speed and explainability authored together.",
                     "/edition-studio/packets/sr5_head.md",
                     "/edition-studio/packets/sr5_head.json",
-                    ["Flagship density", "Explain posture", "Signed-in edition focus"]),
+                    ["Flagship density", "Explainability", "Signed-in edition focus"]),
                 new MediaArtifactDocument(
                     "sr6_head",
                     "SR6 head packet",
-                    "Inspect the modern ruleset-head rail without flattening it into older mental models.",
+                    "Inspect the modern ruleset-head path without flattening it into older mental models.",
                     "/edition-studio/packets/sr6_head.md",
                     "/edition-studio/packets/sr6_head.json",
-                    ["Campaign-approved rail", "Modern pace", "Signed-in edition focus"])
+                    ["Campaign-approved path", "Modern pace", "Signed-in edition focus"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for EDITION STUDIO" : "Open EDITION STUDIO", subject is null ? "/login?next=%2Faccount%2Fedition-studio" : "/account/edition-studio", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open ruleset details", "/edition-studio/receipts/ruleset-heads.json", "secondary"),
@@ -5328,9 +5328,9 @@ public sealed class PublicLandingController : Controller
             currentPath: "/local-co-processor",
             title: "LOCAL CO-PROCESSOR",
             description: "Optional local acceleration, explicit hosted-first parity, and disableable profiles that never become hidden requirements.",
-            eyebrow: "Optional acceleration horizon",
+            eyebrow: "Optional acceleration",
             heading: "LOCAL CO-PROCESSOR",
-            intro: "LOCAL CO-PROCESSOR now ships a bounded first-party optional-acceleration lane: public-safe capability and policy packets stay readable, while signed-in profile choice and account-owned local posture stay on named first-party rails.",
+            intro: "LOCAL CO-PROCESSOR now ships a bounded optional-acceleration path: public-safe capability and policy packets stay readable, while signed-in profile choice and account-owned local status stay on named Chummer paths.",
             boundaryLine: "Optional acceleration surface only. LOCAL CO-PROCESSOR does not move truth into local runtime, make desktop compute mandatory, or turn external helpers into hidden product prerequisites.",
             summaryPoints: ["Capability matrix packet", "Policy boundary packet", "Signed-in optional profile desk"],
             documents:
@@ -5345,10 +5345,10 @@ public sealed class PublicLandingController : Controller
                 new MediaArtifactDocument(
                     "policy_boundary",
                     "Policy boundary packet",
-                    "Inspect the privacy and fail-open boundary that keeps local acceleration optional and governed.",
+                    "Inspect the privacy and fail-open boundary that keeps local acceleration optional and reviewed.",
                     "/local-co-processor/packets/policy_boundary.md",
                     "/local-co-processor/packets/policy_boundary.json",
-                    ["No local truth owner", "No mandatory runtime", "Fail-open fallback", "Privacy posture"])
+                    ["No local truth owner", "No mandatory runtime", "Fail-open fallback", "Privacy boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for LOCAL CO-PROCESSOR" : "Open LOCAL CO-PROCESSOR", subject is null ? "/login?next=%2Faccount%2Flocal-co-processor" : "/account/local-co-processor", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open acceleration details", "/local-co-processor/receipts/optional-acceleration.json", "secondary"),
@@ -5362,11 +5362,11 @@ public sealed class PublicLandingController : Controller
             currentPath: "/runbook",
             title: "RUNBOOK PRESS",
             description: "Printable primers and first-session onboarding packets.",
-            eyebrow: "Primer horizon",
+            eyebrow: "Primers",
             heading: "RUNBOOK PRESS",
             intro: "RUNBOOK PRESS now ships real first-party primers: packets you can hand to a player or GM without sending them into scattered docs.",
-            boundaryLine: "Printable onboarding and prep packets only. This rail does not claim a full long-form publication studio yet.",
-            summaryPoints: ["New-player primer", "GM primer", "Printable packet posture"],
+            boundaryLine: "Printable onboarding and prep packets only. This path does not claim a full long-form publication studio yet.",
+            summaryPoints: ["New-player primer", "GM primer", "Printable packets"],
             documents: _mediaHorizons.ListRunbookPrimers(),
             primaryAction: new TrustPageActionViewModel("Open first primer", "/runbook/primers/new-runner-primer.md", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open primer JSON", "/runbook/primers/new-runner-primer.json", "secondary"),
@@ -5380,11 +5380,11 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/community",
             title: "Community Hub",
-            description: "Open-run board, organizer closeout posture, and moderation-safe public rails.",
-            eyebrow: "Community horizon",
+            description: "Open-run board, organizer closeout status, and moderation-safe public paths.",
+            eyebrow: "Community",
             heading: "Community Hub",
-            intro: "Community Hub now ships a real first-party open-run network: public board posture and safety boundaries stay readable, while signed-in listing, join review, scheduling, meeting handoff, and closeout stay on the same governed campaign-spine rail.",
-            boundaryLine: "Public route shows board posture and safety boundaries. Private roster notes, meeting access, and case handling stay signed-in and Chummer-owned.",
+            intro: "Community Hub now ships a real open-run network: public board status and safety boundaries stay readable, while signed-in listing, join review, scheduling, meeting handoff, and closeout stay on the same reviewed campaign path.",
+            boundaryLine: "Public route shows board status and safety boundaries. Private roster notes, meeting access, and case handling stay signed-in and Chummer-owned.",
             summaryPoints:
             [
                 $"{summary.OpenRuns.Count} open runs visible",
@@ -5406,10 +5406,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/creator",
             title: "Creator OS",
-            description: "Governed publication discovery, trust posture, and campaign return loops.",
-            eyebrow: "Creator horizon",
+            description: "Reviewed publication discovery, trust status, and campaign return loops.",
+            eyebrow: "Creator",
             heading: "Creator OS",
-            intro: "Creator OS now ships a real first-party publication network: governed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return history stay on named account rails.",
+            intro: "Creator OS now ships a real publication network: reviewed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return history stay on named account paths.",
             boundaryLine: "Creator truth comes from Chummer-owned publication history and signed-in review state. External dashboards, shelves, and asset hosts stay off the truth path.",
             summaryPoints:
             [
@@ -5432,16 +5432,16 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/quicksilver",
             title: "Quicksilver",
-            description: "Expert-speed command deck, jump targets, and bounded first-party focus lanes.",
-            eyebrow: "Speed horizon",
+            description: "Expert-speed command deck, jump targets, and bounded focus paths.",
+            eyebrow: "Speed",
             heading: "Quicksilver",
-            intro: "Quicksilver now ships a real first-party command deck: build compare, rules answers, prep rails, and publication desks stay one jump apart without flattening legality, explainability, or account-owned truth.",
+            intro: "Quicksilver now ships a real command deck: build compare, rules answers, prep, and publication desks stay one jump apart without flattening legality, explainability, or account-owned state.",
             boundaryLine: "Quicksilver is a speed surface for the same trusted product. It does not hide legality, invent background automation, or turn stale cached views into authority.",
             summaryPoints:
             [
                 "Command deck packet",
                 "Typed jump targets",
-                "Signed-in focus rail"
+                "Signed-in focus path"
             ],
             documents:
             [
@@ -5455,7 +5455,7 @@ public sealed class PublicLandingController : Controller
                 new MediaArtifactDocument(
                     "jump_targets",
                     "Jump targets",
-                    "Inspect the named targets and focus routes that keep expert speed on first-party rails.",
+                    "Inspect the named targets and focus routes that keep expert speed on Chummer paths.",
                     "/quicksilver/packets/jump_targets.md",
                     "/quicksilver/packets/jump_targets.json",
                     ["Focus routes", "API deck", "Account-owned history"])
@@ -5475,8 +5475,8 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
-            ? _chrome.BuildAuthenticatedChrome("Runner Passport", "Public-safe runner return posture, participation history, and bounded cross-table trust.", "/passport", user.DisplayName, user.Email)
-            : await BuildPublicOrAuthenticatedChromeAsync("Runner Passport", "Public-safe runner return posture, participation history, and bounded cross-table trust.", "/passport", cancellationToken);
+            ? _chrome.BuildAuthenticatedChrome("Runner Passport", "Public-safe runner return status, participation history, and bounded cross-table trust.", "/passport", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Runner Passport", "Public-safe runner return status, participation history, and bounded cross-table trust.", "/passport", cancellationToken);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
         string? factionId = null;
         if (user is not null && subject is not null)
@@ -5491,10 +5491,10 @@ public sealed class PublicLandingController : Controller
 
         return new MediaArtifactHorizonPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Identity horizon",
+            Eyebrow: "Identity",
             Heading: "Runner Passport",
-            Intro: "Runner Passport now ships a real continuity path: public-safe trust posture, bounded cross-table participation history, and signed-in return paths stay connected instead of collapsing into ad hoc organizer memory.",
-            BoundaryLine: "The public lane exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
+            Intro: "Runner Passport now ships a real continuity path: public-safe trust status, bounded cross-table participation history, and signed-in return paths stay connected instead of collapsing into ad hoc organizer memory.",
+            BoundaryLine: "The public page exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
             SummaryPoints:
             [
                 $"{summary.ActiveInstallationCount} active claimed installs",
@@ -5518,8 +5518,8 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
-            ? _chrome.BuildAuthenticatedChrome("Signal Deck", "Governed command pressure, consequence posture, and aftermath continuity on first-party rails.", "/signal-deck", user.DisplayName, user.Email)
-            : await BuildPublicOrAuthenticatedChromeAsync("Signal Deck", "Governed command pressure, consequence posture, and aftermath continuity on first-party rails.", "/signal-deck", cancellationToken);
+            ? _chrome.BuildAuthenticatedChrome("Signal Deck", "Reviewed command pressure, consequence status, and aftermath continuity on Chummer paths.", "/signal-deck", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Signal Deck", "Reviewed command pressure, consequence status, and aftermath continuity on Chummer paths.", "/signal-deck", cancellationToken);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
         string? factionId = null;
         BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
@@ -5538,15 +5538,15 @@ public sealed class PublicLandingController : Controller
 
         return new MediaArtifactHorizonPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Command horizon",
+            Eyebrow: "Command",
             Heading: "Signal Deck",
-            Intro: "Signal Deck now has a real first-party route: governed command pressure, consequence posture, and aftermath continuity stay attached to the same signed-in Table Pulse Live rail instead of disappearing into generic recap copy.",
-            BoundaryLine: "Signal Deck is a first-party command and continuity surface. It can show governed pressure and consequence posture, but it does not become automatic world authority, a hidden moderation score, or a private transcript lane.",
+            Intro: "Signal Deck now has a real route: reviewed command pressure, consequence status, and aftermath continuity stay attached to the same signed-in Table Pulse Live path instead of disappearing into generic recap copy.",
+            BoundaryLine: "Signal Deck is a command and continuity surface. It can show reviewed pressure and consequence status, but it does not become automatic world authority, a hidden moderation score, or a private transcript path.",
             SummaryPoints:
             [
-                consequenceCount > 0 ? $"{consequenceCount} governed consequence cue(s) live" : "Command rail armed",
+                consequenceCount > 0 ? $"{consequenceCount} consequence cue(s) live" : "Command path ready",
                 $"{summary.OpenRunCount} open runs on the public board",
-                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) on the return rail" : "Aftermath rail armed"
+                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) on the return path" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListSignalDeckDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open command pressure details", "/signal-deck/receipts/pressure_posture.md", "primary"),
@@ -5565,8 +5565,8 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
-            ? _chrome.BuildAuthenticatedChrome("Living World", "Between-session command, watch framing, and aftermath continuity on first-party rails.", "/living-world", user.DisplayName, user.Email)
-            : await BuildPublicOrAuthenticatedChromeAsync("Living World", "Between-session command, watch framing, and aftermath continuity on first-party rails.", "/living-world", cancellationToken);
+            ? _chrome.BuildAuthenticatedChrome("Living World", "Between-session command, watch framing, and aftermath continuity on Chummer paths.", "/living-world", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Living World", "Between-session command, watch framing, and aftermath continuity on Chummer paths.", "/living-world", cancellationToken);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
         string? factionId = null;
         BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
@@ -5585,20 +5585,20 @@ public sealed class PublicLandingController : Controller
 
         return new MediaArtifactHorizonPageViewModel(
             Chrome: chrome,
-            Eyebrow: "World horizon",
+            Eyebrow: "World",
             Heading: "Living World",
-            Intro: "Living World is now a real first-party route for between-session command continuity: the watch package, faction command, Runner Passport, and aftermath rail stay attached to the same governed turn instead of scattering into concept-only copy.",
-            BoundaryLine: "Living World engagement is governed, opt-in, and first-party. It does not claim autonomous simulation, automatic world truth, or unbounded off-table authorship.",
+            Intro: "Living World is now a real route for between-session command continuity: the watch package, faction command, Runner Passport, and aftermath path stay attached to the same reviewed turn instead of scattering into concept-only copy.",
+            BoundaryLine: "Living World engagement is reviewed, opt-in, and Chummer-owned. It does not claim autonomous simulation, automatic world truth, or unbounded off-table authorship.",
             SummaryPoints:
             [
                 worldTurnBriefing?.Broadcast is not null ? "Watch package live" : "Watch framing armed",
-                consequenceCount > 0 ? $"{consequenceCount} consequence cue(s) live" : "Command rail armed",
-                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) queued" : "Aftermath rail armed"
+                consequenceCount > 0 ? $"{consequenceCount} consequence cue(s) live" : "Command path ready",
+                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) queued" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListLivingWorldDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open watch package details", "/living-world/receipts/watch_package_posture.md", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open JSON details", "/living-world/receipts/watch_package_posture.json", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open public watch lane", worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1", "ghost"),
+            TertiaryAction: new TrustPageActionViewModel("Open public watch", worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1", "ghost"),
             ConnectedLanePacket: BuildLivingWorldConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -5611,10 +5611,10 @@ public sealed class PublicLandingController : Controller
             currentPath: "/ghostwire",
             title: "GHOSTWIRE",
             description: "Replay packets, after-action reports, and consequence carry-forward.",
-            eyebrow: "Replay horizon",
+            eyebrow: "Replay",
             heading: "GHOSTWIRE",
-            intro: "GHOSTWIRE now ships first-party after-action packet rails: replay timelines, after-action reports, and consequence-chain packets live on real markdown and JSON routes.",
-            boundaryLine: "Replay stays public-safe. No private transcript lane and no retrospective fiction engine are claimed here.",
+            intro: "GHOSTWIRE now ships after-action packets: replay timelines, after-action reports, and consequence-chain packets live on real markdown and JSON routes.",
+            boundaryLine: "Replay stays public-safe. No private transcript path and no retrospective fiction engine are claimed here.",
             summaryPoints:
             [
                 $"{summary.Packages.Count} aftermath packets on record",
@@ -5677,7 +5677,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in board",
-                    Summary: "Sign in to open the governed Community Hub board where open-run listing, join review, scheduling, and closeout stay on one first-party rail.",
+                    Summary: "Sign in to open the Community Hub board where open-run listing, join review, scheduling, and closeout stay on one Chummer path.",
                     Href: "/login?next=%2Faccount%2Fcommunity",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5687,14 +5687,14 @@ public sealed class PublicLandingController : Controller
                     StatusLabel: "Public-safe"),
                 new(
                     Label: "Network details",
-                    Summary: "Inspect the named signed-in and API lanes before treating Community Hub as just another forum or meeting-tool shell.",
+                    Summary: "Inspect the named signed-in and API paths before treating Community Hub as just another forum or meeting-tool shell.",
                     Href: "/community/receipts/open-run-network.json",
                     StatusLabel: "Current")
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Community Hub operations rail",
-                Summary: "Public board posture is readable without an account, but the governed open-run board, join review, scheduling, and closeout loop stay on the signed-in Community Hub rail.",
+                Heading: "Community Hub operations",
+                Summary: "Public board status is readable without an account, but the reviewed open-run board, join review, scheduling, and closeout loop stay on the signed-in Community Hub path.",
                 BoundaryLine: "Meeting tools and public venues are handoff paths only. Chummer owns run, roster, scheduling, and closeout truth.",
                 Cues: guestCues);
         }
@@ -5717,32 +5717,32 @@ public sealed class PublicLandingController : Controller
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
-                Label: "Signed-in board",
-                Summary: openRuns.Count == 0
-                    ? "No governed open run is attached to this account yet. Community Hub is ready to open the named board as soon as a workspace publishes one."
-                    : $"{openRuns.Count} open run(s) are already visible on your governed board, with listing, join review, scheduling, and closeout attached to the same account rail.",
+                    Label: "Signed-in board",
+                    Summary: openRuns.Count == 0
+                    ? "No reviewed open run is attached to this account yet. Community Hub is ready to open the named board as soon as a workspace publishes one."
+                    : $"{openRuns.Count} open run(s) are already visible on your reviewed board, with listing, join review, scheduling, and closeout attached to the same account path.",
                 Href: "/account/community",
                 StatusLabel: openRuns.Count == 0 ? "Ready" : "Signed-in"),
-            new(
-                Label: "Lead open run contract",
-                Summary: leadDetail is null
-                    ? "Use the typed API index when you want the governed open-run contract before a public packet becomes a real table."
+                new(
+                    Label: "Lead open run contract",
+                    Summary: leadDetail is null
+                    ? "Use the typed API index when you want the open-run contract before a public packet becomes a real table."
                     : $"{leadDetail.JoinRequests.Count} join request(s), {leadDetail.Roster.Count} roster seat(s), and {(leadDetail.Schedule is null ? "no" : "a")} schedule are attached to {leadDetail.Listing.ListingTitle}.",
                 Href: detailApiHref,
                 StatusLabel: leadDetail is null ? "API" : "Typed"),
             new(
-                Label: "Venue and handoff boundary",
-                Summary: leadDetail?.MeetingHandoff is null
-                    ? "Public venue posture can be shown without leaking private room truth, and meeting-provider automation still remains a projection-only lane."
+                    Label: "Venue and handoff boundary",
+                    Summary: leadDetail?.MeetingHandoff is null
+                    ? "Public venue status can be shown without leaking private room details, and meeting-service automation still remains projection-only."
                     : $"{leadDetail.MeetingHandoff.ProviderLabel} handoff exists for the lead open run, but Chummer still owns accepted roster and run truth.",
                 Href: venueHref,
                 StatusLabel: leadDetail?.MeetingHandoff is null ? "Boundary" : "Handoff")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Community Hub operations rail",
-            Summary: "The named Community Hub rail now carries governed open-run board posture, join review, scheduling, meeting handoff, and closeout on one first-party campaign-spine path.",
-            BoundaryLine: "Community Hub can project venue posture and provider handoff, but it does not hand run truth, roster truth, or consequence truth to chat tools, meeting tools, or public boards.",
+            Heading: "Community Hub operations",
+            Summary: "The named Community Hub path now carries reviewed open-run board status, join review, scheduling, meeting handoff, and closeout on one Chummer campaign path.",
+            BoundaryLine: "Community Hub can project venue status and service handoff, but it does not hand run truth, roster truth, or consequence truth to chat tools, meeting tools, or public boards.",
             Cues: cues);
     }
 
@@ -5756,7 +5756,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in publication desk",
-                    Summary: "Sign in to open the governed Creator OS desk where publication review, publish state, and campaign-return history stay on first-party rails.",
+                    Summary: "Sign in to open the Creator OS desk where publication review, publish state, and campaign-return history stay on Chummer paths.",
                     Href: "/login?next=%2Faccount%2Fcreator",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5766,15 +5766,15 @@ public sealed class PublicLandingController : Controller
                     StatusLabel: "Public-safe"),
                 new(
                     Label: "Publication details",
-                    Summary: "Inspect the named account and public publication lanes before treating Creator OS as an external creator shelf.",
+                    Summary: "Inspect the named account and public publication paths before treating Creator OS as an external creator page.",
                     Href: "/creator/receipts/publication-network.json",
                     StatusLabel: "Current")
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Creator OS publication rail",
-                Summary: "Public publication discovery is readable without an account, but draft review, publish state, and campaign return stay on the signed-in Creator OS rail.",
-                BoundaryLine: "External creator tools may assist rendering or promotion, but Chummer owns publication truth, moderation posture, and campaign return state.",
+                Heading: "Creator OS publication",
+                Summary: "Public publication discovery is readable without an account, but draft review, publish state, and campaign return stay on the signed-in Creator OS path.",
+                BoundaryLine: "External creator tools may assist rendering or promotion, but Chummer owns publication truth, moderation status, and campaign return state.",
                 Cues: guestCues);
         }
 
@@ -5795,33 +5795,33 @@ public sealed class PublicLandingController : Controller
 
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
-            new(
-                Label: "Signed-in publication desk",
-                Summary: publications.Count == 0
-                    ? "No governed publication is attached to this account yet. Creator OS is ready to open the named desk as soon as a workspace publishes one."
-                    : $"{publications.Count} publication(s) are already visible on your signed-in rail, with review, publish state, and campaign-return history on one account path.",
+                new(
+                    Label: "Signed-in publication desk",
+                    Summary: publications.Count == 0
+                    ? "No reviewed publication is attached to this account yet. Creator OS is ready to open the named desk as soon as a workspace publishes one."
+                    : $"{publications.Count} publication(s) are already visible in your signed-in area, with review, publish state, and campaign-return history on one account path.",
                 Href: "/account/creator",
                 StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
             new(
-                Label: "Lead publication detail",
-                Summary: leadPublication is null
-                    ? "Use the publication board and public view until a governed publication is attached to the signed-in desk."
-                    : $"{leadPublication.PublicationStatus} · {leadPublication.TrustBand}. {leadPublication.CampaignReturnSummary ?? "Campaign-return posture stays attached to the publication."}",
+                    Label: "Lead publication detail",
+                    Summary: leadPublication is null
+                        ? "Use the publication board and public view until a governed publication is attached to the signed-in desk."
+                        : $"{leadPublication.PublicationStatus} · {leadPublication.TrustBand}. {leadPublication.CampaignReturnSummary ?? "Campaign-return status stays attached to the publication."}",
                 Href: leadPublicationHref,
                 StatusLabel: leadPublication is null ? "Desk" : "Typed"),
             new(
-                Label: "Public shelf boundary",
-                Summary: leadPublication is null
-                    ? "Public creator discovery is live, but draft review and provider-side state remain off the public lane."
+                    Label: "Public shelf boundary",
+                    Summary: leadPublication is null
+                    ? "Public creator discovery is live, but draft review and service-side state remain off the public page."
                     : $"{leadPublication.Title} is discoverable on the public view, but Chummer still owns publication history and review state.",
                 Href: publicPublicationHref,
                 StatusLabel: leadPublication is null ? "Public-safe" : "Shelf-linked")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Creator OS publication rail",
-            Summary: "The named Creator OS rail now carries governed publication discovery, signed-in publication detail, and campaign-return history on one first-party path.",
-            BoundaryLine: "Creator OS can expose public-safe publication detail, but it does not hand publication truth, review state, or campaign return to provider dashboards or generic asset shelves.",
+            Heading: "Creator OS publication",
+            Summary: "The named Creator OS path now carries reviewed publication discovery, signed-in publication detail, and campaign-return history on one Chummer path.",
+            BoundaryLine: "Creator OS can expose public-safe publication detail, but it does not hand publication truth, review state, or campaign return to service dashboards or generic asset pages.",
             Cues: cues);
     }
 
@@ -5835,7 +5835,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in command deck",
-                    Summary: "Sign in to open the named Quicksilver bench where jump targets stay attached to first-party build, rules, prep, and publication rails.",
+                    Summary: "Sign in to open the named Quicksilver bench where jump targets stay attached to Chummer build, rules, prep, and publication paths.",
                     Href: "/login?next=%2Faccount%2Fquicksilver",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5851,9 +5851,9 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Quicksilver command rail",
-                Summary: "Public command posture is readable without an account, but the actual fast-jump history stays on signed-in first-party rails.",
-                BoundaryLine: "Quicksilver speeds up access to trusted Chummer lanes; it does not become a separate rules engine, a hidden automation surface, or a stale cache authority.",
+                Heading: "Quicksilver command",
+                Summary: "Public command status is readable without an account, but the actual fast-jump history stays signed in.",
+                BoundaryLine: "Quicksilver speeds up access to trusted Chummer paths; it does not become a separate rules engine, a hidden automation surface, or a stale cache authority.",
                 Cues: guestCues);
         }
 
@@ -5862,7 +5862,7 @@ public sealed class PublicLandingController : Controller
         [
             new(
                 Label: "Signed-in command deck",
-                Summary: $"{receipt.Counts.BuildHandoffs} build handoff(s), {receipt.Counts.RulesAnswers} rules answer(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Publications} publication(s) are currently reachable on one reviewed speed path.",
+                Summary: $"{receipt.Counts.BuildHandoffs} build handoff(s), {receipt.Counts.RulesAnswers} rules answer(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Publications} publication(s) are currently reachable on one speed path.",
                 Href: "/account/quicksilver",
                 StatusLabel: "Signed-in"),
             new(
@@ -5874,14 +5874,14 @@ public sealed class PublicLandingController : Controller
                 Label: "Lead focus route",
                 Summary: leadFocus is null
                     ? "Quicksilver stays ready even when no focus target is populated yet."
-                    : $"{leadFocus.Label} is currently the lead jump target, and it opens a named first-party lane instead of dropping you into a generic shelf.",
+                    : $"{leadFocus.Label} is currently the lead jump target, and it opens a named Chummer path instead of dropping you into a generic page.",
                 Href: leadFocus?.FocusHref ?? "/account/work",
                 StatusLabel: leadFocus is null ? "Ready" : "Focus")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Quicksilver command rail",
-            Summary: "The named Quicksilver rail now carries expert-speed jump targets across builds, rules, prep, and publication desks on one first-party path.",
+            Heading: "Quicksilver command",
+            Summary: "The named Quicksilver path now carries expert-speed jump targets across builds, rules, prep, and publication desks on one Chummer path.",
             BoundaryLine: "Quicksilver can reduce click friction and preserve context, but it does not hide legality, flatten meaning, or let background automation outrank explicit account-owned state.",
             Cues: cues);
     }
@@ -5895,24 +5895,24 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in JACKPOINT desk",
-                    Summary: "Sign in to open the governed JACKPOINT publication desk where review, publication truth, and campaign-return history stay on first-party rails.",
+                    Summary: "Sign in to open the JACKPOINT publication desk where review, publication status, and campaign-return history stay on Chummer paths.",
                     Href: "/login?next=%2Faccount%2Fjackpoint",
                     StatusLabel: "Sign-in"),
                 new(
                     Label: "Public-safe briefing packet",
-                    Summary: $"{_mediaHorizons.ListJackpointBriefings().Count} public-safe briefing packet(s) are already readable without opening the signed-in publication rail.",
+                    Summary: $"{_mediaHorizons.ListJackpointBriefings().Count} public-safe briefing packet(s) are already readable without opening the signed-in publication path.",
                     Href: "/jackpoint/briefings/emerald-sprawl-briefing.json",
                     StatusLabel: "Public-safe"),
                 new(
                     Label: "Briefing details",
-                    Summary: "Inspect the named account and typed publication lanes before treating JACKPOINT like a generic export shelf.",
+                    Summary: "Inspect the named account and typed publication paths before treating JACKPOINT like a generic export page.",
                     Href: "/jackpoint/receipts/briefing-network.json",
                     StatusLabel: "Current")
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "JACKPOINT briefing rail",
-                Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return history stay on signed-in first-party rails.",
+                Heading: "JACKPOINT briefing",
+                Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return history stay signed in.",
                 BoundaryLine: "Narration, export, or promotion helpers may assist packaging, but Chummer owns publication truth, provenance, and spoiler boundaries.",
                 Cues: guestCues);
         }
@@ -5937,30 +5937,30 @@ public sealed class PublicLandingController : Controller
             new(
                 Label: "Signed-in publication desk",
                 Summary: publications.Count == 0
-                    ? "No governed publication is attached to this account yet. JACKPOINT is ready to open the named desk as soon as a publication-safe output lands."
-                    : $"{publications.Count} publication-safe output(s) are already attached to this account, with review and return posture still on first-party rails.",
+                    ? "No reviewed publication is attached to this account yet. JACKPOINT is ready to open the named desk as soon as a publication-safe output lands."
+                    : $"{publications.Count} publication-safe output(s) are already attached to this account, with review and return status still in Chummer.",
                 Href: "/account/jackpoint",
                 StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
             new(
                 Label: "Lead publication contract",
                 Summary: leadPublication is null
-                    ? "Use the typed publication index when you want the governed publication contract before opening a single artifact page."
-                    : $"{leadPublication.Title} stays on the governed publication rail with {leadPublication.PublicationStatus} status and {leadPublication.Visibility} visibility.",
+                    ? "Use the typed publication index when you want the publication contract before opening a single file page."
+                    : $"{leadPublication.Title} stays on the reviewed publication path with {leadPublication.PublicationStatus} status and {leadPublication.Visibility} visibility.",
                 Href: detailApiHref,
                 StatusLabel: leadPublication is null ? "API" : "Typed"),
             new(
                 Label: "Open named desk route",
                 Summary: leadPublication is null
-                    ? "The named JACKPOINT desk opens to the first signed-in publication-safe rail, not to a generic docs shelf."
+                    ? "The named JACKPOINT desk opens to the first signed-in publication-safe path, not to a generic docs page."
                     : $"Open the named JACKPOINT desk for {leadPublication.Title} when the next job is publication review or campaign-return history.",
                 Href: detailAccountHref,
                     StatusLabel: leadPublication is null ? "Desk" : "Next step")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "JACKPOINT briefing rail",
-            Summary: "The named JACKPOINT rail now carries public-safe briefing packets, publication review, and publication-safe campaign return on one first-party path.",
-            BoundaryLine: "JACKPOINT can package and publish, but it does not hand provenance, spoiler truth, or publication authority to external shelves or media adapters.",
+            Heading: "JACKPOINT briefing",
+            Summary: "The named JACKPOINT path now carries public-safe briefing packets, publication review, and publication-safe campaign return on one Chummer path.",
+            BoundaryLine: "JACKPOINT can package and publish, but it does not hand source history, spoiler truth, or publication authority to external pages or media adapters.",
             Cues: cues);
     }
 
@@ -5973,24 +5973,24 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in RUNSITE bench",
-                    Summary: "Sign in to open the governed RUNSITE bench where workspace prep, runboard continuity, and prep-library launch stay on first-party rails.",
+                    Summary: "Sign in to open the RUNSITE bench where workspace prep, runboard continuity, and prep-library launch stay on Chummer paths.",
                     Href: "/login?next=%2Faccount%2Frunsites",
                     StatusLabel: "Sign-in"),
                 new(
                     Label: "Public runsite pack",
-                    Summary: $"{_mediaHorizons.ListRunsitePacks().Count} inspectable runsite pack(s) are already readable without opening the signed-in prep lane.",
+                    Summary: $"{_mediaHorizons.ListRunsitePacks().Count} inspectable runsite pack(s) are already readable without opening the signed-in prep path.",
                     Href: "/runsites/packs/redmond-dockyard-pack.json",
                     StatusLabel: "Public-safe"),
                 new(
                     Label: "Prep details",
-                    Summary: "Inspect the named workspace, run, and prep-library lanes before treating RUNSITE like a static map gallery.",
+                    Summary: "Inspect the named workspace, run, and prep-library paths before treating RUNSITE like a static map gallery.",
                     Href: "/runsites/receipts/prep-network.json",
                     StatusLabel: "Current")
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "RUNSITE prep rail",
-                Summary: "Public runsite packs are inspectable without an account, but governed prep and runboard continuity stay on signed-in workspace and run rails.",
+                Heading: "RUNSITE prep",
+                Summary: "Public runsite packs are inspectable without an account, but reviewed prep and runboard continuity stay in signed-in workspace and run paths.",
                 BoundaryLine: "Route overlays, host clips, and tours may assist orientation, but Chummer owns prep truth, runboard truth, and workspace continuity.",
                 Cues: guestCues);
         }
@@ -6017,29 +6017,29 @@ public sealed class PublicLandingController : Controller
             new(
                 Label: "Signed-in prep bench",
                 Summary: leadWorkspace is null
-                    ? "No governed workspace is attached to this account yet. RUNSITE is ready to open the named prep bench as soon as a workspace returns."
+                    ? "No reviewed workspace is attached to this account yet. RUNSITE is ready to open the named prep bench as soon as a workspace returns."
                     : $"{leadWorkspace.CampaignName} is already on the reviewed prep path with {leadWorkspace.Runs.Count} run(s), {leadWorkspace.RecapShelf.Count} publication-safe recap item(s), and continuity history attached.",
                 Href: workspaceHref,
                 StatusLabel: leadWorkspace is null ? "Ready" : "Signed-in"),
             new(
                 Label: "Workspace and prep contract",
                 Summary: leadWorkspace is null
-                    ? "Use the typed workspace index when you want the governed prep contract before a single runsite pack becomes table prep."
-                    : $"The typed workspace and prep-library APIs stay attached to {leadWorkspace.CampaignName} instead of collapsing prep into a media-only lane.",
+                    ? "Use the typed workspace index when you want the prep contract before a single runsite pack becomes table prep."
+                    : $"The typed workspace and prep-library APIs stay attached to {leadWorkspace.CampaignName} instead of collapsing prep into a media-only path.",
                 Href: prepLibraryApiHref,
                 StatusLabel: leadWorkspace is null ? "API" : "Typed"),
             new(
                 Label: "Lead run continuity",
                 Summary: leadRun is null
                     ? "RUNSITE can still open the governed run index before a live run exists."
-                    : $"{leadRun.Title} keeps active-scene, objective, and continuity state on the same first-party run rail as the prep lane.",
+                    : $"{leadRun.Title} keeps active-scene, objective, and continuity state on the same Chummer run path as prep.",
                 Href: runApiHref,
                 StatusLabel: leadRun is null ? "Index" : "Run")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "RUNSITE prep rail",
-            Summary: "The named RUNSITE rail now carries public pack inspection, signed-in workspace prep, runboard continuity, and governed prep-library launch on one first-party path.",
+            Heading: "RUNSITE prep",
+            Summary: "The named RUNSITE path now carries public pack inspection, signed-in workspace prep, runboard continuity, and reviewed prep-library launch on one Chummer path.",
             BoundaryLine: "RUNSITE can orient a crew before the run starts, but it does not become tactical authority, a live-map replacement, or an off-platform truth source.",
             Cues: cues);
     }
@@ -6054,7 +6054,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in control desk",
-                    Summary: "Sign in to open the named RUN CONTROL desk where runboard continuity, active scene, and recap history stay on first-party campaign rails.",
+                    Summary: "Sign in to open the named RUN CONTROL desk where runboard continuity, active scene, and recap history stay on Chummer campaign paths.",
                     Href: "/login?next=%2Faccount%2Frun-control",
                     StatusLabel: "Sign-in"),
                 new(
@@ -6070,9 +6070,9 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "RUN CONTROL operations rail",
-                Summary: "Public board posture is readable without an account, but the live session-control history stays on signed-in first-party rails.",
-                BoundaryLine: "RUN CONTROL can summarize session posture and continuity, but it does not replace campaign truth, the rules engine, or the dedicated workbench rails.",
+                Heading: "RUN CONTROL operations",
+                Summary: "Public board status is readable without an account, but the live session-control history stays signed in.",
+                BoundaryLine: "RUN CONTROL can summarize session status and continuity, but it does not replace campaign truth, the rules engine, or the dedicated workbench paths.",
                 Cues: guestCues);
         }
 
@@ -6099,8 +6099,8 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "RUN CONTROL operations rail",
-            Summary: "The named RUN CONTROL rail now carries session board posture, active-scene continuity, reconnect-safe history, and recap return on one first-party path.",
+            Heading: "RUN CONTROL operations",
+            Summary: "The named RUN CONTROL path now carries session board status, active-scene continuity, reconnect-safe history, and recap return on one Chummer path.",
             BoundaryLine: "RUN CONTROL can help a GM operate the table, but it does not become hidden state, a generic collaboration suite, or a truth source outside the campaign spine.",
             Cues: cues);
     }
@@ -6115,7 +6115,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in starter desk",
-                    Summary: "Sign in to open the named ONRAMP desk where starter workspace, first playable session, and restore history stay on first-party account rails.",
+                    Summary: "Sign in to open the named ONRAMP desk where starter workspace, first playable session, and restore history stay on Chummer account paths.",
                     Href: "/login?next=%2Faccount%2Fonramp",
                     StatusLabel: "Sign-in"),
                 new(
@@ -6131,8 +6131,8 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "ONRAMP starter rail",
-                Summary: "Public starter posture is readable without an account, but actual starter workspace and restore history stay on signed-in first-party rails.",
+                Heading: "ONRAMP starter",
+                Summary: "Public starter status is readable without an account, but actual starter workspace and restore history stay signed in.",
                 BoundaryLine: "ONRAMP can guide the first playable session and recovery path, but it does not replace rules authority, hide complexity, or turn background hints into authority.",
                 Cues: guestCues);
         }
@@ -14223,7 +14223,7 @@ echo "Help: ${HELP_URL}"
         return new AnarchyPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 "Shadowrun Anarchy",
-                "Rules-light play, Black Ledger consequence, and dispatch-backed mobile continuity.",
+                "Rules-light play, campaign city consequence, and dispatch-backed mobile continuity.",
                 currentPath,
                 cancellationToken),
             Eyebrow: eyebrow,
@@ -14231,8 +14231,8 @@ echo "Help: ${HELP_URL}"
             Intro: intro,
             CurrentSection: currentSection,
             RulesetId: AnarchyPreviewService.RulesetId,
-            VerdictLabel: "Shipped rules-light lane",
-            ScopeLabel: "Dedicated ruleset lane",
+            VerdictLabel: "Shipped rules-light path",
+            ScopeLabel: "Dedicated ruleset path",
             FeaturedProfile: _anarchyPreview.LoadFeaturedProfile(),
             LedgerStats: _anarchyPreview.BuildLedgerStats(),
             Dispatches: _anarchyPreview.ListDispatches(),

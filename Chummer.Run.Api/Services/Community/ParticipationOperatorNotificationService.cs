@@ -42,11 +42,15 @@ public sealed class ParticipationOperatorNotificationService
     private const string ConnectorDispatchTool = "connector.dispatch";
     private const string DeliverySendAction = "delivery.send";
     private const string EmailChannel = "email";
+    private const string WhatsappChannel = "whatsapp";
     private const string ReceiptPrefix = "partnote";
     private const string OperatorRecipientConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO";
+    private const string OperatorRecipientWhatsappConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO_WHATSAPP";
+    private const string OperatorNotifyChannelConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_CHANNEL";
     private const string EaApiTokenConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN";
     private const string EaPrincipalIdConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID";
     private const string EaBindingIdConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID";
+    private const string EaWhatsappBindingIdConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_EA_WHATSAPP_BINDING_ID";
     private const string EaBaseUrlConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL";
     private const string HashSaltConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_HASH_SALT";
     private const string NotificationsEnabledConfigKey = "CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_ENABLED";
@@ -293,18 +297,29 @@ public sealed class ParticipationOperatorNotificationService
                 return FinalizeReceipt(pendingReceipt, "suppressed_disabled", null, "Operator participation notifications are disabled on this runtime.", "notifications_disabled");
             }
 
-            string recipient = ResolveOperatorRecipient();
+            string notifyChannel = ResolveOperatorNotifyChannel();
+            string recipient = ResolveOperatorRecipient(notifyChannel);
             if (string.IsNullOrWhiteSpace(recipient))
             {
                 return FinalizeReceipt(pendingReceipt, "suppressed_recipient_missing", null, "No operator recipient is configured for participant notifications on this runtime.", "recipient_missing");
             }
 
-            if (!EaDispatchConfigured())
+            if (!EaDispatchConfigured(notifyChannel))
             {
                 return FinalizeReceipt(pendingReceipt, "suppressed_adapter_unconfigured", null, "The EA dispatch adapter is not configured on this runtime, so the participant event stayed as a first-party receipt only.", "ea_dispatch_unconfigured");
             }
 
-            string deliveryRef = await SendToEaAsync(pendingReceipt, recipient, cancellationToken);
+            if (!IsSupportedNotifyChannel(notifyChannel))
+            {
+                return FinalizeReceipt(
+                    pendingReceipt,
+                    "suppressed_adapter_unconfigured",
+                    null,
+                    $"Operator notification channel '{notifyChannel}' is not supported.",
+                    "unsupported_notify_channel");
+            }
+
+            string deliveryRef = await SendToEaAsync(pendingReceipt, recipient, notifyChannel, cancellationToken);
             return FinalizeReceipt(pendingReceipt, "sent", deliveryRef, "The participant event was queued to the internal EA delivery bridge.", null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or JsonException)
@@ -397,10 +412,10 @@ public sealed class ParticipationOperatorNotificationService
                 evidenceRef: eventKey,
                 reviewState: status));
 
-    private async Task<string> SendToEaAsync(ParticipationOperatorNotificationReceipt receipt, string recipient, CancellationToken cancellationToken)
+    private async Task<string> SendToEaAsync(ParticipationOperatorNotificationReceipt receipt, string recipient, string notifyChannel, CancellationToken cancellationToken)
     {
         string principalId = (_configuration[EaPrincipalIdConfigKey] ?? string.Empty).Trim();
-        string bindingId = (_configuration[EaBindingIdConfigKey] ?? string.Empty).Trim();
+        string bindingId = ResolveEaBindingId(notifyChannel);
         string idempotencyKey = receipt.EventKey;
         var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
@@ -425,11 +440,12 @@ public sealed class ParticipationOperatorNotificationService
             {
                 principal_id = principalId,
                 binding_id = bindingId,
-                channel = EmailChannel,
+                channel = notifyChannel,
                 recipient,
                 subject = $"[Chummer] New participant account: {receipt.IntentKind}",
                 content = BuildContent(receipt),
                 metadata,
+                notify_channel = notifyChannel,
                 idempotency_key = idempotencyKey,
             }
         };
@@ -471,13 +487,50 @@ public sealed class ParticipationOperatorNotificationService
     private bool NotificationsEnabled()
         => !string.Equals((_configuration[NotificationsEnabledConfigKey] ?? "true").Trim(), "false", StringComparison.OrdinalIgnoreCase);
 
-    private bool EaDispatchConfigured()
+    private bool EaDispatchConfigured(string notifyChannel)
         => !string.IsNullOrWhiteSpace(ResolveEaApiToken())
             && !string.IsNullOrWhiteSpace((_configuration[EaPrincipalIdConfigKey] ?? string.Empty).Trim())
-            && !string.IsNullOrWhiteSpace((_configuration[EaBindingIdConfigKey] ?? string.Empty).Trim());
+            && !string.IsNullOrWhiteSpace(ResolveEaBindingId(notifyChannel));
 
-    private string ResolveOperatorRecipient()
-        => (_configuration[OperatorRecipientConfigKey] ?? string.Empty).Trim();
+    private string ResolveOperatorRecipient(string notifyChannel)
+    {
+        if (string.Equals(notifyChannel, WhatsappChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            string? whatsappRecipient = ResolveWhatsappRecipient(
+                AccountService.NormalizeOptional(_configuration[OperatorRecipientWhatsappConfigKey])
+                    ?? AccountService.NormalizeOptional(_configuration[OperatorRecipientConfigKey]));
+            return whatsappRecipient ?? string.Empty;
+        }
+
+        return AccountService.NormalizeOptional(_configuration[OperatorRecipientConfigKey]) ?? string.Empty;
+    }
+
+    private string ResolveOperatorNotifyChannel()
+    {
+        string requested = (AccountService.NormalizeOptional(_configuration[OperatorNotifyChannelConfigKey]) ?? EmailChannel).ToLowerInvariant();
+        return requested switch
+        {
+            EmailChannel => EmailChannel,
+            WhatsappChannel => WhatsappChannel,
+            _ => requested
+        };
+    }
+
+    private static bool IsSupportedNotifyChannel(string channel)
+        => string.Equals(channel, EmailChannel, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, WhatsappChannel, StringComparison.OrdinalIgnoreCase);
+
+    private string ResolveEaBindingId(string notifyChannel)
+    {
+        if (string.Equals(notifyChannel, WhatsappChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            return AccountService.NormalizeOptional(_configuration[EaWhatsappBindingIdConfigKey])
+                ?? AccountService.NormalizeOptional(_configuration[EaBindingIdConfigKey])
+                ?? string.Empty;
+        }
+
+        return AccountService.NormalizeOptional(_configuration[EaBindingIdConfigKey]) ?? string.Empty;
+    }
 
     private string ResolveEaApiToken()
         => (_configuration[EaApiTokenConfigKey] ?? string.Empty).Trim();
@@ -542,6 +595,23 @@ public sealed class ParticipationOperatorNotificationService
                 $"Auth provider family: {receipt.AuthProviderFamily}",
                 $"Receipt id: {receipt.ReceiptId}",
             });
+
+    private static string? ResolveWhatsappRecipient(string? recipient)
+    {
+        string? normalized = AccountService.NormalizeOptional(recipient);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        string digits = new(normalized.Where(char.IsDigit).ToArray());
+        if (digits.Length < 8 || digits.Length > 15)
+        {
+            return null;
+        }
+
+        return digits;
+    }
 
     private static string Truncate(string? value, int maxLength)
     {

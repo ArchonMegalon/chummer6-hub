@@ -10,11 +10,11 @@ public sealed class SupportSubmittedFlagshipViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Pick the next support page without losing continuity.", view, StringComparison.Ordinal);
-        Assert.Contains("Response helper pack", view, StringComparison.Ordinal);
+        Assert.Contains("Pick the next page without losing the case.", view, StringComparison.Ordinal);
+        Assert.Contains("Case details", view, StringComparison.Ordinal);
         Assert.Contains("Keep the case moving on the same support path.", view, StringComparison.Ordinal);
         Assert.Contains("Open what works today", view, StringComparison.Ordinal);
-        Assert.Contains("No browser-only recovery", view, StringComparison.Ordinal);
+        Assert.Contains("Same recovery path", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public sealed class SupportSubmittedFlagshipViewTests
 
         Assert.Contains("Case timeline", view, StringComparison.Ordinal);
         Assert.Contains("Model.TrackedCaseSummary?.TimelineHighlights is { Count: > 0 }", view, StringComparison.Ordinal);
-        Assert.Contains("Saved evidence", view, StringComparison.Ordinal);
+        Assert.Contains("Saved files", view, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", view, StringComparison.Ordinal);
     }
 }

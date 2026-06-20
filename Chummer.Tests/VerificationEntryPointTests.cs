@@ -465,8 +465,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Release upload authorization was attached", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
-        Assert.Contains("source of truth for release upload in Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("recovery-aware verification path", view, StringComparison.Ordinal);
+        Assert.Contains("handles release upload in Chummer", view, StringComparison.Ordinal);
+        Assert.Contains("recovery-aware status path", view, StringComparison.Ordinal);
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
         Assert.Contains("carries the current short-lived upload handoff code", view, StringComparison.Ordinal);
         Assert.Contains("This signed-in command contains a short-lived handoff code", view, StringComparison.Ordinal);
@@ -3622,13 +3622,13 @@ public sealed class VerificationEntryPointTests
         string accountViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string accountView = File.ReadAllText(accountViewPath);
 
-        Assert.Contains("Decision receipt history", accountView, StringComparison.Ordinal);
+        Assert.Contains("Decision history", accountView, StringComparison.Ordinal);
         Assert.Contains("PublicationDecisionOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("PublicationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent governed prep launches", accountView, StringComparison.Ordinal);
-        Assert.Contains("Recent travel prefetch receipts", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent travel prefetch history", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent aftermath recap packages and replay outputs", accountView, StringComparison.Ordinal);
     }
 

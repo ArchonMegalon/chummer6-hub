@@ -33,8 +33,8 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Continuity posture</p>
-        <h2 class="editorial-title">Claimed installs and reconnect rails are visible without leaking private device history.</h2>
+        <p class="eyebrow">Continuity</p>
+        <h2 class="editorial-title">Claimed installs and reconnect paths are visible without leaking private device history.</h2>
         <p class="editorial-copy">@Model.VerdictSummary</p>
     </div>
     <div class="route-choice-grid">
@@ -49,9 +49,9 @@
             <p>Live continuity grants currently backing claimed installs.</p>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Pending recovery rails</span>
+            <span class="tag">Pending recovery</span>
             <h3>@(Model.PendingClaimCount + Model.PendingBrowserCallbackCount)</h3>
-            <p>Pending claim and browser callback handoffs still in the recovery lane.</p>
+            <p>Pending claim and browser callback handoffs still in recovery.</p>
         </article>
     </div>
 </section>
@@ -59,7 +59,7 @@
 <section class="continuity-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">Platform spread</p>
-        <h2 class="editorial-title">Continuity stays cross-device, but the public rail only shows safe aggregate proof.</h2>
+        <h2 class="editorial-title">Continuity stays cross-device, while the public page only shows safe aggregate status.</h2>
         <p class="editorial-copy">@Model.PlatformSummary</p>
     </div>
     <div class="continuity-band__panel">
@@ -75,9 +75,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Continuity receipts</p>
-        <h2 class="editorial-title">Download the receipt before trusting the continuity story.</h2>
-        <p class="editorial-copy">These receipts expose a bounded continuity contract: aggregate install posture, reconnect handoff, and the public/private boundary around deeper runboard state.</p>
+        <p class="eyebrow">Continuity details</p>
+        <h2 class="editorial-title">See how continuity stays bounded.</h2>
+        <p class="editorial-copy">These details show the continuity contract: aggregate install posture, reconnect handoff, and the public/private boundary around deeper runboard state.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var receipt in Model.Receipts)
@@ -90,7 +90,7 @@
                     <span>@receipt.ReceiptId</span>
                     <span>@receipt.Route</span>
                 </div>
-                <a class="editorial-strip__action" href="@receipt.Route">Open receipt JSON</a>
+                <a class="editorial-strip__action" href="@receipt.Route">Open details</a>
             </article>
         }
     </div>

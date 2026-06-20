@@ -421,8 +421,8 @@ public sealed class GmSessionVenueService
                 : $"{venue.ScheduledStartUtc:yyyy-MM-dd HH:mm} UTC";
         GmSessionVenueAdapterAvailability availability = _adapter.GetAvailability();
         string fallbackMessage = availability.CreateModeAvailable
-            ? "Manual room links remain valid if provider automation is unavailable."
-            : "Live room integration unavailable. Paste your external room link manually or use another provider.";
+            ? "Manual room links remain valid if service automation is unavailable."
+            : "Live room integration unavailable. Paste your external room link manually or use another service.";
 
         return new GmSessionVenueSurfaceProjection(
             CampaignId: campaignId,

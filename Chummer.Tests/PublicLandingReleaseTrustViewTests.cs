@@ -61,7 +61,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         int platformShelfIndex = view.IndexOf("id=\"platforms\"", StringComparison.Ordinal);
         int helpIndex = view.IndexOf("<h2>Help</h2>", StringComparison.Ordinal);
 
-        Assert.Contains("Download lanes", view, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Downloads\"", view, StringComparison.Ordinal);
         Assert.Contains("Platforms", view, StringComparison.Ordinal);
         Assert.Contains("Arch Linux", view, StringComparison.Ordinal);
         Assert.True(laneGridIndex >= 0, "stable/nightly lane grid should stay visible on the main downloads page");
@@ -565,7 +565,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The helper should leave clear changes.", view, StringComparison.Ordinal);
         Assert.Contains("Use the helper to get oriented, then let Chummer do the work.", view, StringComparison.Ordinal);
         Assert.Contains("Signed-in helper", view, StringComparison.Ordinal);
-        Assert.Contains("The real compare bench is now a named account lane.", view, StringComparison.Ordinal);
+        Assert.Contains("The real compare bench is now a named account path.", view, StringComparison.Ordinal);
         Assert.Contains("@SanitizePublicCopy(signedInBench.EntryLabel)", view, StringComparison.Ordinal);
         Assert.Contains("Open lead build handoff", view, StringComparison.Ordinal);
     }
@@ -679,7 +679,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("[HttpGet(\"/community\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/community/receipts/open-run-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("Community Hub now ships a real first-party open-run network", controller, StringComparison.Ordinal);
+        Assert.Contains("Community Hub now ships a real open-run network", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/community\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/community/open\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"me/open-runs\")]", campaignSpineController, StringComparison.Ordinal);
@@ -701,7 +701,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("[HttpGet(\"/creator\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/creator/receipts/publication-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("Creator OS now ships a real first-party publication network", controller, StringComparison.Ordinal);
+        Assert.Contains("Creator OS now ships a real publication network", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/creator\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/creator/open\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/creator/{publicationId}\")]", accountsController, StringComparison.Ordinal);
@@ -722,7 +722,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("[HttpGet(\"/jackpoint\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/jackpoint/receipts/briefing-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("JACKPOINT now ships a real first-party briefing network", controller, StringComparison.Ordinal);
+        Assert.Contains("JACKPOINT now ships a real briefing network", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/jackpoint\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/jackpoint/open\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/jackpoint/{publicationId}\")]", accountsController, StringComparison.Ordinal);
@@ -769,7 +769,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/run-control/receipts/control-network.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/run-control/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/run-control/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("RUN CONTROL now ships a real first-party GM operations lane", controller, StringComparison.Ordinal);
+        Assert.Contains("RUN CONTROL now ships a real GM operations surface", controller, StringComparison.Ordinal);
         Assert.Contains("IsKnownRunControlPacketId", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/run-control\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/run-control/open\")]", accountsController, StringComparison.Ordinal);
@@ -812,7 +812,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/quicksilver/receipts/command-network.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/quicksilver/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/quicksilver/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("Quicksilver now ships a real first-party command deck", controller, StringComparison.Ordinal);
+        Assert.Contains("Quicksilver now ships a real command deck", controller, StringComparison.Ordinal);
         Assert.Contains("IsKnownQuicksilverPacketId", controller, StringComparison.Ordinal);
         Assert.Contains("return NotFound();", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/quicksilver\")]", accountsController, StringComparison.Ordinal);
@@ -832,9 +832,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("[HttpGet(\"/anarchy/receipts/runtime.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("A shipped rules-light lane for mobile play, dispatches, faction consequence, and fast continuity.", controller, StringComparison.Ordinal);
-        Assert.Contains("VerdictLabel: \"Shipped rules-light lane\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Shipped rules-light lane for Black Ledger, dispatches, and mobile play.", view, StringComparison.Ordinal);
+        Assert.Contains("A shipped rules-light path for mobile play, dispatches, faction consequence, and fast continuity.", controller, StringComparison.Ordinal);
+        Assert.Contains("VerdictLabel: \"Shipped rules-light path\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Shipped rules-light path for campaign city dispatches and mobile play.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -846,7 +846,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/ghostwire\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/roadmap/ghostwire\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ghostwire/receipts/replay-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("GHOSTWIRE now ships first-party after-action packet rails", controller, StringComparison.Ordinal);
+        Assert.Contains("GHOSTWIRE now ships after-action packets", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1129,8 +1129,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string nowView = File.ReadAllText(nowViewPath);
         string feedbackView = File.ReadAllText(feedbackViewPath);
 
-        Assert.Contains("You followed a legacy feedback handoff", participateView, StringComparison.Ordinal);
-        Assert.Contains("The current public signal page lives on <code class=\"mono-receipt\">/feedback</code>", participateView, StringComparison.Ordinal);
+        Assert.Contains("You followed an older feedback link", participateView, StringComparison.Ordinal);
+        Assert.Contains("The public feedback page now lives at <code class=\"mono-receipt\">/feedback</code>", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("feedback returns here, roadmap resolves through Horizons, and shipped closeout resolves through What works today.", participateView, StringComparison.Ordinal);
         Assert.Contains("Not the front door", horizonsView, StringComparison.Ordinal);
         Assert.Contains("Future work stays behind the main app.", horizonsView, StringComparison.Ordinal);
@@ -1238,7 +1238,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/local-co-processor/receipts/optional-acceleration.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("LOCAL CO-PROCESSOR now ships a bounded first-party optional-acceleration lane", controller, StringComparison.Ordinal);
+        Assert.Contains("LOCAL CO-PROCESSOR now ships a bounded optional-acceleration path", controller, StringComparison.Ordinal);
         Assert.Contains("IsKnownLocalCoProcessorPacketId", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/local-co-processor\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/local-co-processor/open\")]", accountsController, StringComparison.Ordinal);

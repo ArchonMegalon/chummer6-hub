@@ -382,15 +382,15 @@ public sealed class WeeklyProductPulseArtifactService
                 : "partial";
 
         string proofSegment = string.Equals(localReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-            ? "Current local release proof passed."
-            : $"Current local release proof is {localReleaseProofStatus}.";
+            ? "Current release status is ready."
+            : $"Current release status is {localReleaseProofStatus}.";
         string journeysSegment = provenJourneyCount > 0 && provenRouteCount > 0
             ? $"{provenJourneyCount} tested journeys and {provenRouteCount} checked routes are on record."
             : provenJourneyCount > 0
                 ? $"{provenJourneyCount} tested journeys are on record."
                 : provenRouteCount > 0
                     ? $"{provenRouteCount} checked routes are on record."
-                    : "Journey evidence is still accumulating.";
+                    : "Journey history is still accumulating.";
         string historySegment = historySnapshotCount > 0
             ? historySnapshotCount < 6
                 ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
@@ -572,7 +572,7 @@ public sealed class WeeklyProductPulseArtifactService
 
         if (!string.Equals(localReleaseProof?.Status, "passed", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hold broad promotion until fresh local release proof passes on the public edge.";
+            return "Hold broad promotion until the public release status is current on the public edge.";
         }
 
         if (closureHealth is not null
@@ -610,7 +610,7 @@ public sealed class WeeklyProductPulseArtifactService
 
         if (!string.Equals(localReleaseProof?.Status, "passed", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hold launch expansion pending fresh local release proof on the public edge.";
+            return "Hold launch expansion until the public release status is current on the public edge.";
         }
 
         if (closureHealth is not null

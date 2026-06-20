@@ -12,10 +12,10 @@ public sealed class WaveEightHorizonsService
         new(
             "replay_timeline",
             "Replay timeline",
-            "Receipt-backed replay packet that keeps the order of consequences, reports, and visible return-state changes explicit.",
+            "Replay packet that keeps the order of consequences, reports, and visible return-state changes explicit.",
             "/ghostwire/after-action/replay_timeline.md",
             "/ghostwire/after-action/replay_timeline.json",
-            ["Receipt-backed replay", "Consequence order", "No transcript leak"]),
+            ["Replay packet", "Consequence order", "No transcript leak"]),
         new(
             "after_action_report",
             "After-action report",
@@ -173,7 +173,7 @@ public sealed class WaveEightHorizonsService
     private static string BuildGhostwireBoundary(string id)
         => id switch
         {
-            "replay_timeline" => "Replay stays receipt-backed and public-safe. It does not expose private transcript detail or retrospective invention.",
+            "replay_timeline" => "Replay stays public-safe. It does not expose private transcript detail or retrospective invention.",
             "after_action_report" => "After-action packets can summarize what changed and what comes next, but private table notes stay signed-in.",
             _ => "Consequence carry-forward stays bounded to first-party package truth instead of speculative narrative reconstruction."
         };

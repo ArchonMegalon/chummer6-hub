@@ -200,6 +200,54 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string[] publicFeatureMethodMarkers =
+        [
+            "public async Task<IActionResult> MobileProjectionPage",
+            "public async Task<IActionResult> ParticipatePage",
+            "public async Task<IActionResult> AlicePage",
+            "public async Task<IActionResult> TablePulsePage",
+            "private async Task<KnowledgeFabricPageViewModel> BuildKnowledgeFabricPageModel",
+            "private async Task<MobileProjectionPageViewModel> BuildMobileProjectionPageModel",
+            "private async Task<NexusPanContinuityPageViewModel> BuildNexusPanContinuityPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildJackpointPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildRunsitePageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildRunControlPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildOnrampPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildEditionStudioPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildLocalCoProcessorPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildRunbookPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildCommunityHubPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildCreatorOsPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildQuicksilverPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildRunnerPassportPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildSignalDeckPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildLivingWorldPageModel",
+            "private async Task<MediaArtifactHorizonPageViewModel> BuildGhostwirePageModel"
+        ];
+
+        foreach (string methodMarker in publicFeatureMethodMarkers)
+        {
+            string methodSource = SliceSource(controller, methodMarker);
+            foreach (Match match in CSharpStringLiteralRegex().Matches(methodSource))
+            {
+                string value = match.Groups[1].Value;
+                if (LooksLikeRouteOrIdentifier(value))
+                {
+                    continue;
+                }
+
+                foreach (Regex forbidden in InternalProcessWordRegexes)
+                {
+                    Assert.DoesNotMatch(forbidden, value);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Secondary_public_workflow_views_do_not_reintroduce_maintenance_language()
     {
         foreach (string viewName in new[]
@@ -207,7 +255,12 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                      "ReadyForTonight.cshtml",
                      "JoinPrimer.cshtml",
                      "DownloadDispatch.cshtml",
-                     "Ledger.cshtml"
+                     "Ledger.cshtml",
+                     "Changelog.cshtml",
+                     "MobileProjection.cshtml",
+                     "KarmaForgeSubmitted.cshtml",
+                     "FeedbackOperationsDetail.cshtml",
+                     "GmSessionVenue.cshtml"
                  })
         {
             string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", viewName));
@@ -224,7 +277,18 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                          "first-party email rail",
                          "Faction rail",
                          "governed joining",
-                         "without losing provenance"
+                         "without losing provenance",
+                         "This rail",
+                         "privacy-sensitive lane",
+                         "governed stages",
+                         "These lanes",
+                         "update posture",
+                         "venue posture",
+                         "provider payload",
+                         "provider setup",
+                         "operating posture",
+                         "send posture",
+                         "release-facing trail"
                      })
             {
                 Assert.DoesNotContain(marker, visibleText, StringComparison.OrdinalIgnoreCase);
@@ -276,7 +340,18 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "Guided setup assistant",
             "first-party email rail",
             "Faction rail",
-            "without losing provenance"
+            "without losing provenance",
+            "This rail",
+            "privacy-sensitive lane",
+            "governed stages",
+            "These lanes",
+            "update posture",
+            "venue posture",
+            "provider payload",
+            "provider setup",
+            "operating posture",
+            "send posture",
+            "release-facing trail"
         ];
 
         foreach (string file in sourceFiles)
@@ -336,6 +411,56 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         "product threads"
     ];
 
+    private static readonly Regex[] InternalProcessWordRegexes =
+    [
+        new(@"\bproof\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\breceipts?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\baudits?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bverdict\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bverification\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bvalidated?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bgoverned\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bprovider\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bposture\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\bhorizons?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\brails?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new(@"\blanes?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+    ];
+
+    private static string SliceSource(string source, string startMarker)
+    {
+        int start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find public feature method marker '{startMarker}'.");
+
+        int end = source.Length;
+        foreach (string nextMarker in new[] { "\n    [Http", "\n    private " })
+        {
+            int candidate = source.IndexOf(nextMarker, start + startMarker.Length, StringComparison.Ordinal);
+            if (candidate >= 0)
+            {
+                end = Math.Min(end, candidate);
+            }
+        }
+
+        return source[start..end];
+    }
+
+    private static bool LooksLikeRouteOrIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return value.Contains('/', StringComparison.Ordinal)
+            || value.Contains('_', StringComparison.Ordinal)
+            || value.Contains('%', StringComparison.Ordinal)
+            || value.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            || value.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+            || value.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("api", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ExtractVisibleText(string view)
     {
         string withoutCode = RazorTopCodeBlockRegex().Replace(view, " ");
@@ -368,4 +493,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
     private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex("\"((?:\\\\.|[^\"])*)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex CSharpStringLiteralRegex();
 }

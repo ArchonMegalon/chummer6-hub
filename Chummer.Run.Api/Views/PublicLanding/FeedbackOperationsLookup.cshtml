@@ -15,13 +15,13 @@
         <a class="button-like button-like--ghost" href="/feedback">Back to feedback</a>
         <a class="button-like button-like--ghost" href="/feedback/operations">Open aggregate detail</a>
     </div>
-    <p class="muted-copy">Search by source receipt id, dispatch receipt id, recipient ref, address hash, delivery id, delivery message id, or item reference.</p>
+    <p class="muted-copy">Search by source id, dispatch id, recipient ref, address hash, delivery id, delivery message id, or item reference.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Bounded lookup controls">
     <article class="status-decision-strip__card">
         <span class="tag">Lookup controls</span>
-        <h2>Search one bounded seam instead of scanning the whole archive.</h2>
+        <h2>Search one bounded area instead of scanning the whole archive.</h2>
         <form class="auth-form" method="get" action="/feedback/operations/lookup">
             <label class="field" for="feedbackOperationsLookupQuery">
                 <span>Search query</span>
@@ -31,7 +31,7 @@
                 <span>Scope</span>
                 <select id="feedbackOperationsLookupScope" name="scope">
                     <option value="all" selected="@(string.Equals(lookup.Scope, "all", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Sources and threads</option>
-                    <option value="source" selected="@(string.Equals(lookup.Scope, "source", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Source receipts only</option>
+                    <option value="source" selected="@(string.Equals(lookup.Scope, "source", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Source records only</option>
                     <option value="thread" selected="@(string.Equals(lookup.Scope, "thread", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Recipient threads only</option>
                 </select>
             </label>
@@ -48,8 +48,8 @@
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Bounded only</span>
-        <h2>Lookup stays inside first-party receipts and hashed identity.</h2>
-        <p>No raw delivery payload body, no raw recipient email, and no public claim beyond the stored receipt state.</p>
+        <h2>Lookup stays inside Chummer records and hashed identity.</h2>
+        <p>No raw delivery payload body, no raw recipient email, and no public claim beyond the stored state.</p>
     </article>
 </section>
 
@@ -57,15 +57,15 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Lookup results</p>
         <h2 class="editorial-title">Recent results and exact matches share one public-safe page.</h2>
-        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across source receipts and recipient threads using stored first-party identifiers only.</p>
+        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across source records and recipient threads using stored Chummer identifiers only.</p>
     </div>
     @if (results.Length == 0)
     {
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">No bounded match</span>
-                <h3>No receipt or thread matched this query</h3>
-                <p>Try a source receipt id, dispatch receipt id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
+                <h3>No record or thread matched this query</h3>
+                <p>Try a source id, dispatch id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
             </article>
         </div>
     }

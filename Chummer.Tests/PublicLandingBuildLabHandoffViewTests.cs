@@ -50,11 +50,11 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner note:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
-        Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
+        Assert.Contains("Output source:", view, StringComparison.Ordinal);
         Assert.Contains("Output type:", view, StringComparison.Ordinal);
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
         Assert.Contains("Output status:", view, StringComparison.Ordinal);
-        Assert.Contains("Output audit:", view, StringComparison.Ordinal);
+        Assert.Contains("Output note:", view, StringComparison.Ordinal);
     }
 
     [Fact]

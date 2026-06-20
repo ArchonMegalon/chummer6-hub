@@ -84,7 +84,7 @@ public sealed class BeHumanGmSessionVenueAdapter : IGmSessionVenueAdapter
         BeHumanEventAdapterPosture posture = _postureService.Build();
         if (posture.Verdict != "BEHUMAN_EVENT_ADAPTER_READY")
         {
-            return new(false, "Create BeHuman venue is unavailable until provider verification and operating posture are ready.");
+            return new(false, "Create BeHuman venue is unavailable until service setup and operating status are ready.");
         }
 
         if (string.Equals(posture.OperatingMode, "manual", StringComparison.OrdinalIgnoreCase)
@@ -95,7 +95,7 @@ public sealed class BeHumanGmSessionVenueAdapter : IGmSessionVenueAdapter
 
         if (string.IsNullOrWhiteSpace(GetVenueApiBaseUrl()))
         {
-            return new(false, "Create BeHuman venue is unavailable until a verified adapter transport base URL exists.");
+            return new(false, "Create BeHuman venue is unavailable until an adapter transport base URL exists.");
         }
 
         return new(true, null);

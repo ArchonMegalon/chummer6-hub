@@ -83,16 +83,16 @@ It should not feel like:
 Direction:
 
 - Light-to-deep blueglass palette, not neon overload.
-- Big editorial display type paired with technical mono proof notes.
+- Big editorial display type paired with quiet status notes.
 - Premium dossier surfaces, record rails, and route callouts.
 - Atmospheric stills that imply campaign pressure, dossiers, devices, desks, transit, rain, and continuity.
-- Motion only where it helps sequencing: staged reveal, proof-float rise, route-callout slide, and trust-rail fade.
+- Motion only where it helps sequencing: staged reveal, route-callout slide, and trust-rail fade.
 
 Typography:
 
 - Keep `Space Grotesk` or another display face for editorial headlines.
 - Keep `Instrument Sans` for reading copy.
-- Keep `IBM Plex Mono` for receipts, route IDs, proof trails, and support/status microcopy.
+- Keep `IBM Plex Mono` for route IDs and compact support/status microcopy.
 
 Color system:
 
@@ -245,7 +245,7 @@ Required evidence:
 ## 11. LTD Utilization Map
 
 - `1min.AI` — Tier 1, live now. Role: signal-core generation for explainers, recaps, and compact campaign briefs inside signed-in and artifact routes. Target: `home` cockpit briefs, campaign memory packet summaries, artifact annotations. Dependencies: prompt envelopes and campaign truth inputs. Verify: generated receipt plus workflow test coverage. Touches: signed-in workspace routes and publication workflows.
-- `BrowserAct` — Tier 1, live now. Role: Matrix Scout and external evidence capture. Target: external fact capture, public-signal enrichment, proof packet generation, and guide-source extraction. Dependencies: connector bindings and evidence packet routes. Verify: BrowserAct receipt trails and artifact generation. Touches: artifact workflows, support or signal triage, future scout surfaces.
+- `BrowserAct` — Tier 1, live now. Role: Matrix Scout and external fact capture. Target: external fact capture, public-signal enrichment, review packets, and guide-source extraction. Dependencies: connector bindings and review routes. Verify: BrowserAct review history and file generation. Touches: file workflows, support or signal triage, future scout surfaces.
 - `Emailit` — Tier 1, live now. Role: dispatch and follow-through lane. Target: recap mails, support closeout notices, preview follow-up, and shipped notification mail. Dependencies: sender-domain health and account-aware notification rules. Verify: delivery receipts and route-triggered tests. Touches: support loops, roadmap follow-up, signed-in account value.
 - `AI Magicx` — Tier 1, live now. Role: bounded fallback lane for short overflow generation. Target: helper copy, overflow recap generation, and support-safe summarization. Dependencies: prompt limits and 1min.AI fallback rules. Verify: fallback path tests. Touches: summary generation, not hero marketing.
 - `Prompt Architects` — Tier 2, staged next. Role: voice tuner for premium copy and media prompt consistency. Target: editorial copy pass templates, image prompt normalization, and route-family tone guardrails. Dependencies: prompt-packet wiring. Verify: prompt packet receipts and review diffs. Touches: design-system copy and creative ops.

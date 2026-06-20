@@ -1564,7 +1564,7 @@ public sealed class CampaignSpineController : ControllerBase
             LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt($"/api/v1/campaign-spine/me/workspaces/{workspaceId}/federation-batches");
             RouteClaimStatus routeClaim = ResolveCampaignFederationRouteClaimStatus(
                 routeLookup,
-                "No current local release-proof receipt is attached to this campaign federation exchange route.");
+                "No current release status record is attached to this campaign federation exchange route.");
 
             return Ok(batch with
             {

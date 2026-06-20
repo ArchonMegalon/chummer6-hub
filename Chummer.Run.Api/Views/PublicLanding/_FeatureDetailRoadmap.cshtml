@@ -27,7 +27,7 @@
         {
             <article class="role-matrix__cell">
                 <span class="tag">Related live surface</span>
-                <p>@Model.ProofNote</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.ProofNote)</p>
             </article>
         }
     </div>
@@ -43,7 +43,7 @@
         <div class="trust-claim__microproof">
             @foreach (var item in Model.MicroProof)
             {
-                <span>@item</span>
+                <span>@PublicFacingCopyHumanizer.Clean(item)</span>
             }
         </div>
     </section>

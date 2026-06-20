@@ -7,7 +7,7 @@
 
 <section class="ledger-flagship ledger-flagship--notifications">
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">Signed-in notification rail</p>
+        <p class="eyebrow">Signed-in notifications</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
@@ -18,8 +18,8 @@
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn check</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory lane</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn review</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory</a>
             <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
         </div>
     </div>
@@ -35,17 +35,17 @@
                 data-tick-headline="Newsreel pressure live."
                 data-primary-label="Open Turn 1"
                 data-primary-href="@Model.Status.TurnHref"
-                data-secondary-label="Open turn check"
+                data-secondary-label="Open turn review"
                 data-secondary-href="/account/ledger/worldtick/validation"></div>
         </div>
-        <div class="ledger-flagship__nav" aria-label="Notification command lanes">
+        <div class="ledger-flagship__nav" aria-label="Notification command paths">
             <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="@Model.Status.TurnHref">
                 <span class="tag">Turn</span>
                 <strong>Open the world turn</strong>
                 <p>Jump from the globe straight into the current turn and the route-backed world state.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
-                <span class="tag">Checks</span>
+                <span class="tag">World state</span>
                 <strong>Review the turn</strong>
                 <p>Every inbox line should trace back to the same world turn.</p>
             </a>
@@ -57,7 +57,7 @@
             <a class="ledger-flagship__nav-card" href="/account/ledger/advisory">
                 <span class="tag">Advisory</span>
                 <strong>Open advisory voting</strong>
-                <p>See the player and GM vote lanes that feed upward into the faction chain of command.</p>
+                <p>See the player and GM vote paths that feed upward into the faction chain of command.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/ledger/map#ledger-map">
                 <span class="tag">Public</span>
@@ -100,7 +100,7 @@
                     <h3>@cue.StatusLabel</h3>
                     <p>@cue.Summary</p>
                     <div class="route-choice-card__proof">
-                        <a href="@cue.Href">Open lane</a>
+                        <a href="@cue.Href">Open</a>
                     </div>
                 </article>
             }
@@ -121,7 +121,7 @@
                 <p>@Model.TablePulsePacket.NotificationPosture</p>
             </article>
             <article class="route-choice-card">
-                <span class="tag">Remote reaction lane</span>
+                <span class="tag">Remote reaction</span>
                 <p>@Model.TablePulsePacket.RemoteReactionPosture</p>
             </article>
             <article class="route-choice-card">
@@ -136,12 +136,12 @@
                 <span class="tag">Aftermath</span>
                 <p>@Model.TablePulsePacket.AftermathPosture</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath rail</a>
+                    <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living World</span>
-                <p>Keep the between-session watch package, command carry-forward, and aftermath rail on one first-party route.</p>
+                <p>Keep the between-session watch package, command carry-forward, and aftermath on one first-party route.</p>
                 <div class="route-choice-card__proof">
                     <a href="/living-world">Open Living World</a>
                 </div>
@@ -150,7 +150,7 @@
                 <span class="tag">Entry</span>
                 <p>Use the inbox route as the Table Pulse Live entry point, not a static notification list.</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.TablePulsePacket.EntryHref">Open Table Pulse Live lane</a>
+                    <a href="@Model.TablePulsePacket.EntryHref">Open Table Pulse Live</a>
                 </div>
             </article>
         </div>
@@ -199,7 +199,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Executive</span>
-                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive summary rail(s) currently visible.</p>
+                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive summary item(s) currently visible.</p>
             </article>
         </div>
     </section>
@@ -263,8 +263,8 @@
                                         <span class="tag">@beat.ActorKind</span>
                                         <h4>@beat.BeatLabel</h4>
                                         <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
-                                        <p>@beat.ActionSummary</p>
-                                        <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
+                                        <p>@PublicFacingCopyHumanizer.Clean(beat.ActionSummary)</p>
+                                        <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
                                     </article>
                                 }
                             </div>
@@ -273,10 +273,10 @@
                     <article class="route-choice-card">
                         <span class="tag">Audio</span>
                         <h3>Broadcast mix</h3>
-                        <p>@Model.WorldTurnBriefing.Broadcast.AudioPosture</p>
-                        <p>@Model.WorldTurnBriefing.Broadcast.MusicPosture</p>
+                        <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AudioPosture)</p>
+                        <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.MusicPosture)</p>
                         <div class="route-choice-card__proof">
-                            <a href="@Model.WorldTurnBriefing.Broadcast.WatchHref">Open watch route</a>
+                            <a href="@Model.WorldTurnBriefing.Broadcast.WatchHref">Watch</a>
                         </div>
                     </article>
                 </aside>
@@ -289,7 +289,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Inbox queue</p>
         <h2 class="editorial-title">Actual messages, not just status</h2>
-        <p class="editorial-copy">The signed-in lane now shows the turn, current checks, leader digest, and faction promo as separate inbox items.</p>
+        <p class="editorial-copy">The signed-in path now shows the turn, world state, leader digest, and faction promo as separate inbox items.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var message in Model.InboxMessages)
@@ -361,16 +361,16 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Turn checks</p>
+            <p class="eyebrow">Turn details</p>
             <h2 class="editorial-title">Send this for review</h2>
-            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ValidationPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var check in Model.ValidationPacket.Checks.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">Validation</span>
-                    <p>@check</p>
+                    <span class="tag">Detail</span>
+                    <p>@PublicFacingCopyHumanizer.Clean(check)</p>
                 </article>
             }
         </div>

@@ -12,7 +12,7 @@
     <section class="participation-hero">
         <div class="participation-hero__content">
             <p class="eyebrow">Participation</p>
-            <h1 class="hero-brand">Help Chummer show its work.</h1>
+            <h1 class="hero-brand">Help Chummer improve.</h1>
             <h2 class="hero-headline">Authorize a temporary Codex lane only when you want to use it.</h2>
             <p class="participation-lead">Use the guided contribution flow only when you want Chummer to use your OpenAI account in ChatGPT for bounded product work. Final landing still goes through review, and authorization by itself does not count as contribution credit.</p>
             <div class="stacked-actions">
@@ -32,17 +32,17 @@
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What you need ready</p>
             <h3>Your browser and your OpenAI account</h3>
-            <p>When you start, Chummer requests a fresh device-auth code, opens the ChatGPT verification page, and waits for confirmation. If the code expires, you can request a new one from the wizard.</p>
+            <p>When you start, Chummer requests a fresh device-auth code, opens the ChatGPT confirmation page, and waits for the browser to finish. If the code expires, you can request a new one from the wizard.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What Chummer stores</p>
-            <h3>Consent, lane status, and receipts</h3>
-            <p>Chummer keeps the participation record, your public Codex handle if you submit one, badge state, and receipt history. The temporary auth material stays on the execution host and does not belong in the account surface.</p>
+            <h3>Consent and participation history</h3>
+            <p>Chummer keeps the participation record, your public Codex handle if you submit one, and badge state. The temporary auth material stays on the execution host and does not belong in the account surface.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">When credit appears</p>
-            <h3>After validated work lands</h3>
-            <p>Authorization gets you ready to contribute, but it is not scored as contribution credit. Recognition, badges, and token-backed leaderboard visibility only appear after signed, validated work receipts arrive.</p>
+            <h3>After accepted work lands</h3>
+            <p>Authorization gets you ready to contribute, but it is not scored as contribution credit. Recognition, badges, and token-backed leaderboard visibility only appear after accepted work lands.</p>
         </article>
     </section>
 
@@ -101,14 +101,14 @@
                     <span class="wizard-step__index">2</span>
                     <div>
                         <strong>Authorize with OpenAI</strong>
-                        <p>Open the verification page and enter the one-time code.</p>
+                        <p>Open the confirmation page and enter the one-time code.</p>
                     </div>
                 </li>
                 <li id="wizardStepComplete" class="wizard-step">
                     <span class="wizard-step__index">3</span>
                     <div>
                         <strong>You're set</strong>
-                        <p>Chummer keeps the record and waits for validated work.</p>
+                        <p>Chummer keeps the record and waits for accepted work.</p>
                     </div>
                 </li>
             </ol>
@@ -147,7 +147,7 @@
                 <button id="startContributionButton" class="button-like button-like--primary" type="button">Generate fresh code</button>
                 <button id="closeStartStateButton" class="inline-link inline-link--button" type="button">Not now</button>
             </div>
-            <p class="privacy-note">You can stop later. Final contribution credit appears only after validated receipts land.</p>
+            <p class="privacy-note">You can stop later. Final contribution credit appears only after accepted work lands.</p>
         </div>
 
         <div id="authorizeState" class="state-stack" hidden>
@@ -167,7 +167,7 @@
             </div>
             <div class="wizard-note-band">
                 <strong>Keep this page open.</strong>
-                <span>Chummer keeps checking for confirmation and moves you forward automatically when the lane is ready.</span>
+                <span>Chummer waits for confirmation and moves you forward automatically when the lane is ready.</span>
             </div>
             <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Stop this contribution for now</button>
         </div>
@@ -176,12 +176,12 @@
             <div class="wizard-card">
                 <p class="wizard-card__eyebrow">Step 3</p>
                 <h3>Thanks, you're set</h3>
-                <p>Your contribution lane is ready. Chummer uses it only for bounded project work, and recognition still depends on validated receipts.</p>
+                <p>Your contribution lane is ready. Chummer uses it only for bounded project work, and recognition still depends on accepted work.</p>
             </div>
             <div id="badgeReveal" class="badge-reveal" hidden>
                 <span class="tag">Thank you</span>
                 <h3 id="badgeLabel">Contributor Ready</h3>
-                <p id="badgeNote" class="muted-copy">This is a thank-you marker only. Contribution credit appears later after validated work.</p>
+                <p id="badgeNote" class="muted-copy">This is a thank-you marker only. Contribution credit appears later after accepted work.</p>
             </div>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="/home">Back to home</a>
@@ -464,7 +464,7 @@ function syncUnavailableActions(actions) {
 function syncBadge(phase, badge) {
   nodes.badgeReveal.hidden = !(phase === "complete" && badge);
   ui.setText(nodes.badgeLabel, badge?.label || "Contributor Ready");
-  ui.setText(nodes.badgeNote, badge?.note || "This is a thank-you marker only. Contribution credit appears later after validated work.");
+  ui.setText(nodes.badgeNote, badge?.note || "This is a thank-you marker only. Contribution credit appears later after accepted work.");
 }
 
 function syncTechnicalDetails(contribution, details) {

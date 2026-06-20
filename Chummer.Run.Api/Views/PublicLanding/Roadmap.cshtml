@@ -40,11 +40,11 @@
         }
 
         return value
-            .Replace("proof receipts", "checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
             .Replace("provider", "external service", StringComparison.OrdinalIgnoreCase)
             .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
             .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
@@ -87,7 +87,7 @@
             Summary = "When you need to know whether something actually shipped, leave roadmap and open the changelog backed by release notes, guides, or live pages.",
             Href = "/changelog",
             Label = "Open changelog",
-            Notes = new[] { "Evidence first", "Release-linked", "User-available" }
+            Notes = new[] { "Current", "Release-linked", "User-available" }
         },
         new
         {

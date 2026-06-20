@@ -185,7 +185,7 @@ public sealed class ReadyForTonightService
         lines.Add(string.Empty);
         lines.Add($"Next best screen: {verdict.NextBestScreen}");
         lines.Add(string.Empty);
-        lines.Add("Proof receipts:");
+        lines.Add("Details:");
         lines.AddRange(verdict.ProofReceipts.Select(item => $"- {item}"));
 
         return string.Join('\n', lines) + "\n";

@@ -33,9 +33,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Explain receipts</p>
-        <h2 class="editorial-title">Download the receipt before trusting the summary.</h2>
-        <p class="editorial-copy">This route proves a bounded answer shape: public-safe summary, provenance, and a downloadable receipt. It does not dump book text or pretend to be a total rules oracle.</p>
+        <p class="eyebrow">Rule explanations</p>
+        <h2 class="editorial-title">Read the summary and download the details when needed.</h2>
+        <p class="editorial-copy">This route keeps answer shape bounded: public-safe summary, history, and downloadable details. It does not dump book text or pretend to be a total rules oracle.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var receipt in Model.Receipts)
@@ -48,7 +48,7 @@
                     <span>@receipt.ReceiptId</span>
                     <span>@receipt.Provenance</span>
                 </div>
-                <a class="editorial-strip__action" href="@receipt.Route">Open receipt JSON</a>
+                <a class="editorial-strip__action" href="@receipt.Route">Open details</a>
             </article>
         }
     </div>

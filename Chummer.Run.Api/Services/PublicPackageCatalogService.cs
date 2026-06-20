@@ -54,7 +54,7 @@ public sealed class PublicPackageCatalogService
             [
                 "Compatibility comes from the rules runtime, explanations, and import status.",
                 "Changes need a clear review path before they are described as broadly ready.",
-                "Parity claims stay quiet until current checks support them."
+                "Parity claims stay quiet until the current status supports them."
             ]),
         new(
             "house_rule_package",
@@ -362,7 +362,7 @@ public sealed class PublicPackageCatalogService
                     "Public detail can point to current availability, but cannot overstate overall ruleset seriousness."
                 ],
                 [
-                    "Current checks must stay attached before broader parity language becomes public copy.",
+                    "Current status must stay attached before broader parity language becomes public copy.",
                     "Rollback and boundaries stay explicit when this package changes rules behavior.",
                     "This page shows compatibility and status; it does not replace rules review."
                 ],
@@ -402,11 +402,11 @@ public sealed class PublicPackageCatalogService
                 "Preview",
                 [
                     "Compatibility depends on publication trust, the file shelf, and clear history.",
-                    "The package can be shown in review views without becoming the source of product truth.",
+                    "The package can be shown in review views without becoming the source of product decisions.",
                     "Creator, campaign, and public views can differ while the package lineage stays explicit."
                 ],
                 [
-                    "Media and file packages may support a page, but they cannot replace route, install, or rules checks.",
+                    "Media and file packages may support a page, but they cannot replace route, install, or rules status.",
                     "Publication and moderation stay attached to the package before broader discovery claims.",
                     "Artifact detail and shelf routes remain the Chummer surfaces for discovery and return."
                 ],

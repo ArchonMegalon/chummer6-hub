@@ -10,7 +10,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">The internal Black Ledger view starts with the globe, not a list. Hover factions, read pressure, then drop into the exact command lane.</p>
+        <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the exact command path.</p>
         <div class="trust-claim__microproof">
             <span>Authenticated route</span>
             <span>Faction: @Model.Faction.PublicName</span>
@@ -68,9 +68,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Connected command lane</p>
-            <h2 class="editorial-title">@Model.ConnectedLanePacket.Heading</h2>
-            <p class="editorial-copy">@Model.ConnectedLanePacket.Summary</p>
+            <p class="eyebrow">Connected command path</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Heading)</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var cue in Model.ConnectedLanePacket.Cues)
@@ -78,12 +78,12 @@
                 <article class="route-choice-card">
                     <span class="tag">@cue.StatusLabel</span>
                     <h3>@cue.Label</h3>
-                    <p>@cue.Summary</p>
-                    <a class="editorial-strip__action" href="@cue.Href">Open lane</a>
+                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
+                    <a class="editorial-strip__action" href="@cue.Href">Open</a>
                 </article>
             }
         </div>
-        <p class="editorial-copy">@Model.ConnectedLanePacket.BoundaryLine</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.BoundaryLine)</p>
     </section>
 }
 
@@ -156,12 +156,12 @@ else if (string.Equals(Model.CurrentSection, "stewards", StringComparison.Ordina
             <article class="route-choice-card">
                 <span class="tag">Faction leader</span>
                 <h3>@Model.Faction.FactionLeader</h3>
-                <p>Maintains faction-wide pressure posture and hands off to verified humans when governance requires it.</p>
+                <p>Maintains faction-wide pressure and hands off to a human reviewer when needed.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Field GM</span>
                 <h3>@Model.Faction.FieldGm</h3>
-                <p>Keeps scenario movement bounded to the faction lane without turning public copy into private narrative state.</p>
+                <p>Keeps scenario movement bounded to the faction path without turning public copy into private narrative state.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Intel role</span>
@@ -186,7 +186,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 <p>@(Model.CoveredDistricts.Count == 0 ? "Cross-district posture requires no extra public projection." : string.Join(", ", Model.CoveredDistricts))</p>
             </article>
             <article class="route-choice-card">
-                <span class="tag">Package lane</span>
+                <span class="tag">Package path</span>
                 <h3>Pressure, not shipment</h3>
                 <p>Package heat can rise here without turning into a release promise or public roadmap noise.</p>
             </article>
@@ -239,8 +239,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Latest dispatches</p>
-            <h2 class="editorial-title">Faction-linked dispatch trail</h2>
-            <p class="editorial-copy">Public dispatches remain visible, but this authenticated lane keeps the faction workspace adjacent to them.</p>
+            <h2 class="editorial-title">Faction-linked dispatch history</h2>
+            <p class="editorial-copy">Public dispatches remain visible, and this signed-in path keeps the faction workspace adjacent to them.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var dispatch in Model.Dispatches.Take(3))

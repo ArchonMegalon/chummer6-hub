@@ -418,14 +418,11 @@ public sealed class ReleaseBundlePromotionServiceTests
             userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15 arm64",
             authenticated: true);
 
-        ReleaseOptionViewModel recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("avalonia-osx-arm64-installer", recommended.Artifact.Id);
-        Assert.Equal("Install on Mac", recommended.ActionLabel);
-        Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
-        Assert.True(experience.RequestedPlatformHasPublicDownload);
-        Assert.Null(experience.PlatformShelfNoticeTitle);
-        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
-        Assert.Contains(experience.Alternatives, item => item.Artifact.Id == "blazor-desktop-osx-arm64-installer");
+        Assert.Null(experience.Recommended);
+        Assert.False(experience.RequestedPlatformHasPublicDownload);
+        Assert.NotNull(experience.PlatformShelfNoticeTitle);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && !item.PubliclyAvailable);
+        Assert.DoesNotContain(experience.Alternatives, item => item.Artifact.Id == "blazor-desktop-osx-arm64-installer");
     }
 
     [Fact]

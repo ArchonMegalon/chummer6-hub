@@ -128,7 +128,7 @@ public sealed class LocalReleaseProofArtifactService
         {
             return new LocalReleaseProofCurrentness(
                 false,
-                "the local release-proof package is missing a usable generated timestamp, so direct proof receipts are not current");
+                "the local release status package is missing a usable generated timestamp");
         }
 
         int maxAgeSeconds = ParseNonNegativeIntEnv(
@@ -145,14 +145,14 @@ public sealed class LocalReleaseProofArtifactService
         {
             return new LocalReleaseProofCurrentness(
                 false,
-                "the local release-proof package is stale, so direct proof receipts are not current");
+                "the local release status package is stale");
         }
 
         if (ageSeconds < 0 && Math.Abs(ageSeconds) > maxFutureSkewSeconds)
         {
             return new LocalReleaseProofCurrentness(
                 false,
-                "the local release-proof package is timestamped in the future, so direct proof receipts are not current");
+                "the local release status package is timestamped in the future");
         }
 
         return new LocalReleaseProofCurrentness(true, null);
@@ -184,7 +184,7 @@ public sealed class LocalReleaseProofArtifactService
         {
             string receiptId = TryGetString(receiptElement, "receipt_id") ?? "unknown";
             string packageId = TryGetString(receiptElement, "package_id") ?? "unknown";
-            string summary = TryGetString(receiptElement, "summary") ?? "No summary was published for this proof receipt.";
+            string summary = TryGetString(receiptElement, "summary") ?? "No summary was published for this release status record.";
             IReadOnlyList<string> routes = ReadStringArray(receiptElement, "routes");
             receipts.Add(new LocalReleaseProofReceipt(receiptId, packageId, summary, routes));
         }

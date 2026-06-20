@@ -23,7 +23,7 @@
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Return to followed work, guided contribution receipts, and privacy-safe recognition from one calmer account rail.",
+        "participation" => "Return to followed work, guided contribution history, and privacy-safe recognition from one calmer account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
         "access" => "Keep linked installs, access rights, and claim handoff in one calmer place.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
@@ -35,7 +35,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account rail.";
+    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account area.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
@@ -43,6 +43,7 @@
     var emailLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
     var googleLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase));
     var telegramChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase));
+    var whatsappChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase));
     var laneInterests = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
     var claimedInstallations = Model.InstallLinking.ClaimedInstallations?.Count ?? 0;
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
@@ -84,11 +85,13 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current public release, member downloads, and help stay in one calmer operator view."
-        : $"{openSupportCases} tracked support case(s), current public release truth, and member downloads stay in one calmer operator view.";
+        ? "Current public release, member downloads, and help stay in one calmer account view."
+        : $"{openSupportCases} tracked support case(s), current public release status, and member downloads stay in one calmer account view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
-    var showChannelsSection = telegramChannel is not null;
+    var showChannelsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase)
+        || telegramChannel is not null
+        || whatsappChannel is not null;
     var participationRecognition = Model.ParticipationRecognition;
     var participationSession = Model.ParticipationSession;
     var participationReceipts = (Model.ParticipationReceipts ?? Array.Empty<Chummer.Run.Contracts.Ledger.ContributionReceiptDto>()).Take(6).ToArray();
@@ -178,10 +181,10 @@
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "This workspace is not attached to a governed server plane yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout posture here."
+        ? "This workspace is not attached to a reviewed server plane yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout status here."
         : selectedWorkspaceLeadConsequence is not null
-            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
-            : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and Table Pulse Aftermath on the same governed rail.";
+            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} reviewed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
+            : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and Table Pulse Aftermath on the same reviewed path.";
     var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
         ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
         : selectedWorkspaceCampaignMemory is not null
@@ -189,7 +192,7 @@
             : "Living Newsroom watch framing is armed, but this workspace has not attached a current carry-forward or memory packet yet.";
     var selectedWorkspaceRunnerPassportSummary = selectedWorkspaceLeadConsequence is not null
         ? "Runner Passport continuity is now attached to real command fallout on this workspace instead of sitting as a detached trust card."
-        : "Runner Passport is ready to stamp bounded trust continuity the moment the next governed reaction lands on this workspace.";
+        : "Runner Passport is ready to stamp bounded trust continuity the moment the next reviewed reaction lands on this workspace.";
     var selectedRun = Model.SelectedRun;
     var selectedRunWorkspace = selectedRun is null
         ? null
@@ -206,8 +209,8 @@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same governed workspace rail instead of splitting into a separate Table Pulse Aftermath story."
-            : "This run is ready to bind the next governed reaction, carry-forward receipt, and aftermath package on the shared command rail.";
+            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same reviewed workspace path instead of splitting into a separate Table Pulse Aftermath story."
+            : "This run is ready to bind the next reviewed reaction, carry-forward record, and aftermath package on the shared command path.";
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
@@ -269,8 +272,9 @@
             "active" => "Ready",
             "linked" => "Ready",
             "pending" => "Pending",
-            "pending_verification" => "Verification sent",
-            "verified" => "Verified",
+            "pending_verification" => "Confirmation sent",
+            "ea_linked" => "EA linked",
+            "verified" => "Confirmed",
             "published" => "Published",
             "campaign_approved" => "Campaign-approved",
             "sandbox" => "Sandbox",
@@ -399,11 +403,11 @@
         {
             "intent_created" => "Record consent to continue this access request.",
             "consented" => "Start device authorization from the participation flow.",
-            "pending_auth" => "Open the ChatGPT verification page for your OpenAI account and enter the one-time code.",
+            "pending_auth" => "Open the ChatGPT confirmation page for your OpenAI account and enter the one-time code.",
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
             "lane_pending" => "Keep this page open while activation completes.",
             "waiting_for_slot" => "Stay on this page and retry for a fresh code if authorization expires.",
-            "active" => "Assign bounded contribution work and track receipts.",
+            "active" => "Assign bounded contribution work and track progress.",
             "stopped" => "Start a new invite when the participant is ready again.",
             "revoked" => "Open a new invite with fresh consent and authorization.",
             _ => "Open participation details and choose the latest recovery action."
@@ -442,7 +446,7 @@
 
         if (publication is "published")
         {
-            return "Published: moderation and review receipts completed for this publication.";
+            return "Published: moderation and review are complete for this publication.";
         }
 
         if (publication is "archived" or "delisted")
@@ -465,7 +469,7 @@
             return "Ready to publish: review passed and waiting on explicit publish confirmation.";
         }
 
-        return "Tracked: draft and moderation receipts are attached to this publication.";
+        return "Tracked: draft and moderation history are attached to this publication.";
     }
 
     static string PublicationResumabilitySummary(string? publicationStatus, string? reviewState, string? moderationState)
@@ -502,7 +506,7 @@
         string normalized = summary?.Trim().ToLowerInvariant() ?? string.Empty;
         if (normalized.Length == 0)
         {
-            return "Tracked: receipt exists with no additional action required.";
+            return "Tracked: no additional action required.";
         }
 
         if (normalized.Contains("retry", StringComparison.Ordinal)
@@ -517,7 +521,7 @@
             || normalized.Contains("hydrate", StringComparison.Ordinal)
             || normalized.Contains("catch up", StringComparison.Ordinal))
         {
-            return "Paused: waiting on downstream receipt hydration before final closure.";
+            return "Paused: waiting on downstream updates before final closure.";
         }
 
         if (normalized.Contains("cancel", StringComparison.Ordinal)
@@ -527,7 +531,7 @@
             return "Canceled: this action is closed and needs a new explicit request to continue.";
         }
 
-        return "Completed: action is receipt-backed and attached to campaign continuity.";
+        return "Completed: action is attached to campaign continuity.";
     }
 
     static string AutomationResumabilitySummary(string? summary)
@@ -537,7 +541,7 @@
             || normalized.Contains("revoked", StringComparison.Ordinal)
             || normalized.Contains("stopped", StringComparison.Ordinal))
         {
-            return "Not resumable from this receipt. Start a fresh automation action if still needed.";
+            return "Not resumable from this record. Start a fresh automation action if still needed.";
         }
 
         if (normalized.Contains("retry", StringComparison.Ordinal)
@@ -562,7 +566,7 @@
     var accountRailSummary = showAccessSection
         ? "Relink, reclaim, recovery, and active grant review stay here after the installer or app does the real work. Do not turn this into a browser-first claim ritual."
         : showSupportSection
-            ? "Tracked support stays attached to the affected install so release truth, closure, and recovery never split across separate surfaces."
+            ? "Tracked support stays attached to the affected install so release status, closure, and recovery never split across separate surfaces."
             : installRailSummary;
     var accountRailInstallSummary = leadInstallation is not null
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
@@ -639,7 +643,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
                             <strong>@accountRailSupportSummary</strong>
-                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Recovery reserve</span>
@@ -678,7 +682,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
                     <strong>@accountRailSupportSummary</strong>
-                    <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Recovery reserve</span>
@@ -764,7 +768,7 @@
                 <section id="recovery" class="settings-section" data-account-panel>
                     <div class="settings-section__header">
                         <h2>Recovery email</h2>
-                        <p>Add a verified backup path so one sign-in method is never the whole story.</p>
+                        <p>Add a confirmed backup path so one sign-in method is never the whole story.</p>
                     </div>
                     <div class="settings-summary-row">
                         <span>Status</span>
@@ -775,7 +779,7 @@
                             <label for="recoveryEmail">Recovery email</label>
                             <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
                         </div>
-                        <button class="button-like button-like--secondary" type="submit">Start verification</button>
+                        <button class="button-like button-like--secondary" type="submit">Start confirmation</button>
                         <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
                     </form>
                 </section>
@@ -791,10 +795,14 @@
                             <h2>Linked channels</h2>
                             <p>Companion channels stay separate from account access and recovery.</p>
                         </div>
-                        <div class="settings-summary-row">
-                            <span>Telegram companion</span>
-                            <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
-                        </div>
+                            <div class="settings-summary-row">
+                                <span>Telegram companion</span>
+                                <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>WhatsApp companion</span>
+                                <strong>@(whatsappChannel is null ? "Not connected" : $"{whatsappChannel.DisplayLabel} ({HumanizeStatus(whatsappChannel.Status, "Ready")})")</strong>
+                            </div>
                         <form id="telegramForm" class="settings-form">
                             <div class="field">
                                 <label for="telegramHandle">Telegram handle</label>
@@ -803,6 +811,33 @@
                             <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
                             <p id="telegramStatusNotice" class="muted-copy" hidden></p>
                         </form>
+                        <form id="whatsappForm" class="settings-form">
+                            <div class="field">
+                                <label for="whatsappHandle">WhatsApp number</label>
+                                <input id="whatsappHandle" placeholder="+436647916419" value="@(whatsappChannel?.DisplayLabel ?? string.Empty)" />
+                            </div>
+                            <button class="button-like button-like--secondary" type="submit">Connect WhatsApp</button>
+                            <p id="whatsappStatusNotice" class="muted-copy" hidden></p>
+                        </form>
+                        <div class="settings-form">
+                            <h3>Open in app / QR</h3>
+                            <div class="settings-summary-row">
+                                <button class="button-like button-like--secondary" type="button" id="telegramDeepLinkButton">Generate Telegram link</button>
+                                <button class="button-like button-like--secondary" type="button" id="whatsappDeepLinkButton">Generate WhatsApp link</button>
+                            </div>
+                            <div class="settings-summary-row">
+                                <button class="button-like button-like--secondary" type="button" id="telegramToEaButton">Link Telegram to Executive Assistant</button>
+                                <button class="button-like button-like--secondary" type="button" id="whatsappToEaButton">Link WhatsApp to Executive Assistant</button>
+                            </div>
+                            <p id="telegramToEaNotice" class="muted-copy" hidden></p>
+                            <p id="whatsappToEaNotice" class="muted-copy" hidden></p>
+                            <div id="channelDeepLinkNotice" class="muted-copy" hidden></div>
+                            <div class="settings-summary-row" id="channelDeepLinkActions" hidden>
+                                <a id="channelDeepLinkAnchor" class="site-actions__link" href="#" rel="noopener" target="_blank">Open link</a>
+                                <a id="channelDeepLinkAppAnchor" class="site-actions__link" href="#" rel="noopener" target="_blank" hidden>Open in app</a>
+                                <img id="channelQrImage" alt="Channel QR code" style="max-width: 220px; width: 100%; height: auto;" />
+                            </div>
+                        </div>
                     </section>
                 </details>
             }
@@ -946,7 +981,7 @@
                                 }
                             </select>
                         </div>
-                        <button class="button-like button-like--secondary" type="submit">Check guidance</button>
+                        <button class="button-like button-like--secondary" type="submit">Get guidance</button>
                         <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
                         <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
                         <div id="supportAssistantActions" class="stacked-actions" hidden></div>
@@ -1134,7 +1169,7 @@
                     @if (entitlementSyncReceipts is not null)
                     {
                         <div class="settings-summary-row">
-                            <span>Entitlement receipt posture</span>
+                            <span>Entitlement status</span>
                             <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Review before continuing")</strong>
                         </div>
                         <div class="settings-summary-row">
@@ -1150,7 +1185,7 @@
                 @if (entitlementSyncReceipts is not null)
                 {
                     <details class="details-drawer">
-                        <summary>Entitlement sync receipts</summary>
+                        <summary>Entitlement sync history</summary>
                         <div class="settings-summary-list">
                             <div class="settings-summary-row">
                                 <span>Status summary</span>
@@ -1165,7 +1200,7 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.ConflictSummary</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Lead receipt</span>
+                                <span>Lead record</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LeadReceiptId</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1189,15 +1224,15 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LeadObservedAtUtc.UtcDateTime.ToString("u")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Latest receipt observed</span>
+                                <span>Latest record observed</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Entitlement provenance receipts</span>
+                                <span>Entitlement history records</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncProvenanceCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Entitlement conflict receipts</span>
+                                <span>Entitlement conflict records</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1205,15 +1240,15 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Safe-with-receipt provenance</span>
+                                <span>Safe-to-continue history</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.SafeToContinueWithReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Refresh-before-continue receipts</span>
+                                <span>Refresh-before-continue items</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.RefreshBeforeContinueCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Blocking conflict receipts</span>
+                                <span>Blocking conflicts</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
                             </div>
                         </div>
@@ -1227,7 +1262,7 @@
                                         <span>Lead: @surface.Status.LeadReceiptId</span>
                                         <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_entitlement_ledger")</span>
                                         <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
-                                        <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>Latest record observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
                                         <span>Recovery path: @surface.Status.RecoveryRoute</span>
                                         <span>@surface.Status.RecoverySummary</span>
                                         <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
@@ -1236,7 +1271,7 @@
                                         {
                                             <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
                                         }
-                                        <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                        <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue")</span>
                                     </li>
                                 }
                             </ul>
@@ -1248,7 +1283,7 @@
                                 {
                                     <li>
                                         <strong>@action.Label:</strong> @action.Summary
-                                        <span>Receipt: @action.ReceiptId</span>
+                                        <span>Record: @action.ReceiptId</span>
                                         <span>Authority: @HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
                                         <span>Surface: @HumanizeStatus(action.Surface, "entitlement_sync")</span>
                                         <span>Route: @action.Route</span>
@@ -1269,7 +1304,7 @@
                         }
                         @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No entitlement-sync provenance receipts are attached to this account right now.</p>
+                            <p class="muted-copy">No entitlement-sync history is attached to this account right now.</p>
                         }
                         else
                         {
@@ -1277,12 +1312,12 @@
                                 @foreach (var receipt in entitlementSyncReceipts.ProvenanceRecoveryReceipts.Take(4))
                                 {
                                     <li>
-                                        <strong>@HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                        <strong>@HumanizeStatus(receipt.Kind, "record"):</strong>
                                         @receipt.Summary
                                         <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
                                         <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>State: @HumanizeStatus(receipt.StalenessPosture, "Current receipt")</span>
-                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable with receipt")</span>
+                                        <span>State: @HumanizeStatus(receipt.StalenessPosture, "Current")</span>
+                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable")</span>
                                         <span>Recovery path: @receipt.RecoveryRoute</span>
                                         @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                         {
@@ -1290,14 +1325,14 @@
                                         }
                                         <span>@receipt.RecoveryHint</span>
                                         <span>@receipt.RecoverySummary</span>
-                                        <span>@HumanizeStatus(receipt.ContinuePosture, "Safe to continue with receipt")</span>
+                                        <span>@HumanizeStatus(receipt.ContinuePosture, "Safe to continue")</span>
                                     </li>
                                 }
                             </ul>
                         }
                         @if (entitlementSyncReceipts.ConflictReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No entitlement-sync conflict receipts are active for this account right now.</p>
+                            <p class="muted-copy">No entitlement-sync conflicts are active for this account right now.</p>
                         }
                         else
                         {
@@ -1305,7 +1340,7 @@
                                 @foreach (var receipt in entitlementSyncReceipts.ConflictReceipts.Take(4))
                                 {
                                     <li>
-                                        <strong>@HumanizeStatus(receipt.Severity, "Warning") / @HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                        <strong>@HumanizeStatus(receipt.Severity, "Warning") / @HumanizeStatus(receipt.Kind, "record"):</strong>
                                         @receipt.Summary
                                         <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
                                         <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
@@ -1321,7 +1356,7 @@
                                         <span>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
                                         @if (receipt.BlocksContinue)
                                         {
-                                            <span>Continue is blocked until this receipt is resolved.</span>
+                                            <span>Continue is blocked until this item is resolved.</span>
                                         }
                                     </li>
                                 }
@@ -1634,8 +1669,8 @@
                             {
                                 <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
                                 <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
-                                <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
-                                <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
+                                <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
                             }
                             @if (selectedWorkspaceServerPlane is not null)
                             {
@@ -1679,7 +1714,7 @@
                                 <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
                             }
                             <div class="settings-form">
-                                <p><strong>Table Pulse Live command-to-fallout lane</strong></p>
+                                <p><strong>Table Pulse Live command to fallout</strong></p>
                                 <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
@@ -1688,7 +1723,7 @@
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Signal Deck</span>
-                                        <strong>@(selectedWorkspaceLeadConsequence is null ? "Waiting for governed cue" : selectedWorkspaceLeadConsequence.Summary)</strong>
+                                        <strong>@(selectedWorkspaceLeadConsequence is null ? "Waiting for the next cue" : selectedWorkspaceLeadConsequence.Summary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Runner Passport</span>
@@ -1699,8 +1734,8 @@
                                         <strong>@selectedWorkspaceLivingNewsroomSummary</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Aftermath rail</span>
-                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "Armed" : $"{selectedWorkspaceAftermathPackages.Count} governed package(s)")</strong>
+                                        <span>Aftermath</span>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "Armed" : $"{selectedWorkspaceAftermathPackages.Count} reviewed package(s)")</strong>
                                     </div>
                                 </div>
                                 <div class="stacked-actions">
@@ -1709,7 +1744,7 @@
                                     <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open carry-forward</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceMemoryHref">Open campaign memory</a>
-                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceAftermathHref">Open aftermath rail</a>
+                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceAftermathHref">Open aftermath</a>
                                     <a class="button-like button-like--ghost" href="/passport">Open Runner Passport</a>
                                 </div>
                             </div>
@@ -1740,15 +1775,15 @@
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore provenance receipts</span>
-                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} receipts")</strong>
+                                        <span>Restore history</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} record(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore conflict receipts</span>
-                                        <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "No active conflicts" : $"{selectedWorkspaceServerPlane.RestoreConflictReceipts.Count} receipts")</strong>
+                                        <span>Restore conflicts</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "No active conflicts" : $"{selectedWorkspaceServerPlane.RestoreConflictReceipts.Count} conflict(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore receipt posture</span>
+                                        <span>Restore status</span>
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Review before continuing")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -1772,10 +1807,10 @@
                                             <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                            <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                            <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
                                         </div>
                                     }
                                     <div class="settings-summary-row">
@@ -1791,12 +1826,12 @@
                                         <strong>@(selectedWorkspaceServerPlane.ChangePackets.Count == 0 ? "No recent packet" : $"{selectedWorkspaceServerPlane.ChangePackets[0].Label} · {selectedWorkspaceServerPlane.ChangePackets[0].Summary}")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Transfer audit</span>
-                                        <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} receipts")</strong>
+                                        <span>Transfer history</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} move(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Aftermath packages</span>
-                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No reviewed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} package(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Downtime brief</span>
@@ -1862,10 +1897,10 @@
                                         <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                 </div>
                                 <div class="settings-summary-row">
-                                        <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                        <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
                                 </div>
                                 <div class="settings-summary-row">
-                                        <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                        <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next step</span>
@@ -1885,7 +1920,7 @@
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(selectedWorkspaceFirstPlayableEvidence))
                                     {
-                                        <p><strong>Lead evidence:</strong> @selectedWorkspaceFirstPlayableEvidence</p>
+                                        <p><strong>Lead detail:</strong> @selectedWorkspaceFirstPlayableEvidence</p>
                                     }
                                     @if (selectedWorkspaceFirstPlayableSession.EvidenceLines.Count > 0)
                                     {
@@ -1920,7 +1955,7 @@
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(selectedWorkspaceCampaignMemoryEvidence))
                                     {
-                                        <p><strong>Lead evidence:</strong> @selectedWorkspaceCampaignMemoryEvidence</p>
+                                        <p><strong>Lead detail:</strong> @selectedWorkspaceCampaignMemoryEvidence</p>
                                     }
                                     @if (selectedWorkspaceCampaignMemory.EvidenceLines.Count > 0)
                                     {
@@ -2010,7 +2045,7 @@
                             @if (selectedWorkspaceServerPlane.RosterTransfers.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Roster transfer audit</summary>
+                                    <summary>Roster transfer history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var transfer in selectedWorkspaceServerPlane.RosterTransfers)
                                         {
@@ -2018,7 +2053,7 @@
                                                 <strong>@transfer.RunnerHandle:</strong> @transfer.Summary
                                                 @foreach (var auditLine in transfer.AuditLines)
                                                 {
-                                                    <span> @auditLine</span>
+                                                    <span> @PublicFacingCopyHumanizer.Clean(auditLine)</span>
                                                 }
                                             </li>
                                         }
@@ -2098,10 +2133,10 @@
                                 </ul>
                             </details>
                             <details class="details-drawer">
-                                <summary>Restore provenance and conflict receipts</summary>
+                                <summary>Restore history and conflicts</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
-                                        <span>Restore receipt status</span>
+                                        <span>Restore status</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2114,7 +2149,7 @@
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Staleness posture</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.StalenessPosture, "Current receipts")</strong>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.StalenessPosture, "Current")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Conflict posture</span>
@@ -2122,14 +2157,14 @@
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Recoverability posture</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverabilityPosture, "Recoverable with receipts")</strong>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverabilityPosture, "Recoverable")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Continue posture</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Safe to continue with receipt")</strong>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Safe to continue")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Lead receipt</span>
+                                        <span>Lead record</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2173,7 +2208,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncProvenanceCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Provenance receipts</span>
+                                        <span>History records</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2185,15 +2220,15 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncConflictCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Conflict receipts</span>
+                                        <span>Conflict records</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreConflictReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Safe-with-receipt provenance</span>
+                                        <span>Safe-to-continue history</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Refresh-before-continue receipts</span>
+                                        <span>Refresh-before-continue items</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RefreshBeforeContinueCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2201,7 +2236,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.ReviewBeforeContinueConflictCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Blocking conflict receipts</span>
+                                        <span>Blocking conflicts</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.BlockingConflictCount</strong>
                                     </div>
                                 </div>
@@ -2215,7 +2250,7 @@
                                                 <span>Lead: @surface.Status.LeadReceiptId</span>
                                                 <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_campaign_spine_projection")</span>
                                                 <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
-                                                <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Latest record observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>Recovery path: @surface.Status.RecoveryRoute</span>
                                                 <span>@surface.Status.RecoverySummary</span>
                                                 <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
@@ -2224,7 +2259,7 @@
                                                 {
                                                     <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
                                                 }
-                                                <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                                <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue")</span>
                                             </li>
                                         }
                                     </ul>
@@ -2236,11 +2271,11 @@
                                         {
                                             <li>
                                                 <strong>@action.Label:</strong> @action.Summary
-                                                <span>Receipt: @action.ReceiptId</span>
-                                                <span>Authority: @HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
+                                                <span>Record: @action.ReceiptId</span>
+                                                <span>Source: @HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
                                                 <span>Surface: @HumanizeStatus(action.Surface, "workspace_restore")</span>
                                                 <span>Route: @action.Route</span>
-                                                <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Safe to continue with receipt")</span>
+                                                <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Safe to continue")</span>
                                                 @if (IsNavigableAccountRoute(action.Route))
                                                 {
                                                     <span><a href="@action.Route">@DescribeRecoveryRouteAction(action.Route)</a></span>
@@ -2251,7 +2286,7 @@
                                 }
                                 @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
                                 {
-                                    <p class="muted-copy">No restore provenance receipts are attached to this workspace yet.</p>
+                                    <p class="muted-copy">No restore history is attached to this workspace yet.</p>
                                 }
                                 else
                                 {
@@ -2260,7 +2295,7 @@
                                         {
                                             var recovery = selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault(item => string.Equals(item.ReceiptId, receipt.ReceiptId, StringComparison.Ordinal));
                                             <li>
-                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Kind, "record"):</strong>
                                                 @receipt.Summary
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Authority))
                                                 {
@@ -2268,25 +2303,25 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Proof))
                                                 {
-                                                    <span>Proof: @receipt.Proof</span>
+                                                    <span>Note: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
                                                 }
-                                                <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.RecoveryHint))
                                                 {
                                                     <span>@receipt.RecoveryHint</span>
                                                 }
                                                 @if (recovery is not null)
                                                 {
-                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current receipt")</span>
-                                                    <span>Recoverability: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</span>
+                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current")</span>
+                                                    <span>Recoverability: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable")</span>
                                                     @* Recovery route: @recovery.RecoveryRoute *@
-                                                    <span>Recovery path: @recovery.RecoveryRoute</span>
+                                                    <span>Recovery link: @recovery.RecoveryRoute</span>
                                                     @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
                                                     {
                                                         <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
                                                     }
                                                     <span>@recovery.RecoverySummary</span>
-                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue with receipt")</span>
+                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue")</span>
                                                 }
                                             </li>
                                         }
@@ -2300,13 +2335,13 @@
                                             <li>
                                                 <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Severity, "Warning"):</strong>
                                                 @receipt.Summary
-                                                <span>@HumanizeStatus(receipt.Kind, "receipt").</span>
-                                                <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
-                                                <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                                <span>Conflict posture: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
+                                                <span>@HumanizeStatus(receipt.Kind, "record").</span>
+                                                <span>Source: @HumanizeStatus(receipt.Authority, "hub")</span>
+                                                <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Status: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
                                                 <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</span>
                                                 @* Recovery route: @receipt.RecoveryRoute *@
-                                                <span>Recovery path: @receipt.RecoveryRoute</span>
+                                                <span>Recovery link: @receipt.RecoveryRoute</span>
                                                 @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                                 {
                                                     <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -2315,17 +2350,17 @@
                                                 <span>@receipt.RecoverySummary</span>
                                                 @if (receipt.BlocksContinue)
                                                 {
-                                                    <span>Continue is blocked until this receipt is resolved.</span>
+                                                    <span>Continue is blocked until this item is resolved.</span>
                                                 }
                                                 <span>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
-                                                <span>@(string.IsNullOrWhiteSpace(receipt.Resolution) ? "Review restore evidence before continuing." : receipt.Resolution)</span>
+                                                <span>@(string.IsNullOrWhiteSpace(receipt.Resolution) ? "Review restore details before continuing." : receipt.Resolution)</span>
                                             </li>
                                         }
                                     </ul>
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">No restore conflict receipts are active for this workspace right now.</p>
+                                    <p class="muted-copy">No restore conflicts are active for this workspace right now.</p>
                                 }
                             </details>
 
@@ -2388,7 +2423,7 @@
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Recent launches</span>
-                                    <strong>@(selectedWorkspacePrepLaunches.Count == 0 ? "No governed binds yet" : $"{selectedWorkspacePrepLaunches.Count} receipts")</strong>
+                                    <strong>@(selectedWorkspacePrepLaunches.Count == 0 ? "No reviewed binds yet" : $"{selectedWorkspacePrepLaunches.Count} launch(es)")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Travel-safe devices</span>
@@ -2403,18 +2438,18 @@
                                     <strong>@(selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount == 0 ? "None" : $"{selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount} stale")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Travel prefetch receipts</span>
-                                    <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "No staged receipts yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
+                                    <span>Travel prefetch history</span>
+                                    <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "Nothing staged yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Aftermath and replay packages</span>
-                                    <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} packaged")</strong>
+                                    <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No reviewed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} packaged")</strong>
                                 </div>
                             </div>
                             <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                             <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
                             <p><strong>GM operations:</strong> @selectedWorkspaceServerPlane.GmOperations.Summary</p>
-                            <p><strong>Account/audit backbone:</strong> @selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary</p>
+                            <p><strong>Account backbone:</strong> @selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary</p>
                             @if (selectedWorkspaceServerPlane.GmOperations.LaneCues.Count > 0)
                             {
                                 <div class="settings-summary-list">
@@ -2592,11 +2627,11 @@
                             @if (selectedWorkspaceTravelPrefetches.Count > 0)
                             {
                                 <details class="details-drawer" id="travel-prefetches">
-                                    <summary>Recent travel prefetch receipts</summary>
+                                    <summary>Recent travel prefetch history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var receipt in selectedWorkspaceTravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Receipt: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Record: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2630,7 +2665,7 @@
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Aftermath and replay packages</span>
-                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No reviewed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} package(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Publication posture</span>
@@ -2661,7 +2696,7 @@
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.TrustBand))
                                                     {
-                                                        <span> Trust ranking: @HumanizeStatus(item.TrustBand, "Draft").</span>
+                                                        <span> Status: @HumanizeStatus(item.TrustBand, "Draft").</span>
                                                         <span> Discoverable now: @(item.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
@@ -2802,20 +2837,20 @@
                             <p><strong>Continuity:</strong> @selectedRun.LatestContinuity.Summary</p>
                         }
                         <div class="settings-form">
-                            <p><strong>Table Pulse Aftermath return lane</strong></p>
+                            <p><strong>Table Pulse aftermath return</strong></p>
                             <p class="muted-copy">@selectedRunTablePulseSummary</p>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Inbox and reactions</span>
-                                    <strong>Use the signed-in Table Pulse Live lane to trigger or review the next bounded response.</strong>
+                                    <strong>Use the signed-in Table Pulse Live inbox to trigger or review the next bounded response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Workspace return</span>
-                                    <strong>@(selectedRunWorkspace is null ? "Open campaign work" : $"{selectedRunWorkspace.CampaignName} · governed return rail")</strong>
+                                    <strong>@(selectedRunWorkspace is null ? "Open campaign work" : $"{selectedRunWorkspace.CampaignName} · reviewed return")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Aftermath</span>
-                                    <strong>@(selectedRunWorkspace?.AftermathPackages is { Count: > 0 } ? $"{selectedRunWorkspace.AftermathPackages.Count} governed package(s)" : "Armed")</strong>
+                                    <strong>@(selectedRunWorkspace?.AftermathPackages is { Count: > 0 } ? $"{selectedRunWorkspace.AftermathPackages.Count} reviewed package(s)" : "Armed")</strong>
                                 </div>
                             </div>
                             <div class="stacked-actions">
@@ -2824,7 +2859,7 @@
                                 <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign workspace</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Open carry-forward</a>
-                                <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Open aftermath rail</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Open aftermath</a>
                             </div>
                         </div>
                     </article>
@@ -2984,7 +3019,7 @@
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                         {
-                                            <span> Provenance: @output.ProvenanceSummary</span>
+                                            <span> Source: @output.ProvenanceSummary</span>
                                         }
                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind)</span>
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -2997,7 +3032,7 @@
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                         {
-                                            <span> Audit: @output.AuditSummary</span>
+                                            <span> Note: @PublicFacingCopyHumanizer.Clean(output.AuditSummary)</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
                                         {
@@ -3214,11 +3249,11 @@
                                         <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Receipt visibility</span>
+                                        <span>Visibility</span>
                                         <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.Visibility, "Campaign-shared")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Artifact receipt</span>
+                                        <span>File record</span>
                                         <strong>@selectedCreatorPublicationReceipt.Artifact.Kind · @selectedCreatorPublicationReceipt.Artifact.ArtifactId · @selectedCreatorPublicationReceipt.Artifact.Version</strong>
                                     </div>
                                     @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
@@ -3238,7 +3273,7 @@
                                 }
                             </div>
                             <details class="details-drawer">
-                                <summary>Decision receipt history</summary>
+                                <summary>Decision history</summary>
                                 <ul class="muted-copy">
                                     <li>
                                         <strong>Draft state:</strong> @HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")
@@ -3408,20 +3443,20 @@
                                     <strong>@(workspace.Consequences is { Count: > 0 } ? $"{workspace.Consequences.Count} tracked" : "Pending")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Roster transfer audit</span>
-                                    <strong>@(workspace.RosterTransfers is { Count: > 0 } ? $"{workspace.RosterTransfers.Count} receipts" : "No recent moves")</strong>
+                                    <span>Roster transfer history</span>
+                                    <strong>@(workspace.RosterTransfers is { Count: > 0 } ? $"{workspace.RosterTransfers.Count} move(s)" : "No recent moves")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Prep launch audit</span>
-                                    <strong>@(workspace.PrepLaunches is { Count: > 0 } ? $"{workspace.PrepLaunches.Count} receipts" : "No recent launches")</strong>
+                                    <span>Prep launch history</span>
+                                    <strong>@(workspace.PrepLaunches is { Count: > 0 } ? $"{workspace.PrepLaunches.Count} launch(es)" : "No recent launches")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Travel prefetch audit</span>
-                                    <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} receipts" : "No recent prefetches")</strong>
+                                    <span>Travel prefetch history</span>
+                                    <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} prefetch(es)" : "No recent prefetches")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Aftermath and replay audit</span>
-                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} receipts" : "No governed packages")</strong>
+                                    <span>Aftermath and replay history</span>
+                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} package(s)" : "No reviewed packages")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Downtime brief</span>
@@ -3457,7 +3492,7 @@
                             @if (workspace.RosterTransfers is { Count: > 0 })
                             {
                                 <details class="details-drawer">
-                                    <summary>Roster transfer audit</summary>
+                                    <summary>Roster transfer history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var transfer in workspace.RosterTransfers)
                                         {
@@ -3470,11 +3505,11 @@
                             @if (workspace.PrepLaunches is { Count: > 0 })
                             {
                                 <details class="details-drawer">
-                                    <summary>Governed prep launch audit</summary>
+                                    <summary>Reviewed prep launch history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var launch in workspace.PrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Receipt: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Record: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3483,11 +3518,11 @@
                             @if (workspace.TravelPrefetches is { Count: > 0 })
                             {
                                 <details class="details-drawer">
-                                    <summary>Travel prefetch audit</summary>
+                                    <summary>Travel prefetch history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var receipt in workspace.TravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Receipt: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Record: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3496,11 +3531,11 @@
                             @if (workspace.AftermathPackages is { Count: > 0 })
                             {
                                 <details class="details-drawer">
-                                    <summary>Aftermath and replay audit</summary>
+                                    <summary>Aftermath and replay history</summary>
                                     <ul class="muted-copy">
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
-                                            <li><strong>@package.Title:</strong> @package.Summary <span> Receipt: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
+                                            <li><strong>@package.Title:</strong> @package.Summary <span> Record: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3609,11 +3644,11 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                                                 {
-                                                    <span> Provenance: @item.ProvenanceSummary</span>
+                                                    <span> Source: @item.ProvenanceSummary</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                                                 {
-                                                    <span> Audit: @item.AuditSummary</span>
+                                                    <span> Note: @PublicFacingCopyHumanizer.Clean(item.AuditSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.CompatibilitySummary))
                                                 {
@@ -3629,7 +3664,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.TrustBand))
                                                 {
-                                                    <span> Trust ranking: @HumanizeStatus(item.TrustBand, "Draft").</span>
+                                                    <span> Status: @HumanizeStatus(item.TrustBand, "Draft").</span>
                                                     <span> Discoverable now: @(item.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
@@ -3853,7 +3888,7 @@
                 @if (Model.CampaignSpine.MigrationReceipts.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Legacy migration receipts</summary>
+                        <summary>Legacy migration history</summary>
                         <ul class="muted-copy">
                             @foreach (var receipt in Model.CampaignSpine.MigrationReceipts)
                             {
@@ -3874,10 +3909,10 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Provenance: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary Discoverable: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Source: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary Available: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                     {
-                                        <span> Trust: @publication.TrustSummary</span>
+                                        <span> Status: @publication.TrustSummary</span>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                                     {
@@ -4050,7 +4085,7 @@
                                     <li>@op.LeagueOperationsSummary</li>
                                     @if (op.RecentLeagueAuditLines.Count == 0)
                                     {
-                                        <li>No governed league or season audit lines are attached yet.</li>
+                                        <li>No reviewed league or season history is attached yet.</li>
                                     }
                                     else
                                     {
@@ -4069,7 +4104,7 @@
                                     <li>Support escalation: @op.SupportEscalationSummary</li>
                                     @if (op.RecentEventSummaries.Count == 0)
                                     {
-                                        <li>No governed season or event receipts are attached yet.</li>
+                                        <li>No reviewed season or event records are attached yet.</li>
                                     }
                                     else
                                     {
@@ -4263,16 +4298,16 @@
                                 <summary>Member guidance</summary>
                                 <div class="app-rail">
                                     <article class="app-rail__item">
-                                        <span class="tag">Trust now</span>
+                                        <span class="tag">Now</span>
                                         <div class="app-rail__copy">
-                                            <h3>Signed-in trust snapshot</h3>
-                                            <p>What is fixed, who can get it now, and what still needs caution stays on this same signed-in account surface before you fan guidance out to the rest of the table.</p>
-                                            <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open current release to confirm the live access posture.")</p>
-                                            <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open current release to confirm the promoted install path.")</p>
-                                            <p class="muted-copy"><strong>Release checks:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release proof", "Open current release to confirm the current release checks.")</p>
-                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+                                            <h3>What works today</h3>
+                                            <p>What is fixed, who can get it now, and what still needs care stays on this same signed-in account surface before you guide the rest of the table.</p>
+                                            <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open what works today for the latest availability.")</p>
+                                            <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open what works today for the current install path.")</p>
+                                            <p class="muted-copy"><strong>Release status:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release status", "Open what works today for the latest status.")</p>
+                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
                                         </div>
-                                        <a class="inline-link" href="#signed-in-trust-status">Review trust snapshot</a>
+                                        <a class="inline-link" href="#signed-in-trust-status">Open current status</a>
                                     </article>
                                     <article class="app-rail__item">
                                         <span class="tag">Current release</span>
@@ -4390,7 +4425,7 @@
             <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Participation</h2>
-                    <p>Return to followed work, guided contribution receipts, and privacy-safe recognition without turning votes into product truth.</p>
+                    <p>Return to followed work, guided contribution history, and privacy-safe recognition without turning votes into shipping decisions.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -4423,7 +4458,7 @@
                         }
                     </div>
                 }
-                <p class="muted-copy">Contribution cred follows proof, closeout, and useful continuity. Votes show demand; Chummer-owned proof decides what ships. Public recognition stays off unless you opt in.</p>
+                <p class="muted-copy">Contribution credit follows useful closeout and continuity. Votes show demand; only finished work ships. Public recognition stays off unless you opt in.</p>
                 <p class="muted-copy">Recovery codes stay below as a fallback, not the first instruction.</p>
                 <section class="compact-rail">
                     <article class="compact-rail__item">
@@ -4442,8 +4477,8 @@
                     </article>
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Guided contribution receipts</h3>
-                            <p>@participationReceipts.Length recent receipt@(participationReceipts.Length == 1 ? string.Empty : "s"), @(participationRecognition?.LandedSlices ?? 0) landed slice@(participationRecognition?.LandedSlices == 1 ? string.Empty : "s"), and @(participationRecognition?.ActiveSessionCount ?? 0) active session@(participationRecognition?.ActiveSessionCount == 1 ? string.Empty : "s").</p>
+                            <h3>Guided contribution history</h3>
+                            <p>@participationReceipts.Length recent event@(participationReceipts.Length == 1 ? string.Empty : "s"), @(participationRecognition?.LandedSlices ?? 0) landed slice@(participationRecognition?.LandedSlices == 1 ? string.Empty : "s"), and @(participationRecognition?.ActiveSessionCount ?? 0) active session@(participationRecognition?.ActiveSessionCount == 1 ? string.Empty : "s").</p>
                         </div>
                         <a class="editorial-strip__action" href="/participate/codex">Open guided contribution</a>
                     </article>
@@ -4478,14 +4513,14 @@
                                     <p>@submission.QueueSummary</p>
                                     <p><strong>@submission.Packet.Title</strong> · @submission.SubmittedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
                                 </div>
-                                <a class="editorial-strip__action" href="/participate/karma-forge/submitted/@submission.SubmissionId">Open receipt</a>
+                                <a class="editorial-strip__action" href="/participate/karma-forge/submitted/@submission.SubmissionId">Open submission</a>
                             </article>
                         }
                         @foreach (var receipt in participationReceipts)
                         {
                             <article class="compact-rail__item">
                                 <div class="compact-rail__copy">
-                                    <h3>Contribution receipt</h3>
+                                    <h3>Contribution event</h3>
                                     <p>@HumanizeStatus(receipt.EventKind) · @receipt.ProjectId · @receipt.AuthorizationTierAtReceipt</p>
                                     <p>@((receipt.EndedAtUtc ?? receipt.LandedAtUtc ?? receipt.StartedAtUtc) is DateTimeOffset occurredAtUtc
                                         ? occurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)
@@ -4498,7 +4533,7 @@
                             <article class="compact-rail__item">
                                 <div class="compact-rail__copy">
                                     <h3>Impact journal</h3>
-                                    <p>@(activity.Summary ?? "The internal continuity bridge recorded a participation event receipt.")</p>
+                                    <p>@(activity.Summary ?? "The internal continuity bridge recorded a participation event.")</p>
                                     <p><strong>@HumanizeStatus(activity.EventType)</strong> · @activity.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
                                 </div>
                             </article>
@@ -5000,8 +5035,8 @@
         nextPath: "/account"
         }
       });
-      document.getElementById("recoveryEmailStatus").textContent = ui.humanizeStatus(data.linkStatus, "Verification sent");
-      ui.setNotice(notice, data.previewNote || "Check your email to finish verifying the recovery address.");
+      document.getElementById("recoveryEmailStatus").textContent = ui.humanizeStatus(data.linkStatus, "Confirmation sent");
+      ui.setNotice(notice, data.previewNote || "Open your email to confirm the recovery address.");
       if (data.previewHref) {
         window.location.href = data.previewHref;
       }
@@ -5034,6 +5069,149 @@
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }
+  });
+
+  bindSubmit("whatsappForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("whatsappStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Saving...");
+    try {
+      await ui.requestJson("/api/v1/accounts/me/channels", {
+        method: "POST",
+        json: {
+          subjectId,
+          channelKind: "whatsapp_official_business",
+          channelHandle: document.getElementById("whatsappHandle").value,
+          notificationsEnabled: true
+        }
+      });
+      ui.setNotice(notice, "WhatsApp companion settings saved.");
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "WhatsApp companion settings could not be saved."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Saving...");
+    }
+  });
+
+  const channelDeepLinkNotice = document.getElementById("channelDeepLinkNotice");
+  const channelDeepLinkAnchor = document.getElementById("channelDeepLinkAnchor");
+  const channelDeepLinkAppAnchor = document.getElementById("channelDeepLinkAppAnchor");
+  const channelQrImage = document.getElementById("channelQrImage");
+  const channelDeepLinkActions = document.getElementById("channelDeepLinkActions");
+  const setChannelDeepLinkNotice = (message, isError = false) => {
+    if (!channelDeepLinkNotice) {
+      return;
+    }
+
+    channelDeepLinkNotice.hidden = false;
+    ui.setNotice(channelDeepLinkNotice, message, isError);
+  };
+
+  const setChannelToEaNotice = (node, message, isError = false) => {
+    ui.setNotice(node, message, isError);
+  };
+
+  const linkChannelToExecutiveAssistant = async (channelKind, channelHandleInputId, button, noticeNode) => {
+    const rawHandle = document.getElementById(channelHandleInputId);
+    const channelHandle = rawHandle && typeof rawHandle.value === "string"
+      ? rawHandle.value.trim()
+      : "";
+
+    ui.clearNotice(noticeNode);
+    ui.setButtonBusy(button, true, "Linking to EA...");
+    try {
+      await ui.requestJson(`/api/v1/accounts/me/channels/${encodeURIComponent(channelKind)}/executive-assistant`, {
+        method: "POST",
+        json: {
+          subjectId,
+          channelHandle
+        }
+      });
+      setChannelToEaNotice(noticeNode, "Executive Assistant linked to channel.");
+    } catch (error) {
+      setChannelToEaNotice(noticeNode, ui.describeError(error, `Could not link ${channelKind} to Executive Assistant.`), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Link to Executive Assistant");
+    }
+  };
+
+  const renderChannelDeepLink = (payload) => {
+    if (!channelDeepLinkAnchor || !channelQrImage || !channelDeepLinkActions) {
+      return;
+    }
+
+    const safeDeepLink = payload?.deepLink ?? "";
+    const safeAlternateDeepLink = payload?.alternateDeepLink?.trim();
+
+    channelDeepLinkAnchor.href = payload.deepLink;
+    channelDeepLinkAnchor.textContent = payload.deepLink;
+    channelDeepLinkAnchor.title = `Open ${payload.channelKind} link on this device`;
+    channelDeepLinkAnchor.setAttribute("target", "_blank");
+
+    if (channelDeepLinkAppAnchor) {
+      if (safeAlternateDeepLink) {
+        channelDeepLinkAppAnchor.href = safeAlternateDeepLink;
+        channelDeepLinkAppAnchor.hidden = false;
+        channelDeepLinkAppAnchor.textContent = `Open ${payload.channelKind} app link`;
+        channelDeepLinkAppAnchor.title = `Open ${payload.channelKind} in native app`;
+        channelDeepLinkAppAnchor.setAttribute("target", "_blank");
+      }
+      else {
+        channelDeepLinkAppAnchor.hidden = true;
+      }
+    }
+
+    if (safeAlternateDeepLink && safeAlternateDeepLink !== safeDeepLink && channelDeepLinkAnchor) {
+      channelDeepLinkAnchor.textContent = safeDeepLink;
+    }
+
+    channelQrImage.src = payload.qrImageUrl;
+    channelQrImage.alt = `${payload.channelKind} QR`;
+    channelDeepLinkActions.hidden = false;
+    setChannelDeepLinkNotice(`Channel handle stored: ${payload.channelHandle || "saved value"}. Scan QR or open link directly.`);
+  };
+
+  const loadChannelDeeplink = async (channelKind, channelHandleInputId, button) => {
+    ui.clearNotice(channelDeepLinkNotice);
+    ui.setButtonBusy(button, true, "Preparing...");
+    try {
+      const handleInput = document.getElementById(channelHandleInputId);
+      const handle = handleInput && typeof handleInput.value === "string"
+        ? handleInput.value.trim()
+        : "";
+      const query = handle ? `?channelHandle=${encodeURIComponent(handle)}` : "";
+      const payload = await ui.requestJson(`/api/v1/accounts/me/links/channels/${encodeURIComponent(channelKind)}/deeplink${query}`);
+      renderChannelDeepLink(payload);
+    } catch (error) {
+      setChannelDeepLinkNotice(ui.describeError(error, `${channelKind} link could not be prepared.`), true);
+      if (channelDeepLinkActions) {
+        channelDeepLinkActions.hidden = true;
+      }
+    } finally {
+      ui.setButtonBusy(button, false, channelKind === "whatsapp_official_business" ? "Generate WhatsApp link" : "Generate Telegram link");
+    }
+  };
+
+  document.getElementById("telegramDeepLinkButton")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    await loadChannelDeeplink("telegram_official_bot", "telegramHandle", button);
+  });
+
+  document.getElementById("whatsappDeepLinkButton")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    await loadChannelDeeplink("whatsapp_official_business", "whatsappHandle", button);
+  });
+
+  document.getElementById("telegramToEaButton")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    await linkChannelToExecutiveAssistant("telegram_official_bot", "telegramHandle", button, document.getElementById("telegramToEaNotice"));
+  });
+
+  document.getElementById("whatsappToEaButton")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    await linkChannelToExecutiveAssistant("whatsapp_official_business", "whatsappHandle", button, document.getElementById("whatsappToEaNotice"));
   });
 
   bindSubmit("experienceForm", async (event) => {
@@ -5228,7 +5406,7 @@
     answer.textContent = "";
     actions.innerHTML = "";
     citations.innerHTML = "";
-    ui.setButtonBusy(button, true, "Checking...");
+    ui.setButtonBusy(button, true, "Loading...");
     try {
       const payload = await ui.requestJson("/api/v1/support/cases/assistant", {
         method: "POST",
@@ -5288,7 +5466,7 @@
         ui.setNotice(notice, ui.describeError(error, "Grounded guidance could not be loaded right now."), true);
       }
     } finally {
-      ui.setButtonBusy(button, false, "Checking...");
+      ui.setButtonBusy(button, false, "Loading...");
     }
   });
 
@@ -5487,11 +5665,11 @@
         const rateLimited = setRateLimitNotice(
           notice,
           error,
-          "Fix verification is pacing repeated submissions to preserve one reliable decision timeline.",
-          "Wait for the timer, then submit only the final verification result for this install."
+          "Fix status is pacing repeated submissions to preserve one reliable decision timeline.",
+          "Wait for the timer, then submit only the final result for this install."
         );
         if (!rateLimited) {
-          ui.setNotice(notice, ui.describeError(error, "Fix verification could not be recorded right now."), true);
+          ui.setNotice(notice, ui.describeError(error, "Fix status could not be recorded right now."), true);
         }
       } finally {
         siblingButtons.forEach((item) => ui.setButtonBusy(item, false, "Saving..."));

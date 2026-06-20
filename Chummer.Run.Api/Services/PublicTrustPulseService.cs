@@ -71,7 +71,7 @@ public sealed class PublicTrustPulseService
                 ResolveLocalReleaseProofPath(),
                 options,
                 static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
-                "hub local release proof");
+                "hub local release status");
             FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
             ImportRouteParityProofGuardSnapshot importRouteGuard = localReleaseProof is null
                 ? new ImportRouteParityProofGuardSnapshot(true, null)

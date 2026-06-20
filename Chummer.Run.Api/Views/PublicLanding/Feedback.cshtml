@@ -249,10 +249,10 @@
     @foreach (var rail in operatingRails)
     {
         <article class="status-decision-strip__card">
-            <span class="tag">@rail.Badge</span>
-            <h2>@rail.Title</h2>
-            <p>@rail.Summary</p>
-            <a class="button-like button-like--ghost" href="@rail.Href">@rail.Label</a>
+            <span class="tag">@PublicFacingCopyHumanizer.Clean(rail.Badge)</span>
+            <h2>@PublicFacingCopyHumanizer.Clean(rail.Title)</h2>
+            <p>@PublicFacingCopyHumanizer.Clean(rail.Summary)</p>
+            <a class="button-like button-like--ghost" href="@rail.Href">@PublicFacingCopyHumanizer.Clean(rail.Label)</a>
         </article>
     }
 </section>
@@ -285,7 +285,7 @@
         <article class="lane-strip">
             <div class="lane-strip__copy">
                 <span class="tag">Deeper participation</span>
-                <h2>Signed-in contribution lanes stay optional</h2>
+                <h2>Signed-in contribution paths stay optional</h2>
                 <p>Public product signal should work without turning this page into a contributor-only or account-gated surface. Signed-in participation remains available when you need the deeper path.</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@codexHref">@(Model.Chrome.Authenticated ? "Open codex participation" : "Open participation")</a>

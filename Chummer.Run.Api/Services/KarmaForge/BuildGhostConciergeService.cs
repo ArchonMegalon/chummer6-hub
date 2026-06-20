@@ -53,22 +53,22 @@ public sealed class BuildGhostConciergeService
             RulesetId: "build_ghost",
             AnswerType: "support_question",
             Authority: "chummer6-build-ghost-boundary",
-            SafeSummary: "The character helper is a guided preview. A short intake can route a builder into the right Chummer path. A plain-language explainer can describe what the preview means. Chummer still owns draft creation, comparison, checks, legality explanation, and the final apply decision.",
+            SafeSummary: "The character helper is a guided preview. A short intake can route a builder into the right Chummer path. A plain-language explainer can describe what the preview means. Chummer still owns draft creation, comparison, legality explanation, and the final apply decision.",
             CalculationSteps:
             [
                 new RuleSafeCalculationStep("Entry", "Public concierge asks what changed and what the builder wants to compare", "facepop_concierge_boundary"),
                 new RuleSafeCalculationStep("Explain", "Plain-language explainer summarizes the preview without becoming mechanics truth", "answerly_humanizer_boundary"),
-                new RuleSafeCalculationStep("Truth", "Chummer creates drafts, compares them, checks them, and applies only reviewed variants", "alice_build_ghost_lab")
+                new RuleSafeCalculationStep("Apply", "Chummer creates drafts, compares them, and applies only reviewed variants", "alice_build_ghost_lab")
             ],
             SourceAnchors: Array.Empty<RuleSafeSourceAnchor>(),
             ReceiptIds: ["build_ghost_lab", "alice_horizon"],
             Confidence: "bounded",
             ForbiddenToAnswerly: ["mechanics_truth", "legality_truth", "apply_truth", "runner_mutation"],
-            HumanizerInstruction: "Explain the character-helper split in plain language without claiming runtime truth.",
+            HumanizerInstruction: "Explain the character-helper split in plain language without overclaiming what the helper can do.",
             FallbackMessage: "A short intake can greet the builder, the explainer can clarify the preview, and Chummer still owns the actual compare and apply decision.");
         RuleSafeOutputGateResult humanized = _humanizer.Humanize(packet);
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
-            ? "Bounded explainer fail-closed"
+            ? "Limited explainer fail-closed"
             : "Fallback explainer only";
         const string clientReportHref = "/contact?kind=bug_report&title=Build%20Ghost%20report&summary=Build%20Ghost%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=alice_build_ghost_lab&bundle=build_ghost&sceneId=build-ghost";
         const string publicFeedbackHref = "/feedback?topic=build-ghosts";
@@ -76,7 +76,7 @@ public sealed class BuildGhostConciergeService
         return new BuildGhostConciergeProjection(
             FacePopEntryHref: facePopHref,
             FacePopStatus: "Public concierge only",
-            AnswerlyStatus: answerlyStatus.Replace("Bounded", "Limited", StringComparison.OrdinalIgnoreCase),
+            AnswerlyStatus: answerlyStatus,
             EngineStatus: "First-party compare/apply only",
             HumanizedSummary: packet.FallbackMessage,
             CanonicalLane: "Short intake -> plain-language explanation -> Chummer character compare bench",

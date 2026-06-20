@@ -17,7 +17,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Public loop status</p>
         <h2 class="editorial-title">Keep signal, planning, shipped updates, and private help on separate pages.</h2>
-        <p class="editorial-copy">This rail stays honest when it shows public demand clearly, leaves private follow-up to Help, and waits for Changelog before it treats anything as shipped.</p>
+        <p class="editorial-copy">This page shows public demand clearly, leaves private follow-up to Help, and waits for Changelog before it treats anything as shipped.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -27,7 +27,7 @@
             <div class="route-choice-card__proof">
                 <span>@Model.CategoryCount public category@(Model.CategoryCount == 1 ? string.Empty : "ies")</span>
                 <span>@Model.MisrouteLikelyCount likely private-support crossover@(Model.MisrouteLikelyCount == 1 ? string.Empty : "s")</span>
-                <span>@Model.PrivacySensitiveCount privacy-sensitive lane@(Model.PrivacySensitiveCount == 1 ? string.Empty : "s")</span>
+                <span>@Model.PrivacySensitiveCount private-support item@(Model.PrivacySensitiveCount == 1 ? string.Empty : "s")</span>
             </div>
             <a class="editorial-strip__action" href="/roadmap">Open roadmap</a>
         </article>

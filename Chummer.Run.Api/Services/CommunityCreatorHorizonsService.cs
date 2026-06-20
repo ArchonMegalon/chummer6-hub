@@ -24,7 +24,7 @@ public sealed class CommunityCreatorHorizonsService
             "How organizer-owned scheduling, handoff, and closeout rails stay visible without pretending public chat tools own the workflow.",
             "/community/open-runs/organizer_closeout_posture.md",
             "/community/open-runs/organizer_closeout_posture.json",
-            ["Organizer lane", "Meeting handoff", "Closeout proof"]),
+            ["Organizer path", "Meeting handoff", "Closeout status"]),
         new(
             "moderation_boundary",
             "Moderation boundary",
@@ -46,7 +46,7 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "publication_trust_boundary",
             "Publication trust boundary",
-            "Receipt-backed trust posture and moderation limits for discoverable creator publications.",
+            "Visible trust posture and moderation limits for discoverable creator publications.",
             "/creator/packets/publication_trust_boundary.md",
             "/creator/packets/publication_trust_boundary.json",
             ["Trust posture", "Moderation limits", "No provider-owned truth"]),
@@ -56,7 +56,7 @@ public sealed class CommunityCreatorHorizonsService
             "Shows how public creator output returns to campaign use instead of becoming dead gallery inventory.",
             "/creator/packets/campaign_return_loop.md",
             "/creator/packets/campaign_return_loop.json",
-            ["Campaign return", "Artifact provenance", "Update followthrough"])
+            ["Campaign return", "File history", "Update follow-through"])
     ];
 
     private static readonly IReadOnlyList<CommunityCreatorDocument> PassportDocuments =
@@ -77,11 +77,11 @@ public sealed class CommunityCreatorHorizonsService
             ["Cross-table trust", "Private stays private", "No fake reputation engine"]),
         new(
             "privacy_safe_participation_proof",
-            "Privacy-safe participation proof",
-            "Aggregate proof that participation identity remains first-party, bounded, and non-surveillant.",
+            "Privacy-safe participation",
+            "Aggregate status that participation identity remains first-party, bounded, and non-surveillant.",
             "/passport/receipts/privacy_safe_participation_proof.md",
             "/passport/receipts/privacy_safe_participation_proof.json",
-            ["Aggregate proof", "Public-safe counts", "Bounded identity"])
+            ["Aggregate status", "Public-safe counts", "Bounded identity"])
     ];
 
     private static readonly IReadOnlyList<CommunityCreatorDocument> SignalDeckDocuments =
@@ -634,9 +634,9 @@ public sealed class CommunityCreatorHorizonsService
     private static string BuildCreatorBoundary(string id)
         => id switch
         {
-            "publication_board" => "Discoverable creator publication truth comes from Chummer-owned publication receipts, not external provider dashboards.",
+            "publication_board" => "Discoverable creator publication truth comes from Chummer-owned publication history, not external service dashboards.",
             "campaign_return_loop" => "Public publication can point at return posture and next safe action without exposing private workspace review detail.",
-            _ => "Trust bands and moderation posture stay receipt-backed. Provider analytics and hidden scoring do not become creator truth."
+            _ => "Trust bands and moderation posture stay visible. External service analytics and hidden scoring do not become creator truth."
         };
 
     private static string BuildPassportBoundary(string id)
@@ -644,7 +644,7 @@ public sealed class CommunityCreatorHorizonsService
         {
             "runner_return_posture" => "Runner Passport can expose aggregate readiness posture and continuity rails without showing private device history or account internals.",
             "cross_table_identity_boundary" => "Cross-table trust stays bounded, explainable, and non-surveillant. It is not a secret ranking engine.",
-            _ => "Participation proof remains aggregate and first-party. Private moderation, private identity links, and account recovery detail stay signed-in."
+            _ => "Participation status remains aggregate and first-party. Private moderation, private identity links, and account recovery detail stay signed-in."
         };
 
     private static string BuildSignalDeckBoundary(string id)
@@ -659,7 +659,7 @@ public sealed class CommunityCreatorHorizonsService
         => id switch
         {
             "watch_package_posture" => "Living World can expose the current public-safe watch package and first-party follow-through posture, but it does not claim an autonomous always-on simulation.",
-            "command_followthrough_boundary" => "Living World engagement stays governed, opt-in, and bounded to first-party command, aftermath, and continuity rails. It does not mutate world truth outside those receipts.",
+            "command_followthrough_boundary" => "Living World engagement stays reviewed, opt-in, and bounded to Chummer-owned command, aftermath, and continuity paths. It does not mutate world truth outside that loop.",
             _ => "Living Newsroom framing, aftermath, and runner continuity can stay on the same turn loop without exposing private campaign detail or pretending off-table fiction is authoritative by itself."
         };
 }

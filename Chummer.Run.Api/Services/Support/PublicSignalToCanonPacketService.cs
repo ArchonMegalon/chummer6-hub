@@ -97,7 +97,7 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "source_backed_roadmap_review",
             UpstreamPatchRequirement: "projection_changes_must_follow_design_or_release_source_truth",
             NoChangeRationalePolicy: "allowed_only_when_public_projection_stays_honest_about_live_state",
-            CloseoutPosture: "Roadmap cards stay projection-only until shipped proof, source patches, or release receipts close the gap.",
+            CloseoutPosture: "Roadmap cards stay projection-only until shipped status, source patches, or release records close the gap.",
             Summary: "Roadmap surfaces can project direction, but they do not become implementation, release, or support authority.",
             EvidenceLines:
             [
@@ -133,14 +133,14 @@ public sealed class PublicSignalToCanonPacketService
             ClaimSensitivity: "shipped_only",
             Owner: "release_ops",
             DecisionAuthority: "published_release_closeout",
-            UpstreamPatchRequirement: "closeout_claims_must_match_release_proof_and_public_shelf_truth",
-            NoChangeRationalePolicy: "disallowed_for_shipped_claims_without_release_proof",
-            CloseoutPosture: "Changelog entries stay tied to shipped closeout and published release proof instead of open roadmap intent.",
+            UpstreamPatchRequirement: "closeout_claims_must_match_release_status_and_public_shelf_truth",
+            NoChangeRationalePolicy: "disallowed_for_shipped_claims_without_release_status",
+            CloseoutPosture: "Changelog entries stay tied to shipped closeout and published release status instead of open roadmap intent.",
             Summary: "The public changelog is a shipped-closeout projection, not a backlog promise or private staging note.",
             EvidenceLines:
             [
                 "/changelog redirects to the public shipped-closeout anchor on /now.",
-                "Release proof, installer shelf, and shipped-closeout language must agree before the public changelog can claim delivery.",
+                "Release status, installer shelf, and shipped-closeout language must agree before the public changelog can claim delivery.",
                 "Unshipped or support-only fixes must not be promoted into changelog truth."
             ],
             JourneyProofEventRefs:
@@ -222,13 +222,13 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "signal_cluster_review",
             UpstreamPatchRequirement: "accepted_findings_must_patch_chummer_owned_source_before_public_feedback_projection_changes",
             NoChangeRationalePolicy: "required_for_review_threshold_items_that_do_not_change_source_or_release_state",
-            CloseoutPosture: "Repeated ProductLift findings can synthesize queue candidates and shipped closeout, but only after Chummer-owned source and proof move first.",
+            CloseoutPosture: "Repeated ProductLift findings can synthesize queue candidates and shipped closeout, but only after Chummer-owned source and status move first.",
             Summary: "ProductLift signal is classified before it becomes queue, roadmap, or closeout input.",
             EvidenceLines:
             [
-                "Public feedback boards collect demand, but source truth still lives in Chummer-owned routes and release proof.",
+                "Public feedback boards collect demand, but source truth still lives in Chummer-owned routes and release status.",
                 "Review-threshold ideas need either source-backed movement or an explicit no-change rationale.",
-                "Voter closeout must cite shipped proof before public delivery can claim resolution."
+                "Voter closeout must cite shipped status before public delivery can claim resolution."
             ],
             JourneyProofEventRefs:
             [
@@ -341,7 +341,7 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "signal_cluster_review",
             UpstreamPatchRequirement: "survey_results_must_feed_chummer_owned_packets_before_queue_or_closeout_changes",
             NoChangeRationalePolicy: "required_when_survey_signal_does_not_justify_product_or_copy_changes",
-            CloseoutPosture: "Survey ranking can validate repeated demand, but it never becomes priority or release truth without packet and design review.",
+            CloseoutPosture: "Survey ranking can validate repeated demand, but it never becomes priority or a release decision without packet and design review.",
             Summary: "MetaSurvey-style followup remains a ranking signal, not the priority decision itself.",
             EvidenceLines:
             [

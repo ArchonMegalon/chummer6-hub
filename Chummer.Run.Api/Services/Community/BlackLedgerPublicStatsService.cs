@@ -106,9 +106,9 @@ public sealed class BlackLedgerPublicStatsService
     private static readonly BlackLedgerCloseoutViewModel[] Closeouts =
     [
         new("Last turn summary", "Turn 1 already ran, and the first seeded board stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe board"),
-        new("Closeout witness feed", "Reviewed closeout updates only appear after package, route, and release checks all agree.", "/ledger/closeouts", "Reviewed only"),
+        new("Closeout witness feed", "Reviewed closeout updates only appear after package, route, and release status all agree.", "/ledger/closeouts", "Reviewed only"),
         new("Package recovery watch", "Recovery and rollback posture stays visible without implying promoted shipment.", "/packages", "Governed watch"),
-        new("Karma Forge dispatch", "Discovery packets can point at candidate motion, but not shipped status, until release proof is real.", "/karma-forge", "Signal only"),
+        new("Karma Forge dispatch", "Discovery packets can point at candidate motion, but not shipped status, until release status is current.", "/karma-forge", "Signal only"),
     ];
     private static readonly BlackLedgerWorldPreviewViewModel FallbackWorldPreview = new(
         WorldId: "emerald-sprawl-prelude",

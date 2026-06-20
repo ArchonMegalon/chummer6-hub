@@ -63,8 +63,198 @@ public sealed class ParticipantNotificationTests
             Assert.Contains("\"tool_name\":\"connector.dispatch\"", request.Body, StringComparison.Ordinal);
             Assert.Contains("\"action_kind\":\"delivery.send\"", request.Body, StringComparison.Ordinal);
             Assert.Contains("\"recipient\":\"ops@chummer.run\"", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"channel\":\"email\"", request.Body, StringComparison.Ordinal);
             Assert.Contains("\"email_masked\":\"r***@example.com\"", request.Body, StringComparison.Ordinal);
             Assert.DoesNotContain("runner@example.com", request.Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task ParticipantNotification_AccountOpenCanSendViaWhatsappChannelWhenConfigured()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var requests = new List<CapturedRequest>();
+            using var http = new HttpClient(new CapturingHandler(requests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-wa-1"}"""));
+            IConfiguration configuration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO"] = "ops@chummer.run",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO_WHATSAPP"] = "+436647916419",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_CHANNEL"] = "whatsapp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_WHATSAPP_BINDING_ID"] = "binding-whatsapp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_HASH_SALT"] = "salt-1",
+                });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserEnsureResult ensured = accounts.EnsureUserWithStatus("subject.google.runner", "Runner Prime", "runner@example.com");
+            ParticipationOperatorNotificationService service = new(http, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? receipt = await service.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/codex",
+                authProviderFamily: "google",
+                accountCreated: ensured.Created,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("sent", receipt!.Status);
+            Assert.Equal("google", receipt.AuthProviderFamily);
+            Assert.NotNull(receipt.Envelope);
+            Assert.Equal("sent", receipt.Envelope!.ReviewState);
+
+            CapturedRequest request = Assert.Single(requests);
+            Assert.Equal("https://ea.test/v1/tools/execute", request.Url);
+            Assert.Contains("\"channel\":\"whatsapp\"", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"recipient\":\"436647916419\"", request.Body, StringComparison.Ordinal);
+            Assert.DoesNotContain("ops@chummer.run", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"binding_id\":\"binding-whatsapp\"", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"notify_channel\":\"whatsapp\"", request.Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task ParticipantNotification_AccountOpenCanSendViaWhatsappChannelWhenConfiguredCaseInsensitiveConfig()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var requests = new List<CapturedRequest>();
+            using var http = new HttpClient(new CapturingHandler(requests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-wa-2"}"""));
+            IConfiguration configuration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_CHANNEL"] = "WhatsApp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO_WHATSAPP"] = "+43 666 123 456",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_WHATSAPP_BINDING_ID"] = "binding-whatsapp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserEnsureResult ensured = accounts.EnsureUserWithStatus("subject.google.runner", "Runner Prime", "runner@example.com");
+            ParticipationOperatorNotificationService service = new(http, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? receipt = await service.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/codex",
+                authProviderFamily: "google",
+                accountCreated: ensured.Created,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("sent", receipt!.Status);
+            CapturedRequest request = Assert.Single(requests);
+            Assert.Contains("\"channel\":\"whatsapp\"", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"notify_channel\":\"whatsapp\"", request.Body, StringComparison.Ordinal);
+            Assert.Contains("\"recipient\":\"43666123456\"", request.Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task ParticipantNotification_SuppressUnsupportedNotifyChannel()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var requests = new List<CapturedRequest>();
+            using var http = new HttpClient(new CapturingHandler(requests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-1"}"""));
+            IConfiguration configuration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_CHANNEL"] = "signal",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO"] = "ops@chummer.run",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserEnsureResult ensured = accounts.EnsureUserWithStatus("subject.google.runner", "Runner Prime", "runner@example.com");
+            ParticipationOperatorNotificationService service = new(http, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? receipt = await service.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/codex",
+                authProviderFamily: "google",
+                accountCreated: ensured.Created,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("suppressed_adapter_unconfigured", receipt!.Status);
+            Assert.Equal("unsupported_notify_channel", receipt.FailureReason);
+            Assert.Empty(requests);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task ParticipantNotification_AccountOpenSuppressesWhenWhatsappConfigMissing()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var requests = new List<CapturedRequest>();
+            using var http = new HttpClient(new CapturingHandler(requests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-1"}"""));
+            IConfiguration configuration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_CHANNEL"] = "whatsapp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO_WHATSAPP"] = "invalid-number",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_WHATSAPP_BINDING_ID"] = "binding-whatsapp",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserEnsureResult ensured = accounts.EnsureUserWithStatus("subject.google.runner", "Runner Prime", "runner@example.com");
+            ParticipationOperatorNotificationService service = new(http, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? receipt = await service.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/codex",
+                authProviderFamily: "google",
+                accountCreated: ensured.Created,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("suppressed_recipient_missing", receipt!.Status);
+            Assert.NotNull(receipt.Envelope);
+            Assert.Equal("recipient_missing", receipt.FailureReason);
+            Assert.Empty(requests);
         }
         finally
         {

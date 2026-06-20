@@ -185,7 +185,7 @@ public sealed class BlackLedgerFactionOnboardingService
             $"{detail.PublicName} welcome kit",
             $"{detail.PublicName} badge unlocked",
             "Runner Passport stamp queued",
-            "First task: Gather receipts"
+            "First task: Gather notes"
         };
 
         return new BlackLedgerFactionHomeViewModel(
@@ -514,7 +514,7 @@ public sealed class BlackLedgerFactionOnboardingService
             "ghostline-network" => [
                 "The opener says Ghostline is fighting for the signal itself, not just the street beneath it.",
                 "An orkish correspondent breaks through a glitching wall of screens while false feeds die behind him.",
-                "The operator kills the rumor stream and reasserts verified narrative control in full public view."
+                "The operator kills the rumor stream and reasserts the public story in full view."
             ],
             "barrens-free-wardens" => [
                 "The bulletin says the Wardens are broadcasting survival as a promise, not a slogan.",
@@ -522,9 +522,9 @@ public sealed class BlackLedgerFactionOnboardingService
                 "The convoy marshal drives the line forward and sells protection as something the whole district can witness."
             ],
             _ => [
-                $"{detail.PublicName} ships a first-party recruitment bulletin with theatrical pressure and public proof.",
+                $"{detail.PublicName} ships a Chummer-owned recruitment bulletin with theatrical pressure and visible stakes.",
                 "The public lane is allowed to roar, but it is not allowed to lie.",
-                "Motion video, captions, and route-backed validation are available now."
+                "Motion video, captions, and world-state details are available now."
             ]
         };
 
@@ -534,19 +534,19 @@ public sealed class BlackLedgerFactionOnboardingService
                 Label: "Anchor Open",
                 VisualHook: $"{detail.PublicName} hits the nightly bulletin desk first: charismatic anchor, premium newsroom wall, and one pressure claim already on screen.",
                 ActionBeat: captions[0],
-                ProofPayoff: "The first scene now sells the bulletin format directly, but the claim still has to survive the public world tick."
+                ProofPayoff: "The first scene sells the bulletin format directly, but the claim still has to survive the public world turn."
             ),
             new(
                 Label: "Field Report",
                 VisualHook: "An orkish correspondent pushes through the faction environment live while panic, infrastructure, or ritual pressure moves behind him.",
                 ActionBeat: captions[1],
-                ProofPayoff: "The middle beat now proves visible people, motion, and camera pressure instead of a static card with dramatic copy."
+                ProofPayoff: "The middle beat shows visible people, motion, and camera pressure instead of a static card with dramatic copy."
             ),
             new(
                 Label: "Action Close",
                 VisualHook: "Close hard on the faction lead changing the district in frame while the lower-third still points back to a measurable promise.",
                 ActionBeat: captions[2],
-                ProofPayoff: "The closer still names the validation route directly, but now does it through a visible action beat instead of inert atmosphere."
+                ProofPayoff: "The closer points back to the world state through a visible action beat instead of inert atmosphere."
             ),
         ];
 
@@ -574,8 +574,8 @@ public sealed class BlackLedgerFactionOnboardingService
             RenderMode: useMagicFit ? "magicfit_cinematic_faction_promo_with_narration" : "first_party_motion_video",
             FallbackRenderMode: "first_party_storyboard",
             StorylineSummary: useMagicFit
-                ? $"{detail.PublicName} now runs as a five-scene cinematic faction reel: motive, pressure, field proof, command claim, and a closing faction hook."
-                : $"{detail.PublicName} currently runs as a three-beat bulletin: anchor claim, field proof, and action close.",
+                ? $"{detail.PublicName} now runs as a five-scene cinematic faction reel: motive, pressure, field action, command claim, and a closing faction hook."
+                : $"{detail.PublicName} currently runs as a three-beat bulletin: anchor claim, field action, and action close.",
             NarratorPosture: useMagicFit
                 ? "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite."
                 : "Anchor-led bulletin with first-party narration and captions.",
@@ -598,14 +598,14 @@ public sealed class BlackLedgerFactionOnboardingService
                 ? $"{detail.PublicName} now opens on a faction-defining problem, moves through field pressure, and closes on a visible command claim before the next turn can judge the boast."
                 : $"{detail.PublicName} now opens on a glamour-news anchor, cuts to an orkish field correspondent in the district, and closes on a visible faction lead changing the scene before the next turn can judge the claim.",
             AudiencePromise: useMagicFit
-                ? "This lane is a rendered cinematic faction reel with narration, camera motion, and metahuman action on screen. It can be stylish, but it still loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree."
-                : "This lane is now a first-party nightly bulletin with visible people, camera motion, and action on screen. It is still allowed to feel like propaganda, but it loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree.",
+                ? "This lane is a rendered cinematic faction reel with narration, camera motion, and metahuman action on screen. It can be stylish, but it still loses immediately if the world turn, dispatches, faction file, and visible action disagree."
+                : "This lane is now a Chummer-owned nightly bulletin with visible people, camera motion, and action on screen. It is still allowed to feel like propaganda, but it loses immediately if the world turn, dispatches, faction file, and visible action disagree.",
             ValidationHref: $"/account/ledger/factions/{normalizedFactionId}/leader-briefing",
             StoryboardShots:
             [
                 "Anchor open in the Black Ledger studio with a headline and lower-third already framing the faction conflict.",
                 "Field report with an orkish correspondent inside the district while pressure, civilians, or infrastructure move behind him.",
-                "Action close on the faction lead changing the conflict in frame and handing the claim back to the validation lanes."
+                "Action close on the faction lead changing the conflict in frame and handing the claim back to the world state."
             ],
             StoryboardFrames: storyboardFrames,
             ScreenplayScenes: screenplayScenes);
@@ -914,11 +914,11 @@ public sealed class BlackLedgerFactionOnboardingService
             "recruit" => $"Recruit action improved cohesion and faction reach. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
             "secure-district" => $"Secure District hardened pressure around {request.TargetDistrictId ?? "the current front"}. Influence is now {FormatSigned(state.InfluenceDelta)}.",
             "sponsor-package" => $"Sponsor Package added bounded pressure to a package candidate. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
-            "publish-dispatch" => $"Publish Dispatch queued a clean receipt-backed summary for the faction feed. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
+            "publish-dispatch" => $"Publish Dispatch queued a clean summary for the faction feed. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
             "reduce-heat" => $"Reduce Heat cooled public pressure at the cost of momentum. Heat is now {FormatSigned(state.HeatDelta)}.",
             "challenge-faction" => $"Challenge Faction targeted {request.TargetFactionId ?? "a larger rival"} for visible underdog pressure. Influence is now {FormatSigned(state.InfluenceDelta)}.",
             "fortify-safehouse" => $"Fortify Safehouse reduced attrition risk before the next tick. Heat is now {FormatSigned(state.HeatDelta)}.",
-            "gather-receipts" => $"Gather Receipts improved proof-trail strength for the next closeout. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
+            "gather-receipts" => $"Gather Notes improved confidence for the next closeout. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
             _ => $"{action.Label} resolved."
         };
 
@@ -1233,7 +1233,7 @@ public sealed class BlackLedgerFactionOnboardingService
         new("reduce-heat", "Reduce Heat", 1, "lowers Heat and trades away momentum"),
         new("challenge-faction", "Challenge Faction", 2, "contests a district or package lane"),
         new("fortify-safehouse", "Fortify Safehouse", 1, "reduces attrition risk"),
-        new("gather-receipts", "Gather Receipts", 1, "improves proof-trail strength")
+        new("gather-receipts", "Gather Notes", 1, "improves closeout confidence")
     ];
 
     public static readonly IReadOnlyList<BlackLedgerFactionArchetypeDto> Archetypes =

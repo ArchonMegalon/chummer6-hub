@@ -359,7 +359,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                         {
-                            <p><strong>Review:</strong> @item.AuditSummary</p>
+                            <p><strong>Note:</strong> @PublicFacingCopyHumanizer.Clean(item.AuditSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                         {
@@ -473,7 +473,7 @@
                             <span>@card.Action.Label</span>
                             @if (!string.IsNullOrWhiteSpace(card.Card.MicroProof))
                             {
-                                <span>@card.Card.MicroProof</span>
+                                <span>@PublicFacingCopyHumanizer.Clean(card.Card.MicroProof)</span>
                             }
                         </div>
                         @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
@@ -482,7 +482,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
-                            <p><strong>Detail:</strong> @card.Card.ProofNote</p>
+                            <p><strong>Note:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                         }
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
@@ -514,7 +514,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
-                            <p><strong>Current seam:</strong> @card.Card.ProofNote</p>
+                            <p><strong>Next:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                         }
                     </div>
                     <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>

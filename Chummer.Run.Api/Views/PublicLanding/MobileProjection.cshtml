@@ -13,7 +13,7 @@
         <div class="trust-claim__microproof">
             <span>@Model.CurrentRoleLabel</span>
             <span>Installable app shell live</span>
-            <span>Offline and reconnect lane cached</span>
+            <span>Offline and reconnect path cached</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -46,7 +46,7 @@
                 <span class="tag">Live</span>
                 <h3>Offline return path</h3>
             </div>
-            <p>The worker keeps the mobile rail, play shell, continuity route, and install assets cached so a reconnect starts from the right surface.</p>
+            <p>The worker keeps the mobile path, play shell, continuity route, and install assets cached so a reconnect starts from the right surface.</p>
             <div class="stacked-actions">
                 <a class="editorial-strip__action" href="/service-worker.js">Open service worker</a>
                 <a class="editorial-strip__action" href="/mobile/pwa.json">Open PWA JSON</a>
@@ -55,7 +55,7 @@
         <article class="gateway-card">
             <div class="gateway-card__header">
                 <span class="tag">Continuity</span>
-                <h3>Next-safe-action rail</h3>
+                <h3>Next safe action</h3>
             </div>
             <p>The installable shell does not replace downloads, support, or account recovery. It keeps the return path explicit when you move between public, linked, and session surfaces.</p>
             <div class="stacked-actions">
@@ -89,7 +89,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Role entry</p>
         <h2 class="editorial-title">Player, GM, and observer routes converge on one shell.</h2>
-        <p class="editorial-copy">Choose a role-specific front door without branching into different product truths. The same app shell keeps install, return, and reconnect posture visible in every role.</p>
+        <p class="editorial-copy">Choose a role-specific front door without splitting the product into different stories. The same app shell keeps install, return, and reconnect status visible in every role.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var role in Model.Roles)
@@ -147,7 +147,7 @@
                 }
 
                 installButton.setAttribute("aria-disabled", "true");
-                installState.textContent = "If this browser does not expose a direct install prompt, use its Add to Home Screen or Install App menu. The shell still keeps the same continuity rail.";
+                installState.textContent = "If this browser does not expose a direct install prompt, use its Add to Home Screen or Install App menu. The shell still keeps the same continuity path.";
             }
 
             setOnlineState();
@@ -180,7 +180,7 @@
             window.addEventListener("appinstalled", function () {
                 deferredPrompt = null;
                 if (installState) {
-                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep return and role entry on the same rail.";
+                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep return and role entry on the same path.";
                 }
                 setInstallAvailability(false);
             });

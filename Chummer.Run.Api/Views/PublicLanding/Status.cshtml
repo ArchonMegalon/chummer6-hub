@@ -7,8 +7,8 @@
         string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
         "Not mirrored");
     var releaseChecksLabel = releaseCheckState.Contains("Passed", StringComparison.OrdinalIgnoreCase)
-        ? "Checks passed"
-        : "Checks unavailable";
+        ? "Status ready"
+        : "Status unavailable";
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
     var verifiedLabel = Model.VerifiedAtLabel
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
@@ -57,11 +57,11 @@
             <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
         </article>
         <article>
-            <span>Last checked</span>
+            <span>Last updated</span>
             <strong>@verifiedLabel</strong>
         </article>
         <article>
-            <span>Checks</span>
+            <span>Status</span>
             <strong>@releaseChecksLabel</strong>
         </article>
     </div>

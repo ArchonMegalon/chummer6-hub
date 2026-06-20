@@ -159,7 +159,7 @@ public sealed class ArtifactFactoryOrchestrationService
                 DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 RequiredReceiptPrefixes: ["release", "promotion", "public-shelf"],
-                RequiredAnchorDescription: "a release artifact id or public proof shelf ref"),
+                RequiredAnchorDescription: "a release artifact id or public status shelf ref"),
             ["fix"] = new(
                 RecipeId: "fix-followthrough-bundle",
                 AllowedSourceKinds: ["fix_receipt", "support_case", "install_receipt", "release"],
@@ -180,21 +180,21 @@ public sealed class ArtifactFactoryOrchestrationService
                 DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 RequiredReceiptPrefixes: ["publication", "moderation", "public-shelf"],
-                RequiredAnchorDescription: "a publication id or public proof shelf ref"),
+                RequiredAnchorDescription: "a publication id or public status shelf ref"),
             ["campaign_cold_open"] = new(
                 RecipeId: "campaign-cold-open-bundle",
                 AllowedSourceKinds: ["campaign_primer", "campaign_pack", "campaign_cold_open_pack"],
                 DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 RequiredReceiptPrefixes: ["campaign", "primer", "audience", "locale"],
-                RequiredAnchorDescription: "a campaign id or campaign proof shelf ref"),
+                RequiredAnchorDescription: "a campaign id or campaign status shelf ref"),
             ["mission_briefing"] = new(
                 RecipeId: "mission-briefing-reel",
                 AllowedSourceKinds: ["mission_pack", "mission_briefing", "mission_briefing_pack"],
                 DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 RequiredReceiptPrefixes: ["mission", "briefing", "audience", "locale"],
-                RequiredAnchorDescription: "a mission id or mission proof shelf ref")
+                RequiredAnchorDescription: "a mission id or mission status shelf ref")
         };
 
     public ArtifactFactoryRecipeCatalogResult ListRecipes()
@@ -975,7 +975,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (!publicShelfRef.StartsWith("/", StringComparison.Ordinal) || publicShelfRef.StartsWith("//", StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has non-local public proof shelf {fieldName} '{value}'; artifact factory output refs must stay on the Chummer public proof shelf.");
+                $"source pack '{sourcePackId}' has non-local public status shelf {fieldName} '{value}'; artifact factory output refs must stay on the Chummer public status shelf.");
         }
 
         RejectUnsafePublicShelfRef(sourcePackId, publicShelfRef, fieldName);
@@ -998,7 +998,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (allowedPrefixes.Length == 0 || !allowedPrefixes.Any(prefix => publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has public proof shelf {fieldName} '{value}' outside recipe {family} shelf routes; artifact factory bundle refs must stay on approved release, support, fix, or publication shelves.");
+                $"source pack '{sourcePackId}' has public status shelf {fieldName} '{value}' outside recipe {family} shelf routes; artifact factory bundle refs must stay on approved release, support, fix, or publication shelves.");
         }
 
         RejectRecipeShelfAnchorShape(sourcePackId, family, publicShelfRef, fieldName);
@@ -1009,7 +1009,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (publicShelfRef.Contains('?', StringComparison.Ordinal) || publicShelfRef.Contains('#', StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must be stable shelf paths without query strings or fragments.");
+                $"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must be stable shelf paths without query strings or fragments.");
         }
 
         foreach (string segment in publicShelfRef.Split('/', StringSplitOptions.RemoveEmptyEntries))
@@ -1018,13 +1018,13 @@ public sealed class ArtifactFactoryOrchestrationService
             if (decodedSegment is "." or ".." || decodedSegment.Contains('/', StringComparison.Ordinal) || decodedSegment.Contains('\\', StringComparison.Ordinal))
             {
                 throw new InvalidDataException(
-                    $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must not contain traversal or encoded path separators.");
+                    $"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must not contain traversal or encoded path separators.");
             }
 
             if (!IsStablePublicShelfSegment(decodedSegment))
             {
                 throw new InvalidDataException(
-                    $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.");
+                    $"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public status shelf segment characters.");
             }
         }
     }
@@ -1042,7 +1042,7 @@ public sealed class ArtifactFactoryOrchestrationService
             || releaseArtifactId.Contains('\\', StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.");
+                $"source pack '{sourcePackId}' has unsafe release public status shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.");
         }
     }
 
@@ -1058,14 +1058,14 @@ public sealed class ArtifactFactoryOrchestrationService
             && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/publications/", allowBundlesSuffix: true))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe publication public proof shelf {fieldName} '{publicShelfRef}'; publication bundle anchors must resolve to one publication segment with an optional bundles shelf.");
+                $"source pack '{sourcePackId}' has unsafe publication public status shelf {fieldName} '{publicShelfRef}'; publication bundle anchors must resolve to one publication segment with an optional bundles shelf.");
         }
 
         if (family.Equals("support", StringComparison.OrdinalIgnoreCase)
             && !HasAnyResourceShelfAnchorShape(publicShelfRef, ["/account/support/", "/account/support-packets/"], allowBundlesSuffix: false))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe support public proof shelf {fieldName} '{publicShelfRef}'; support bundle anchors must resolve to exactly one support case segment.");
+                $"source pack '{sourcePackId}' has unsafe support public status shelf {fieldName} '{publicShelfRef}'; support bundle anchors must resolve to exactly one support case segment.");
         }
 
         if (family.Equals("fix", StringComparison.OrdinalIgnoreCase)
@@ -1075,21 +1075,21 @@ public sealed class ArtifactFactoryOrchestrationService
                 allowBundlesSuffix: false))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe fix public proof shelf {fieldName} '{publicShelfRef}'; fix bundle anchors must resolve to exactly one support case or release artifact segment.");
+                $"source pack '{sourcePackId}' has unsafe fix public status shelf {fieldName} '{publicShelfRef}'; fix bundle anchors must resolve to exactly one support case or release artifact segment.");
         }
 
         if (family.Equals("campaign_cold_open", StringComparison.OrdinalIgnoreCase)
             && !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", "cold-open", allowBundlesSuffix: true))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe campaign public proof shelf {fieldName} '{publicShelfRef}'; campaign cold-open anchors must resolve to /artifacts/campaigns/{{campaignId}}/cold-open with an optional bundles shelf.");
+                $"source pack '{sourcePackId}' has unsafe campaign public status shelf {fieldName} '{publicShelfRef}'; campaign cold-open anchors must resolve to /artifacts/campaigns/{{campaignId}}/cold-open with an optional bundles shelf.");
         }
 
         if (family.Equals("mission_briefing", StringComparison.OrdinalIgnoreCase)
             && !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", "briefing", allowBundlesSuffix: true))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe mission public proof shelf {fieldName} '{publicShelfRef}'; mission briefing anchors must resolve to /artifacts/missions/{{missionId}}/briefing with an optional bundles shelf.");
+                $"source pack '{sourcePackId}' has unsafe mission public status shelf {fieldName} '{publicShelfRef}'; mission briefing anchors must resolve to /artifacts/missions/{{missionId}}/briefing with an optional bundles shelf.");
         }
     }
 
@@ -1154,7 +1154,7 @@ public sealed class ArtifactFactoryOrchestrationService
             || pathId.Contains('\\', StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public proof shelf segments.");
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public status shelf segments.");
         }
 
         string decoded = Uri.UnescapeDataString(pathId);
@@ -1170,7 +1170,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (!IsStablePublicShelfSegment(decoded))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must use stable public proof shelf segment characters.");
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must use stable public status shelf segment characters.");
         }
     }
 

@@ -75,3 +75,14 @@ public sealed record LinkChannelRequest(
     [Required(AllowEmptyStrings = false), StringLength(64)] string ChannelKind,
     string? ChannelHandle = null,
     bool NotificationsEnabled = true);
+
+public sealed record LinkChannelToExecutiveAssistantRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    string? ChannelHandle = null);
+
+public sealed record ChannelDeepLinkResponse(
+    string ChannelKind,
+    string ChannelHandle,
+    string DeepLink,
+    string QrImageUrl,
+    string? AlternateDeepLink = null);

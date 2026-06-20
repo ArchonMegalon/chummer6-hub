@@ -30,7 +30,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Consent basis pending", packet.ConsentStatusLabel);
         Assert.Equal("Queue blocked", packet.QueueStatusLabel);
         Assert.Equal("Governor approval pending", packet.GovernorStatusLabel);
-        Assert.Equal("Release proof pending", packet.ReleaseProofStatusLabel);
+        Assert.Equal("Release status pending", packet.ReleaseProofStatusLabel);
         Assert.Equal(0, packet.ReceiptCount);
         Assert.Equal(0, packet.RoutingReceiptCount);
         Assert.Equal(0, packet.CloseoutDeliveryReceiptCount);
@@ -192,7 +192,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal(0, packet.ProjectedRecipientCount);
         Assert.Equal("Queue blocked", packet.QueueStatusLabel);
         Assert.Equal("Governor approval pending", packet.GovernorStatusLabel);
-        Assert.Equal("Release proof pending", packet.ReleaseProofStatusLabel);
+        Assert.Equal("Release status pending", packet.ReleaseProofStatusLabel);
         string compactArtifactJson = artifactJson.Replace(" ", string.Empty);
         Assert.Contains("\"contractName\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"generatedAtUtc\"", artifactJson, StringComparison.Ordinal);
@@ -299,7 +299,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Consent basis configured", packet.ConsentStatusLabel);
         Assert.Equal("Queue adapter configured", packet.QueueStatusLabel);
         Assert.Equal("Governor approval configured", packet.GovernorStatusLabel);
-        Assert.Equal("Release proof current", packet.ReleaseProofStatusLabel);
+        Assert.Equal("Release status current", packet.ReleaseProofStatusLabel);
         Assert.Equal(1, packet.ProjectedRecipientCount);
         Assert.Equal(1, packet.CloseoutDeliveryCandidateCount);
         Assert.Equal(1, packet.CloseoutQueueReceiptCount);
@@ -479,7 +479,7 @@ public sealed class PublicSignalOperationsServiceTests
         PublicSignalOperationsPacketViewModel blockedPacket = service.BuildPacket();
 
         Assert.Equal("Governor approval pending", blockedPacket.GovernorStatusLabel);
-        Assert.Equal("Release proof pending", blockedPacket.ReleaseProofStatusLabel);
+        Assert.Equal("Release status pending", blockedPacket.ReleaseProofStatusLabel);
         Assert.Equal(0, blockedPacket.CloseoutDispatchReceiptCount);
         Assert.Equal(0, blockedPacket.JourneyReceiptCount);
         Assert.Equal(0, blockedPacket.ReplayCandidateCount);
@@ -562,7 +562,7 @@ public sealed class PublicSignalOperationsServiceTests
         PublicSignalOperationsPacketViewModel packet = service.BuildPacket();
 
         Assert.Equal("Governor approval pending", packet.GovernorStatusLabel);
-        Assert.Equal("Release proof current", packet.ReleaseProofStatusLabel);
+        Assert.Equal("Release status current", packet.ReleaseProofStatusLabel);
         Assert.Single(packet.RecentQueueReceipts);
         Assert.Equal("Governor approval pending", packet.RecentQueueReceipts[0].StatusLabel);
         Assert.Equal("blocked", packet.RecentQueueReceipts[0].QueueState);
@@ -1004,7 +1004,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal(packet.RecentJourneyReceipts[0].StatusLabel, packet.RecentRecipientThreads[0].CurrentStageLabel);
         Assert.Contains("joined", packet.RecentRecipientThreads[0].Summary, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(sourceDetail);
-        Assert.Equal("Source receipt drilldown", sourceDetail!.DetailKindLabel);
+        Assert.Equal("Source record drilldown", sourceDetail!.DetailKindLabel);
         Assert.Equal(packet.RecentDispatchReceipts[0].SourceReceiptId, sourceDetail.DetailKey);
         Assert.Equal("all", sourceDetail.FilterKey);
         Assert.False(sourceDetail.FilterApplied);
@@ -1036,7 +1036,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Contains("\"recipientThreads\"", sourceDetailJson, StringComparison.Ordinal);
         Assert.Contains("\"savedPivots\"", sourceDetailJson, StringComparison.Ordinal);
         Assert.Contains("\"deliveryOutcomes\"", sourceDetailJson, StringComparison.Ordinal);
-        Assert.Contains("\"detailKindLabel\": \"Source receipt drilldown\"", sourceDetailJson, StringComparison.Ordinal);
+        Assert.Contains("\"detailKindLabel\": \"Source record drilldown\"", sourceDetailJson, StringComparison.Ordinal);
         Assert.Contains("\"detailKindLabel\": \"Recipient thread drilldown\"", threadDetailJson, StringComparison.Ordinal);
         Assert.Contains("\"dispatchReceipts\"", threadDetailJson, StringComparison.Ordinal);
     }
@@ -1317,7 +1317,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Single(sourceLookup.Results);
         Assert.Equal("sent", sourceLookup.Results[0].FilterKey);
         Assert.Equal("Sent threads", sourceLookup.Results[0].FilterLabel);
-        Assert.Equal("Source receipt", sourceLookup.Results[0].ResultKindLabel);
+        Assert.Equal("Source record", sourceLookup.Results[0].ResultKindLabel);
         Assert.Equal(packet.RecentDispatchReceipts[0].SourceReceiptId, sourceLookup.Results[0].Key);
         Assert.Equal("Item reference", sourceLookup.Results[0].MatchReason);
         Assert.Contains("?filter=sent", sourceLookup.Results[0].Href, StringComparison.Ordinal);

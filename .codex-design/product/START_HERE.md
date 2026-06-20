@@ -23,3 +23,7 @@ Start with [Runner Passport](RUNNER_PASSPORT.md), [Living World](LIVING_WORLD.md
 ## Something is blocking me
 
 Open [Help](HELP.md) first. Use [Contact](CONTACT.md) if the problem is private, account-bound, or still unresolved.
+
+## I am maintaining the product
+
+Use [Next 12 Biggest Wins](NEXT_12_BIGGEST_WINS_GUIDE.md), [Campaign OS gap guide](CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md), and [privacy and retention boundaries](PRIVACY_AND_RETENTION_BOUNDARIES.md) when changing product direction.

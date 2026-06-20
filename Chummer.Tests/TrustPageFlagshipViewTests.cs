@@ -10,8 +10,8 @@ public sealed class TrustPageFlagshipViewTests
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string trustView = File.ReadAllText(trustViewPath);
 
-        Assert.Contains("Choose the right path.", trustView, StringComparison.Ordinal);
-        Assert.Contains("First-party help keeps the next step concrete.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Choose the right path", trustView, StringComparison.Ordinal);
+        Assert.Contains("Public feedback, tracked return, and install recovery stay nearby.", trustView, StringComparison.Ordinal);
         Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the trust boundary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the rule boundary first, then the full terms.", trustView, StringComparison.Ordinal);

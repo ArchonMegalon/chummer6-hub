@@ -496,13 +496,13 @@ public sealed class FactionCharterBuilderTests
         Assert.Contains(".webm", promo.VideoWebmHref, StringComparison.Ordinal);
         Assert.Contains("MagicFit-rendered 16:9 MP4", promo.FormatLabels, StringComparer.Ordinal);
         Assert.Contains("Captions required", promo.FormatLabels, StringComparer.Ordinal);
-        Assert.Contains("world tick", promo.AudiencePromise, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("world turn", promo.AudiencePromise, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", promo.ValidationHref, StringComparison.Ordinal);
         Assert.Equal(3, promo.StoryboardShots.Count);
         Assert.Equal(3, promo.StoryboardFrames.Count);
         Assert.Equal("Anchor Open", promo.StoryboardFrames[0].Label);
         Assert.Contains("pressure", promo.StoryboardFrames[0].VisualHook, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("world tick", promo.StoryboardFrames[0].ProofPayoff, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("world turn", promo.StoryboardFrames[0].ProofPayoff, StringComparison.OrdinalIgnoreCase);
         Assert.NotEmpty(promo.ScreenplayScenes);
         Assert.Contains(promo.ScreenplayScenes, scene => scene.Label.Contains("Turn 1", StringComparison.OrdinalIgnoreCase)
             || scene.Label.Contains("scene", StringComparison.OrdinalIgnoreCase)

@@ -23,12 +23,12 @@
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
-    var proofTargets = Model.ProofModules
+    var detailTargets = Model.ProofModules
         .Select(card => NormalizeRoute(card.Action.Href))
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    var supportingProof = Model.AvailableToday
+    var supportingDetails = Model.AvailableToday
         .Concat(Model.Inspectable)
-        .Where(card => !proofTargets.Contains(NormalizeRoute(card.Action.Href)))
+        .Where(card => !detailTargets.Contains(NormalizeRoute(card.Action.Href)))
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
@@ -91,7 +91,7 @@
             <strong>@publishedLabel</strong>
         </div>
         <div>
-            <span class="evidence-header__label">Last verified</span>
+            <span class="evidence-header__label">Last updated</span>
             <strong>@verifiedLabel</strong>
         </div>
     </div>
@@ -105,10 +105,10 @@
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">What you can check now</span>
-        <h2>The checks below answer the normal questions before you commit a device.</h2>
+        <span class="tag">What matters now</span>
+        <h2>The details below answer the normal questions before you commit a device.</h2>
         <p>Use them when you want one concrete result and one clear next step.</p>
-        <a class="button-like button-like--ghost" href="#now-proof">Open quick checks</a>
+        <a class="button-like button-like--ghost" href="#now-details">Open details</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Need caution</span>
@@ -153,7 +153,7 @@
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>Known issues and install help</h3>
-                    <p>Check download help and known issues before you commit a fresh device to the current downloads page.</p>
+                    <p>Read download help and known issues before you commit a fresh device to the current downloads page.</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
             </article>
@@ -175,10 +175,10 @@
     </article>
 </section>
 
-<section class="workflow-band" id="now-proof">
+<section class="workflow-band" id="now-details">
     <div class="workflow-band__lead">
-        <p class="eyebrow">What you can check now</p>
-        <h2 class="editorial-title">Three quick checks beyond the landing page</h2>
+        <p class="eyebrow">What matters now</p>
+        <h2 class="editorial-title">Three useful details beyond the landing page</h2>
         <p class="editorial-copy">These cards focus on real product behavior: builder results, rule explanations, and saved work after changes.</p>
     </div>
     <div class="workflow-grid">
@@ -197,7 +197,7 @@
                     <p>@card.Card.Summary</p>
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                     {
-                        <p class="workflow-card__proof">@card.Card.ProofNote</p>
+                        <p class="workflow-card__proof">@PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                     }
                     <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </div>
@@ -206,14 +206,14 @@
     </div>
 </section>
 
-@if (supportingProof.Length > 0)
+@if (supportingDetails.Length > 0)
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
             <summary>More release detail you can inspect today</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
-                    @foreach (var card in supportingProof)
+                    @foreach (var card in supportingDetails)
                     {
                         <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
                             <div class="evidence-row__copy">

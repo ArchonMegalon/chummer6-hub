@@ -208,8 +208,8 @@
             "active" => "Ready",
             "linked" => "Ready",
             "pending" => "Pending",
-            "pending_verification" => "Verification sent",
-            "verified" => "Verified",
+            "pending_verification" => "Confirmation sent",
+            "verified" => "Confirmed",
             "published" => "Published",
             "campaign_approved" => "Campaign-approved",
             "sandbox" => "Sandbox",
@@ -356,8 +356,8 @@
         </article>
         <article class="home-cockpit-strip__fact">
             <span>Current release</span>
-            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release to confirm the live access posture.")</strong>
-            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open what works today for the latest availability.")</strong>
+            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open what works today for the latest notes.")</p>
         </article>
     </div>
 </section>
@@ -368,7 +368,7 @@
         <div class="flagship-coverage__lead">
             <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
             <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
-            <p class="editorial-copy">This signed-in view keeps downloads, session access, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
+            <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
         </div>
         <div class="flagship-coverage__grid">
             @foreach (var card in Model.FlagshipCoverage.Cards)
@@ -388,7 +388,7 @@ else
 {
     <section class="editorial-block">
         <details class="details-drawer">
-            <summary>Release, access, and flagship status</summary>
+            <summary>Release and access</summary>
             @if (showStatusDrawer)
             {
                 @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
@@ -396,8 +396,8 @@ else
             <div class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
                 <div class="flagship-coverage__lead">
                     <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
-                    <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
-                    <p class="editorial-copy">This signed-in view keeps downloads, session access, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
+                    <h2 class="editorial-title">Everything you need in one place.</h2>
+                    <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
                 </div>
                 <div class="flagship-coverage__grid">
                     @foreach (var card in Model.FlagshipCoverage.Cards)
@@ -462,7 +462,7 @@ else
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Access</p>
                                         <h2 class="home-stream__title">What changed for you</h2>
-                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so this view explains why something moved.</p>
+                                        <p class="home-stream__summary">Support, install return, and release follow-up stay grouped so the next step is clear.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
@@ -696,8 +696,8 @@ else
                                                                 {
                                                                     <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
-                                                                <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
-                                                                <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
+                                                                <span> Understandable return: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.ReturnLaneSummary)</span>
+                                                                <span> Campaign-ready: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.CampaignReadySummary)</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
@@ -769,11 +769,11 @@ else
                                                                 <span> Next: @leadFirstPlayableSession.NextSafeAction</span>
                                                             </p>
                                                             <p class="muted-copy">Legal runner: @leadFirstPlayableSession.RuleReadySummary</p>
-                                                            <p class="muted-copy">Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</p>
-                                                            <p class="muted-copy">Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</p>
+                                                            <p class="muted-copy">Understandable return: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.ReturnLaneSummary)</p>
+                                                            <p class="muted-copy">Campaign-ready: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.CampaignReadySummary)</p>
                                                             @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
                                                             {
-                                                                <p class="muted-copy">Evidence: @leadFirstPlayableEvidence</p>
+                                                                <p class="muted-copy">Note: @leadFirstPlayableEvidence</p>
                                                             }
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session</a>
@@ -792,7 +792,7 @@ else
                                                                 <span> Next: @leadNextSessionCarryForward.NextSafeAction</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadNextSessionEvidence))
                                                                 {
-                                                                    <span> Evidence: @leadNextSessionEvidence</span>
+                                                                    <span> Note: @leadNextSessionEvidence</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -808,10 +808,10 @@ else
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
                                                                 @leadAftermathPackage.Summary
-                                                                <span> Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace, not in a disconnected recap lane.</span>
+                                                                <span> Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace, not in a disconnected recap.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
                                                                 {
-                                                                    <span> Evidence: @leadAftermathEvidence</span>
+                                                                    <span> Note: @leadAftermathEvidence</span>
                                                                 }
                                                                 @if (leadAftermathShelfEntry is not null)
                                                                 {
@@ -823,11 +823,11 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.ProvenanceSummary))
                                                                     {
-                                                                        <span> Provenance: @leadAftermathShelfEntry.ProvenanceSummary</span>
+                                                                        <span> Source: @leadAftermathShelfEntry.ProvenanceSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.AuditSummary))
                                                                     {
-                                                                        <span> Audit: @leadAftermathShelfEntry.AuditSummary</span>
+                                                                        <span> Note: @leadAftermathShelfEntry.AuditSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.CompatibilitySummary))
                                                                     {
@@ -843,8 +843,8 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.TrustBand))
                                                                     {
-                                                                        <span> Trust ranking: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
-                                                                        <span> Available now: @(leadAftermathShelfEntry.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                                        <span> Status: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
+                                                                        <span> Available: @(leadAftermathShelfEntry.Discoverable ? "Yes" : "Not yet").</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
@@ -860,7 +860,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.TrustSummary))
                                                                     {
-                                                                        <span> Trust: @leadAftermathCreatorPublication.TrustSummary</span>
+                                                                        <span> Status: @leadAftermathCreatorPublication.TrustSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.ComparisonSummary))
                                                                     {
@@ -909,10 +909,10 @@ else
                                                             <h3>@leadDowntimePackage.Title</h3>
                                                             <p>
                                                                 @leadDowntimePackage.Summary
-                                                                <span> This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop, not a second disconnected system.</span>
+                                                                <span> This is the off-table half of the same Table Pulse loop, not a second disconnected system.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadDowntimeEvidence))
                                                                 {
-                                                                    <span> Evidence: @leadDowntimeEvidence</span>
+                                                                    <span> Note: @leadDowntimeEvidence</span>
                                                                 }
                                                                 @if (leadNextSessionCarryForward is not null)
                                                                 {
@@ -936,7 +936,7 @@ else
                                                                 <span> Next: @leadCampaignMemory.NextSafeAction</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadCampaignMemoryEvidence))
                                                                 {
-                                                                    <span> Evidence: @leadCampaignMemoryEvidence</span>
+                                                                    <span> Note: @leadCampaignMemoryEvidence</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -954,7 +954,7 @@ else
                                                                 @leadConsequence.Summary
                                                                 @if (!string.IsNullOrWhiteSpace(leadConsequenceEvidence))
                                                                 {
-                                                                    <span> Evidence: @leadConsequenceEvidence</span>
+                                                                    <span> Note: @leadConsequenceEvidence</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -973,18 +973,18 @@ else
                                                                 <span> Target: @leadRosterTransfer.TargetCampaignName via @leadRosterTransfer.TargetGroupName.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadRosterAuditLine))
                                                                 {
-                                                                    <span> Audit: @leadRosterAuditLine</span>
+                                                                    <span> Note: @leadRosterAuditLine</span>
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="/account/work#community-ops">Open governed roster moves</a>
+                                                        <a class="inline-link" href="/account/work#community-ops">Open roster moves</a>
                                                     </article>
                                                 }
 
                                                 @if (leadCommunityOperation is not null)
                                                 {
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Operator posture</span>
+                                                        <span class="tag">Community role</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@leadCommunityOperation.GroupName</h3>
                                                             <p>
@@ -1026,10 +1026,10 @@ else
                                                                 {
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
-                                                                <span> Guide: current public release, downloads, and closure posture stay on the same guided view.</span>
-                                                                <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</span>
-                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix status.")</span>
-                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution notes.")</span>
+                                                                <span> Guide: release notes, downloads, and support stay on the same view.</span>
+                                                                <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open what works today for the latest availability.")</span>
+                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open what works today for the latest fix status.")</span>
+                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open what works today for the latest notes.")</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
@@ -1062,7 +1062,7 @@ else
                                                             }
                                                             @if (leadTravelPrefetch is not null)
                                                             {
-                                                                <span> Latest travel receipt: @leadTravelPrefetch.DeviceRole on @leadTravelPrefetch.Platform.</span>
+                                                                <span> Latest travel setup: @leadTravelPrefetch.DeviceRole on @leadTravelPrefetch.Platform.</span>
                                                             }
                                                             <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
                                                             <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
@@ -1200,7 +1200,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                                                         {
-                                                                            <span> Output provenance: @output.ProvenanceSummary.</span>
+                                                                            <span> Output source: @output.ProvenanceSummary.</span>
                                                                         }
                                                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -1213,7 +1213,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
-                                                                            <span> Output audit: @output.AuditSummary.</span>
+                                                                            <span> Output note: @output.AuditSummary.</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
                                                                         {
@@ -1238,7 +1238,7 @@ else
                                                 {
                                                     var answer = rulesAnswers[0];
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Grounded rule answer</span>
+                                                        <span class="tag">Rule answer</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@answer.Question</h3>
                                                             <p>
@@ -1246,7 +1246,7 @@ else
                                                                 <span> Source: @answer.ProvenanceLabel.</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
-                                                                    <span> Evidence: @answer.EvidenceLines[0]</span>
+                                                                    <span> Note: @answer.EvidenceLines[0]</span>
                                                                 }
                                                                 @if (answer.Studio is not null)
                                                                 {
@@ -1306,13 +1306,13 @@ else
                                                         <h3>@publication.Title</h3>
                                                         <p>
                                                             @publication.Summary
-                                                            <span>Provenance: @publication.ProvenanceSummary.</span>
+                                                            <span>Source: @publication.ProvenanceSummary.</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
-                                                            <span>Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft").</span>
+                                                            <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @publication.DiscoverySummary</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                                             {
-                                                                <span> Trust: @publication.TrustSummary</span>
+                                                                <span> Status: @publication.TrustSummary</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                                                             {
@@ -1514,8 +1514,8 @@ else
     ui.setText(nodes.interestState, followCount === 0 ? "Quiet" : `${followCount} active`);
 
     if (recoveryRequested) {
-      ui.setText(nodes.recoveryState, "Verification sent");
-      ui.setText(nodes.recoveryCopy, "Check your email to finish verifying the backup sign-in path.");
+      ui.setText(nodes.recoveryState, "Confirmation sent");
+      ui.setText(nodes.recoveryCopy, "Open your email to confirm the backup sign-in path.");
     }
 
     ui.setText(nodes.setupCardTitle, "Review setup");

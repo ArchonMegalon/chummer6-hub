@@ -16,7 +16,7 @@ public sealed class ParticipationDashboardViewTests
         Assert.Contains("publicContributionProfileOptIn", view, StringComparison.Ordinal);
         Assert.Contains("impactCloseoutNotifications", view, StringComparison.Ordinal);
         Assert.Contains("Impact journal", view, StringComparison.Ordinal);
-        Assert.Contains("Votes show demand; Chummer-owned proof decides what ships.", view, StringComparison.Ordinal);
+        Assert.Contains("Votes show demand; only finished work ships.", view, StringComparison.Ordinal);
     }
 
     [Fact]

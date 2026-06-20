@@ -131,10 +131,10 @@ public sealed class PublicReleaseManifestServiceTests
         var manifest = fixture.CreateService().LoadManifest();
 
         Assert.Equal("review_required", manifest.SupportabilityState);
-        Assert.Equal("desktop_proof_review_required", manifest.RolloutState);
+        Assert.Equal("desktop_polish_needed", manifest.RolloutState);
         Assert.Contains("desktop_client", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("parity-sensitive routes", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("support lane", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chummer support", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("passed", manifest.ProofStatus);
     }
 
@@ -149,9 +149,9 @@ public sealed class PublicReleaseManifestServiceTests
         var manifest = fixture.CreateService().LoadManifest();
 
         Assert.Equal("review_required", manifest.SupportabilityState);
-        Assert.Equal("desktop_proof_review_required", manifest.RolloutState);
+        Assert.Equal("desktop_polish_needed", manifest.RolloutState);
         Assert.Contains("desktop_client", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("review-required lane", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Desktop polish is not current yet", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class PublicReleaseManifestServiceTests
             ["status"] = "published",
             ["supportabilityState"] = "gold_supported",
             ["supportabilitySummary"] = "Current shelf is gold-supported.",
-            ["knownIssueSummary"] = "Current release proof is green.",
+            ["knownIssueSummary"] = "Current release status is green.",
             ["artifacts"] = new object[]
             {
                 new Dictionary<string, object?>
@@ -232,7 +232,7 @@ public sealed class PublicReleaseManifestServiceTests
             ["status"] = "published",
             ["supportabilityState"] = "gold_supported",
             ["supportabilitySummary"] = "Current shelf is gold-supported.",
-            ["knownIssueSummary"] = "Current release proof is green.",
+            ["knownIssueSummary"] = "Current release status is green.",
             ["artifacts"] = new object[]
             {
                 new Dictionary<string, object?>

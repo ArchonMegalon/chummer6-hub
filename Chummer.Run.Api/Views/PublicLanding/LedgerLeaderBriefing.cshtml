@@ -21,7 +21,7 @@
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@Model.Digest.ValidationHref">Open details</a>
-        <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn check</a>
+        <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn review</a>
         <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
     </div>
 </section>
@@ -76,7 +76,7 @@
                 <span class="tag">Living Newsroom</span>
                 <p>@Model.GmCockpitPacket.LivingNewsroomSummary</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.GmCockpitPacket.LivingNewsroomHref">Open watch lane</a>
+                    <a href="@Model.GmCockpitPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
                 </div>
             </article>
@@ -84,7 +84,7 @@
                 <span class="tag">Aftermath</span>
                 <p>@Model.GmCockpitPacket.AftermathSummary</p>
                 <div class="route-choice-card__proof">
-                    <a href="@Model.GmCockpitPacket.AftermathHref">Open aftermath rail</a>
+                    <a href="@Model.GmCockpitPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
@@ -100,7 +100,7 @@
                     <h3>@cue.StatusLabel</h3>
                     <p>@cue.Summary</p>
                     <div class="route-choice-card__proof">
-                        <a href="@cue.Href">Open lane</a>
+                        <a href="@cue.Href">Open</a>
                     </div>
                 </article>
             }
@@ -112,16 +112,16 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Checks</p>
-            <h2 class="editorial-title">What supports this briefing</h2>
-            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+            <p class="eyebrow">Details</p>
+            <h2 class="editorial-title">What this briefing uses</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ValidationPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.ValidationPacket.Checks.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">Check</span>
-                    <p>@item</p>
+                    <span class="tag">Detail</span>
+                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
                 </article>
             }
         </div>

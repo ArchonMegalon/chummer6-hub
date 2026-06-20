@@ -14,7 +14,7 @@ DEFAULT_FACTIONS = [
     ("ghostline-network", "Ghostline Network", "Ghostline trades in movement, secrecy, and timing, but only through signals the board can actually verify.", "This promo can dramatize stealth and routing, but it cannot invent private intel or outrun the ledger."),
     ("glass-tower-compact", "Glass Tower Compact", "The Compact projects executive calm while every pressure move remains measurable from the outside.", "This lane can sell control and prestige, but it must stay anchored to the public turn packet."),
     ("neon-docks-union", "Neon Docks Union", "The Union frames leverage through throughput, labor, and visible chokepoints the city can feel next turn.", "This ad lane can dramatize momentum, but it cannot overclaim beyond the verified world tick."),
-    ("rust-market-syndicate", "Rust Market Syndicate", "The Syndicate enters through salvage, barter, and pressure that climbs in plain sight rather than hidden lore.", "This lane can lean into grit and hustle, but it remains bounded by the public-safe dispatch and receipt trail."),
+    ("rust-market-syndicate", "Rust Market Syndicate", "The Syndicate enters through salvage, barter, and pressure that climbs in plain sight rather than hidden lore.", "This lane can lean into grit and hustle, but it remains bounded by the public-safe dispatch history."),
 ]
 
 

@@ -24,9 +24,9 @@ public sealed class BuildGhostConciergeServiceTests
         BuildGhostConciergeProjection projection = service.Build();
 
         Assert.Equal("/facepop/build-ghosts", projection.FacePopEntryHref);
-        Assert.Equal("Bounded explainer fail-closed", projection.AnswerlyStatus);
+        Assert.Equal("Limited explainer fail-closed", projection.AnswerlyStatus);
         Assert.Equal("First-party compare/apply only", projection.EngineStatus);
-        Assert.Contains("Answerly can explain the experiment", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("A short intake can", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(projection.Actions, item => string.Equals(item.Href, "/participate/karma-forge?track=player_trust_track", StringComparison.Ordinal));
     }
 
@@ -42,7 +42,7 @@ public sealed class BuildGhostConciergeServiceTests
 
         Assert.Equal("/participate", projection.FacePopEntryHref);
         Assert.Equal("Fallback explainer only", projection.AnswerlyStatus);
-        Assert.Contains("Answerly can explain the experiment", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("A short intake can", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("legality", projection.RuntimeBoundary, StringComparison.OrdinalIgnoreCase);
     }
 

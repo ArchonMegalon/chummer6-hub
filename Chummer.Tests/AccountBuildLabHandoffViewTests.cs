@@ -18,7 +18,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
         Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
         Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
-        Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(output.AuditSummary)", view, StringComparison.Ordinal);
         Assert.Contains("Output type:", view, StringComparison.Ordinal);
         Assert.Contains("Publication:", view, StringComparison.Ordinal);
         Assert.Contains("Compatibility: @output.CompatibilitySummary", view, StringComparison.Ordinal);
@@ -66,7 +66,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("gmLane.SignalCount", view, StringComparison.Ordinal);
         Assert.Contains("gmLane.Summary", view, StringComparison.Ordinal);
         Assert.Contains("GM operations", view, StringComparison.Ordinal);
-        Assert.Contains("Account/audit backbone", view, StringComparison.Ordinal);
+        Assert.Contains("Account backbone", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues.Count > 0", view, StringComparison.Ordinal);

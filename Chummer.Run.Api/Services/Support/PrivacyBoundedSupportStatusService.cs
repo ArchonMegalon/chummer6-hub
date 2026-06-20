@@ -81,14 +81,14 @@ public sealed class PrivacyBoundedSupportStatusService
                 latestSupportCase is null
                     ? "No tracked support case is active yet, so the first-party intake lane remains the only safe support status route."
                     : $"Case {latestSupportCase.CaseId} is currently {HumanizeStatus(latestSupportCase.Status).ToLowerInvariant()}.",
-                concierge?.ReleaseExplainer.CorrectnessBasis ?? "Support status stays grounded in the same release truth that powers downloads, install help, and fix availability.",
+                concierge?.ReleaseExplainer.CorrectnessBasis ?? "Support status stays grounded in the same release status that powers downloads, install help, and fix availability.",
                 ResolveFixAvailabilitySummary(manifest)
             ],
             Actions:
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the tracked case or the governed support account rail."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Start first-party intake when no tracked case exists yet."),
-                new PrivacyBoundedSupportStatusActionProjection("open_current_release", "Open current release", "/now", "Compare support posture with the same registry-backed release truth.")
+                new PrivacyBoundedSupportStatusActionProjection("open_current_release", "Open current release", "/now", "Compare support posture with the same current release status.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -263,7 +263,7 @@ public sealed class PrivacyBoundedSupportStatusService
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_privacy", "Open privacy", "/privacy", "Review the privacy and retention boundary."),
                 new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Inspect the signed-in support continuity that stays on the bounded clock."),
-                new PrivacyBoundedSupportStatusActionProjection("open_status", "Open status", "/status", "Compare privacy and retention posture with the public release evidence.")
+                new PrivacyBoundedSupportStatusActionProjection("open_status", "Open status", "/status", "Compare privacy and retention posture with the public release status.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -283,7 +283,7 @@ public sealed class PrivacyBoundedSupportStatusService
         string comparisonRoute = "/api/v1/install-linking/continuation/support";
         string summary = latestSupportCase is null
             ? "Case-status followthrough starts on the first-party support rail and only becomes install-aware once a tracked case exists."
-            : concierge?.SupportClosure.Summary ?? $"Case {latestSupportCase.CaseId} keeps first-party followthrough attached to the same install and release truth.";
+            : concierge?.SupportClosure.Summary ?? $"Case {latestSupportCase.CaseId} keeps first-party followthrough attached to the same install and release status.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-case-followthrough", latestSupportCase?.CaseId ?? manifest.Version),

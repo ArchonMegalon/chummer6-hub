@@ -70,7 +70,7 @@
                     <h3>@Model.Promo.PublicName</h3>
                     <p class="faction-storyboard-frame__visual">@frame.VisualHook</p>
                     <p class="faction-storyboard-frame__action">@frame.ActionBeat</p>
-                    <p class="faction-storyboard-frame__proof">@frame.ProofPayoff</p>
+                    <p class="faction-storyboard-frame__proof">@PublicFacingCopyHumanizer.Clean(frame.ProofPayoff)</p>
                 </article>
             }
         </div>
@@ -236,6 +236,6 @@
         }
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open checks</a>
+        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open status</a>
     </div>
 </section>

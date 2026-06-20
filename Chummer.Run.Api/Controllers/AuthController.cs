@@ -151,12 +151,12 @@ public sealed class AuthController : Controller
 
         var callback = $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(nextPath)}";
         var model = new AuthMessagePageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Check your email", "Finish the magic-link step and come back to your account.", "/login"),
-            Heading: "Check your email",
-            SupportLine: $"{started.PreviewNote} After verification, Chummer sends you back to {nextTarget}.",
+            Chrome: _chrome.BuildPublicChrome("Open your email", "Finish the magic-link step and come back to your account.", "/login"),
+            Heading: "Open your email",
+            SupportLine: $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}.",
             Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC · next stop: {nextTarget}",
             PrimaryLabel: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
-                ? $"Open the verification link for {nextTarget}"
+                ? $"Open the confirmation link for {nextTarget}"
                 : "Return to sign in",
             PrimaryHref: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
                 ? callback
@@ -167,8 +167,8 @@ public sealed class AuthController : Controller
             Highlights:
             [
                 $"Check {started.Email} for the Chummer sign-in email.",
-                "Open the verification link in the same browser when possible.",
-                $"After verification, Chummer sends you back to {nextTarget}."
+                "Open the confirmation link in the same browser when possible.",
+                $"After confirmation, Chummer sends you back to {nextTarget}."
             ]);
         return View("~/Views/Auth/Message.cshtml", model);
     }
@@ -192,7 +192,7 @@ public sealed class AuthController : Controller
             var nextTarget = DescribeNextTarget(nextPath);
             return BuildAuthMessage(
                 chromeTitle: "Magic link expired",
-                chromeDescription: "The Chummer email verification link is no longer valid.",
+                chromeDescription: "The Chummer email confirmation link is no longer valid.",
                 currentPath: "/login",
                 heading: "Magic link expired",
                 supportLine: "That link is missing, invalid, or too old to finish the sign-in step. Start again and Chummer will issue a fresh one.",
@@ -201,10 +201,10 @@ public sealed class AuthController : Controller
                 primaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
                 secondaryLabel: "Create account instead",
                 secondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}",
-                stateLabel: "Verification expired",
+                stateLabel: "Confirmation expired",
                 highlights:
                 [
-                    "The old verification link cannot be reused.",
+                    "The old confirmation link cannot be reused.",
                     $"A fresh link will still return you to {nextTarget}.",
                     "If you switched devices, open the new link in the browser you want to keep signed in."
                 ]);
@@ -262,8 +262,8 @@ public sealed class AuthController : Controller
         catch (InvalidOperationException)
         {
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Recovery email verification expired", "The recovery-email verification token was missing, expired, or invalid.", "/account"),
-                Heading: "Recovery email verification expired",
+                Chrome: _chrome.BuildPublicChrome("Recovery email confirmation expired", "The recovery-email confirmation token was missing, expired, or invalid.", "/account"),
+                Heading: "Recovery email confirmation expired",
                 SupportLine: "Start the recovery-email step again from your signed-in account settings.",
                 Notice: null,
                 PrimaryLabel: "Open account",
@@ -280,9 +280,9 @@ public sealed class AuthController : Controller
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Recovery email verification failed", "The verification email was opened without an active verified-email session.", "/login"),
-                Heading: "Recovery email verification failed",
-                SupportLine: "Open the verification email again from the same browser so Chummer can finish linking the recovery address.",
+                Chrome: _chrome.BuildPublicChrome("Recovery email confirmation failed", "The confirmation email was opened without an active confirmed-email session.", "/login"),
+                Heading: "Recovery email confirmation failed",
+                SupportLine: "Open the confirmation email again from the same browser so Chummer can finish linking the recovery address.",
                 Notice: null,
                 PrimaryLabel: "Open account",
                 PrimaryHref: "/account",
@@ -291,13 +291,13 @@ public sealed class AuthController : Controller
         }
         catch (HubRequestAuthException ex)
         {
-            _logger.LogWarning(ex, "Recovery email verification could not confirm the active identity session.");
+            _logger.LogWarning(ex, "Recovery email confirmation could not confirm the active identity session.");
             return BuildAuthMessage(
                 chromeTitle: "Recovery email unavailable",
-                chromeDescription: "The recovery-email verification flow could not confirm the active identity session right now.",
+                chromeDescription: "The recovery-email confirmation flow could not confirm the active identity session right now.",
                 currentPath: "/account",
-                heading: "Recovery email verification is unavailable",
-                supportLine: "Chummer could not confirm the active sign-in session for recovery-email verification right now. Start again from Account.",
+                heading: "Recovery email confirmation is unavailable",
+                supportLine: "Chummer could not confirm the active sign-in session for recovery-email confirmation right now. Start again from Account.",
                 notice: null,
                 primaryLabel: "Open account",
                 primaryHref: "/account",
@@ -309,9 +309,9 @@ public sealed class AuthController : Controller
         {
             await TryClearBrowserSessionAsync(cancellationToken);
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Recovery email verification failed", "The browser session did not match the recovery email that was verified.", "/account"),
-                Heading: "Recovery email verification failed",
-                SupportLine: "That verification link was completed under a different email identity than the one Chummer expected.",
+                Chrome: _chrome.BuildPublicChrome("Recovery email confirmation failed", "The browser session did not match the recovery email that was confirmed.", "/account"),
+                Heading: "Recovery email confirmation failed",
+                SupportLine: "That confirmation link was completed under a different email identity than the one Chummer expected.",
                 Notice: null,
                 PrimaryLabel: "Open account",
                 PrimaryHref: "/account",
@@ -328,7 +328,7 @@ public sealed class AuthController : Controller
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Recovery email already linked", "That recovery email now belongs to a different Chummer account.", "/account"),
                 Heading: "Recovery email already linked",
-                SupportLine: "Chummer will not relink that verified email because it is already attached to another account.",
+                SupportLine: "Chummer will not relink that confirmed email because it is already attached to another account.",
                 Notice: null,
                 PrimaryLabel: "Open account",
                 PrimaryHref: "/account",
@@ -355,13 +355,13 @@ public sealed class AuthController : Controller
         }
         catch (HubBrowserAuthUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Recovery email verification could not restore the primary Hub session for {SubjectId}.", payload.AccountSubjectId);
+            _logger.LogWarning(ex, "Recovery email confirmation could not restore the primary Hub session for {SubjectId}.", payload.AccountSubjectId);
             return BuildAuthMessage(
                 chromeTitle: "Recovery email unavailable",
-                chromeDescription: "The recovery-email verification flow could not finish the signed-in browser session right now.",
+                chromeDescription: "The recovery-email confirmation flow could not finish the signed-in browser session right now.",
                 currentPath: "/account",
-                heading: "Recovery email verification is unavailable",
-                supportLine: "Chummer verified the recovery email but could not finish the signed-in browser session right now. Return to Account and try the final step again.",
+                heading: "Recovery email confirmation is unavailable",
+                supportLine: "Chummer confirmed the recovery email but could not finish the signed-in browser session right now. Return to Account and try the final step again.",
                 notice: null,
                 primaryLabel: "Open account",
                 primaryHref: "/account",
@@ -478,7 +478,7 @@ public sealed class AuthController : Controller
         if (result.MergeCandidate is not null)
         {
             var mergeModel = new GoogleMergePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Confirm account link", "Google found a verified email that already belongs to a Chummer account.", "/login"),
+                Chrome: _chrome.BuildPublicChrome("Confirm account link", "Google found a confirmed email that already belongs to a Chummer account.", "/login"),
                 ExistingDisplayName: result.MergeCandidate.ExistingDisplayName,
                 VerifiedEmail: result.MergeCandidate.VerifiedEmail,
                 NextPath: result.MergeCandidate.NextPath,

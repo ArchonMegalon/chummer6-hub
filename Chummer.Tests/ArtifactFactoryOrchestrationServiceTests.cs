@@ -26,7 +26,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
             && recipe.RequiredReceiptPrefixes.Contains("public-shelf")
             && recipe.DefaultFormats.Contains("preview_card")
             && recipe.AllowedFormats.Contains("short_video")
-            && string.Equals(recipe.RequiredAnchorDescription, "a release artifact id or public proof shelf ref", StringComparison.Ordinal));
+            && string.Equals(recipe.RequiredAnchorDescription, "a release artifact id or public status shelf ref", StringComparison.Ordinal));
         Assert.Contains(catalog.Recipes, recipe =>
             string.Equals(recipe.Family, "support", StringComparison.Ordinal)
             && recipe.AllowedSourceKinds.Contains("support_case")
@@ -616,7 +616,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     EvidenceRefs: ["release:run-20260415", "promotion:startup-smoke"])
             ])));
 
-        Assert.Contains("release artifact id or public proof shelf ref", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("release artifact id or public status shelf ref", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -891,8 +891,8 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     PublicShelfRef: "https://vendor.example/rendered/preview")
             ])));
 
-        Assert.Contains("non-local public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Chummer public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("non-local public status shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chummer public status shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -919,7 +919,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     PublicationId: "redmond-brief")
             ])));
 
-        Assert.Contains("non-local public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("non-local public status shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1031,7 +1031,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     PublicShelfRef: "/artifacts/release-bundles/../support-packets/11709")
             ])));
 
-        Assert.Contains("unsafe public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unsafe public status shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("traversal", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1059,7 +1059,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     PublicationId: "redmond-brief")
             ])));
 
-        Assert.Contains("unsafe public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unsafe public status shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("query strings or fragments", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -1089,7 +1089,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
             ])));
 
         Assert.Contains("unsafe releaseArtifactId", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("stable public proof shelf segments", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stable public status shelf segments", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

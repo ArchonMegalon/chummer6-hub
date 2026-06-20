@@ -78,7 +78,7 @@ public sealed class HostedBoundedContextCoverageService
                 feedbackPacket is null
                     ? "Public signal still enters through /participate before any account-linked followthrough is attached."
                     : $"{feedbackPacket.Route} keeps governed signal intake separate from the signed-in support and account rails.",
-                "Public routes compare against published release truth rather than worker-local helper state."
+                "Public routes compare against the published release status rather than worker-local helper state."
             ],
             Actions:
             [
@@ -282,7 +282,7 @@ public sealed class HostedBoundedContextCoverageService
     {
         string summary = installation is null
             ? "Install and orchestration adapters stay boundary-owned: they help downloads, claim, artifact launch, and Fleet handoff without replacing public, account, or campaign truth."
-            : $"{installation.Platform ?? "desktop"} {installation.Channel} {installation.Version} keeps install claim, release upload, and Fleet handoff as adapter seams rather than standalone product truth.";
+            : $"{installation.Platform ?? "desktop"} {installation.Channel} {installation.Version} keeps install claim, release upload, and Fleet handoff as adapter seams rather than standalone product decisions.";
 
         return new HostedBoundedContextCoverageProjection(
             ProjectionId: StableId("hosted-bounded-context-orchestration", installation?.InstallationId ?? receipt?.ReceiptId ?? manifest.Version),
@@ -341,7 +341,7 @@ public sealed class HostedBoundedContextCoverageService
                 "AddHubAccountsAndCommunityContext owns signed-in account, group, membership, reward, entitlement, and community lanes.",
                 "AddHubCampaignSpineContext owns workspaces, open-run orchestration, creator-publication return lanes, and campaign continuity.",
                 "AddHubControlAndSupportContext owns support, crash, feedback, privacy-bounded status, and support followthrough.",
-                "AddHubInstallAndOrchestrationAdapters owns install linking, release upload, artifact-factory adapter, and Fleet bridge seams without becoming canonical product truth."
+                "AddHubInstallAndOrchestrationAdapters owns install linking, release upload, artifact-factory adapter, and Fleet bridge seams without becoming canonical product decisions."
             ],
             Actions:
             [

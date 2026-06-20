@@ -1729,11 +1729,11 @@ public sealed class ReleaseBundlePromotionService
 
         if (proofPassed)
         {
-            return "Current release shelf was exercised by the local docker release proof harness before publication.";
+            return "Current release shelf passed the local release run before publication.";
         }
 
         return string.Equals(NormalizeToken(channel), "preview", StringComparison.Ordinal)
-            ? "Current preview shelf is published, but release proof should be re-run before widening trust claims."
+            ? "Current preview shelf is published, but the release run should be repeated before widening trust claims."
             : "Current release shelf is published.";
     }
 
@@ -1784,7 +1784,7 @@ public sealed class ReleaseBundlePromotionService
 
         if (!proofPassed)
         {
-            return "Treat the current release as review-required until release proof and support closure checks pass.";
+            return "Treat the current release as review-required until release status and support closure are ready.";
         }
 
         List<string> journeys = proofJourneys?

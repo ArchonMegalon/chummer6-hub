@@ -979,7 +979,7 @@ public sealed class CodexParticipationController : Controller
 
         return phase switch
         {
-            "complete" => "Your contribution lane is linked. Chummer will only count receipt-backed work after validation and review.",
+            "complete" => "Your contribution lane is linked. Chummer will only count accepted work after review.",
             "authorize" => "Open the authorization page, sign in to ChatGPT with your OpenAI account, enter the one-time code, and keep this page open while Chummer watches for confirmation. If the code expires, ask for a fresh one here.",
             _ => "Authorize a temporary Codex contribution lane with your OpenAI account in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
         };

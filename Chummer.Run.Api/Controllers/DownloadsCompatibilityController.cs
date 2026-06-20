@@ -112,7 +112,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ApplyProofInstallerHeaders(Response.Headers);
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the Windows proof-installer output route.",
+            "No current release status record is attached to the Windows installer output route.",
             "/downloads/proof/windows/{fileName}",
             "/downloads/install/{artifactId}/proof",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
@@ -136,7 +136,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ApplyProofInstallerHeaders(Response.Headers);
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the Windows proof-installer artifact route.",
+            "No current release status record is attached to the Windows installer artifact route.",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/proof",
             "/downloads/install/{artifactId}/proof",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
@@ -187,7 +187,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         Response.Headers["X-Chummer-Download-Receipt-Id"] = dispatch.Receipt.ReceiptId;
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the compatibility download route.",
+            "No current release status record is attached to the compatibility download route.",
             $"/downloads/get/{Uri.EscapeDataString(artifact.Id)}",
             "/downloads/get/{artifactId}",
             $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
@@ -269,7 +269,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the artifact download output route.",
+            "No current release status record is attached to the artifact download output route.",
             $"/downloads/file/{Uri.EscapeDataString(artifact.Id)}",
             "/downloads/file/{artifactId}",
             $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
@@ -349,7 +349,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the public file-output route.",
+            "No current release status record is attached to the public file-output route.",
             "/downloads/files/{**path}",
             $"/downloads/install/{encodedArtifactId}");
         return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
@@ -372,7 +372,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         ApplyRouteProofHeaders(
             Response.Headers,
-            "No current local release-proof receipt is attached to the Arch package sidecar output route.",
+            "No current release status record is attached to the Arch package sidecar output route.",
             "/downloads/files/{**path}",
             "/downloads");
         Response.Headers["X-Chummer-Install-Tier"] = "arch-sidecar";
@@ -485,7 +485,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Skipping local release-proof receipt lookup after JSON load failure.");
+            _logger.LogDebug(ex, "Skipping local release status record lookup after JSON load failure.");
         }
 
         return null;

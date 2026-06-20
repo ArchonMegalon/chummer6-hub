@@ -24,11 +24,18 @@ MEDIA_ROOT = REPO / "Chummer.Run.Api" / "wwwroot" / "media"
 OUT_ROOT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619")
 LEGACY_PROMO_AUDIO = REPO / "scripts" / "rebuild_promo_audio_continuous.py"
 UNMIXR_PROVIDER = "unmixr-short-tts"
+EDGE_TTS_PYTHON = Path("/docker/chummercomplete/_completion/promo_video_rework_20260602/tts_venv/bin/python")
 TARGET_SR = 48000
 HIGH_TONE_CLEANUP_FILTER = "equalizer=f=11730:width_type=h:width=420:g=-48,lowpass=f=9800"
-LOW_RUMBLE_HIGHPASS_HZ = 270
+LOW_RUMBLE_HIGHPASS_HZ = 90
 LOW_TONE_CLEANUP_FILTER = "equalizer=f=188:width_type=h:width=90:g=-18,equalizer=f=235:width_type=h:width=105:g=-18"
-NARRATION_START_DELAY_MS = 500
+NARRATION_START_DELAY_MS = 180
+MAX_SILENCE_SECONDS = 0.70
+MAX_EDGE_SILENCE_SECONDS = 0.30
+SILENCE_GATE_DBFS = -42.0
+PREMIUM_NEWS_VOICE = "en-US-GuyNeural"
+ALICE_PREMIUM_NEWS_VOICE = "en-US-JennyNeural"
+EDGE_TTS_DEFAULT = True
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -42,6 +49,10 @@ VOICE_ENV_BY_GROUP = {
         "UNMIXR_FEMALE_NARRATOR_VOICE_ID",
         *DEFAULT_VOICE_ENV_KEYS,
     ),
+}
+
+EDGE_VOICE_BY_GROUP = {
+    "alice-90s-deepdive": ALICE_PREMIUM_NEWS_VOICE,
 }
 
 
@@ -105,6 +116,17 @@ def resolve_voice_id(group_key: str) -> tuple[str, str]:
         if value:
             return value, key
     return "", ""
+
+
+def edge_voice_for_group(group_key: str) -> str:
+    return EDGE_VOICE_BY_GROUP.get(group_key, PREMIUM_NEWS_VOICE)
+
+
+def prefer_edge_tts() -> bool:
+    raw = str(os.getenv("CHUMMER_PUBLIC_VIDEO_AUDIO_PREFER_EDGE_TTS") or "").strip().lower()
+    if raw:
+        return raw in {"1", "true", "yes", "on"}
+    return EDGE_TTS_DEFAULT
 
 
 @contextmanager
@@ -324,6 +346,31 @@ def render_pause(output: Path, seconds: float) -> None:
     )
 
 
+def render_edge_tts(text: str, voice: str, output: Path) -> bool:
+    if not EDGE_TTS_PYTHON.is_file():
+        return False
+    helper = OUT_ROOT / "render_edge_tts_public_video.py"
+    helper.parent.mkdir(parents=True, exist_ok=True)
+    helper.write_text(
+        "import asyncio, edge_tts, pathlib, sys\n"
+        "async def main():\n"
+        "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
+        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-2Hz')\n"
+        "    await communicate.save(str(output))\n"
+        "asyncio.run(main())\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [str(EDGE_TTS_PYTHON), str(helper), voice, text, str(output)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        return False
+    return output.is_file() and output.stat().st_size > 0
+
+
 def normalize_voice(source: Path, output: Path) -> None:
     run(
         "ffmpeg",
@@ -331,7 +378,9 @@ def normalize_voice(source: Path, output: Path) -> None:
         "-i",
         str(source),
         "-af",
-        f"afade=t=in:st=0:d=0.025,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},acompressor=threshold=-23dB:ratio=2.2:attack=16:release=240:makeup=1.8,alimiter=limit=0.91",
+        f"afade=t=in:st=0:d=0.025,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
+        "acompressor=threshold=-24dB:ratio=2.0:attack=12:release=180:makeup=2.6,"
+        "loudnorm=I=-17:LRA=8:TP=-2.0,alimiter=limit=0.90",
         "-ar",
         str(TARGET_SR),
         "-ac",
@@ -407,6 +456,43 @@ def render_unmixr_narration(
     }
 
 
+def render_edge_narration(group_key: str, text: str, work: Path, *, force_tts: bool = False) -> tuple[Path, dict[str, Any]]:
+    beats = LEGACY.split_script_into_beats(text)
+    beat_dir = work / "beats"
+    beat_dir.mkdir(parents=True, exist_ok=True)
+    stitched = work / "edge-narration.wav"
+    voice = edge_voice_for_group(group_key)
+    if stitched.is_file() and stitched.stat().st_size > 0 and not force_tts:
+        return stitched, {
+            "provider": "edge-tts-premium-news",
+            "voice": voice,
+            "voice_policy": "female_only" if group_key == "alice-90s-deepdive" else "premium_news_anchor",
+            "voice_reused_from_cache": True,
+            "beat_count": len(beats),
+        }
+    parts: list[Path] = []
+    for index, beat in enumerate(beats, start=1):
+        raw = beat_dir / f"edge-beat-{index:02d}.mp3"
+        if not render_edge_tts(beat, voice, raw):
+            raise RuntimeError(f"Edge TTS failed for {work.name} beat {index}")
+        normalized = beat_dir / f"edge-beat-{index:02d}.wav"
+        normalize_voice(raw, normalized)
+        parts.append(normalized)
+        if index < len(beats):
+            pause = beat_dir / f"edge-pause-{index:02d}.wav"
+            pause_seconds = min(max(0.10 + len(beat.split()) * 0.003, 0.12), 0.28)
+            render_pause(pause, pause_seconds)
+            parts.append(pause)
+    concat_wavs(parts, stitched)
+    return stitched, {
+        "provider": "edge-tts-premium-news",
+        "voice": voice,
+        "voice_policy": "female_only" if group_key == "alice-90s-deepdive" else "premium_news_anchor",
+        "voice_reused_from_cache": False,
+        "beat_count": len(beats),
+    }
+
+
 def redact(value: str) -> str:
     if not value:
         return ""
@@ -417,26 +503,30 @@ def redact(value: str) -> str:
 
 def bed_filter(total_duration: float, style: str) -> str:
     if style == "ambient":
-        volume = 0.060
-        lowpass = 3400
-        modulation = "aphaser=in_gain=0.18:out_gain=0.42:delay=2.0:decay=0.08:speed=0.10"
+        volume = 0.42
+        lowpass = 6200
+        bass_gain = 0.4
     else:
-        volume = 0.045
-        lowpass = 3200
-        modulation = "aphaser=in_gain=0.14:out_gain=0.34:delay=2.0:decay=0.06:speed=0.10"
-    fade_out = min(2.4, max(total_duration / 4.0, 0.4))
+        volume = 0.30
+        lowpass = 6800
+        bass_gain = 0.5
     return (
-        f"anoisesrc=color=pink:amplitude=0.050:r={TARGET_SR}:d={total_duration:.3f},"
-        f"highpass=f={LOW_RUMBLE_HIGHPASS_HZ},highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},lowpass=f={lowpass},{modulation},"
+        "aevalsrc="
+        f"'0.020*sin(2*PI*(220+1.3*sin(2*PI*0.030*t))*t)+"
+        "0.016*sin(2*PI*(330+1.5*sin(2*PI*0.021*t))*t)+"
+        "0.012*sin(2*PI*440*t)+0.009*sin(2*PI*660*t)+"
+        "0.006*sin(2*PI*880*t)'"
+        f":s={TARGET_SR}:d={total_duration:.3f},"
+        f"highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},lowpass=f={lowpass},"
+        f"bass=g={bass_gain}:f=95:w=0.7,acompressor=threshold=-30dB:ratio=1.6:attack=24:release=220:makeup=1.2,"
         f"afade=t=in:st=0:d={min(1.2, max(total_duration / 4.0, 0.2)):.3f},"
-        f"afade=t=out:st={max(total_duration - fade_out, 0):.3f}:d={fade_out:.3f},"
         f"volume={volume}[bed]"
     )
 
 
 def build_mixed_audio(narration: Path | None, total_duration: float, output: Path) -> str:
     if narration is None:
-        filter_complex = f"{bed_filter(total_duration, 'ambient')};[bed]highpass=f={LOW_RUMBLE_HIGHPASS_HZ},highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},alimiter=limit=0.83[a]"
+        filter_complex = f"{bed_filter(total_duration, 'ambient')};[bed]highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},loudnorm=I=-22:LRA=8:TP=-2.5,alimiter=limit=0.83[a]"
         run(
             "ffmpeg",
             "-y",
@@ -466,11 +556,15 @@ def build_mixed_audio(narration: Path | None, total_duration: float, output: Pat
 
     filter_complex = (
         f"[0:a]{voice_prep},afade=t=in:st=0:d=0.35,afade=t=out:st={max(target_voice - 0.6, 0):.3f}:d=0.6,"
-        f"highpass=f={LOW_RUMBLE_HIGHPASS_HZ},highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},acompressor=threshold=-22dB:ratio=2.4:attack=18:release=260:makeup=2.0,"
-        f"alimiter=limit=0.88[vo0];"
+        f"highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},acompressor=threshold=-23dB:ratio=2.1:attack=12:release=190:makeup=2.7,"
+        f"loudnorm=I=-17:LRA=8:TP=-2.0,alimiter=limit=0.88[vo0];"
         f"[vo0]adelay={NARRATION_START_DELAY_MS}|{NARRATION_START_DELAY_MS},apad,atrim=0:{total_duration:.3f},volume=1.10[vo];"
         f"{bed_filter(total_duration, 'narration')};"
-        f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},alimiter=limit=0.90[a]"
+        f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
+        "acompressor=threshold=-21dB:ratio=1.7:attack=12:release=180:makeup=1.1,loudnorm=I=-16:LRA=7:TP=-1.8,alimiter=limit=0.90[main];"
+        f"aevalsrc='0.022*sin(2*PI*440*t)+0.017*sin(2*PI*660*t)':s={TARGET_SR}:d={total_duration:.3f},"
+        "volume=1.0[floor];"
+        "[main][floor]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.90[a]"
     )
     run(
         "ffmpeg",
@@ -605,6 +699,29 @@ def audio_quality(path: Path) -> dict[str, Any]:
     else:
         low_tone_peak_hz = 0.0
         low_tone_prominence_db = 0.0
+    frame_samples = max(int(TARGET_SR * 0.25), 1)
+    frame_count = max(math.ceil(samples.size / frame_samples), 1)
+    padded = np.pad(samples, (0, frame_count * frame_samples - samples.size))
+    rms_frames = np.sqrt(np.mean(padded.reshape(frame_count, frame_samples) ** 2, axis=1))
+    silent = rms_frames < (10 ** (SILENCE_GATE_DBFS / 20.0))
+    max_silent_frames = 0
+    current_silent_frames = 0
+    for value in silent:
+        if bool(value):
+            current_silent_frames += 1
+            max_silent_frames = max(max_silent_frames, current_silent_frames)
+        else:
+            current_silent_frames = 0
+    non_silent_indexes = np.where(~silent)[0]
+    if non_silent_indexes.size:
+        first_audible_seconds = float(non_silent_indexes[0] * frame_samples / TARGET_SR)
+        last_audible_end_seconds = float(min((non_silent_indexes[-1] + 1) * frame_samples / TARGET_SR, samples.size / TARGET_SR))
+    else:
+        first_audible_seconds = samples.size / TARGET_SR
+        last_audible_end_seconds = 0.0
+    total_seconds = samples.size / TARGET_SR
+    max_silence_seconds = max_silent_frames * frame_samples / TARGET_SR
+    tail_silence_seconds = max(0.0, total_seconds - last_audible_end_seconds)
     status = "pass"
     reasons: list[str] = []
     if peak > 0.98:
@@ -625,6 +742,15 @@ def audio_quality(path: Path) -> dict[str, Any]:
     if low_tone_peak_hz <= 280 and low_tone_prominence_db > 9.0 and low_bass_ratio > 0.020:
         status = "fail"
         reasons.append("low_frequency_tonal_artifact")
+    if max_silence_seconds > MAX_SILENCE_SECONDS:
+        status = "fail"
+        reasons.append("audio_coverage_gap")
+    if first_audible_seconds > MAX_EDGE_SILENCE_SECONDS:
+        status = "fail"
+        reasons.append("audio_starts_late")
+    if tail_silence_seconds > MAX_EDGE_SILENCE_SECONDS:
+        status = "fail"
+        reasons.append("audio_ends_early")
     return {
         "status": status,
         "reasons": reasons,
@@ -638,6 +764,10 @@ def audio_quality(path: Path) -> dict[str, Any]:
         "voice_to_low_db": round(voice_to_low_db, 2),
         "low_tone_peak_hz": round(low_tone_peak_hz, 1),
         "low_tone_peak_prominence_db": round(low_tone_prominence_db, 2),
+        "silence_gate_dbfs": SILENCE_GATE_DBFS,
+        "max_silence_seconds": round(max_silence_seconds, 3),
+        "first_audible_seconds": round(first_audible_seconds, 3),
+        "tail_silence_seconds": round(tail_silence_seconds, 3),
     }
 
 
@@ -647,7 +777,10 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     provider_meta: dict[str, Any] = {"provider": "first_party_audio_bed", "voice_id_redacted": ""}
     narration_path: Path | None = None
     if group.narration:
-        narration_path, provider_meta = render_unmixr_narration(group.key, group.narration, work, force_tts=force_tts)
+        if LEGACY.unmixr_config() and group.key != "alice-90s-deepdive" and not prefer_edge_tts():
+            narration_path, provider_meta = render_unmixr_narration(group.key, group.narration, work, force_tts=force_tts)
+        else:
+            narration_path, provider_meta = render_edge_narration(group.key, group.narration, work, force_tts=force_tts)
     file_receipts: list[dict[str, Any]] = []
     for video in group.files:
         total_duration = duration(video)
@@ -678,6 +811,8 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     for receipt in file_receipts:
         if receipt["audio_streams"] != 1 or receipt["video_streams"] != 1 or receipt["quality"].get("status") != "pass":
             status = "fail"
+    if group.key == "alice-90s-deepdive" and str(provider_meta.get("voice_policy") or "") != "female_only":
+        status = "fail"
     return {
         "group_key": group.key,
         "status": status,
@@ -691,7 +826,7 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Regenerate public Chummer video audio with Unmixr narration and hard audio QA.")
+    parser = argparse.ArgumentParser(description="Regenerate public Chummer video audio with premium narration and hard audio QA.")
     parser.add_argument("--only", default="", help="Comma-separated group keys or file names.")
     parser.add_argument("--audit-only", action="store_true", help="Only audit current audio quality.")
     parser.add_argument("--force-tts", action="store_true", help="Regenerate Unmixr narration even when a cached narration WAV exists.")
@@ -716,8 +851,6 @@ def main() -> int:
                 )
             receipts.append({"group_key": group.key, "mode": group.mode, "files": files})
     else:
-        if not LEGACY.unmixr_config():
-            raise SystemExit("UNMIXR_API_KEY and UNMIXR_VOICE_ID are required for this rebuild.")
         receipts = [rebuild_group(group, force_tts=args.force_tts) for group in groups]
 
     status = "pass"
@@ -740,9 +873,22 @@ def main() -> int:
             "group_count": len(receipts),
             "file_count": sum(len(group.get("files", [])) for group in receipts),
         },
+        "hard_exit_gate": {
+            "applies_to": "all public video files selected by this script; horizon manifest MP4s are the publication-critical subset",
+            "duration_seconds_min": 89.5,
+            "duration_seconds_max": 90.5,
+            "audio_streams_required": 1,
+            "video_streams_required": 1,
+            "max_silence_seconds_at_gate_dbfs": MAX_SILENCE_SECONDS,
+            "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
+            "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
+            "silence_gate_dbfs": SILENCE_GATE_DBFS,
+            "alice_voice_policy": "female_only",
+            "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed; noise-bed-only output is rejected by review policy",
+        },
         "provider_posture": {
-            "narration_provider": UNMIXR_PROVIDER,
-            "unmixr_required": not args.audit_only,
+            "narration_provider": "edge-tts-premium-news; optional Unmixr when configured except Alice female-only override",
+            "unmixr_required": False,
             "non_narrated_mode": "clean first-party cinematic ambient bed only when no narration source exists",
             "artifact_filters": {
                 "notch_hz": 11730,
@@ -754,6 +900,8 @@ def main() -> int:
             "voice_selection": {
                 "default_voice_env_order": list(DEFAULT_VOICE_ENV_KEYS),
                 "alice_voice_env_order": list(VOICE_ENV_BY_GROUP["alice-90s-deepdive"]),
+                "default_edge_voice": PREMIUM_NEWS_VOICE,
+                "alice_edge_voice": ALICE_PREMIUM_NEWS_VOICE,
             },
         },
         "groups": receipts,

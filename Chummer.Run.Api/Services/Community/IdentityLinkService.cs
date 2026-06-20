@@ -14,7 +14,8 @@ public sealed class IdentityLinkService
 
     private static readonly string[] SupportedChannels =
     {
-        "telegram_official_bot"
+        "telegram_official_bot",
+        "whatsapp_official_business"
     };
 
     private static readonly string[] FutureCapabilities =
@@ -287,6 +288,7 @@ public sealed class IdentityLinkService
         var subjectId = AccountService.NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
         var channelKind = NormalizeChannelKind(request.ChannelKind);
         var channelHandle = AccountService.NormalizeOptional(request.ChannelHandle) ?? channelKind;
+        var normalizedHandle = NormalizeOptionalChannelHandle(channelKind, channelHandle);
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
 
@@ -299,22 +301,24 @@ public sealed class IdentityLinkService
             var status = channelKind switch
             {
                 "telegram_official_bot" => "pending_verification",
+                "whatsapp_official_business" => "linked",
                 "telegram_user_bot" => "future_capability",
                 _ => "linked"
             };
             var note = channelKind switch
             {
                 "telegram_official_bot" => "Telegram companion linking stays pending until the official bot confirms the account handshake.",
+                "whatsapp_official_business" => "WhatsApp companion linking is configured as a connected operator destination.",
                 "telegram_user_bot" => "Bring-your-own Telegram bots are intentionally deferred until ownership, verification, and policy controls are stronger.",
                 _ => null
             };
-            var official = channelKind == "telegram_official_bot";
+            var official = channelKind is "telegram_official_bot" or "whatsapp_official_business";
 
             if (existingIndex >= 0)
             {
                 var updated = _store.ChannelLinks[existingIndex] with
                 {
-                    DisplayLabel = channelHandle,
+                    DisplayLabel = normalizedHandle,
                     Status = status,
                     NotificationsEnabled = request.NotificationsEnabled,
                     UpdatedAtUtc = now,
@@ -329,7 +333,7 @@ public sealed class IdentityLinkService
                 ChannelLinkId: AccountService.NewId("chn"),
                 UserId: user.UserId,
                 ChannelKind: channelKind,
-                DisplayLabel: channelHandle,
+                DisplayLabel: normalizedHandle,
                 Status: status,
                 OfficialChannel: official,
                 NotificationsEnabled: request.NotificationsEnabled,
@@ -340,6 +344,101 @@ public sealed class IdentityLinkService
             _store.PersistLocked();
             return created;
         }
+    }
+
+    public ChannelLinkDto LinkChannelToExecutiveAssistant(string channelKind, LinkChannelToExecutiveAssistantRequest request)
+    {
+        var subjectId = AccountService.NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
+        var normalizedChannelKind = NormalizeChannelKind(channelKind);
+        var requestedChannelHandle = NormalizeOptionalChannelHandle(
+            normalizedChannelKind,
+            AccountService.NormalizeOptional(request.ChannelHandle));
+        var user = _accounts.EnsureUser(subjectId, subjectId);
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            var existingIndex = _store.ChannelLinks.FindIndex(link =>
+                string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.ChannelKind, normalizedChannelKind, StringComparison.OrdinalIgnoreCase));
+
+            if (existingIndex < 0)
+            {
+                if (requestedChannelHandle is null)
+                {
+                    throw new InvalidOperationException(
+                        $"No existing {normalizedChannelKind} channel is linked for this account. Save a channel handle first or send it in the request.");
+                }
+
+                var created = new ChannelLinkDto(
+                    ChannelLinkId: AccountService.NewId("chn"),
+                    UserId: user.UserId,
+                    ChannelKind: normalizedChannelKind,
+                    DisplayLabel: requestedChannelHandle,
+                    Status: "ea_linked",
+                    OfficialChannel: normalizedChannelKind is "telegram_official_bot" or "whatsapp_official_business",
+                    NotificationsEnabled: true,
+                    CreatedAtUtc: now,
+                    UpdatedAtUtc: now,
+                    Note: "Executive Assistant is now linked to this channel handle.");
+
+                _store.ChannelLinks.Add(created);
+                _store.PersistLocked();
+                return created;
+            }
+
+            var existing = _store.ChannelLinks[existingIndex];
+            var displayLabel = requestedChannelHandle
+                ?? NormalizeOptionalChannelHandle(normalizedChannelKind, existing.DisplayLabel)
+                ?? existing.DisplayLabel;
+
+            var updated = existing with
+            {
+                DisplayLabel = displayLabel,
+                Status = "ea_linked",
+                NotificationsEnabled = existing.NotificationsEnabled,
+                UpdatedAtUtc = now,
+                Note = "Executive Assistant is now linked to this channel."
+            };
+
+            _store.ChannelLinks[existingIndex] = updated;
+            _store.PersistLocked();
+            return updated;
+        }
+    }
+
+    public ChannelDeepLinkResponse GetChannelDeepLink(string subjectId, string channelKind, string? channelHandle)
+    {
+        var normalizedSubjectId = AccountService.NormalizeRequired(subjectId, nameof(subjectId));
+        var normalizedChannelKind = NormalizeChannelKind(channelKind);
+        var user = _accounts.EnsureUser(normalizedSubjectId, normalizedSubjectId);
+
+        string? resolvedHandle;
+        lock (_store.Gate)
+        {
+            var stored = _store.ChannelLinks.FirstOrDefault(link =>
+                string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.ChannelKind, normalizedChannelKind, StringComparison.OrdinalIgnoreCase));
+
+            resolvedHandle = AccountService.NormalizeOptional(channelHandle) ?? stored?.DisplayLabel;
+        }
+
+        if (resolvedHandle is null)
+        {
+            throw new ArgumentException($"A channel handle is required for {normalizedChannelKind}.");
+        }
+
+        var normalizedHandle = NormalizeOptionalChannelHandle(normalizedChannelKind, resolvedHandle)
+            ?? throw new ArgumentException($"A valid channel handle is required for {normalizedChannelKind}.");
+
+        var (normalizedChannelHandle, deepLink, alternateDeepLink) = BuildChannelDeepLink(normalizedChannelKind, normalizedHandle);
+
+        return new ChannelDeepLinkResponse(
+            ChannelKind: normalizedChannelKind,
+            ChannelHandle: normalizedChannelHandle,
+            DeepLink: deepLink,
+            QrImageUrl: BuildQrImageUrl(deepLink),
+            AlternateDeepLink: alternateDeepLink);
     }
 
     private static LinkedIdentityDto RedactIdentityForSummary(LinkedIdentityDto link)
@@ -416,6 +515,139 @@ public sealed class IdentityLinkService
         return "recovery_unset";
     }
 
+    private static (string NormalizedHandle, string DeepLink, string? AlternateDeepLink) BuildChannelDeepLink(string channelKind, string rawHandle)
+    {
+        return channelKind switch
+        {
+            "telegram_official_bot" => BuildTelegramDeepLink(rawHandle),
+            "whatsapp_official_business" => BuildWhatsappDeepLink(rawHandle),
+            "telegram_user_bot" => BuildTelegramDeepLink(rawHandle),
+            _ => throw new ArgumentException($"Unsupported channel kind '{channelKind}'.")
+        };
+    }
+
+    private static string BuildQrImageUrl(string deepLink)
+        => $"https://api.qrserver.com/v1/create-qr-code/?size=640x640&margin=16&data={Uri.EscapeDataString(deepLink)}";
+
+    private static (string NormalizedHandle, string DeepLink, string? AlternateDeepLink) BuildTelegramDeepLink(string rawHandle)
+    {
+        var normalizedHandle = NormalizeTelegramHandle(rawHandle);
+        var deepLink = $"https://t.me/{Uri.EscapeDataString(normalizedHandle)}";
+        return (normalizedHandle, deepLink, $"https://telegram.me/{Uri.EscapeDataString(normalizedHandle)}");
+    }
+
+    private static (string NormalizedHandle, string DeepLink, string? AlternateDeepLink) BuildWhatsappDeepLink(string rawHandle)
+    {
+        string digits = NormalizeWhatsappHandle(rawHandle);
+        return (digits, $"https://wa.me/{digits}", $"whatsapp://send?phone={digits}");
+    }
+
+    private static string NormalizeWhatsappHandle(string rawHandle)
+    {
+        var digits = new string(rawHandle.Where(char.IsDigit).ToArray());
+        if (digits.Length < 7)
+        {
+            throw new ArgumentException("WhatsApp number must include country code and at least 7 digits.");
+        }
+
+        return digits;
+    }
+
+    private static string NormalizeChannelHandleForDisplay(string channelKind, string rawHandle)
+        => channelKind switch
+        {
+            "whatsapp_official_business" => NormalizeWhatsappHandle(rawHandle),
+            "telegram_official_bot" => NormalizeTelegramHandle(rawHandle),
+            "telegram_user_bot" => NormalizeTelegramHandle(rawHandle),
+            _ => rawHandle.Trim()
+        };
+
+    private static string? NormalizeOptionalChannelHandle(string channelKind, string? rawHandle)
+        => string.IsNullOrWhiteSpace(rawHandle)
+            ? null
+            : NormalizeChannelHandleForDisplay(channelKind, rawHandle);
+
+    private static string NormalizeTelegramHandle(string rawHandle)
+    {
+        string trimmed = rawHandle.Trim();
+        if (trimmed.StartsWith("@", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[1..];
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri)
+            && uri.Host.StartsWith("t.me", StringComparison.OrdinalIgnoreCase))
+        {
+            string path = uri.AbsolutePath.Trim('/');
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path.Split('/', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+            }
+
+            string queryHandle = TryReadQueryParameter(uri.Query, "start") ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(queryHandle))
+            {
+                return queryHandle.TrimStart('@');
+            }
+        }
+
+        if (trimmed.StartsWith("tg://", StringComparison.OrdinalIgnoreCase)
+            && Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? deepLinkUri))
+        {
+            string domain = deepLinkUri.Host;
+            if (!string.IsNullOrWhiteSpace(domain) && !string.Equals(domain, "resolve", StringComparison.OrdinalIgnoreCase))
+            {
+                return domain;
+            }
+
+            string queryDomain = TryReadQueryParameter(deepLinkUri.Query, "domain") ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(queryDomain))
+            {
+                return queryDomain.TrimStart('@');
+            }
+        }
+
+        if (trimmed.Contains(' ') )
+        {
+            trimmed = trimmed.Replace(" ", string.Empty);
+        }
+
+        if (trimmed.Length == 0)
+        {
+            throw new ArgumentException("Telegram handle cannot be empty.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? TryReadQueryParameter(string query, string key)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return null;
+        }
+
+        var normalizedKey = key.Trim().ToLowerInvariant();
+        foreach (string pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int separator = pair.IndexOf('=');
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            string candidateKey = Uri.UnescapeDataString(pair[..separator]).ToLowerInvariant();
+            if (!string.Equals(candidateKey, normalizedKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return Uri.UnescapeDataString(pair[(separator + 1)..]);
+        }
+
+        return null;
+    }
+
     private static string NormalizeProvider(string value)
     {
         var provider = AccountService.NormalizeRequired(value, nameof(value)).ToLowerInvariant();
@@ -434,6 +666,7 @@ public sealed class IdentityLinkService
         {
             "telegram_official_bot" => normalized,
             "telegram_user_bot" => normalized,
+            "whatsapp_official_business" => normalized,
             _ => throw new ArgumentException($"Unsupported channel kind '{normalized}'.")
         };
     }
