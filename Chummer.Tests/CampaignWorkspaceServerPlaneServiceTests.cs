@@ -8555,11 +8555,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
                 Assert.Contains("rule-environment:sr6-preview->sr6-mainline", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("source-hints:sources:sr6-core|house-rules:reputation_house_rules", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.NextSafeAction);
-                Assert.Contains("Open workflow.", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
+                Assert.StartsWith("Open ", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("workflow.", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.CompatibilitySummary);
                 Assert.Contains("Compatibility stays pinned to", output.CompatibilitySummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.LineageSummary);
-                Assert.Contains("governed build lane", output.LineageSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("governed character path", output.LineageSummary!, StringComparison.OrdinalIgnoreCase);
             });
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(handoff.RuleEnvironmentDiff);

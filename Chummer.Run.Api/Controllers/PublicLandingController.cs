@@ -5248,24 +5248,24 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/onramp",
             title: "ONRAMP",
-            description: "Guided starter lane, recovery posture, and first-session continuity without fake automation.",
-            eyebrow: "Guided mastery horizon",
+            description: "Guided first session, recovery posture, and continuity without fake automation.",
+            eyebrow: "Guided start",
             heading: "ONRAMP",
-            intro: "ONRAMP now ships a bounded first-party starter lane: public-safe starter and recovery packets stay readable, while signed-in starter workspace, continuity restore, and first-session history stay on named campaign-spine rails.",
+            intro: "ONRAMP keeps first-session setup calm: public starter and recovery packets stay readable, while signed-in workspace, continuity restore, and session history stay attached to your account.",
             boundaryLine: "Guided starter surface only. ONRAMP does not auto-build characters, invent legality, or let tutorial theater outrank core receipts and signed-in restore truth.",
-            summaryPoints: ["Starter lane packet", "Recovery lane packet", "Signed-in starter desk"],
+            summaryPoints: ["Starter packet", "Recovery packet", "Signed-in workspace"],
             documents:
             [
                 new MediaArtifactDocument(
                     "starter_lane",
-                    "Starter lane packet",
+                    "Starter packet",
                     "Inspect the public-safe starter contract before treating ONRAMP like an automatic build wizard.",
                     "/onramp/packets/starter_lane.md",
                     "/onramp/packets/starter_lane.json",
                     ["Starter workspace", "First playable session", "Next safe action", "Signed-in desk"]),
                 new MediaArtifactDocument(
                     "recovery_lane",
-                    "Recovery lane packet",
+                    "Recovery packet",
                     "Inspect the restore and continuity contract that keeps guided setup tied to first-party account truth.",
                     "/onramp/packets/recovery_lane.md",
                     "/onramp/packets/recovery_lane.json",
@@ -6141,7 +6141,7 @@ public sealed class PublicLandingController : Controller
         [
             new(
                 Label: "Signed-in starter desk",
-                Summary: $"{receipt.Counts.Campaigns} campaign(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Dossiers} dossier(s) are currently visible on the starter lane.",
+                Summary: $"{receipt.Counts.Campaigns} campaign(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Dossiers} dossier(s) are currently visible on the starter path.",
                 Href: "/account/onramp",
                 StatusLabel: "Signed-in"),
             new(
@@ -6770,8 +6770,8 @@ ONRAMP keeps guided recovery on first-party rails.
 
 ## Public board
 
-* Starter lane packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
-* Recovery lane packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
+* Starter packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
+* Recovery packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
 
 ## Signed-in desk
 
@@ -6795,12 +6795,12 @@ ONRAMP does not claim hidden automation, auto-build authority, or off-account re
         return $$"""
 # ONRAMP starter packet
 
-ONRAMP now ships a first-party guided starter lane.
+ONRAMP now ships a first-party guided starter packet.
 
 ## Public board
 
-* Starter lane packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
-* Recovery lane packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
+* Starter packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
+* Recovery packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
 
 ## Signed-in desk
 
@@ -7669,10 +7669,10 @@ Boundary:
         if ((installLinking.ClaimedInstallations?.Count ?? 0) > 0 && hasNoCampaignWork)
         {
             return new HomePrimaryActionViewModel(
-                "Starter lane",
-                "Open work and seed your first playable session",
-                "Your install is linked. Open the work lane to move from setup into the next safe session surface before returning to optional tasks.",
-                "Open work",
+                "First workspace",
+                "Create your first playable session",
+                "Your install is linked. Open your workspace to move from setup into the next safe session before returning to optional tasks.",
+                "Open your workspace",
                 "/home/work",
                 "primary");
         }

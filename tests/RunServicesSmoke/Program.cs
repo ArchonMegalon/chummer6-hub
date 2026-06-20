@@ -2082,12 +2082,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!landingSource.Contains("future-strip", StringComparison.Ordinal), "landing should move future-lane editorial material off the main front-door spine.");
     Assert(!landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should keep the full weekly trust pulse on deeper status surfaces instead of restating it on the front door.");
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
-    Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter lane from the grounded first playable session truth already attached to the campaign spine.");
-    Assert(landingSource.Contains("Open starter lane on Home", StringComparison.Ordinal), "landing should keep a direct signed-in starter-lane route instead of forcing repo knowledge.");
+    Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter path from the first playable session truth already attached to the campaign spine.");
+    Assert(landingSource.Contains("Open first session on Home", StringComparison.Ordinal), "landing should keep a direct signed-in first-session route instead of forcing repo knowledge.");
     Assert(landingSource.Contains("Open first playable session proof", StringComparison.Ordinal), "landing should keep a direct route from the front door into the bounded first-session proof drawer.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter lane should reuse signed-in fix-availability truth instead of tutorial prose.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter lane should reuse signed-in caution truth instead of tutorial prose.");
-    Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter lane should keep install-support follow-through on the same governed front-door rail.");
+    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter path should reuse signed-in fix-availability truth instead of tutorial prose.");
+    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter path should reuse signed-in caution truth instead of tutorial prose.");
+    Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter path should keep install-support follow-through on the same front-door rail.");
     var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
     Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
     Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
@@ -2180,9 +2180,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("showAccessSection && (!showOnboarding || accessSurfaceReady)", StringComparison.Ordinal), "home access should unlock when the account already has real device or support truth, even if the softer onboarding flag is still incomplete.");
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
-    Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when starter lane can be seeded, instead of hiding the route behind a stale onboarding bit.");
-    Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-lane seeding on the empty workspace first-run path.");
-    Assert(homeSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "home work should wire starter-lane seeding to the campaign-spine starter endpoint.");
+    Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when the starter path can be seeded, instead of hiding the route behind a stale onboarding bit.");
+    Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-path seeding on the empty workspace first-run path.");
+    Assert(homeSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "home work should wire starter-path seeding to the campaign-spine starter endpoint.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
@@ -2342,9 +2342,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current release checks.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the caution lane.");
     Assert(accountSource.Contains("#signed-in-trust-status", StringComparison.Ordinal), "account member guidance should deep-link back to the shared signed-in trust panel instead of inventing a second trust page.");
-    Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
-    Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-lane button on the empty-state route.");
-    Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-lane feedback on the empty-state route.");
+    Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-path follow-through when the shared campaign view is still empty.");
+    Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-path button on the empty-state route.");
+    Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-path feedback on the empty-state route.");
     Assert(accountSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "account work should reuse the campaign-spine starter endpoint instead of inventing a second onboarding API.");
     Assert(accountSource.Contains("selected-first-playable-session", StringComparison.Ordinal), "account work should keep a bounded first-session proof drawer on the selected shared campaign view.");
     Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "account work should surface first-session campaign-start proof directly on the selected shared campaign view.");
@@ -3039,7 +3039,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(
         macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("macOS", StringComparison.OrdinalIgnoreCase) == true
         && macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary.Contains("does not publish", StringComparison.OrdinalIgnoreCase),
-        "downloads page should explain that the macOS build lane is not yet on the public shelf.");
+        "downloads page should explain that the macOS build is not yet on the public shelf.");
     Assert(
         macDownloadsModel.ReleaseExperience.PlatformAvailability.Any(static item =>
             string.Equals(item.PlatformId, "linux", StringComparison.OrdinalIgnoreCase)

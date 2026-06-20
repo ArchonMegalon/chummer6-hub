@@ -350,7 +350,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (ShouldUseBuildJourneyTruth(tokens))
         {
-            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");
+            Add("open_work", "Open your workspace", "/account/work", "Review the current character path, dossier, and campaign return point.");
         }
 
         return actions.Values.ToList();

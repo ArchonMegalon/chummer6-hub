@@ -27,6 +27,7 @@ public static partial class PublicFacingCopyHumanizer
         ("operator lane", "user path"),
         ("operator-facing", "private"),
         ("operator view", "account view"),
+        ("starter-lane", "starter path"),
         ("starter lane", "starter path"),
     ];
 

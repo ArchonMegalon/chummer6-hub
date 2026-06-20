@@ -5197,7 +5197,7 @@ public sealed class CampaignSpineService
                     DossierId: dossier.DossierId,
                     CampaignId: dossier.CampaignId,
                     Title: $"{dossier.DisplayName} build path",
-                    Summary: "The chosen build lane now lands in living dossier and campaign return truth instead of a disposable comparison card.",
+                    Summary: "The chosen character path now lands in the dossier and campaign return point instead of a disposable comparison card.",
                     VariantLabel: variantLabel,
                     ProgressionLabel: progressionLabel,
                     ExplainEntryId: explainReceiptId,
@@ -5260,12 +5260,12 @@ public sealed class CampaignSpineService
                 projectionIdSuffix: "character-template",
                 kind: "character_template",
                 label: "Character template export",
-                summary: "Save this build lane as a reusable character template without forking dossier truth.",
+                summary: "Save this character path as a reusable template without forking dossier truth.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.templates.character to save a governed character-template export."),
+                nextSafeAction: "Open character template export when you are ready to save this path."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "json-exchange",
@@ -5276,7 +5276,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.exchange.json before publishing JSON exchange payloads."),
+                nextSafeAction: "Open JSON exchange export before publishing a transfer file."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "foundry-export",
@@ -5287,7 +5287,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.exchange.foundry before publishing exchange payloads."),
+                nextSafeAction: "Open Foundry exchange export before publishing a transfer file."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "sheet-viewer",
@@ -5298,7 +5298,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export."),
+                nextSafeAction: "Open character sheet preview before print or export."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "print-pdf-export",
@@ -5309,7 +5309,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff."),
+                nextSafeAction: "Open PDF export to generate the current print-ready sheet."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "replay-timeline",
@@ -5320,7 +5320,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.replay.timeline before publishing replay timeline artifacts."),
+                nextSafeAction: "Open replay timeline export before publishing the replay."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "session-recap",
@@ -5331,7 +5331,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.recap.session before publishing session recap artifacts."),
+                nextSafeAction: "Open session recap export before publishing the recap."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "run-module",
@@ -5342,7 +5342,7 @@ public sealed class CampaignSpineService
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
                 sourceHintAuditToken: sourceHintAuditToken,
-                nextSafeAction: "Open workflow.module.run before publishing run-module artifacts.")
+                nextSafeAction: "Open run module export before publishing the module.")
         };
 
         var carryForwardOutputs = dossier.Projections
@@ -5443,10 +5443,10 @@ public sealed class CampaignSpineService
             PublicationSummary: $"Lane {laneLabel} is ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); source hints {sourceHintAuditToken}.",
             CreatorPublicationId: null,
             NextSafeAction: nextSafeAction,
-            ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
+            ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this character follow-through.",
             AuditSummary: $"lane:{kind}; rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}; source-hints:{sourceHintAuditToken}",
             CompatibilitySummary: $"Compatibility stays pinned to {runtimeFingerprint} with rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}) and source hints {sourceHintAuditToken}.",
-            LineageSummary: $"{dossier.DossierId} keeps {kind} on the governed build lane with explain receipt {explainReceiptId}.");
+            LineageSummary: $"{dossier.DossierId} keeps {kind} on the governed character path with explain receipt {explainReceiptId}.");
     }
 
     private static BuildLabRuleEnvironmentDiffProjection BuildBuildLabRuleEnvironmentDiff(
