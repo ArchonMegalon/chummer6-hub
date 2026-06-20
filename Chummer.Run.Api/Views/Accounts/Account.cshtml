@@ -2052,11 +2052,11 @@
                                             <strong>@selectedWorkspaceRosterTransferPlan.DossierOptions.Count</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Target operator groups</span>
+                                            <span>Target groups</span>
                                             <strong>@selectedWorkspaceRosterTransferPlan.TargetGroups.Count</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Source campaign</span>
+                                            <span>Original campaign</span>
                                             <strong>@selectedWorkspaceRosterTransferPlan.SourceCampaignName</strong>
                                         </div>
                                     </div>
@@ -2076,7 +2076,7 @@
                                             <select id="rosterTransferGroup">
                                                 @foreach (var target in selectedWorkspaceRosterTransferPlan.TargetGroups)
                                                 {
-                                                    <option value="@target.GroupId">@target.GroupName · @HumanizeStatus(target.OperatorRole, "Operator")</option>
+                                                    <option value="@target.GroupId">@target.GroupName · @HumanizeStatus(target.OperatorRole, "Member")</option>
                                                 }
                                             </select>
                                         </div>
@@ -2089,7 +2089,7 @@
                                             <input id="rosterTransferCampaignTitle" placeholder="Use the target group's active campaign or create a transfer campaign" />
                                         </div>
                                         <div class="field">
-                                            <label for="rosterTransferNote">Operator note</label>
+                                            <label for="rosterTransferNote">Move note</label>
                                             <textarea id="rosterTransferNote" rows="3" placeholder="Why is this dossier moving between rosters, campaigns, or owners?"></textarea>
                                         </div>
                                         <button class="button-like button-like--secondary" type="submit">Transfer roster state</button>
@@ -2436,7 +2436,7 @@
                                         </select>
                                     </div>
                                     <div class="field">
-                                        <label for="travelPrefetchNote">Operator note</label>
+                                        <label for="travelPrefetchNote">Travel note</label>
                                         <textarea id="travelPrefetchNote" rows="3" placeholder="Why are you staging this travel-safe prefetch set?"></textarea>
                                     </div>
                                     <div id="travelPrefetchPreview" class="settings-summary-list" hidden></div>
@@ -2484,7 +2484,7 @@
                                         </div>
                                     }
                                     <div class="field">
-                                        <label for="prepLaunchNote">Operator note</label>
+                                        <label for="prepLaunchNote">Prep note</label>
                                         <textarea id="prepLaunchNote" rows="3" placeholder="Why are you launching this prep packet now?"></textarea>
                                     </div>
                                     <div id="prepLaunchTargetPreview" class="settings-summary-list" hidden></div>
@@ -2723,7 +2723,7 @@
                                             <input id="aftermathPackageTitle" maxlength="128" placeholder="Generated from run and package kind by default" />
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageNote">Operator note</label>
+                                            <label for="aftermathPackageNote">Package note</label>
                                             <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session continuity should stay grounded in this package?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
@@ -2886,7 +2886,7 @@
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.SourceHintSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Source-linked hints</span>
+                                    <span>Linked hints</span>
                                     <strong>@selectedBuildLabHandoff.SourceHintSummary</strong>
                                 </div>
                             }
@@ -2934,7 +2934,7 @@
                         }
                         @if (selectedBuildLabHandoff.SourceHintLines is { Count: > 0 })
                         {
-                            <p><strong>Source-linked hints:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
+                            <p><strong>Linked hints:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.BuildSurfaceLines is { Count: > 0 })
                         {
@@ -3757,13 +3757,13 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
                                     {
-                                        <span> Source-linked hints: @handoff.SourceHintSummary.</span>
+                                        <span> Linked hints: @handoff.SourceHintSummary.</span>
                                     }
                                     @if (handoff.SourceHintLines is { Count: > 0 })
                                     {
                                         foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
                                         {
-                                            <span> Source hint: @sourceHintLine</span>
+                                            <span> Hint: @sourceHintLine</span>
                                         }
                                     }
                                     @if (handoff.RuleEnvironmentDiff is not null)
@@ -3909,7 +3909,7 @@
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
-                        <span>Operator groups</span>
+                        <span>Groups</span>
                         <strong>@communityOpsCount</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -3919,7 +3919,7 @@
                 </div>
                 @if (communityOpsCount == 0)
                 {
-                    <p class="muted-copy">You are not currently the operator for a campaign, creator team, or community group on this account.</p>
+                    <p class="muted-copy">You do not currently manage a campaign, creator team, or community group on this account.</p>
                 }
                 else
                 {
@@ -4005,7 +4005,7 @@
                                     <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Operator watchouts</span>
+                                    <span>Watchouts</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
                             </div>
@@ -4047,7 +4047,7 @@
                                     <li>Support escalation: @op.SupportEscalationSummary</li>
                                     @if (op.RecentEventSummaries.Count == 0)
                                     {
-                                        <li>No reviewed season or event records are attached yet.</li>
+                                        <li>No reviewed season or event activity is attached yet.</li>
                                     }
                                     else
                                     {
@@ -4476,7 +4476,7 @@
                             <article class="compact-rail__item">
                                 <div class="compact-rail__copy">
                                     <h3>Impact journal</h3>
-                                    <p>@(activity.Summary ?? "The internal continuity bridge recorded a participation event.")</p>
+                                    <p>@(activity.Summary ?? "A participation event was saved.")</p>
                                     <p><strong>@HumanizeStatus(activity.EventType)</strong> · @activity.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
                                 </div>
                             </article>

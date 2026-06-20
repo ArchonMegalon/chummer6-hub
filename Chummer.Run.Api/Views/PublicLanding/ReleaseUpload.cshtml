@@ -10,8 +10,8 @@
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
             <span class="tag">Mac release one-liner</span>
-            <h2>Run this in your mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload handoff code so non-interactive runners do not stop after the integrity step.</p>
+            <h2>Run this in your Mac release shell</h2>
+            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload handoff code so non-interactive runners do not stop after the integrity step.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -20,7 +20,7 @@
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open bootstrap script</a>
                 </div>
                 <p class="status-copy">This signed-in command contains a short-lived handoff code. Use it in the release shell that will run the bootstrap, and do not paste it into logs or shared chat.</p>
-                <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging artifacts again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
+                <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging files again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
         </div>
@@ -80,9 +80,9 @@
         <span class="tag">What happens next</span>
         <h2>Automatic publication and recovery-aware status</h2>
         <ul class="trust-page-section__list">
-            <li>The upload response validates the bundle and publishes only the target platform artifact to the live downloads shelf.</li>
+            <li>The upload response accepts the bundle and publishes only the target platform file to the live downloads shelf.</li>
             <li>The response returns the install handoff URL and keeps any recovery-only code on the same handoff if setup explicitly enters recovery mode during setup.</li>
-            <li>The promoted artifact appears in the canonical public manifest at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>, while <code>/downloads/releases.json</code> remains the compatibility view.</li>
+            <li>The promoted file appears in the canonical public manifest at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>, while <code>/downloads/releases.json</code> remains the compatibility view.</li>
         </ul>
     </article>
     <article class="release-guidance__item">

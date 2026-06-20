@@ -15,7 +15,7 @@
         <a class="button-like button-like--ghost" href="/feedback">Back to feedback</a>
         <a class="button-like button-like--ghost" href="/feedback/operations">Open aggregate detail</a>
     </div>
-    <p class="muted-copy">Search by source id, dispatch id, recipient ref, address hash, delivery id, delivery message id, or item reference.</p>
+    <p class="muted-copy">Search by item id, message id, recipient ref, address hash, delivery id, or item reference.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Bounded lookup controls">
@@ -30,14 +30,14 @@
             <label class="field" for="feedbackOperationsLookupScope">
                 <span>Scope</span>
                 <select id="feedbackOperationsLookupScope" name="scope">
-                    <option value="all" selected="@(string.Equals(lookup.Scope, "all", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Sources and threads</option>
-                    <option value="source" selected="@(string.Equals(lookup.Scope, "source", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Source records only</option>
+                    <option value="all" selected="@(string.Equals(lookup.Scope, "all", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Items and threads</option>
+                    <option value="source" selected="@(string.Equals(lookup.Scope, "source", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Items only</option>
                     <option value="thread" selected="@(string.Equals(lookup.Scope, "thread", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Recipient threads only</option>
                 </select>
             </label>
             <div class="stacked-actions">
                 <button class="button-like button-like--secondary" type="submit">Open bounded lookup</button>
-                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open lookup artifact</a>
+                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open lookup data</a>
             </div>
         </form>
     </article>
@@ -48,8 +48,8 @@
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Bounded only</span>
-        <h2>Lookup stays inside Chummer records and hashed identity.</h2>
-        <p>No raw delivery payload body, no raw recipient email, and no public claim beyond the stored state.</p>
+        <h2>Lookup stays inside Chummer history and hashed identity.</h2>
+        <p>No raw delivery payload body, no raw recipient email, and no public claim beyond the saved state.</p>
     </article>
 </section>
 
@@ -57,15 +57,15 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Lookup results</p>
         <h2 class="editorial-title">Recent results and exact matches share one public-safe page.</h2>
-        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across source records and recipient threads using stored Chummer identifiers only.</p>
+        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across saved items and recipient threads using Chummer identifiers only.</p>
     </div>
     @if (results.Length == 0)
     {
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">No bounded match</span>
-                <h3>No record or thread matched this query</h3>
-                <p>Try a source id, dispatch id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
+                <h3>No item or thread matched this query</h3>
+                <p>Try an item id, dispatch id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
             </article>
         </div>
     }
@@ -89,7 +89,7 @@
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@result.Href">Open drilldown</a>
-                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open detail artifact</a>
+                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open detail data</a>
                     </div>
                 </article>
             }

@@ -1134,7 +1134,7 @@ else
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
                                                                 {
-                                                                    <span> Source-linked hints: @handoff.SourceHintSummary.</span>
+                                                                    <span> Linked hints: @handoff.SourceHintSummary.</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary))
                                                                 {
@@ -1152,7 +1152,7 @@ else
                                                                 {
                                                                     foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
                                                                     {
-                                                                        <span> Source hint: @sourceHintLine</span>
+                                                                        <span> Hint: @sourceHintLine</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.BuildSurfaceLines is { Count: > 0 })

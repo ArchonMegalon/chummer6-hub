@@ -237,6 +237,16 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         " Source: @HumanizeStatus(consequence.Receipts[0].SourceKind",
         " Source: @answer.ProvenanceLabel",
         " Source: @publication.ProvenanceSummary",
+        "Target operator groups",
+        "Source campaign",
+        "Operator note",
+        "Source-linked hints",
+        "Source hint:",
+        "Operator groups",
+        "You are not currently the operator",
+        "Operator watchouts",
+        "No reviewed season or event records are attached yet.",
+        "The internal continuity bridge recorded a participation event.",
     ):
         assert forbidden not in account
 
@@ -267,6 +277,16 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Details: @PublicText(item.ProvenanceSummary)" in account
     assert "Details: @PublicText(answer.ProvenanceLabel)" in account
     assert "Details: @PublicText(publication.ProvenanceSummary)" in account
+    assert "Target groups" in account
+    assert "Original campaign" in account
+    assert "Move note" in account
+    assert "Travel note" in account
+    assert "Prep note" in account
+    assert "Package note" in account
+    assert "Linked hints" in account
+    assert "You do not currently manage a campaign" in account
+    assert "No reviewed season or event activity is attached yet." in account
+    assert "A participation event was saved." in account
 
 
 def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
@@ -384,6 +404,8 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
         "Output source: @output.ProvenanceSummary",
         "Source: @answer.ProvenanceLabel",
         "Source: @publication.ProvenanceSummary",
+        "Source-linked hints",
+        "Source hint:",
     ):
         assert forbidden not in combined
 
@@ -394,6 +416,73 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
+    assert "Linked hints" in home
+    assert "Hint: @sourceHintLine" in home
+
+
+def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
+    lookup = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsLookup.cshtml")
+    leaderboards = read("Chummer.Run.Api/Views/Leaderboards/Index.cshtml")
+    combined = "\n".join((lookup, leaderboards))
+
+    for forbidden in (
+        "Search by source id",
+        "Sources and threads",
+        "Source records only",
+        "Chummer records",
+        "stored state",
+        "source records",
+        "No record or thread matched this query",
+        "Open lookup artifact",
+        "Open detail artifact",
+        "<th scope=\"col\">Records</th>",
+    ):
+        assert forbidden not in combined
+
+    assert "Search by item id" in lookup
+    assert "Items and threads" in lookup
+    assert "Items only" in lookup
+    assert "Chummer history" in lookup
+    assert "saved state" in lookup
+    assert "saved items" in lookup
+    assert "No item or thread matched this query" in lookup
+    assert "Open lookup data" in lookup
+    assert "Open detail data" in lookup
+    assert "<th scope=\"col\">Entries</th>" in leaderboards
+
+
+def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
+    codex = read("Chummer.Run.Api/Views/CodexParticipation/Console.cshtml")
+    release_upload = read("Chummer.Run.Api/Views/PublicLanding/ReleaseUpload.cshtml")
+    gm_session = read("Chummer.Run.Api/Views/PublicLanding/GmSessionVenue.cshtml")
+    ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
+    roadmap_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml")
+    combined = "\n".join((codex, release_upload, gm_session, ledger, roadmap_detail))
+
+    for forbidden in (
+        "participation record",
+        "keeps the record",
+        "desktop artifact",
+        "packaging artifacts",
+        "validates the bundle",
+        "platform artifact",
+        "promoted artifact",
+        "campaign record",
+        "Source details",
+        "publication record",
+    ):
+        assert forbidden not in combined
+
+    assert "participation history" in codex
+    assert "keeps the history" in codex
+    assert "desktop app" in release_upload
+    assert "packaging files" in release_upload
+    assert "accepts the bundle" in release_upload
+    assert "platform file" in release_upload
+    assert "promoted file" in release_upload
+    assert "campaign history" in gm_session
+    assert "Details</a>" in ledger
+    assert "publication history" in roadmap_detail
 
 
 def test_package_and_publication_pages_use_activity_and_details_language() -> None:
