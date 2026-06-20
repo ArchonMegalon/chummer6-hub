@@ -175,6 +175,17 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_copy_humanizer_does_not_replace_short_terms_inside_words()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("The plane view mentions an install rail and a lane without proof.");
+
+        Assert.Equal("The plane view mentions a linked copy and a path without status.", cleaned);
+        Assert.DoesNotContain("ppath", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("install rail", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" lane ", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Public_api_sources_do_not_reintroduce_old_human_copy_markers()
     {
         string apiRoot = RepoPaths.FromRoot("Chummer.Run.Api");

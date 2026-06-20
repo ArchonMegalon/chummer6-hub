@@ -61,15 +61,22 @@ public static partial class PublicFacingCopyHumanizer
         string cleaned = value.Trim();
         foreach ((string from, string to) in Replacements)
         {
-            cleaned = cleaned.Replace(from, to, StringComparison.OrdinalIgnoreCase);
+            cleaned = ReplacePhrase(cleaned, from, to);
         }
 
         cleaned = ArticleAiRegex().Replace(cleaned, "a");
         cleaned = StandaloneAiRegex().Replace(cleaned, "help");
         cleaned = ArticleHelpRegex().Replace(cleaned, "help");
+        cleaned = ArticleConsonantReplacementRegex().Replace(cleaned, "a $1");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         return cleaned.Trim();
+    }
+
+    private static string ReplacePhrase(string value, string from, string to)
+    {
+        string pattern = $@"(?<![A-Za-z0-9]){Regex.Escape(from)}(?![A-Za-z0-9])";
+        return Regex.Replace(value, pattern, to, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     public static IReadOnlyList<string> CleanLines(IEnumerable<string>? values)
@@ -93,4 +100,7 @@ public static partial class PublicFacingCopyHumanizer
 
     [GeneratedRegex(@"\b(?:an|a)\s+help\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ArticleHelpRegex();
+
+    [GeneratedRegex(@"\ban\s+(linked|path|status|record|file|service|source|page|tool|roadmap|Chummer)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ArticleConsonantReplacementRegex();
 }
