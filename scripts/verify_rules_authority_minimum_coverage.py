@@ -99,12 +99,58 @@ def rulefact_provider_counts(payload: dict[str, Any]) -> dict[str, int]:
     return counts
 
 
+def registry_schema_failures(ruleset: str, payload: dict[str, Any], declared_count: int, min_rulefacts: int) -> list[str]:
+    failures: list[str] = []
+    if not payload:
+        return [f"{ruleset} rule authority registry is missing"]
+
+    status_values = " ".join(
+        str(payload.get(key) or "")
+        for key in ("status", "final_verdict", "verdict", "status_label")
+    ).lower()
+    if payload.get("superseded") is True or "superseded" in status_values:
+        failures.append(f"{ruleset} rule authority registry is superseded")
+
+    rulefacts = payload.get("rulefacts")
+    if not isinstance(rulefacts, list):
+        failures.append(f"{ruleset} rule authority registry is missing a rulefacts list")
+        actual_count = 0
+    else:
+        actual_count = len(rulefacts)
+        if actual_count != declared_count:
+            failures.append(f"{ruleset} rulefact_count {declared_count} does not match rulefacts list length {actual_count}")
+        if actual_count < min_rulefacts:
+            failures.append(f"{ruleset} rulefacts list length {actual_count} is below minimum {min_rulefacts}")
+        for index, item in enumerate(rulefacts):
+            if not isinstance(item, dict):
+                failures.append(f"{ruleset} rulefact at index {index} is not an object")
+                continue
+            if not str(item.get("id") or "").strip():
+                failures.append(f"{ruleset} rulefact at index {index} has no id")
+            if not str(item.get("provider") or "").strip():
+                failures.append(f"{ruleset} rulefact at index {index} has no provider")
+            item_ruleset = str(item.get("ruleset") or "").strip().lower()
+            if item_ruleset and item_ruleset != ruleset:
+                failures.append(f"{ruleset} rulefact at index {index} declares ruleset {item_ruleset}")
+
+    required_providers = string_list(payload.get("required_providers"))
+    implemented_providers = string_list(payload.get("implemented_providers"))
+    missing_implemented_providers = string_list(payload.get("missing_implemented_providers"))
+    if not required_providers:
+        failures.append(f"{ruleset} rule authority registry declares no required providers")
+    if not implemented_providers:
+        failures.append(f"{ruleset} rule authority registry declares no implemented providers")
+    if missing_implemented_providers:
+        failures.append(f"{ruleset} rule authority registry has missing implemented providers: {', '.join(missing_implemented_providers)}")
+
+    return failures
+
+
 def provider_group_coverage(ruleset: str, payload: dict[str, Any]) -> dict[str, Any]:
     required_providers = set(string_list(payload.get("required_providers")))
     implemented_providers = set(string_list(payload.get("implemented_providers")))
     provider_counts = rulefact_provider_counts(payload)
     declared_providers = required_providers | implemented_providers | set(provider_counts)
-    enforced = bool(declared_providers)
     groups: dict[str, Any] = {}
     missing: list[str] = []
     for group, candidates in REQUIRED_PROVIDER_GROUPS[ruleset].items():
@@ -115,16 +161,14 @@ def provider_group_coverage(ruleset: str, payload: dict[str, Any]) -> dict[str, 
             "candidate_providers": list(candidates),
             "listed_providers": listed,
             "rulefact_count": fact_count,
-            "status": group_status if enforced else "not_enforced",
+            "status": group_status,
         }
-        if not enforced:
-            continue
         if not listed:
             missing.append(f"{ruleset} required provider group {group} is not listed")
         elif fact_count <= 0:
             missing.append(f"{ruleset} required provider group {group} has no rulefacts")
     return {
-        "enforced": enforced,
+        "enforced": True,
         "provider_fact_counts": provider_counts,
         "groups": groups,
         "failures": missing,
@@ -166,11 +210,13 @@ def main() -> int:
         ready_by_completion = bool(completion_entry.get("rule_authority_ready"))
         ready_by_operator = operator_entry.get("status") == "pass" and operator_entry.get("verdict") == expected_verdict
         matrix_has_unexpected_failures = bool(matrix_payload.get("unexpected_failed_gates"))
+        schema_failures = registry_schema_failures(ruleset, payload, count, args.min_rulefacts)
         provider_coverage = provider_group_coverage(ruleset, payload)
         provider_coverage_ready = not provider_coverage["failures"]
         status = (
             "pass"
             if count >= args.min_rulefacts
+            and not schema_failures
             and ready_by_verdict
             and ready_by_completion
             and ready_by_operator
@@ -188,6 +234,7 @@ def main() -> int:
             failures.append(f"{ruleset} operator promoted rule authority gold is not ready")
         if matrix_has_unexpected_failures:
             failures.append(f"{ruleset} verification matrix has unexpected failed gates")
+        failures.extend(schema_failures)
         failures.extend(provider_coverage["failures"])
         rulesets[ruleset] = {
             "path": str(path),
@@ -205,6 +252,7 @@ def main() -> int:
             "verification_matrix_failed_gates": matrix_payload.get("failed_gates", []),
             "verification_matrix_unexpected_failed_gates": matrix_payload.get("unexpected_failed_gates", []),
             "verification_matrix_expected_ready_blockers": matrix_payload.get("expected_ready_blockers", []),
+            "schema_failures": schema_failures,
             "provider_group_coverage": provider_coverage,
             "remaining_gates": blocker_entry.get("remaining_gates", []),
             "status": status,
@@ -239,6 +287,7 @@ def main() -> int:
                     "operator_gold_status": payload["operator_gold_status"],
                     "operator_gold_verdict": payload["operator_gold_verdict"],
                     "remaining_gates": payload["remaining_gates"],
+                    "schema_failures": payload["schema_failures"],
                     "provider_group_failures": payload["provider_group_coverage"]["failures"],
                     "verification_matrix_status": payload["verification_matrix_status"],
                     "verification_matrix_unexpected_failed_gates": payload["verification_matrix_unexpected_failed_gates"],

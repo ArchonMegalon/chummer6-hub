@@ -19,6 +19,34 @@ def load_module():
     return module
 
 
+def ready_registry(module, ruleset: str, verdict: str, *, count: int = 120, omit_provider: str | None = None) -> dict:
+    providers = [
+        provider
+        for candidates in module.REQUIRED_PROVIDER_GROUPS[ruleset].values()
+        for provider in candidates
+    ]
+    fact_providers = [provider for provider in providers if provider != omit_provider]
+    if not fact_providers:
+        raise ValueError("ready_registry requires at least one rulefact provider")
+    rulefacts = [
+        {
+            "id": f"{ruleset}.{index:03d}.{fact_providers[index % len(fact_providers)]}",
+            "provider": fact_providers[index % len(fact_providers)],
+            "ruleset": ruleset,
+        }
+        for index in range(count)
+    ]
+    return {
+        "rulefact_count": len(rulefacts),
+        "final_verdict": verdict,
+        "status": "pass",
+        "required_providers": providers,
+        "implemented_providers": providers,
+        "missing_implemented_providers": [],
+        "rulefacts": rulefacts,
+    }
+
+
 class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
     def test_gate_fails_below_threshold(self) -> None:
         module = load_module()
@@ -53,9 +81,9 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
             root = Path(temp_dir)
             for name in ("SR4_RULEFACT_REGISTRY.generated.json", "SR5_RULE_AUTHORITY_REGISTRY.generated.json", "SR6_RULEFACT_REGISTRY.generated.json"):
                 (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
-            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR4_RULE_AUTHORITY_READY"}), encoding="utf-8")
-            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR5_RULE_AUTHORITY_READY"}), encoding="utf-8")
-            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR6_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr4", "SR4_RULE_AUTHORITY_READY")), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr5", "SR5_RULE_AUTHORITY_READY")), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr6", "SR6_RULE_AUTHORITY_READY")), encoding="utf-8")
             (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
                 json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
                 encoding="utf-8",
@@ -69,14 +97,86 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
                 with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
                     self.assertEqual(module.main(), 0)
 
+    def test_gate_rejects_marker_only_ready_registry(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="rules-min-marker-only-") as temp_dir:
+            root = Path(temp_dir)
+            (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
+            for name, verdict in (
+                ("SR4_RULEFACT_REGISTRY.generated.json", "SR4_RULE_AUTHORITY_READY"),
+                ("SR5_RULE_AUTHORITY_REGISTRY.generated.json", "SR5_RULE_AUTHORITY_READY"),
+                ("SR6_RULEFACT_REGISTRY.generated.json", "SR6_RULE_AUTHORITY_READY"),
+            ):
+                (root / ".codex-studio" / "published" / name).write_text(
+                    json.dumps({"rulefact_count": 120, "final_verdict": verdict}),
+                    encoding="utf-8",
+                )
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "pass", "verdict": "SR4_RULE_AUTHORITY_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "pass", "verdict": "SR6_RULE_AUTHORITY_READY"}]}),
+                encoding="utf-8",
+            )
+            output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
+                stderr = io.StringIO()
+                with self.assertRaises(SystemExit):
+                    with redirect_stderr(stderr), mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
+                        module.main()
+
+            self.assertIn("sr4 rule authority registry is missing a rulefacts list", stderr.getvalue())
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertIn("sr5 rule authority registry declares no required providers", payload["failures"])
+            self.assertEqual("fail", payload["rulesets"]["sr6"]["status"])
+
+    def test_gate_rejects_superseded_registry_even_with_ready_marker(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="rules-min-superseded-") as temp_dir:
+            root = Path(temp_dir)
+            (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(
+                json.dumps(ready_registry(module, "sr4", "SR4_RULE_AUTHORITY_READY")),
+                encoding="utf-8",
+            )
+            sr5_registry = ready_registry(module, "sr5", "SR5_RULE_AUTHORITY_READY")
+            sr5_registry["superseded"] = True
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(
+                json.dumps(sr5_registry),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(
+                json.dumps(ready_registry(module, "sr6", "SR6_RULE_AUTHORITY_READY")),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "pass", "verdict": "SR4_RULE_AUTHORITY_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "pass", "verdict": "SR6_RULE_AUTHORITY_READY"}]}),
+                encoding="utf-8",
+            )
+            output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
+                stderr = io.StringIO()
+                with self.assertRaises(SystemExit):
+                    with redirect_stderr(stderr), mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
+                        module.main()
+
+            self.assertIn("sr5 rule authority registry is superseded", stderr.getvalue())
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(["sr5 rule authority registry is superseded"], payload["rulesets"]["sr5"]["schema_failures"])
+
     def test_gate_fails_when_completion_or_operator_gold_are_not_ready(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="rules-min-completion-") as temp_dir:
             root = Path(temp_dir)
             (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
-            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR4_RULE_AUTHORITY_READY"}), encoding="utf-8")
-            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR5_RULE_AUTHORITY_READY"}), encoding="utf-8")
-            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR6_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr4", "SR4_RULE_AUTHORITY_READY")), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr5", "SR5_RULE_AUTHORITY_READY")), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps(ready_registry(module, "sr6", "SR6_RULE_AUTHORITY_READY")), encoding="utf-8")
             (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
                 json.dumps({"rulesets": {"sr4": {"rule_authority_ready": False}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": False}}}),
                 encoding="utf-8",
@@ -235,37 +335,19 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
     def test_gate_fails_when_declared_required_provider_has_no_rulefacts(self) -> None:
         module = load_module()
 
-        def ready_registry(ruleset: str, verdict: str, omit_provider: str = "") -> dict:
-            providers = [
-                provider
-                for candidates in module.REQUIRED_PROVIDER_GROUPS[ruleset].values()
-                for provider in candidates
-            ]
-            return {
-                "rulefact_count": 120,
-                "final_verdict": verdict,
-                "required_providers": providers,
-                "implemented_providers": providers,
-                "rulefacts": [
-                    {"id": f"{ruleset}.{provider}.fixture", "provider": provider}
-                    for provider in providers
-                    if provider != omit_provider
-                ],
-            }
-
         with tempfile.TemporaryDirectory(prefix="rules-min-provider-") as temp_dir:
             root = Path(temp_dir)
             (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
             (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(
-                json.dumps(ready_registry("sr4", "SR4_RULE_AUTHORITY_READY")),
+                json.dumps(ready_registry(module, "sr4", "SR4_RULE_AUTHORITY_READY")),
                 encoding="utf-8",
             )
             (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(
-                json.dumps(ready_registry("sr5", "SR5_RULE_AUTHORITY_READY", omit_provider="SR5CombatProvider")),
+                json.dumps(ready_registry(module, "sr5", "SR5_RULE_AUTHORITY_READY", omit_provider="SR5CombatProvider")),
                 encoding="utf-8",
             )
             (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(
-                json.dumps(ready_registry("sr6", "SR6_RULE_AUTHORITY_READY")),
+                json.dumps(ready_registry(module, "sr6", "SR6_RULE_AUTHORITY_READY")),
                 encoding="utf-8",
             )
             (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(

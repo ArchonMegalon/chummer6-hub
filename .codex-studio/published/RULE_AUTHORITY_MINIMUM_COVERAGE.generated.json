@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-20T00:44:30Z",
+  "generated_at_utc": "2026-06-20T19:39:45Z",
   "source_generated_at_utc": {
     "full_completion": "2026-06-19T23:15:54Z",
     "operator_gold": "2026-06-19T23:15:10Z"
@@ -26,6 +26,7 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "schema_failures": [],
       "provider_group_coverage": {
         "enforced": true,
         "provider_fact_counts": {
@@ -160,6 +161,7 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "schema_failures": [],
       "provider_group_coverage": {
         "enforced": true,
         "provider_fact_counts": {
@@ -292,6 +294,7 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "schema_failures": [],
       "provider_group_coverage": {
         "enforced": true,
         "provider_fact_counts": {
