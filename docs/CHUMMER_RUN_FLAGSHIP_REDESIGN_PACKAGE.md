@@ -6,9 +6,9 @@ Status: the major route-family redesign slices are already landed in this repo; 
 
 ## 1. Audit Summary
 
-Live observation on 2026-05-06:
+Live observation on 2026-05-06, amended by the 2026-06 minimalist front-door pass:
 
-- `/`, `/downloads`, `/now`, and `/horizons` already project real proof, release posture, and public truth more honestly than most preview product fronts.
+- `/`, `/downloads`, `/now`, and `/roadmap` carry the normal public route family. `/horizons` is now a noindex maintenance alias for older links, not a product shelf.
 - `/participate` and `/help` still read like a different, flatter product shell. The route family loses visual continuity precisely where the user needs trust and guidance.
 - The current front door strongly communicates "explainable rules truth" but under-projects "campaign command surface", "who this is for", and "why the account-aware return path matters".
 - Install, support, and device-linking truth exists, but it is presented as compliance plumbing rather than as a premium continuity benefit.
@@ -19,22 +19,22 @@ What is already working:
 - One concrete proof result is visible on the landing page.
 - Downloads posture is honest about recommended install, known issues, and platform gaps.
 - `/now` does real decision support instead of marketing theater.
-- `/horizons` shows public direction without pretending research is shipped.
+- `/roadmap` shows public direction without pretending planned work is shipped.
 - Account-aware handoff, claim-linking, and support continuity already have real canonical seams.
 
 What is still weak:
 
-- The landing page does not yet convert the public proof rail into a fuller "campaign OS" story.
+- The landing page must keep converting the visible result into a fuller product story.
 - The route family does not yet feel like one flagship product system.
 - GM, player, and creator fit are present in canon, but underused on the front door.
-- The visual hierarchy is still "proof shelf first, flagship operating surface second".
+- The visual hierarchy must stay "install and product clarity first, deeper checks second".
 
 ## 1A. Current Shipped Baseline (2026-05-07)
 
 This package started as the 2026-05-06 audit, and several of the weaker spots listed above have already been tightened. Do not restart this work from a blank redesign prompt. The repo already ships most of the route-family work described below:
 
 - `Chummer.Run.Api/Views/PublicLanding/Landing.cshtml` already projects canon `start_here`, `why_trust_it`, `choose_your_lane`, continuity, and flagship-coverage sections onto the live landing route.
-- `Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml`, `Now.cshtml`, `Participate.cshtml`, `Roadmap.cshtml`, `Shelf.cshtml`, `ProductStory.cshtml`, and `TrustPage.cshtml` already share the stronger flagship shell language, route-choice cards, proof rails, and first-party truth boundaries.
+- `Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml`, `Now.cshtml`, `Participate.cshtml`, `Roadmap.cshtml`, `Shelf.cshtml`, `ProductStory.cshtml`, and `TrustPage.cshtml` already share the stronger flagship shell language, route-choice cards, check rails, and first-party truth boundaries.
 - `Chummer.Run.Api/Views/PublicLanding/Home.cshtml`, `Chummer.Run.Api/Views/Accounts/Account.cshtml`, `Chummer.Run.Api/Views/Auth/Entry.cshtml`, and `Chummer.Run.Api/Views/Shared/_Layout.cshtml` already carry the signed-in continuation, auth-value, shared navigation, and mobile CTA work.
 - `Chummer.Tests/PublicLandingReleaseTrustViewTests.cs` and related route/view tests already fail closed on the core route-family expectations, so new work should extend those guardrails instead of bypassing them.
 
@@ -53,11 +53,11 @@ Use that shipped baseline. The remaining work is not "redesign chummer.run again
 
 Recommended positioning:
 
-> Chummer is the explainable Shadowrun campaign OS in preview.
+> Chummer is the explainable Shadowrun campaign companion.
 
 Not because the site should become a fake enterprise dashboard, but because the current product truth already supports three premium promises:
 
-1. Rules truth you can inspect.
+1. Rules results you can inspect.
 2. Campaign continuity that survives device drift.
 3. Account-aware follow-through for installs, support, roadmap interest, and return-to-work.
 
@@ -68,8 +68,8 @@ The redesign should make those three promises legible on every major route.
 The flagship public surface should feel like:
 
 - a serious campaign operating deck
-- a premium dossier and evidence system
-- a product that knows the difference between live proof, preview posture, and future work
+- a premium dossier and continuity system
+- a product that knows the difference between current downloads, deeper checks, and future work
 
 It should not feel like:
 
@@ -84,7 +84,7 @@ Direction:
 
 - Light-to-deep blueglass palette, not neon overload.
 - Big editorial display type paired with technical mono proof notes.
-- Premium dossier surfaces, receipt rails, and route callouts.
+- Premium dossier surfaces, record rails, and route callouts.
 - Atmospheric stills that imply campaign pressure, dossiers, devices, desks, transit, rain, and continuity.
 - Motion only where it helps sequencing: staged reveal, proof-float rise, route-callout slide, and trust-rail fade.
 
@@ -103,10 +103,10 @@ Color system:
 
 Component families:
 
-- Hero proof float
+- Hero result float
 - Route callout
 - Workflow cards
-- Trust claim cards
+- Trust cards
 - Role or route choice cards
 - Release shelf cards
 - Support decision cards
@@ -114,15 +114,15 @@ Component families:
 
 ## 6. Route Family Strategy
 
-| Route | Primary job | Stop doing | Inherit | Visual density | Mobile simplification | CTA posture | Proof posture |
+| Route | Primary job | Stop doing | Inherit | Visual density | Mobile simplification | CTA posture | Validation posture |
 |---|---|---|---|---|---|---|---|
-| `/` | Turn proof into belief and explain who Chummer is for | Acting like only a proof shelf | Hero proof float, workflow band, trust band, role-fit grid | High | Collapse into stacked hero, trust, lanes | Primary install/account CTA, secondary `what works today` | One concrete result, trust pulse, role fit |
+| `/` | Explain who Chummer is for | Acting like only a checks page | Hero result float, workflow band, trust band, role-fit grid | High | Collapse into stacked hero, trust, lanes | Primary install/account CTA, secondary `what works today` | One concrete result, trust pulse, role fit |
 | `/what-is-chummer` | Tell the product story | Repeating downloads or roadmap verbatim | Editorial hero, trust pillars, route family links | Medium | Story blocks only | Primary `downloads`, secondary `status` | Validation examples inline, no release shelf duplication |
-| `/downloads` | Get the user onto the right build safely | Letting artifact explainers crowd the install decision | Shared header, trust rail, help adjacency | Medium | Recommended platform first, advanced accordion later | Recommended install first, sign-in secondary only when needed | Shelf-level validation, known issues, current caution |
+| `/downloads` | Get the user onto the right build safely | Letting extra files crowd the install decision | Shared header, trust rail, help adjacency | Medium | Recommended platform first, details collapsed | Stable and Nightly first, account optional | Build date, platform state, known issues |
 | `/now` | Help users decide install now vs wait | Reading like changelog fluff | Workflow cards, release posture, signed-in return rail | Medium-high | Keep 3 core validation cards, collapse supporting validation | Primary `downloads`, secondary `status` | Live, preview, and caution all explicit |
-| `/horizons` | Explain what is next and why it matters | Pretending research is almost shipped | Shared trust pulse, horizon cards, readiness labels | Medium-high | Show 1-2 cards per horizon group | Primary `downloads`, secondary detail route | Pain, payoff, and next truthful step |
-| `/roadmap` | Show milestone-backed direction | Redirecting back to a softer summary shelf | Milestone drawer, horizon cards, public loop framing | High | Keep cards collapsed by default | Primary detail routes, secondary `status` | Milestone difficulty, claimed state, dependencies |
-| `/artifacts` | Make the factory tangible | Becoming a junk drawer | Publication gallery, publication rail, route-boundary copy | Medium | Featured artifact stack | Primary artifact details, secondary `downloads` | Evidence-first, not hype-first |
+| `/horizons` | Compatibility maintenance alias for older links | Being promoted like a product section | Minimal pointer back to Downloads, Help, Status, and Roadmap | Low | One short maintenance page | Primary `downloads`, secondary `roadmap` | Noindex, not promoted |
+| `/roadmap` | Show milestone-backed direction | Redirecting back to a softer summary shelf | Milestone drawer, planned-work cards, public loop framing | High | Keep cards collapsed by default | Primary detail routes, secondary `status` | Milestone difficulty, claimed state, dependencies |
+| `/artifacts` | Make supporting files tangible | Becoming a junk drawer | Publication gallery, publication rail, route-boundary copy | Medium | Featured file stack | Primary file details, secondary `downloads` | Evidence-first, not hype-first |
 | `/participate` | Route signal safely to public or signed-in lanes | Mixing support, contribution, and roadmap authority | Trust claims, route choice cards, public loop stages | Medium | Two primary paths: public and signed-in | Primary public route, secondary signed-in route | ProductLift boundary, first-party fallback honesty |
 | `/help` | Triage install, account, and product help fast | Acting like a legal FAQ | Support decision cards, downloads and contact adjacency | Medium | Three biggest jobs first | Primary support intake, secondary `downloads` | First-party support truth only |
 | `/faq` | Answer normal product questions plainly | Becoming a catch-all support form | Plain-language cards, route links | Low-medium | Accordion or stacked Q/A | CTAs back to help/downloads | Validation via route references, not screenshots |
@@ -139,13 +139,13 @@ Component families:
 - Global nav: `Product`, `Downloads`, `What works today`, `Roadmap`, `Artifacts`, `Participate`
 - Hero eyebrow: `Explainable Shadowrun`
 - Hero headline: `Build a runner, explain every ruling, and recover the campaign.`
-- Hero subheadline: `Start with the current preview, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.`
+- Hero subheadline: `Start with the current build, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.`
 - Hero CTA pair: `Open downloads` / `See what works today`
-- Proof section headline: `One concrete result, one visible trail, one current build`
-- What's-live-now strip: `What is real today, what is preview, what is next`
+- Result section headline: `One concrete result, one visible trail, one current build`
+- What's-live-now strip: `What works today, what needs care, what is next`
 - Downloads summary: `Start with the one recommended build for this device, then use status and help without leaving the same truth rail.`
 - Roadmap intro: `Direction stays visible, but readiness and dependencies stay attached.`
-- Artifacts intro: `Proof, packets, and publication outputs that make the product tangible without inflating maturity claims.`
+- Files intro: `Packets and publication outputs that make the product tangible without inflating maturity claims.`
 - Final CTA band: `Create the account that keeps your place`
 - Account-value microcopy: `Installs, devices, roadmap follow-up, and support history stay attached to one return path.`
 - Support/help microcopy: `Use first-party help for installs, account recovery, and practical product trouble before you fall through to public issue lanes.`
@@ -179,11 +179,11 @@ Global prompt rules:
 
 Prompts:
 
-1. Flagship hero: `Rain-heavy blueglass operations desk inside a Shadowrun-safe campaign workspace, dossier stacks, soft holographic route traces, grounded hardware, one premium proof screen, cinematic but restrained, no text, no logos`
-2. Proof section: `Close-up of a rules proof panel with dice math notes, source tabs, receipt markers, and one trusted result, cool cobalt lighting, tactile materials, no text, no logos`
-3. Downloads/install confidence: `Premium install handoff scene with sealed package, device silhouette, claim receipt, support notes, calm trust posture, deep navy and steel palette, no text`
-4. Roadmap/futures: `Blue boulevard reflections and distant horizon markers suggesting future product lanes, evidence tags and measured wayfinding, restrained cyberpunk, no text`
-5. Artifacts/dossier shelf: `Curated evidence shelf with briefing cards, publication packets, camera stills, and physical dossier objects, museum-grade lighting, no text`
+1. Flagship hero: `Rain-heavy blueglass operations desk inside a Shadowrun-safe campaign workspace, dossier stacks, soft holographic route traces, grounded hardware, one premium result screen, cinematic but restrained, no text, no logos`
+2. Result section: `Close-up of a rules result panel with dice math notes, source tabs, check markers, and one trusted result, cool cobalt lighting, tactile materials, no text, no logos`
+3. Downloads/install confidence: `Premium install handoff scene with sealed package, device silhouette, claim record, support notes, calm trust posture, deep navy and steel palette, no text`
+4. Roadmap/futures: `Blue boulevard reflections and distant wayfinding markers suggesting future product lanes, evidence tags and measured wayfinding, restrained cyberpunk, no text`
+5. Files/dossier shelf: `Curated evidence shelf with briefing cards, publication packets, camera stills, and physical dossier objects, museum-grade lighting, no text`
 6. Participation/signal lane: `Public signal board with clean route splits between feedback, roadmap, and support, human-scale control surfaces, premium interface realism, no text`
 7. Help/support: `Quiet support desk with device, recovery notes, contact rail, and trustworthy first-party service atmosphere, premium but not sterile, no text`
 8. Mobile continuity: `Compact mobile campaign continuity scene with one dossier carried across phone, tablet, and laptop under rain-lit transit light, no text`
@@ -327,7 +327,7 @@ Current follow-through priority on 2026-05-07:
 
 Reusable components:
 
-- hero proof float
+- hero result float
 - workflow band and workflow cards
 - trust claims grid
 - route choice cards
