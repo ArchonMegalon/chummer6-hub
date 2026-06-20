@@ -70,8 +70,8 @@ public sealed class BuildGhostConciergeService
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
             ? "Limited explainer fail-closed"
             : "Fallback explainer only";
-        const string clientReportHref = "/contact?kind=bug_report&title=Build%20Ghost%20report&summary=Build%20Ghost%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=alice_build_ghost_lab&bundle=build_ghost&sceneId=build-ghost";
-        const string publicFeedbackHref = "/feedback?topic=build-ghosts";
+        const string clientReportHref = "/contact?kind=bug_report&title=Character%20helper%20report&summary=Character%20helper%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=character_helper&bundle=character_helper&sceneId=character-helper";
+        const string publicFeedbackHref = "/feedback?topic=character-helper";
 
         return new BuildGhostConciergeProjection(
             FacePopEntryHref: facePopHref,
@@ -89,14 +89,14 @@ public sealed class BuildGhostConciergeService
             ],
             AnswerlyResponsibilities:
             [
-                "Paraphrase what a build-ghost experiment is for.",
+                "Paraphrase what a draft-build preview is for.",
                 "Explain the compare/apply boundary in human language.",
                 "Stay outside mechanics, legality, and canonical runner state."
             ],
             ChummerResponsibilities:
             [
-                "Spawn temporary build ghosts from canonical runner truth.",
-                "Compare deltas with receipts and explicit tradeoff notes.",
+                "Create temporary draft builds from the current runner.",
+                "Compare changes with explicit tradeoff notes.",
                 "Apply only the reviewed variant through Chummer."
             ],
             CompareArtifacts:
@@ -110,10 +110,10 @@ public sealed class BuildGhostConciergeService
             Actions:
             [
                 new BuildGhostConciergeActionProjection(
-                    "Open character intake",
-                    "/participate/karma-forge?track=player_trust_track",
+                    "Open character helper",
+                    "/alice",
                     "primary",
-                    "Start the first-party intake that can feed a future ghost-comparison packet."),
+                    "Open the public character-helper preview."),
                 new BuildGhostConciergeActionProjection(
                     "Open signed-in helper",
                     "/account/alice/open",
@@ -123,12 +123,12 @@ public sealed class BuildGhostConciergeService
                     "Open public concierge",
                     facePopHref,
                     "ghost",
-                    "Use the bounded public invite lane without granting it runtime truth."),
+                    "Use the public intake path when you want to shape the workflow."),
                 new BuildGhostConciergeActionProjection(
-                    "Report a Build Ghost issue",
+                    "Report a character-helper issue",
                     clientReportHref,
                     "secondary",
-                    "Open first-party support with the build-ghost runtime context already attached.")
+                    "Open support with the character-helper context already attached.")
             ]);
     }
 

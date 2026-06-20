@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('runsite public route stays receipt-backed and points at the signed-in prep bench', async ({ request, page }) => {
+test('runsite public route stays available and points at the signed-in prep bench', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/runsites`);
   const receiptResponse = await request.get(`${baseUrl}/runsites/receipts/prep-network.json`);
 

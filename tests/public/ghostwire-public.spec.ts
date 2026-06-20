@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('ghostwire public route stays receipt-backed and shipped as a replay lane', async ({ request, page }) => {
+test('ghostwire public route stays available and shipped as a replay lane', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/ghostwire`);
   const receiptResponse = await request.get(`${baseUrl}/ghostwire/receipts/replay-network.json`);
 
@@ -21,8 +21,8 @@ test('ghostwire public route stays receipt-backed and shipped as a replay lane',
 
   await page.goto(`${baseUrl}/ghostwire`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'GHOSTWIRE' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('GHOSTWIRE now ships first-party after-action packet rails');
-  await expect(page.locator('body')).toContainText('Replay stays receipt-backed and public-safe.');
+  await expect(page.locator('body')).toContainText('GHOSTWIRE now ships after-action packets');
+  await expect(page.locator('body')).toContainText('Replay stays public-safe.');
 
   writeJsonArtifact('GHOSTWIRE_PUBLIC_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

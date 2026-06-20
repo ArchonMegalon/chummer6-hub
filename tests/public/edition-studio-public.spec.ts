@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('edition studio public route stays receipt-backed and points at the signed-in edition desk', async ({ request, page }) => {
+test('edition studio public route stays available and points at the signed-in edition desk', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/edition-studio`);
   const receiptResponse = await request.get(`${baseUrl}/edition-studio/receipts/ruleset-heads.json`);
   const sr4PacketResponse = await request.get(`${baseUrl}/edition-studio/packets/sr4_head.json`);

@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('quicksilver public route stays receipt-backed and points at the signed-in command deck', async ({ request, page }) => {
+test('quicksilver public route stays available and points at the signed-in command deck', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/quicksilver`);
   const receiptResponse = await request.get(`${baseUrl}/quicksilver/receipts/command-network.json`);
   const packetResponse = await request.get(`${baseUrl}/quicksilver/packets/command_deck.json`);

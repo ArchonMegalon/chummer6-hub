@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('community hub public route stays receipt-backed and points at the signed-in board', async ({ request, page }) => {
+test('community hub public route stays available and points at the signed-in board', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/community`);
   const receiptResponse = await request.get(`${baseUrl}/community/receipts/open-run-network.json`);
 

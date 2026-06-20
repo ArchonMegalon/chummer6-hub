@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('runner passport public route stays receipt-backed and points at the signed-in continuity bench', async ({ request, page }) => {
+test('runner passport public route stays available and points at the signed-in continuity bench', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/passport`);
   const receiptResponse = await request.get(`${baseUrl}/passport/receipts/identity-network.json`);
 

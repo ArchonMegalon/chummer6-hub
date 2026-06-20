@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('run control public route stays receipt-backed and points at the signed-in control desk', async ({ request, page }) => {
+test('run control public route stays available and points at the signed-in control desk', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/run-control`);
   const receiptResponse = await request.get(`${baseUrl}/run-control/receipts/control-network.json`);
   const sessionPacketResponse = await request.get(`${baseUrl}/run-control/packets/session_board.json`);

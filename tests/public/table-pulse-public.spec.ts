@@ -22,7 +22,7 @@ test('table pulse public route keeps live and aftermath rails separate', async (
   await page.goto(`${baseUrl}/table-pulse`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'TABLE PULSE' })).toBeVisible();
   await expect(page.locator('body')).toContainText('GM-controlled heat packets on the signed-in ledger notifications route.');
-  await expect(page.locator('body')).toContainText('Workspace aftermath recap packages stay receipt-backed.');
+  await expect(page.locator('body')).toContainText('Workspace aftermath recap packages stay attached.');
   await expect(page.locator('body')).toContainText('No player surveillance or public trust scoring.');
 
   writeJsonArtifact('TABLE_PULSE_PUBLIC_ROUTE_PROOF.generated.json', {

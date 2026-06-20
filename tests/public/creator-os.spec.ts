@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('creator os public route stays receipt-backed and points at the signed-in publication desk', async ({ request, page }) => {
+test('creator os public route stays available and points at the signed-in publication desk', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/creator`);
   const receiptResponse = await request.get(`${baseUrl}/creator/receipts/publication-network.json`);
 

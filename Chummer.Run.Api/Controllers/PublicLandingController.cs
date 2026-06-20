@@ -4826,7 +4826,7 @@ public sealed class PublicLandingController : Controller
         return await BuildFeatureDetailPageAsync(
             currentPath,
             chromeTitle: "Roadmap detail",
-            chromeDescription: "A horizon detail page with the pain, payoff, and the next place to read deeper.",
+            chromeDescription: "A maintenance detail page with the pain, payoff, and the next place to read deeper.",
             eyebrow: "Roadmap detail",
             cancellationToken);
     }
@@ -8507,7 +8507,7 @@ Boundary:
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
         return new BuildGhostConciergeTeaserViewModel(
-            StatusLabel: "ALICE compare bench",
+            StatusLabel: "Character compare bench",
             Summary: projection.HumanizedSummary,
             Href: "/alice",
             ProofPoints:
@@ -8521,17 +8521,17 @@ Boundary:
     private async Task<BuildGhostConciergePageViewModel> BuildBuildGhostConciergePageModel(
         CancellationToken cancellationToken,
         string currentPath = "/participate/build-ghosts",
-        string title = "Build Ghost concierge",
-        string eyebrow = "Bounded public pilot",
-        string heading = "FacePop can greet. Answerly can explain. Chummer still makes the character decisions.",
-        string intro = "This page is the public front door for ALICE Build Ghost experiments. It keeps the concierge, the explainer, and the compare engine clearly separated.")
+        string title = "Character helper",
+        string eyebrow = "Private preview",
+        string heading = "A helper can orient you. Chummer still makes the character decisions.",
+        string intro = "This page is the public preview for character-helper experiments. It keeps intake, explanation, comparison, and final apply decisions clearly separated.")
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
         AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync(currentPath, cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             title,
-            "Public intake and explanation for ALICE Build Ghosts with Chummer keeping the actual character decisions.",
+            "Public intake and explanation for character help, with Chummer keeping the actual character decisions.",
             currentPath,
             cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
@@ -8728,11 +8728,11 @@ Boundary:
         return await BuildHorizonPreviewPageModel(
             pageId: "document-portal",
             title: "Document Portal",
-            description: "Chummer-owned guides, primers, and player-safe packets with a governed publication boundary.",
+            description: "Chummer-owned guides, primers, and player-safe packets with a clear fallback path.",
             currentPath: "/docs",
-            eyebrow: "Governed publication rail",
+            eyebrow: "Document library",
             heading: "Document Portal",
-            intro: "Chummer owns the source document, version, access policy, and safety boundary. FlipLink is the optional governed viewer layer for approved PDFs, not the truth owner. The first bounded publication lane starts with the Chummer6 Quickstart Guide.",
+            intro: "Start with the Chummer6 Quickstart Guide. Read it on Chummer, open the optional viewer, or download the PDF.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -8759,10 +8759,9 @@ Boundary:
                     "document_portal_provider_posture",
                     "Provider posture",
                     "Operator publication first",
-                    "The initial publication mode is operator-managed. Chummer already owns the route, source hash, PDF fallback, and publication boundary. An external FlipLink viewer can be linked later without changing document truth ownership.",
+                    "The Chummer page and PDF are available now. The external FlipLink viewer can be linked later without changing the user path.",
                     [
-                        "Operator-managed publication lane is current",
-                        "First-party route and PDF fallback are current",
+                        "Chummer page and PDF fallback are current",
                         "External viewer remains optional"
                     ])
             ],
@@ -8777,7 +8776,7 @@ Boundary:
             summaryPoints:
             [
                 "Original Chummer guides only",
-                "Governed document classification",
+                "Clear document classification",
                 "FlipLink optional as viewer layer"
             ]);
     }
@@ -8816,18 +8815,18 @@ Boundary:
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-quickstart-guide",
             title: document.Title,
-            description: "Original Chummer quickstart guide with governed publication and viewer boundary.",
+            description: "Original Chummer quickstart guide with a simple viewer fallback.",
             currentPath: $"/docs/{document.Slug}",
             eyebrow: "Chummer-owned guide",
             heading: document.Title,
-            intro: "This route is the Chummer-owned document surface for the first bounded flipbook publication lane. This document is generated and owned by Chummer. FlipLink is the optional external viewer; the first-party route and PDF fallback remain the truth-owning current path.",
+            intro: "Open the Chummer quickstart as a flipbook or PDF. The Chummer page stays available even if the external viewer is unavailable.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "quickstart_scope",
                     "Scope",
                     "What this guide is for",
-                    "Use the Quickstart Guide to orient a new player or operator without pushing them into a sourcebook PDF, an unbounded docs pile, or a private campaign packet.",
+                    "Use the Quickstart Guide to orient a new player without pushing them into a sourcebook PDF, an unbounded docs pile, or private campaign notes.",
                     [
                         "Install posture",
                         "First safe actions",
@@ -8845,15 +8844,13 @@ Boundary:
                     ]),
                 new TrustPageSectionViewModel(
                     "quickstart_publication_posture",
-                    "Publication posture",
-                    "Current provider state",
-                    "The Chummer route and fallback PDF are live now. The external FlipLink viewer remains governed and optional, so the document can ship today without moving truth ownership outside Chummer.",
+                    "Availability",
+                    "Current service state",
+                    "The Chummer page and fallback PDF are live now. The external FlipLink viewer remains optional.",
                     [
-                        "First-party route is current",
+                        "Chummer page is current",
                         "PDF fallback is current",
-                        "Operator-managed publication lane is current",
-                        "External viewer remains optional",
-                        $"Source hash recorded: {document.SourceHash}"
+                        "External viewer remains optional"
                     ])
             ],
             actions:
@@ -8875,18 +8872,18 @@ Boundary:
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-embed-boundary",
             title: "Quickstart embed boundary",
-            description: "Bounded viewer-layer posture for the Chummer6 Quickstart Guide.",
+            description: "Viewer fallback for the Chummer6 Quickstart Guide.",
             currentPath: $"/docs/embed/{document.Slug}",
             eyebrow: "Viewer boundary",
             heading: "Quickstart embed boundary",
-            intro: "This route exists so the viewer boundary stays explicit. This document is generated and owned by Chummer. FlipLink is the viewer. The Chummer route and PDF fallback stay current even when no external embed is linked.",
+            intro: "Open the quickstart in the embedded viewer. The Chummer page and PDF fallback stay available even when the external viewer is unavailable.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "embed_boundary_contract",
                     "Contract",
                     "What the viewer layer may do",
-                    "The viewer may present, brand, embed, and measure an approved Chummer document. It does not own document truth, rules authority, payment truth, or private campaign memory.",
+                    "The viewer may present the guide, but the Chummer page and PDF remain the reliable fallback.",
                     [
                         "Presentation only",
                         "Analytics are engagement-only",
@@ -8895,8 +8892,8 @@ Boundary:
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",
                     "Current state",
-                    "Why the boundary stays visible",
-                    "The external viewer remains optional and governed. Chummer keeps the route, the fallback PDF, the source hash, and the publication receipt even when the operator chooses not to link a live external flipbook.",
+                    "Why the fallback stays visible",
+                    "The external viewer remains optional. Chummer keeps the page and PDF available even when the embedded flipbook is unavailable.",
                     [
                         "Chummer route remains current",
                         "Fallback PDF remains current",
@@ -9086,7 +9083,7 @@ Boundary:
         List<TrustPageActionViewModel> actions =
         [
             new("Open KARMA FORGE", "/participate/karma-forge", "primary"),
-            new("Read the horizon brief", "/roadmap/karma-forge", "secondary"),
+            new("Read the maintenance note", "/roadmap/karma-forge", "secondary"),
             new("Open support intake", "/contact#support-intake", "ghost")
         ];
 
@@ -10775,7 +10772,7 @@ Boundary:
             "featured_artifacts" when PublicSurfaceStatus.IsAvailableToday(card.Badge)
                 => "What is live today",
             "featured_artifacts" => "What this artifact is proving next",
-            "coming_next" => "Where this horizon sits now",
+            "coming_next" => "Where this maintenance item sits now",
             _ => card.Badge
         };
         var facts = BuildFeatureDetailFacts(card);
@@ -10871,8 +10868,8 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => "Compare this horizon with the current public-release surface first, then open the deeper roadmap brief only when you need the longer rationale.",
-            "featured_artifacts" => "Use publication discovery and the current release page together to verify whether this artifact is live today or still preview-only.",
+            "coming_next" => "Compare this maintenance item with the current release first, then open the longer note only when you need the rationale.",
+            "featured_artifacts" => "Use the current release page to see whether this is live today or still preview-only.",
             _ => null
         };
     }
@@ -10886,8 +10883,8 @@ Boundary:
 
         return card.Bucket switch
         {
-            "featured_artifacts" => "This artifact keeps the preview tangible through manifests, provenance, and one truthful next action instead of a vague gallery card.",
-            "coming_next" => "The payoff only becomes real when the horizon moves onto the current release view, but the user value is already explicit here.",
+            "featured_artifacts" => "This page keeps the preview tangible with one clear next action instead of a vague gallery card.",
+            "coming_next" => "The payoff becomes real when this maintenance item moves onto the current release view, but the user value is already explicit here.",
             _ => null
         };
     }
@@ -10902,8 +10899,8 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => new[] { "Planned product work", "Current release contrast", "Deeper horizon brief" },
-            "featured_artifacts" => new[] { "Manifest-backed", "Preview or live status", "Next truthful action" },
+            "coming_next" => new[] { "Planned product work", "Current release contrast", "Longer maintenance note" },
+            "featured_artifacts" => new[] { "Current listing", "Preview or live status", "Next useful action" },
             _ => Array.Empty<string>()
         };
     }

@@ -55,11 +55,12 @@ public static partial class PublicFacingCopyHumanizer
         ("operator view", "account view"),
         ("starter-lane", "starter path"),
         ("starter lane", "starter path"),
-        ("horizon brief", "roadmap note"),
-        ("horizon detail", "roadmap note"),
-        ("horizon page", "roadmap page"),
-        ("horizon-only", "roadmap-only"),
-        ("horizon", "roadmap"),
+        ("horizon brief", "maintenance note"),
+        ("horizon detail", "maintenance note"),
+        ("horizon page", "maintenance page"),
+        ("horizon-only", "maintenance-only"),
+        ("horizons", "maintenance"),
+        ("horizon", "maintenance"),
     ];
 
     public static string Clean(string? value)

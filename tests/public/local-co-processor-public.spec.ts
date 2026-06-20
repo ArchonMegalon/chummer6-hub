@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('local co-processor public route stays receipt-backed and points at the signed-in profile desk', async ({ request, page }) => {
+test('local co-processor public route stays available and points at the signed-in profile desk', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/local-co-processor`);
   const receiptResponse = await request.get(`${baseUrl}/local-co-processor/receipts/optional-acceleration.json`);
   const capabilityPacketResponse = await request.get(`${baseUrl}/local-co-processor/packets/capability_matrix.json`);

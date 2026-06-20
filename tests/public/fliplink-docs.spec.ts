@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('document portal keeps Chummer as truth owner and exposes a bounded publication receipt', async ({ request, page }) => {
+test('document portal exposes the quickstart guide with a PDF fallback', async ({ request, page }) => {
   const docsResponse = await request.get(`${baseUrl}/docs`);
   const guideResponse = await request.get(`${baseUrl}/docs/chummer6-quickstart`);
   const embedResponse = await request.get(`${baseUrl}/docs/embed/chummer6-quickstart`);
@@ -40,10 +40,11 @@ test('document portal keeps Chummer as truth owner and exposes a bounded publica
 
   await page.goto(`${baseUrl}/docs/chummer6-quickstart`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Chummer6 Quickstart Guide' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('This document is generated and owned by Chummer.');
-  await expect(page.locator('body')).toContainText('FlipLink is the optional external viewer');
-  await expect(page.locator('body')).toContainText('Source hash recorded');
+  await expect(page.locator('body')).toContainText('Open the Chummer quickstart as a flipbook or PDF.');
+  await expect(page.locator('body')).toContainText('The external FlipLink viewer remains optional');
   await expect(page.locator('body')).toContainText('PDF fallback is current');
+  await expect(page.locator('body')).not.toContainText('Source hash recorded');
+  await expect(page.locator('body')).not.toContainText('Operator-managed');
   await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible();
 
   writeJsonArtifact('FLIPLINK_DOCS_ROUTE_PROOF.generated.json', {

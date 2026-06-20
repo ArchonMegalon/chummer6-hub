@@ -41,7 +41,7 @@ test('help page stays practical instead of exposing internal policy language', a
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
   await expect(page.locator('h1')).toContainText('Get help without guessing');
-  expect(bodyText).toContain('Choose the right path.');
+  expect(bodyText).toContain('Choose the right path');
   expect(bodyText).not.toContain('Provider-backed help');
   expect(bodyText).not.toContain('Retention window');
   expect(bodyText).not.toContain('receipt');
@@ -152,8 +152,9 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
 
   expect(horizonsText).not.toContain('Black Ledger');
   expect(horizonsText).not.toContain('Open Black Ledger');
-  expect(horizonsText).toContain('Early campaign work stays behind the main app');
+  expect(horizonsText).toContain('Future work stays behind the main app');
   expect(horizonsText).toContain('Not the front door');
+  expect(horizonsText.toLowerCase()).not.toContain('horizon');
   expect(horizonsText).not.toContain('Watch');
   expect(horizonsText).not.toContain('deep dive');
 

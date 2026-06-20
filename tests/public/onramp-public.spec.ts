@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('onramp public route stays receipt-backed and points at the signed-in starter desk', async ({ request, page }) => {
+test('onramp public route stays available and points at the signed-in starter desk', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/onramp`);
   const receiptResponse = await request.get(`${baseUrl}/onramp/receipts/guided-starter.json`);
   const starterPacketResponse = await request.get(`${baseUrl}/onramp/packets/starter_lane.json`);
