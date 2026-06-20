@@ -93,6 +93,9 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue) {
             if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 return $process
             }
+            if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                return $process
+            }
             continue
         }
 
@@ -214,6 +217,9 @@ foreach ($request in $captureRequests) {
         $delaySeconds = $AutoCaptureDelaySeconds
         if ((Normalize-Surface $captureSurface) -eq "install-progress") {
             $delaySeconds = 0
+        }
+        elseif ($window.MainWindowTitle.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            $delaySeconds = [Math]::Max($delaySeconds, 8)
         }
         if ($delaySeconds -gt 0) {
             Write-Host "Auto-capturing in $delaySeconds seconds."

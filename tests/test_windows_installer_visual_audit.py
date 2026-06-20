@@ -308,6 +308,8 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("function Wait-ForInstallerSurface", text)
         self.assertIn("Find-InstallerSurfaceWindow", text)
         self.assertIn("MainWindowTitle", text)
+        self.assertIn('$title.IndexOf("Install Complete"', text)
+        self.assertIn('$title.IndexOf("Installer"', text)
         self.assertIn("function Get-CaptureBounds", text)
         self.assertIn("GetWindowRect", text)
         self.assertIn("SetForegroundWindow", text)
@@ -319,6 +321,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("Timed out waiting for Chummer installer surface", text)
         self.assertIn("$AutoCaptureTimeoutSeconds", text)
         self.assertIn("$delaySeconds = 0", text)
+        self.assertIn("$delaySeconds = [Math]::Max($delaySeconds, 8)", text)
         self.assertIn("surfaceCoverage", text)
 
     def test_windows_gold_proof_helper_writes_startup_receipt_and_delegates_visual_capture(self) -> None:
