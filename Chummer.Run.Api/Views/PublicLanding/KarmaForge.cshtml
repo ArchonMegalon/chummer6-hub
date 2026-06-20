@@ -5,56 +5,56 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE sections";
-    ViewData["ContextSidebarSummary"] = "Use the shared side panel for intake, governor stages, and packet review.";
+    ViewData["ContextSidebarSummary"] = "Use this page to send a table problem and see what happens next.";
     ViewData["ContextSidebarLinks"] = new[]
     {
         new PublicNavigationLink("Intake", "#karma-forge-intake"),
-        new PublicNavigationLink("Bounded stages", "#external-stages"),
+        new PublicNavigationLink("Workflow", "#external-stages"),
         new PublicNavigationLink("Track questions", "#track-questions"),
-        new PublicNavigationLink("Governor decisions", "#candidate-decisions"),
-        new PublicNavigationLink("Recent packets", "#recent-packets"),
+        new PublicNavigationLink("Review decisions", "#candidate-decisions"),
+        new PublicNavigationLink("Recent requests", "#recent-packets"),
     };
     bool hasErrors = Model.Form.ValidationErrors.Count > 0;
     var historyHref = Model.Form.Authenticated
         ? "#recent-packets"
         : "/signup?next=%2Fparticipate%2Fkarma-forge";
     var historyLabel = Model.Form.Authenticated
-        ? "Open signed-in packet history"
-        : "Create account for packet history";
+        ? "Open my request history"
+        : "Create account for request history";
     var historyTitle = Model.Form.Authenticated
-        ? "Stay on the signed-in packet history page when you need recent KARMA FORGE continuity"
-        : "Create the account only when you want packet history and next steps in one place";
+        ? "Open your recent requests"
+        : "Create an account only if you want request history";
     var historySummary = Model.Form.Authenticated
-        ? "Signed-in history keeps recent packets, queue posture, and next steps attached to the same discovery page instead of burying them in generic feedback history."
-        : "The public intake works without an account. Sign in only when you want your packet history, queue posture, and next steps to stay visible in one place.";
+        ? "Signed-in history keeps recent requests and next steps together."
+        : "The public intake works without an account. Sign in only if you want your request history saved.";
     var routeChoices = new[]
     {
         new
         {
             Badge = "Intake",
-            Title = "Stay on this page when the job is turning table pain into a Chummer-owned packet",
-            Summary = "This intake page owns normalization, consent, and the first named packet output. It should not be replaced by generic support copy or vague future-signal chatter.",
+            Title = "Submit a rules or table problem",
+            Summary = "Use this page when something at the table is slowing play, causing confusion, or needs a Chummer-shaped fix.",
             Href = "#karma-forge-intake",
             Label = "Start the intake",
-            Proof = new[] { "Chummer-owned packets", "Consent explicit", "One intake page" }
+            Details = new[] { "Describe the problem", "Pick the edition", "Send it" }
         },
         new
         {
             Badge = "Roadmap family",
-            Title = "Open the horizon brief only when you need the larger product case",
-            Summary = "The intake page keeps the discovery job concrete. Move to the horizon brief when you need the broader why, planned shape, or longer strategic frame behind KARMA FORGE.",
+            Title = "Read the roadmap only if you want the larger plan",
+            Summary = "Stay here to submit a request. Open the roadmap when you want to understand where this work may go later.",
             Href = "/roadmap/karma-forge",
             Label = "Read the horizon brief",
-            Proof = new[] { "Broader rationale", "Planned product frame", "Still first-party" }
+            Details = new[] { "Larger plan", "Related work", "No intake required" }
         },
         new
         {
             Badge = "Public signal",
-            Title = "Return to participate when the question is broader public discovery, not this intake packet",
-            Summary = "Participate still owns the wider public signal loop. This page should stay the governed intake for specific house-rule and campaign demand packets.",
+            Title = "Return to participate for broader feedback",
+            Summary = "Use Participate for general product feedback. Use this page for a specific table or rules pain point.",
             Href = "/participate",
             Label = "Back to participate",
-            Proof = new[] { "Broader signal loop", "Public discovery", "No mixed jobs" }
+            Details = new[] { "General feedback", "Broader topics", "Separate from support" }
         },
         new
         {
@@ -63,18 +63,18 @@
             Summary = historySummary,
             Href = historyHref,
             Label = historyLabel,
-            Proof = Model.Form.Authenticated
-                ? new[] { "Recent packets", "Queue posture", "Same discovery page" }
-                : new[] { "Public first", "Account adds history", "No auth wall for intake" }
+            Details = Model.Form.Authenticated
+                ? new[] { "Recent requests", "Queue status", "Same page" }
+                : new[] { "Public first", "Account adds history", "No login required" }
         },
         new
         {
             Badge = "Support",
-            Title = "Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work",
-            Summary = "If the problem is install repair, account recovery, or a normal bug/support case, stop using this discovery page and move to first-party support instead.",
+            Title = "Use Help for setup, account, or bug problems",
+            Summary = "If the problem is install repair, account recovery, or a normal bug report, Help is the right place.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "Support-owned", "Normal support page", "Discovery stays bounded" }
+            Details = new[] { "Install help", "Account help", "Bug reports" }
         }
     };
 
@@ -82,7 +82,7 @@
         => string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value
-                .Replace(string.Concat("Product", " Governor"), "governed product decision", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Product", " Governor"), "product review", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
@@ -96,11 +96,11 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Turn one table pain into a named Chummer-owned packet before it drifts into support noise or roadmap guessing.</p>
+        <p class="page-copy">Send one concrete table problem to Chummer.</p>
         <div class="trust-claim__microproof">
             <span>@Model.CanonicalLane</span>
             <span>@Model.EntryLane</span>
-            <span>@Model.Dashboard.TotalPackets packet(s) normalized so far</span>
+            <span>@Model.Dashboard.TotalPackets request(s) received so far</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -113,8 +113,8 @@
 <section class="editorial-block" id="karma-forge-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Keep intake, roadmap, account return, and support on separate pages.</h2>
-        <p class="editorial-copy">This page is for governed discovery intake only.</p>
+        <h2 class="editorial-title">Pick the page that matches the job.</h2>
+        <p class="editorial-copy">Submit a table problem here. Use Help for setup or account issues.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -124,7 +124,7 @@
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }
@@ -137,35 +137,35 @@
 
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Loop state</p>
-        <h2 class="editorial-title">The loop is visible before any rules work starts.</h2>
-        <p class="editorial-copy">Hub owns intake, receipts, and the first named packet.</p>
+        <p class="eyebrow">Current queue</p>
+        <h2 class="editorial-title">Recent intake at a glance.</h2>
+        <p class="editorial-copy">These numbers show what people are sending in.</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
             <span class="tag">Queue</span>
-            <p>@Model.Dashboard.GovernorQueueCount packet(s) already normalized for review queue handling.</p>
+            <p>@Model.Dashboard.GovernorQueueCount request(s) waiting for review.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Follow-up</span>
-            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for likely follow-up on the governed review rail.</p>
+            <p>@Model.Dashboard.FollowUpCandidateCount request(s) are likely to need follow-up.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Shareable</span>
-            <p>@Model.Dashboard.ShareablePacketCount packet(s) currently look reusable across tables instead of staying campaign-local.</p>
+            <p>@Model.Dashboard.ShareablePacketCount request(s) may be useful beyond one table.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Core gap</span>
-            <p>@Model.Dashboard.CoreRulesetGapCount packet(s) already look closer to core-ruleset review than KARMA FORGE packaging work.</p>
+            <p>@Model.Dashboard.CoreRulesetGapCount request(s) look like core ruleset work.</p>
         </article>
     </div>
 </section>
 
 <section class="editorial-block" id="external-stages">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Bounded workflow stages</p>
-        <h2 class="editorial-title">The discovery loop stays explicit from signal to closeout.</h2>
-        <p class="editorial-copy">No external step replaces Chummer-owned packet truth.</p>
+        <p class="eyebrow">Workflow</p>
+        <h2 class="editorial-title">What happens after you send it.</h2>
+        <p class="editorial-copy">Chummer keeps the request tied to this page.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var stage in Model.ExternalStages)
@@ -175,7 +175,7 @@
                 <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__proof">
-                    <span>@stage.ReceiptId</span>
+                    <span>Request status</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
@@ -193,7 +193,7 @@
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
                 <h3>@step</h3>
-                <p>The loop stays named and bounded.</p>
+                <p>The next step stays clear.</p>
             </div>
         </article>
     }
@@ -202,9 +202,9 @@
 <section class="trust-page-layout">
     <div class="trust-page-sections">
         <article class="trust-page-section trust-page-section--form" id="karma-forge-intake">
-            <p class="eyebrow">Structured intake</p>
-            <h2>Pre-screen the table pain before it turns into canon talk.</h2>
-            <p>Tell Chummer what is breaking trust or pace. Hub normalizes it into Chummer-owned packets.</p>
+            <p class="eyebrow">Intake</p>
+            <h2>Describe the problem.</h2>
+            <p>Tell Chummer what is breaking trust or pace at the table.</p>
 
             @if (!string.IsNullOrWhiteSpace(Model.Form.SubmissionNotice))
             {
@@ -320,7 +320,7 @@
                     <div class="field">
                         <label>
                             <input name="FollowUpAllowed" type="checkbox" value="true" checked="@Model.Form.DefaultFollowUpAllowed" />
-                            Chummer may follow up through the reply route I provided if this packet looks high-signal.
+                            Chummer may follow up through the reply route I provided if this request looks useful.
                         </label>
                     </div>
                     <div class="field">
@@ -332,12 +332,12 @@
                     <div class="field">
                         <label>
                             <input name="ConsentAccepted" type="checkbox" value="true" checked="@Model.Form.DefaultConsentAccepted" required />
-                            I understand this may inform Chummer design, but it does not become feature truth or backlog ownership by itself.
+                            I understand this may inform Chummer design, but it does not become a feature commitment or backlog ownership by itself.
                         </label>
                     </div>
                 </details>
                 <div class="stacked-actions">
-                    <button class="button-like button-like--primary" type="submit">Normalize into KARMA FORGE packets</button>
+                    <button class="button-like button-like--primary" type="submit">Send request</button>
                     <a class="button-like button-like--ghost" href="/contact#support-intake">This is really a normal support issue</a>
                 </div>
             </form>
@@ -346,7 +346,7 @@
         <article class="trust-page-section" id="track-questions">
             <p class="eyebrow">Follow-up prompts</p>
             <h2>@Model.SelectedTrack.Title</h2>
-            <p>These prompts sharpen the need without becoming truth by themselves.</p>
+            <p>These prompts sharpen the need without becoming decisions by themselves.</p>
             <ul class="trust-page-section__list">
                 @foreach (var question in Model.SelectedTrack.Questions)
                 {
@@ -357,9 +357,9 @@
 
         <article class="trust-page-section" id="candidate-decisions">
             <p class="eyebrow">Priority decisions</p>
-            <h2>Every packet still has to land on a named decision.</h2>
+            <h2>Every request should land on a clear decision.</h2>
             <p>Discovery does not skip straight to implementation.</p>
-            <p class="muted-copy">The packet stays explicit before any routing or follow-up.</p>
+            <p class="muted-copy">The request stays clear before any routing or follow-up.</p>
             <div class="settings-summary-list">
                 @foreach (var decision in Model.CandidateDecisions)
                 {
@@ -384,11 +384,11 @@
 
         <article class="trust-page-section" id="recent-packets">
             <p class="eyebrow">Signed-in history</p>
-            <h2>Your recent KARMA FORGE packets</h2>
-            <p>@(Model.Form.Authenticated ? "Signed-in submissions stay visible here with current queue posture." : "Sign in if you want packet history beyond the receipt link.")</p>
+            <h2>Your recent KARMA FORGE requests</h2>
+            <p>@(Model.Form.Authenticated ? "Signed-in submissions stay visible here with current queue status." : "Sign in if you want request history beyond this page.")</p>
             @if (Model.RecentSubmissions.Count == 0)
             {
-                <p class="muted-copy">No signed-in KARMA FORGE packets are visible on this account yet.</p>
+                <p class="muted-copy">No signed-in KARMA FORGE requests are visible on this account yet.</p>
             }
             else
             {

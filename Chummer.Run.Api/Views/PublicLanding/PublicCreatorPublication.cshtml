@@ -17,8 +17,8 @@
             "active" => "Ready",
             "linked" => "Ready",
             "pending" => "Pending",
-            "pending_verification" => "Verification sent",
-            "verified" => "Verified",
+            "pending_verification" => "Confirmation sent",
+            "verified" => "Confirmed",
             "approved" => "Approved",
             "published" => "Published",
             "self_service" => "Self-service",
@@ -39,15 +39,15 @@
                 : "Limited release";
 
     var publicationPostureTitle = publicationRouteReviewRequired
-        ? "Why this publication stays review-required"
+        ? "Why this publication is still limited"
         : "Why this publication is live";
     var publicationPostureCopy = publicationRouteReviewRequired
-        ? "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together while direct parity proof still keeps the public claim under review."
-        : "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.";
+        ? "This page keeps the useful detail and next step together while public availability stays limited."
+        : "This page keeps the useful detail and next step together.";
     var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
-        ?? "No visible receipt is attached to this outward-facing publication yet.";
+        ?? "No visible publication history is attached to this outward-facing publication yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
     var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in account return view" : "Create account for signed-in account return";
     var signedInShelfSummary = Model.Chrome.Authenticated
@@ -64,16 +64,16 @@
             Summary = "This publication detail page belongs to the discovery family. Use the gallery and discovery pages when you want to inspect related outputs instead of jumping straight to downloads.",
             Href = Model.BackHref,
             Label = "Back to publication discovery",
-            Proof = new[] { "Details first", "Publication lineage", "Comparison nearby" }
+            Details = new[] { "Details first", "Related items", "Comparison nearby" }
         },
         new
         {
             Badge = "Creator routing",
             Title = "Use the creator concierge when the next job is consult, intake, or creator next steps",
-            Summary = "The creator wrapper keeps consult routing, governed intake, and packet return separate from downloads, support, and account truth.",
+            Summary = "The creator wrapper keeps creator intake and follow-up separate from downloads, support, and account settings.",
             Href = creatorConciergeHref,
             Label = "Open creator concierge",
-            Proof = new[] { "Consult stays bounded", "Packet return visible", "No install confusion" }
+            Details = new[] { "Creator intake", "Follow-up visible", "No install confusion" }
         },
         new
         {
@@ -82,7 +82,7 @@
             Summary = "The publication page should never compete with the recommended build, platform posture, or install help. Downloads still owns that decision.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "Install path stays primary", "Known issues nearby", "No fake build path" }
+            Details = new[] { "Install path", "Known issues nearby", "No fake build path" }
         },
         new
         {
@@ -93,18 +93,18 @@
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
-            Proof = Model.Chrome.Authenticated
+            Details = Model.Chrome.Authenticated
                 ? new[] { "Personal and campaign returns", "Creator next steps", "Same detail view" }
                 : new[] { "Public first", "Account adds return paths", "No auth wall for discovery" }
         },
         new
         {
             Badge = "Public testimonials",
-            Title = "Use the testimonial wrapper when you want moderated public validation instead of support follow-up",
+            Title = "Use the testimonial wrapper when you want moderated public feedback instead of support follow-up",
             Summary = "The testimonial route keeps ratings, media captures, and moderation separate from support cases, install recovery, and publication approval.",
             Href = testimonialConciergeHref,
             Label = "Open testimonial wrapper",
-            Proof = new[] { "Moderated public validation", "Optional media capture", "Support stays separate" }
+            Details = new[] { "Moderated feedback", "Optional media", "Support stays separate" }
         },
         new
         {
@@ -113,7 +113,7 @@
             Summary = "If the problem needs logs, account recovery, install repair, or private campaign detail, leave the publication page and move to help or support immediately.",
             Href = "/help",
             Label = "Open help",
-            Proof = new[] { "Support-owned", "Private help", "No page confusion" }
+            Details = new[] { "Setup help", "Private help", "No page confusion" }
         }
     };
 }
@@ -132,7 +132,7 @@
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }
@@ -157,7 +157,7 @@
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
-            <p class="muted-copy">Current direct parity receipts still keep the public parity claim under review.</p>
+            <p class="muted-copy">Current desktop coverage still keeps this public wording limited.</p>
         }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
@@ -178,7 +178,7 @@
             <p>@HumanizeStatus(Model.Publication.Kind, "Publication packet")</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Provenance</span>
+            <span class="tag">Source</span>
             <p>@Model.Publication.ProvenanceSummary</p>
         </article>
         <article class="trust-rail">
@@ -190,20 +190,20 @@
             <p>@Model.Publication.DiscoverySummary</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Publication receipt</span>
+            <span class="tag">History</span>
             <p>@routeReceiptSummary</p>
             @if (Model.RouteReceipt is not null)
             {
-                <p class="muted-copy">Receipt @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute (@HumanizeStatus(Model.RouteReceipt.MatchMode, "Page match")).</p>
+                <p class="muted-copy">This page is linked to the current publication history.</p>
             }
             else
             {
-                <p class="muted-copy">This publication stays bounded until a current outward-facing receipt is attached.</p>
+                <p class="muted-copy">This publication stays bounded until current outward-facing history is attached.</p>
             }
         </article>
         <article class="trust-rail">
-            <span class="tag">Required receipts</span>
-            <p>@string.Join(", ", Model.RequiredReceiptRefs)</p>
+            <span class="tag">Required details</span>
+            <p>@Model.RequiredReceiptRefs.Count required item@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") attached.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {

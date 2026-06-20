@@ -2,14 +2,14 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Use this live surface</p>
-        <h2 class="editorial-title">What this live artifact does, who it helps, and where to go next</h2>
-        <p class="editorial-copy">Live artifact pages should help you use the product surface immediately, then point you to the right next step before you leave for support.</p>
+        <p class="eyebrow">Use this page</p>
+        <h2 class="editorial-title">What it does, who it helps, and where to go next</h2>
+        <p class="editorial-copy">Start with the product action. Use help only if the page stops being enough.</p>
     </div>
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
             <span class="tag">Use it now</span>
-            <p>Start from the live product surface attached to this artifact, then use support only if the surface stops being enough to move forward.</p>
+            <p>Start from the product page, then use help only if it does not get you where you need to go.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
         {
@@ -28,7 +28,7 @@
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
         {
             <article class="role-matrix__cell">
-                <span class="tag">How to verify it</span>
+                <span class="tag">What to look for</span>
                 <p>@Model.ProofNote</p>
             </article>
         }
@@ -39,8 +39,8 @@
 {
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Verification markers</p>
-            <h2 class="editorial-title">Keep these cues in view before you assume the page is complete</h2>
+            <p class="eyebrow">Useful cues</p>
+            <h2 class="editorial-title">Keep these in view before you decide this is the right page.</h2>
         </div>
         <div class="trust-claim__microproof">
             @foreach (var item in Model.MicroProof)
@@ -55,7 +55,7 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Start from the live surface</h3>
-            <p>Use the product action first, not the gallery card. Live artifact pages should move you into the working surface before they send you to any secondary reading.</p>
+            <p>Use the product action first. The page should move you forward before it sends you to secondary reading.</p>
         </div>
         <a class="inline-link" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
     </article>
@@ -78,7 +78,7 @@
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
                 <h3>Keep the same detail trail signed in</h3>
-                <p>Use the signed-in detail view when you want the same recap, campaign, and publication record instead of jumping across separate detail pages.</p>
+                <p>Use the signed-in detail view when you want the same recap, campaign, and publication history in one place.</p>
             </div>
             <a class="inline-link" href="/artifacts#signed-in-detail-view">Open signed-in detail view</a>
         </article>

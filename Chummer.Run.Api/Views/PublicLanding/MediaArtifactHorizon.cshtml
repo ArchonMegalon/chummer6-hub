@@ -26,8 +26,8 @@
 
 <section class="continuity-band">
     <div class="continuity-band__copy">
-        <p class="eyebrow">Boundary</p>
-        <h2 class="editorial-title">Real packets, bounded scope.</h2>
+        <p class="eyebrow">Limits</p>
+        <h2 class="editorial-title">Files, with the limits clearly stated.</h2>
         <p class="editorial-copy">@Model.BoundaryLine</p>
     </div>
 </section>
@@ -36,7 +36,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Connected lane</p>
+            <p class="eyebrow">Connected page</p>
             <h2 class="editorial-title">@Model.ConnectedLanePacket.Heading</h2>
             <p class="editorial-copy">@Model.ConnectedLanePacket.Summary</p>
         </div>
@@ -47,7 +47,7 @@
                     <span class="tag">@cue.StatusLabel</span>
                     <h3>@cue.Label</h3>
                     <p>@cue.Summary</p>
-                    <a class="editorial-strip__action" href="@cue.Href">Open lane</a>
+                    <a class="editorial-strip__action" href="@cue.Href">Open page</a>
                 </article>
             }
         </div>
@@ -57,9 +57,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Artifact lane</p>
-        <h2 class="editorial-title">Download the packet before trusting the pitch.</h2>
-        <p class="editorial-copy">This lane is only real if it ships actual first-party packet routes, not just horizon copy. Each card here has markdown and JSON rails.</p>
+        <p class="eyebrow">Files</p>
+        <h2 class="editorial-title">Open the files when you need detail.</h2>
+        <p class="editorial-copy">Each card has readable notes and raw data for tools.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var document in Model.Documents)
@@ -75,8 +75,8 @@
                     }
                 </div>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--secondary" href="@document.MarkdownRoute">Open markdown</a>
-                    <a class="button-like button-like--ghost" href="@document.JsonRoute">Open JSON</a>
+                    <a class="button-like button-like--secondary" href="@document.MarkdownRoute">Open notes</a>
+                    <a class="button-like button-like--ghost" href="@document.JsonRoute">Open data</a>
                 </div>
             </article>
         }

@@ -398,14 +398,16 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep intake, roadmap, account return, and support on separate pages.", view, StringComparison.Ordinal);
+        Assert.Contains("Pick the page that matches the job.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Stay on this page when the job is turning table pain into a Chummer packet", view, StringComparison.Ordinal);
-        Assert.Contains("Return to participate when the question is broader public discovery, not this intake", view, StringComparison.Ordinal);
-        Assert.Contains("Create the account only when you want packet history and next steps in one place", view, StringComparison.Ordinal);
+        Assert.Contains("Submit a rules or table problem", view, StringComparison.Ordinal);
+        Assert.Contains("Return to participate for broader feedback", view, StringComparison.Ordinal);
+        Assert.Contains("Create an account only if you want request history", view, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", view, StringComparison.Ordinal);
-        Assert.Contains("Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work", view, StringComparison.Ordinal);
-        Assert.Contains("The loop is visible before any rules work starts.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("governed discovery intake", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Normalize into KARMA FORGE packets", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help for setup, account, or bug problems", view, StringComparison.Ordinal);
+        Assert.Contains("Recent intake at a glance.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -421,17 +423,21 @@ public sealed class PublicLandingReleaseTrustViewTests
         string previewConcept = File.ReadAllText(previewConceptPath);
         string roadmap = File.ReadAllText(roadmapPath);
 
-        Assert.Contains("invite path is for governed joining", joinPrimer, StringComparison.Ordinal);
+        Assert.Contains("invite path is for joining", joinPrimer, StringComparison.Ordinal);
         Assert.DoesNotContain("invite rail", joinPrimer, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", joinPrimer, StringComparison.Ordinal);
 
+        Assert.Contains("Use this page", liveProof, StringComparison.Ordinal);
+        Assert.Contains("Useful cues", liveProof, StringComparison.Ordinal);
         Assert.Contains("signed-in detail view", liveProof, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain("Verification markers", liveProof, StringComparison.Ordinal);
 
         Assert.Contains("detail view", previewConcept, StringComparison.Ordinal);
         Assert.Contains("signed-in detail view", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain("artifact is already live", previewConcept, StringComparison.Ordinal);
 
         Assert.Contains("signed-in detail view", roadmap, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", roadmap, StringComparison.Ordinal);
