@@ -91,6 +91,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertTrue(any("Windows Installer Gold Proof" in item for item in payload["nextActions"]))
         self.assertTrue(any("windows-installer-gold-proof.yml" in item for item in payload["nextActions"]))
         self.assertTrue(any("does not publish downloads" in item for item in payload["nextActions"]))
+        self.assertTrue(any("byte-identical" in item for item in payload["nextActions"]))
         self.assertTrue(any("native Windows pass" in item for item in payload["nextActions"]))
 
     def test_native_startup_with_only_completion_screenshots_still_fails(self) -> None:

@@ -1,0 +1,107 @@
+{
+  "contract_name": "chummer.windows_installer_visual_audit",
+  "generated_at_utc": "2026-06-20T01:04:49Z",
+  "status": "fail",
+  "release": {
+    "version": "run-258",
+    "channel": "preview"
+  },
+  "artifact": {
+    "artifactId": "avalonia-win-x64-installer",
+    "fileName": "chummer-avalonia-win-x64-installer.exe",
+    "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe",
+    "sha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
+    "actualSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51"
+  },
+  "startupReceipt": {
+    "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+    "status": "pass",
+    "verificationDisposition": null,
+    "skipClass": null,
+    "artifactDigest": "sha256:c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51"
+  },
+  "visualAuditSource": {
+    "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+    "exists": true,
+    "status": "review_required",
+    "platform": "windows",
+    "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
+    "artifactSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
+    "screenshotCount": 4,
+    "defaultDpiScreenshotCount": 2,
+    "scaledDpiScreenshotCount": 2,
+    "requiredSurfaces": [
+      "install-progress",
+      "completion"
+    ]
+  },
+  "screenshots": [
+    {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
+      "exists": true,
+      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "dpiScale": "1.0",
+      "surface": "install-progress",
+      "canonicalSurface": "install-progress",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
+      "exists": true,
+      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "dpiScale": "1.0",
+      "surface": "completion",
+      "canonicalSurface": "completion",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
+      "exists": true,
+      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "dpiScale": "1.5",
+      "surface": "install-progress",
+      "canonicalSurface": "install-progress",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
+      "exists": true,
+      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "dpiScale": "1.5",
+      "surface": "completion",
+      "canonicalSurface": "completion",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows"
+    }
+  ],
+  "failures": [
+    "Windows installer visual audit source is not pass",
+    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
+    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
+    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
+    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
+    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
+    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
+    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
+    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
+    "Windows installer screenshots for distinct required surfaces are byte-identical: 0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3 covers completion, install-progress"
+  ],
+  "nextActions": [
+    "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
+    "Preferred remote path: trigger GitHub Actions workflow 'Windows Installer Gold Proof' (.github/workflows/windows-installer-gold-proof.yml); it captures native Windows evidence only and does not publish downloads.",
+    "Use PowerShell: scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5",
+    "Use PowerShell: scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass",
+    "If you need manual capture, run scripts/capture_windows_installer_visual_audit.ps1 once per surface/DPI for install-progress and completion at default plus scaled DPI.",
+    "If progress and completion screenshots are byte-identical, rerun manual capture with the progress dialog visible before accepting the completion dialog.",
+    "If proof came from GitHub Actions, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+    "Commit the generated source receipt and screenshots under /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer.",
+    "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest."
+  ]
+}

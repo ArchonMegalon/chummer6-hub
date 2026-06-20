@@ -1,0 +1,61 @@
+{
+  "contract_name": "chummer.windows_installer_visual_audit.source",
+  "status": "review_required",
+  "platform": "windows",
+  "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
+  "artifactPath": "D:\\a\\chummer6-hub\\chummer6-hub\\Chummer.Portal\\downloads\\files\\chummer-avalonia-win-x64-installer.exe",
+  "artifactSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
+  "sourceUpdatedAtUtc": "2026-06-20T01:02:20.1230657Z",
+  "requiredSurfaces": [
+    "install-progress",
+    "completion"
+  ],
+  "surfaceCoverage": {
+    "install-progress": {
+      "defaultDpi": true,
+      "scaledDpi": true
+    },
+    "completion": {
+      "defaultDpi": true,
+      "scaledDpi": true
+    }
+  },
+  "screenshots": [
+    {
+      "path": "windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
+      "dpiScale": "1.0",
+      "surface": "install-progress",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows",
+      "capturedAtUtc": "2026-06-20T01:02:10.7613936Z"
+    },
+    {
+      "path": "windows-installer-completion-dpi-1.0-20260620T010213Z.png",
+      "dpiScale": "1.0",
+      "surface": "completion",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows",
+      "capturedAtUtc": "2026-06-20T01:02:13.8420969Z"
+    },
+    {
+      "path": "windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
+      "dpiScale": "1.5",
+      "surface": "install-progress",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows",
+      "capturedAtUtc": "2026-06-20T01:02:16.8978962Z"
+    },
+    {
+      "path": "windows-installer-completion-dpi-1.5-20260620T010219Z.png",
+      "dpiScale": "1.5",
+      "surface": "completion",
+      "clippingStatus": "review_required",
+      "readabilityStatus": "review_required",
+      "hostClass": "native-windows",
+      "capturedAtUtc": "2026-06-20T01:02:19.9518788Z"
+    }
+  ]
+}

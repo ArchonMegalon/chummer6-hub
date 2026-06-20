@@ -216,6 +216,7 @@ def build_payload(
             f"Use PowerShell: {GOLD_PROOF_SCRIPT} -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5",
             f"Use PowerShell: {CAPTURE_SCRIPT} -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass",
             f"If you need manual capture, run {CAPTURE_SCRIPT} once per surface/DPI for install-progress and completion at default plus scaled DPI.",
+            "If progress and completion screenshots are byte-identical, rerun manual capture with the progress dialog visible before accepting the completion dialog.",
             "If proof came from GitHub Actions, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
             f"Commit the generated source receipt and screenshots under {source_path.parent}.",
             "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest.",
