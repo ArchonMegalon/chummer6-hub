@@ -8374,6 +8374,19 @@ body {
   line-height: 1.52;
 }
 
+.minimal-video {
+  margin: clamp(1rem, 3vw, 1.65rem) 0 0;
+  border: 1px solid var(--minimal-line);
+  background: var(--minimal-soft);
+}
+
+.minimal-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #111111;
+}
+
 .minimal-download-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

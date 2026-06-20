@@ -30,8 +30,18 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (!heroImageComplete) {
     failures.push('homepage: hero image did not load with useful dimensions');
   }
+  const productVideo = desktop.locator('[data-homepage-section="workflow"] video[aria-label="Product video"]');
+  await expect(productVideo).toBeVisible();
+  const videoSources = await productVideo.locator('source').evaluateAll((sources) =>
+    sources.map((source) => (source as HTMLSourceElement).getAttribute('src') || ''),
+  );
+  if (!videoSources.includes('/media/promo/chummer6-flagship-promo.mp4') || !videoSources.includes('/media/promo/chummer6-flagship-promo.webm')) {
+    failures.push(`homepage: product video sources are missing or wrong: ${videoSources.join(', ')}`);
+  }
+  const captionTrack = productVideo.locator('track[kind="captions"]');
+  await expect(captionTrack).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo.vtt');
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toContainText('Get the app');
-  results.push({ surface: 'home', nav_panel_open: navPanelOpen, hero_image_loaded: heroImageComplete });
+  results.push({ surface: 'home', nav_panel_open: navPanelOpen, hero_image_loaded: heroImageComplete, product_video_sources: videoSources });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
   const stableLane = desktop.locator('#stable');
@@ -56,7 +66,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const nextActions = decisionSurface.locator('.minimal-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
   await expect(decisionSurface).toContainText('Release');
-  await expect(decisionSurface).toContainText('Downloads');
+  await expect(decisionSurface).toContainText('Open downloads');
   const cardCount = await decisionCards.count();
   if (cardCount !== 1) {
     failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);
