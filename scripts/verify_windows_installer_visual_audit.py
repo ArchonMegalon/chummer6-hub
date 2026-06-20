@@ -107,9 +107,36 @@ def screenshot_rows(source_path: Path, source: dict[str, Any]) -> list[dict[str,
                 "clippingStatus": normalized(row.get("clippingStatus")),
                 "readabilityStatus": normalized(row.get("readabilityStatus")),
                 "hostClass": str(row.get("hostClass") or "").strip(),
+                "captureMode": normalized(row.get("captureMode")),
+                "captureBounds": row.get("captureBounds") if isinstance(row.get("captureBounds"), dict) else {},
+                "reusedFrom": str(row.get("reusedFrom") or "").strip(),
+                "windowTitle": str(row.get("windowTitle") or "").strip(),
             }
         )
     return normalized_rows
+
+
+def capture_bounds_look_like_desktop_fallback(row: dict[str, Any]) -> bool:
+    mode = normalized(row.get("captureMode"))
+    if mode not in {"window-bounds", "reused-same-surface"}:
+        return False
+    if row.get("canonicalSurface") not in REQUIRED_SURFACES:
+        return False
+
+    bounds = row.get("captureBounds")
+    if not isinstance(bounds, dict):
+        return False
+    try:
+        left = int(bounds.get("left", 0))
+        top = int(bounds.get("top", 0))
+        width = int(bounds.get("width", 0))
+        height = int(bounds.get("height", 0))
+    except (TypeError, ValueError):
+        return False
+
+    # A real Chummer installer window is compact even at scaled DPI. 1024x768 from
+    # (0,0) is the Windows runner's virtual desktop fallback, not a dialog.
+    return left == 0 and top == 0 and width >= 1000 and height >= 700
 
 
 def build_payload(
@@ -195,6 +222,11 @@ def build_payload(
             failures.append(f"Windows installer screenshot clipping check is not pass: {row['path']}")
         if row["readabilityStatus"] != "pass":
             failures.append(f"Windows installer screenshot readability check is not pass: {row['path']}")
+        if capture_bounds_look_like_desktop_fallback(row):
+            failures.append(
+                "Windows installer screenshot used full-desktop fallback bounds instead of the installer window: "
+                f"{row['path']}"
+            )
     rows_by_hash: dict[str, set[str]] = {}
     for row in screenshots:
         screenshot_sha = str(row.get("sha256") or "")

@@ -284,6 +284,87 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             any("distinct required surfaces are byte-identical" in item for item in payload["failures"])
         )
 
+    def test_automated_full_desktop_capture_bounds_block_visual_gold(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-installer-visual-bounds-") as temp_dir:
+            root = Path(temp_dir)
+            downloads_root, release_channel, sha = self._write_release_fixture(root)
+            startup = downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+            startup.parent.mkdir()
+            startup.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "artifactDigest": f"sha256:{sha}",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            source = downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            source.parent.mkdir(parents=True)
+            for index, name in enumerate(["progress-default.png", "progress-scaled.png", "completion-default.png", "completion-scaled.png"]):
+                (source.parent / name).write_bytes(f"png-{index}".encode("utf-8"))
+            source.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "platform": "windows",
+                        "hostClass": "native-windows-11",
+                        "artifactSha256": sha,
+                        "screenshots": [
+                            {
+                                "path": "progress-default.png",
+                                "dpiScale": 1.0,
+                                "surface": "install-progress",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 180, "top": 200, "width": 656, "height": 319},
+                            },
+                            {
+                                "path": "progress-scaled.png",
+                                "dpiScale": 1.5,
+                                "surface": "install-progress",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 180, "top": 200, "width": 656, "height": 319},
+                            },
+                            {
+                                "path": "completion-default.png",
+                                "dpiScale": 1.0,
+                                "surface": "completion",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 0, "top": 0, "width": 1024, "height": 768},
+                            },
+                            {
+                                "path": "completion-scaled.png",
+                                "dpiScale": 1.5,
+                                "surface": "completion",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                                "captureMode": "reused-same-surface",
+                                "captureBounds": {"left": 0, "top": 0, "width": 1024, "height": 768},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            payload = module.build_payload(
+                release_channel_path=release_channel,
+                downloads_root=downloads_root,
+                startup_receipt_path=startup,
+                source_path=source,
+            )
+
+        self.assertEqual("fail", payload["status"])
+        self.assertTrue(
+            any("used full-desktop fallback bounds" in item for item in payload["failures"])
+        )
+
     def test_windows_capture_helper_updates_source_receipt_without_manual_json_editing(self) -> None:
         script = Path("/docker/chummercomplete/chummer.run-services/scripts/capture_windows_installer_visual_audit.ps1")
         text = script.read_text(encoding="utf-8")
@@ -313,6 +394,9 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("function Get-CaptureBounds", text)
         self.assertIn("GetWindowRect", text)
         self.assertIn("SetForegroundWindow", text)
+        self.assertIn("Automated installer capture refused full-screen fallback", text)
+        self.assertIn("expected compact installer window bounds", text)
+        self.assertIn("Get-CaptureBounds $window (-not $AutoCapture)", text)
         self.assertIn("window-bounds", text)
         self.assertIn("captureBounds", text)
         self.assertIn("Launching installer for visual capture", text)

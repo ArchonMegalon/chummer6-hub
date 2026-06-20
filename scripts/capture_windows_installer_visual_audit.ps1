@@ -158,25 +158,44 @@ namespace ChummerInstallerCapture
 }
 "@
 
-function Get-CaptureBounds([object]$Window) {
+function Get-CaptureBounds([object]$Window, [bool]$AllowScreenFallback = $true) {
     $fallbackBounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
     if ($null -eq $Window) {
+        if (-not $AllowScreenFallback) {
+            throw "Automated installer capture refused full-screen fallback because no installer window was available."
+        }
         return $fallbackBounds
     }
 
     if ($Window.MainWindowHandle -eq [IntPtr]::Zero) {
+        if (-not $AllowScreenFallback) {
+            throw "Automated installer capture refused full-screen fallback because the installer window handle was invalid."
+        }
         return $fallbackBounds
     }
 
     $rect = New-Object ChummerInstallerCapture.Rect
     if (-not [ChummerInstallerCapture.NativeMethods]::GetWindowRect($Window.MainWindowHandle, [ref]$rect)) {
+        if (-not $AllowScreenFallback) {
+            throw "Automated installer capture refused full-screen fallback because the installer window bounds could not be read."
+        }
         return $fallbackBounds
     }
 
     $width = [Math]::Max(0, $rect.Right - $rect.Left)
     $height = [Math]::Max(0, $rect.Bottom - $rect.Top)
     if ($width -lt 240 -or $height -lt 160) {
+        if (-not $AllowScreenFallback) {
+            throw "Automated installer capture refused full-screen fallback because the installer window bounds were too small."
+        }
         return $fallbackBounds
+    }
+    if (-not $AllowScreenFallback -and
+        $rect.Left -eq $fallbackBounds.Left -and
+        $rect.Top -eq $fallbackBounds.Top -and
+        $width -eq $fallbackBounds.Width -and
+        $height -eq $fallbackBounds.Height) {
+        throw "Automated installer capture refused full-screen fallback bounds; expected compact installer window bounds."
     }
 
     return New-Object System.Drawing.Rectangle $rect.Left, $rect.Top, $width, $height
@@ -270,7 +289,7 @@ foreach ($request in $captureRequests) {
         [void](Read-Host)
     }
 
-    $bounds = Get-CaptureBounds $window
+    $bounds = Get-CaptureBounds $window (-not $AutoCapture)
     $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
