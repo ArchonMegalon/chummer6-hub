@@ -83,7 +83,7 @@ test('public user pages do not expose AI or repo-process copy', async ({ page })
     'AI generated',
   ];
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/participate', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
     const pageSource = await page.content();

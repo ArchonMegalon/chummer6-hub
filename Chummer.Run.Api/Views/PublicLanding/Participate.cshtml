@@ -17,6 +17,7 @@
     var betaHref = Model.Chrome.Authenticated
         ? "/account/participation"
         : "/signup?next=%2Faccount%2Fparticipation";
+    string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
     var fixerRoutes = new[]
     {
         new
@@ -190,16 +191,16 @@
         @foreach (var route in fixerRoutes)
         {
             <article class="trust-claim" id="@route.Id">
-                <span class="tag">@route.Eyebrow</span>
-                <h3>@route.Title</h3>
-                <p>@route.Summary</p>
+                <span class="tag">@PublicText(route.Eyebrow)</span>
+                <h3>@PublicText(route.Title)</h3>
+                <p>@PublicText(route.Summary)</p>
                 <div class="trust-claim__microproof">
                     @foreach (var item in route.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="inline-link" href="@route.Href">@route.Label</a>
+                <a class="inline-link" href="@route.Href">@PublicText(route.Label)</a>
             </article>
         }
     </div>
@@ -215,16 +216,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicText(choice.Badge)</span>
+                <h3>@PublicText(choice.Title)</h3>
+                <p>@PublicText(choice.Summary)</p>
                 <div class="route-choice-card__proof">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
             </article>
         }
     </div>
@@ -234,22 +235,22 @@
 {
     <section class="editorial-block" id="build-ghost-concierge">
         <div class="editorial-block__lead">
-            <p class="eyebrow">ALICE build ghosts</p>
-            <h2 class="editorial-title">Use the public concierge for orientation, then finish the build inside Chummer.</h2>
-            <p class="editorial-copy">@buildGhost.Summary</p>
+            <p class="eyebrow">Character help preview</p>
+            <h2 class="editorial-title">Use the public helper for orientation, then finish the build inside Chummer.</h2>
+            <p class="editorial-copy">@PublicText(buildGhost.Summary)</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
-                <span class="tag">@buildGhost.StatusLabel</span>
-                <h3>Public concierge can help open the path</h3>
-                <p>The actual Build Ghost compare and apply decision still stays inside Chummer.</p>
+                <span class="tag">@PublicText(buildGhost.StatusLabel)</span>
+                <h3>Public helper can open the path</h3>
+                <p>The compare and apply decision still stays inside Chummer.</p>
                 <div class="route-choice-card__proof">
                     @foreach (var item in buildGhost.ProofPoints)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@buildGhost.Href">Open Build Ghost concierge</a>
+                <a class="editorial-strip__action" href="@buildGhost.Href">Open character helper</a>
             </article>
         </div>
     </section>
@@ -266,11 +267,11 @@
         {
             <article class="workflow-card">
                 <div class="workflow-card__copy">
-                    <span class="tag">@stage.Badge</span>
-                    <h3>@stage.Title</h3>
-                    <p>@stage.Summary</p>
-                    <p class="workflow-card__proof">@stage.Detail</p>
-                    <a class="inline-link" href="@stage.Href">@stage.Label</a>
+                    <span class="tag">@PublicText(stage.Badge)</span>
+                    <h3>@PublicText(stage.Title)</h3>
+                    <p>@PublicText(stage.Summary)</p>
+                    <p class="workflow-card__proof">@PublicText(stage.Detail)</p>
+                    <a class="inline-link" href="@stage.Href">@PublicText(stage.Label)</a>
                 </div>
             </article>
         }
@@ -283,13 +284,13 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Community event venue boundary</p>
         <h2 class="editorial-title">BeHuman can help host public community events, but it does not decide the product.</h2>
-            <p class="editorial-copy">@beHuman.Summary</p>
+            <p class="editorial-copy">@PublicText(beHuman.Summary)</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
-                <span class="tag">@beHuman.StatusLabel</span>
-                <h3>@PublicFacingCopyHumanizer.Clean(beHuman.Verdict)</h3>
-                <p>Current setup: <code class="mono-receipt">@PublicFacingCopyHumanizer.Clean(beHuman.OperatingMode)</code></p>
+                <span class="tag">@PublicText(beHuman.StatusLabel)</span>
+                <h3>@PublicText(beHuman.Verdict)</h3>
+                <p>Current setup: <code class="mono-receipt">@PublicText(beHuman.OperatingMode)</code></p>
                 <p>
                     @if (beHuman.CapacityClaimAllowed && beHuman.VerifiedRegistrationCapacity is > 0)
                     {
@@ -307,7 +308,7 @@
                 <div class="route-choice-card__proof">
                     @foreach (var eventFamily in beHuman.AllowedEventFamilies)
                     {
-                        <span>@eventFamily</span>
+                        <span>@PublicText(eventFamily)</span>
                     }
                 </div>
             </article>
@@ -317,7 +318,7 @@
                 <div class="route-choice-card__proof">
                     @foreach (var truthDomain in beHuman.ForbiddenTruthDomains)
                     {
-                        <span>@truthDomain</span>
+                        <span>@PublicText(truthDomain)</span>
                     }
                 </div>
             </article>
@@ -343,10 +344,10 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
-                                <p>@milestone.CasualSummary</p>
+                                <h3>@($"Milestone {milestone.Id}") · @PublicText(milestone.Title)</h3>
+                                <p>@PublicText(milestone.CasualSummary)</p>
                             </div>
-                            <span class="tag">@milestone.StatusLabel</span>
+                            <span class="tag">@PublicText(milestone.StatusLabel)</span>
                         </article>
                     }
                 </div>
@@ -364,10 +365,10 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@PublicText(card.Card.Title)</h3>
+                                <p>@PublicText(card.Card.Summary)</p>
                             </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -385,10 +386,10 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@PublicText(card.Card.Title)</h3>
+                                <p>@PublicText(card.Card.Summary)</p>
                             </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -414,10 +415,10 @@
                             : card.Card.Id.Replace('_', '-');
                         <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@PublicText(card.Card.Title)</h3>
+                                <p>@PublicText(card.Card.Summary)</p>
                             </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -437,10 +438,10 @@
                             : card.Card.Id.Replace('_', '-');
                         <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@PublicText(card.Card.Title)</h3>
+                                <p>@PublicText(card.Card.Summary)</p>
                             </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                         </article>
                     }
                 </div>

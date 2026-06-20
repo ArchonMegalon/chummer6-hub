@@ -35,7 +35,9 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const videoSources = await productVideo.locator('source').evaluateAll((sources) =>
     sources.map((source) => (source as HTMLSourceElement).getAttribute('src') || ''),
   );
-  if (!videoSources.includes('/media/promo/chummer6-flagship-promo.mp4') || !videoSources.includes('/media/promo/chummer6-flagship-promo.webm')) {
+  const hasMp4 = videoSources.some((source) => source === '/media/promo/chummer6-flagship-promo.mp4' || source.startsWith('/media/promo/chummer6-flagship-promo.mp4?'));
+  const hasWebm = videoSources.some((source) => source === '/media/promo/chummer6-flagship-promo.webm' || source.startsWith('/media/promo/chummer6-flagship-promo.webm?'));
+  if (!hasMp4 || !hasWebm) {
     failures.push(`homepage: product video sources are missing or wrong: ${videoSources.join(', ')}`);
   }
   const captionTrack = productVideo.locator('track[kind="captions"]');
