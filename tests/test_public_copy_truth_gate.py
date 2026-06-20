@@ -38,7 +38,8 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "First-party follow-up is not posted here yet." in operations
     assert "account-backed follow-up waits until the shipped path is available on this host" in operations
     assert "Public feedback stays easy to route." in operations
-    assert "Decision sources" in projection
+    assert "Decision context" in projection
+    assert "Decision sources" not in projection
     assert "Before it ships" in projection
     assert "The /feedback public copy stays clear, public-safe, and honest about what has shipped." in GATE_SCRIPT.read_text(encoding="utf-8")
     assert "webhook verification" not in feedback

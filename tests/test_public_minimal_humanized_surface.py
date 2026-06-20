@@ -273,15 +273,20 @@ def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
         "Record summary",
         "without losing the record",
         "The record keeps",
+        "Package records should not become a support workaround",
+        "Stored records",
+        "Decision sources",
     ):
         assert forbidden not in combined
 
     assert "Saved action" in sources["package_receipt"]
     assert "without losing the saved action" in sources["package_receipt"]
+    assert "Package activity should not become a support workaround" in sources["package_receipt"]
     assert "Portable runner explanation" in sources["anarchy"]
     assert "Recent decision" in sources["ledger_account"]
     assert "Recent decision" in sources["ledger_faction_workspace"]
     assert "Delivery attempt" in sources["ledger_notifications"]
+    assert "Saved updates" in sources["ledger_notifications"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Provenance)" in sources["knowledge_fabric"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Route)" in sources["nexus_pan"]
 
