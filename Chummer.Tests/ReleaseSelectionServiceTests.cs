@@ -576,7 +576,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildExperienceKeepsPublicStableMacDmgVisibleWhenProofIsMirrored()
+    public void BuildExperienceKeepsMacDmgOffPublicDownloadsEvenWhenProofIsMirrored()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -626,13 +626,14 @@ platforms:
 
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: false);
 
-        Assert.Contains(experience.OtherPlatforms, item => item.Artifact.Id == "avalonia-osx-arm64-installer");
+        Assert.DoesNotContain(experience.OtherPlatforms, item => item.Artifact.Id == "avalonia-osx-arm64-installer");
         var mac = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "macos");
-        Assert.True(mac.PubliclyAvailable);
+        Assert.False(mac.PubliclyAvailable);
+        Assert.Contains("guided", mac.SupportabilityLabel, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void BuildExperienceUsesMacSetupScriptForAuthenticatedMacUsers()
+    public void BuildExperienceKeepsMacSetupScriptOffPublicDownloadsForAuthenticatedMacUsers()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -669,13 +670,11 @@ platforms:
 
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: true);
 
-        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Install on Mac", recommended.ActionLabel);
-        Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
-        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
-        Assert.Contains("published Mac DMG immediately", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
-        Assert.True(service.UsesMacBootstrapScript(recommended.Artifact));
+        Assert.Null(experience.Recommended);
+        var mac = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "macos");
+        Assert.False(mac.PubliclyAvailable);
+        Assert.Equal("Guided support only", mac.StatusLabel);
+        Assert.Contains("guided", mac.SupportabilityLabel, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -907,7 +906,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildExperiencePromptsGuestMacUsersToSignInForSetupScript()
+    public void BuildExperienceKeepsGuestMacUsersOnGuidedSupportInsteadOfSignupDownload()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -944,14 +943,10 @@ platforms:
 
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
 
-        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Open Mac install path", recommended.ActionLabel);
-        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
-        Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
-        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
-        Assert.Equal("Already have an account? Sign in", experience.GuestGateSecondaryLabel);
-        Assert.Equal("/login?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
-        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
+        Assert.Null(experience.Recommended);
+        var mac = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "macos");
+        Assert.False(mac.PubliclyAvailable);
+        Assert.Equal("Guided support only", mac.StatusLabel);
     }
 
     [Fact]
@@ -996,7 +991,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildExperiencePrefersArchitectureMatchWithinDetectedPlatform()
+    public void BuildExperienceKeepsMacArchitectureRowsOffPublicDownloadsUntilMacIsPromoted()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -1049,8 +1044,9 @@ platforms:
             userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15 arm64",
             authenticated: true);
 
-        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("avalonia-osx-arm64-installer", recommended.Artifact.Id);
-        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
+        Assert.Null(experience.Recommended);
+        Assert.DoesNotContain(experience.OtherPlatforms, item => item.Artifact.Id.Contains("osx", StringComparison.OrdinalIgnoreCase));
+        var mac = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "macos");
+        Assert.False(mac.PubliclyAvailable);
     }
 }

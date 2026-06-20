@@ -529,10 +529,10 @@ public sealed class ReleaseSelectionService
         if (UsesMacBootstrapFlow(download))
         {
             return authenticated
-                ? "Download the published Mac DMG immediately. If you want the guided Terminal flow or install-link history, you can still open that route separately."
+                ? "Open the guided Mac support path when support has sent you a Mac installer."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Open the Mac install path. You can create an account there if you want recovery or install history attached later."
-                    : "Download the Mac DMG immediately, or sign in if you want recovery and install history tied back to your account.";
+                    ? "Open guided Mac support. You can create an account there if support needs install history attached later."
+                    : "Open guided Mac support when support has sent you a Mac installer.";
         }
 
         if (authenticated)
@@ -574,12 +574,12 @@ public sealed class ReleaseSelectionService
         {
             if (authenticated)
             {
-                return "Install on Mac";
+                return "Open Mac support";
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Open Mac install path"
-                : "Install on Mac";
+                ? "Open Mac support"
+                : "Open Mac support";
         }
 
         if (authenticated)
@@ -779,17 +779,17 @@ public sealed class ReleaseSelectionService
             return true;
         }
 
+        if (string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (UsesMacBootstrapFlow(download)
             && string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
             && string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
             && HasExplicitArtifactProof(manifest, download))
         {
             return true;
-        }
-
-        if (string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
         }
 
         if (string.Equals(platform.PublicManifestVisibility, "visible_as_account_gated_setup_script_release", StringComparison.OrdinalIgnoreCase)

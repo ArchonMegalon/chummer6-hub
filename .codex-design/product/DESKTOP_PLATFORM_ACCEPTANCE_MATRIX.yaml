@@ -36,8 +36,7 @@ platforms:
   - id: windows
     public_shelf_status: promoted_release
     primary_package_kind: installer
-    fallback_package_kinds:
-      - portable_exe
+    fallback_package_kinds: []
     startup_smoke_gate: required
     signing_posture: required_for_promoted_release
     updater_mode: in_app_apply_helper
@@ -45,20 +44,18 @@ platforms:
   - id: linux
     public_shelf_status: promoted_release
     primary_package_kind: deb
-    fallback_package_kinds:
-      - archive
+    fallback_package_kinds: []
     startup_smoke_gate: required
     signing_posture: package_integrity_required
     updater_mode: in_app_or_installer_handoff
     supportability: secondary
   - id: macOS
-    public_shelf_status: promoted_release
-    primary_package_kind: dmg
-    fallback_package_kinds:
-      - archive
+    public_shelf_status: buildable_not_publicly_promoted
+    primary_package_kind: none
+    fallback_package_kinds: []
     startup_smoke_gate: required
     signing_posture: codesign_and_notarization_required
     updater_mode: promoted_installer_then_in_app_or_handoff
-    supportability: signed_notarized_release
-    public_manifest_visibility: visible_as_promoted_release
-    public_promotion_gate: signed_notarized_installer_with_startup_smoke
+    supportability: guided_support_only
+    public_manifest_visibility: hidden_from_public_downloads
+    public_promotion_gate: guided_support_manual_only
