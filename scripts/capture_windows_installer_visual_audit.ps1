@@ -36,7 +36,12 @@ function Read-JsonObject([string]$PathValue) {
         return [ordered]@{}
     }
 
-    return $raw | ConvertFrom-Json -AsHashtable
+    $converted = $raw | ConvertFrom-Json -AsHashtable
+    $normalized = @{}
+    foreach ($key in $converted.Keys) {
+        $normalized[$key] = $converted[$key]
+    }
+    return $normalized
 }
 
 function Test-IsDefaultDpi([object]$Value) {
