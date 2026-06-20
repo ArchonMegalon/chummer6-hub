@@ -124,75 +124,80 @@ function Normalize-Surface([object]$Value) {
     }
 }
 
-function New-InstallerSurfaceWindow([object]$Process) {
+function New-InstallerSurfaceWindow([object]$Window) {
     return [pscustomobject]@{
-        ProcessId = $Process.Id
-        MainWindowTitle = [string]$Process.MainWindowTitle
-        MainWindowHandle = $Process.MainWindowHandle
+        ProcessId = [int]$Window.ProcessId
+        MainWindowTitle = [string]$Window.Title
+        MainWindowHandle = $Window.Handle
     }
+}
+
+function Get-VisibleInstallerWindows {
+    return @([ChummerInstallerCapture.WindowScanner]::GetVisibleTopLevelWindows() | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.Title) -and
+        ($_.Title.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $_.Title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+    })
 }
 
 function Close-InstallerSurfaceWindows {
     $wmClose = 0x0010
-    $processes = @(Get-Process | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
-        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-        $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    $windows = @(Get-VisibleInstallerWindows | Where-Object {
+        $_.Title.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $_.Title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
     })
 
-    foreach ($process in $processes) {
-        if ($process.MainWindowHandle -eq [IntPtr]::Zero) {
+    foreach ($window in $windows) {
+        if ($window.Handle -eq [IntPtr]::Zero) {
             continue
         }
         [void][ChummerInstallerCapture.NativeMethods]::PostMessage(
-            $process.MainWindowHandle,
+            $window.Handle,
             $wmClose,
             [IntPtr]::Zero,
             [IntPtr]::Zero)
-        Write-Host "Requested close for installer window: $($process.MainWindowTitle)"
+        Write-Host "Requested close for installer window: $($window.Title)"
     }
 }
 
 function Stop-InstallerSurfaceProcesses {
-    $processes = @(Get-Process | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
-        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-        $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
-    })
+    $processIds = @(Get-VisibleInstallerWindows | Where-Object {
+        $_.Title.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $_.Title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    } | ForEach-Object { [int]$_.ProcessId } | Sort-Object -Unique)
 
-    foreach ($process in $processes) {
+    foreach ($processId in $processIds) {
         try {
-            Stop-Process -Id $process.Id -Force -ErrorAction Stop
-            Write-Host "Stopped installer window process: $($process.MainWindowTitle)"
+            Stop-Process -Id $processId -Force -ErrorAction Stop
+            Write-Host "Stopped installer window process: $processId"
         }
         catch {
-            Write-Warning "Could not stop installer window process $($process.Id): $($_.Exception.Message)"
+            Write-Warning "Could not stop installer window process $($processId): $($_.Exception.Message)"
         }
     }
 }
 
 function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompletionInstallerFallback = $false) {
     $canonicalSurface = Normalize-Surface $SurfaceValue
-    $processes = @(Get-Process | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
-        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    $windows = @(Get-VisibleInstallerWindows | Where-Object {
+        $_.Title.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
     })
 
-    foreach ($process in $processes) {
-        $title = [string]$process.MainWindowTitle
+    foreach ($window in $windows) {
+        $title = [string]$window.Title
         if ($canonicalSurface -eq "completion") {
             if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                return (New-InstallerSurfaceWindow $process)
+                return (New-InstallerSurfaceWindow $window)
             }
             if ($AllowCompletionInstallerFallback -and $title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                return (New-InstallerSurfaceWindow $process)
+                return (New-InstallerSurfaceWindow $window)
             }
             continue
         }
 
         if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
             $title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
-            return (New-InstallerSurfaceWindow $process)
+            return (New-InstallerSurfaceWindow $window)
         }
     }
 
@@ -230,9 +235,17 @@ Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ChummerInstallerCapture
 {
+    public sealed class WindowInfo
+    {
+        public int ProcessId { get; set; }
+        public IntPtr Handle { get; set; }
+        public string Title { get; set; } = string.Empty;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct Rect
     {
@@ -244,6 +257,23 @@ namespace ChummerInstallerCapture
 
     public static class NativeMethods
     {
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern int GetWindowTextLength(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
 
@@ -253,6 +283,47 @@ namespace ChummerInstallerCapture
         [DllImport("user32.dll")]
         public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     }
+
+    public static class WindowScanner
+    {
+        public static WindowInfo[] GetVisibleTopLevelWindows()
+        {
+            var rows = new System.Collections.Generic.List<WindowInfo>();
+            NativeMethods.EnumWindows((hWnd, lParam) =>
+            {
+                if (!NativeMethods.IsWindowVisible(hWnd))
+                {
+                    return true;
+                }
+
+                int length = NativeMethods.GetWindowTextLength(hWnd);
+                if (length <= 0)
+                {
+                    return true;
+                }
+
+                var title = new StringBuilder(length + 1);
+                NativeMethods.GetWindowText(hWnd, title, title.Capacity);
+                string value = title.ToString();
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return true;
+                }
+
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint processId);
+                rows.Add(new WindowInfo
+                {
+                    ProcessId = unchecked((int)processId),
+                    Handle = hWnd,
+                    Title = value
+                });
+
+                return true;
+            }, IntPtr.Zero);
+
+            return rows.ToArray();
+        }
+    }
 }
 "@
 
@@ -261,12 +332,8 @@ $script:LaunchedInstallerProcessId = $null
 function Write-InstallerCaptureFailure([string]$Message) {
     try {
         $failurePath = Join-Path $outputFullRoot "WINDOWS_INSTALLER_CAPTURE_FAILURE.txt"
-        $windowRows = @(Get-Process | Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
-            ($_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-                $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
-        } | ForEach-Object {
-            "pid=$($_.Id) title=$($_.MainWindowTitle)"
+        $windowRows = @(Get-VisibleInstallerWindows | ForEach-Object {
+            "pid=$($_.ProcessId) handle=$($_.Handle) title=$($_.Title)"
         })
         $lines = @(
             "capturedAtUtc=$((Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z"))",
