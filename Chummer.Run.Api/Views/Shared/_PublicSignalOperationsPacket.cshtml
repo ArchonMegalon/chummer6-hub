@@ -21,9 +21,9 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Hosted page promotion</span>
+            <span class="tag">Public board</span>
             <h3>@(publicSignalLive ? "Public signal is live on Chummer pages." : "Public signal is still warming up on this host.")</h3>
-            <p>@Model.CategoryCount category@(Model.CategoryCount == 1 ? string.Empty : "ies") keep ideas, safe public bugs, and likely misroutes separated before they blur into support or roadmap claims.</p>
+            <p>@Model.CategoryCount category@(Model.CategoryCount == 1 ? string.Empty : "ies") keep ideas, safe public bugs, and likely private issues separated before they blur into support or roadmap copy.</p>
             <div class="route-choice-card__proof">
                 <span>@Model.CategoryCount public category@(Model.CategoryCount == 1 ? string.Empty : "ies")</span>
                 <span>@Model.MisrouteLikelyCount likely private-support crossover@(Model.MisrouteLikelyCount == 1 ? string.Empty : "s")</span>
@@ -32,7 +32,7 @@
             <a class="editorial-strip__action" href="/roadmap">Open roadmap</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Closeout follow-up</span>
+            <span class="tag">Follow-up</span>
             <h3>@followThroughHeading</h3>
             <p>@followThroughSummary</p>
             <div class="route-choice-card__proof">
@@ -43,7 +43,7 @@
             <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Ingress and closeout</span>
+            <span class="tag">Private help</span>
             <h3>Private help still leaves this page immediately.</h3>
             <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public board noise.</p>
             <div class="route-choice-card__proof">
@@ -59,8 +59,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Category routing</p>
-        <h2 class="editorial-title">Signal routing and public follow-up stay explicit.</h2>
-        <p class="editorial-copy">Public signals follow a Chummer routing board, with clear paths for follow-up and shipped updates.</p>
+        <h2 class="editorial-title">Public feedback stays easy to route.</h2>
+        <p class="editorial-copy">Ideas, safe bugs, private help, and shipped updates each have their own path.</p>
     </div>
     <p class="muted-copy">Public signal routing stays transparent; private follow-up goes through Help.</p>
 </section>

@@ -154,9 +154,9 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Review signals</span>
-            <h3>Product records and shipped updates stay behind the public board.</h3>
-            <p>These records keep the public board connected to real product review while the page handles visibility and follow-up.</p>
+            <span class="tag">Product review</span>
+            <h3>Planning and shipped updates stay separate from the public board.</h3>
+            <p>These links keep feedback connected to product review without turning public comments into promises.</p>
             @if (sourceReceipts.Length > 0)
             {
                 <div class="route-choice-card__proof">
@@ -171,7 +171,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                        <h3>Canonical sources</h3>
+                        <h3>Decision sources</h3>
                         <p>@string.Join(" / ", canonicalSources)</p>
                         </div>
                     </article>
@@ -189,7 +189,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                        <h3>Shipped closeout gate</h3>
+                        <h3>Before it ships</h3>
                         <p>@string.Join(" / ", Model.CloseoutRequirements.Select(SanitizeProjectionText))</p>
                         </div>
                     </article>

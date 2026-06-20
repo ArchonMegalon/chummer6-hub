@@ -13,8 +13,8 @@ OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
-    "Votes show demand; Chummer-owned release decisions decide what ships.",
-    "release-backed closeout",
+    "Votes show demand. Chummer decides what ships.",
+    "The loop closes only after people can use it",
     "First-party follow-up is not posted here yet.",
     "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.",
 )
@@ -26,10 +26,12 @@ FORBIDDEN_HTML_PHRASES = (
     "delivery candidates",
     "outbox candidates",
     "sent receipts",
+    "release-backed closeout",
+    "proof-bound",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "Votes show demand; Chummer-owned release decisions decide what ships.",
-    "release-backed closeout",
+    "Votes show demand. Chummer decides what ships.",
+    "The loop closes only after people can use it",
     "First-party follow-up is not posted here yet.",
     "account-backed follow-up waits until the shipped path is available on this host",
 )
@@ -39,6 +41,8 @@ FORBIDDEN_SOURCE_PHRASES = (
     "recipient projection",
     "consent basis",
     "governor approval",
+    "release-backed closeout",
+    "proof-bound",
     "release proof, delivery candidates, outbox candidates, sent receipts, and journey receipts are pending or zero",
 )
 
@@ -111,7 +115,7 @@ def run(base_url: str, route: str) -> int:
         lines.extend(["", "## Failures", ""])
         lines.extend(f"- {failure}" for failure in failures)
     else:
-        lines.extend(["", "The /feedback public copy stays preview-honest, first-party, and proof-bound."])
+        lines.extend(["", "The /feedback public copy stays clear, public-safe, and honest about what has shipped."])
     write_text(completion_path("PUBLIC_COPY_TRUTH_GATE.md"), "\n".join(lines))
     return 0 if not failures else 1
 
