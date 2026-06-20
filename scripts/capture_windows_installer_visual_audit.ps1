@@ -127,10 +127,6 @@ $outputFullRoot = Resolve-RepoPath $OutputRoot
 New-Item -ItemType Directory -Force -Path $outputFullRoot | Out-Null
 $sourcePath = Join-Path $outputFullRoot "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
 
-if ($LaunchInstaller) {
-    Start-Process -FilePath $installerFullPath | Out-Null
-}
-
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
@@ -194,6 +190,12 @@ if ($CaptureRequiredSet) {
 }
 else {
     $captureRequests = @([ordered]@{ Surface = $Surface; DpiScale = $DpiScale })
+}
+
+if ($LaunchInstaller) {
+    Write-Host "Launching installer for visual capture: $installerFullPath"
+    Start-Process -FilePath $installerFullPath | Out-Null
+    Start-Sleep -Milliseconds 150
 }
 
 $newRows = @()
