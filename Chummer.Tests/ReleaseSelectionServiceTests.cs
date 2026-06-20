@@ -418,7 +418,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildOptionDistinguishesWindowsLauncherAndZipFallbackPackages()
+    public void BuildOptionTreatsWindowsLauncherAndZipAsSupportOnlyPackages()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -448,7 +448,7 @@ platforms:
                     InstallAccessClass: "open_public"),
                 new PublicReleaseArtifactDto(
                     Id: "avalonia-win-x64-archive",
-                    Platform: "Avalonia Desktop Windows X64 Portable ZIP",
+                    Platform: "Avalonia Desktop Windows X64 Support Package",
                     Url: "/downloads/files/chummer-avalonia-win-x64.zip",
                     Sha256: "portable-zip",
                     SizeBytes: 49292098,
@@ -463,13 +463,13 @@ platforms:
         var launcher = service.BuildOption(manifest, manifest.Downloads[0], authenticated: false, recommended: false);
         var archive = service.BuildOption(manifest, manifest.Downloads[1], authenticated: false, recommended: false);
 
-        Assert.Equal("Portable launcher for Windows", launcher.Title);
-        Assert.Equal("Small launcher for Windows. Use this only when support sends you to the app launcher instead of the full installer or ZIP.", launcher.SupportLine);
-        Assert.Equal("Download Windows launcher", launcher.ActionLabel);
+        Assert.Equal("Support package for Windows", launcher.Title);
+        Assert.Equal("Support-only package for Windows. Use the main installer unless support gives you this link.", launcher.SupportLine);
+        Assert.Equal("Download Windows support package", launcher.ActionLabel);
 
-        Assert.Equal("Portable ZIP for Windows", archive.Title);
-        Assert.Equal("Portable ZIP for Windows. Use this when you want the full desktop payload without the installer wrapper.", archive.SupportLine);
-        Assert.Equal("Download Windows ZIP", archive.ActionLabel);
+        Assert.Equal("Support package for Windows", archive.Title);
+        Assert.Equal("Support-only package for Windows. Use the main installer unless support gives you this link.", archive.SupportLine);
+        Assert.Equal("Download Windows support package", archive.ActionLabel);
     }
 
     [Fact]
@@ -505,9 +505,74 @@ platforms:
 
         var launcher = service.BuildOption(manifest, manifest.Downloads[0], authenticated: false, recommended: false);
 
-        Assert.Equal("Portable launcher for Windows", launcher.Title);
-        Assert.Equal("Small launcher for Windows. Use this only when support sends you to the app launcher instead of the full installer or ZIP.", launcher.SupportLine);
-        Assert.Equal("Download Windows launcher", launcher.ActionLabel);
+        Assert.Equal("Support package for Windows", launcher.Title);
+        Assert.Equal("Support-only package for Windows. Use the main installer unless support gives you this link.", launcher.SupportLine);
+        Assert.Equal("Download Windows support package", launcher.ActionLabel);
+    }
+
+    [Fact]
+    public void ApplyAccessPolicyDropsPortableAndArchiveRowsFromPublicDownloads()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260620-installer-only",
+            Channel: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-20T06:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "installer",
+                    SizeBytes: 98_977_472,
+                    Head: "avalonia",
+                    PlatformId: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-portable",
+                    Platform: "Avalonia Desktop Windows X64 Portable Launcher",
+                    Url: "/downloads/files/chummer-avalonia-win-x64.exe",
+                    Sha256: "portable-launcher",
+                    SizeBytes: 433_152,
+                    Head: "avalonia",
+                    PlatformId: "windows",
+                    Arch: "x64",
+                    Kind: "portable",
+                    FileName: "chummer-avalonia-win-x64.exe",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-archive",
+                    Platform: "Avalonia Desktop Windows X64 ZIP",
+                    Url: "/downloads/files/chummer-avalonia-win-x64.zip",
+                    Sha256: "portable-zip",
+                    SizeBytes: 49_292_098,
+                    Head: "avalonia",
+                    PlatformId: "windows",
+                    Arch: "x64",
+                    Kind: "archive",
+                    FileName: "chummer-avalonia-win-x64.zip",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        var normalized = service.ApplyAccessPolicy(manifest);
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: false);
+
+        var download = Assert.Single(normalized.Downloads);
+        Assert.Equal("avalonia-win-x64-installer", download.Id);
+        Assert.Equal("avalonia-win-x64-installer", experience.Recommended?.Artifact.Id);
+        Assert.DoesNotContain(experience.Alternatives, item => item.Artifact.Id.Contains("portable", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(experience.Alternatives, item => item.Artifact.Id.Contains("archive", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

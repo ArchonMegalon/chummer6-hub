@@ -142,10 +142,12 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("ALICE generated an AI proof receipt for the Black Ledger operator lane.");
 
-        Assert.Equal("character help created a check for the campaign city user path.", cleaned);
+        Assert.Equal("character help created a status for the campaign city user path.", cleaned);
         Assert.DoesNotContain("Alice", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("AI", cleaned, StringComparison.Ordinal);
         Assert.DoesNotContain("assistant", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("receipt", cleaned, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -159,6 +161,76 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("help help", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("provider", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("artifact", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Public_copy_humanizer_replaces_horizon_maintenance_vocabulary()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("Read the horizon brief before opening the horizon-only proof trail.");
+
+        Assert.Equal("Read the roadmap note before opening the roadmap-only details.", cleaned);
+        Assert.DoesNotContain("horizon", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Public_api_sources_do_not_reintroduce_old_human_copy_markers()
+    {
+        string apiRoot = RepoPaths.FromRoot("Chummer.Run.Api");
+        string[] sourceFiles = Directory.EnumerateFiles(apiRoot, "*.*", SearchOption.AllDirectories)
+            .Where(static path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase))
+            .Where(static path => !path.EndsWith($"{Path.DirectorySeparatorChar}PublicFacingCopyHumanizer.cs", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        string[] forbiddenPhrases =
+        [
+            "No current local release-proof receipt",
+            "receipt-backed work after validation",
+            "Output audit",
+            "Check your email",
+            "Verification sent",
+            "Release proof",
+            "release proof",
+            "public proof shelf",
+            "proof shelf ref",
+            "stable public proof shelf",
+            "Evidence first",
+            "Availability check",
+            "Release check pending",
+            "Windows proof-installer",
+            "Last verified",
+            "Last checked",
+            "Open checks",
+            "World turn check",
+            "Turn checks",
+            "Check the current release posture",
+            "published rules checks",
+            "Desktop flagship checks",
+            "direct checks are green",
+            "setup checks the install-link receipt",
+            "Finish verified and linked",
+            "Proof receipts",
+            "receipt-backed",
+            "release-truth substitution"
+        ];
+
+        foreach (string file in sourceFiles)
+        {
+            string searchable = string.Join(
+                '\n',
+                File.ReadLines(file)
+                    .Where(static line => !line.Contains(".Replace(", StringComparison.Ordinal))
+                    .Where(static line => !line.Contains("route-choice-card__proof", StringComparison.Ordinal))
+                    .Where(static line => !line.Contains("trust-claim__microproof", StringComparison.Ordinal))
+                    .Where(static line => !line.Contains("mono-receipt", StringComparison.Ordinal)));
+
+            foreach (string phrase in forbiddenPhrases)
+            {
+                Assert.DoesNotContain(phrase, searchable, StringComparison.Ordinal);
+            }
+        }
     }
 
     [Fact]

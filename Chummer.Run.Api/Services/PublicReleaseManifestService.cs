@@ -897,9 +897,9 @@ public sealed class PublicReleaseManifestService
             rolloutState = "coverage_incomplete";
             rolloutReason = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
             supportabilityState = "review_required";
-            supportabilitySummary = $"The current release is live, but support posture stays review_required because {coverageSummary}.";
-            knownIssueSummary = "Some desktop downloads stay hidden until fresh platform proof is republished.";
-            fixAvailabilitySummary = "Verify fix availability against the live channel artifact before closing support loops.";
+            supportabilitySummary = $"The current release is live, but some support paths stay limited because {coverageSummary}.";
+            knownIssueSummary = "Some desktop downloads stay hidden until the platform status is current again.";
+            fixAvailabilitySummary = "Confirm the fix against the live channel before closing support loops.";
         }
 
         return EnsureContractName(manifest with
@@ -928,7 +928,7 @@ public sealed class PublicReleaseManifestService
         return EnsureContractName(manifest with
         {
             RolloutState = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase)
-                ? "desktop_proof_review_required"
+                ? "desktop_polish_needed"
                 : manifest.RolloutState,
             RolloutReason = AppendDistinctSentence(
                 manifest.RolloutReason,
@@ -936,13 +936,13 @@ public sealed class PublicReleaseManifestService
             SupportabilityState = "review_required",
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
-                $"Treat the current release as review-required because {gapSummary}."),
+                $"Treat the current release as limited because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
-                "Desktop flagship proof receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
+                "Desktop polish is not current yet, so parity-sensitive routes stay with support."),
             FixAvailabilitySummary = AppendDistinctSentence(
                 manifest.FixAvailabilitySummary,
-                "Use the linked-install recovery and first-party support lane until current desktop proof receipts are green again.")
+                "Use linked-install recovery and Chummer support until the desktop experience is ready again.")
         });
     }
 
@@ -965,13 +965,13 @@ public sealed class PublicReleaseManifestService
             SupportabilityState = "review_required",
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
-                $"Treat the current release as review-required because {gapSummary}."),
+                $"Treat the current release as limited because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
-                "Translator, XML amendment, Hero Lab, and adjacent import parity receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
+                "Translator, XML amendment, Hero Lab, and adjacent import paths are not current yet, so parity-sensitive routes stay with support."),
             FixAvailabilitySummary = AppendDistinctSentence(
                 manifest.FixAvailabilitySummary,
-                "Use the linked-install recovery and first-party support lane until current translator/XML/Hero Lab/import-route proof receipts are published.")
+                "Use linked-install recovery and Chummer support until translator, XML, Hero Lab, and import paths are current.")
         });
     }
 
@@ -1032,9 +1032,9 @@ public sealed class PublicReleaseManifestService
                     manifest["rolloutState"] = "coverage_incomplete";
                     manifest["rolloutReason"] = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
                     manifest["supportabilityState"] = "review_required";
-                    manifest["supportabilitySummary"] = $"The current release is live, but support posture stays review_required because {coverageSummary}.";
-                    manifest["knownIssueSummary"] = "Some desktop downloads stay hidden until fresh platform proof is republished.";
-                    manifest["fixAvailabilitySummary"] = "Verify fix availability against the live channel artifact before closing support loops.";
+                    manifest["supportabilitySummary"] = $"The current release is live, but some support paths stay limited because {coverageSummary}.";
+                    manifest["knownIssueSummary"] = "Some desktop downloads stay hidden until the platform status is current again.";
+                    manifest["fixAvailabilitySummary"] = "Confirm the fix against the live channel before closing support loops.";
                 }
             }
         }
@@ -1200,7 +1200,7 @@ public sealed class PublicReleaseManifestService
             $"{publicInstallCount} are direct downloads, " +
             $"{accountLinkedInstallCount} can start with sign-in and support attached, " +
             $"{GetJsonInt32(adoptionHealth["fallbackRecoveryCount"])} fallback recovery routes are promoted, " +
-            $"and {GetJsonInt32(adoptionHealth["blockedRouteCount"])} routes are still blocked on proof.";
+            $"and {GetJsonInt32(adoptionHealth["blockedRouteCount"])} routes are still blocked.";
     }
 
     private static int GetJsonInt32(JsonNode? node)
@@ -1820,7 +1820,7 @@ public sealed class PublicReleaseManifestService
                 : $"Published {channelId} channel keeps primary-route {tupleId} current for installed build selector {installedBuildSelector}.";
         }
 
-        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup verification are present.";
+        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup status are present.";
     }
 
     private static string InstallAwareCorrectnessReason(
@@ -1855,8 +1855,7 @@ public sealed class PublicReleaseManifestService
         bool accountRequiredPlatform = platform is "macos";
         bool accountRequiredKind = kind switch
         {
-            "portable" when platform is "windows" => false,
-            _ => kind is "installer" or "portable" or "dmg" or "pkg"
+            _ => kind is "installer" or "dmg" or "pkg" or "msix"
         };
         return accountRequiredPlatform && accountRequiredKind
             ? InstallAccessClasses.AccountRequired

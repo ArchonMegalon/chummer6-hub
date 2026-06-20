@@ -628,24 +628,24 @@ public sealed class ReleaseSelectionService
     private static string AlternativePackageTitle(PublicReleaseArtifactDto download)
         => NormalizePackageKind(download.Kind) switch
         {
-            "portable_exe" => $"Portable launcher for {PlatformLabel(download)}",
-            "archive" => $"Portable ZIP for {PlatformLabel(download)}",
-            _ => $"Public package for {PlatformLabel(download)}"
+            "portable_exe" => $"Support package for {PlatformLabel(download)}",
+            "archive" => $"Support package for {PlatformLabel(download)}",
+            _ => $"Support package for {PlatformLabel(download)}"
         };
 
     private static string AlternativePackageSupport(PublicReleaseArtifactDto download)
         => NormalizePackageKind(download.Kind) switch
         {
-            "portable_exe" => $"Small launcher for {PlatformLabel(download)}. Use this only when support sends you to the app launcher instead of the full installer or ZIP.",
-            "archive" => $"Portable ZIP for {PlatformLabel(download)}. Use this when you want the full desktop payload without the installer wrapper.",
-            _ => $"Manual package for {PlatformLabel(download)}. Use this only for advanced or support-directed install work."
+            "portable_exe" => $"Support-only package for {PlatformLabel(download)}. Use the main installer unless support gives you this link.",
+            "archive" => $"Support-only package for {PlatformLabel(download)}. Use the main installer unless support gives you this link.",
+            _ => $"Support-only package for {PlatformLabel(download)}. Use this only when support gives you this link."
         };
 
     private static string AlternativePackageActionLabel(PublicReleaseArtifactDto download)
         => NormalizePackageKind(download.Kind) switch
         {
-            "portable_exe" => $"Download {PlatformLabel(download)} launcher",
-            "archive" => $"Download {PlatformLabel(download)} ZIP",
+            "portable_exe" => $"Download {PlatformLabel(download)} support package",
+            "archive" => $"Download {PlatformLabel(download)} support package",
             _ => $"Download {PlatformLabel(download)} package"
         };
 
@@ -763,6 +763,11 @@ public sealed class ReleaseSelectionService
         PublicReleaseExperienceDocument experience,
         DesktopPlatformAcceptanceDocument platformAcceptance)
     {
+        if (!IsInstaller(download))
+        {
+            return false;
+        }
+
         if (UsesMacBootstrapFlow(download) && !HasExplicitArtifactProof(manifest, download))
         {
             return false;
@@ -882,12 +887,12 @@ public sealed class ReleaseSelectionService
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the downloads page yet",
-                $"The current release build does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and release-truth checks.");
+                $"The current release does not include a public {label} installer yet. Use Windows or Linux today, or contact support if you need help with this platform.");
         }
 
         return new PlatformShelfNoticeViewModel(
             $"{label} is not on the current downloads page",
-            $"The current release build does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
+            $"The current release does not include a public {label} installer. Use the platforms listed on this page.");
     }
 
     private static string? RequestedPlatformLabel(string? requestedPlatform)
@@ -1046,8 +1051,8 @@ public sealed class ReleaseSelectionService
             "pkg" => "PKG installer",
             "setup_script" => "setup script",
             "installer" => "installer",
-            "portable_exe" => "portable EXE",
-            "archive" => "fallback package",
+            "portable_exe" => "support package",
+            "archive" => "support package",
             "none" => "no public fallback",
             _ => string.IsNullOrWhiteSpace(packageKind) ? "package not specified" : packageKind.Replace('_', ' ')
         };
@@ -1070,7 +1075,7 @@ public sealed class ReleaseSelectionService
             "account_gated_setup_script_preview" => "account-gated setup continuity",
             "account_gated_setup_script_release" => "account-gated setup-script release",
             "signed_notarized_preview" => "signed and notarized track",
-            "public_archive_preview" => "fallback package track",
+            "public_archive_preview" => "guided support track",
             "signed_notarized_release" => "signed and notarized release",
             _ => string.IsNullOrWhiteSpace(platform?.Supportability) ? "not specified" : platform!.Supportability.Replace('_', ' ')
         };
