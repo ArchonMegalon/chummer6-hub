@@ -100,8 +100,8 @@ internal static class DesktopInstallRail
             ReturnHref: $"/downloads/install/{Uri.EscapeDataString(normalizedArtifactId)}",
             ReturnLabel: recoveryMode ? "Return to recovery handoff" : "Return to guided installer",
             Summary: recoveryMode
-                ? "This case stays on the same install rail. Go back to the guided handoff when you are ready to retry recovery, and only use a recovery code if Chummer entered recovery mode on that device."
-                : "This case stays on the same install rail. Go back to the guided handoff when you are ready to retry install, first launch, or update on that device.",
+                ? "This case stays with the same linked copy. Go back to the guided handoff when you are ready to retry recovery, and only use a recovery code if Chummer entered recovery mode on that device."
+                : "This case stays with the same linked copy. Go back to the guided handoff when you are ready to retry install, first launch, or update on that device.",
             RecoveryModeOnly: recoveryMode);
     }
 
@@ -126,10 +126,10 @@ internal static class DesktopInstallRail
                 : "Guided setup and in-app update are the default path. Claim codes are a recovery fallback, not a browser redemption step.",
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."
-                : "Continue in the installer or desktop app so the linked install can claim this account without a browser handoff.",
-            UpdateAction: "Use the desktop app update lane or signed-in installer for this same channel and build lineage before filing a new support case.",
-            RollbackAction: "If update or setup fails, keep the previous installed copy and return to this claimed install continuation rail or tracked support on this same install rail.",
-            SupportContinuation: "Support stays on the same install rail with the current claim, build, channel, fallback, and recovery context attached.");
+                : "Continue in the installer or desktop app so the linked copy can claim this account without another browser step.",
+            UpdateAction: "Use the desktop app updater or signed-in installer for this same channel and build before filing a new support case.",
+            RollbackAction: "If update or setup fails, keep the previous installed copy and return to Devices and access or tracked support for this same linked copy.",
+            SupportContinuation: "Support stays with this linked copy, including its current claim, build, channel, fallback, and recovery context.");
     }
 
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)
@@ -142,21 +142,21 @@ internal static class DesktopInstallRail
     private static string BuildSupportDetail(bool recoveryMode, string? installedBuildReceiptId)
     {
         string baseDetail = recoveryMode
-            ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same install rail."
-            : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same install rail.";
+            ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same linked copy."
+            : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same linked copy.";
         string? receiptId = NormalizeSupportPrefill(installedBuildReceiptId);
         return receiptId is null
             ? baseDetail
-            : $"{baseDetail}\n\nInstalled build receipt: {receiptId}";
+            : $"{baseDetail}\n\nInstalled build record: {receiptId}";
     }
 
     private static string BuildAccountSupportDetail(string? installedBuildReceiptId)
     {
-        const string baseDetail = "The desktop app requested continuation help from its claimed install rail. Keep the fix, update, rollback, and verification on this same linked install.";
+        const string baseDetail = "The desktop app requested help for this linked copy. Keep the fix, update, rollback, and follow-up on this same device.";
         string? receiptId = NormalizeSupportPrefill(installedBuildReceiptId);
         return receiptId is null
             ? baseDetail
-            : $"{baseDetail}\n\nInstalled build receipt: {receiptId}";
+            : $"{baseDetail}\n\nInstalled build record: {receiptId}";
     }
 
     private static string? NormalizeSupportPrefill(string? value)

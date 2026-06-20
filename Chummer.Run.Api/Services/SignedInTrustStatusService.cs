@@ -64,7 +64,7 @@ public sealed class SignedInTrustStatusService
                 "Recommended for this install",
                 BuildSignedInInstallRecommendationSummary(manifest, releaseExperience, latestInstallation, followThrough)),
             new(
-                "Install posture",
+                "Install status",
                 BuildSignedInInstallPostureSummary(manifest, latestInstallation, followThrough)),
             new(
                 "Fix availability",
@@ -77,7 +77,7 @@ public sealed class SignedInTrustStatusService
                 ShouldUseManifestAdoptionSummary(pulse)
                     ? BuildManifestAdoptionSummary(manifest)
                     : BuildTrustPulseAdoptionSummary(pulse!)),
-            new("Release proof", BuildReleaseProofSummary(manifest)),
+            new("Release status", BuildReleaseStatusSummary(manifest)),
             new(
                 "Support next steps",
                 followThrough is null
@@ -148,7 +148,7 @@ public sealed class SignedInTrustStatusService
         bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)
             || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase);
         string summary = reviewRequired
-            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive desktop checks remain review-required until current release receipts are green."
+            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay with this linked copy, but some desktop review work is still open."
             : $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.";
         return new SignedInTrustStatusPanelViewModel(
             Eyebrow: "Signed-in trust status",
@@ -194,20 +194,20 @@ public sealed class SignedInTrustStatusService
         return HumanizeToken(channel, "Current release");
     }
 
-    private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
+    private static string BuildReleaseStatusSummary(PublicReleaseManifestDto manifest)
     {
-        string proof = HumanizeToken(manifest.ProofStatus, "Unknown");
+        string status = HumanizeToken(manifest.ProofStatus, "Unknown");
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilitySummary))
         {
-            return $"{proof} · {manifest.SupportabilitySummary}";
+            return $"{status} · {manifest.SupportabilitySummary}";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
         {
-            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
+            return $"{status} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
         }
 
-        return proof;
+        return status;
     }
 
     private static string BuildManifestAdoptionSummary(PublicReleaseManifestDto manifest)
@@ -230,7 +230,7 @@ public sealed class SignedInTrustStatusService
             }
         }
 
-        return BuildReleaseProofSummary(manifest);
+        return BuildReleaseStatusSummary(manifest);
     }
 
     private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)
@@ -316,7 +316,7 @@ public sealed class SignedInTrustStatusService
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
         {
-            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the promoted public release right now.";
+            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that build is not on the promoted public release right now.";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
@@ -341,7 +341,7 @@ public sealed class SignedInTrustStatusService
 
         return installation is null
             ? "No linked install is attached yet, so Chummer cannot compare this account against the current public release or fix path."
-            : "No extra install-specific posture warning is published right now.";
+            : "No extra install-specific warning is published right now.";
     }
 
     private static string BuildSignedInFixAvailabilitySummary(
@@ -406,7 +406,7 @@ public sealed class SignedInTrustStatusService
 
         if (followThrough?.CanVerifyFix == true)
         {
-            return "No extra caution is published for this linked install right now; use the verification lane to confirm the fix on this device.";
+            return "No extra caution is published for this linked install right now; use support to confirm the fix on this device.";
         }
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
@@ -515,8 +515,8 @@ public sealed class SignedInTrustStatusService
         string platform = BuildPlatformDisplayLabel(installation.Platform, installation.Arch);
         return NormalizeHeadId(installation.HeadId) switch
         {
-            "avalonia" => $"the recommended desktop lane on {platform}",
-            "blazor-desktop" => $"the alternative desktop lane on {platform}",
+            "avalonia" => $"the recommended desktop app on {platform}",
+            "blazor-desktop" => $"the alternative desktop app on {platform}",
             _ => platform
         };
     }
@@ -585,8 +585,8 @@ public sealed class SignedInTrustStatusService
             || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
-                ? "The linked install route stays preferred while desktop proof receipts are still review-required."
-                : "Public downloads are visible, but parity-sensitive desktop checks still stay on the review-required support path until current release receipts are green.";
+                ? "The linked install route stays preferred while the desktop experience is still being polished."
+                : "Public downloads are visible, but parity-sensitive desktop steps still stay with support until the release status is current.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
@@ -609,8 +609,8 @@ public sealed class SignedInTrustStatusService
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current local verification passed."
-                : $"Current local verification is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+                ? "Current local status passed."
+                : $"Current local status is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
@@ -630,12 +630,12 @@ public sealed class SignedInTrustStatusService
         {
             segments.Add(historySnapshotCount < 6
                 ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
-                : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture.");
+                : $"{historySnapshotCount} weekly snapshots are on record for the current public status.");
         }
 
         if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
         {
-            segments.Add($"Flagship desktop proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
+            segments.Add($"Desktop review still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
         }
         else if (pulse.ParityClaimsReviewRequired && !string.IsNullOrWhiteSpace(pulse.LaunchReadiness))
         {

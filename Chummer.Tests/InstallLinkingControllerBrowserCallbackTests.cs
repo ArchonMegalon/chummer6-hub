@@ -101,11 +101,13 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
         Assert.Contains("Claim this copy in Chummer", page.Content, StringComparison.Ordinal);
         Assert.Contains("Claim this copy", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Installer:", page.Content, StringComparison.Ordinal);
         Assert.Contains("id=\"install-link-open\"", page.Content, StringComparison.Ordinal);
         Assert.Contains("Claim link", page.Content, StringComparison.Ordinal);
         Assert.Contains("Copy claim link", page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("Manual launch link", page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Package:", page.Content, StringComparison.Ordinal);
         Assert.Contains("window.location.assign(href)", page.Content, StringComparison.Ordinal);
         Assert.Contains("iframe", page.Content, StringComparison.Ordinal);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
@@ -306,8 +308,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         ContentResult page = Assert.IsType<ContentResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, page.StatusCode);
         Assert.Contains("This install needs a current desktop package", page.Content, StringComparison.Ordinal);
+        Assert.Contains("could not match this copy to a current desktop installer", page.Content, StringComparison.Ordinal);
         Assert.Contains("Open downloads", page.Content, StringComparison.Ordinal);
         Assert.Contains("ins-missing-artifact", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("published desktop artifact", page.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("app handoff", page.Content, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryExtractPrimaryHref(string content, out string href)

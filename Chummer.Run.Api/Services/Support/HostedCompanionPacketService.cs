@@ -72,8 +72,8 @@ public sealed class HostedCompanionPacketService
         string deviceRole = ResolveDeviceRole(installation?.Platform, installation?.HeadId);
         string artifactLabel = artifact?.Id ?? claimTicket?.ArtifactId ?? installation?.ArtifactId ?? "current-release";
         string summary = installation is not null
-            ? $"Claimed install {installation.Platform ?? "desktop"} {installation.Version} on {installation.Channel} can continue through first-party install and account routes."
-            : $"Pending claim ticket {claimTicket?.ClaimCode ?? receipt?.ReceiptId ?? "pending"} stays bound to first-party install continuation until the claimed device handoff finishes.";
+            ? $"Claimed install {installation.Platform ?? "desktop"} {installation.Version} on {installation.Channel} can continue through Chummer install and account routes."
+            : $"Claim {claimTicket?.ClaimCode ?? receipt?.ReceiptId ?? "pending"} stays with Chummer until the claimed device finishes.";
 
         List<string> routes =
         [
@@ -112,23 +112,23 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("install-fact", installation?.InstallationId ?? claimTicket?.TicketId ?? receipt?.ReceiptId ?? "install"),
                     Kind: "install_linking_state",
-                    Label: installation is null ? "Install claim posture" : "Claimed installation posture",
+                    Label: installation is null ? "Install claim" : "Claimed installation",
                     Summary: summary,
                     Route: "/api/v1/install-linking/continuation",
                     ReceiptId: receipt?.ReceiptId),
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("install-manifest", artifactLabel),
                     Kind: "release_manifest",
-                    Label: "Current release shelf",
+                    Label: "Current release",
                     Summary: $"{manifest.Channel} {manifest.Version} currently publishes {artifactLabel}.",
                     Route: string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}")
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("continue_install", "Continue install", "/api/v1/install-linking/continuation", "Resume first-party install continuation from the claimed device lane."),
-                new HostedCompanionActionProjection("open_downloads", "Open installer shelf", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Inspect the current installer bytes and release posture."),
-                new HostedCompanionActionProjection("open_account_access", "Review account access", "/account/access", "Confirm the same account and claimed-install posture before you continue.")
+                new HostedCompanionActionProjection("continue_install", "Continue install", "/api/v1/install-linking/continuation", "Resume the install from the claimed device."),
+                new HostedCompanionActionProjection("open_downloads", "Open downloads", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Inspect the current installer and release status."),
+                new HostedCompanionActionProjection("open_account_access", "Review account access", "/account/access", "Confirm the same account and linked install before you continue.")
             ],
             Suppression: BuildSuppression("trigger_class_per_install", 21600, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),
@@ -139,7 +139,7 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddHours(12),
             ForbiddenClaims:
             [
-                "Do not claim the installer bytes are newer than the release shelf proves.",
+                "Do not claim the installer files are newer than the current release shows.",
                 "Do not replace first-party install continuation with browser ritual or chat-only recovery."
             ],
             Summary: summary,
@@ -165,8 +165,8 @@ public sealed class HostedCompanionPacketService
         bool channelMatches = string.Equals(Normalize(installation.Channel), Normalize(manifest.Channel), StringComparison.OrdinalIgnoreCase);
         bool previewPosture = string.Equals(Normalize(manifest.Channel), "preview", StringComparison.OrdinalIgnoreCase);
         string summary = !versionMatches || !channelMatches
-            ? $"{installation.Platform ?? "desktop"} is on {installation.Channel} {installation.Version} while the hosted shelf promotes {manifest.Channel} {manifest.Version}."
-            : $"{installation.Platform ?? "desktop"} already matches the hosted {manifest.Channel} {manifest.Version} lane, but preview posture still needs visible first-party update caution.";
+            ? $"{installation.Platform ?? "desktop"} is on {installation.Channel} {installation.Version} while chummer.run promotes {manifest.Channel} {manifest.Version}."
+            : $"{installation.Platform ?? "desktop"} already matches the hosted {manifest.Channel} {manifest.Version}, but preview status still needs visible update caution.";
 
         return new HostedCompanionPacketProjection(
             PacketId: StableId("update", installation.InstallationId),
@@ -195,23 +195,23 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("update-install", installation.InstallationId),
                     Kind: "install_linking_state",
-                    Label: "Installed build posture",
+                    Label: "Installed build status",
                     Summary: $"{installation.Platform ?? "desktop"} / {installation.Channel} / {installation.Version}",
                     Route: "/api/v1/install-linking/continuation",
                     ReceiptId: installation.GrantId),
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("update-release", manifest.Version),
                     Kind: "update_ready",
-                    Label: "Hosted release posture",
-                    Summary: $"{manifest.Channel} {manifest.Version} is the promoted hosted update lane.",
+                    Label: "Hosted release status",
+                    Summary: $"{manifest.Channel} {manifest.Version} is the promoted hosted update.",
                     Route: string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}")
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("show_risk", "Show release posture", "/downloads", "Inspect the promoted release, supportability, and installer shelf on the hosted route."),
-                new HostedCompanionActionProjection("open_safe_install", "Open safe install", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Jump to the first-party installer path for the promoted release head."),
-                new HostedCompanionActionProjection("open_support_lane", "Open support continuation", "/api/v1/install-linking/continuation/support", "Keep recovery and update follow-through on the hosted install-support lane.")
+                new HostedCompanionActionProjection("show_risk", "Show release status", "/downloads", "Inspect the promoted release, support state, and current installer."),
+                new HostedCompanionActionProjection("open_safe_install", "Open safe install", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Jump to the Chummer installer path for the promoted release."),
+                new HostedCompanionActionProjection("open_support_lane", "Open support", "/api/v1/install-linking/continuation/support", "Keep recovery and update follow-up attached to the linked copy.")
             ],
             Suppression: BuildSuppression("trigger_class_per_install", 21600, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),
@@ -222,8 +222,8 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddHours(12),
             ForbiddenClaims:
             [
-                "Do not claim an update is safe without the hosted release shelf, supportability, and install routes agreeing.",
-                "Do not imply the update feed outranks first-party support or recovery truth."
+                "Do not claim an update is safe unless the Chummer release status, support state, and install routes agree.",
+                "Do not imply the update feed outranks Chummer support or recovery status."
             ],
             Summary: summary,
             FallbackPackId: "preview_scout_warning",
@@ -289,10 +289,10 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("support-install", supportCase.CaseId),
                     Kind: "install_linking_truth",
-                    Label: "Install-aware support lane",
+                    Label: "Linked-copy support",
                     Summary: concierge.IsInstallAware
-                        ? $"Installed build receipt {concierge.InstalledBuildTruth.InstalledBuildReceiptId ?? "linked"} keeps support closure tied to the claimed device."
-                        : "Support stays first-party, but the install-aware proof is incomplete until the claimed device lane is linked.",
+                        ? "The installed build is linked, so support stays tied to the claimed device."
+                        : "Support stays in Chummer, but this case needs a linked device before it can be closed cleanly.",
                     Route: "/api/v1/install-linking/continuation/support",
                     ReceiptId: concierge.InstalledBuildTruth.InstalledBuildReceiptId)
             ],
@@ -300,8 +300,8 @@ public sealed class HostedCompanionPacketService
             AllowedActions:
             [
                 new HostedCompanionActionProjection("open_support_case", "Open support case", detailRoute, "Inspect the tracked support case, next-safe action, and closure timeline."),
-                new HostedCompanionActionProjection("show_fix_receipt", "Show fix receipt", concierge.ReleaseExplainer.FirstPartyRoutes.FirstOrDefault(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)) ?? "/downloads", "Verify the same hosted release lane that support says fixes the issue."),
-                new HostedCompanionActionProjection("open_install_support", "Open install-support lane", "/api/v1/install-linking/continuation/support", "Keep support, install, and verification follow-through on the same first-party lane.")
+                new HostedCompanionActionProjection("show_fix_receipt", "Show fix record", concierge.ReleaseExplainer.FirstPartyRoutes.FirstOrDefault(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)) ?? "/downloads", "Check the same Chummer release path that support says fixes the issue."),
+                new HostedCompanionActionProjection("open_install_support", "Open install support", "/api/v1/install-linking/continuation/support", "Keep support and install follow-up on the same linked copy.")
             ],
             Suppression: BuildSuppression("trigger_class_per_support_case", reporterCanClose ? 28800 : 14400, 1, true),
             EaCompile: BuildEaCompile(true, reporterCanClose ? "line_variant_pack_and_rare_media_brief" : "line_variant_pack", reporterCanClose ? ["line_variant_pack", "rare_media_brief"] : ["line_variant_pack"], runtimeBlocking: false),
@@ -335,8 +335,8 @@ public sealed class HostedCompanionPacketService
         string summary = hasConflict
             ? restore.ConflictSummaries.FirstOrDefault()
                 ?? restore.ConflictReceipts?.FirstOrDefault()?.Summary
-                ?? "Restore needs explicit operator choice before the hosted continuation lane can continue safely."
-            : $"Restore continuity keeps {restore.ClaimedDevices.Count} claimed device(s), {restore.RecentCampaigns.Count} campaign(s), and {restore.RecentDossiers.Count} dossier(s) available on the first-party return lane.";
+                ?? "Restore needs an explicit choice before the hosted path can continue safely."
+            : $"Restore keeps {restore.ClaimedDevices.Count} claimed device(s), {restore.RecentCampaigns.Count} campaign(s), and {restore.RecentDossiers.Count} dossier(s) available on the Chummer return path.";
         WorkspaceRestoreConflictReceipt? conflict = restore.ConflictReceipts?.FirstOrDefault();
         WorkspaceRestoreProvenanceReceipt? provenance = restore.ProvenanceReceipts?.FirstOrDefault();
         ClaimedDeviceRestoreProjection? claimedDevice = restore.ClaimedDevices.FirstOrDefault();
@@ -368,7 +368,7 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("restore-conflict", restore.RestoreId),
                     Kind: "restore_conflict_receipt",
-                    Label: hasConflict ? "Restore conflict posture" : "Restore continuity posture",
+                    Label: hasConflict ? "Restore conflict" : "Restore status",
                     Summary: summary,
                     Route: "/account/access",
                     ReceiptId: conflict?.ReceiptId),
@@ -376,16 +376,16 @@ public sealed class HostedCompanionPacketService
                     FactId: StableId("restore-provenance", restore.RestoreId),
                     Kind: "provenance_receipt",
                     Label: "Restore provenance",
-                    Summary: provenance?.Summary ?? $"{restore.RecentArtifacts.Count} recent artifacts and {restore.Entitlements.Count} entitlements remain visible on the restore lane.",
+                    Summary: provenance?.Summary ?? $"{restore.RecentArtifacts.Count} recent files and {restore.Entitlements.Count} entitlements remain visible on the restore path.",
                     Route: "/api/v1/install-linking/continuation",
                     ReceiptId: provenance?.ReceiptId)
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("resolve_conflict", "Review restore lane", "/account/access", "Inspect restore conflicts, provenance, and the next safe continuation route."),
-                new HostedCompanionActionProjection("inspect_versions", "Inspect install continuation", "/api/v1/install-linking/continuation", "Keep restore and claimed-install truth on the same hosted continuation rail."),
-                new HostedCompanionActionProjection("open_support", "Open support intake", "/contact#support-intake", "Escalate restore drift through the first-party support path when the hosted continuity lane is not enough.")
+                new HostedCompanionActionProjection("resolve_conflict", "Review restore", "/account/access", "Inspect restore conflicts, provenance, and the next safe route."),
+                new HostedCompanionActionProjection("inspect_versions", "Inspect linked copy", "/api/v1/install-linking/continuation", "Keep restore and the claimed device on the same Chummer path."),
+                new HostedCompanionActionProjection("open_support", "Open support intake", "/contact#support-intake", "Escalate restore drift through Chummer support when the hosted path is not enough.")
             ],
             Suppression: BuildSuppression("trigger_class_per_restore_session", hasConflict ? 0 : 21600, hasConflict ? 6 : 1, !hasConflict),
             EaCompile: BuildEaCompile(false, hasConflict ? "first_party_only" : "line_variant_pack", hasConflict ? [] : ["line_variant_pack"], runtimeBlocking: false),
@@ -396,7 +396,7 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddHours(12),
             ForbiddenClaims:
             [
-                "Do not auto-resolve restore drift without the first-party provenance and conflict receipts staying visible.",
+                "Do not auto-resolve restore drift without the Chummer restore records staying visible.",
                 "Do not imply restore can outrank claimed-install, entitlement, or support continuity."
             ],
             Summary: summary,
@@ -466,9 +466,9 @@ public sealed class HostedCompanionPacketService
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_campaign_workspace", "Open campaign workspace", "/account/work", "Inspect campaign return posture, what changed, and governed continuity on the same workspace lane."),
+                new HostedCompanionActionProjection("open_campaign_workspace", "Open campaign workspace", "/account/work", "See what changed and pick up the same campaign workspace."),
                 new HostedCompanionActionProjection("review_impacts", "Review impacts", "/account/work#campaign-memory", "Inspect world-tick, player-safe news, and next-session follow-through."),
-                new HostedCompanionActionProjection("open_runboard", "Open runboard", "/account/work#runboard", "Resume the governed runboard and continuation lane without recreating engine math.")
+                new HostedCompanionActionProjection("open_runboard", "Open runboard", "/account/work#runboard", "Resume the runboard without recreating the session state.")
             ],
             Suppression: BuildSuppression("trigger_class_per_campaign", 43200, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),
@@ -479,8 +479,8 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddDays(1),
             ForbiddenClaims:
             [
-                "Do not fabricate campaign, rules, or world consequences beyond the first-party change packets and campaign-memory rails.",
-                "Do not hide governed campaign truth behind a detached community or recap story."
+                "Do not fabricate campaign, rules, or world consequences beyond Chummer's saved campaign state.",
+                "Do not hide campaign state behind a detached community or recap story."
             ],
             Summary: summary,
             FallbackPackId: "campaign_workspace_change",
@@ -537,16 +537,16 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("publication-trust", publication.PublicationId),
                     Kind: "published_artifact_ref",
-                    Label: "Publication trust posture",
+                    Label: "Publication status",
                     Summary: publication.TrustSummary ?? publication.ProvenanceSummary ?? publication.DiscoverySummary,
                     Route: discoverable ? publicRoute : "/account/publications")
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_publication", discoverable ? "Open published packet" : "Open publication detail", discoverable ? publicRoute : "/account/publications", "Inspect the governed creator-publication lane and trust posture."),
-                new HostedCompanionActionProjection("review_workspace", "Open campaign workspace", "/account/work", "Return to the same workspace truth that promoted the publication."),
-                new HostedCompanionActionProjection("review_support", "Review support posture", "/account/support", "Keep publication, support, and rollout truth on first-party rails when the packet still needs follow-through.")
+                new HostedCompanionActionProjection("open_publication", discoverable ? "Open publication" : "Open publication detail", discoverable ? publicRoute : "/account/publications", "Review the publication and its current status."),
+                new HostedCompanionActionProjection("review_workspace", "Open campaign workspace", "/account/work", "Return to the workspace that created the publication."),
+                new HostedCompanionActionProjection("review_support", "Review support status", "/account/support", "Keep publication, support, and rollout follow-up inside Chummer when more work is needed.")
             ],
             Suppression: BuildSuppression("trigger_class_per_campaign", 86400, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack_and_rare_media_brief", ["line_variant_pack", "rare_media_brief"], runtimeBlocking: false),
@@ -557,8 +557,8 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddDays(2),
             ForbiddenClaims:
             [
-                "Do not claim discoverability, compatibility, or moderation posture that the first-party publication route does not show.",
-                "Do not detach creator-publication truth from the underlying campaign, support, or trust rails."
+                "Do not claim discoverability, compatibility, or moderation status that Chummer does not show.",
+                "Do not detach publication status from the underlying campaign and support state."
             ],
             Summary: summary,
             FallbackPackId: "creator_publication_ready",
@@ -572,7 +572,7 @@ public sealed class HostedCompanionPacketService
     {
         string summary = manifest.SupportabilitySummary
             ?? manifest.Message
-            ?? $"{manifest.Channel} {manifest.Version} keeps downloads, support posture, and proof status aligned on the hosted public hub.";
+            ?? $"{manifest.Channel} {manifest.Version} keeps downloads and support status aligned on chummer.run.";
         string severity = string.Equals(Normalize(manifest.Channel), "preview", StringComparison.OrdinalIgnoreCase)
             || string.Equals(Normalize(manifest.SupportabilityState), "watch", StringComparison.OrdinalIgnoreCase)
             ? "caution"
@@ -605,22 +605,22 @@ public sealed class HostedCompanionPacketService
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("public-release", manifest.Version),
                     Kind: "public_release_truth",
-                    Label: "Hosted release shelf",
+                    Label: "Hosted release",
                     Summary: $"{manifest.Channel} {manifest.Version} / {manifest.Status}",
                     Route: "/downloads"),
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("public-support", manifest.Version),
                     Kind: "public_support_truth",
-                    Label: "Public support posture",
-                    Summary: manifest.SupportabilitySummary ?? manifest.KnownIssueSummary ?? "Public support posture stays on first-party downloads and contact routes.",
+                    Label: "Public support",
+                    Summary: manifest.SupportabilitySummary ?? manifest.KnownIssueSummary ?? "Public support stays on Chummer downloads and contact routes.",
                     Route: "/contact#support-intake")
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "Inspect the current installer shelf, release posture, and published proof rail."),
-                new HostedCompanionActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Use the first-party public support entry when the public hub posture still needs help."),
-                new HostedCompanionActionProjection("open_account_access", "Create account for guided install", "/account/access", "Move from public posture into the first-party claimed install and restore lane.")
+                new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "See the current installers and release status."),
+                new HostedCompanionActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Use Chummer support when the public page still needs help."),
+                new HostedCompanionActionProjection("open_account_access", "Create account for guided install", "/account/access", "Move from the public page into a linked install and restore path.")
             ],
             Suppression: BuildSuppression("trigger_class_per_surface", 43200, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),
@@ -631,8 +631,8 @@ public sealed class HostedCompanionPacketService
             ExpiryUtc: now.AddHours(12),
             ForbiddenClaims:
             [
-                "Do not let public-hub copy outrank installer bytes, release-channel truth, or first-party support posture.",
-                "Do not imply public pages can verify private install or support state without account-bound first-party truth."
+                "Do not let public page copy outrank the installer files, release channel, or Chummer support status.",
+                "Do not imply public pages can check private install or support state without an account-linked copy."
             ],
             Summary: summary,
             FallbackPackId: "public_hub_release_posture",

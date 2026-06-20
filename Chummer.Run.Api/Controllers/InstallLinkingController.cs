@@ -24,6 +24,8 @@ public sealed class InstallLinkingController : ControllerBase
     private const string NativeUpdateHref = "/api/v1/install-linking/continuation/update";
     private const string NativeRollbackHref = "/api/v1/install-linking/continuation/rollback";
     private const string NativeRecoveryHref = NativeContinuationHref;
+    private const string MissingCurrentInstallerFallbackPosture =
+        "Chummer cannot confirm the current installer for this claimed copy yet. Use support recovery with this install identity attached.";
     private static readonly HashSet<string> InstallLinkCallbackReservedQueryKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "artifactId",
@@ -187,7 +189,7 @@ public sealed class InstallLinkingController : ControllerBase
                 return BuildBrowserInstallLinkStatusPage(
                     statusCode: StatusCodes.Status404NotFound,
                     heading: "This install needs a current desktop package",
-                    supportLine: "Chummer could not match this app handoff to a published desktop artifact. Open Downloads for the current installer, or contact support with this install identity attached.",
+                    supportLine: "Chummer could not match this copy to a current desktop installer. Open Downloads for the current installer, or contact support with this install identity attached.",
                     primaryLabel: "Open downloads",
                     primaryHref: "/downloads",
                     secondaryLabel: "Open install support",
@@ -243,7 +245,7 @@ public sealed class InstallLinkingController : ControllerBase
                 highlights:
                 [
                     $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
-                    $"Package: {artifact.Id}",
+                    $"Installer: {artifact.Id}",
                     $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
                 ],
                 autoOpenHref: callbackRedirectUri,
@@ -474,7 +476,7 @@ public sealed class InstallLinkingController : ControllerBase
             ?? supportCases.FirstOrDefault();
         NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
             NativeContinuationHref,
-            "No current local release-proof receipt is attached to the native claimed-install continuation route.");
+            "No current release status record is attached to the native claimed-install continuation route.");
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
             applicationVersion: installation.Version,
@@ -500,8 +502,7 @@ public sealed class InstallLinkingController : ControllerBase
             RouteState: nativeRouteProof.State,
             RouteReceipt: nativeRouteProof.RouteReceipt,
             BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
-            FallbackPosture: continuation?.FallbackPosture
-                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            FallbackPosture: continuation?.FallbackPosture ?? MissingCurrentInstallerFallbackPosture,
             UpdateAvailable: updateAvailable,
             NextSafeAction: BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation),
             NativePrimaryActionHref: BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase),
@@ -614,7 +615,7 @@ public sealed class InstallLinkingController : ControllerBase
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
         NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
             NativeSupportHref,
-            "No current local release-proof receipt is attached to the native claimed-install support route.");
+            "No current release status record is attached to the native claimed-install support route.");
 
         SupportCaseProjection created;
         try
@@ -655,13 +656,12 @@ public sealed class InstallLinkingController : ControllerBase
             RouteState: nativeRouteProof.State,
             RouteReceipt: nativeRouteProof.RouteReceipt,
             BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
-            FallbackPosture: continuation?.FallbackPosture
-                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            FallbackPosture: continuation?.FallbackPosture ?? MissingCurrentInstallerFallbackPosture,
             UpdateAvailable: updateAvailable,
             UpdateAction: updateAvailable
                 ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the install grant from the app."
                 : continuation?.UpdateAction ?? "Refresh the install grant from the app before starting a new install or support path.",
-            RollbackAction: "If support, update, or setup fails, keep the previous installed copy and return to this claimed install continuation rail.",
+            RollbackAction: "If support, update, or setup fails, keep the previous installed copy and return to Devices and access for this linked copy.",
             RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
     }
 
@@ -690,7 +690,7 @@ public sealed class InstallLinkingController : ControllerBase
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
         NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
             NativeUpdateHref,
-            "No current local release-proof receipt is attached to the native claimed-install update planner route.");
+            "No current release status record is attached to the native claimed-install update planner route.");
 
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
@@ -719,16 +719,15 @@ public sealed class InstallLinkingController : ControllerBase
             UpdateAvailable: updateAvailable,
             UpdatePlan: BuildNativeUpdatePlan(installation, manifest, releaseArtifact, receipt, updateAvailable),
             UpdateAction: updateAvailable
-                ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh this grant-bound update planner from the app."
-                : continuation?.UpdateAction ?? "Refresh this grant-bound update planner from the app before starting another install or support path.",
+                ? $"Update this linked copy from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the update view from the app."
+                : continuation?.UpdateAction ?? "Refresh the update view from the app before starting another install or support path.",
             NativePrimaryActionHref: NativeUpdateHref,
             SupportHref: supportHref,
             NativeContinuationHref: "/api/v1/install-linking/continuation",
             NativeSupportHref: "/api/v1/install-linking/continuation/support",
             NativeRollbackHref: "/api/v1/install-linking/continuation/rollback",
             NativeRecoveryHref: NativeRecoveryHref,
-            FallbackPosture: continuation?.FallbackPosture
-                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            FallbackPosture: continuation?.FallbackPosture ?? MissingCurrentInstallerFallbackPosture,
             RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
     }
 
@@ -757,7 +756,7 @@ public sealed class InstallLinkingController : ControllerBase
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
         NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
             NativeRollbackHref,
-            "No current local release-proof receipt is attached to the native claimed-install rollback planner route.");
+            "No current release status record is attached to the native claimed-install rollback planner route.");
 
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
@@ -786,15 +785,14 @@ public sealed class InstallLinkingController : ControllerBase
             UpdateAvailable: updateAvailable,
             RollbackPlan: BuildNativeRollbackPlan(installation, receipt),
             RollbackAction: continuation?.RollbackAction
-                ?? "Keep the previous installed copy and return to this claimed install continuation rail before starting another recovery path.",
+                ?? "Keep the previous installed copy and return to Devices and access for this linked copy before starting another recovery path.",
             NativePrimaryActionHref: NativeRollbackHref,
             SupportHref: supportHref,
             NativeContinuationHref: "/api/v1/install-linking/continuation",
             NativeUpdateHref: "/api/v1/install-linking/continuation/update",
             NativeSupportHref: "/api/v1/install-linking/continuation/support",
             NativeRecoveryHref: NativeRecoveryHref,
-            FallbackPosture: continuation?.FallbackPosture
-                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            FallbackPosture: continuation?.FallbackPosture ?? MissingCurrentInstallerFallbackPosture,
             RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
     }
 
@@ -811,10 +809,10 @@ public sealed class InstallLinkingController : ControllerBase
             ? "Install help for claimed desktop install"
             : request.Title.Trim();
         string summary = string.IsNullOrWhiteSpace(request.Summary)
-            ? "The desktop app needs help on this claimed install rail."
+            ? "The desktop app needs help with this linked copy."
             : request.Summary.Trim();
         string detail = string.IsNullOrWhiteSpace(request.Detail)
-            ? "The desktop app filed this from a grant-bound claimed install. Keep install, update, rollback, and verification on this same native continuation rail."
+            ? "The desktop app filed this from a linked copy. Keep install, update, rollback, and follow-up on this same device."
             : request.Detail.Trim();
         string? installedBuildReceiptId = string.IsNullOrWhiteSpace(installedBuildReceipt?.ReceiptId)
             ? null
@@ -848,7 +846,7 @@ public sealed class InstallLinkingController : ControllerBase
             return detail;
         }
 
-        string requiredLine = $"Installed build receipt: {installedBuildReceiptId}";
+        string requiredLine = $"Installed build record: {installedBuildReceiptId}";
         return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
             ? detail
             : $"{detail}\n\n{requiredLine}";
@@ -865,7 +863,7 @@ public sealed class InstallLinkingController : ControllerBase
 
     private static string AppendNativeContinuationContextDetail(string detail)
     {
-        const string requiredLine = "Native continuation: grant-bound claimed install support; browser callback, claim-code, or public form identifiers in the desktop payload are advisory only.";
+        const string requiredLine = "Linked copy support: browser callback, claim code, or public form identifiers in the desktop payload are advisory only.";
         return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
             ? detail
             : $"{detail}\n\n{requiredLine}";
@@ -881,7 +879,7 @@ public sealed class InstallLinkingController : ControllerBase
         string trimmed = requestedActionHref.Trim();
         string safeHref = RedactNativeRequestedActionHref(trimmed);
         string posture = NormalizeNativeInstallRailHref(trimmed) is not null
-            ? "native grant-bound action"
+            ? "linked-copy action"
             : "advisory browser or external action";
         string requiredLine = $"Desktop requested action ({posture}): {safeHref}";
         return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
@@ -1263,7 +1261,7 @@ public sealed class InstallLinkingController : ControllerBase
     private static string AppendNativeRouteReceiptDetail(string detail)
     {
         string requiredLine =
-            $"Native route receipt: support {NativeSupportHref}; update {NativeUpdateHref}; rollback {NativeRollbackHref}; recovery {NativeRecoveryHref}; account, downloads, and public support links are human fallback only.";
+            $"Linked copy support paths: support {NativeSupportHref}; update {NativeUpdateHref}; rollback {NativeRollbackHref}; recovery {NativeRecoveryHref}; account, downloads, and public support links are fallback only.";
         return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
             ? detail
             : $"{detail}\n\n{requiredLine}";
@@ -1277,9 +1275,9 @@ public sealed class InstallLinkingController : ControllerBase
         bool updateAvailable)
     {
         string fallbackPosture = continuation?.FallbackPosture
-            ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.";
+            ?? MissingCurrentInstallerFallbackPosture;
         string requiredLine =
-            $"Native release recovery truth: current {manifest.Channel} {manifest.Version}; artifact {NormalizeResponseValue(releaseArtifact?.Id)}; updateAvailable {updateAvailable.ToString().ToLowerInvariant()}; rollback stays on the previous installed copy; fallback {fallbackPosture}";
+            $"Linked copy recovery status: current {manifest.Channel} {manifest.Version}; installer {NormalizeResponseValue(releaseArtifact?.Id)}; update available {updateAvailable.ToString().ToLowerInvariant()}; rollback stays on the previous installed copy; fallback {fallbackPosture}";
         return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
             ? detail
             : $"{detail}\n\n{requiredLine}";
@@ -1514,13 +1512,13 @@ public sealed class InstallLinkingController : ControllerBase
                 CurrentReleaseChannel: manifest.Channel,
                 CurrentArtifactId: releaseArtifact?.Id,
                 FallbackPosture: continuation?.FallbackPosture
-                    ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+                    ?? MissingCurrentInstallerFallbackPosture,
                 UpdateAvailable: updateAvailable,
                 UpdateAction: updateAvailable
-                    ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the grant-bound support follow-through from the app."
-                    : continuation?.UpdateAction ?? "Refresh the grant-bound support follow-through from the app before starting another install or support path.",
+                    ? $"Update this linked copy from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh support from the app."
+                    : continuation?.UpdateAction ?? "Refresh support from the app before starting another install or support path.",
                 RollbackAction: continuation?.RollbackAction
-                    ?? "If support, update, or setup fails, keep the previous installed copy and return to this claimed install continuation rail.",
+                    ?? "If support, update, or setup fails, keep the previous installed copy and return to Devices and access for this linked copy.",
                 NativeContinuationHref: "/api/v1/install-linking/continuation",
                 NativeSupportHref: "/api/v1/install-linking/continuation/support",
                 NativeUpdateHref: "/api/v1/install-linking/continuation/update",
@@ -1554,29 +1552,29 @@ public sealed class InstallLinkingController : ControllerBase
     {
         if (item.ReporterActionNeeded)
         {
-            return "Continue support follow-through from the desktop app on this grant-bound native support endpoint; keep the case, install, and device tuple attached.";
+            return "Continue support from the desktop app for this linked copy; keep the case, install, and device together.";
         }
 
         if (item.NeedsInstallUpdate)
         {
             return updateAvailable
-                ? "Continue on the grant-bound native update planner for this claimed install, then return to this same support follow-through to verify the fix."
-                : "Refresh this grant-bound continuation from the desktop app before verifying support; do not start a downloads or account browser handoff.";
+                ? "Continue with the desktop app update view for this linked copy, then return to this same support case to check the fix."
+                : "Refresh this linked copy from the desktop app before checking support; do not start a separate download or browser claim path.";
         }
 
         if (item.FixReadyOnLinkedInstall)
         {
-            return "Verify the fix from this claimed desktop install through the grant-bound continuation rail; keep support follow-through attached to this install.";
+            return "Check the fix from this linked desktop copy; keep support attached to this install.";
         }
 
         string? nativeActionHref = NormalizeNativeInstallRailHref(item.PrimaryActionHref);
         bool primaryActionIsBrowserRail = IsBrowserRailHref(item.PrimaryActionHref);
         if (!primaryActionIsBrowserRail && string.Equals(nativeActionHref, NativeContinuationHref, StringComparison.Ordinal))
         {
-            return "Continue on the grant-bound desktop continuation rail for this claimed install.";
+            return "Continue in the desktop app for this linked copy.";
         }
 
-        return "Stay on the grant-bound desktop continuation rail for this claimed install; account, downloads, and public support browser links are human fallback only.";
+        return "Stay with this linked desktop copy; account, downloads, and public support links are fallback only.";
     }
 
     private static string? NormalizeNativeInstallRailHref(string? href)
@@ -1927,7 +1925,7 @@ public sealed class InstallLinkingController : ControllerBase
 
         if (updateAvailable)
         {
-            return "Continue in the desktop app update lane for this claimed install; keep support and rollback on this same install rail.";
+            return "Continue in the desktop app updater for this linked copy; keep support and rollback on this same device.";
         }
 
         return continuation?.NextSafeAction
@@ -1970,8 +1968,8 @@ public sealed class InstallLinkingController : ControllerBase
     {
         string receiptLabel = string.IsNullOrWhiteSpace(receipt?.ReceiptId)
             ? "the installed build already linked to this grant"
-            : $"installed build receipt {receipt.ReceiptId}";
-        return $"Keep or restore {installation.Channel} {installation.Version} from {receiptLabel} on {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}, then refresh this grant-bound continuation rail before filing support.";
+            : $"installed build record {receipt.ReceiptId}";
+        return $"Keep or restore {installation.Channel} {installation.Version} from {receiptLabel} on {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}, then refresh this linked copy before filing support.";
     }
 
     private static string BuildNativeUpdatePlan(
@@ -1983,21 +1981,21 @@ public sealed class InstallLinkingController : ControllerBase
     {
         string receiptLabel = string.IsNullOrWhiteSpace(receipt?.ReceiptId)
             ? "the installed build already linked to this grant"
-            : $"installed build receipt {receipt.ReceiptId}";
+            : $"installed build record {receipt.ReceiptId}";
         string artifactLabel = string.IsNullOrWhiteSpace(releaseArtifact?.Id)
-            ? "the matching release artifact"
+            ? "the matching installer"
             : releaseArtifact.Id;
         string deviceLabel = $"{NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}";
         return updateAvailable
-            ? $"Update {deviceLabel} from {installation.Channel} {installation.Version} using {receiptLabel} to {manifest.Channel} {manifest.Version} via {artifactLabel}, then refresh this grant-bound continuation rail before support verification."
-            : $"Keep {deviceLabel} on {installation.Channel} {installation.Version} from {receiptLabel}; no newer matching release artifact is required, so refresh this grant-bound continuation rail before filing support.";
+            ? $"Update {deviceLabel} from {installation.Channel} {installation.Version} using {receiptLabel} to {manifest.Channel} {manifest.Version} via {artifactLabel}, then refresh this linked copy before checking support."
+            : $"Keep {deviceLabel} on {installation.Channel} {installation.Version} from {receiptLabel}; no newer matching installer is required, so refresh this linked copy before filing support.";
     }
 
     private static string BuildNativeRecoveryAction(
         ClaimedInstallationDto installation,
         DesktopInstallContinuationReceipt? continuation)
         => continuation?.NextSafeAction
-           ?? $"Return {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)} to the grant-bound continuation rail for recovery; claim-code and account browser links remain fallback context only.";
+           ?? $"Return {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)} to this linked copy for recovery; claim-code and account links remain fallback context only.";
 
     private static PublicReleaseArtifactDto? ResolveBrowserCallbackArtifact(
         PublicReleaseManifestDto manifest,
@@ -2212,7 +2210,7 @@ public sealed class InstallLinkingController : ControllerBase
             return new NativeRouteProofStatus(
                 State: "bounded_failure",
                 RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
-                BoundedFailureReason: $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+                BoundedFailureReason: $"Current direct route is attached, but this still needs review because {reviewRequiredReason}.");
         }
 
         ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
@@ -2221,7 +2219,7 @@ public sealed class InstallLinkingController : ControllerBase
             return new NativeRouteProofStatus(
                 State: "bounded_failure",
                 RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
-                BoundedFailureReason: $"Current direct route receipt is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+                BoundedFailureReason: $"Current direct route is attached, but this still needs review because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
         }
 
         return new NativeRouteProofStatus(

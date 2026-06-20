@@ -83,8 +83,9 @@ public sealed class DesktopInstallRailTests
         Assert.Equal("/downloads/install/avalonia-linux-x64-installer", context.ReturnHref);
         Assert.Equal("Return to recovery handoff", context.ReturnLabel);
         Assert.True(context.RecoveryModeOnly);
-        Assert.Contains("same install rail", context.Summary!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("same linked copy", context.Summary!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("retry recovery", context.Summary!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("install rail", context.Summary!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -119,11 +120,13 @@ public sealed class DesktopInstallRailTests
         Assert.Equal("avalonia", receipt.HeadId);
         Assert.Equal("linux-x64", receipt.PlatformId);
         Assert.Contains("Recovery fallback only", receipt.FallbackPosture, StringComparison.Ordinal);
-        Assert.Contains("desktop app update lane", receipt.UpdateAction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("desktop app updater", receipt.UpdateAction, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("setup assistant", receipt.UpdateAction, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("previous installed copy", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("claimed install continuation rail", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Devices and access", receipt.RollbackAction, StringComparison.Ordinal);
-        Assert.Contains("claim, build, channel, fallback, and recovery context", receipt.SupportContinuation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("same linked copy", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("install rail", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("continuation rail", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("linked copy", receipt.SupportContinuation, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("install rail", receipt.SupportContinuation, StringComparison.OrdinalIgnoreCase);
     }
 }

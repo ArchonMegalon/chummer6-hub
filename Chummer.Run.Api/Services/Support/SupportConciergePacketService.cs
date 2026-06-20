@@ -119,7 +119,7 @@ public sealed class SupportConciergePacketService
                 InstalledToReleaseDelta: installedToReleaseDelta,
                 FirstPartyRoutes: routes),
             PublicTrustWrapper: new PublicConciergeTrustWrapper(
-                Summary: "Public help and downloads may point to this bounded concierge packet, but installed-build truth, support history, and verification stay on signed-in first-party Hub surfaces.",
+                Summary: "Public help and downloads may point to this support packet, but installed-build status and support history stay on signed-in Chummer surfaces.",
                 PublicRoutes: routes.Where(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase) || route.StartsWith("/contact", StringComparison.OrdinalIgnoreCase)).ToArray(),
                 AuthenticatedRoutes: routes.Where(static route => route.StartsWith("/account", StringComparison.OrdinalIgnoreCase) || route.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)).ToArray(),
                 FirstPartyOnlyTruth: true));
@@ -232,9 +232,9 @@ public sealed class SupportConciergePacketService
         PublicReleaseArtifactDto? artifact)
     {
         string artifactLabel = string.IsNullOrWhiteSpace(artifact?.Id)
-            ? "the matching published artifact"
+            ? "the matching published installer"
             : artifact.Id;
-        return $"{presentation.ReleaseProgressSummary} The release explainer compares installed {installedLabel} with {releaseLabel} and points to {artifactLabel}.";
+        return $"{presentation.ReleaseProgressSummary} Support compares installed {installedLabel} with {releaseLabel} and points to {artifactLabel}.";
     }
 
     private static string BuildCorrectnessBasis(
@@ -245,12 +245,12 @@ public sealed class SupportConciergePacketService
         bool channelAgrees)
     {
         string receipt = string.IsNullOrWhiteSpace(installedBuildReceiptId)
-            ? "no installed-build receipt id was embedded in case detail"
-            : $"installed-build receipt {installedBuildReceiptId}";
+            ? "no installed-build record id was embedded in case detail"
+            : $"installed build record {installedBuildReceiptId}";
         string channelPosture = channelAgrees
-            ? "channel truth agrees"
-            : "channel truth needs support-directed handling";
-        return $"Case {supportCase.CaseId} binds {installedLabel}, {releaseLabel}, {receipt}, and support status {supportCase.Status}; {channelPosture}.";
+            ? "channel status agrees"
+            : "channel status needs support-directed handling";
+        return $"Case {supportCase.CaseId} connects {installedLabel}, {releaseLabel}, {receipt}, and support status {supportCase.Status}; {channelPosture}.";
     }
 
     private static bool BuildChannelAgreement(string? installedChannel, string? fixedChannel, string manifestChannel)
@@ -277,8 +277,8 @@ public sealed class SupportConciergePacketService
         }
 
         return artifact is null
-            ? "Release artifact truth is not published for this install yet; keep support-directed recovery as the backup path."
-            : "Use the same linked install and published artifact; public help is a wrapper, not the source of closure truth.";
+            ? "Chummer cannot confirm the current installer for this copy yet; keep support-directed recovery as the backup path."
+            : "Use the same linked copy and published installer; public help is a wrapper, not the final fix state.";
     }
 
     private static SupportClosureReadiness BuildClosureReadiness(
@@ -314,12 +314,12 @@ public sealed class SupportConciergePacketService
         List<string> blockers = [];
         if (!installedBuildComplete)
         {
-            blockers.Add("installed build truth is incomplete");
+            blockers.Add("installed build status is incomplete");
         }
 
         if (!releaseArtifactReady)
         {
-            blockers.Add("published artifact proof is incomplete");
+            blockers.Add("published file status is incomplete");
         }
 
         if (!channelAgrees)
@@ -334,11 +334,11 @@ public sealed class SupportConciergePacketService
 
         if (presentation.NeedsInstallUpdate)
         {
-            blockers.Add("the reporter still needs to update before verification");
+            blockers.Add("the reporter still needs to update before closing the case");
         }
 
         return blockers.Count == 0
-            ? "support closure is ready for reporter verification on the linked install"
+            ? "support closure is ready on the linked install"
             : string.Join("; ", blockers);
     }
 
@@ -402,8 +402,14 @@ public sealed class SupportConciergePacketService
 
         foreach (string line in detail.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
-            const string marker = "Installed build receipt:";
-            if (!line.StartsWith(marker, StringComparison.OrdinalIgnoreCase))
+            const string currentMarker = "Installed build record:";
+            const string legacyMarker = "Installed build receipt:";
+            string? marker = line.StartsWith(currentMarker, StringComparison.OrdinalIgnoreCase)
+                ? currentMarker
+                : line.StartsWith(legacyMarker, StringComparison.OrdinalIgnoreCase)
+                    ? legacyMarker
+                    : null;
+            if (marker is null)
             {
                 continue;
             }

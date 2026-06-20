@@ -121,8 +121,8 @@ public sealed class SupportCasePresentationService
             SupportCaseStatuses.Fixed => (
                 "Fixed",
                 installRailCase
-                    ? "Open Devices and access, then continue on the same linked install rail when the fixed build reaches your install."
-                    : "Watch the release lane and downloads so this fix can reach your installed channel.",
+                    ? "Open Devices and access, then continue with the same linked copy when the fixed build reaches your install."
+                    : "Watch downloads so this fix can reach your installed channel.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The underlying issue is fixed, but the release handoff may still be moving."
                     : $"The underlying issue is fixed and is moving through {fixedReleaseLabel}.",
@@ -143,7 +143,7 @@ public sealed class SupportCasePresentationService
             SupportCaseStatuses.UserNotified => (
                 "Closed with notice",
                 installRailCase
-                    ? "Open Devices and access, then update, relink, or reinstall on the same account rail if needed."
+                    ? "Open Devices and access, then update, relink, or reinstall with the same account if needed."
                     : "Update or reinstall if needed, then reopen support only if the same issue still reproduces.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Chummer already sent the closure notice for this case."
@@ -323,7 +323,7 @@ public sealed class SupportCasePresentationService
             return "Follow-up stays on the reply email attached to this case.";
         }
 
-        return "Follow-up stays attached to this case id until a clearer response lane exists.";
+        return "Follow-up stays attached to this case id until there is a better reply path.";
     }
 
     private static bool HasInstallRailContext(SupportCaseProjection supportCase)
@@ -349,10 +349,10 @@ public sealed class SupportCasePresentationService
         string baseSummary = normalizedStatus switch
         {
             SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                ? "The fix already reached the reporter lane and the closure notice went out."
+                ? "The fix already reached the reporter and the closure notice went out."
                 : $"The fix reached {fixedReleaseLabel}, and the closure notice already went out.",
             SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                ? "The fix reached the reporter-ready release lane. Update or reinstall on the affected device to pick it up."
+                ? "The fix is ready for the reporter. Update or reinstall on the affected device to pick it up."
                 : $"The fix reached {fixedReleaseLabel}. Update or reinstall on the affected device to pick it up.",
             SupportCaseStatuses.Fixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
                 ? "The fix exists, but the release handoff is still moving."
@@ -701,7 +701,7 @@ public sealed class SupportCasePresentationService
         {
             highlights.Add(new SupportCaseTimelineHighlightViewModel(
                 Label: "Notified",
-                Summary: "Chummer sent the closure notice to the reporter lane.",
+                Summary: "Chummer sent the closure notice to the reporter.",
                 OccurredLabel: $"{supportCase.UserNotifiedAtUtc.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"));
         }
 
@@ -710,7 +710,7 @@ public sealed class SupportCasePresentationService
         {
             highlights.Add(new SupportCaseTimelineHighlightViewModel(
                 Label: "Released",
-                Summary: "The fix reached the reporter-ready release lane.",
+                Summary: "The fix is ready for the reporter.",
                 OccurredLabel: $"{supportCase.ReleasedToReporterChannelAtUtc.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"));
         }
 
