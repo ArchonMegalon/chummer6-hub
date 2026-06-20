@@ -26,7 +26,7 @@ def test_projection_contains_unique_important_work_rows():
     rows = module.important_work_items()
     item_ids = [row.item_id for row in rows]
 
-    assert len(rows) >= 25
+    assert len(rows) >= 30
     assert len(item_ids) == len(set(item_ids))
     assert "desktop-premium-ui-polish" in item_ids
     assert "origin-dossier-first-story" in item_ids
@@ -34,6 +34,11 @@ def test_projection_contains_unique_important_work_rows():
     assert "public-website-minimal-redesign" in item_ids
     assert "character-builder-core-usability" in item_ids
     assert "release-policy-daily-08" in item_ids
+    assert "reproducible-gold-proof-chain" in item_ids
+    assert "shadowrun-data-files-completeness" in item_ids
+    assert "table-pulse-remote-loop" in item_ids
+    assert "minimal-seo-optimization" in item_ids
+    assert "code-quality-specialization-pass" in item_ids
     assert "teable-important-work-sync" in item_ids
 
 
