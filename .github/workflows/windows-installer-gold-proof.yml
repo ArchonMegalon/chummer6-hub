@@ -1,0 +1,95 @@
+name: Windows Installer Gold Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      installer_url:
+        description: "Optional installer URL to download before proof capture"
+        required: false
+        default: ""
+        type: string
+      auto_capture_visuals:
+        description: "Capture visual audit screenshots automatically for human review"
+        required: false
+        default: true
+        type: boolean
+      scaled_dpi_scale:
+        description: "Scaled DPI label to record for the second screenshot pass"
+        required: false
+        default: "1.5"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-gold-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  capture-proof:
+    name: Capture Native Windows Installer Proof
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download installer override
+        if: ${{ inputs.installer_url != '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "Chummer.Portal/downloads/files" | Out-Null
+          Invoke-WebRequest -Uri "${{ inputs.installer_url }}" -OutFile "Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe"
+
+      - name: Capture native startup and visual evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $args = @("-LaunchInstaller")
+          if ("${{ inputs.auto_capture_visuals }}" -eq "true") {
+            $args += @(
+              "-CaptureVisualAudit",
+              "-AutoCaptureVisualAudit",
+              "-ScaledDpiScale", "${{ inputs.scaled_dpi_scale }}",
+              "-VisualClippingStatus", "review_required",
+              "-VisualReadabilityStatus", "review_required"
+            )
+          }
+          & .\scripts\capture_windows_installer_gold_proof.ps1 @args
+
+      - name: Verify proof receipt
+        id: verify
+        shell: pwsh
+        continue-on-error: true
+        run: python scripts/verify_windows_installer_visual_audit.py
+
+      - name: Upload proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-gold-proof
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json
+            Chummer.Portal/downloads/visual-audit/windows-installer/**
+            .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json
+
+      - name: Explain review boundary
+        if: always()
+        shell: pwsh
+        run: |
+          "## Windows Installer Gold Proof" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "This workflow collects native Windows proof artifacts only. It does not publish downloads." >> $env:GITHUB_STEP_SUMMARY
+          "Auto-captured visual rows are marked review_required. A human must inspect screenshots before changing clipping/readability to pass." >> $env:GITHUB_STEP_SUMMARY
+          "After downloading the artifact, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify" >> $env:GITHUB_STEP_SUMMARY
+          "Verifier outcome: ${{ steps.verify.outcome }}" >> $env:GITHUB_STEP_SUMMARY

@@ -108,6 +108,19 @@ Required post-publish checks:
 4. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
 5. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
 
+Windows installer gold proof:
+1. This proof is a native Windows visual/startup gate only. It must not publish downloads or promote a release.
+2. Preferred remote path: run GitHub Actions workflow `Windows Installer Gold Proof` from `.github/workflows/windows-installer-gold-proof.yml`.
+3. The workflow captures the promoted installer startup receipt plus installer progress/completion screenshots on a native Windows runner, then uploads artifact `windows-installer-gold-proof`.
+4. Auto-captured screenshots are intentionally marked `review_required`; a human must inspect clipping/readability before changing those rows to `pass`.
+5. Import the downloaded workflow artifact from this repository root:
+`python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify`
+6. Local native-Windows fallback:
+`scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5`
+7. Manual screenshot fallback:
+`scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass`
+8. Gold remains blocked until `scripts/verify_windows_installer_visual_audit.py` passes against the promoted installer digest.
+
 Manifest-driven public route proof:
 1. `python3 scripts/verify_public_routes_from_manifest.py --base-url https://chummer.run --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
 2. Local reverse-proxy variant: `python3 scripts/verify_public_routes_from_manifest.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`

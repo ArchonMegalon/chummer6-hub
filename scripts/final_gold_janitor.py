@@ -34,6 +34,7 @@ FRESHNESS_REQUIRED_GATES = {
     "external_distribution_mirror_proof",
     "public_copy_leak_gate",
     "design_quality_gate",
+    "windows_installer_visual_audit",
     "ui_layout_exit_gate",
     "operator_release_dashboard",
     "release_ready",
@@ -56,6 +57,7 @@ REQUIRED_RECEIPTS = {
     "external_distribution_mirror_proof": PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
     "public_copy_leak_gate": PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json",
     "design_quality_gate": PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json",
+    "windows_installer_visual_audit": PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
     "ui_layout_exit_gate": UI_LAYOUT_COMPLETION_ROOT / "UI_LAYOUT_EXIT_GATE.generated.json",
     "operator_release_dashboard": PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json",
     "release_ready": PUBLISHED_ROOT / "RELEASE_READY.generated.json",
@@ -87,6 +89,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_public_copy_leak_gate.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/ui_layout_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/materialize_design_quality_gate.py"],
+    ["python3", "scripts/verify_windows_installer_visual_audit.py"],
     ["python3", "scripts/materialize_operator_release_dashboard.py"],
     ["python3", "scripts/materialize_release_ready_receipt.py"],
 ]
@@ -240,6 +243,11 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["verdict"] = payload.get("verdict")
             required_gates[name]["failures"] = payload.get("failures", [])
             required_gates[name]["release"] = payload.get("release", {})
+        if name == "windows_installer_visual_audit" and path.is_file():
+            required_gates[name]["failures"] = payload.get("failures", [])
+            required_gates[name]["nextActions"] = payload.get("nextActions", [])
+            required_gates[name]["startupReceipt"] = payload.get("startupReceipt", {})
+            required_gates[name]["visualAuditSource"] = payload.get("visualAuditSource", {})
 
     for caveat in caveats:
         if not isinstance(caveat, dict):
@@ -312,6 +320,11 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
             lines.append(f"  - release: {release.get('version')} on {release.get('channel')}")
         if name == "operator_release_dashboard" and gate.get("failures"):
             lines.append(f"  - dashboard failures: {', '.join(str(item) for item in gate['failures'])}")
+        if name == "windows_installer_visual_audit" and gate.get("failures"):
+            lines.append(f"  - visual audit failures: {', '.join(str(item) for item in gate['failures'])}")
+            if gate.get("nextActions"):
+                lines.append("  - next actions:")
+                lines.extend(f"    - {item}" for item in gate["nextActions"])
 
     if caveats:
         lines.extend(["", "## Accepted Boundaries"])

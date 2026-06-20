@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -59,6 +59,49 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertIn("live_public_web_recrawl stale", payload["failures"])
 
+    def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dual-write-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            artifact_root = Path(temp_dir) / "full_product_reaudit_v20"
+            legacy_root = Path(temp_dir) / "gold_readiness_closure"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            stdout = io.StringIO()
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
+                with redirect_stdout(stdout):
+                    self.assertEqual(0, module.main())
+
+            published_payload = json.loads(
+                (published / "FINAL_GOLD_JANITOR.generated.json").read_text(encoding="utf-8")
+            )
+            durable_payload = json.loads(
+                (artifact_root / "FINAL_GOLD_JANITOR.generated.json").read_text(encoding="utf-8")
+            )
+            legacy_payload = json.loads(
+                (legacy_root / "FINAL_GOLD_JANITOR.generated.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual("final_gold_janitor:ok\n", stdout.getvalue())
+        self.assertEqual(published_payload, durable_payload)
+        self.assertEqual("_completion/full_product_reaudit_v20", durable_payload["artifact_root"])
+        self.assertEqual("GOLD_READY", durable_payload["verdict"])
+        self.assertEqual("_completion/full_product_reaudit_v20", legacy_payload["mirrors"]["authoritative_artifact_root"])
+
     def test_payload_fails_on_stale_rule_authority_receipt(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-rules-") as temp_dir:
@@ -111,6 +154,45 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("/tmp/sr4-row.json", rules_gate["rulesets"]["sr4"]["blocker_receipts"]["row_level_mapping"])
         self.assertTrue(rules_gate["rulesets"]["sr4"]["human_review_status"]["pending_review"])
         self.assertFalse(rules_gate["rulesets"]["sr4"]["human_review_status"]["source_baseline_required"])
+
+    def test_payload_surfaces_windows_installer_visual_audit_failures(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-windows-visual-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "windows_installer_visual_audit":
+                    payload = {
+                        "status": "fail",
+                        "generated_at_utc": module.now_iso(),
+                        "failures": [
+                            "Windows startup receipt is an incompatible-host skip, not native proof",
+                            "Windows installer visual audit source is missing",
+                        ],
+                        "nextActions": [
+                            "Use PowerShell: scripts/capture_windows_installer_visual_audit.ps1 -Surface install-progress",
+                            "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass",
+                        ],
+                        "startupReceipt": {
+                            "status": "skipped",
+                            "verificationDisposition": "incompatible_host",
+                        },
+                        "visualAuditSource": {
+                            "exists": False,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["windows_installer_visual_audit"]
+        self.assertEqual("fail", payload["status"])
+        self.assertEqual("fail", gate["status"])
+        self.assertIn("windows_installer_visual_audit failed", payload["failures"])
+        self.assertIn("Windows startup receipt is an incompatible-host skip, not native proof", gate["failures"])
+        self.assertTrue(any("capture_windows_installer_visual_audit.ps1" in item for item in gate["nextActions"]))
 
     def test_main_prints_failed_gate_details_before_exiting(self) -> None:
         module = load_module()
