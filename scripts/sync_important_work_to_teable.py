@@ -387,11 +387,11 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Important work Teable sync",
             area="Operations",
             priority="P0",
-            status="ready-for-credentials",
+            status="active",
             cadence="daily",
             source="User request",
             why_it_matters="The project needs a concise operating board for everything that actually matters.",
-            next_action="Populate Teable API key and base/table configuration, then run this projection with --sync.",
+            next_action="Refresh this projection after material product-scope changes and keep stale or resolved rows honest.",
             acceptance_gate="Teable contains one current row per critical Chummer workstream and can be refreshed without duplicating records.",
         ),
     ]

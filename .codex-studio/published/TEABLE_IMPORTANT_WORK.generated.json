@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T13:28:32Z",
+  "generated_at_utc": "2026-06-20T13:40:25Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 28,
@@ -11,13 +11,12 @@
       "P2": 1
     },
     "status_counts": {
-      "active": 20,
+      "active": 21,
       "blocked-until-next-publish": 1,
       "design-active": 1,
       "design-ready": 2,
       "policy-active": 1,
-      "queued": 2,
-      "ready-for-credentials": 1
+      "queued": 2
     },
     "area_counts": {
       "Account and privacy": 1,
@@ -372,26 +371,26 @@
       "title": "Important work Teable sync",
       "area": "Operations",
       "priority": "P0",
-      "status": "ready-for-credentials",
+      "status": "active",
       "cadence": "daily",
       "source": "User request",
       "why_it_matters": "The project needs a concise operating board for everything that actually matters.",
-      "next_action": "Populate Teable API key and base/table configuration, then run this projection with --sync.",
+      "next_action": "Refresh this projection after material product-scope changes and keep stale or resolved rows honest.",
       "acceptance_gate": "Teable contains one current row per critical Chummer workstream and can be refreshed without duplicating records."
     }
   ],
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-20T13:28:32Z",
-    "finished_at_utc": "2026-06-20T13:29:26Z",
+    "started_at_utc": "2026-06-20T13:40:25Z",
+    "finished_at_utc": "2026-06-20T13:41:25Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bseQCIXVnYLcq2KiWzN",
     "table_id": "tbl5UEwrkhI27HOlwkT",
     "table_name": "Chummer Important Work",
     "synced_count": 28,
-    "created_count": 1,
-    "updated_count": 27,
+    "created_count": 0,
+    "updated_count": 28,
     "failed_count": 0,
     "errors": []
   }
