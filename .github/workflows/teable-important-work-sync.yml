@@ -27,6 +27,7 @@ jobs:
 
       - name: Sync important work rows
         env:
+          CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY: ${{ secrets.CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY }}
           TEABLE_API_KEY: ${{ secrets.TEABLE_API_KEY }}
         run: >
           python3 scripts/sync_important_work_to_teable.py
