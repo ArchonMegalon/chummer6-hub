@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T13:56:26Z",
+  "generated_at_utc": "2026-06-20T14:38:30Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 33,
@@ -11,10 +11,11 @@
       "P2": 1
     },
     "status_counts": {
-      "active": 25,
+      "active": 24,
       "blocked-until-next-publish": 1,
       "design-active": 1,
       "design-ready": 2,
+      "local-public-gate-passed": 1,
       "policy-active": 1,
       "queued": 3
     },
@@ -247,19 +248,19 @@
       "cadence": "daily until first human pass",
       "source": "Human tester feedback",
       "why_it_matters": "The site must look human-designed, quiet, and respectful of attention.",
-      "next_action": "Remove public AI/provider/proof/check noise, hide Black Ledger until ready, and focus on what Chummer is, downloads, help, and trust.",
-      "acceptance_gate": "A skeptical visitor can understand Chummer in five seconds and sees no internal process language on first-visit pages."
+      "next_action": "Publish the pushed minimal-copy pass at the next 08:00 release window, rerun the live leak gate, then do a human visual pass.",
+      "acceptance_gate": "A skeptical visitor can understand Chummer in five seconds and first-visit pages pass minimal copy, nav, attention-budget, and live leak-gate tests."
     },
     {
       "item_id": "public-copy-humanizer",
       "title": "Humanize public and desktop copy",
       "area": "Copy",
       "priority": "P0",
-      "status": "active",
-      "cadence": "continuous",
+      "status": "local-public-gate-passed",
+      "cadence": "continuous; live after scheduled publish",
       "source": "Human tester feedback",
       "why_it_matters": "Generated-sounding copy undermines trust even when the feature works.",
-      "next_action": "Run the humanizer loop over website, help, installer, desktop dialogs, and Origin Dossier output.",
+      "next_action": "Keep the local public leak gate green after scheduled publish, then continue the same loop through installer, desktop dialogs, and Origin Dossier output.",
       "acceptance_gate": "Public and primary desktop surfaces avoid AI, provider, proof, audit, and internal workflow wording unless directly useful."
     },
     {
@@ -446,15 +447,15 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-20T13:56:26Z",
-    "finished_at_utc": "2026-06-20T13:57:40Z",
+    "started_at_utc": "2026-06-20T14:38:30Z",
+    "finished_at_utc": "2026-06-20T14:39:14Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bseQCIXVnYLcq2KiWzN",
     "table_id": "tbl5UEwrkhI27HOlwkT",
     "table_name": "Chummer Important Work",
     "synced_count": 33,
-    "created_count": 5,
-    "updated_count": 28,
+    "created_count": 0,
+    "updated_count": 33,
     "failed_count": 0,
     "errors": []
   }
