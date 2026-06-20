@@ -224,6 +224,14 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "Entitlement conflict records",
         "Safe-to-continue history",
         "Refresh-before-continue items",
+        "Record consent to continue this access request.",
+        "Not resumable from this record.",
+        "Source summary",
+        "Stale source history",
+        "Legacy migration records",
+        "record(s)",
+        "File record",
+        "carry-forward record",
     ):
         assert forbidden not in account
 
@@ -245,6 +253,11 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Help and privacy" in account
     assert "Recovery status" in account
     assert "PublicText(" in account
+    assert "Save consent to continue this access request." in account
+    assert "Not resumable from this action." in account
+    assert "Stale history" in account
+    assert "Legacy migration history" in account
+    assert "File detail" in account
 
 
 def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:

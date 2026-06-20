@@ -210,7 +210,7 @@
         ? string.Empty
         : selectedRun.LatestContinuity is not null
             ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same reviewed workspace path instead of splitting into a separate Table Pulse Aftermath story."
-            : "This run is ready to bind the next reviewed reaction, carry-forward record, and aftermath package on the shared command path.";
+            : "This run is ready to bind the next reviewed reaction, carry-forward detail, and aftermath package on the shared command path.";
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
@@ -406,7 +406,7 @@
     static string SponsorNextSafeAction(string? status)
         => status?.Trim().ToLowerInvariant() switch
         {
-            "intent_created" => "Record consent to continue this access request.",
+            "intent_created" => "Save consent to continue this access request.",
             "consented" => "Start device authorization from the participation flow.",
             "pending_auth" => "Open the ChatGPT confirmation page and enter the one-time code.",
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
@@ -546,7 +546,7 @@
             || normalized.Contains("revoked", StringComparison.Ordinal)
             || normalized.Contains("stopped", StringComparison.Ordinal))
         {
-            return "Not resumable from this record. Start a fresh automation action if still needed.";
+            return "Not resumable from this action. Start a fresh automation action if still needed.";
         }
 
         if (normalized.Contains("retry", StringComparison.Ordinal)
@@ -1197,7 +1197,7 @@
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.Summary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Source summary</span>
+                                <span>Details</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ProvenanceSummary)</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1225,7 +1225,7 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Stale source history</span>
+                                <span>Stale history</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1555,7 +1555,7 @@
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Legacy migration records</span>
+                        <span>Legacy migration history</span>
                         <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1755,7 +1755,7 @@
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Restore history</span>
-                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} record(s)")</strong>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} update(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Restore conflicts</span>
@@ -2119,7 +2119,7 @@
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Source summary</span>
+                                        <span>Details</span>
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.ProvenanceSummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -3196,7 +3196,7 @@
                                         <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.Visibility, "Campaign-shared")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>File record</span>
+                                        <span>File detail</span>
                                         <strong>@selectedCreatorPublicationReceipt.Artifact.Kind · @selectedCreatorPublicationReceipt.Artifact.ArtifactId · @selectedCreatorPublicationReceipt.Artifact.Version</strong>
                                     </div>
                                     @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
