@@ -435,6 +435,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("window-bounds", text)
         self.assertIn("captureBounds", text)
         self.assertIn("Launching installer for visual capture", text)
+        self.assertIn('$isProgressSurface = (Normalize-Surface $captureSurface) -eq "install-progress"', text)
+        self.assertIn("Progress surfaces are captured immediately so fast installers cannot close before bounds are read.", text)
+        self.assertLess(
+            text.index("Progress surfaces are captured immediately"),
+            text.index("[void][ChummerInstallerCapture.NativeMethods]::SetForegroundWindow"),
+        )
         self.assertLess(text.index('Add-Type @"'), text.index("Launching installer for visual capture"))
         self.assertLess(text.index("Launching installer for visual capture"), text.index("foreach ($request in $captureRequests)"))
         self.assertIn("$previousSameSurfaceRows", text)

@@ -504,10 +504,16 @@ foreach ($request in $captureRequests) {
             continue
         }
         Write-Host "Matched window: $($window.MainWindowTitle)"
-        [void][ChummerInstallerCapture.NativeMethods]::SetForegroundWindow($window.MainWindowHandle)
-        Start-Sleep -Milliseconds 250
+        $isProgressSurface = (Normalize-Surface $captureSurface) -eq "install-progress"
+        if ($isProgressSurface) {
+            Write-Host "Progress surfaces are captured immediately so fast installers cannot close before bounds are read."
+        }
+        else {
+            [void][ChummerInstallerCapture.NativeMethods]::SetForegroundWindow($window.MainWindowHandle)
+            Start-Sleep -Milliseconds 250
+        }
         $delaySeconds = $AutoCaptureDelaySeconds
-        if ((Normalize-Surface $captureSurface) -eq "install-progress") {
+        if ($isProgressSurface) {
             $delaySeconds = 0
         }
         elseif ($window.MainWindowTitle.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
