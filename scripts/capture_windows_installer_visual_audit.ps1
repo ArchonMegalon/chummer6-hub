@@ -80,6 +80,14 @@ function Normalize-Surface([object]$Value) {
     }
 }
 
+function New-InstallerSurfaceWindow([object]$Process) {
+    return [pscustomobject]@{
+        ProcessId = $Process.Id
+        MainWindowTitle = [string]$Process.MainWindowTitle
+        MainWindowHandle = $Process.MainWindowHandle
+    }
+}
+
 function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompletionInstallerFallback = $false) {
     $canonicalSurface = Normalize-Surface $SurfaceValue
     $processes = @(Get-Process | Where-Object {
@@ -91,17 +99,17 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompleti
         $title = [string]$process.MainWindowTitle
         if ($canonicalSurface -eq "completion") {
             if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                return $process
+                return (New-InstallerSurfaceWindow $process)
             }
             if ($AllowCompletionInstallerFallback -and $title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                return $process
+                return (New-InstallerSurfaceWindow $process)
             }
             continue
         }
 
         if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
             $title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
-            return $process
+            return (New-InstallerSurfaceWindow $process)
         }
     }
 
