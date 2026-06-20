@@ -91,3 +91,27 @@ def test_public_form_controls_have_os_dark_safe_defaults() -> None:
     assert "color: var(--ink-strong);" in site_css
     assert "::placeholder" in site_css
     assert "opacity: 1;" in site_css
+
+
+def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> None:
+    sources = [
+        read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml"),
+    ]
+    combined = "\n".join(sources)
+
+    for forbidden in (
+        "Why this horizon matters now",
+        "What following this horizon means",
+        "This page names the horizon",
+        "Move to Horizons",
+        "current horizon",
+        "named horizons",
+        "Horizons already carrying public movement",
+    ):
+        assert forbidden not in combined
+
+    assert "Maintenance" in combined
+    assert "planned work" in combined
