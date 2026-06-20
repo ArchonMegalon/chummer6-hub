@@ -13,11 +13,11 @@
         <div class="trust-claim__microproof">
             <span>World: @Model.Packet.WorldName</span>
             <span>Turn: @Model.Packet.ToTurn</span>
-            <span>Packet: current</span>
+            <span>Data: current</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Open JSON packet</a>
+        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Open data</a>
         <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open inbox</a>
         <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
     </div>
@@ -55,14 +55,14 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Leader parity</p>
+            <p class="eyebrow">Leader view</p>
             <h2 class="editorial-title">@Model.LeaderDigest.PublicName leader digest</h2>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">Parity</span>
+                    <span class="tag">Match</span>
                     <p>@item</p>
                 </article>
             }

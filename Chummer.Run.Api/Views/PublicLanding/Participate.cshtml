@@ -27,7 +27,7 @@
             Summary = "Use the public signal page for feature requests, safe public bugs, and help-copy gaps. Keep crashes, install failures, account issues, and private campaign details on Chummer help pages instead.",
             Href = "/feedback",
             Label = "Open public feedback",
-            Proof = new[] { "Public by default", "No private logs", "Sorted by topic" }
+            Details = new[] { "Public by default", "No private logs", "Sorted by topic" }
         },
         new
         {
@@ -37,7 +37,7 @@
             Summary = "Roadmap cards show where the product may move next. Votes help show demand, but they do not decide priority by themselves.",
             Href = "/roadmap",
             Label = "Open roadmap",
-            Proof = new[] { "Direction only", "Help stays separate", "Votes are not promises" }
+            Details = new[] { "Direction only", "Help stays separate", "Votes are not promises" }
         },
         new
         {
@@ -47,7 +47,7 @@
             Summary = "Release notes and public follow-up should only move after a real release, guide, or live page exists. The changelog should stay attached to what works today.",
             Href = "/changelog",
             Label = "Open shipped updates",
-            Proof = new[] { "Reviewed update", "Available to users", "Release-linked" }
+            Details = new[] { "Reviewed update", "Available to users", "Release-linked" }
         }
     };
     var signalStages = new[]
@@ -57,7 +57,7 @@
             Badge = "Signal intake",
             Title = "Post one safe public signal",
             Summary = "Users can suggest work, vote on shared pain, or flag confusing copy without opening a private case first.",
-            Proof = "The public post stays short, safe, and sorted by topic.",
+            Detail = "The public post stays short, safe, and sorted by topic.",
             Href = "/feedback",
             Label = "Start with public feedback"
         },
@@ -66,7 +66,7 @@
             Badge = "Chummer review",
             Title = "Review and decide before promising anything",
             Summary = "Chummer triage decides whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
-            Proof = "Votes show demand; they do not decide the roadmap by themselves.",
+            Detail = "Votes show demand; they do not decide the roadmap by themselves.",
             Href = "/roadmap",
             Label = "See public direction"
         },
@@ -75,7 +75,7 @@
             Badge = "Availability",
             Title = "Show real user availability",
             Summary = "A planned or shipped public claim needs a reachable release, guide, or live page, not only enthusiasm or merged code.",
-            Proof = "A release, guide, or live page must exist.",
+            Detail = "A release, guide, or live page must exist.",
             Href = "/now",
             Label = "Open what works today"
         },
@@ -84,7 +84,7 @@
             Badge = "Public closeout",
             Title = "Notify and document after the update exists",
             Summary = "Only then should the public changelog, voter notices, and help copy close the loop back to the original request.",
-            Proof = "Help and status stay available even if a mirror is down.",
+            Detail = "Help and status stay available even if a mirror is down.",
             Href = "/help",
             Label = "Open help hub"
         }
@@ -98,16 +98,16 @@
             Summary = "Start on public feedback when the issue can stay public and does not need logs, secrets, or account recovery.",
             Href = "/feedback",
             Label = "Open feedback",
-            Proof = new[] { "Public by default", "Sorted by topic", "Shared demand" }
+            Details = new[] { "Public by default", "Sorted by topic", "Shared demand" }
         },
         new
         {
             Badge = "Follow movement",
             Title = "Want to know whether an idea is moving",
-            Summary = "Use the roadmap when you need public direction and readiness posture, not a promise that votes alone decide priority.",
+            Summary = "Use the roadmap when you need public direction and readiness, not a promise that votes alone decide priority.",
             Href = "/roadmap",
             Label = "Open roadmap",
-            Proof = new[] { "Direction only", "Milestone-backed", "Votes are not promises" }
+            Details = new[] { "Direction only", "Milestone-backed", "Votes are not promises" }
         },
         new
         {
@@ -116,7 +116,7 @@
             Summary = "Use shipped updates when you need release status, guides, or user-available results instead of merged-code optimism.",
             Href = "/changelog",
             Label = "Open shipped updates",
-            Proof = new[] { "Release-linked", "Guide-backed", "Available now" }
+            Details = new[] { "Release-linked", "Guide-backed", "Available now" }
         },
         new
         {
@@ -125,7 +125,7 @@
             Summary = "Leave the public page when the issue needs logs, recovery, support status, or private table details that should never sit on the public board.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "Private case", "Follow-up stays here", "Support handles it" }
+            Details = new[] { "Private case", "Follow-up stays here", "Support handles it" }
         }
     };
 }
@@ -146,7 +146,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Live pressure</span>
         <h2>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") keep the public loop grounded in real delivery pressure.</h2>
-        <p>@signalLoop.ClaimedMilestoneCount already show claimed movement. Public participation stays more credible when it points at live work instead of generic enthusiasm.</p>
+        <p>@signalLoop.ClaimedMilestoneCount already show visible movement. Public participation stays more credible when it points at live work instead of generic enthusiasm.</p>
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestones</a>
     </article>
     <article class="status-decision-strip__card">
@@ -194,7 +194,7 @@
                 <h3>@route.Title</h3>
                 <p>@route.Summary</p>
                 <div class="trust-claim__microproof">
-                    @foreach (var item in route.Proof)
+                    @foreach (var item in route.Details)
                     {
                         <span>@item</span>
                     }
@@ -219,7 +219,7 @@
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }
@@ -269,7 +269,7 @@
                     <span class="tag">@stage.Badge</span>
                     <h3>@stage.Title</h3>
                     <p>@stage.Summary</p>
-                    <p class="workflow-card__proof">@stage.Proof</p>
+                    <p class="workflow-card__proof">@stage.Detail</p>
                     <a class="inline-link" href="@stage.Href">@stage.Label</a>
                 </div>
             </article>

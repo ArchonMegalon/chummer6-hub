@@ -67,25 +67,25 @@
             Label: "Open what works today",
             Title: "See what is available today",
             Summary: "Use the current status page when you want to know what is ready to use.",
-            Proof: new[] { "Current status", "Download path", "Known limits" }),
+            Details: new[] { "Current status", "Download path", "Known limits" }),
         "live-proof" => (
             Href: "/downloads",
             Label: "Open downloads",
             Title: "Install or update Chummer",
             Summary: "Use downloads when you need the current Windows or Linux installer.",
-            Proof: new[] { "Installer", "Platform choice", "Help nearby" }),
+            Details: new[] { "Installer", "Platform choice", "Help nearby" }),
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
             Title: "See what is available today",
             Summary: "Use the current status page before planning around an upcoming feature.",
-            Proof: new[] { "Current status", "Downloads", "Help nearby" }),
+            Details: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
             Title: "See what is available today",
             Summary: "Use the current status page when availability matters more than the feature brief.",
-            Proof: new[] { "Current status", "Downloads", "Help nearby" })
+            Details: new[] { "Current status", "Downloads", "Help nearby" })
     };
 
     var deeperRoute = Model.SecondaryAction is not null
@@ -94,7 +94,7 @@
             Label: Model.SecondaryAction.Label,
             Title: "Read the longer brief",
             Summary: $"{Model.SecondaryAction.Label} opens the broader context for this feature.",
-            Proof: new[] { "More context", "Related pages", "Help nearby" })
+            Details: new[] { "More context", "Related pages", "Help nearby" })
         : Model.Family switch
         {
             "roadmap" => (
@@ -102,30 +102,30 @@
                 Label: "Open maintenance",
                 Title: "Open the broader roadmap",
                 Summary: "Move to Maintenance when you want the larger product picture.",
-                Proof: new[] { "Roadmap", "Related work", "Current status" }),
+                Details: new[] { "Roadmap", "Related work", "Current status" }),
             "live-proof" => (
                 Href: "/artifacts",
                 Label: "Open detail view",
                 Title: "Open the related detail view",
                 Summary: "Use the detail view when you want nearby items and history together.",
-                Proof: new[] { "Details", "Related items", "History" }),
+                Details: new[] { "Details", "Related items", "History" }),
             "preview-concept" => (
                 Href: "/artifacts",
                 Label: "Open detail view",
                 Title: "Open the related detail view",
                 Summary: "Use the detail view when you want nearby items and availability context together.",
-                Proof: new[] { "Details", "Related items", "Availability" }),
+                Details: new[] { "Details", "Related items", "Availability" }),
             _ => (
                 Href: "/roadmap",
                 Label: "Open roadmap",
                 Title: "Open the broader roadmap",
                 Summary: "Open the roadmap when you need surrounding context.",
-                Proof: new[] { "Roadmap", "Related pages", "Current status" })
+                Details: new[] { "Roadmap", "Related pages", "Current status" })
         };
 
     AddRouteChoice("Best next page", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteDetails);
-    AddRouteChoice(compareRoute.Title.Contains("Install or update", StringComparison.Ordinal) ? "Install" : "Status", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
-    AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Proof);
+    AddRouteChoice(compareRoute.Title.Contains("Install or update", StringComparison.Ordinal) ? "Install" : "Status", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Details);
+    AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Details);
     AddRouteChoice(
         "Help",
         "Get help if this becomes a setup or account issue",

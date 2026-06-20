@@ -168,7 +168,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("Read the horizon brief before opening the horizon-only proof trail.");
 
-        Assert.Equal("Read the roadmap note before opening the roadmap-only details.", cleaned);
+        Assert.Equal("Read the maintenance note before opening the maintenance-only details.", cleaned);
         Assert.DoesNotContain("horizon", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -197,6 +197,16 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("validation", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("rail", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Public_copy_humanizer_removes_packet_and_posture_jargon()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("Open the JSON packet when roadmap readiness posture and command posture matter.");
+
+        Assert.Equal("Open the data when roadmap readiness and command state matter.", cleaned);
+        Assert.DoesNotContain("JSON packet", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("posture", cleaned, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
