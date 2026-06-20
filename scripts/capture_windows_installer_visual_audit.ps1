@@ -88,6 +88,27 @@ function New-InstallerSurfaceWindow([object]$Process) {
     }
 }
 
+function Close-InstallerSurfaceWindows {
+    $wmClose = 0x0010
+    $processes = @(Get-Process | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
+        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+
+    foreach ($process in $processes) {
+        if ($process.MainWindowHandle -eq [IntPtr]::Zero) {
+            continue
+        }
+        [void][ChummerInstallerCapture.NativeMethods]::PostMessage(
+            $process.MainWindowHandle,
+            $wmClose,
+            [IntPtr]::Zero,
+            [IntPtr]::Zero)
+        Write-Host "Requested close for installer window: $($process.MainWindowTitle)"
+    }
+}
+
 function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompletionInstallerFallback = $false) {
     $canonicalSurface = Normalize-Surface $SurfaceValue
     $processes = @(Get-Process | Where-Object {
@@ -162,6 +183,9 @@ namespace ChummerInstallerCapture
 
         [DllImport("user32.dll")]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     }
 }
 "@
@@ -455,3 +479,7 @@ $payload = [ordered]@{
 $payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $sourcePath -Encoding UTF8
 Write-Host "Updated source receipt: $sourcePath"
 Write-Host "Status: $status"
+
+if ($AutoCapture -and $LaunchInstaller) {
+    Close-InstallerSurfaceWindows
+}
