@@ -32,10 +32,10 @@ public sealed class PublicConciergeServiceTests
         Assert.False(page.LocaleFallbackUsed);
         Assert.Equal("Optional guided widget live", page.Widget.StatusLabel);
         Assert.Equal("widget.example.invalid", page.Widget.HostLabel);
-        Assert.Contains("First-party fallback stays visible", page.ProofPoints, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Chummer path stays visible", page.ProofPoints, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(4, page.Branches.Count);
         Assert.Contains(page.Branches, branch => branch.BranchId == "download_now" && branch.ActionHref.Contains("/downloads/concierge/download_now", StringComparison.Ordinal));
-        Assert.Contains(page.Branches, branch => branch.BranchId == "human_setup_call" && branch.DestinationLabel.Contains("Support follow-up", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(page.Branches, branch => branch.BranchId == "unresolved_setup_issue" && branch.DestinationLabel.Contains("Support follow-up", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class PublicConciergeServiceTests
         using TempRoot temp = new("public-concierge-redirect");
         IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>
         {
-            ["CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_BRANCH_HUMAN_SETUP_CALL_URL"] = "https://book.example.invalid/setup"
+            ["CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_BRANCH_UNRESOLVED_SETUP_ISSUE_URL"] = "https://support.example.invalid/setup"
         });
 
         PublicConciergeStore store = new(configuration, NullLogger<PublicConciergeStore>.Instance);
@@ -52,12 +52,12 @@ public sealed class PublicConciergeServiceTests
 
         ConciergeRedirectResolution resolution = service.ResolveBranchRedirect(
             surfaceKey: "downloads",
-            branchId: "human_setup_call",
+            branchId: "unresolved_setup_issue",
             authenticated: false,
             requestedLocale: "en-US",
             acceptLanguage: null);
 
-        Assert.StartsWith("https://book.example.invalid/setup", resolution.RedirectHref, StringComparison.Ordinal);
+        Assert.StartsWith("https://support.example.invalid/setup", resolution.RedirectHref, StringComparison.Ordinal);
         Assert.Contains("concierge_flow_id=downloads_concierge", resolution.RedirectHref, StringComparison.Ordinal);
         Assert.Contains("locale=en-US", resolution.RedirectHref, StringComparison.Ordinal);
         Assert.Equal("Support follow-up", resolution.DestinationLabel);
@@ -65,7 +65,7 @@ public sealed class PublicConciergeServiceTests
         PublicConciergeBranchReceipt receipt = Assert.Single(store.BranchReceiptsById.Values);
         Assert.Equal(resolution.ReceiptId, receipt.ReceiptId);
         Assert.Equal("downloads", receipt.SurfaceKey);
-        Assert.Equal("human_setup_call", receipt.BranchId);
+        Assert.Equal("unresolved_setup_issue", receipt.BranchId);
         Assert.Equal("external_redirect", receipt.TargetKind);
         Assert.NotNull(receipt.Envelope);
         Assert.Equal("public_concierge_branch", receipt.Envelope!.ReceiptKind);

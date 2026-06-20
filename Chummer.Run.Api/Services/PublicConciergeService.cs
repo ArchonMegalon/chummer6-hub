@@ -64,7 +64,7 @@ public sealed class PublicConciergeService
         [
             $"Locale {locale}",
             enabled ? "Kill switch armed but currently enabled" : "Kill switch disabled the optional widget",
-            "First-party fallback stays visible"
+            "Chummer path stays visible"
         ];
         proofPoints.AddRange(flow.ProofAnchors?.Select(HumanizeToken) ?? Enumerable.Empty<string>());
 
@@ -165,7 +165,7 @@ public sealed class PublicConciergeService
         string status = NormalizeToken(ExtractFirstString(payload, "status", "state")) ?? "received";
         string? providerReceiptId = NormalizeToken(ExtractFirstString(payload, "provider_receipt_id", "receipt_id", "submission_id", "booking_id", "id", "event_id"));
         string summary = ExtractFirstString(payload, "summary", "message", "headline")
-            ?? $"{HumanizeToken(provider)} {HumanizeToken(eventType)} receipt captured.";
+            ?? $"{HumanizeToken(provider)} {HumanizeToken(eventType)} record captured.";
         string? caseId = NormalizeToken(ExtractFirstString(payload, "case_id", "support_case_id"));
         string? bookingId = NormalizeToken(ExtractFirstString(payload, "booking_id", "appointment_id"));
         string? assetRef = NormalizeToken(ExtractFirstString(payload, "asset_ref", "registry_asset_ref"));
@@ -299,9 +299,9 @@ public sealed class PublicConciergeService
                 SurfaceKey: normalized,
                 ConfigPrefix: "INVITE",
                 FlowId: "campaign_invite_concierge",
-                Eyebrow: "Campaign invite concierge",
-                Heading: "Continue the invite, review the primer, or ask for session-zero help without losing the first-party lane.",
-                Intro: "Invite routing, primer context, and session-zero help stay bounded here. This wrapper does not replace account identity, support truth, or governed campaign follow-through.",
+                Eyebrow: "Campaign invite",
+                Heading: "Continue the invite, review the primer, or ask for session-zero help.",
+                Intro: "Invite routing, primer context, and session-zero help stay here. This page does not replace account identity, support, or campaign state.",
                 EntrySurfaceLabel: "invite page",
                 EntryRoute: "/signup",
                 ReturnActionLabel: "Continue the invite",
@@ -312,24 +312,24 @@ public sealed class PublicConciergeService
                 ConfigPrefix: "CREATOR",
                 FlowId: "creator_consult_concierge",
                 Eyebrow: "Creator concierge",
-                Heading: "Choose the next creator step without losing publication proof and provenance.",
-                Intro: "This wrapper keeps publication discovery, creator consult routing, and governed intake separated from installs, support, and account truth.",
+                Heading: "Choose the next creator step without losing publication history.",
+                Intro: "This wrapper keeps publication discovery, creator consult routing, and reviewed intake separated from installs, support, and account status.",
                 EntrySurfaceLabel: "creator publication",
                 EntryRoute: "/artifacts",
                 ReturnActionLabel: "Back to publication",
-                SecondaryActionLabel: "Open artifacts shelf",
+                SecondaryActionLabel: "Open publications",
                 SecondaryActionHref: "/artifacts"),
             "testimonials" => new ConciergeSurfaceDefinition(
                 SurfaceKey: normalized,
                 ConfigPrefix: "TESTIMONIALS",
                 FlowId: "testimonial_capture",
-                Eyebrow: "Public proof capture",
-                Heading: "Capture moderated public proof without confusing it for support or product truth.",
-                Intro: "This wrapper keeps testimonials optional, moderated, and first-party governed. It never replaces support intake, account recovery, or publication approval.",
+                Eyebrow: "Public feedback",
+                Heading: "Leave a moderated public note without confusing it for support or a product decision.",
+                Intro: "This wrapper keeps testimonials optional, moderated, and Chummer-owned. It never replaces support intake, account recovery, or publication approval.",
                 EntrySurfaceLabel: "testimonial capture",
                 EntryRoute: "/feedback",
                 ReturnActionLabel: "Back to feedback",
-                SecondaryActionLabel: "Open artifacts shelf",
+                SecondaryActionLabel: "Open publications",
                 SecondaryActionHref: "/artifacts"),
             _ => throw new KeyNotFoundException($"Unknown concierge surface '{surfaceKey}'.")
         };
@@ -379,7 +379,7 @@ public sealed class PublicConciergeService
                 "Send setup issue",
                 "ghost",
                 "Setup help"),
-            ("downloads", "human_setup_call") => new ConciergeBranchPresentation(
+            ("downloads", "unresolved_setup_issue") => new ConciergeBranchPresentation(
                 "Setup is still blocked",
                 "Send setup context so support can reproduce the problem asynchronously.",
                 "Send setup issue",
@@ -411,7 +411,7 @@ public sealed class PublicConciergeService
                 "Support follow-up"),
             ("contact", "public_feedback") => new ConciergeBranchPresentation(
                 "This can stay public",
-                "Use the public signal lane for safe feedback, feature demand, and non-sensitive public bugs.",
+                "Use the public feedback path for safe feedback, feature demand, and non-sensitive public bugs.",
                 "Open feedback",
                 "primary",
                 "Public feedback"),
@@ -424,8 +424,8 @@ public sealed class PublicConciergeService
             ("contact", "install_continuity") => new ConciergeBranchPresentation(
                 "I need account return",
                 authenticated
-                    ? "Open the signed-in devices and access rail so the affected install stays attached to the same return path."
-                    : "Open the public install shelf first, then attach the installed copy when you are ready for account-backed return.",
+                    ? "Open Devices and access so the affected install stays attached to the same return path."
+                    : "Open Downloads first, then attach the installed copy when you are ready for account return.",
                 authenticated ? "Open devices and access" : "Open downloads",
                 "ghost",
                 authenticated ? "Account return" : "Downloads"),
@@ -442,79 +442,79 @@ public sealed class PublicConciergeService
                     : "Claim your copy only when you are ready to continue the invite and keep the return path attached.",
                 authenticated ? "Open invite tools" : "Claim your copy",
                 "primary",
-                authenticated ? "Signed-in invite follow-through" : "First-party account entry"),
+                authenticated ? "Signed-in invite follow-through" : "Account entry"),
             ("campaign-invite", "watch_primer") => new ConciergeBranchPresentation(
                 "Watch the primer",
                 "Open the invite primer page when a short orientation is the fastest way to reduce friction before the first session.",
                 "Open primer guide",
                 "secondary",
-                "First-party invite primer"),
+                "Invite primer"),
             ("campaign-invite", "open_primer_packet") => new ConciergeBranchPresentation(
                 "Open the primer packet",
-                "Stay on the same first-party invite primer page when you want the packet-style expectations, prep list, and calmer next steps.",
+                "Stay on the same invite primer page when you want expectations, a prep list, and calmer next steps.",
                 "Open primer packet",
                 "ghost",
-                "First-party invite primer"),
+                "Invite primer"),
             ("campaign-invite", "ask_questions") => new ConciergeBranchPresentation(
                 "Ask questions first",
                 "Route into structured invite and onboarding help before this becomes a support or install problem.",
                 "Open invite help",
                 "ghost",
-                "Structured first-party help or approved intake"),
+                "Structured help or approved intake"),
             ("campaign-invite", "session_zero_call") => new ConciergeBranchPresentation(
                 "Request session-zero help",
-                "Escalate to a bounded session-zero or onboarding handoff without turning booking into the campaign system of record.",
+                "Request session-zero or onboarding help without turning booking into the campaign record.",
                 "Request session-zero help",
                 "ghost",
-                "Human escalation with first-party fallback"),
+                "Session-zero support"),
             ("creator-publication", "how_publishing_works") => new ConciergeBranchPresentation(
                 "How publishing works",
-                "Stay on the creator artifact rail when you want the proof, lineage, and discovery posture before you ask for help.",
+                "Stay on the creator publication page when you want the history, lineage, and discovery status before you ask for help.",
                 "Open creator discovery",
                 "primary",
-                "First-party creator discovery"),
+                "Creator discovery"),
             ("creator-publication", "book_consult") => new ConciergeBranchPresentation(
                 "Book a creator consult",
-                "Route into a bounded consult handoff without making booking the owner of publication truth.",
+                "Route into a bounded consult handoff without making booking the owner of publication status.",
                 "Request creator consult",
                 "secondary",
-                "Human escalation with first-party fallback"),
+                "Creator consult"),
             ("creator-publication", "submit_interest") => new ConciergeBranchPresentation(
                 "Submit creator interest",
-                "Open governed intake when the next step is a creator submission, not a support case or install question.",
+                "Open reviewed intake when the next step is a creator submission, not a support case or install question.",
                 "Open creator intake",
                 "ghost",
-                "Structured first-party help or approved intake"),
+                "Structured help or approved intake"),
             ("creator-publication", "open_creator_packet") => new ConciergeBranchPresentation(
                 "Open the creator packet",
-                "Return to the publication detail page when you want to inspect the actual packet, trust band, or provenance again.",
+                "Return to the publication detail page when you want to inspect the packet, status, or history again.",
                 "Back to publication",
                 "ghost",
-                "First-party publication proof"),
+                "Publication history"),
             ("testimonials", "video_review") => new ConciergeBranchPresentation(
-                "Leave a video proof",
-                "Use the moderated public-proof lane when you want to offer public testimony without turning it into support truth.",
-                "Open video proof lane",
+                "Leave a video note",
+                "Use the moderated public feedback path when you want to share a public story without turning it into support.",
+                "Open video note",
                 "primary",
-                "Moderated public proof"),
+                "Moderated public feedback"),
             ("testimonials", "audio_review") => new ConciergeBranchPresentation(
-                "Leave an audio proof",
-                "Use the same bounded moderation lane when audio is enough and the proof should stay governed before publication.",
-                "Open audio proof lane",
+                "Leave an audio note",
+                "Use the same moderation path when audio is enough and the note should be reviewed before publication.",
+                "Open audio note",
                 "secondary",
-                "Moderated public proof"),
+                "Moderated public feedback"),
             ("testimonials", "quick_rating") => new ConciergeBranchPresentation(
                 "Leave a quick rating",
-                "Use the public feedback lane when the lightweight signal is enough and no media upload is needed.",
+                "Use the public feedback path when a lightweight note is enough and no media upload is needed.",
                 "Open feedback",
                 "ghost",
                 "Public signal route"),
             _ => new ConciergeBranchPresentation(
                 HumanizeToken(branch.Id),
-                $"Follow the governed {HumanizeToken(branch.Target ?? "next step")} lane from this first-party wrapper.",
+                $"Follow the {HumanizeToken(branch.Target ?? "next step")} path from this page.",
                 "Continue",
                 "secondary",
-                "Governed next step")
+                "Next step")
         };
     }
 
@@ -558,7 +558,7 @@ public sealed class PublicConciergeService
             ("downloads", "download_now") => "/downloads#recommended-download",
             ("downloads", "platform_help") => "/downloads#platform-shelf",
             ("downloads", "setup_help") => "/contact?kind=install_help&title=Setup%20help&summary=Need%20setup%20help#support-intake",
-            ("downloads", "human_setup_call") => "/contact?kind=install_help&title=Setup%20is%20still%20blocked&summary=Setup%20still%20fails%20after%20using%20the%20current%20installer#support-intake",
+            ("downloads", "unresolved_setup_issue") => "/contact?kind=install_help&title=Setup%20is%20still%20blocked&summary=Setup%20still%20fails%20after%20using%20the%20current%20installer#support-intake",
             ("now", "watch_whats_new") => "/changelog",
             ("now", "read_notes") => "/now#public-shipped-closeout",
             ("now", "update_help") => "/contact?kind=install_update&title=Need%20update%20help&summary=Need%20update%20help#support-intake",
@@ -580,8 +580,8 @@ public sealed class PublicConciergeService
             ("creator-publication", "open_creator_packet") => string.IsNullOrWhiteSpace(contextId)
                 ? "/artifacts#governed-creator-discovery"
                 : $"/artifacts/publications/{Uri.EscapeDataString(contextId)}",
-            ("testimonials", "video_review") => "/contact?kind=public_proof&title=Share%20video%20proof&summary=Want%20to%20leave%20a%20moderated%20video%20testimonial#support-intake",
-            ("testimonials", "audio_review") => "/contact?kind=public_proof&title=Share%20audio%20proof&summary=Want%20to%20leave%20a%20moderated%20audio%20testimonial#support-intake",
+            ("testimonials", "video_review") => "/contact?kind=public_note&title=Share%20video%20note&summary=Want%20to%20leave%20a%20moderated%20video%20testimonial#support-intake",
+            ("testimonials", "audio_review") => "/contact?kind=public_note&title=Share%20audio%20note&summary=Want%20to%20leave%20a%20moderated%20audio%20testimonial#support-intake",
             ("testimonials", "quick_rating") => "/feedback",
             _ => surface.EntryRoute
         };
@@ -593,22 +593,22 @@ public sealed class PublicConciergeService
         {
             return new PublicConciergeWidgetViewModel(
                 StatusLabel: "Disabled by kill switch",
-                Summary: "This public surface is using the direct first-party path right now. The supported links below remain the source of truth.");
+                Summary: "This public surface is using the direct Chummer path right now. The supported links below remain the source.");
         }
 
         string? iframeHref = GetSurfaceConfig(surface.ConfigPrefix, "WIDGET_URL");
         if (string.IsNullOrWhiteSpace(iframeHref))
         {
             return new PublicConciergeWidgetViewModel(
-                StatusLabel: "First-party fallback only",
-                Summary: "No optional guided widget is configured on this host, so the wrapper stays fully first-party.");
+                StatusLabel: "Chummer path only",
+                Summary: "No optional guided widget is configured on this host, so the wrapper stays fully inside Chummer.");
         }
 
         if (!Uri.TryCreate(iframeHref, UriKind.Absolute, out Uri? widgetUri))
         {
             return new PublicConciergeWidgetViewModel(
-                StatusLabel: "Direct first-party path",
-                Summary: "The optional guided widget is unavailable on this host, so the first-party branch cards below stay active.");
+                StatusLabel: "Direct Chummer path",
+                Summary: "The optional guided widget is unavailable on this host, so the Chummer branch cards below stay active.");
         }
 
         string origin = $"{widgetUri.Scheme}://{widgetUri.Host}{(widgetUri.IsDefaultPort ? string.Empty : $":{widgetUri.Port}")}";
@@ -625,7 +625,7 @@ public sealed class PublicConciergeService
 
         return new PublicConciergeWidgetViewModel(
             StatusLabel: "Optional guided widget live",
-            Summary: "The embedded guide is optional, kill-switchable, and backed by the same first-party fallback links shown underneath it.",
+            Summary: "The embedded guide is optional, kill-switchable, and backed by the same Chummer links shown underneath it.",
             IframeHref: iframeHref,
             HostLabel: widgetUri.Host,
             ContentSecurityPolicy: policy.ToString());
