@@ -41,13 +41,39 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Download installer override
-        if: ${{ inputs.installer_url != '' }}
+      - name: Ensure installer artifact
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force -Path "Chummer.Portal/downloads/files" | Out-Null
-          Invoke-WebRequest -Uri "${{ inputs.installer_url }}" -OutFile "Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe"
+          $installerPath = "Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe"
+          if (Test-Path -LiteralPath $installerPath) {
+            "Installer already present: $installerPath"
+            return
+          }
+
+          $installerUrl = "${{ inputs.installer_url }}"
+          if ([string]::IsNullOrWhiteSpace($installerUrl)) {
+            $releaseChannelPath = "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
+            if (Test-Path -LiteralPath $releaseChannelPath) {
+              $releaseChannel = Get-Content -LiteralPath $releaseChannelPath -Raw | ConvertFrom-Json
+              $artifact = @($releaseChannel.artifacts) | Where-Object { $_.artifactId -eq "avalonia-win-x64-installer" } | Select-Object -First 1
+              if ($null -ne $artifact -and -not [string]::IsNullOrWhiteSpace([string]$artifact.downloadUrl)) {
+                $installerUrl = [string]$artifact.downloadUrl
+              }
+            }
+          }
+          if ([string]::IsNullOrWhiteSpace($installerUrl)) {
+            $installerUrl = "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe"
+          }
+          if ($installerUrl.StartsWith("/", [System.StringComparison]::Ordinal)) {
+            $installerUrl = "https://chummer.run$installerUrl"
+          }
+
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $installerPath) | Out-Null
+          Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+          $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "Downloaded Windows installer from $installerUrl"
+          "sha256:$hash"
 
       - name: Capture native startup and visual evidence
         shell: pwsh
