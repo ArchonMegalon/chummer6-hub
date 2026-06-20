@@ -10,16 +10,18 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 ROUTE_REQUIREMENTS = {
     "/downloads": [
-        "Open downloads first. Create account for guided install only when you want first-launch recovery, linked restore, and support follow-through to stay attached.",
+        "Choose the latest build for Windows or Linux.",
+        "Stable",
+        "Nightly",
     ],
     "/feedback": [
-        "Votes show demand; Chummer-owned proof decides what ships.",
+        "Votes show demand. Chummer decides what ships.",
         "Good reports include context and reproduction steps.",
         "Private logs and account issues belong in Help, not public feedback.",
         "Create account for follow-up",
     ],
     "/participate": [
-        "Follow an item to hear when it actually changes.",
+        "Follow an item to hear when it changes.",
         "Join beta waitlist",
         "Open support intake",
     ],
@@ -34,7 +36,7 @@ ACCOUNT_SOURCE_REQUIREMENTS = (
     "Contribution cred",
     "Impact closeout notifications",
     "Public recognition stays off unless you opt in.",
-    "Votes show demand; Chummer-owned proof decides what ships.",
+    "Votes show demand; only finished work ships.",
 )
 ACCOUNT_SOURCE_FORBIDDEN = (
     "Earn Karma",

@@ -24,10 +24,10 @@ def main() -> int:
     feedback_view = FEEDBACK_VIEW.read_text(encoding="utf-8")
     account_view = ACCOUNT_VIEW.read_text(encoding="utf-8")
 
-    if "proof-backed closeout" not in feedback_view:
-        failures.append("feedback view lost proof-backed closeout wording")
-    if "Votes show demand; Chummer-owned proof decides what ships." not in feedback_view:
-        failures.append("feedback view lost vote-vs-proof wording")
+    if "The loop closes only after people can use it" not in feedback_view:
+        failures.append("feedback view lost user-available closeout wording")
+    if "Votes show demand. Chummer decides what ships." not in feedback_view:
+        failures.append("feedback view lost vote-vs-shipping wording")
     if args.stub_delivery and not DRY_RUN_RECEIPT.is_file():
         failures.append(f"missing dry-run receipt: {DRY_RUN_RECEIPT}")
     if args.with_impact_receipt and "Impact journal" not in account_view:

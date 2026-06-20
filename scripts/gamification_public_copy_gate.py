@@ -9,8 +9,8 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 
 REQUIRED_PHRASES = [
-    "Votes show demand; Chummer-owned proof decides what ships.",
-    "Follow an item to hear when it actually changes.",
+    "Votes show demand. Chummer decides what ships.",
+    "Follow an item to hear when it changes.",
     "Good reports include context and reproduction steps.",
     "Private logs and account issues belong in Help, not public feedback.",
 ]
@@ -78,7 +78,7 @@ def run(base_url: str) -> int:
         lines.extend(["", "## Failures", ""])
         lines.extend(f"- {failure}" for failure in failures)
     else:
-        lines.extend(["", "Public participation copy keeps motivation, route clarity, and proof authority without fake public gamification claims."])
+        lines.extend(["", "Public participation copy keeps motivation, route clarity, and shipping authority without fake public gamification claims."])
     write_text(completion_path("GAMIFICATION_PUBLIC_COPY_GATE.md"), "\n".join(lines))
     return 0 if not failures else 1
 

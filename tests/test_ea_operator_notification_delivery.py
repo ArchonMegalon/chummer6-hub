@@ -29,5 +29,5 @@ def test_operator_notification_privacy_review_matches_runtime_constraints() -> N
 
     assert "unmasked user email" in privacy_review
     assert "recipient address on public routes" in privacy_review
-    assert "Votes show demand; Chummer-owned proof decides what ships." in copy_guide
+    assert "Votes show demand. Chummer decides what ships." in copy_guide
     assert "Private logs and account issues belong in Help, not public feedback." in copy_guide
