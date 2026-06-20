@@ -402,8 +402,8 @@ static IResult GetSelfHostedDocs()
     <p>Chummer Hub exposes first-party health, release, account, campaign, support, and public information routes from this host.</p>
     <ul>
       <li><a href="/api/health">Health JSON</a></li>
-      <li><a href="/downloads/releases.json">Public release manifest</a></li>
-      <li><a href="/downloads/RELEASE_CHANNEL.generated.json">Canonical release channel</a></li>
+      <li><a href="/downloads/releases.json">Release details</a></li>
+      <li><a href="/downloads/RELEASE_CHANNEL.generated.json">Current release data</a></li>
       <li><a href="/status">Release status</a></li>
     </ul>
   </main>
