@@ -30,12 +30,12 @@
     <article class="status-decision-strip__card">
         <span class="tag">Venue status</span>
         <h2>@Model.VenueStatus</h2>
-        <p>Provider: @Model.Provider. Mode: @Model.Mode. Visibility: @Model.Visibility.</p>
+        <p>Room: @Model.Provider. Visibility: @Model.Visibility.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Scheduled time</span>
         <h2>@Model.ScheduledTimeSummary</h2>
-        <p>Keep scheduling visible here without moving campaign or roster data to the video service.</p>
+        <p>Keep scheduling visible here without moving campaign or roster data into the room tool.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Privacy and consent</span>
@@ -47,8 +47,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">What this page must show</p>
-        <h2 class="editorial-title">Session title, campaign name, venue status, invite return, and closeout stay attached.</h2>
-        <p class="editorial-copy">The page is useful only if the GM and players can see the live-room state without letting the video service become the system of record.</p>
+        <h2 class="editorial-title">Session title, campaign name, room status, invite return, and closeout stay attached.</h2>
+        <p class="editorial-copy">The page is useful only if the GM and players can see the live-room state while Chummer remains the campaign record.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -57,13 +57,13 @@
             <p>Session id: <code class="mono-receipt">@Model.SessionId</code></p>
             <div class="route-choice-card__proof">
                 <span>Campaign data stays in Chummer</span>
-                <span>Runner sheets stay out of video-service payloads</span>
+                <span>Runner sheets stay out of room links</span>
                 <span>GM secrets stay private</span>
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Provider link</span>
-            <h3>@(string.IsNullOrWhiteSpace(Model.ProviderRoomUrl) ? "Manual room link not configured yet" : "Provider room available to signed-in participants")</h3>
+            <span class="tag">Room link</span>
+            <h3>@(string.IsNullOrWhiteSpace(Model.ProviderRoomUrl) ? "Manual room link not configured yet" : "Room available to signed-in participants")</h3>
             <p>@Model.FallbackMessage</p>
             <div class="route-choice-card__proof">
                 <span>Private by default</span>
@@ -78,7 +78,7 @@
             <div class="route-choice-card__proof">
                 <span>Attendee sync status: @Model.AttendeeSyncStatus</span>
                 <span>Consent status: @Model.ConsentStatus</span>
-                <span>Black Ledger continuity stays first-party</span>
+                <span>Campaign continuity stays in Chummer</span>
             </div>
         </article>
     </div>
@@ -89,7 +89,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Manage</p>
-            <h2 class="editorial-title">Create mode stays hidden or unavailable until service setup and transport are both ready.</h2>
+            <h2 class="editorial-title">Create mode stays hidden or unavailable until the room connection is ready.</h2>
             <p class="editorial-copy">Manual link mode is the required baseline. Automation may appear only when the connection is actually ready.</p>
         </div>
         <div class="route-choice-grid">
@@ -100,7 +100,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Create mode</span>
-                <h3>@(Model.ProviderCreateAvailable ? "Provider create available" : "Create BeHuman room unavailable")</h3>
+                <h3>@(Model.ProviderCreateAvailable ? "Room creation available" : "Room creation unavailable")</h3>
                 <p>@Model.ProviderCreateDisabledReason</p>
             </article>
         </div>
@@ -113,7 +113,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Closeout</p>
             <h2 class="editorial-title">The room can close without inventing attendance.</h2>
-            <p class="editorial-copy">If service sync is unavailable or not consented, manual closeout remains valid and the campaign can still continue inside Chummer.</p>
+            <p class="editorial-copy">If attendance sync is unavailable or not consented, manual closeout remains valid and the campaign can still continue inside Chummer.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -123,8 +123,8 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Recap</span>
-                <h3>@(Model.LatestRecapStatus ?? "private_only")</h3>
-                <p>Public-safe recap and Black Ledger continuity stay bounded and optional.</p>
+                <h3>@(Model.LatestRecapStatus ?? "Private only")</h3>
+                <p>Recaps stay private unless the GM chooses otherwise.</p>
             </article>
         </div>
     </section>

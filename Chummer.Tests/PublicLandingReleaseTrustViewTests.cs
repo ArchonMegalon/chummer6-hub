@@ -505,7 +505,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("command carry-forward", ledgerNotifications, StringComparison.Ordinal);
         Assert.DoesNotContain("command follow-through", ledgerNotifications, StringComparison.Ordinal);
 
-        Assert.Contains("Black Ledger continuity", gmSessionVenue, StringComparison.Ordinal);
+        Assert.Contains("Campaign continuity", gmSessionVenue, StringComparison.Ordinal);
         Assert.DoesNotContain("Black Ledger follow-through", gmSessionVenue, StringComparison.Ordinal);
 
         Assert.Contains("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);

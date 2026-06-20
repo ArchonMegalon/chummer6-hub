@@ -37,8 +37,11 @@ public sealed class GmSessionVenueIntegrationTests
         Assert.Contains("Copy invite link", venueView, StringComparison.Ordinal);
         Assert.Contains("Join live room", venueView, StringComparison.Ordinal);
         Assert.Contains("Attendance sync", venueView, StringComparison.Ordinal);
-        Assert.Contains("Create BeHuman room unavailable", venueView, StringComparison.Ordinal);
-        Assert.Contains("Provider create available", venueView, StringComparison.Ordinal);
-        Assert.Contains("Create mode stays hidden or unavailable until service setup and transport are both ready.", venueView, StringComparison.Ordinal);
+        Assert.Contains("Room creation unavailable", venueView, StringComparison.Ordinal);
+        Assert.Contains("Room creation available", venueView, StringComparison.Ordinal);
+        Assert.Contains("Create mode stays hidden or unavailable until the room connection is ready.", venueView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Provider link", venueView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Provider create available", venueView, StringComparison.Ordinal);
+        Assert.DoesNotContain("video-service payloads", venueView, StringComparison.Ordinal);
     }
 }
