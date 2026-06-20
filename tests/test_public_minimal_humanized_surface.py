@@ -211,10 +211,29 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "Package posture",
         "Recap and artifact shelf",
         "waiting for governed",
+        "Record:",
+        "Evidence:",
+        "Lead:",
+        "Authority:",
+        "Surface:",
+        "Route:",
+        "Recovery path:",
+        "Recovery link:",
+        "Lead recovery hint:",
+        "Latest record observed:",
+        "Entitlement conflict records",
+        "Safe-to-continue history",
+        "Refresh-before-continue items",
     ):
         assert forbidden not in account
 
     assert "The download stays the same for everyone" in account
+    assert "Access conflicts" in account
+    assert "Ready history" in account
+    assert "Needs refresh" in account
+    assert "Account update" in account
+    assert "Restore update" in account
+    assert "Details:" in account
     assert "Recap files" in account
     assert "Restore status" in account
     assert "Move roster state" in account

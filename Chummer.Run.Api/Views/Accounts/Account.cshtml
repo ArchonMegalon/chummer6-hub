@@ -1205,39 +1205,23 @@
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ConflictSummary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Lead record</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadReceiptId</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Lead subject</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadSubjectId</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Lead authority</span>
-                                <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.LeadAuthority, "hub_entitlement_ledger")</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Lead recovery hint</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint</strong>
+                                <span>Next step</span>
+                                <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint)</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Recovery summary</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.RecoverySummary</strong>
+                                <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.RecoverySummary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Lead observed</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadObservedAtUtc.UtcDateTime.ToString("u")</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Latest record observed</span>
+                                <span>Updated</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Entitlement history records</span>
+                                <span>Access history</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncProvenanceCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Entitlement conflict records</span>
+                                <span>Access conflicts</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1245,11 +1229,11 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Safe-to-continue history</span>
+                                <span>Ready history</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.SafeToContinueWithReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Refresh-before-continue items</span>
+                                <span>Needs refresh</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.RefreshBeforeContinueCount</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1263,14 +1247,11 @@
                                 @foreach (var surface in entitlementSyncReceipts.ReceiptSurfaces)
                                 {
                                     <li>
-                                        <strong>@surface.Label:</strong> @surface.Status.Summary
-                                        <span>Lead: @surface.Status.LeadReceiptId</span>
-                                        <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_entitlement_ledger")</span>
-                                        <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
-                                        <span>Latest record observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>Recovery path: @surface.Status.RecoveryRoute</span>
-                                        <span>@surface.Status.RecoverySummary</span>
-                                        <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
+                                        <strong>@surface.Label:</strong> @PublicText(surface.Status.Summary)
+                                        <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
+                                        <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>@PublicText(surface.Status.RecoverySummary)</span>
+                                        <span>Needs refresh: @surface.Status.RefreshBeforeContinueCount</span>
                                         <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
                                         @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
                                         {
@@ -1287,11 +1268,8 @@
                                 @foreach (var action in entitlementSyncReceipts.ReceiptStatus.RecoveryActions)
                                 {
                                     <li>
-                                        <strong>@action.Label:</strong> @action.Summary
-                                        <span>Record: @action.ReceiptId</span>
-                                        <span>Authority: @HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
-                                        <span>Surface: @HumanizeStatus(action.Surface, "entitlement_sync")</span>
-                                        <span>Route: @action.Route</span>
+                                        <strong>@action.Label:</strong> @PublicText(action.Summary)
+                                        <span>Next: @DescribeRecoveryRouteAction(action.Route)</span>
                                         <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
                                         @if (IsNavigableAccountRoute(action.Route))
                                         {
@@ -1317,13 +1295,11 @@
                                 @foreach (var receipt in entitlementSyncReceipts.ProvenanceRecoveryReceipts.Take(4))
                                 {
                                     <li>
-                                        <strong>@HumanizeStatus(receipt.Kind, "record"):</strong>
+                                        <strong>Account update:</strong>
                                         @PublicText(receipt.Summary)
-                                        <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
-                                        <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                         <span>State: @HumanizeStatus(receipt.StalenessPosture, "Current")</span>
-                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable")</span>
-                                        <span>Recovery path: @receipt.RecoveryRoute</span>
+                                        <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable")</span>
                                         @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                         {
                                             <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -1345,13 +1321,11 @@
                                 @foreach (var receipt in entitlementSyncReceipts.ConflictReceipts.Take(4))
                                 {
                                     <li>
-                                        <strong>@HumanizeStatus(receipt.Severity, "Warning") / @HumanizeStatus(receipt.Kind, "record"):</strong>
-                                        @receipt.Summary
-                                        <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
-                                        <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <strong>@HumanizeStatus(receipt.Severity, "Warning"):</strong>
+                                        @PublicText(receipt.Summary)
+                                        <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                         <span>Conflict status: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
-                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by account access")</span>
-                                        <span>Recovery path: @receipt.RecoveryRoute</span>
+                                        <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by account access")</span>
                                         @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                         {
                                             <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -1848,7 +1822,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var evidence in selectedWorkspaceServerPlane.WorkspaceState.EvidenceLines)
                                         {
-                                            <li>@evidence</li>
+                                            <li>@PublicText(evidence)</li>
                                         }
                                     </ul>
                                 }
@@ -1932,7 +1906,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var evidence in selectedWorkspaceFirstPlayableSession.EvidenceLines)
                                             {
-                                                <li>@evidence</li>
+                                                <li>@PublicText(evidence)</li>
                                             }
                                         </ul>
                                     }
@@ -1967,7 +1941,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var evidence in selectedWorkspaceCampaignMemory.EvidenceLines)
                                             {
-                                                <li>@evidence</li>
+                                                <li>@PublicText(evidence)</li>
                                             }
                                         </ul>
                                     }
@@ -1997,7 +1971,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var evidence in selectedWorkspaceNextSessionCarryForward.EvidenceLines)
                                             {
-                                                <li>@evidence</li>
+                                                <li>@PublicText(evidence)</li>
                                             }
                                         </ul>
                                     }
@@ -2026,7 +2000,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var evidence in selectedWorkspaceDowntimePackage.EvidenceLines)
                                             {
-                                                <li>@evidence</li>
+                                                <li>@PublicText(evidence)</li>
                                             }
                                         </ul>
                                     }
@@ -2169,51 +2143,27 @@
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Safe to continue")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Lead record</span>
-                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Lead surface</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSurface, "workspace_restore")</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Lead authority</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadAuthority, "hub_campaign_spine_projection")</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Lead kind</span>
-                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadKind, "restore_review")</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Lead subject</span>
-                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Recovery path</span>
-                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
+                                        <span>Next step</span>
+                                        <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadRecoveryHint)</strong>
                                         @if (IsNavigableAccountRoute(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute))
                                         {
                                             <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)</a>
                                         }
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Lead recovery hint</span>
-                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadRecoveryHint</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
                                         <span>Recovery summary</span>
-                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary</strong>
+                                        <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Workspace restore provenance</span>
+                                        <span>Restore history</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreProvenanceCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Entitlement sync provenance</span>
+                                        <span>Access history</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncProvenanceCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>History records</span>
+                                        <span>History</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2225,15 +2175,15 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncConflictCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Conflict records</span>
+                                        <span>Conflicts</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreConflictReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Safe-to-continue history</span>
+                                        <span>Ready history</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Refresh-before-continue items</span>
+                                        <span>Needs refresh</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RefreshBeforeContinueCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2251,14 +2201,11 @@
                                         @foreach (var surface in selectedWorkspaceServerPlane.RestoreReceiptSurfaces)
                                         {
                                             <li>
-                                                <strong>@surface.Label:</strong> @surface.Status.Summary
-                                                <span>Lead: @surface.Status.LeadReceiptId</span>
-                                                <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_campaign_spine_projection")</span>
-                                                <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
-                                                <span>Latest record observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                                <span>Recovery path: @surface.Status.RecoveryRoute</span>
-                                                <span>@surface.Status.RecoverySummary</span>
-                                                <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
+                                                <strong>@surface.Label:</strong> @PublicText(surface.Status.Summary)
+                                                <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
+                                                <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>@PublicText(surface.Status.RecoverySummary)</span>
+                                                <span>Needs refresh: @surface.Status.RefreshBeforeContinueCount</span>
                                                 <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
                                                 @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
                                                 {
@@ -2275,11 +2222,8 @@
                                         @foreach (var action in selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActions)
                                         {
                                             <li>
-                                                <strong>@action.Label:</strong> @action.Summary
-                                                <span>Record: @action.ReceiptId</span>
-                                                <span>Source: @HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
-                                                <span>Surface: @HumanizeStatus(action.Surface, "workspace_restore")</span>
-                                                <span>Route: @action.Route</span>
+                                                <strong>@action.Label:</strong> @PublicText(action.Summary)
+                                                <span>Next: @DescribeRecoveryRouteAction(action.Route)</span>
                                                 <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Safe to continue")</span>
                                                 @if (IsNavigableAccountRoute(action.Route))
                                                 {
@@ -2300,12 +2244,8 @@
                                         {
                                             var recovery = selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault(item => string.Equals(item.ReceiptId, receipt.ReceiptId, StringComparison.Ordinal));
                                             <li>
-                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Kind, "record"):</strong>
+                                                <strong>Restore update:</strong>
                                                 @PublicText(receipt.Summary)
-                                                @if (!string.IsNullOrWhiteSpace(receipt.Authority))
-                                                {
-                                                    <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
-                                                }
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Proof))
                                                 {
                                                     <span>Note: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
@@ -2318,9 +2258,9 @@
                                                 @if (recovery is not null)
                                                 {
                                                     <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current")</span>
-                                                    <span>Recoverability: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable")</span>
+                                                    <span>Recovery: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable")</span>
                                                     @* Recovery route: @recovery.RecoveryRoute *@
-                                                    <span>Recovery link: @recovery.RecoveryRoute</span>
+                                                    <span>Next: @DescribeRecoveryRouteAction(recovery.RecoveryRoute)</span>
                                                     @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
                                                     {
                                                         <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
@@ -2338,15 +2278,13 @@
                                         @foreach (var receipt in selectedWorkspaceServerPlane.RestoreConflictReceipts.Take(6))
                                         {
                                             <li>
-                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Severity, "Warning"):</strong>
+                                                <strong>@HumanizeStatus(receipt.Severity, "Warning"):</strong>
                                                 @PublicText(receipt.Summary)
-                                                <span>@HumanizeStatus(receipt.Kind, "record").</span>
-                                                <span>Source: @HumanizeStatus(receipt.Authority, "hub")</span>
                                                 <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>Status: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
-                                                <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</span>
+                                                <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</span>
                                                 @* Recovery route: @receipt.RecoveryRoute *@
-                                                <span>Recovery link: @receipt.RecoveryRoute</span>
+                                                <span>Next: @DescribeRecoveryRouteAction(receipt.RecoveryRoute)</span>
                                                 @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                                 {
                                                     <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -2624,7 +2562,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var launch in selectedWorkspacePrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Record: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
+                                            <li><strong>@launch.PacketTitle:</strong> @PublicText(launch.Summary) <span> Updated: @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2636,7 +2574,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var receipt in selectedWorkspaceTravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Record: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @PublicText(receipt.PrefetchSummary) <span> Updated: @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2804,7 +2742,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var package in selectedWorkspaceAftermathPackages)
                                             {
-                                                <li><strong>@package.Title:</strong> @package.Summary <span> Record: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
+                                                <li><strong>@package.Title:</strong> @PublicText(package.Summary) <span> Updated: @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                             }
                                         </ul>
                                     </details>
@@ -3111,7 +3049,7 @@
                         }
                         @if (selectedRulesNavigatorAnswer.EvidenceLines.Count > 0)
                         {
-                            <p><strong>Evidence:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3))</p>
+                            <p><strong>Details:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3).Select(line => PublicText(line)))</p>
                         }
                         @if (selectedRulesNavigatorAnswer.Diffs is { Count: > 0 })
                         {
@@ -3514,7 +3452,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var launch in workspace.PrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Record: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
+                                            <li><strong>@launch.PacketTitle:</strong> @PublicText(launch.Summary) <span> Updated: @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3527,7 +3465,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var receipt in workspace.TravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Record: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @PublicText(receipt.PrefetchSummary) <span> Updated: @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3540,7 +3478,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
-                                            <li><strong>@package.Title:</strong> @package.Summary <span> Record: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
+                                            <li><strong>@package.Title:</strong> @PublicText(package.Summary) <span> Updated: @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -3555,7 +3493,7 @@
                                         <li><strong>@downtimeBrief.Title:</strong> @downtimeBrief.Summary</li>
                                         @if (downtimeBrief.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Evidence:</strong> @downtimeBrief.EvidenceLines[0]</li>
+                                            <li><strong>Details:</strong> @PublicText(downtimeBrief.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3571,7 +3509,7 @@
                                         <li><strong>Next:</strong> @workspace.NextSessionCarryForward.NextSafeAction</li>
                                         @if (workspace.NextSessionCarryForward.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Evidence:</strong> @workspace.NextSessionCarryForward.EvidenceLines[0]</li>
+                                            <li><strong>Details:</strong> @PublicText(workspace.NextSessionCarryForward.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3587,7 +3525,7 @@
                                         <li><strong>Next:</strong> @workspace.CampaignMemory.NextSafeAction</li>
                                         @if (workspace.CampaignMemory.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Evidence:</strong> @workspace.CampaignMemory.EvidenceLines[0]</li>
+                                            <li><strong>Details:</strong> @PublicText(workspace.CampaignMemory.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3758,11 +3696,11 @@
                                                 <strong>@consequence.Label</strong>: @HumanizeStatus(consequence.State, "Tracked"). @consequence.Summary
                                                 @if (consequence.EvidenceLines.Count > 0)
                                                 {
-                                                    <span> Evidence: @consequence.EvidenceLines[0]</span>
+                                                    <span> Details: @PublicText(consequence.EvidenceLines[0])</span>
                                                 }
                                                 @if (consequence.Receipts.Count > 0)
                                                 {
-                                                    <span> Record: @consequence.Receipts[0].SourceKind @consequence.Receipts[0].ReceiptId</span>
+                                                    <span> Source: @HumanizeStatus(consequence.Receipts[0].SourceKind, "Update")</span>
                                                 }
                                             </li>
                                         }
@@ -3879,7 +3817,7 @@
                                     }
                                     @if (answer.EvidenceLines.Count > 0)
                                     {
-                                        <span> Evidence: @answer.EvidenceLines[0].</span>
+                                        <span> Details: @PublicText(answer.EvidenceLines[0]).</span>
                                     }
                                     @if (answer.SupportReuseHints.Count > 0)
                                     {
@@ -3898,7 +3836,7 @@
                             @foreach (var receipt in Model.CampaignSpine.MigrationReceipts)
                             {
                                 <li>
-                                    <strong>@receipt.SourceKind</strong>: @receipt.Summary
+                                    <strong>@PublicText(receipt.SourceKind)</strong>: @PublicText(receipt.Summary)
                                     <span> Fields: @string.Join(", ", receipt.Fields.Select(field => $"{field.Label}={field.Status}")).</span>
                                 </li>
                             }
