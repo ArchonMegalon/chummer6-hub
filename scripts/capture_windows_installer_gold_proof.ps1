@@ -11,6 +11,7 @@ param(
     [string]$ScaledDpiScale = "1.5",
     [switch]$AutoCaptureVisualAudit,
     [int]$AutoCaptureDelaySeconds = 3,
+    [int]$AutoCaptureTimeoutSeconds = 45,
     [ValidateSet("pass", "fail", "review_required")]
     [string]$VisualClippingStatus = "pass",
     [ValidateSet("pass", "fail", "review_required")]
@@ -147,6 +148,7 @@ if ($CaptureVisualAudit) {
     if ($AutoCaptureVisualAudit) {
         $captureArgs["AutoCapture"] = $true
         $captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds
+        $captureArgs["AutoCaptureTimeoutSeconds"] = $AutoCaptureTimeoutSeconds
     }
 
     & $captureScript @captureArgs

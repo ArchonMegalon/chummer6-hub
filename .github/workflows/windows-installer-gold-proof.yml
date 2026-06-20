@@ -18,6 +18,11 @@ on:
         required: false
         default: "1.5"
         type: string
+      auto_capture_timeout_seconds:
+        description: "Seconds to wait for each requested installer surface before failing capture"
+        required: false
+        default: "45"
+        type: string
 
 permissions:
   contents: read
@@ -86,6 +91,7 @@ jobs:
             $proofArgs["CaptureVisualAudit"] = $true
             $proofArgs["AutoCaptureVisualAudit"] = $true
             $proofArgs["ScaledDpiScale"] = "${{ inputs.scaled_dpi_scale }}"
+            $proofArgs["AutoCaptureTimeoutSeconds"] = [int]"${{ inputs.auto_capture_timeout_seconds }}"
             $proofArgs["VisualClippingStatus"] = "review_required"
             $proofArgs["VisualReadabilityStatus"] = "review_required"
           }

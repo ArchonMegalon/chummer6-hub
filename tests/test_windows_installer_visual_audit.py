@@ -300,7 +300,17 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn('"install-progress", "completion"', text)
         self.assertIn("[switch]$CaptureRequiredSet", text)
         self.assertIn("$ScaledDpiScale", text)
+        self.assertLess(
+            text.index('[ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale }'),
+            text.index('[ordered]@{ Surface = "completion"; DpiScale = "1.0" }'),
+        )
         self.assertIn("foreach ($request in $captureRequests)", text)
+        self.assertIn("function Wait-ForInstallerSurface", text)
+        self.assertIn("Find-InstallerSurfaceWindow", text)
+        self.assertIn("MainWindowTitle", text)
+        self.assertIn("Timed out waiting for Chummer installer surface", text)
+        self.assertIn("$AutoCaptureTimeoutSeconds", text)
+        self.assertIn("$delaySeconds = 0", text)
         self.assertIn("surfaceCoverage", text)
 
     def test_windows_gold_proof_helper_writes_startup_receipt_and_delegates_visual_capture(self) -> None:
@@ -323,6 +333,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("ReadabilityStatus = $VisualReadabilityStatus", text)
         self.assertIn("$AutoCaptureVisualAudit", text)
         self.assertIn('$captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds', text)
+        self.assertIn('$captureArgs["AutoCaptureTimeoutSeconds"] = $AutoCaptureTimeoutSeconds', text)
 
     def test_windows_installer_gold_proof_workflow_is_manual_non_publishing_and_review_bounded(self) -> None:
         workflow = Path("/docker/chummercomplete/chummer.run-services/.github/workflows/windows-installer-gold-proof.yml")
@@ -341,6 +352,8 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("$proofArgs = @{", text)
         self.assertIn('$proofArgs["VisualClippingStatus"] = "review_required"', text)
         self.assertIn('$proofArgs["VisualReadabilityStatus"] = "review_required"', text)
+        self.assertIn("auto_capture_timeout_seconds", text)
+        self.assertIn('$proofArgs["AutoCaptureTimeoutSeconds"]', text)
         self.assertIn("does not publish downloads", text)
         self.assertIn("actions/upload-artifact", text)
         self.assertIn("import_windows_installer_gold_proof_artifact.py", text)

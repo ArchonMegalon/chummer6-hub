@@ -12,7 +12,8 @@ param(
     [switch]$CaptureRequiredSet,
     [string]$ScaledDpiScale = "1.5",
     [switch]$AutoCapture,
-    [int]$AutoCaptureDelaySeconds = 3
+    [int]$AutoCaptureDelaySeconds = 3,
+    [int]$AutoCaptureTimeoutSeconds = 45
 )
 
 Set-StrictMode -Version Latest
@@ -79,6 +80,44 @@ function Normalize-Surface([object]$Value) {
     }
 }
 
+function Find-InstallerSurfaceWindow([string]$SurfaceValue) {
+    $canonicalSurface = Normalize-Surface $SurfaceValue
+    $processes = @(Get-Process | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
+        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+
+    foreach ($process in $processes) {
+        $title = [string]$process.MainWindowTitle
+        if ($canonicalSurface -eq "completion") {
+            if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                return $process
+            }
+            continue
+        }
+
+        if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+            $title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            return $process
+        }
+    }
+
+    return $null
+}
+
+function Wait-ForInstallerSurface([string]$SurfaceValue, [int]$TimeoutSeconds) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $window = Find-InstallerSurfaceWindow $SurfaceValue
+        if ($null -ne $window) {
+            return $window
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Timed out waiting for Chummer installer surface '$SurfaceValue'. Automated capture must see the requested window before taking a screenshot."
+}
+
 $installerFullPath = Resolve-RepoPath $InstallerPath
 if (-not (Test-Path -LiteralPath $installerFullPath)) {
     throw "Installer not found: $installerFullPath"
@@ -99,8 +138,8 @@ $captureRequests = @()
 if ($CaptureRequiredSet) {
     $captureRequests = @(
         [ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },
-        [ordered]@{ Surface = "completion"; DpiScale = "1.0" },
         [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },
+        [ordered]@{ Surface = "completion"; DpiScale = "1.0" },
         [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }
     )
 }
@@ -115,8 +154,17 @@ foreach ($request in $captureRequests) {
     Write-Host "Put the Windows installer surface to audit on screen, then press Enter."
     Write-Host "Surface: $captureSurface; DPI label: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
     if ($AutoCapture) {
-        Write-Host "Auto-capturing in $AutoCaptureDelaySeconds seconds."
-        Start-Sleep -Seconds $AutoCaptureDelaySeconds
+        Write-Host "Waiting up to $AutoCaptureTimeoutSeconds seconds for the $captureSurface window."
+        $window = Wait-ForInstallerSurface $captureSurface $AutoCaptureTimeoutSeconds
+        Write-Host "Matched window: $($window.MainWindowTitle)"
+        $delaySeconds = $AutoCaptureDelaySeconds
+        if ((Normalize-Surface $captureSurface) -eq "install-progress") {
+            $delaySeconds = 0
+        }
+        if ($delaySeconds -gt 0) {
+            Write-Host "Auto-capturing in $delaySeconds seconds."
+            Start-Sleep -Seconds $delaySeconds
+        }
     }
     else {
         [void](Read-Host)
