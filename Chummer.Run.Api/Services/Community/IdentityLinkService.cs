@@ -288,7 +288,7 @@ public sealed class IdentityLinkService
         var subjectId = AccountService.NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
         var channelKind = NormalizeChannelKind(request.ChannelKind);
         var channelHandle = AccountService.NormalizeOptional(request.ChannelHandle) ?? channelKind;
-        var normalizedHandle = NormalizeOptionalChannelHandle(channelKind, channelHandle);
+        var normalizedHandle = NormalizeRequiredChannelHandle(channelKind, channelHandle);
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
 
@@ -566,6 +566,10 @@ public sealed class IdentityLinkService
         => string.IsNullOrWhiteSpace(rawHandle)
             ? null
             : NormalizeChannelHandleForDisplay(channelKind, rawHandle);
+
+    private static string NormalizeRequiredChannelHandle(string channelKind, string rawHandle)
+        => NormalizeOptionalChannelHandle(channelKind, rawHandle)
+           ?? throw new ArgumentException("Channel handle is required.");
 
     private static string NormalizeTelegramHandle(string rawHandle)
     {

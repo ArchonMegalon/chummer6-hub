@@ -34,6 +34,28 @@ public sealed class IdentityLinkServiceTests
     }
 
     [Fact]
+    public void LinkChannelWithoutHandleKeepsNonNullDisplayLabel()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            CommunityStore store = new(BuildConfiguration(tempRoot), NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            IdentityLinkService links = new(store, accounts);
+            accounts.EnsureUserWithStatus("subject.telegram.runner", "Runner Prime", "runner@example.com");
+
+            ChannelLinkDto link = links.LinkChannel(new LinkChannelRequest("subject.telegram.runner", "telegram_official_bot"));
+
+            Assert.Equal("telegram_official_bot", link.DisplayLabel);
+            Assert.False(string.IsNullOrWhiteSpace(store.ChannelLinks[0].DisplayLabel));
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
     public void LinkChannelToExecutiveAssistantUpdatesExistingChannelToEaLinked()
     {
         string tempRoot = CreateTempRoot();
