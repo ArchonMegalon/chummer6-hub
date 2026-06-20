@@ -78,7 +78,7 @@
 - credential_source: local `.env`
 - status: `tracked_in_discovery`
 - runtime_ready: `false`
-- required_boundary: `governed memorial video rendering only; Manfred likeness clips require avatar_consent`
+- required_boundary: `candidate avatar and character video rendering only; Chummer Origin Dossier or claim-copy scenes require explicit likeness/data consent, provider proof, privacy review, and human approval before use`
 - mirrors_default: `false`
 
 ### dadan

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.provider_proof_discoverability",
-  "generated_at_utc": "2026-06-19T19:01:59Z",
+  "generated_at_utc": "2026-06-20T17:58:30Z",
   "status": "pass",
   "providers": {
     "payfunnels": {

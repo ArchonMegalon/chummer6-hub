@@ -82,9 +82,9 @@ TRACKED_PROVIDER_RECEIPTS: dict[str, dict[str, Any]] = {
     "joggai": {
         "status": "tracked",
         "provider": "JoggAI",
-        "lane": "governed memorial video rendering",
+        "lane": "consented avatar and character video candidates",
         "runtime_ready": False,
-        "boundary": "Off by default; likeness clips require avatar_consent before use.",
+        "boundary": "Off by default; likeness or user-data scenes require explicit consent, provider proof, privacy review, and human approval before use.",
     },
     "poppy_ai": {
         "status": "tracked",

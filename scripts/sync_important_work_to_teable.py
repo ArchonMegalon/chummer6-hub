@@ -193,6 +193,18 @@ def important_work_items() -> list[ImportantWorkItem]:
             acceptance_gate="Help menu can replay the login video on demand and account linking can show the personalized email render safely.",
         ),
         ImportantWorkItem(
+            item_id="joggai-consented-avatar-video-lane",
+            title="JoggAI consented avatar video lane",
+            area="Provider governance",
+            priority="P1",
+            status="tracked-not-runtime",
+            cadence="after core Origin Dossier flow",
+            source="Provider inventory and user prompt",
+            why_it_matters="JoggAI may be useful for polished character or account-link videos, but only with explicit likeness and data boundaries.",
+            next_action="Define JoggAI as an off-by-default candidate render lane for Origin Dossier portraits/scenes and claim-copy login clips; require consent, provider proof, and human review before any output ships.",
+            acceptance_gate="JoggAI has a provider verification receipt, consent gate, sample candidate render, privacy review, and no path that can publish or alter character/rules/account truth.",
+        ),
+        ImportantWorkItem(
             item_id="desktop-updater-install-link",
             title="Updater and install-link reliability",
             area="Updater",
