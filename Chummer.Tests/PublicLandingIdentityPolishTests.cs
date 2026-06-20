@@ -27,7 +27,7 @@ public sealed class PublicLandingIdentityPolishTests
         Assert.Contains("Runner Passport continuity rail", controller, StringComparison.Ordinal);
         Assert.Contains("Signal Deck command rail", controller, StringComparison.Ordinal);
         Assert.Contains("Living World continuity rail", controller, StringComparison.Ordinal);
-        Assert.Contains("Package route receipt", controller, StringComparison.Ordinal);
+        Assert.Contains("Package record", controller, StringComparison.Ordinal);
         Assert.Contains("KARMA FORGE intake receipt", controller, StringComparison.Ordinal);
         Assert.Contains("Faction command workspace", controller, StringComparison.Ordinal);
     }

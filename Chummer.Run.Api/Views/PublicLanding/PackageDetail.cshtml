@@ -3,16 +3,41 @@
     ViewData["Title"] = Model.Package.Title;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-package-detail";
+
+    static string PublicPackageText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("Governed", "Reviewed", StringComparison.OrdinalIgnoreCase)
+            .Replace("governance", "review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Governance", "Review", StringComparison.OrdinalIgnoreCase)
+            .Replace("provenance", "history", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipts", "checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
+            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
+            .Replace("rail", "page", StringComparison.OrdinalIgnoreCase)
+            .Replace("lane", "path", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.ScopeLabel</p>
-        <h1 class="page-title">@Model.Package.Title</h1>
-        <p class="page-copy">@Model.Package.Summary</p>
+        <p class="eyebrow">@PublicPackageText(Model.ScopeLabel)</p>
+        <h1 class="page-title">@PublicPackageText(Model.Package.Title)</h1>
+        <p class="page-copy">@PublicPackageText(Model.Package.Summary)</p>
         <div class="trust-claim__microproof">
-            <span>@Model.Package.ClassLabel</span>
-            <span>@Model.Package.StatusLabel</span>
+            <span>@PublicPackageText(Model.Package.ClassLabel)</span>
+            <span>@PublicPackageText(Model.Package.StatusLabel)</span>
             <span>@Model.Package.VoteCount vote(s)</span>
             <span>@Model.Package.FollowCount follow(s)</span>
         </div>
@@ -29,40 +54,40 @@
 
 <section class="continuity-band">
     <div class="continuity-band__copy">
-        <p class="eyebrow">Package posture</p>
-        <h2 class="editorial-title">Compatibility and governance stay attached before any action fires.</h2>
-        <p class="editorial-copy">@Model.Package.EvidenceSummary</p>
+        <p class="eyebrow">Package fit</p>
+        <h2 class="editorial-title">Check where this belongs before you act.</h2>
+        <p class="editorial-copy">@PublicPackageText(Model.Package.EvidenceSummary)</p>
     </div>
     <div class="continuity-band__panel">
         <article class="continuity-band__fact">
             <span>Compatibility</span>
-            <strong>@Model.Package.CompatibilitySummary</strong>
+            <strong>@PublicPackageText(Model.Package.CompatibilitySummary)</strong>
         </article>
         <article class="continuity-band__fact">
-            <span>Governance</span>
-            <strong>@Model.Package.GovernanceSummary</strong>
+            <span>Review</span>
+            <strong>@PublicPackageText(Model.Package.GovernanceSummary)</strong>
         </article>
     </div>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Compatibility notes</p>
-        <h2 class="editorial-title">Know where this package belongs before you treat it like a build or a roadmap promise.</h2>
+        <p class="eyebrow">Fit notes</p>
+        <h2 class="editorial-title">Know where this belongs before you treat it like a build or a roadmap promise.</h2>
     </div>
     <div class="trust-rail-list">
         @foreach (var note in Model.CompatibilityNotes)
         {
             <article class="trust-rail">
                 <span class="tag">Compatibility</span>
-                <p>@note</p>
+                <p>@PublicPackageText(note)</p>
             </article>
         }
         @foreach (var note in Model.GovernanceNotes)
         {
             <article class="trust-rail">
-                <span class="tag">Governance</span>
-                <p>@note</p>
+                <span class="tag">Review</span>
+                <p>@PublicPackageText(note)</p>
             </article>
         }
     </div>
@@ -71,18 +96,18 @@
 <section class="editorial-block" id="community-actions">
     <div class="editorial-block__lead">
         <p class="eyebrow">Community actions</p>
-        <h2 class="editorial-title">Vote or follow on first-party routes.</h2>
+        <h2 class="editorial-title">Vote or follow in Chummer.</h2>
         <p class="editorial-copy">
             @(Model.CanInteract
                 ? "These actions keep package interest attached to the package, not to an external board name."
-                : "Public package detail stays readable without an account. Sign in only when you want your package history tracked on the account rail.")
+                : "Public package detail stays readable without an account. Sign in only when you want your package history tracked on the account page.")
         </p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Vote</span>
             <h3>@Model.VoteActionLabel</h3>
-            <p>Package votes stay first-party and bounded by package compatibility posture.</p>
+            <p>Package votes stay in Chummer and stay tied to compatibility.</p>
             @if (Model.CanInteract)
             {
                 <form method="post" action="@Model.VoteActionHref">
@@ -109,7 +134,7 @@
         <article class="route-choice-card">
             <span class="tag">Follow</span>
             <h3>@Model.FollowActionLabel</h3>
-            <p>Package follows stay on the same Chummer-owned rail as later compatibility or release updates.</p>
+            <p>Package follows stay on the same Chummer page as later compatibility or release updates.</p>
             @if (Model.CanInteract)
             {
                 <form method="post" action="@Model.FollowActionHref">
@@ -157,8 +182,8 @@
             {
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>@receipt.ActionLabel · @receipt.ActorLabel</h3>
-                        <p>@receipt.RouteSummary</p>
+                        <h3>@PublicPackageText(receipt.ActionLabel) · @receipt.ActorLabel</h3>
+                        <p>@PublicPackageText(receipt.RouteSummary)</p>
                         <p>@receipt.RecordedAtLabel</p>
                     </div>
                     <a class="editorial-strip__action" href="@receipt.Href">Open record</a>

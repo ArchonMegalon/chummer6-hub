@@ -519,7 +519,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("support history", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", packageCatalogService, StringComparison.Ordinal);
-        Assert.Contains("proof view", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("Publication trust, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", packageCatalogService, StringComparison.Ordinal);
 
         string ledgerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml");
@@ -903,8 +903,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
-        Assert.Contains("The next page finishes linking this install with your running Chummer app in this browser tab.", view, StringComparison.Ordinal);
-        Assert.Contains("If it stalls, use the button again from the same browser.", view, StringComparison.Ordinal);
+        Assert.Contains("The next page claims this copy with your running Chummer app in this browser tab.", view, StringComparison.Ordinal);
+        Assert.Contains("If it stalls, use the claim button again from the same browser.", view, StringComparison.Ordinal);
+        Assert.Contains("The next page opens Chummer to claim this copy.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("manual open button", view, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

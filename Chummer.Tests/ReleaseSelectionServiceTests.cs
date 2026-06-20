@@ -260,6 +260,50 @@ platforms:
     }
 
     [Fact]
+    public void PublicStableKeepsWindowsInstallerGuestReadableEvenWhenRegistryMarksAccountRequired()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260619-080000",
+            Channel: "public_stable",
+            Status: "published",
+            RolloutState: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-19T08:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
+                    SizeBytes: 96466473,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "account_required")
+            ]);
+
+        PublicReleaseArtifactDto windowsDownload = Assert.Single(manifest.Downloads);
+        ReleaseOptionViewModel windowsOption = service.BuildOption(manifest, windowsDownload, authenticated: false, recommended: true);
+        PublicAccessPostureViewModel posture = service.BuildPublicAccessPosture(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: false);
+
+        Assert.Equal("open_public", windowsOption.InstallAccessClass);
+        Assert.False(windowsOption.RequiresAccount);
+        Assert.Equal("/downloads/get/avalonia-win-x64-installer", windowsOption.DispatchHref);
+        Assert.True(posture.GuestInstallAvailable);
+        Assert.False(posture.AccountRequiredInstallAvailable);
+    }
+
+    [Fact]
     public void PublicReleaseExperienceCanonAcceptsCurrentProofBoundaryFields()
     {
         var configuration = new ConfigurationBuilder()
@@ -368,7 +412,7 @@ platforms:
         Assert.True(experience.RequestedPlatformHasPublicDownload);
         Assert.NotNull(experience.Recommended);
         Assert.Equal("avalonia-win-x64-installer", experience.Recommended!.Artifact.Id);
-        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", experience.Recommended.DispatchHref, StringComparison.Ordinal);
+        Assert.Equal("/downloads/get/avalonia-win-x64-installer", experience.Recommended.DispatchHref);
         var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
         Assert.True(windows.PubliclyAvailable);
     }
@@ -609,10 +653,10 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: true);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Install on Windows", recommended.ActionLabel);
-        Assert.Equal("/downloads/install/avalonia-win-x64-installer", recommended.DispatchHref);
-        Assert.Contains("setup .exe", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("default browser", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Install Chummer on Windows", recommended.ActionLabel);
+        Assert.Equal("/downloads/get/avalonia-win-x64-installer", recommended.DispatchHref);
+        Assert.Contains("default recommended installer", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("default browser", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("powershell", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.False(service.UsesGuidedBootstrapScript(recommended.Artifact));
     }
@@ -791,10 +835,10 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: true);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Install on Linux", recommended.ActionLabel);
-        Assert.Equal("/downloads/install/avalonia-linux-x64-installer", recommended.DispatchHref);
-        Assert.Contains("short-lived shell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Install Chummer on Linux", recommended.ActionLabel);
+        Assert.Equal("/downloads/get/avalonia-linux-x64-installer", recommended.DispatchHref);
+        Assert.Contains("default recommended installer", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("short-lived shell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

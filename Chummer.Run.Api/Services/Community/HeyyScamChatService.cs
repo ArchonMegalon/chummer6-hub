@@ -99,6 +99,8 @@ public sealed class HeyyScamChatService
     private const string ManualCopyDeliveryMode = "manual_copy";
     private const string OperatorEmailDeliveryMode = "operator_email";
     private const string WhatsAppApprovedDeliveryMode = "whatsapp_approved";
+    private const string OperatorSummaryChannelSms = "sms";
+    private const string OperatorSummaryChannelWhatsapp = "whatsapp";
     private const string PersonaId = "empathetic_slow_typing_old_lady";
     private const int MinimumOldLadyDelaySeconds = 240;
 
@@ -849,6 +851,15 @@ public sealed class HeyyScamChatService
         string idempotencyKey,
         CancellationToken cancellationToken)
     {
+        return await SendMetaWhatsappTextAsync(approvedText, recipient, idempotencyKey, cancellationToken);
+    }
+
+    private async Task<string> SendMetaWhatsappTextAsync(
+        string text,
+        string recipient,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
         string accessToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN");
         string phoneNumberId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID");
         string graphVersion = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"]) ?? "v21.0";
@@ -867,7 +878,7 @@ public sealed class HeyyScamChatService
             text = new
             {
                 preview_url = false,
-                body = approvedText
+                body = text
             }
         });
 
@@ -891,6 +902,56 @@ public sealed class HeyyScamChatService
         throw new InvalidOperationException("meta_whatsapp_missing_message_id");
     }
 
+    private async Task<string> SendTurnSummaryWhatsappAsync(
+        HeyyScamChatConversationState conversation,
+        string content,
+        string recipient,
+        string eventKey,
+        CancellationToken cancellationToken)
+    {
+        if (MetaWhatsAppConfigured())
+        {
+            return await SendMetaWhatsappTextAsync(content, recipient, eventKey, cancellationToken);
+        }
+
+        string apiToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN");
+        string principalId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID");
+        string bindingId = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"])
+            ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
+        string baseUrl = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL").Trim().TrimEnd('/');
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/tools/execute");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Add("x-ea-principal-id", principalId);
+        request.Headers.Add("Idempotency-Key", eventKey);
+        request.Content = JsonContent.Create(new
+        {
+            tool_name = ConnectorDispatchTool,
+            action_kind = DeliverySendAction,
+            payload_json = new
+            {
+                principal_id = principalId,
+                binding_id = bindingId,
+                channel = WhatsappChannel,
+                recipient,
+                content,
+                metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["event_type"] = "heyy_scam_chat_operator_turn_summary",
+                    ["conversation_id"] = conversation.ConversationId,
+                    ["incoming_turn_count"] = conversation.Messages.Count(static item => item.Direction == "incoming"),
+                    ["mode"] = DraftOnlyMode,
+                    ["delivery_mode"] = "operator_summary",
+                    ["auto_send_allowed"] = false,
+                    ["manual_approval_required"] = true
+                },
+                idempotency_key = eventKey,
+            }
+        });
+
+        return await SendConnectorDispatchAsync(request, cancellationToken);
+    }
+
     private async Task DispatchTurnSummaryIfDueAsync(HeyyScamChatConversationState conversation, CancellationToken cancellationToken)
     {
         int threshold = Math.Clamp(ReadInt("CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS", 5), 1, 50);
@@ -910,7 +971,8 @@ public sealed class HeyyScamChatService
             }
         }
 
-        string? recipient = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"]);
+        string summaryChannel = ResolveOperatorSummaryChannel();
+        string? recipient = ResolveOperatorSummaryRecipient();
         string recipientMasked = MaskReceiptRecipient(recipient);
         string content = BuildTurnSummaryContent(conversation, incomingTurns, threshold);
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -918,15 +980,49 @@ public sealed class HeyyScamChatService
         string? deliveryRef = null;
         string? failureReason = null;
 
-        if (!OperatorSmsEnabled())
+        if (summaryChannel == OperatorSummaryChannelWhatsapp && !WhatsAppEnabled())
         {
-            status = "suppressed_sms_disabled";
-            failureReason = "operator_sms_disabled";
+            status = "suppressed_whatsapp_disabled";
+            failureReason = "operator_whatsapp_disabled";
         }
         else if (string.IsNullOrWhiteSpace(recipient))
         {
-            status = "suppressed_sms_recipient_missing";
+            status = summaryChannel == OperatorSummaryChannelWhatsapp
+                ? "suppressed_whatsapp_recipient_missing"
+                : "suppressed_sms_recipient_missing";
             failureReason = "recipient_missing";
+        }
+        else if (summaryChannel == OperatorSummaryChannelWhatsapp && !IsWhatsappRecipientAllowed(recipient))
+        {
+            status = "suppressed_whatsapp_recipient_not_allowed";
+            failureReason = "recipient_not_allowed";
+        }
+        else if (summaryChannel == OperatorSummaryChannelWhatsapp)
+        {
+            if (!WhatsAppDeliveryConfigured())
+            {
+                status = "suppressed_whatsapp_delivery_unconfigured";
+                failureReason = "real_whatsapp_delivery_unconfigured";
+            }
+            else
+            {
+                try
+                {
+                    deliveryRef = await SendTurnSummaryWhatsappAsync(conversation, content, recipient, eventKey, cancellationToken);
+                    status = "sent_whatsapp";
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or JsonException)
+                {
+                    _logger.LogWarning(ex, "Heyy scam-chat operator WhatsApp summary failed for {ConversationId}.", conversation.ConversationId);
+                    status = "failed_whatsapp";
+                    failureReason = Truncate(ex.Message, 400);
+                }
+            }
+        }
+        else if (!OperatorSmsEnabled())
+        {
+            status = "suppressed_sms_disabled";
+            failureReason = "operator_sms_disabled";
         }
         else if (!RealPhoneDeliveryConfigured())
         {
@@ -954,7 +1050,7 @@ public sealed class HeyyScamChatService
             IncomingTurnCount: incomingTurns,
             Threshold: threshold,
             Status: status,
-            Channel: SmsChannel,
+            Channel: summaryChannel,
             RecipientMasked: recipientMasked,
             Content: content,
             DeliveryRef: deliveryRef,
@@ -1573,6 +1669,21 @@ public sealed class HeyyScamChatService
 
     private bool OperatorSmsEnabled()
         => bool.TryParse(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_ENABLED"], out bool enabled) && enabled;
+
+    private string ResolveOperatorSummaryChannel()
+    {
+        string configured = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"])
+            ?? OperatorSummaryChannelSms;
+        return configured.Equals(OperatorSummaryChannelWhatsapp, StringComparison.OrdinalIgnoreCase)
+            ? OperatorSummaryChannelWhatsapp
+            : OperatorSummaryChannelSms;
+    }
+
+    private string? ResolveOperatorSummaryRecipient()
+    {
+        return AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"])
+            ?? AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"]);
+    }
 
     private bool RedactNumbers()
         => bool.TryParse(_configuration["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"], out bool redact) && redact;

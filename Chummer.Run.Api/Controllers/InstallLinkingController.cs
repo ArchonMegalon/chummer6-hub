@@ -231,15 +231,15 @@ public sealed class InstallLinkingController : ControllerBase
             bool appLocalCallback = IsAppLocalInstallLinkCallbackUri(callbackRedirectUri);
             return BuildBrowserInstallLinkStatusPage(
                 statusCode: StatusCodes.Status200OK,
-                heading: appLocalCallback ? "Finish linking this install" : "Open Chummer to finish linking this install",
+                heading: appLocalCallback ? "Claim this copy" : "Claim this copy in Chummer",
                 supportLine: appLocalCallback
-                    ? "Your account approved this install. Keep this browser tab open while the running app finishes linking through the local callback."
-                    : "Your account approved this install. If the app does not open automatically, use the button below from this same browser.",
-                primaryLabel: appLocalCallback ? "Finish linking" : "Open Chummer",
+                    ? "Your account approved this copy. Keep this tab open while the running app finishes the claim."
+                    : "Your account approved this copy. If Chummer does not open automatically, use the button below from this same browser.",
+                primaryLabel: "Claim this copy",
                 primaryHref: callbackRedirectUri,
                 secondaryLabel: "Open devices and access",
                 secondaryHref: "/account/access",
-                stateLabel: "Install link ready",
+                stateLabel: "Copy ready to claim",
                 highlights:
                 [
                     $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
@@ -277,14 +277,14 @@ public sealed class InstallLinkingController : ControllerBase
         bool appLocalCallback)
     {
         string clickAttemptMessage = appLocalCallback
-            ? "Tried the local callback again. If this tab still does not finish linking, copy the callback link below and open it in the same browser."
-            : "Tried the Chummer app handoff again. If nothing opens, copy the launch link below and paste it into the browser address bar.";
+            ? "Tried to claim this copy again. If this tab still does not finish, copy the claim link below and open it in the same browser."
+            : "Tried to open Chummer again. If nothing opens, copy the claim link below and paste it into the browser address bar.";
         string copiedMessage = appLocalCallback
-            ? "Callback link copied. Open it in this browser if the tab still does not finish linking."
-            : "Launch link copied. Paste it into the browser address bar if the app still does not open.";
+            ? "Claim link copied. Open it in this browser if the tab still does not finish."
+            : "Claim link copied. Paste it into the browser address bar if Chummer still does not open.";
         string autoAttemptMessage = appLocalCallback
-            ? "Tried the local callback automatically. If this tab did not finish linking, use the button again or copy the callback link below."
-            : "Tried the Chummer app handoff automatically. If the app did not open, use the button again or copy the launch link below.";
+            ? "Tried to claim this copy automatically. If this tab did not finish, use the button again or copy the claim link below."
+            : "Tried to open Chummer automatically. If the app did not open, use the button again or copy the claim link below.";
         string tryOpenBody = appLocalCallback
             ? """
                   try {
@@ -393,12 +393,12 @@ public sealed class InstallLinkingController : ControllerBase
                       <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(secondaryHref)}}">{{WebUtility.HtmlEncode(secondaryLabel)}}</a>
                     </div>
                     <p id="install-link-status" class="muted-copy">{{WebUtility.HtmlEncode(appLocalCallback
-                        ? "This page should finish linking with your running Chummer app. If the local callback does not respond, use the button again or the manual callback link below."
-                        : "Chummer should open from this page. If the browser blocks the handoff, use the button again or the manual launch link below.")}}</p>
+                        ? "This page should claim the running Chummer app. If it does not finish, use the button again or copy the claim link below."
+                        : "Chummer should open from this page. If the browser blocks it, use the button again or copy the claim link below.")}}</p>
                     <div id="install-link-manual" class="field" hidden>
-                      <label for="install-link-manual-field">{{WebUtility.HtmlEncode(appLocalCallback ? "Manual callback link" : "Manual launch link")}}</label>
+                      <label for="install-link-manual-field">Claim link</label>
                       <input id="install-link-manual-field" type="text" readonly value="{{WebUtility.HtmlEncode(primaryHref)}}">
-                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>{{WebUtility.HtmlEncode(appLocalCallback ? "Copy callback link" : "Copy launch link")}}</button>
+                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>Copy claim link</button>
                     </div>
                   </div>
                 </section>

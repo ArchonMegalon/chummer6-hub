@@ -1,9 +1,9 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-19T19:01:59Z",
+  "generated_at_utc": "2026-06-20T00:44:30Z",
   "source_generated_at_utc": {
-    "full_completion": "2026-06-17T17:02:00Z",
-    "operator_gold": "2026-06-12T10:56:51Z"
+    "full_completion": "2026-06-19T23:15:54Z",
+    "operator_gold": "2026-06-19T23:15:10Z"
   },
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
@@ -26,12 +26,127 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "provider_group_coverage": {
+        "enforced": true,
+        "provider_fact_counts": {
+          "Sr4DiceProvider": 5,
+          "Sr4TestProvider": 24,
+          "Sr4EdgeProvider": 14,
+          "Sr4AttributeProvider": 28,
+          "Sr4DerivedStatsProvider": 12,
+          "Sr4CharacterCreationProvider": 72,
+          "Sr4MetatypeProvider": 58,
+          "Sr4QualityProvider": 6,
+          "Sr4AdvancementProvider": 8,
+          "Sr4GearProvider": 2,
+          "Sr4MagicProvider": 42,
+          "Sr4MatrixProvider": 60,
+          "Sr4CombatProvider": 19,
+          "Sr4ActionEconomyProvider": 27,
+          "Sr4DamageProvider": 5,
+          "Sr4RiggingProvider": 39,
+          "Sr4SkillProvider": 28
+        },
+        "groups": {
+          "dice": {
+            "candidate_providers": [
+              "Sr4DiceProvider"
+            ],
+            "listed_providers": [
+              "Sr4DiceProvider"
+            ],
+            "rulefact_count": 5,
+            "status": "pass"
+          },
+          "tests": {
+            "candidate_providers": [
+              "Sr4TestProvider"
+            ],
+            "listed_providers": [
+              "Sr4TestProvider"
+            ],
+            "rulefact_count": 24,
+            "status": "pass"
+          },
+          "character_creation": {
+            "candidate_providers": [
+              "Sr4CharacterCreationProvider"
+            ],
+            "listed_providers": [
+              "Sr4CharacterCreationProvider"
+            ],
+            "rulefact_count": 72,
+            "status": "pass"
+          },
+          "combat": {
+            "candidate_providers": [
+              "Sr4CombatProvider"
+            ],
+            "listed_providers": [
+              "Sr4CombatProvider"
+            ],
+            "rulefact_count": 19,
+            "status": "pass"
+          },
+          "magic": {
+            "candidate_providers": [
+              "Sr4MagicProvider"
+            ],
+            "listed_providers": [
+              "Sr4MagicProvider"
+            ],
+            "rulefact_count": 42,
+            "status": "pass"
+          },
+          "matrix": {
+            "candidate_providers": [
+              "Sr4MatrixProvider"
+            ],
+            "listed_providers": [
+              "Sr4MatrixProvider"
+            ],
+            "rulefact_count": 60,
+            "status": "pass"
+          },
+          "rigging": {
+            "candidate_providers": [
+              "Sr4RiggingProvider"
+            ],
+            "listed_providers": [
+              "Sr4RiggingProvider"
+            ],
+            "rulefact_count": 39,
+            "status": "pass"
+          },
+          "gear": {
+            "candidate_providers": [
+              "Sr4GearProvider"
+            ],
+            "listed_providers": [
+              "Sr4GearProvider"
+            ],
+            "rulefact_count": 2,
+            "status": "pass"
+          },
+          "advancement": {
+            "candidate_providers": [
+              "Sr4AdvancementProvider"
+            ],
+            "listed_providers": [
+              "Sr4AdvancementProvider"
+            ],
+            "rulefact_count": 8,
+            "status": "pass"
+          }
+        },
+        "failures": []
+      },
       "remaining_gates": [],
       "status": "pass"
     },
     "sr5": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
-      "rulefact_count": 375,
+      "rulefact_count": 473,
       "final_verdict": "SR5_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR5_RULE_AUTHORITY_READY",
       "full_completion_rule_authority_ready": true,
@@ -45,6 +160,119 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "provider_group_coverage": {
+        "enforced": true,
+        "provider_fact_counts": {
+          "SR5ShellCatalogProvider": 143,
+          "SR5CapabilityHostProvider": 14,
+          "SR5DiceProvider": 3,
+          "SR5TestProvider": 4,
+          "SR5ExplainReceiptProvider": 1,
+          "SR5GearProvider": 29,
+          "SR5CharacterCreationProvider": 17,
+          "SR5CombatProvider": 13,
+          "SR5MagicProvider": 10,
+          "SR5MatrixProvider": 9,
+          "SR5RiggingProvider": 12,
+          "SR5WorkspaceCodecProvider": 53,
+          "SR5DerivedStatsProvider": 12,
+          "SR5AdvancementProvider": 6,
+          "SR5TableImportProvider": 147
+        },
+        "groups": {
+          "dice": {
+            "candidate_providers": [
+              "SR5DiceProvider"
+            ],
+            "listed_providers": [
+              "SR5DiceProvider"
+            ],
+            "rulefact_count": 3,
+            "status": "pass"
+          },
+          "tests": {
+            "candidate_providers": [
+              "SR5TestProvider"
+            ],
+            "listed_providers": [
+              "SR5TestProvider"
+            ],
+            "rulefact_count": 4,
+            "status": "pass"
+          },
+          "character_creation": {
+            "candidate_providers": [
+              "SR5CharacterCreationProvider"
+            ],
+            "listed_providers": [
+              "SR5CharacterCreationProvider"
+            ],
+            "rulefact_count": 17,
+            "status": "pass"
+          },
+          "combat": {
+            "candidate_providers": [
+              "SR5CombatProvider"
+            ],
+            "listed_providers": [
+              "SR5CombatProvider"
+            ],
+            "rulefact_count": 13,
+            "status": "pass"
+          },
+          "magic": {
+            "candidate_providers": [
+              "SR5MagicProvider"
+            ],
+            "listed_providers": [
+              "SR5MagicProvider"
+            ],
+            "rulefact_count": 10,
+            "status": "pass"
+          },
+          "matrix": {
+            "candidate_providers": [
+              "SR5MatrixProvider"
+            ],
+            "listed_providers": [
+              "SR5MatrixProvider"
+            ],
+            "rulefact_count": 9,
+            "status": "pass"
+          },
+          "rigging": {
+            "candidate_providers": [
+              "SR5RiggingProvider"
+            ],
+            "listed_providers": [
+              "SR5RiggingProvider"
+            ],
+            "rulefact_count": 12,
+            "status": "pass"
+          },
+          "gear": {
+            "candidate_providers": [
+              "SR5GearProvider"
+            ],
+            "listed_providers": [
+              "SR5GearProvider"
+            ],
+            "rulefact_count": 29,
+            "status": "pass"
+          },
+          "advancement": {
+            "candidate_providers": [
+              "SR5AdvancementProvider"
+            ],
+            "listed_providers": [
+              "SR5AdvancementProvider"
+            ],
+            "rulefact_count": 6,
+            "status": "pass"
+          }
+        },
+        "failures": []
+      },
       "remaining_gates": [],
       "status": "pass"
     },
@@ -64,6 +292,120 @@
       "verification_matrix_failed_gates": [],
       "verification_matrix_unexpected_failed_gates": [],
       "verification_matrix_expected_ready_blockers": [],
+      "provider_group_coverage": {
+        "enforced": true,
+        "provider_fact_counts": {
+          "Sr6DiceProvider": 4,
+          "Sr6TestProvider": 16,
+          "Sr6DerivedStatsProvider": 9,
+          "Sr6ActionEconomyProvider": 9,
+          "Sr6EdgeProvider": 31,
+          "Sr6CharacterCreationProvider": 58,
+          "Sr6MetatypeProvider": 53,
+          "Sr6QualityProvider": 11,
+          "Sr6GearProvider": 4,
+          "Sr6SkillProvider": 46,
+          "Sr6AdvancementProvider": 9,
+          "Sr6CombatProvider": 31,
+          "Sr6MagicProvider": 62,
+          "Sr6MatrixProvider": 37,
+          "Sr6RiggingProvider": 30,
+          "Sr6StatusProvider": 37
+        },
+        "groups": {
+          "dice": {
+            "candidate_providers": [
+              "Sr6DiceProvider"
+            ],
+            "listed_providers": [
+              "Sr6DiceProvider"
+            ],
+            "rulefact_count": 4,
+            "status": "pass"
+          },
+          "tests": {
+            "candidate_providers": [
+              "Sr6TestProvider"
+            ],
+            "listed_providers": [
+              "Sr6TestProvider"
+            ],
+            "rulefact_count": 16,
+            "status": "pass"
+          },
+          "character_creation": {
+            "candidate_providers": [
+              "Sr6CharacterCreationProvider"
+            ],
+            "listed_providers": [
+              "Sr6CharacterCreationProvider"
+            ],
+            "rulefact_count": 58,
+            "status": "pass"
+          },
+          "combat": {
+            "candidate_providers": [
+              "Sr6CombatProvider"
+            ],
+            "listed_providers": [
+              "Sr6CombatProvider"
+            ],
+            "rulefact_count": 31,
+            "status": "pass"
+          },
+          "magic": {
+            "candidate_providers": [
+              "Sr6MagicProvider"
+            ],
+            "listed_providers": [
+              "Sr6MagicProvider"
+            ],
+            "rulefact_count": 62,
+            "status": "pass"
+          },
+          "matrix": {
+            "candidate_providers": [
+              "Sr6MatrixProvider"
+            ],
+            "listed_providers": [
+              "Sr6MatrixProvider"
+            ],
+            "rulefact_count": 37,
+            "status": "pass"
+          },
+          "rigging": {
+            "candidate_providers": [
+              "Sr6RiggingProvider"
+            ],
+            "listed_providers": [
+              "Sr6RiggingProvider"
+            ],
+            "rulefact_count": 30,
+            "status": "pass"
+          },
+          "gear": {
+            "candidate_providers": [
+              "Sr6GearProvider"
+            ],
+            "listed_providers": [
+              "Sr6GearProvider"
+            ],
+            "rulefact_count": 4,
+            "status": "pass"
+          },
+          "advancement": {
+            "candidate_providers": [
+              "Sr6AdvancementProvider"
+            ],
+            "listed_providers": [
+              "Sr6AdvancementProvider"
+            ],
+            "rulefact_count": 9,
+            "status": "pass"
+          }
+        },
+        "failures": []
+      },
       "remaining_gates": [],
       "status": "pass"
     }

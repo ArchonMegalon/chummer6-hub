@@ -232,6 +232,64 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
             self.assertIn("sr4 verification matrix has unexpected failed gates", payload["failures"])
             self.assertIn("SR4-G002", stderr.getvalue())
 
+    def test_gate_fails_when_declared_required_provider_has_no_rulefacts(self) -> None:
+        module = load_module()
+
+        def ready_registry(ruleset: str, verdict: str, omit_provider: str = "") -> dict:
+            providers = [
+                provider
+                for candidates in module.REQUIRED_PROVIDER_GROUPS[ruleset].values()
+                for provider in candidates
+            ]
+            return {
+                "rulefact_count": 120,
+                "final_verdict": verdict,
+                "required_providers": providers,
+                "implemented_providers": providers,
+                "rulefacts": [
+                    {"id": f"{ruleset}.{provider}.fixture", "provider": provider}
+                    for provider in providers
+                    if provider != omit_provider
+                ],
+            }
+
+        with tempfile.TemporaryDirectory(prefix="rules-min-provider-") as temp_dir:
+            root = Path(temp_dir)
+            (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(
+                json.dumps(ready_registry("sr4", "SR4_RULE_AUTHORITY_READY")),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(
+                json.dumps(ready_registry("sr5", "SR5_RULE_AUTHORITY_READY", omit_provider="SR5CombatProvider")),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(
+                json.dumps(ready_registry("sr6", "SR6_RULE_AUTHORITY_READY")),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "pass", "verdict": "SR4_RULE_AUTHORITY_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "pass", "verdict": "SR6_RULE_AUTHORITY_READY"}]}),
+                encoding="utf-8",
+            )
+            output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
+                stderr = io.StringIO()
+                with self.assertRaises(SystemExit):
+                    with redirect_stderr(stderr), mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
+                        module.main()
+
+            self.assertIn("sr5 required provider group combat has no rulefacts", stderr.getvalue())
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            sr5_combat = payload["rulesets"]["sr5"]["provider_group_coverage"]["groups"]["combat"]
+            self.assertEqual("fail", payload["rulesets"]["sr5"]["status"])
+            self.assertEqual(["SR5CombatProvider"], sr5_combat["listed_providers"])
+            self.assertEqual(0, sr5_combat["rulefact_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

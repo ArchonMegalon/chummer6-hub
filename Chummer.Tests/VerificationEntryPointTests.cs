@@ -616,8 +616,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("AutoStartDownload", viewModel, StringComparison.Ordinal);
         Assert.Contains("ClaimExchangeUrl", viewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("downloads-quicknav", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Advanced options", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Platform downloads", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("minimal-lane-grid", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Stable", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Nightly", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Arch Linux", downloadsView, StringComparison.Ordinal);
         Assert.Contains("BuildMacBootstrapTerminalCommand", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveClaimTicketForDownload", controller, StringComparison.Ordinal);
         Assert.Contains("CopyCommandLabel", controller, StringComparison.Ordinal);
@@ -3519,7 +3521,7 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", storyView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", participateView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadDispatchView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", nowView, StringComparison.Ordinal);
@@ -3569,12 +3571,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("ReleaseExperience: releaseExperience", controller, StringComparison.Ordinal);
         Assert.Contains("StoryPageViewModel(", viewModels, StringComparison.Ordinal);
         Assert.Contains("ReleaseExperienceViewModel ReleaseExperience", viewModels, StringComparison.Ordinal);
-        Assert.Contains("ContextualPreviewHref", storyView, StringComparison.Ordinal);
-        Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", storyView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/downloads\"", storyView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.ReleaseExperience.GuestGatePrimaryHref", storyView, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref", nowView, StringComparison.Ordinal);
         Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", nowView, StringComparison.Ordinal);
-        Assert.Contains("ContextualPreviewHref", statusView, StringComparison.Ordinal);
-        Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", statusView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/downloads\"", statusView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.ReleaseExperience.GuestGatePrimaryHref", statusView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3655,7 +3657,9 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("\"/downloads\"", audit, StringComparison.Ordinal);
         Assert.Contains("\"Open downloads\"", audit, StringComparison.Ordinal);
-        Assert.Contains("\"Open account-assisted install\"", audit, StringComparison.Ordinal);
+        Assert.Contains("\"Stable\"", audit, StringComparison.Ordinal);
+        Assert.Contains("\"Nightly\"", audit, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Open account-assisted install\"", audit, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Get preview build\"", audit, StringComparison.Ordinal);
     }
 
@@ -3677,13 +3681,16 @@ public sealed class VerificationEntryPointTests
         string mirroredLandingManifest = File.ReadAllText(mirroredLandingManifestPath);
         string mirroredFeatureRegistry = File.ReadAllText(mirroredFeatureRegistryPath);
 
-        Assert.Contains("`Open account-assisted install`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.Contains("`Claim your copy`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.Contains("visible `Nightly` and `Stable` lane buttons", downloadsPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.DoesNotContain("`Open account-assisted install`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.DoesNotContain("`Install the current preview`", downloadsPolicy, StringComparison.Ordinal);
         Assert.Contains("`Open downloads`", landingPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", landingPolicy, StringComparison.Ordinal);
         Assert.Contains("headline: Build Shadowrun characters. Know why the numbers changed.", landingManifest, StringComparison.Ordinal);
         Assert.Contains("product_proof_primary_label: Download Chummer", landingManifest, StringComparison.Ordinal);
-        Assert.Contains("Open downloads for the current preview", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("Open downloads for the current build", landingManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("product_proof_primary_label: Open account-assisted install", landingManifest, StringComparison.Ordinal);
         Assert.Contains("action_label: Open downloads", canonicalFeatureRegistry, StringComparison.Ordinal);
         Assert.DoesNotContain("action_label: Install the current preview", canonicalFeatureRegistry, StringComparison.Ordinal);
@@ -3733,9 +3740,11 @@ public sealed class VerificationEntryPointTests
     public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
     {
         string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");
+        string legacyNightlyWorkflowPath = RepoPaths.FromRoot(".github", "workflows", "nightly-build.yml");
         string docsPath = RepoPaths.FromRoot("docs", "ACTIVE_HEAD_RELEASE_ARTIFACTS.md");
 
         string workflow = File.ReadAllText(workflowPath);
+        string legacyNightlyWorkflow = File.ReadAllText(legacyNightlyWorkflowPath);
         string docs = File.ReadAllText(docsPath);
 
         Assert.Contains("- main", workflow, StringComparison.Ordinal);
@@ -3743,8 +3752,15 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("name: release-api-portable", workflow, StringComparison.Ordinal);
         Assert.Contains("Stage public downloads mirror", workflow, StringComparison.Ordinal);
         Assert.Contains("desktop-download-bundle", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)", workflow, StringComparison.Ordinal);
+        Assert.Contains("github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != ''", workflow, StringComparison.Ordinal);
+        Assert.Contains("github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != ''", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Avalonia/Chummer.Avalonia.csproj", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj", workflow, StringComparison.Ordinal);
+        Assert.Contains("Legacy Nightly GitHub Release", legacyNightlyWorkflow, StringComparison.Ordinal);
+        Assert.Contains("workflow_dispatch", legacyNightlyWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("schedule:", legacyNightlyWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("cron:", legacyNightlyWorkflow, StringComparison.Ordinal);
         Assert.Contains("release-api-portable", docs, StringComparison.Ordinal);
         Assert.Contains("checked-in public download mirror", docs, StringComparison.Ordinal);
         Assert.Contains("desktop-download-bundle", docs, StringComparison.Ordinal);

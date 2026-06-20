@@ -26,7 +26,6 @@ Allowed primary CTA labels include:
 * `Stable`
 * `Claim your copy`
 * `Open Mac install path`
-* `Install the current preview`
 * `Download for Windows`
 * `Download for Linux`
 * `Install on Arch`

@@ -172,12 +172,13 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        if (subject is not null)
+        var requiresAccount = _releaseSelection.RequiresAccount(artifact);
+        if (subject is not null && requiresAccount)
         {
             return Redirect($"/downloads/install/{encodedArtifactId}");
         }
 
-        if (_releaseSelection.RequiresAccount(artifact))
+        if (requiresAccount)
         {
             return Redirect(BuildInstallLoginHref(artifact));
         }
@@ -335,12 +336,13 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        if (subject is not null)
+        var requiresAccount = _releaseSelection.RequiresAccount(artifact);
+        if (subject is not null && requiresAccount)
         {
             return Redirect($"/downloads/install/{encodedArtifactId}");
         }
 
-        if (_releaseSelection.RequiresAccount(artifact))
+        if (requiresAccount)
         {
             return Redirect(BuildInstallLoginHref(artifact));
         }

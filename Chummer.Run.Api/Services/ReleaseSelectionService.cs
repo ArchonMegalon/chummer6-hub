@@ -135,7 +135,7 @@ public sealed class ReleaseSelectionService
             .Where(IsInstaller)
             .Select(download => download with
             {
-                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience)
+                InstallAccessClass = NormalizeInstallAccessClass(download.InstallAccessClass) ?? InstallAccessClasses.AccountRequired
             })
             .OrderBy(HeadPriority)
             .ThenBy(static download => string.Equals((download.Arch ?? string.Empty).Trim(), "x64", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
@@ -270,8 +270,11 @@ public sealed class ReleaseSelectionService
         var guestDownloadAllowed = !requiresAccount;
         var artifactId = Uri.EscapeDataString(download.Id);
         var usesMacBootstrap = UsesMacBootstrapFlow(download);
+        var usesDirectInstallerDownload = UsesDirectPublicInstallerDownload(download, accessClass);
         var directFileHref = $"/downloads/file/{artifactId}";
-        var dispatchHref = authenticated
+        var dispatchHref = usesDirectInstallerDownload
+            ? $"/downloads/get/{artifactId}"
+            : authenticated
             ? $"/downloads/install/{artifactId}"
             : usesMacBootstrap
                 ? requiresAccount
@@ -389,7 +392,15 @@ public sealed class ReleaseSelectionService
         string? rolloutState,
         PublicReleaseArtifactDto download,
         PublicReleaseExperienceDocument experience)
-        => ResolveInstallAccessClass(channel, rolloutState, download.InstallAccessClass, experience);
+    {
+        if (IsInstaller(download)
+            && PlatformFamily(download) is "windows" or "linux")
+        {
+            return InstallAccessClasses.OpenPublic;
+        }
+
+        return ResolveInstallAccessClass(channel, rolloutState, download.InstallAccessClass, experience);
+    }
 
     private static HashSet<string> ResolveGuestReadableChannels(PublicReleaseExperienceDocument experience)
         => (experience.GuestReadableChannels ?? new List<string> { DefaultGuestReadableChannel })
@@ -483,6 +494,11 @@ public sealed class ReleaseSelectionService
         => UsesMacBootstrapFlow(download)
            || UsesLinuxBootstrapFlow(download);
 
+    private static bool UsesDirectPublicInstallerDownload(PublicReleaseArtifactDto download, string accessClass)
+        => IsInstaller(download)
+           && !string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
+           && PlatformFamily(download) is "windows" or "linux";
+
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"This is the default recommended installer for {PlatformLabel(download)}."
@@ -495,6 +511,11 @@ public sealed class ReleaseSelectionService
 
     private static string SupportLine(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
+        if (UsesDirectPublicInstallerDownload(download, accessClass))
+        {
+            return recommended ? RecommendedSupport(download) : AlternativeSupport(download);
+        }
+
         if (authenticated && UsesWindowsBootstrapFlow(download))
         {
             return "Open the Windows install handoff, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.";
@@ -534,6 +555,11 @@ public sealed class ReleaseSelectionService
 
     private static string ActionLabel(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
+        if (UsesDirectPublicInstallerDownload(download, accessClass))
+        {
+            return recommended ? RecommendedActionLabel(download) : AlternativeActionLabel(download);
+        }
+
         if (authenticated && UsesWindowsBootstrapFlow(download))
         {
             return "Install on Windows";

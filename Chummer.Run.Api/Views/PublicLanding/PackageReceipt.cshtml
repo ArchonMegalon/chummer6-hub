@@ -3,16 +3,31 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-package-receipt";
+
+    static string PublicPackageText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
+            .Replace("rail", "page", StringComparison.OrdinalIgnoreCase)
+            .Replace("lane", "path", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicPackageText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicPackageText(Model.Heading)</h1>
+        <p class="page-copy">@PublicPackageText(Model.Intro)</p>
         <div class="trust-claim__microproof">
-            <span>@Model.Receipt.ReceiptId</span>
-            <span>@Model.Receipt.PackageTitle</span>
+            <span>@PublicPackageText(Model.Receipt.ReceiptId)</span>
+            <span>@PublicPackageText(Model.Receipt.PackageTitle)</span>
             <span>@Model.Receipt.RecordedAtLabel</span>
         </div>
     </div>
@@ -28,9 +43,9 @@
 
 <section class="continuity-band">
     <div class="continuity-band__copy">
-        <p class="eyebrow">Receipt summary</p>
-        <h2 class="editorial-title">The action now has a Chummer-owned receipt.</h2>
-        <p class="editorial-copy">@Model.Receipt.RouteSummary</p>
+        <p class="eyebrow">Record summary</p>
+        <h2 class="editorial-title">The action is saved in Chummer.</h2>
+        <p class="editorial-copy">@PublicPackageText(Model.Receipt.RouteSummary)</p>
     </div>
     <div class="continuity-band__panel">
         <article class="continuity-band__fact">
@@ -51,29 +66,29 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Next route</p>
-        <h2 class="editorial-title">Return to the package detail or the account rail without losing the receipt.</h2>
-        <p class="editorial-copy">The receipt proves that the public action stayed inside Chummer-owned routes. The next step is either the package detail page or the signed-in package rail, not a vague external board name.</p>
+        <h2 class="editorial-title">Return to the package detail or the account page without losing the record.</h2>
+        <p class="editorial-copy">The record keeps the public action inside Chummer. The next step is either the package detail page or the signed-in package page, not an external board.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Package detail</span>
             <h3>Return to the package route</h3>
-            <p>Keep class, compatibility, and package posture attached to the same detail rail.</p>
+            <p>Keep class, compatibility, and package status attached to the same detail page.</p>
             <a class="editorial-strip__action" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
         </article>
         @if (Model.SecondaryAction is not null)
         {
             <article class="route-choice-card">
-                <span class="tag">Account rail</span>
+                <span class="tag">Account page</span>
                 <h3>Keep tracked package work together</h3>
-                <p>Use the account package rail when you want your follows, votes, and later return path to stay grouped.</p>
+                <p>Use the account package page when you want your follows, votes, and later return path to stay grouped.</p>
                 <a class="editorial-strip__action" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
             </article>
         }
         <article class="route-choice-card">
             <span class="tag">Help</span>
-            <h3>Switch to first-party help if the issue becomes private</h3>
-            <p>Package receipts should not become a support workaround once the question turns into install repair, account recovery, or a private campaign issue.</p>
+            <h3>Switch to Chummer help if the issue becomes private</h3>
+            <p>Package records should not become a support workaround once the question turns into install repair, account recovery, or a private campaign issue.</p>
             <a class="editorial-strip__action" href="/help">Open help</a>
         </article>
     </div>

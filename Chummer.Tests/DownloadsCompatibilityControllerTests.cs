@@ -182,7 +182,7 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
-    public async Task AccountRequiredWindowsArtifactStillRedirectsToLoginWithoutClaimCode()
+    public async Task WindowsInstallerFilePathRouteDownloadsDirectlyEvenWhenRegistryMetadataIsStale()
     {
         using Fixture fixture = new();
         fixture.Controller.ControllerContext = new ControllerContext
@@ -192,9 +192,8 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-installer.exe", CancellationToken.None);
 
-        var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url, StringComparison.Ordinal);
+        var file = Assert.IsType<PhysicalFileResult>(result);
+        Assert.True(file.EnableRangeProcessing);
     }
 
     [Fact]

@@ -403,8 +403,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
         Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
         Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
-        Assert.Contains("Public concierge greeting", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
-        Assert.Contains("bounded explanation", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Short intake", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
+        Assert.Contains("plain-language explanation", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
         Assert.Contains("Neither the public concierge nor the bounded explainer may compute legality", payload.RootElement.GetProperty("RuntimeBoundary").GetString(), StringComparison.Ordinal);
         Assert.True(payload.RootElement.GetProperty("Actions").GetArrayLength() >= 3);
     }
@@ -421,7 +421,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
         Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
         Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
-        Assert.Contains("/alice", payload.RootElement.GetProperty("Actions").EnumerateArray().Select(item => item.GetProperty("Href").GetString()), StringComparer.Ordinal);
+        Assert.Contains("/account/alice/open", payload.RootElement.GetProperty("Actions").EnumerateArray().Select(item => item.GetProperty("Href").GetString()), StringComparer.Ordinal);
         Assert.Equal("/account/alice", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
         Assert.Equal("/account/alice/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/build-handoffs", payload.RootElement.GetProperty("SignedInBench").GetProperty("HandoffIndexApiHref").GetString());

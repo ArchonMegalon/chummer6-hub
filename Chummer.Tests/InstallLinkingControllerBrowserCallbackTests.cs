@@ -99,11 +99,13 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         ContentResult page = Assert.IsType<ContentResult>(result);
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
-        Assert.Contains("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Open Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Claim this copy in Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Claim this copy", page.Content, StringComparison.Ordinal);
         Assert.Contains("id=\"install-link-open\"", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Manual launch link", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Copy launch link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Claim link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Copy claim link", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Manual launch link", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
         Assert.Contains("window.location.assign(href)", page.Content, StringComparison.Ordinal);
         Assert.Contains("iframe", page.Content, StringComparison.Ordinal);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
@@ -153,11 +155,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         ContentResult page = Assert.IsType<ContentResult>(result);
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
-        Assert.Contains("Finish linking this install", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Finish linking", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Claim this copy", page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Manual callback link", page.Content, StringComparison.Ordinal);
-        Assert.Contains("Copy callback link", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Manual callback link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Claim link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Copy claim link", page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("iframe", page.Content, StringComparison.Ordinal);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
         string decodedCallbackHref = WebUtility.HtmlDecode(callbackHref);

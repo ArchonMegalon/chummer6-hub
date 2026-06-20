@@ -353,6 +353,80 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task FiveIncomingTurnsCreateOperatorWhatsappSummaryReceiptThroughMetaAndSend()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = "+15555550101",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550101;+15555550102",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+
+        for (int i = 1; i <= 5; i++)
+        {
+            await fixture.Service.IngestIncomingAsync(
+                new HeyyScamChatIngestRequest(
+                    Channel: "heyy",
+                    ConversationId: "conv-whatsapp-summary",
+                    CounterpartyHandle: "+15555550102",
+                    MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
+                CancellationToken.None);
+        }
+
+        HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-whatsapp-summary");
+        Assert.NotNull(conversation);
+        HeyyScamChatOperatorSummaryResponse summary = Assert.Single(conversation.OperatorSummaries);
+        Assert.Equal(5, summary.IncomingTurnCount);
+        Assert.Equal("sent_whatsapp", summary.Status);
+        Assert.Equal("whatsapp", summary.Channel);
+        Assert.Equal("wamid.meta1", summary.DeliveryRef);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        Assert.Contains("\"to\":\"15555550101\"", request.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FiveIncomingTurnsCreateOperatorSummaryReceiptButBlockNotAllowedWhatsappRecipient()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = "+15555550101",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550103",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+
+        for (int i = 1; i <= 5; i++)
+        {
+            await fixture.Service.IngestIncomingAsync(
+                new HeyyScamChatIngestRequest(
+                    Channel: "heyy",
+                    ConversationId: "conv-whatsapp-summary-blocked",
+                    CounterpartyHandle: "+15555550102",
+                    MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
+                CancellationToken.None);
+        }
+
+        HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-whatsapp-summary-blocked");
+        Assert.NotNull(conversation);
+        HeyyScamChatOperatorSummaryResponse summary = Assert.Single(conversation.OperatorSummaries);
+        Assert.Equal("suppressed_whatsapp_recipient_not_allowed", summary.Status);
+        Assert.Equal("recipient_not_allowed", summary.FailureReason);
+        Assert.Equal("whatsapp", summary.Channel);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+    }
+
+    [Fact]
     public async Task DigestDispatchSendsDailyEmailThroughEaAndDoesNotDuplicate()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
