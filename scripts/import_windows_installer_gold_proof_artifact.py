@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ DEFAULT_DOWNLOADS_ROOT = ROOT / "Chummer.Portal" / "downloads"
 STARTUP_RECEIPT_NAME = "startup-smoke-avalonia-win-x64.receipt.json"
 VISUAL_SOURCE_NAME = "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
 VERIFY_SCRIPT = ROOT / "scripts" / "verify_windows_installer_visual_audit.py"
+REQUIRED_SURFACES = {"install-progress", "completion"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -68,6 +70,52 @@ def copy_file(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def normalized(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def normalized_surface(value: Any) -> str:
+    surface = normalized(value).replace("_", "-").replace(" ", "-")
+    aliases = {
+        "progress": "install-progress",
+        "install": "install-progress",
+        "splash": "install-progress",
+        "install-splash": "install-progress",
+        "complete": "completion",
+        "install-complete": "completion",
+    }
+    return aliases.get(surface, surface)
+
+
+def sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest().lower()
+
+
+def capture_bounds_look_like_desktop_fallback(row: dict[str, Any]) -> bool:
+    mode = normalized(row.get("captureMode"))
+    if mode not in {"window-bounds", "reused-same-surface"}:
+        return False
+    if normalized_surface(row.get("surface")) not in REQUIRED_SURFACES:
+        return False
+
+    bounds = row.get("captureBounds")
+    if not isinstance(bounds, dict):
+        return False
+    try:
+        left = int(bounds.get("left", 0))
+        top = int(bounds.get("top", 0))
+        width = int(bounds.get("width", 0))
+        height = int(bounds.get("height", 0))
+    except (TypeError, ValueError):
+        return False
+
+    return left == 0 and top == 0 and width >= 1000 and height >= 700
+
+
 def resolve_screenshot(source_root: Path, raw_path: Any) -> Path:
     raw = str(raw_path or "").strip()
     if not raw:
@@ -88,10 +136,38 @@ def resolve_screenshot(source_root: Path, raw_path: Any) -> Path:
     raise SystemExit(f"visual audit screenshot path is ambiguous: {raw}")
 
 
+def validate_visual_payload_before_import(visual_source: Path, visual_payload: dict[str, Any]) -> None:
+    screenshots = visual_payload.get("screenshots")
+    if not isinstance(screenshots, list):
+        raise SystemExit(f"visual audit source has no screenshots list: {visual_source}")
+
+    surfaces_by_hash: dict[str, set[str]] = {}
+    for row in screenshots:
+        if not isinstance(row, dict):
+            raise SystemExit("visual audit screenshot row is not an object")
+        if capture_bounds_look_like_desktop_fallback(row):
+            raise SystemExit(
+                "visual audit screenshot used full-desktop fallback bounds instead of installer window: "
+                f"{row.get('path')}"
+            )
+        screenshot_source = resolve_screenshot(visual_source.parent, row.get("path"))
+        surface = normalized_surface(row.get("surface"))
+        if surface in REQUIRED_SURFACES:
+            surfaces_by_hash.setdefault(sha256_file(screenshot_source), set()).add(surface)
+
+    for screenshot_sha, surfaces in sorted(surfaces_by_hash.items()):
+        if len(surfaces) > 1:
+            raise SystemExit(
+                "visual audit screenshots for distinct required surfaces are byte-identical: "
+                f"{screenshot_sha} covers {', '.join(sorted(surfaces))}"
+            )
+
+
 def import_artifact(artifact_root: Path, downloads_root: Path) -> dict[str, Any]:
     startup_source = find_unique(artifact_root, STARTUP_RECEIPT_NAME)
     visual_source = find_unique(artifact_root, VISUAL_SOURCE_NAME)
     visual_payload = load_json(visual_source)
+    validate_visual_payload_before_import(visual_source, visual_payload)
 
     startup_destination = downloads_root / "startup-smoke" / STARTUP_RECEIPT_NAME
     visual_destination_root = downloads_root / "visual-audit" / "windows-installer"

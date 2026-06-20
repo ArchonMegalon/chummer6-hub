@@ -560,6 +560,95 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             self.assertEqual(4, len(summary["screenshots"]))
             self.assertTrue((downloads_root / "visual-audit" / "windows-installer" / "completion-scaled.png").is_file())
 
+    def test_import_windows_installer_gold_proof_artifact_rejects_desktop_fallback_bounds_before_copying(self) -> None:
+        module = load_import_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-import-fallback-") as temp_dir:
+            root = Path(temp_dir)
+            artifact = root / "artifact"
+            visual_root = artifact / "Chummer.Portal" / "downloads" / "visual-audit" / "windows-installer"
+            startup_root = artifact / "Chummer.Portal" / "downloads" / "startup-smoke"
+            visual_root.mkdir(parents=True)
+            startup_root.mkdir(parents=True)
+            (startup_root / "startup-smoke-avalonia-win-x64.receipt.json").write_text(
+                json.dumps({"status": "pass", "artifactDigest": "sha256:test"}),
+                encoding="utf-8",
+            )
+            (visual_root / "progress.png").write_bytes(b"progress")
+            (visual_root / "completion.png").write_bytes(b"completion")
+            (visual_root / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "screenshots": [
+                            {
+                                "path": "progress.png",
+                                "surface": "install-progress",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 184, "top": 200, "width": 656, "height": 319},
+                            },
+                            {
+                                "path": "completion.png",
+                                "surface": "completion",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 0, "top": 0, "width": 1024, "height": 768},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            downloads_root = root / "downloads"
+
+            with self.assertRaises(SystemExit) as raised:
+                module.import_artifact(artifact, downloads_root)
+
+            self.assertIn("full-desktop fallback bounds", str(raised.exception))
+            self.assertFalse((downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json").exists())
+            self.assertFalse((downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json").exists())
+
+    def test_import_windows_installer_gold_proof_artifact_rejects_byte_identical_required_surfaces(self) -> None:
+        module = load_import_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-import-identical-") as temp_dir:
+            root = Path(temp_dir)
+            artifact = root / "artifact"
+            visual_root = artifact / "Chummer.Portal" / "downloads" / "visual-audit" / "windows-installer"
+            startup_root = artifact / "Chummer.Portal" / "downloads" / "startup-smoke"
+            visual_root.mkdir(parents=True)
+            startup_root.mkdir(parents=True)
+            (startup_root / "startup-smoke-avalonia-win-x64.receipt.json").write_text(
+                json.dumps({"status": "pass", "artifactDigest": "sha256:test"}),
+                encoding="utf-8",
+            )
+            for name in ["progress.png", "completion.png"]:
+                (visual_root / name).write_bytes(b"same installer surface")
+            (visual_root / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "screenshots": [
+                            {
+                                "path": "progress.png",
+                                "surface": "install-progress",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 184, "top": 200, "width": 656, "height": 319},
+                            },
+                            {
+                                "path": "completion.png",
+                                "surface": "completion",
+                                "captureMode": "window-bounds",
+                                "captureBounds": {"left": 184, "top": 200, "width": 656, "height": 319},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SystemExit) as raised:
+                module.import_artifact(artifact, root / "downloads")
+
+            self.assertIn("byte-identical", str(raised.exception))
+
     def test_import_windows_installer_gold_proof_artifact_rejects_unsafe_zip_members(self) -> None:
         module = load_import_module()
         with tempfile.TemporaryDirectory(prefix="windows-proof-import-zip-") as temp_dir:
