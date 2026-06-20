@@ -44,6 +44,29 @@ def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     assert "Downloads first" in horizons
 
 
+def test_downloads_surface_hides_account_handoff_noise() -> None:
+    downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
+
+    assert "Stable" in downloads
+    assert "Nightly" in downloads
+    assert "Windows" in downloads
+    assert "Linux" in downloads
+
+    for forbidden in (
+        "Signed-in download",
+        "recommended download",
+        "manual activation",
+        "install ticket",
+        "short-lived install ticket",
+        "Claim code",
+        "claim code",
+        "portable",
+        "proof",
+        "receipt",
+    ):
+        assert forbidden not in downloads
+
+
 def test_minimal_palette_stays_neutral_and_readable() -> None:
     site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
