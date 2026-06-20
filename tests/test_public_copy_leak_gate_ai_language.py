@@ -73,6 +73,7 @@ def test_minimal_route_detection_keeps_special_routes_out_of_first_visit_tier():
 
     assert module.is_minimal_public_route("/")
     assert module.is_minimal_public_route("/downloads")
+    assert module.is_minimal_public_route("/feedback")
     assert module.is_minimal_public_route("/login?next=%2Faccount%2Faccess")
     assert not module.is_minimal_public_route("/ledger")
     assert not module.is_minimal_public_route("/horizons")
