@@ -232,6 +232,8 @@ if ($AutoCapture -and $effectiveAutoCaptureTimeoutSeconds -ne $AutoCaptureTimeou
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -441,6 +443,10 @@ function Get-CaptureBounds([object]$Window, [bool]$AllowScreenFallback = $true) 
 
     $rect = New-Object ChummerInstallerCapture.Rect
     if (-not [ChummerInstallerCapture.NativeMethods]::GetWindowRect($Window.MainWindowHandle, [ref]$rect)) {
+        $automationBounds = Get-AutomationCaptureBounds $Window.MainWindowHandle
+        if ($null -ne $automationBounds) {
+            return $automationBounds
+        }
         if (-not $AllowScreenFallback) {
             throw "Automated installer capture refused full-screen fallback because the installer window bounds could not be read."
         }
@@ -464,6 +470,41 @@ function Get-CaptureBounds([object]$Window, [bool]$AllowScreenFallback = $true) 
     }
 
     return New-Object System.Drawing.Rectangle $rect.Left, $rect.Top, $width, $height
+}
+
+function Get-AutomationCaptureBounds([IntPtr]$Handle) {
+    if ($Handle -eq [IntPtr]::Zero) {
+        return $null
+    }
+
+    try {
+        $element = [System.Windows.Automation.AutomationElement]::FromHandle($Handle)
+        if ($null -eq $element) {
+            return $null
+        }
+
+        $automationRect = $element.Current.BoundingRectangle
+        if ($automationRect.IsEmpty) {
+            return $null
+        }
+
+        $left = [int][Math]::Floor($automationRect.Left)
+        $top = [int][Math]::Floor($automationRect.Top)
+        $right = [int][Math]::Ceiling($automationRect.Right)
+        $bottom = [int][Math]::Ceiling($automationRect.Bottom)
+        $width = [Math]::Max(0, $right - $left)
+        $height = [Math]::Max(0, $bottom - $top)
+        if ($width -lt 240 -or $height -lt 160) {
+            return $null
+        }
+
+        Write-Host "Using UI Automation bounds for installer window after GetWindowRect was unavailable."
+        return New-Object System.Drawing.Rectangle $left, $top, $width, $height
+    }
+    catch {
+        Write-Host "UI Automation bounds lookup was unavailable: $($_.Exception.Message)"
+        return $null
+    }
 }
 
 $captureRequests = @()
