@@ -80,7 +80,7 @@ function Normalize-Surface([object]$Value) {
     }
 }
 
-function Find-InstallerSurfaceWindow([string]$SurfaceValue) {
+function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompletionInstallerFallback = $false) {
     $canonicalSurface = Normalize-Surface $SurfaceValue
     $processes = @(Get-Process | Where-Object {
         -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
@@ -93,7 +93,7 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue) {
             if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 return $process
             }
-            if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            if ($AllowCompletionInstallerFallback -and $title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 return $process
             }
             continue
@@ -108,10 +108,10 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue) {
     return $null
 }
 
-function Wait-ForInstallerSurface([string]$SurfaceValue, [int]$TimeoutSeconds) {
+function Wait-ForInstallerSurface([string]$SurfaceValue, [int]$TimeoutSeconds, [bool]$AllowCompletionInstallerFallback = $false) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
-        $window = Find-InstallerSurfaceWindow $SurfaceValue
+        $window = Find-InstallerSurfaceWindow $SurfaceValue $AllowCompletionInstallerFallback
         if ($null -ne $window) {
             return $window
         }
