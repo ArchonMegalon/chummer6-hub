@@ -2962,7 +2962,7 @@
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                         {
-                                            <span> Source: @output.ProvenanceSummary</span>
+                                            <span> Details: @PublicText(output.ProvenanceSummary)</span>
                                         }
                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind)</span>
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -3587,7 +3587,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                                                 {
-                                                    <span> Source: @PublicText(item.ProvenanceSummary)</span>
+                                                    <span> Details: @PublicText(item.ProvenanceSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                                                 {
@@ -3700,7 +3700,7 @@
                                                 }
                                                 @if (consequence.Receipts.Count > 0)
                                                 {
-                                                    <span> Source: @HumanizeStatus(consequence.Receipts[0].SourceKind, "Update")</span>
+                                                    <span> Details: @HumanizeStatus(consequence.Receipts[0].SourceKind, "Update")</span>
                                                 }
                                             </li>
                                         }
@@ -3809,7 +3809,7 @@
                                 <li>
                                     <strong><a class="inline-link" href="@RulesDetailHref(answer.EntryId)">@answer.Question</a></strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
-                                    <span> Source: @answer.ProvenanceLabel.</span>
+                                    <span> Details: @PublicText(answer.ProvenanceLabel).</span>
                                     @if (answer.Studio is not null)
                                     {
                                         <span> Lifecycle: @answer.Studio.CurrentStageLabel -> @answer.Studio.PromotionTargetLabel.</span>
@@ -3852,7 +3852,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Source: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary Available: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Details: @PublicText(publication.ProvenanceSummary). Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @PublicText(publication.DiscoverySummary) Available: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                     {
                                         <span> Status: @publication.TrustSummary</span>

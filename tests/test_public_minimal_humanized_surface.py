@@ -232,6 +232,11 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "record(s)",
         "File record",
         "carry-forward record",
+        " Source: @output.ProvenanceSummary",
+        " Source: @PublicText(item.ProvenanceSummary)",
+        " Source: @HumanizeStatus(consequence.Receipts[0].SourceKind",
+        " Source: @answer.ProvenanceLabel",
+        " Source: @publication.ProvenanceSummary",
     ):
         assert forbidden not in account
 
@@ -258,6 +263,10 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Stale history" in account
     assert "Legacy migration history" in account
     assert "File detail" in account
+    assert "Details: @PublicText(output.ProvenanceSummary)" in account
+    assert "Details: @PublicText(item.ProvenanceSummary)" in account
+    assert "Details: @PublicText(answer.ProvenanceLabel)" in account
+    assert "Details: @PublicText(publication.ProvenanceSummary)" in account
 
 
 def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
