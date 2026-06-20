@@ -82,6 +82,29 @@ textarea {
   font: inherit;
 }
 
+input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background: #ffffff;
+  color: var(--ink-strong);
+  border: 1px solid rgba(15, 39, 74, 0.18);
+  color-scheme: light;
+  caret-color: var(--ink-strong);
+  accent-color: var(--accent-cyan);
+}
+
+input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])::placeholder,
+textarea::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+select option,
+select optgroup {
+  background: #ffffff;
+  color: var(--ink-strong);
+}
+
 .skip-link {
   position: absolute;
   left: 1rem;

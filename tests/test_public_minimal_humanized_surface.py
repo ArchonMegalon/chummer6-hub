@@ -78,3 +78,16 @@ def test_minimal_palette_stays_neutral_and_readable() -> None:
     assert "--minimal-soft: #ece8df;" not in site_css
     assert ".surface-minimal .field input" in site_css
     assert ".surface-minimal .field select option" in site_css
+
+
+def test_public_form_controls_have_os_dark_safe_defaults() -> None:
+    site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
+
+    assert 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])' in site_css
+    assert "select option,\nselect optgroup" in site_css
+    assert "color-scheme: light;" in site_css
+    assert "caret-color: var(--ink-strong);" in site_css
+    assert "background: #ffffff;" in site_css
+    assert "color: var(--ink-strong);" in site_css
+    assert "::placeholder" in site_css
+    assert "opacity: 1;" in site_css
