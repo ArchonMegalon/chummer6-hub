@@ -44,6 +44,23 @@ def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     assert "Downloads first" in horizons
 
 
+def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
+    entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
+
+    assert "Claim your copy" in entry
+    assert "Claim with email" in entry
+    assert "Claim with your account" in entry
+
+    for forbidden in (
+        "Campaign OS",
+        "roadmap follows",
+        "preview interest",
+        "optional participation state",
+        "claim tickets",
+    ):
+        assert forbidden not in entry
+
+
 def test_downloads_surface_hides_account_handoff_noise() -> None:
     downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
 
@@ -63,8 +80,11 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
         "portable",
         "proof",
         "receipt",
+        "Checked",
     ):
         assert forbidden not in downloads
+
+    assert "Updated" in downloads
 
 
 def test_minimal_palette_stays_neutral_and_readable() -> None:

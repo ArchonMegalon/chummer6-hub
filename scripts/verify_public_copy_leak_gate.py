@@ -90,6 +90,8 @@ FORBIDDEN_PATTERNS = [
     r"\bproof shelf\b",
     r"\bproof trail\b",
     r"\bProof:\b",
+    r"\bChecked\b",
+    r"\bStatus ready\b",
     r"\bpublic shelf\b",
     r"\brelease truth\b",
     r"\bposted-shelf\b",
