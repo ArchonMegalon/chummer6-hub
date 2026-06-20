@@ -224,9 +224,9 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 {
                     <article class="route-choice-card">
                         <span class="tag">@receipt.ActionLabel</span>
-                        <h3>@receipt.ReceiptId</h3>
-                        <p>@receipt.ResultSummary</p>
-                        <a class="editorial-strip__action" href="@receipt.Href">View record</a>
+                        <h3>Recent decision</h3>
+                        <p>@PublicFacingCopyHumanizer.Clean(receipt.ResultSummary)</p>
+                        <a class="editorial-strip__action" href="@receipt.Href">Open details</a>
                     </article>
                 }
             </div>

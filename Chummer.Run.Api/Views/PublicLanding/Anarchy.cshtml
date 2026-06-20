@@ -116,7 +116,6 @@
                     <span class="tag">@dispatch.Type</span>
                     <h3>@dispatch.Title</h3>
                     <p>@dispatch.Summary</p>
-                    <p class="muted-copy">Source: @dispatch.SourceReceiptId</p>
                     <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                 </article>
             }
@@ -133,8 +132,8 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@Model.ExplainReceipt.Status</span>
-            <h3>@Model.ExplainReceipt.ReceiptId</h3>
-            <p>Source: @Model.ExplainReceipt.SourceReceiptId</p>
+            <h3>Portable runner explanation</h3>
+            <p>The export keeps enough context for Chummer to explain the sheet without showing sourcebook text.</p>
             <div class="route-choice-card__proof">
                 @foreach (var note in Model.ExplainReceipt.ProvenanceNotes)
                 {

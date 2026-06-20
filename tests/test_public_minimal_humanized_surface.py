@@ -245,3 +245,42 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Help and privacy" in account
     assert "Recovery status" in account
     assert "PublicText(" in account
+
+
+def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
+    sources = {
+        "package_receipt": read("Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml"),
+        "knowledge_fabric": read("Chummer.Run.Api/Views/PublicLanding/KnowledgeFabric.cshtml"),
+        "nexus_pan": read("Chummer.Run.Api/Views/PublicLanding/NexusPanContinuity.cshtml"),
+        "anarchy": read("Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml"),
+        "ledger_account": read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml"),
+        "ledger_faction_workspace": read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
+        "ledger_notifications": read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml"),
+    }
+    combined = "\n".join(sources.values())
+
+    for forbidden in (
+        "@PublicPackageText(Model.Receipt.ReceiptId)",
+        "<span>@receipt.ReceiptId</span>",
+        "<span>@receipt.Provenance</span>",
+        "<span>@receipt.Route</span>",
+        "<h3>@receipt.ReceiptId</h3>",
+        "<h3>@Model.ExplainReceipt.ReceiptId</h3>",
+        "Source: @dispatch.SourceReceiptId",
+        "Source: @Model.ExplainReceipt.SourceReceiptId",
+        "Delivery: @receipt.DeliveryRef",
+        "View record",
+        "Record summary",
+        "without losing the record",
+        "The record keeps",
+    ):
+        assert forbidden not in combined
+
+    assert "Saved action" in sources["package_receipt"]
+    assert "without losing the saved action" in sources["package_receipt"]
+    assert "Portable runner explanation" in sources["anarchy"]
+    assert "Recent decision" in sources["ledger_account"]
+    assert "Recent decision" in sources["ledger_faction_workspace"]
+    assert "Delivery attempt" in sources["ledger_notifications"]
+    assert "PublicFacingCopyHumanizer.Clean(receipt.Provenance)" in sources["knowledge_fabric"]
+    assert "PublicFacingCopyHumanizer.Clean(receipt.Route)" in sources["nexus_pan"]

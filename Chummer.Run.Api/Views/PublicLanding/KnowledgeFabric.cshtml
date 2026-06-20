@@ -45,8 +45,7 @@
                 <h3>@receipt.Topic</h3>
                 <p>@receipt.Summary</p>
                 <div class="route-choice-card__proof">
-                    <span>@receipt.ReceiptId</span>
-                    <span>@receipt.Provenance</span>
+                    <span>@PublicFacingCopyHumanizer.Clean(receipt.Provenance)</span>
                 </div>
                 <a class="editorial-strip__action" href="@receipt.Route">Open details</a>
             </article>

@@ -337,15 +337,11 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
-                    <h3>@receipt.ReceiptId</h3>
+                    <h3>Delivery attempt</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
                     <div class="route-choice-card__proof">
                         <span>Recipient: @receipt.RecipientLabel</span>
                         <span>Attempted: @receipt.AttemptedAtUtc</span>
-                        @if (!string.IsNullOrWhiteSpace(receipt.DeliveryRef))
-                        {
-                            <span>Delivery: @receipt.DeliveryRef</span>
-                        }
                         @if (!string.IsNullOrWhiteSpace(receipt.FailureReason))
                         {
                             <span>Reason: @receipt.FailureReason</span>
