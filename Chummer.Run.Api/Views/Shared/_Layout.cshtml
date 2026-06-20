@@ -156,14 +156,14 @@
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(clickRankSiteId)
         && (
-            routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            routeKey is "landing" or "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
     var requestPathIsRoot = string.Equals(normalizedRequestPath, "/", StringComparison.Ordinal);
     var requestPathIndexable = requestPathIsRoot
         || normalizedRequestPath is "/now" or "/downloads" or "/status" or "/changelog" or "/what-is-chummer" or "/help" or "/faq" or "/contact" or "/privacy" or "/terms"
         || routeKey is "landing" or "what-is-chummer" or "now" or "downloads" or "changelog" || routeKey is "help" or "faq" || routeKey is "contact" or "privacy" or "terms" or "status"
-        || routeKey is "horizons" or "roadmap" or "artifacts" || routeKey is "participate" or "feedback";
+        || routeKey is "roadmap" or "artifacts" || routeKey is "participate" or "feedback";
     var indexablePublicRoute = !authSurface
         && !chrome.Authenticated
         && requestPathIndexable;
@@ -172,7 +172,7 @@
         && !string.IsNullOrWhiteSpace(rybbitSiteId)
         && !string.IsNullOrWhiteSpace(rybbitScriptUrl)
         && (
-            routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            routeKey is "landing" or "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
     var robotsPolicy = indexablePublicRoute
@@ -564,7 +564,6 @@
         </footer>
     }
 
-    <script src="~/js/public-copy-polish.js" asp-append-version="true" defer></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script>
         (function () {

@@ -23,6 +23,9 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
         Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
         Assert.Contains("public signal, projected movement, and shipped updates", doc, StringComparison.Ordinal);
+        Assert.Contains("compatibility maintenance alias", doc, StringComparison.Ordinal);
+        Assert.DoesNotContain("/horizons for the deeper readiness shelf", doc, StringComparison.Ordinal);
+        Assert.DoesNotContain("horizons stay the deeper readiness view", doc, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -41,6 +44,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
+        Assert.DoesNotContain("/horizons", llms, StringComparison.Ordinal);
         Assert.DoesNotContain("/ledger", llms, StringComparison.Ordinal);
         Assert.DoesNotContain("/ledger", ai, StringComparison.Ordinal);
         Assert.DoesNotContain("/black-ledger", llms, StringComparison.Ordinal);
@@ -53,6 +57,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
         Assert.Contains("/docs", ai, StringComparison.Ordinal);
         Assert.Contains("/roadmap", ai, StringComparison.Ordinal);
+        Assert.DoesNotContain("/horizons", ai, StringComparison.Ordinal);
         Assert.Contains("/feedback", ai, StringComparison.Ordinal);
         Assert.Contains("/contact", ai, StringComparison.Ordinal);
     }

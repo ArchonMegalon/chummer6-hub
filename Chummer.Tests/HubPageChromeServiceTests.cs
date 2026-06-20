@@ -87,6 +87,32 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
+    public void BuildPublicChromeCleansPublicTitleAndDescriptionBeforeFirstPaint()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildPublicChrome(
+            "Black Ledger proof",
+            "ALICE generated an AI proof receipt for the Black Ledger operator lane.",
+            "/status");
+
+        Assert.Equal("campaign city check", chrome.Title);
+        Assert.Equal("character help created a check for the campaign city user path.", chrome.Description);
+        Assert.DoesNotContain("Alice", chrome.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("AI", chrome.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof", chrome.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("receipt", chrome.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("operator", chrome.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BlackLedgerRouteExistsButIsNotPrimaryNavigation()
     {
         string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");

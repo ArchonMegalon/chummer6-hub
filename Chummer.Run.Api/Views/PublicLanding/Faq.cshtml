@@ -16,7 +16,7 @@
             Summary = "Use this when you want to know whether something is ready now, needs care, or is still coming next.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Ready now", "Needs care", "Coming next" }
+            Highlights = new[] { "Ready now", "Needs care", "Coming next" }
         },
         new
         {
@@ -25,7 +25,7 @@
             Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package, known issues, and setup help without making you read a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "Latest build", "Setup help", "Known issues" }
+            Highlights = new[] { "Latest build", "Setup help", "Known issues" }
         },
         new
         {
@@ -38,7 +38,7 @@
                 : accessPosture?.AccountValueSummary ?? "The download stays the same. An account helps you find linked installs, recovery, and support history later.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
             Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
-            Proof = new[] { "Linked installs", "Devices", "Support history" }
+            Highlights = new[] { "Linked installs", "Devices", "Support history" }
         },
         new
         {
@@ -47,7 +47,7 @@
             Summary = "Install failures, crashes, account issues, and private campaign details belong in support, not in a public search box.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "Private by default", "No outside account required", "Tracked follow-up" }
+            Highlights = new[] { "Private by default", "No outside account required", "Tracked follow-up" }
         }
     };
 
@@ -124,8 +124,8 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                <div class="route-choice-card__highlights">
+                    @foreach (var item in choice.Highlights)
                     {
                         <span>@item</span>
                     }

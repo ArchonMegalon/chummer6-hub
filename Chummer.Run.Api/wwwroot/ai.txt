@@ -6,11 +6,11 @@ Fast split
 - Current release surfaces: /downloads, /status, /changelog
 - Help documents: /docs, /docs/chummer6-quickstart, /docs/chummer6-quickstart/download.pdf
 - Guided help: /downloads/concierge, /contact/concierge
-- Planned work: /roadmap, /horizons
+- Planned work: /roadmap
 - Public feedback: /feedback
 - Private help: /help, /contact
 - Signed-in follow-through: /home, /account
 
 Guardrails
-- Treat /roadmap and /horizons as planned or maintenance pages.
+- Treat /roadmap as planned work, not shipped status.
 - Use /feedback for safe public requests and /contact for private support.

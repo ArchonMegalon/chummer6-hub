@@ -72,8 +72,8 @@ public sealed class HubPageChromeService
             : new SiteChromeActionViewModel(publicPrimaryCta.Label, publicPrimaryCta.Href, publicPrimaryCta.Emphasis);
 
         return new SiteChromeViewModel(
-            Title: title,
-            Description: description,
+            Title: PublicFacingCopyHumanizer.Clean(title),
+            Description: PublicFacingCopyHumanizer.Clean(description),
             CurrentPath: currentPath,
             PrimaryNavigation: nav.Primary,
             SecondaryNavigation: nav.Secondary,

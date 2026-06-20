@@ -90,8 +90,8 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If it stalls, use the button again from the same browser."
-                    : "The next page opens Chummer to finish linking this install. If the browser blocks it, use the manual open button.")</p>
+                    ? "The next page claims this copy with your running Chummer app in this browser tab. If it stalls, use the claim button again from the same browser."
+                    : "The next page opens Chummer to claim this copy. If the browser blocks it, use the claim button again.")</p>
             }
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
@@ -132,8 +132,8 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "The next page finishes linking this install with your running Chummer app in this browser tab. If it stalls, use the button again from the same browser."
-                    : "The next page opens Chummer to finish linking this install. If the browser blocks it, use the manual open button.")</p>
+                    ? "The next page claims this copy with your running Chummer app in this browser tab. If it stalls, use the claim button again from the same browser."
+                    : "The next page opens Chummer to claim this copy. If the browser blocks it, use the claim button again.")</p>
             }
 
             <form class="auth-form" method="post" action="/auth/email/start">

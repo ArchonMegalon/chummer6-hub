@@ -42,7 +42,6 @@ Front-door and current-build routes:
 
 Direction, feedback, and release-history routes:
 
-- `/horizons` for the deeper readiness shelf
 - `/roadmap` for milestone-backed public direction
 - `/feedback` for safe public signal and votes
 - `/changelog` for shipped closeout
@@ -85,7 +84,7 @@ Package routes are intentionally split across public browser, account tracking, 
 Discoverable publication pages may still open bounded creator or moderated public-validation follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/ledger` and `/black-ledger` are intentionally direct-access lab routes until Black Ledger clears the normal-user visual and behavior bar.
-`/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness view, while roadmap stays the public milestone and direction rail.
+`/roadmap` is the public planning surface. `/horizons` remains only as a compatibility maintenance alias for older links and should not be promoted, indexed, or presented as a normal product category.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped updates do not collapse into one vague route family.
 
 ## Route Families
@@ -121,7 +120,6 @@ Public visitors get:
 - current-build status
 - progress report
 - shipped closeout
-- horizons
 - roadmap projection
 - public feedback
 - downloads

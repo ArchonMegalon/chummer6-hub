@@ -16,7 +16,6 @@ Primary routes
 - /status : current release
 
 Maintenance and feedback routes
-- /horizons : maintenance page
 - /roadmap : planned work
 - /feedback : public feedback
 - /changelog : shipped closeout and release-backed updates
@@ -29,7 +28,7 @@ Help and account routes
 - /account : signed-in account, account return, and follow settings
 
 Reading rules
-- Treat /roadmap and /horizons as planned or maintenance pages.
+- Treat /roadmap as planned work, not shipped status.
 - Use /downloads, /status, and /changelog when the question is what is available now.
 - Use /feedback for public requests and safe public bugs.
 - Use /contact or /help when the issue is private, recovery-bound, or account-specific.

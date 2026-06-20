@@ -3545,14 +3545,16 @@ td {
 }
 
 .route-callout__proof,
-.route-choice-card__proof {
+.route-choice-card__proof,
+.route-choice-card__highlights {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .route-callout__proof span,
-.route-choice-card__proof span {
+.route-choice-card__proof span,
+.route-choice-card__highlights span {
   display: inline-flex;
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
@@ -8467,6 +8469,54 @@ body {
   background: transparent;
   color: var(--minimal-accent);
   border-color: var(--minimal-line);
+}
+
+.surface-faq .field input,
+.surface-faq .field select,
+.surface-faq .field textarea,
+.route-help .field input,
+.route-help .field select,
+.route-help .field textarea {
+  border-color: rgba(21, 21, 21, 0.18);
+  background: #ffffff;
+  color: #151515;
+  caret-color: #151515;
+  color-scheme: light;
+  box-shadow: none;
+}
+
+.surface-faq .field input:hover,
+.surface-faq .field select:hover,
+.surface-faq .field textarea:hover,
+.surface-faq .field input:focus,
+.surface-faq .field select:focus,
+.surface-faq .field textarea:focus,
+.route-help .field input:hover,
+.route-help .field select:hover,
+.route-help .field textarea:hover,
+.route-help .field input:focus,
+.route-help .field select:focus,
+.route-help .field textarea:focus {
+  border-color: #151515;
+  background: #ffffff;
+  color: #151515;
+  outline: none;
+}
+
+.surface-faq .field select option,
+.surface-faq .field select optgroup,
+.route-help .field select option,
+.route-help .field select optgroup {
+  background: #ffffff;
+  color: #151515;
+}
+
+.surface-faq .field input::placeholder,
+.surface-faq .field textarea::placeholder,
+.route-help .field input::placeholder,
+.route-help .field textarea::placeholder {
+  color: #6f6b62;
+  opacity: 1;
 }
 
 @media (max-width: 860px) {

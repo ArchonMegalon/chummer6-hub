@@ -4580,7 +4580,7 @@ public sealed class PublicLandingController : Controller
         DesktopInstallRailContext installRail = ResolveSupportIntakeRailFromQuery();
         var highlights = new List<string>
         {
-            sampleReceipt ? "Sample receipt used for public-route proof." : $"Case id {caseId}",
+            sampleReceipt ? "Sample route used for public page checks." : $"Case id {caseId}",
             sampleReceipt
                 ? "This route resolves without opening a real support case."
                 : authenticated
@@ -4625,14 +4625,14 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Support",
             Heading: "Support case received",
             Intro: sampleReceipt
-                ? "This sample receipt keeps the public support-submission route provable without opening a real support case."
+                ? "This sample route keeps the support confirmation page reachable without opening a real support case."
                 : trackedCase is null
                     ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
                     : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
             CaseId: caseId,
             StatusLabel: sampleReceipt ? "sample" : trackedCase?.Status ?? SupportCaseStatuses.New,
             ResponseExpectation: sampleReceipt
-                ? "This sample receipt only proves the first-party support submission route resolves on the hosted surface. Real follow-up still starts from a submitted support case or the account support rail."
+                ? "This sample route only checks that the support confirmation page resolves. Real follow-up still starts from a submitted support case or the account support rail."
                 : BuildSupportResponseExpectation(
                     authenticated,
                     BuildPublicTrustPulsePanel(manifest, releaseExperience)),
@@ -4980,13 +4980,13 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
             ? _chrome.BuildAuthenticatedChrome(
-                $"{BuildPackageActionLabel(receipt.ActionKind)} receipt",
+                $"{BuildPackageActionLabel(receipt.ActionKind)} record",
                 receipt.RouteSummary,
                 currentPath,
                 user.DisplayName,
                 user.Email)
             : await BuildPublicOrAuthenticatedChromeAsync(
-                $"{BuildPackageActionLabel(receipt.ActionKind)} receipt",
+                $"{BuildPackageActionLabel(receipt.ActionKind)} record",
                 receipt.RouteSummary,
                 currentPath,
                 cancellationToken);
@@ -4996,9 +4996,9 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/PackageReceipt.cshtml",
             new PackageActionReceiptPageViewModel(
                 Chrome: chrome,
-                Eyebrow: "Package route receipt",
+                Eyebrow: "Package record",
                 Heading: $"{BuildPackageActionLabel(receipt.ActionKind)} recorded",
-                Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later next steps do not disappear into an external board or generic support thread.",
+                Intro: "This record stays inside Chummer so package interest, compatibility, and later next steps do not disappear into an external board or generic support thread.",
                 Package: packageEntry,
                 Receipt: receiptCard,
                 PrimaryAction: new TrustPageActionViewModel("Open package detail", $"/packages/{Uri.EscapeDataString(package.PackageId)}", "primary"),
@@ -10969,7 +10969,7 @@ Boundary:
                             : string.Equals(entry.Question, "Can I actually use Chummer right now?", StringComparison.Ordinal)
                                 ? entry with
                                 {
-                                    Answer = "Yes. Chummer is publicly available now on Windows, macOS, and Linux, with live downloads, current pages, and clear labels for what is still rough or still missing."
+                                    Answer = "Yes. Windows and Linux are public now. macOS is guided support only for now. Downloads shows the current packages and any known limits."
                                 }
                             : string.Equals(entry.Question, "What does account creation give me right away?", StringComparison.Ordinal)
                                 ? entry with { Answer = accessPosture.AccountFaqAnswer }
