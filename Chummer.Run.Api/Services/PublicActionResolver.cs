@@ -8,7 +8,7 @@ public sealed class PublicActionResolver
     private static readonly string[] GenericLabels =
     {
         "open",
-        "open the artifact detail",
+        "open the file detail",
         "open the roadmap detail",
         "read the linked detail",
         "read more",
@@ -118,8 +118,8 @@ public sealed class PublicActionResolver
 
             return card.Bucket switch
             {
-                "coming_next" => "Read the horizon brief",
-                "featured_artifacts" => "Open the external release brief",
+                "coming_next" => "Read the roadmap note",
+                "featured_artifacts" => "Open the release note",
                 "supporting_reads" => "Read the external guide",
                 _ => "Read the external brief"
             };
@@ -127,12 +127,12 @@ public sealed class PublicActionResolver
 
         return card.Bucket switch
         {
-            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) => "Open the live artifact",
+            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) => "Open what works now",
             "featured_artifacts" => "Inspect the preview concept",
             "coming_next" => "Read the concept page",
             "whats_real_now" when string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) => "See what works now",
             "whats_real_now" => "See current release",
-            "choose_your_lane" => "See the lane fit",
+            "choose_your_lane" => "Choose your path",
             "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Authorize contribution access",
             "participate" when href.Contains("/account/participation", StringComparison.OrdinalIgnoreCase) || href.Contains("/account/settings", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
             "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Claim your copy",
