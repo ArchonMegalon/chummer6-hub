@@ -1,17 +1,17 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T16:14:44Z",
+  "generated_at_utc": "2026-06-20T16:43:14Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
-  "row_count": 33,
+  "row_count": 37,
   "summary": {
     "priority_counts": {
-      "P0": 23,
+      "P0": 27,
       "P1": 9,
       "P2": 1
     },
     "status_counts": {
-      "active": 22,
+      "active": 26,
       "blocked-until-next-publish": 1,
       "book-first-ui-pushed": 1,
       "campaign-city-source-pass-pushed": 1,
@@ -28,20 +28,20 @@
       "Black Ledger": 1,
       "Campaign tools": 1,
       "Character creation": 1,
-      "Copy": 1,
+      "Copy": 2,
       "Desktop client": 4,
       "Documentation": 1,
       "Engineering quality": 1,
       "Gold readiness": 1,
       "Installer": 1,
-      "Operations": 1,
-      "Origin Dossier": 1,
+      "Operations": 2,
+      "Origin Dossier": 2,
       "Packaging": 1,
       "Provider governance": 2,
       "Release": 2,
       "Rules data": 1,
       "Rules engine": 1,
-      "Support": 1,
+      "Support": 2,
       "Table Pulse": 1,
       "Testing": 1,
       "Updater": 1,
@@ -120,6 +120,18 @@
       "why_it_matters": "Alice should reason from the character's story instead of raw combo boxes.",
       "next_action": "Feed the approved story into Alice suggestions for new builds and support read-only dossier generation for finished characters.",
       "acceptance_gate": "Origin Dossier E2E proves story generation, Alice follow-up, and established-character dossier creation."
+    },
+    {
+      "item_id": "origin-dossier-humanizer-loop",
+      "title": "Origin Dossier humanizer loop",
+      "area": "Origin Dossier",
+      "priority": "P0",
+      "status": "active",
+      "cadence": "daily until covered",
+      "source": "Product direction",
+      "why_it_matters": "A dossier should read like a deliberate character book, not generated filler or a form summary.",
+      "next_action": "Run the generated story through the Humanizer lane before FlipLink/book, audiobook, video, and Alice ingestion; keep advanced steering collapsed by default.",
+      "acceptance_gate": "Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, book-first output, voice choice, video option, and Alice using the final story."
     },
     {
       "item_id": "alice-build-from-scratch",
@@ -264,6 +276,30 @@
       "why_it_matters": "Generated-sounding copy undermines trust even when the feature works.",
       "next_action": "Publish the campaign-city copy cleanup at the next 08:00 release window, rerun the live leak gate, then continue the same loop through installer, desktop dialogs, and Origin Dossier output.",
       "acceptance_gate": "Public and primary desktop surfaces avoid AI, provider, proof, audit, and internal workflow wording unless directly useful."
+    },
+    {
+      "item_id": "public-proof-language-removal",
+      "title": "Remove proof/check wording from user surfaces",
+      "area": "Copy",
+      "priority": "P0",
+      "status": "active",
+      "cadence": "continuous until leak gate is boring",
+      "source": "Human tester feedback",
+      "why_it_matters": "Users need clear product state, not internal proof, checks, receipts, IDs, or validation language.",
+      "next_action": "Continue scanning public views and desktop dialogs for proof, check, receipt, source, record, evidence, audit, validation, provider, and raw-id wording; replace it with user-facing state only when needed.",
+      "acceptance_gate": "Public copy leak gates and source tests pass, and screenshots show no internal proof/check language in normal user journeys."
+    },
+    {
+      "item_id": "public-help-accessibility-polish",
+      "title": "Public help readability and labels",
+      "area": "Support",
+      "priority": "P0",
+      "status": "active",
+      "cadence": "daily until readable",
+      "source": "Human tester feedback",
+      "why_it_matters": "Help is where confused users land; unreadable inputs or missing labels make the product feel careless.",
+      "next_action": "Audit chummer.run help, support, report issue, account, and recovery surfaces for contrast, labels, button names, and minimal copy.",
+      "acceptance_gate": "Help and support pages have readable light/dark contrast, visible labels for every field, clear primary actions, and no internal wording."
     },
     {
       "item_id": "black-ledger-hide-and-polish",
@@ -444,19 +480,31 @@
       "why_it_matters": "The project needs a concise operating board for everything that actually matters.",
       "next_action": "Refresh this projection after material product-scope changes and keep stale or resolved rows honest.",
       "acceptance_gate": "Teable contains one current row per critical Chummer workstream and can be refreshed without duplicating records."
+    },
+    {
+      "item_id": "teable-maintenance-not-horizon",
+      "title": "Teable remains maintenance, not a horizon",
+      "area": "Operations",
+      "priority": "P0",
+      "status": "active",
+      "cadence": "continuous",
+      "source": "User correction",
+      "why_it_matters": "Teable is an operator board; presenting it like a product horizon confuses users and adds noise.",
+      "next_action": "Keep Teable integration in maintenance/admin flows and remove any public product framing that makes it look like a user-facing horizon.",
+      "acceptance_gate": "Public navigation and horizon pages do not present Teable as a product feature, while the operator board still syncs important work."
     }
   ],
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-20T16:14:44Z",
-    "finished_at_utc": "2026-06-20T16:15:45Z",
+    "started_at_utc": "2026-06-20T16:43:14Z",
+    "finished_at_utc": "2026-06-20T16:44:12Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bseQCIXVnYLcq2KiWzN",
     "table_id": "tbl5UEwrkhI27HOlwkT",
     "table_name": "Chummer Important Work",
-    "synced_count": 33,
-    "created_count": 0,
+    "synced_count": 37,
+    "created_count": 4,
     "updated_count": 33,
     "failed_count": 0,
     "errors": []

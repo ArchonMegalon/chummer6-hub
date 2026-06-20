@@ -27,12 +27,15 @@ def test_projection_contains_unique_important_work_rows():
     rows = module.important_work_items()
     item_ids = [row.item_id for row in rows]
 
-    assert len(rows) >= 30
+    assert len(rows) >= 37
     assert len(item_ids) == len(set(item_ids))
     assert "desktop-premium-ui-polish" in item_ids
     assert "origin-dossier-first-story" in item_ids
+    assert "origin-dossier-humanizer-loop" in item_ids
     assert "desktop-updater-install-link" in item_ids
     assert "public-website-minimal-redesign" in item_ids
+    assert "public-proof-language-removal" in item_ids
+    assert "public-help-accessibility-polish" in item_ids
     assert "character-builder-core-usability" in item_ids
     assert "release-policy-daily-08" in item_ids
     assert "reproducible-gold-proof-chain" in item_ids
@@ -41,6 +44,7 @@ def test_projection_contains_unique_important_work_rows():
     assert "minimal-seo-optimization" in item_ids
     assert "code-quality-specialization-pass" in item_ids
     assert "teable-important-work-sync" in item_ids
+    assert "teable-maintenance-not-horizon" in item_ids
 
 
 def test_projection_rows_have_teable_ready_fields():
