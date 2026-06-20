@@ -81,6 +81,7 @@ def test_minimal_route_detection_keeps_special_routes_out_of_first_visit_tier():
 
 def test_route_result_fails_when_minimal_route_contains_strict_forbidden_copy():
     module = load_module()
+    detail = "first-visit page contains specialist feature names, internal process wording, or lab wording"
 
     result = module.RouteResult(
         route="/",
@@ -90,10 +91,13 @@ def test_route_result_fails_when_minimal_route_contains_strict_forbidden_copy():
         forbidden_hits=[],
         minimal_route=True,
         minimal_forbidden_hits=[r"\bAI\b"],
-        detail="minimal public route contains AI, proof, campaign-city, provider, or internal workflow wording",
+        detail=detail,
     )
     payload = module.build_payload("https://example.invalid", [result])
 
     assert payload["status"] == "fail"
     assert payload["routes"][0]["minimal_route"] is True
     assert payload["routes"][0]["minimal_forbidden_hits"] == [r"\bAI\b"]
+    assert "AI, proof" not in detail
+    assert "artifact" not in detail
+    assert "lane" not in detail

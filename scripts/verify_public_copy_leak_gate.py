@@ -284,7 +284,7 @@ def verify_route(session: requests.Session, base_url: str, route: str) -> RouteR
     elif hits:
         detail = "public visible copy contains internal, provider, local-host, or demo wording"
     elif minimal_hits:
-        detail = "minimal public route contains AI, proof, campaign-city, provider, or internal workflow wording"
+        detail = "first-visit page contains specialist feature names, internal process wording, or lab wording"
 
     return RouteResult(route, url, response.status_code, success, hits, minimal_route, minimal_hits, detail)
 
