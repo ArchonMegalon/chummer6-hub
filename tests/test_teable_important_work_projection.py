@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import sys
@@ -72,6 +73,7 @@ def test_teable_field_definition_omits_unsupported_validation_flags():
 def test_main_writes_dry_run_artifact_without_teable_credentials(tmp_path, monkeypatch):
     module = load_module()
     output = tmp_path / "TEABLE_IMPORTANT_WORK.generated.json"
+    csv_output = output.with_suffix(".csv")
     monkeypatch.delenv("TEABLE_API_KEY", raising=False)
     monkeypatch.delenv("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY", raising=False)
 
@@ -82,6 +84,11 @@ def test_main_writes_dry_run_artifact_without_teable_credentials(tmp_path, monke
     assert payload["status"] == "ready"
     assert payload["sync"]["state"] == "not_requested"
     assert payload["sync"]["attempted"] is False
+    rows = list(csv.DictReader(csv_output.read_text(encoding="utf-8").splitlines()))
+    assert len(rows) == payload["row_count"]
+    assert rows[0]["Item Id"]
+    assert rows[0]["Title"]
+    assert rows[0]["Acceptance Gate"]
 
 
 def test_sync_without_credentials_fails_closed_without_token_text():

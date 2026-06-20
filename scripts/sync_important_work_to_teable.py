@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -17,6 +18,7 @@ from typing import Any
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.generated.json"
+DEFAULT_CSV_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.csv"
 DEFAULT_TEABLE_ORIGIN = "https://app.teable.ai"
 DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
 DEFAULT_TABLE_NAME = "Chummer Important Work"
@@ -481,6 +483,16 @@ def teable_fields_for_row(item: ImportantWorkItem, synced_at: str) -> dict[str, 
     }
 
 
+def write_csv_projection(path: Path, generated_at_utc: str) -> None:
+    fieldnames = [str(field["name"]) for field in REQUIRED_FIELDS]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for item in important_work_items():
+            writer.writerow(teable_fields_for_row(item, generated_at_utc))
+
+
 def build_projection() -> dict[str, Any]:
     generated_at = now_iso()
     rows = [asdict(item) for item in important_work_items()]
@@ -729,6 +741,7 @@ def resolve_api_base_url() -> str:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Project the important Chummer workstreams into Teable.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--csv-output", type=Path, default=None, help="Write a Teable import CSV beside the JSON receipt.")
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
     parser.add_argument("--api-base-url", default=resolve_api_base_url())
     parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
@@ -753,7 +766,9 @@ def main(argv: list[str] | None = None) -> int:
             projection["status"] = "blocked" if projection["sync"]["state"] == "blocked" else "failed"
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(projection, indent=2) + "\n", encoding="utf-8")
-    print(f"teable_important_work:{projection['status']} rows={projection['row_count']} sync={projection['sync']['state']}")
+    csv_output = args.csv_output or (DEFAULT_CSV_OUTPUT if args.output == DEFAULT_OUTPUT else args.output.with_suffix(".csv"))
+    write_csv_projection(csv_output, str(projection["generated_at_utc"]))
+    print(f"teable_important_work:{projection['status']} rows={projection['row_count']} sync={projection['sync']['state']} csv={csv_output}")
     return 0 if projection["status"] == "ready" or projection["sync"]["state"] == "passed" else 2
 
 
