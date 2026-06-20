@@ -329,18 +329,59 @@ namespace ChummerInstallerCapture
 
 $script:LaunchedInstallerProcessId = $null
 
+function Get-InstallerTraceCandidates {
+    $paths = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:TEMP)) {
+        $paths += (Join-Path $env:TEMP "chummer-desktop-installer-progress.log")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $paths += (Join-Path $env:LOCALAPPDATA "Chummer6\Installer\chummer-desktop-installer-progress.log")
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
+function Get-InstallerProcessSnapshotRows {
+    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        ([string]$_.Name).IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        ([string]$_.CommandLine).IndexOf("chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        ([string]$_.ExecutablePath).IndexOf("chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    } | ForEach-Object {
+        $commandLine = [string]$_.CommandLine
+        if ($commandLine.Length -gt 260) {
+            $commandLine = $commandLine.Substring(0, 260) + "..."
+        }
+        "pid=$($_.ProcessId) name=$($_.Name) path=$($_.ExecutablePath) commandLine=$commandLine"
+    })
+}
+
 function Write-InstallerCaptureFailure([string]$Message) {
     try {
         $failurePath = Join-Path $outputFullRoot "WINDOWS_INSTALLER_CAPTURE_FAILURE.txt"
         $windowRows = @(Get-VisibleInstallerWindows | ForEach-Object {
             "pid=$($_.ProcessId) handle=$($_.Handle) title=$($_.Title)"
         })
+        $processRows = @(Get-InstallerProcessSnapshotRows)
+        $traceRows = @()
+        foreach ($candidate in Get-InstallerTraceCandidates) {
+            if (Test-Path -LiteralPath $candidate) {
+                $traceRows += "path=$candidate size=$((Get-Item -LiteralPath $candidate).Length)"
+                $traceRows += @(Get-Content -LiteralPath $candidate -Tail 40 -Encoding UTF8 | ForEach-Object { "  $_" })
+            }
+            else {
+                $traceRows += "missing=$candidate"
+            }
+        }
         $lines = @(
             "capturedAtUtc=$((Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z"))",
             "message=$Message",
             "launchedInstallerProcessId=$script:LaunchedInstallerProcessId",
             "visibleWindows:"
-        ) + $windowRows
+        ) + $windowRows + @(
+            "chummerProcesses:"
+        ) + $processRows + @(
+            "traceCandidates:"
+        ) + $traceRows
         $lines | Set-Content -LiteralPath $failurePath -Encoding UTF8
         Write-Host "Wrote installer capture failure note: $failurePath"
     }
