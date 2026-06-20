@@ -67,6 +67,50 @@ function Test-IsDefaultDpi([object]$Value) {
     return $text -in @("1", "1.0", "100", "100%")
 }
 
+function Test-CaptureBoundsLookLikeDesktopFallback([object]$Bounds) {
+    if ($null -eq $Bounds) {
+        return $false
+    }
+
+    try {
+        $left = [int]$Bounds.Left
+        $top = [int]$Bounds.Top
+        $width = [int]$Bounds.Width
+        $height = [int]$Bounds.Height
+    }
+    catch {
+        return $false
+    }
+
+    return $left -eq 0 -and $top -eq 0 -and $width -ge 1000 -and $height -ge 700
+}
+
+function Test-CaptureBoundsMapLookLikeDesktopFallback([object]$Bounds) {
+    if ($null -eq $Bounds) {
+        return $false
+    }
+
+    try {
+        if ($Bounds -is [System.Collections.IDictionary]) {
+            $left = [int]$Bounds["left"]
+            $top = [int]$Bounds["top"]
+            $width = [int]$Bounds["width"]
+            $height = [int]$Bounds["height"]
+        }
+        else {
+            $left = [int]$Bounds.left
+            $top = [int]$Bounds.top
+            $width = [int]$Bounds.width
+            $height = [int]$Bounds.height
+        }
+    }
+    catch {
+        return $false
+    }
+
+    return $left -eq 0 -and $top -eq 0 -and $width -ge 1000 -and $height -ge 700
+}
+
 function Normalize-Surface([object]$Value) {
     $text = ([string]$Value).Trim().ToLowerInvariant().Replace("_", "-").Replace(" ", "-")
     switch ($text) {
@@ -451,6 +495,9 @@ foreach ($request in $captureRequests) {
         Write-Host "Reused previous $captureSurface screenshot after the window bounds became unavailable: $screenshotPath"
         continue
     }
+    if ($AutoCapture -and (Test-CaptureBoundsLookLikeDesktopFallback $bounds)) {
+        throw "Automated installer capture refused full-desktop fallback bounds; expected compact installer window bounds."
+    }
     $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
@@ -509,6 +556,7 @@ $screenshots = @($existingScreenshots + $newRows)
 $allPass = $true
 $hasDefaultDpi = $false
 $hasScaledDpi = $false
+$surfacesByHash = @{}
 $surfaceCoverage = @{}
 foreach ($requiredSurface in $requiredSurfaces) {
     $surfaceCoverage[$requiredSurface] = @{
@@ -521,6 +569,9 @@ foreach ($item in $screenshots) {
         $allPass = $false
     }
     if (([string]$item.readabilityStatus).ToLowerInvariant() -ne "pass") {
+        $allPass = $false
+    }
+    if (Test-CaptureBoundsMapLookLikeDesktopFallback $item.captureBounds) {
         $allPass = $false
     }
     if (Test-IsDefaultDpi $item.dpiScale) {
@@ -536,6 +587,22 @@ foreach ($item in $screenshots) {
         if ($surfaceCoverage.Contains($surfaceName)) {
             $surfaceCoverage[$surfaceName].scaledDpi = $true
         }
+    }
+    $surfaceName = Normalize-Surface $item.surface
+    if ($requiredSurfaces -contains $surfaceName) {
+        $screenshotPath = Join-Path $outputFullRoot ([string]$item.path)
+        if (Test-Path -LiteralPath $screenshotPath) {
+            $screenshotHash = (Get-FileHash -LiteralPath $screenshotPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (-not $surfacesByHash.ContainsKey($screenshotHash)) {
+                $surfacesByHash[$screenshotHash] = [System.Collections.Generic.HashSet[string]]::new()
+            }
+            [void]$surfacesByHash[$screenshotHash].Add($surfaceName)
+        }
+    }
+}
+foreach ($surfaceSet in $surfacesByHash.Values) {
+    if ($surfaceSet.Count -gt 1) {
+        $allPass = $false
     }
 }
 $hasRequiredSurfaceCoverage = $true
