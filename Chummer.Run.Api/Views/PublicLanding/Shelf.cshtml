@@ -37,10 +37,10 @@
         {
             Badge = "Detail view",
             Title = "Inspect dossiers, recaps, and shared publications here",
-            Summary = "Use this page when you want detail and source context without confusing that with the install decision.",
+            Summary = "Use this page when you want background and detail without confusing that with the install decision.",
             Href = artifactShelfPrimaryHref,
             Label = "Open detail view",
-            Details = new[] { "Readable detail", "Related files", "Source context" }
+            Details = new[] { "Readable detail", "Related files", "Background" }
         },
         new
         {
@@ -145,11 +145,11 @@
     };
     static string ArtifactViewSummary(string view) => view switch
     {
-        "personal" => "Keep account-side runner and return details visible without losing the shared record they belong to.",
+        "personal" => "Keep account-side runner and return details visible without losing the shared history they belong to.",
         "campaign" => "Stay on the shared crew and continuity page for campaign-owned files, prep notes, Table Pulse Aftermath return cues, and replay next steps.",
         "creator" => "Inspect creator-linked history, confidence, availability, and next steps for published or publication-ready work.",
         "public" => "Inspect published shared-publication pages so discoverable creator work and publication detail stay together while you are signed in.",
-        _ => "When you are signed in, the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate stories."
+        _ => "When you are signed in, the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together instead of splitting them into separate stories."
     };
 
     string PublicationAvailabilityLabel(bool discoverable)
@@ -171,7 +171,7 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and source context, then go back to downloads when you actually want the build.</p>
+        <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and background, then go back to downloads when you actually want the build.</p>
         <div class="trust-claim__microproof">
             <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
             <span>@previewItems.Length opening next</span>
@@ -196,7 +196,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick details, downloads, signed-in history, or help without mixing their jobs.</h2>
-        <p class="editorial-copy">The detail view should make outputs and source context tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
+        <p class="editorial-copy">The detail view should make outputs and background tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -229,7 +229,7 @@
                 <article class="route-callout">
                     <span class="tag">Limited public wording</span>
                     <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
-                    <p>You can inspect the publication and source context today. The remaining limit is about how broadly the public page should compare it, not whether the publication exists.</p>
+                    <p>You can inspect the publication and background today. The remaining limit is about how broadly the public page should compare it, not whether the publication exists.</p>
                     <p>Public comparison language stays limited until the current review is finished.</p>
                     <div class="route-callout__proof">
                         <span>Discoverable now</span>
@@ -252,7 +252,7 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Source:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
                         <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
@@ -355,7 +355,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                         {
-                            <p><strong>Source:</strong> @item.ProvenanceSummary</p>
+                            <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(item.ProvenanceSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                         {
@@ -404,7 +404,7 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Source:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
                         <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {

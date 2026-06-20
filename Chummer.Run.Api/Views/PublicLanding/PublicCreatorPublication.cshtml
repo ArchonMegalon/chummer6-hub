@@ -178,8 +178,8 @@
             <p>@HumanizeStatus(Model.Publication.Kind, "Publication packet")</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Source</span>
-            <p>@Model.Publication.ProvenanceSummary</p>
+            <span class="tag">Details</span>
+            <p>@PublicFacingCopyHumanizer.Clean(Model.Publication.ProvenanceSummary)</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Trust</span>
@@ -203,7 +203,7 @@
         </article>
         <article class="trust-rail">
             <span class="tag">Required details</span>
-            <p>@Model.RequiredReceiptRefs.Count required item@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") attached.</p>
+            <p>@Model.RequiredReceiptRefs.Count required detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") attached.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {

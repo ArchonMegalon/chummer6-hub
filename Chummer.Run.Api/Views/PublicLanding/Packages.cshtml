@@ -16,10 +16,10 @@
             .Replace("governance", "review", StringComparison.OrdinalIgnoreCase)
             .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
             .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipts", "updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "update", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "update", StringComparison.OrdinalIgnoreCase)
             .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
             .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
             .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
@@ -107,7 +107,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Recent activity</p>
-        <h2 class="editorial-title">Your recent package records</h2>
+        <h2 class="editorial-title">Your recent package activity</h2>
         <p class="editorial-copy">Recent votes and follows stay with your account so you can return to them later.</p>
     </div>
     <section class="compact-rail">
@@ -119,7 +119,7 @@
                     <p>@PublicPackageText(receipt.RouteSummary)</p>
                     <p><strong>@receipt.ActorLabel</strong> · @receipt.RecordedAtLabel</p>
                 </div>
-                <a class="editorial-strip__action" href="@receipt.Href">Open record</a>
+                <a class="editorial-strip__action" href="@receipt.Href">Open activity</a>
             </article>
         }
     </section>

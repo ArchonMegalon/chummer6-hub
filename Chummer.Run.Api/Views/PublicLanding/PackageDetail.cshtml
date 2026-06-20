@@ -18,10 +18,10 @@
             .Replace("provenance", "history", StringComparison.OrdinalIgnoreCase)
             .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
             .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipts", "updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof receipt", "update", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipts", "updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "update", StringComparison.OrdinalIgnoreCase)
             .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
             .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
             .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
@@ -163,7 +163,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Recent records</p>
+        <p class="eyebrow">Recent activity</p>
         <h2 class="editorial-title">Package history stays attached to this package route.</h2>
     </div>
     <section class="compact-rail">
@@ -171,7 +171,7 @@
         {
             <article class="compact-rail__item">
                 <div class="compact-rail__copy">
-                    <h3>No records yet</h3>
+                    <h3>No activity yet</h3>
                     <p>Use the vote or follow action to create the first history entry for this package.</p>
                 </div>
             </article>
@@ -186,7 +186,7 @@
                         <p>@PublicPackageText(receipt.RouteSummary)</p>
                         <p>@receipt.RecordedAtLabel</p>
                     </div>
-                    <a class="editorial-strip__action" href="@receipt.Href">Open record</a>
+                    <a class="editorial-strip__action" href="@receipt.Href">Open activity</a>
                 </article>
             }
         }

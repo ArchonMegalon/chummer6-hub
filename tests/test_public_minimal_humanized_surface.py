@@ -367,3 +367,32 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
+
+
+def test_package_and_publication_pages_use_activity_and_details_language() -> None:
+    packages = read("Chummer.Run.Api/Views/PublicLanding/Packages.cshtml")
+    package_detail = read("Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml")
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+    combined = "\n".join((packages, package_detail, shelf, publication))
+
+    for forbidden in (
+        "Your recent package records",
+        "Recent records",
+        "No records yet",
+        "Open record",
+        "Source:",
+        "<span class=\"tag\">Source</span>",
+        "source context",
+        "shared record",
+        "creator-publication record",
+        "required item",
+    ):
+        assert forbidden not in combined
+
+    assert "Your recent package activity" in packages
+    assert "Recent activity" in package_detail
+    assert "Open activity" in package_detail
+    assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
+    assert "<span class=\"tag\">Details</span>" in publication
+    assert "required detail" in publication
