@@ -119,6 +119,15 @@ jobs:
         timeout-minutes: 20
         run: |
           $ErrorActionPreference = "Stop"
+          $visualRoot = "Chummer.Portal/downloads/visual-audit/windows-installer"
+          if (Test-Path -LiteralPath $visualRoot) {
+            Remove-Item -LiteralPath $visualRoot -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path $visualRoot | Out-Null
+          $tracePath = Join-Path $env:TEMP "chummer-desktop-installer-progress.log"
+          if (Test-Path -LiteralPath $tracePath) {
+            Remove-Item -LiteralPath $tracePath -Force
+          }
           $proofArgs = @{
             LaunchInstaller = $true
           }
@@ -131,6 +140,24 @@ jobs:
             $proofArgs["VisualReadabilityStatus"] = "pass"
           }
           & .\scripts\capture_windows_installer_gold_proof.ps1 @proofArgs
+
+      - name: Collect Windows installer diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $visualRoot = "Chummer.Portal/downloads/visual-audit/windows-installer"
+          New-Item -ItemType Directory -Force -Path $visualRoot | Out-Null
+          $traceCandidates = @(
+            (Join-Path $env:TEMP "chummer-desktop-installer-progress.log"),
+            (Join-Path $env:LOCALAPPDATA "Chummer6/Installer/chummer-desktop-installer-progress.log")
+          )
+          foreach ($candidate in $traceCandidates) {
+            if (Test-Path -LiteralPath $candidate) {
+              $safeName = [System.IO.Path]::GetFileName($candidate)
+              Copy-Item -LiteralPath $candidate -Destination (Join-Path $visualRoot $safeName) -Force
+            }
+          }
 
       - name: Verify proof receipt
         id: verify

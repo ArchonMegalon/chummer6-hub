@@ -36,11 +36,11 @@
         new
         {
             Badge = "Detail view",
-            Title = "Inspect outputs, dossiers, and publication lineage here",
-            Summary = "Use this page when the job is to inspect outputs, provenance, trust posture, or linked artifacts without confusing that with the install decision.",
+            Title = "Inspect dossiers, recaps, and shared publications here",
+            Summary = "Use this page when you want detail and source context without confusing that with the install decision.",
             Href = artifactShelfPrimaryHref,
             Label = "Open detail view",
-            Proof = new[] { "Inspectable outputs", "Linked artifacts", "Provenance first" }
+            Details = new[] { "Readable detail", "Related files", "Source context" }
         },
         new
         {
@@ -49,7 +49,7 @@
             Summary = "Downloads still owns the recommended install path, account-aware handoff, known issues, and support fallback. This page should not compete with that decision.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "Install path stays primary", "Same file for everyone", "Support nearby" }
+            Details = new[] { "Install path", "Same file for everyone", "Support nearby" }
         },
         new
         {
@@ -58,12 +58,12 @@
                 ? "Personal, campaign, creator, and public returns stay in one signed-in view"
                 : "Sign in when you want the private account-return view as well as public detail pages",
             Summary = Model.Chrome.Authenticated
-                ? "The signed-in view is the return rail for Table Pulse Aftermath: aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps stay visible without splitting into separate stories."
-                : "Public detail pages work without an account. Sign in only when you want private account return, linked returns, and campaign or creator-owned next steps.",
+                ? "The signed-in view keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
+                : "Public detail pages work without an account. Sign in only when you want private account return and campaign or creator-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
-            Proof = Model.Chrome.Authenticated
-                ? new[] { "Table Pulse Aftermath return rail", "Creator next steps", "Same return view" }
+            Details = Model.Chrome.Authenticated
+                ? new[] { "Table Pulse Aftermath", "Creator next steps", "Same return view" }
                 : new[] { "Public first", "Account adds return paths", "No auth wall for detail pages" }
         },
         new
@@ -73,7 +73,7 @@
             Summary = "Install failures, account recovery, and private campaign issues belong on first-party help. These detail pages should support that work, not replace it.",
             Href = "/help",
             Label = "Open help",
-            Proof = new[] { "Support-owned", "Private help", "No page confusion" }
+            Details = new[] { "Setup help", "Private help", "No page confusion" }
         }
     };
 
@@ -89,8 +89,8 @@
             "active" => "Ready",
             "linked" => "Ready",
             "pending" => "Pending",
-            "pending_verification" => "Verification sent",
-            "verified" => "Verified",
+            "pending_verification" => "Confirmation sent",
+            "verified" => "Confirmed",
             "approved" => "Approved",
             "self_service" => "Self-service",
             "review" => "Needs review",
@@ -145,10 +145,10 @@
     };
     static string ArtifactViewSummary(string view) => view switch
     {
-        "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
-        "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, Table Pulse Aftermath return cues, and aftermath or replay next steps.",
-        "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
-        "public" => "Inspect only the published shared-publication page so discoverable creator packets, trust posture, and publication detail stay together while you are signed in.",
+        "personal" => "Keep account-side runner and return details visible without losing the shared record they belong to.",
+        "campaign" => "Stay on the shared crew and continuity page for campaign-owned files, prep notes, Table Pulse Aftermath return cues, and replay next steps.",
+        "creator" => "Inspect creator-linked history, confidence, availability, and next steps for published or publication-ready work.",
+        "public" => "Inspect published shared-publication pages so discoverable creator work and publication detail stay together while you are signed in.",
         _ => "When you are signed in, the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate stories."
     };
 
@@ -160,11 +160,11 @@
                 : "Limited release";
 
     var governedDiscoveryTitle = publicationRouteReviewRequired
-        ? "Shared publications with limited public claims"
+        ? "Shared publications with limited public wording"
         : "Published shared publications";
     var governedDiscoveryCopy = publicationRouteReviewRequired
-        ? "These campaign, primer, dossier, recap, replay, and run-module outputs are still discoverable, but some public comparison language stays narrower until the remaining review gate closes."
-        : "These campaign, primer, dossier, recap, replay, and run-module outputs are live because they made it through review, publication, lineage, and moderation on one consistent account path.";
+        ? "These campaign, primer, dossier, recap, replay, and run-module outputs are visible, but some public comparison language stays narrow until the remaining review is finished."
+        : "These campaign, primer, dossier, recap, replay, and run-module outputs are live after review and moderation.";
 }
 
 <section class="trust-page-hero">
@@ -177,7 +177,7 @@
             <span>@previewItems.Length opening next</span>
             @if (publicationRouteReviewRequired)
             {
-                <span>Limited public claims</span>
+                <span>Limited public wording</span>
             }
             @if (Model.Chrome.Authenticated)
             {
@@ -206,7 +206,7 @@
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }
@@ -227,10 +227,10 @@
             @if (publicationRouteReviewRequired)
             {
                 <article class="route-callout">
-                    <span class="tag">Limited public claims</span>
+                    <span class="tag">Limited public wording</span>
                     <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
-                    <p>You can inspect the publication, source context, and trust posture today. The remaining boundary is about how broadly the public page should claim parity, not whether the publication exists.</p>
-                    <p>Public parity claims remain review-required until the current direct checks are green.</p>
+                    <p>You can inspect the publication and source context today. The remaining limit is about how broadly the public page should compare it, not whether the publication exists.</p>
+                    <p>Public comparison language stays limited until the current review is finished.</p>
                     <div class="route-callout__proof">
                         <span>Discoverable now</span>
                         <span>Comparison still reviewed</span>
@@ -252,11 +252,11 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Source:</strong> @publication.ProvenanceSummary</p>
                         <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
-                            <p><strong>Trust:</strong> @publication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @publication.TrustSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                         {
@@ -264,7 +264,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                         {
-                            <p><strong>Lineage:</strong> @publication.LineageSummary</p>
+                            <p><strong>History:</strong> @publication.LineageSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                         {
@@ -319,8 +319,8 @@
             </article>
             <article class="continuity-band__fact">
                 <span>Boundary</span>
-                <strong>@(publicationRouteReviewRequired ? "Public parity still reviewed" : "Public parity ready now")</strong>
-                <p>Signed-in account return can stay productive even while the public publication page is still review-required.</p>
+                <strong>@(publicationRouteReviewRequired ? "Public wording still reviewed" : "Public wording ready now")</strong>
+                <p>Signed-in account return can stay useful even while the public publication page is still limited.</p>
             </article>
         </div>
     </section>
@@ -355,11 +355,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                         {
-                            <p><strong>Provenance:</strong> @item.ProvenanceSummary</p>
+                            <p><strong>Source:</strong> @item.ProvenanceSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                         {
-                            <p><strong>Audit:</strong> @item.AuditSummary</p>
+                            <p><strong>Review:</strong> @item.AuditSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                         {
@@ -367,11 +367,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
                         {
-                            <p><strong>Trust:</strong> @linkedPublication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @linkedPublication.TrustSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                         {
-                            <p><strong>Lineage:</strong> @linkedPublication.LineageSummary</p>
+                            <p><strong>History:</strong> @linkedPublication.LineageSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
                         {
@@ -404,11 +404,11 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Source:</strong> @publication.ProvenanceSummary</p>
                         <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
-                            <p><strong>Trust:</strong> @publication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @publication.TrustSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                         {
@@ -416,7 +416,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                         {
-                            <p><strong>Lineage:</strong> @publication.LineageSummary</p>
+                            <p><strong>History:</strong> @publication.LineageSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                         {
@@ -530,7 +530,7 @@
         <article class="route-callout">
             <span class="tag">Temporarily thin view</span>
             <h3>The detail view is not populated on this request.</h3>
-            <p>Use downloads for the live build, what works today for current product truth, or help if you expected a specific artifact to be visible here already.</p>
+            <p>Use downloads for the live build, what works today for current product status, or help if you expected a specific file to be visible here already.</p>
             <div class="route-callout__actions">
                 <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
                 <a class="inline-link" href="/now">Open what works today</a>

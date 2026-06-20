@@ -511,7 +511,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("reviewed output history", buildGhostConcierge, StringComparison.Ordinal);
         Assert.DoesNotContain("governed output follow-through", buildGhostConcierge, StringComparison.Ordinal);
 
-        Assert.Contains("aftermath or replay next steps", shelf, StringComparison.Ordinal);
+        Assert.Contains("replay next steps", shelf, StringComparison.Ordinal);
+        Assert.Contains("Public wording still reviewed", shelf, StringComparison.Ordinal);
         Assert.DoesNotContain("aftermath or replay follow-through", shelf, StringComparison.Ordinal);
 
         Assert.Contains("No open support next step is waiting right now.", controller, StringComparison.Ordinal);
@@ -1036,7 +1037,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", publicationView, StringComparison.Ordinal);
         Assert.Contains("Review-required state", publicationView, StringComparison.Ordinal);
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", shelfView, StringComparison.Ordinal);
-        Assert.Contains("review-required", shelfView, StringComparison.Ordinal);
+        Assert.Contains("Limited public wording", shelfView, StringComparison.Ordinal);
+        Assert.DoesNotContain("review-required", shelfView, StringComparison.Ordinal);
     }
 
     [Fact]

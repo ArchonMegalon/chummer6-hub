@@ -23,7 +23,7 @@
             Summary = "Use this page when the issue can stay public and does not need logs, private campaign detail, install recovery, or account repair.",
             Href = "#feedback-public-lanes",
             Label = "Review public signal pages",
-            Proof = new[] { "Public by default", "Votes inform demand", "No private logs" }
+            Details = new[] { "Public by default", "Votes show demand", "No private logs" }
         },
         new
         {
@@ -32,16 +32,16 @@
             Summary = "Roadmap shows the next likely product movement. It is not a promise and it is not the shipped status page.",
             Href = "/roadmap",
             Label = "Open roadmap",
-            Proof = new[] { "Planned", "Milestone-backed", "Separate from shipped updates" }
+            Details = new[] { "Planned", "Milestones", "Separate from shipped updates" }
         },
         new
         {
             Badge = "Changelog",
-            Title = "Check what is actually available now",
+            Title = "See what is actually available now",
             Summary = "When you need to know whether something is ready today, switch to the changelog backed by releases, live pages, and guides.",
             Href = "/changelog",
             Label = "Open changelog",
-            Proof = new[] { "Evidence first", "User-available", "Release-linked" }
+            Details = new[] { "Available now", "Release notes", "Help nearby" }
         },
         new
         {
@@ -50,7 +50,7 @@
             Summary = "Use Chummer help when the problem needs logs, recovery, support history, or any private account or campaign detail that should not sit on a public board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
-            Proof = new[] { "Support-owned", "Tracked return", "Private by default" }
+            Details = new[] { "Setup help", "Account help", "Private by default" }
         }
     };
     var signalStages = new[]
@@ -60,7 +60,7 @@
             Badge = "Share it",
             Title = "Post one clear public item",
             Summary = "A public feature request, UX pain point, or safe public bug should live on one public page instead of scattering across comments and replies.",
-            Proof = "Start here when the issue can stay public.",
+            Note = "Start here when the issue can stay public.",
             Href = "#feedback-public-lanes",
             Label = "Review the public pages"
         },
@@ -69,7 +69,7 @@
             Badge = "Review",
             Title = "The team reviews it before plans change",
             Summary = "Votes and comments help show demand, but the roadmap only moves when the team is ready to name what comes next.",
-            Proof = "Public interest helps prioritize; it does not promise a ship date.",
+            Note = "Public interest helps prioritize; it does not promise a ship date.",
             Href = "/roadmap",
             Label = "Open roadmap"
         },
@@ -78,7 +78,7 @@
             Badge = "Ship it",
             Title = "The loop closes only after people can use it",
             Summary = "A signal is not done because code merged. It is done when a release, live page, or guide lets people actually use the result.",
-            Proof = "The changelog shows what is available now.",
+            Note = "The changelog shows what is available now.",
             Href = "/changelog",
             Label = "Open changelog"
         },
@@ -87,7 +87,7 @@
             Badge = "Take it private",
             Title = "Move to help when the issue stops being public",
             Summary = "If the issue needs recovery, logs, support history, or account detail, move it to Chummer help early instead of keeping it on a public signal page.",
-            Proof = "Private help stays in Chummer even while the hosted public mirror catches up.",
+            Note = "Private help stays in Chummer even while the hosted public mirror catches up.",
             Href = "/help",
             Label = "Open help"
         }
@@ -127,7 +127,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Feedback boundary</p>
             <h2 class="editorial-title">Public feedback can show direction without pretending something already shipped.</h2>
-            <p class="editorial-copy">This packet keeps the public board connected to Chummer review before feature demand becomes public celebration.</p>
+            <p class="editorial-copy">This page keeps feedback connected to Chummer review before demand turns into release language.</p>
         </div>
         <div class="support-operations-panel">
             @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
@@ -139,9 +139,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Operations packet</p>
-        <h2 class="editorial-title">Hosted signal promotion still needs ingress, routing, and closeout discipline.</h2>
-            <p class="editorial-copy">The public board earns trust only when promotion, taxonomy, intake, and update routes remain inspectable instead of becoming vibes.</p>
+            <p class="eyebrow">Maintenance</p>
+            <h2 class="editorial-title">Public feedback needs routing and closeout discipline.</h2>
+            <p class="editorial-copy">The public board works only when intake, categories, and update routes stay easy to follow.</p>
         </div>
         <div class="support-operations-panel">
             @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
@@ -158,7 +158,7 @@
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </div>
-    <p class="muted-copy">Votes show demand; Chummer-owned release decisions decide what ships. Reviewed shipped updates stay in first-party channels. Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback. These first-party pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths. Use release-backed closeout language to keep public feedback from overclaiming what ships. Create the account when you want signal, installs, support, and roadmap return cues to stay in one place. Truth stays split on purpose.</p>
+    <p class="muted-copy">Votes show demand. Chummer decides what ships. Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
 </section>
 
 <section class="editorial-block">
@@ -204,7 +204,7 @@
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
                 <div class="route-choice-card__proof">
-                    @foreach (var item in choice.Proof)
+                    @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
                     }
@@ -229,7 +229,7 @@
                     <span class="tag">@stage.Badge</span>
                     <h3>@stage.Title</h3>
                     <p>@stage.Summary</p>
-                    <p class="workflow-card__proof">@stage.Proof</p>
+                    <p class="workflow-card__proof">@stage.Note</p>
                     <a class="inline-link" href="@stage.Href">@stage.Label</a>
                 </div>
             </article>
