@@ -109,6 +109,24 @@ function Close-InstallerSurfaceWindows {
     }
 }
 
+function Stop-InstallerSurfaceProcesses {
+    $processes = @(Get-Process | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
+        $_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+
+    foreach ($process in $processes) {
+        try {
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
+            Write-Host "Stopped installer window process: $($process.MainWindowTitle)"
+        }
+        catch {
+            Write-Warning "Could not stop installer window process $($process.Id): $($_.Exception.Message)"
+        }
+    }
+}
+
 function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompletionInstallerFallback = $false) {
     $canonicalSurface = Normalize-Surface $SurfaceValue
     $processes = @(Get-Process | Where-Object {
@@ -190,6 +208,65 @@ namespace ChummerInstallerCapture
 }
 "@
 
+$script:LaunchedInstallerProcessId = $null
+
+function Write-InstallerCaptureFailure([string]$Message) {
+    try {
+        $failurePath = Join-Path $outputFullRoot "WINDOWS_INSTALLER_CAPTURE_FAILURE.txt"
+        $windowRows = @(Get-Process | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) -and
+            ($_.MainWindowTitle.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+                $_.MainWindowTitle.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+        } | ForEach-Object {
+            "pid=$($_.Id) title=$($_.MainWindowTitle)"
+        })
+        $lines = @(
+            "capturedAtUtc=$((Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z"))",
+            "message=$Message",
+            "launchedInstallerProcessId=$script:LaunchedInstallerProcessId",
+            "visibleWindows:"
+        ) + $windowRows
+        $lines | Set-Content -LiteralPath $failurePath -Encoding UTF8
+        Write-Host "Wrote installer capture failure note: $failurePath"
+    }
+    catch {
+        Write-Warning "Could not write installer capture failure note: $($_.Exception.Message)"
+    }
+}
+
+function Stop-LaunchedInstallerProcess {
+    if ($null -eq $script:LaunchedInstallerProcessId) {
+        return
+    }
+
+    $process = Get-Process -Id $script:LaunchedInstallerProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        return
+    }
+
+    try {
+        if (-not $process.HasExited) {
+            [void]$process.CloseMainWindow()
+            Start-Sleep -Seconds 2
+            $process.Refresh()
+        }
+        if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
+            Write-Host "Stopped launched installer process: $($process.Id)"
+        }
+    }
+    catch {
+        Write-Warning "Could not stop launched installer process $($script:LaunchedInstallerProcessId): $($_.Exception.Message)"
+    }
+}
+
+function Invoke-InstallerCaptureCleanup {
+    Close-InstallerSurfaceWindows
+    Start-Sleep -Seconds 2
+    Stop-LaunchedInstallerProcess
+    Stop-InstallerSurfaceProcesses
+}
+
 function Get-CaptureBounds([object]$Window, [bool]$AllowScreenFallback = $true) {
     $fallbackBounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
     if ($null -eq $Window) {
@@ -248,8 +325,17 @@ else {
 
 if ($LaunchInstaller) {
     Write-Host "Launching installer for visual capture: $installerFullPath"
-    Start-Process -FilePath $installerFullPath | Out-Null
+    $launchedProcess = Start-Process -FilePath $installerFullPath -PassThru
+    $script:LaunchedInstallerProcessId = $launchedProcess.Id
     Start-Sleep -Milliseconds 150
+}
+
+trap {
+    Write-InstallerCaptureFailure $_.Exception.Message
+    if ($AutoCapture -and $LaunchInstaller) {
+        Invoke-InstallerCaptureCleanup
+    }
+    throw
 }
 
 $newRows = @()
@@ -481,5 +567,5 @@ Write-Host "Updated source receipt: $sourcePath"
 Write-Host "Status: $status"
 
 if ($AutoCapture -and $LaunchInstaller) {
-    Close-InstallerSurfaceWindows
+    Invoke-InstallerCaptureCleanup
 }

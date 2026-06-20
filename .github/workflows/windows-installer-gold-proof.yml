@@ -116,6 +116,7 @@ jobs:
 
       - name: Capture native startup and visual evidence
         shell: pwsh
+        timeout-minutes: 20
         run: |
           $ErrorActionPreference = "Stop"
           $proofArgs = @{
@@ -157,5 +158,6 @@ jobs:
           "" >> $env:GITHUB_STEP_SUMMARY
           "This workflow collects native Windows proof artifacts only. It does not publish downloads." >> $env:GITHUB_STEP_SUMMARY
           "Auto-captured visual rows use native window-bounds screenshots. The verifier fails if required surfaces are missing or byte-identical." >> $env:GITHUB_STEP_SUMMARY
+          "The capture step has a hard timeout and writes WINDOWS_INSTALLER_CAPTURE_FAILURE.txt when the installer surface cannot be captured." >> $env:GITHUB_STEP_SUMMARY
           "After downloading the artifact, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify" >> $env:GITHUB_STEP_SUMMARY
           "Verifier outcome: ${{ steps.verify.outcome }}" >> $env:GITHUB_STEP_SUMMARY
