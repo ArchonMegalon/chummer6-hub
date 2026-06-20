@@ -149,11 +149,11 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Global AI-off mode hides AI features",
             area="Account and privacy",
             priority="P0",
-            status="active",
+            status="desktop-option-policy-pushed",
             cadence="daily until covered",
             source="User request",
             why_it_matters="Users who do not want AI should not see AI-labeled buttons, companions, critters, or behavior.",
-            next_action="Finish account-linking question, persist preference, hide AI surfaces, and suppress AI as character companion/critter option.",
+            next_action="Verify the next installed desktop build with AI disabled hides Alice, Origin Dossier, explain companions, and AI/metasapient character options while keeping normal critter workflows available.",
             acceptance_gate="With AI disabled, public and desktop flows hide AI entry points and tests prove no AI-only choices are offered.",
         ),
         ImportantWorkItem(

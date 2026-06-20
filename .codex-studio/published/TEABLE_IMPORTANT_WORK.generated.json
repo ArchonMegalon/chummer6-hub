@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T16:00:04Z",
+  "generated_at_utc": "2026-06-20T16:06:52Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 33,
@@ -11,11 +11,12 @@
       "P2": 1
     },
     "status_counts": {
-      "active": 23,
+      "active": 22,
       "blocked-until-next-publish": 1,
       "book-first-ui-pushed": 1,
       "design-active": 1,
       "design-ready": 2,
+      "desktop-option-policy-pushed": 1,
       "local-public-gate-passed": 1,
       "policy-active": 1,
       "queued": 3
@@ -137,11 +138,11 @@
       "title": "Global AI-off mode hides AI features",
       "area": "Account and privacy",
       "priority": "P0",
-      "status": "active",
+      "status": "desktop-option-policy-pushed",
       "cadence": "daily until covered",
       "source": "User request",
       "why_it_matters": "Users who do not want AI should not see AI-labeled buttons, companions, critters, or behavior.",
-      "next_action": "Finish account-linking question, persist preference, hide AI surfaces, and suppress AI as character companion/critter option.",
+      "next_action": "Verify the next installed desktop build with AI disabled hides Alice, Origin Dossier, explain companions, and AI/metasapient character options while keeping normal critter workflows available.",
       "acceptance_gate": "With AI disabled, public and desktop flows hide AI entry points and tests prove no AI-only choices are offered."
     },
     {
@@ -448,8 +449,8 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-20T16:00:04Z",
-    "finished_at_utc": "2026-06-20T16:03:04Z",
+    "started_at_utc": "2026-06-20T16:06:52Z",
+    "finished_at_utc": "2026-06-20T16:07:39Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bseQCIXVnYLcq2KiWzN",
     "table_id": "tbl5UEwrkhI27HOlwkT",
