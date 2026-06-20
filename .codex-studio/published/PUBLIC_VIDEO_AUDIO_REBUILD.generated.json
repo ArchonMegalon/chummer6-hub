@@ -1,0 +1,2838 @@
+{
+  "contract_name": "chummer.public_video_audio_rebuild.v1",
+  "generated_at_utc": "2026-06-20T18:14:27Z",
+  "status": "pass",
+  "scope": {
+    "definition": "all public MP4/WebM files under Chummer.Run.Api/wwwroot/media, grouped by canonical asset stem; desktop, mobile and WebM variants included",
+    "media_root": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media",
+    "group_count": 27,
+    "file_count": 48
+  },
+  "hard_exit_gate": {
+    "applies_to": "all public video files selected by this script; horizon manifest MP4s are the publication-critical subset",
+    "duration_seconds_min": 89.5,
+    "duration_seconds_max": 90.5,
+    "audio_streams_required": 1,
+    "video_streams_required": 1,
+    "max_silence_seconds_at_gate_dbfs": 0.7,
+    "max_start_silence_seconds": 0.3,
+    "max_tail_silence_seconds": 0.3,
+    "silence_gate_dbfs": -42.0,
+    "alice_voice_policy": "female_only",
+    "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed; noise-bed-only output is rejected by review policy"
+  },
+  "provider_posture": {
+    "narration_provider": "edge-tts-premium-news; optional Unmixr when configured except Alice female-only override",
+    "unmixr_required": false,
+    "non_narrated_mode": "clean first-party cinematic ambient bed only when no narration source exists",
+    "artifact_filters": {
+      "notch_hz": 11730,
+      "low_tone_notches_hz": [
+        188,
+        235
+      ],
+      "lowpass_hz": 9800,
+      "low_rumble_highpass_hz": 90,
+      "tone_gate": "fails on narrow high-frequency tonal artifact, sub-bass rumble, and 35-190 Hz low-tone brumming, not only missing audio"
+    },
+    "voice_selection": {
+      "default_voice_env_order": [
+        "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
+        "UNMIXR_NARRATOR_VOICE_ID",
+        "UNMIXR_VOICE_ID"
+      ],
+      "alice_voice_env_order": [
+        "UNMIXR_ALICE_VOICE_ID",
+        "UNMIXR_FEMALE_NARRATOR_VOICE_ID",
+        "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
+        "UNMIXR_NARRATOR_VOICE_ID",
+        "UNMIXR_VOICE_ID"
+      ],
+      "default_edge_voice": "en-US-GuyNeural",
+      "alice_edge_voice": "en-US-JennyNeural"
+    }
+  },
+  "groups": [
+    {
+      "group_key": "alice-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 179,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-JennyNeural",
+        "voice_policy": "female_only",
+        "voice_reused_from_cache": true,
+        "beat_count": 10
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/alice-90s-deepdive/alice-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2401506"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196989"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "29105503"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -22.77,
+            "peak_dbfs": -5.59,
+            "high_band_power_ratio": 4.6e-05,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 23.64,
+            "sub_bass_power_ratio": 1.8e-05,
+            "low_bass_power_ratio": 0.000177,
+            "voice_to_low_db": 36.84,
+            "low_tone_peak_hz": 140.6,
+            "low_tone_peak_prominence_db": 12.14,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.25,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.103
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "all-horizons-90s-magicfit-promo",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 170,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.vtt",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 8
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/all-horizons-90s-magicfit-promo/all-horizons-90s-magicfit-promo.mp4.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "4049319"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "197044"
+              }
+            ],
+            "format": {
+              "duration": "90.000000",
+              "size": "47781582"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.25,
+            "peak_dbfs": -5.62,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 11.06,
+            "sub_bass_power_ratio": 0.000279,
+            "low_bass_power_ratio": 0.0017,
+            "voice_to_low_db": 27.17,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 19.41,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.webm",
+          "duration_seconds": 90.037,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/all-horizons-90s-magicfit-promo/all-horizons-90s-magicfit-promo.webm.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "90.027000",
+              "size": "20195955"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.2,
+            "peak_dbfs": -4.95,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 23.34,
+            "sub_bass_power_ratio": 0.000271,
+            "low_bass_power_ratio": 0.001672,
+            "voice_to_low_db": 27.24,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.03,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "ashline-circle-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 14,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ashline-circle-promo/ashline-circle-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "1878605"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194056"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "6775205"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.39,
+            "peak_dbfs": -5.56,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.24,
+            "sub_bass_power_ratio": 0.00046,
+            "low_bass_power_ratio": 0.0018,
+            "voice_to_low_db": 26.74,
+            "low_tone_peak_hz": 128.9,
+            "low_tone_peak_prominence_db": 20.4,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ashline-circle-promo/ashline-circle-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "3002587"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194056"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "10474956"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.39,
+            "peak_dbfs": -5.56,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.24,
+            "sub_bass_power_ratio": 0.00046,
+            "low_bass_power_ratio": 0.0018,
+            "voice_to_low_db": 26.74,
+            "low_tone_peak_hz": 128.9,
+            "low_tone_peak_prominence_db": 20.4,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.webm",
+          "duration_seconds": 26.358,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ashline-circle-promo/ashline-circle-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.361000",
+              "size": "3953872"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.33,
+            "peak_dbfs": -5.64,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 18.45,
+            "sub_bass_power_ratio": 0.000455,
+            "low_bass_power_ratio": 0.001783,
+            "voice_to_low_db": 26.78,
+            "low_tone_peak_hz": 128.9,
+            "low_tone_peak_prominence_db": 21.86,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "barrens-free-wardens-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 14,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/barrens-free-wardens-promo/barrens-free-wardens-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2473817"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "193915"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "8734008"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.76,
+            "peak_dbfs": -5.78,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 18.46,
+            "sub_bass_power_ratio": 0.000768,
+            "low_bass_power_ratio": 0.002459,
+            "voice_to_low_db": 25.24,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 23.79,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/barrens-free-wardens-promo/barrens-free-wardens-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "4183555"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "193915"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "14361894"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.76,
+            "peak_dbfs": -5.78,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 18.46,
+            "sub_bass_power_ratio": 0.000768,
+            "low_bass_power_ratio": 0.002459,
+            "voice_to_low_db": 25.24,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 23.79,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.webm",
+          "duration_seconds": 26.35,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/barrens-free-wardens-promo/barrens-free-wardens-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.354000",
+              "size": "5088201"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.71,
+            "peak_dbfs": -5.69,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 25.51,
+            "sub_bass_power_ratio": 0.000756,
+            "low_bass_power_ratio": 0.002417,
+            "voice_to_low_db": 25.32,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 25.08,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-3dvista-flythrough",
+      "status": "pass",
+      "mode": "authored_repair_script",
+      "narration_word_count": 65,
+      "caption_file": "",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 3
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+          "duration_seconds": 60.233,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/black-ledger-3dvista-flythrough/black-ledger-3dvista-flythrough.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "3500503"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "195084"
+              }
+            ],
+            "format": {
+              "duration": "60.233333",
+              "size": "27816333"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.76,
+            "peak_dbfs": -5.6,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 12.74,
+            "sub_bass_power_ratio": 0.00026,
+            "low_bass_power_ratio": 0.001828,
+            "voice_to_low_db": 27.02,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.19,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.25,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.051
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 144,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 7
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/black-ledger-90s-deepdive/black-ledger-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2228941"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196587"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "27168614"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.67,
+            "peak_dbfs": -5.57,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 14.52,
+            "sub_bass_power_ratio": 0.00025,
+            "low_bass_power_ratio": 0.002055,
+            "voice_to_low_db": 26.31,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.09,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-epic-90s",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 150,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-epic-90s.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-epic-90s.mp4",
+          "duration_seconds": 89.75,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/black-ledger-epic-90s/black-ledger-epic-90s.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "3063046"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196753"
+              }
+            ],
+            "format": {
+              "duration": "89.750000",
+              "size": "36579363"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.52,
+            "peak_dbfs": -5.65,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 15.14,
+            "sub_bass_power_ratio": 0.000203,
+            "low_bass_power_ratio": 0.001548,
+            "voice_to_low_db": 27.6,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 19.19,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.25,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.055
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-video-globe-idle",
+      "status": "pass",
+      "mode": "authored_repair_script",
+      "narration_word_count": 21,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.mp4",
+          "duration_seconds": 14.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/black-ledger-video-globe-idle/black-ledger-video-globe-idle.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "1213520"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "195757"
+              }
+            ],
+            "format": {
+              "duration": "14.000000",
+              "size": "2407922"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.36,
+            "peak_dbfs": -5.67,
+            "high_band_power_ratio": 1.1e-05,
+            "tone_peak_hz": 10546.9,
+            "tone_peak_prominence_db": 19.4,
+            "sub_bass_power_ratio": 0.000263,
+            "low_bass_power_ratio": 0.001944,
+            "voice_to_low_db": 26.3,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.28,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.25,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.104
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.webm",
+          "duration_seconds": 14.024,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/black-ledger-video-globe-idle/black-ledger-video-globe-idle.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "14.020000",
+              "size": "5441229"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.32,
+            "peak_dbfs": -5.67,
+            "high_band_power_ratio": 1e-05,
+            "tone_peak_hz": 10546.9,
+            "tone_peak_prominence_db": 28.35,
+            "sub_bass_power_ratio": 0.000256,
+            "low_bass_power_ratio": 0.001895,
+            "voice_to_low_db": 26.41,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 22.49,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "chummer6-flagship-promo",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 194,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 10
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/chummer6-flagship-promo/chummer6-flagship-promo.mp4.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "3672518"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "197109"
+              }
+            ],
+            "format": {
+              "duration": "90.000000",
+              "size": "43542994"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.26,
+            "peak_dbfs": -5.66,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.38,
+            "sub_bass_power_ratio": 0.000188,
+            "low_bass_power_ratio": 0.001826,
+            "voice_to_low_db": 26.77,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.34,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
+          "duration_seconds": 90.077,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/chummer6-flagship-promo/chummer6-flagship-promo.webm.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "90.062000",
+              "size": "27173891"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.22,
+            "peak_dbfs": -5.53,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 24.22,
+            "sub_bass_power_ratio": 0.00018,
+            "low_bass_power_ratio": 0.001801,
+            "voice_to_low_db": 26.83,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 23.05,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "community-hub-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 154,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/community-hub-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/community-hub-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/community-hub-90s-deepdive/community-hub-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2069015"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196815"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "25380362"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.58,
+            "peak_dbfs": -5.61,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 11.79,
+            "sub_bass_power_ratio": 0.000286,
+            "low_bass_power_ratio": 0.002086,
+            "voice_to_low_db": 26.4,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 20.83,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "every-wonder-horizon-promo",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 132,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.vtt",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 7
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/every-wonder-horizon-promo/every-wonder-horizon-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2725284"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196278"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "32736018"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.55,
+            "peak_dbfs": -5.66,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 12.19,
+            "sub_bass_power_ratio": 0.000191,
+            "low_bass_power_ratio": 0.00172,
+            "voice_to_low_db": 27.02,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 20.74,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.webm",
+          "duration_seconds": 90.037,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/every-wonder-horizon-promo/every-wonder-horizon-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "89.611000",
+              "size": "12933828"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.5,
+            "peak_dbfs": -5.66,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 24.29,
+            "sub_bass_power_ratio": 0.000182,
+            "low_bass_power_ratio": 0.001694,
+            "voice_to_low_db": 27.09,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 22.42,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "ghostline-network-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 11,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ghostline-network-promo/ghostline-network-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2482498"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194251"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "8763605"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.25,
+            "peak_dbfs": -5.69,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10535.2,
+            "tone_peak_prominence_db": 18.88,
+            "sub_bass_power_ratio": 0.000476,
+            "low_bass_power_ratio": 0.001505,
+            "voice_to_low_db": 27.62,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 21.87,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ghostline-network-promo/ghostline-network-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "4330016"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194251"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "14844985"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.25,
+            "peak_dbfs": -5.69,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10535.2,
+            "tone_peak_prominence_db": 18.88,
+            "sub_bass_power_ratio": 0.000476,
+            "low_bass_power_ratio": 0.001505,
+            "voice_to_low_db": 27.62,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 21.87,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.webm",
+          "duration_seconds": 26.35,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/ghostline-network-promo/ghostline-network-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.354000",
+              "size": "6437090"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.21,
+            "peak_dbfs": -5.65,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 24.64,
+            "sub_bass_power_ratio": 0.000468,
+            "low_bass_power_ratio": 0.001481,
+            "voice_to_low_db": 27.69,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 25.5,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "glass-tower-compact-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 18,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 2
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/glass-tower-compact-promo/glass-tower-compact-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2027642"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194539"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "7267205"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.14,
+            "peak_dbfs": -5.7,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 19.08,
+            "sub_bass_power_ratio": 0.000396,
+            "low_bass_power_ratio": 0.001611,
+            "voice_to_low_db": 27.18,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.99,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/glass-tower-compact-promo/glass-tower-compact-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "3728640"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194539"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "12866285"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.14,
+            "peak_dbfs": -5.7,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 19.08,
+            "sub_bass_power_ratio": 0.000396,
+            "low_bass_power_ratio": 0.001611,
+            "voice_to_low_db": 27.18,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.99,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.webm",
+          "duration_seconds": 26.35,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/glass-tower-compact-promo/glass-tower-compact-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.354000",
+              "size": "4615219"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -25.1,
+            "peak_dbfs": -5.64,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 27.6,
+            "sub_bass_power_ratio": 0.000389,
+            "low_bass_power_ratio": 0.001595,
+            "voice_to_low_db": 27.22,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 24.71,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "jackpoint-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 142,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/jackpoint-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 8
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/jackpoint-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/jackpoint-90s-deepdive/jackpoint-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2314587"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196859"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "28130687"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.41,
+            "peak_dbfs": -5.41,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 12.81,
+            "sub_bass_power_ratio": 0.000349,
+            "low_bass_power_ratio": 0.00247,
+            "voice_to_low_db": 25.44,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.94,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "karma-forge-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 143,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/karma-forge-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 7
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/karma-forge-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/karma-forge-90s-deepdive/karma-forge-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2257712"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196805"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "27493333"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.57,
+            "peak_dbfs": -5.62,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 15.58,
+            "sub_bass_power_ratio": 0.000188,
+            "low_bass_power_ratio": 0.00187,
+            "voice_to_low_db": 26.81,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.89,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "neon-docks-union-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 13,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/neon-docks-union-promo/neon-docks-union-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2966396"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "193800"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "10355106"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.73,
+            "peak_dbfs": -5.7,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.26,
+            "sub_bass_power_ratio": 0.000619,
+            "low_bass_power_ratio": 0.001684,
+            "voice_to_low_db": 26.92,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 22.95,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/neon-docks-union-promo/neon-docks-union-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "4902504"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "193800"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "16728105"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.73,
+            "peak_dbfs": -5.7,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.26,
+            "sub_bass_power_ratio": 0.000619,
+            "low_bass_power_ratio": 0.001684,
+            "voice_to_low_db": 26.92,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 22.95,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.webm",
+          "duration_seconds": 26.35,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/neon-docks-union-promo/neon-docks-union-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.354000",
+              "size": "7568095"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.68,
+            "peak_dbfs": -5.65,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 23.2,
+            "sub_bass_power_ratio": 0.000604,
+            "low_bass_power_ratio": 0.001645,
+            "voice_to_low_db": 27.02,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 25.95,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "nexus-pan-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 163,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 10
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/nexus-pan-90s-deepdive/nexus-pan-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2158515"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196921"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "26383707"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.19,
+            "peak_dbfs": -5.61,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 14.16,
+            "sub_bass_power_ratio": 0.000205,
+            "low_bass_power_ratio": 0.001422,
+            "voice_to_low_db": 27.89,
+            "low_tone_peak_hz": 128.9,
+            "low_tone_peak_prominence_db": 19.75,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "nexus-pan-epic-90s",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 168,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-epic-90s.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-epic-90s.mp4",
+          "duration_seconds": 89.667,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/nexus-pan-epic-90s/nexus-pan-epic-90s.mp4.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2275521"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196396"
+              }
+            ],
+            "format": {
+              "duration": "89.666667",
+              "size": "27714510"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.82,
+            "peak_dbfs": -5.53,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 14.71,
+            "sub_bass_power_ratio": 0.000335,
+            "low_bass_power_ratio": 0.001748,
+            "voice_to_low_db": 26.98,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 19.72,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-90s-deepdive",
+      "status": "pass",
+      "mode": "authored_repair_script",
+      "narration_word_count": 163,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-90s-deepdive/origin-dossier-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.873",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804,
+                "bit_rate": "547204"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "197434"
+              }
+            ],
+            "format": {
+              "duration": "90.000000",
+              "size": "8387077"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.17,
+            "peak_dbfs": -5.62,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 12.93,
+            "sub_bass_power_ratio": 0.000162,
+            "low_bass_power_ratio": 0.001709,
+            "voice_to_low_db": 27.13,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.38,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.25,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.104
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.webm",
+          "duration_seconds": 90.02,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-90s-deepdive/origin-dossier-90s-deepdive.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.872",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "90.027000",
+              "size": "4873562"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.13,
+            "peak_dbfs": -5.54,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 23.69,
+            "sub_bass_power_ratio": 0.00015,
+            "low_bass_power_ratio": 0.001686,
+            "voice_to_low_db": 27.19,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 23.58,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-the-name-she-chose",
+      "status": "pass",
+      "mode": "caption_file_humanized",
+      "narration_word_count": 177,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-the-name-she-chose/origin-dossier-the-name-she-chose.mp4.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804,
+                "bit_rate": "547204"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196142"
+              }
+            ],
+            "format": {
+              "duration": "90.000000",
+              "size": "8373018"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.64,
+            "peak_dbfs": -5.63,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 13.43,
+            "sub_bass_power_ratio": 0.000315,
+            "low_bass_power_ratio": 0.001555,
+            "voice_to_low_db": 27.55,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 18.22,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.webm",
+          "duration_seconds": 90.02,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-the-name-she-chose/origin-dossier-the-name-she-chose.webm.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "90.027000",
+              "size": "4827483"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.59,
+            "peak_dbfs": -5.54,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 24.91,
+            "sub_bass_power_ratio": 0.000307,
+            "low_bass_power_ratio": 0.001529,
+            "voice_to_low_db": 27.62,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 19.35,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-the-name-she-chose-20260619",
+      "status": "pass",
+      "mode": "caption_file_humanized",
+      "narration_word_count": 177,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
+          "duration_seconds": 90.0,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-the-name-she-chose-20260619/origin-dossier-the-name-she-chose-20260619.mp4.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804,
+                "bit_rate": "547204"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196142"
+              }
+            ],
+            "format": {
+              "duration": "90.000000",
+              "size": "8373018"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.64,
+            "peak_dbfs": -5.63,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 13.43,
+            "sub_bass_power_ratio": 0.000315,
+            "low_bass_power_ratio": 0.001555,
+            "voice_to_low_db": 27.55,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 18.22,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.webm",
+          "duration_seconds": 90.02,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/origin-dossier-the-name-she-chose-20260619/origin-dossier-the-name-she-chose-20260619.webm.before-unmixr-audio",
+          "fit_mode": "natural",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 804
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "90.027000",
+              "size": "4827483"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.59,
+            "peak_dbfs": -5.54,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 24.91,
+            "sub_bass_power_ratio": 0.000307,
+            "low_bass_power_ratio": 0.001529,
+            "voice_to_low_db": 27.62,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 19.35,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "runbook-press-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 151,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 6
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.mp4",
+          "duration_seconds": 89.667,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/runbook-press-90s-deepdive/runbook-press-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2897185"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196367"
+              }
+            ],
+            "format": {
+              "duration": "89.666667",
+              "size": "34682005"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.44,
+            "peak_dbfs": -5.41,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 13.49,
+            "sub_bass_power_ratio": 0.000228,
+            "low_bass_power_ratio": 0.001891,
+            "voice_to_low_db": 26.72,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 20.47,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "runsite-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 147,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.mp4",
+          "duration_seconds": 89.625,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/runsite-90s-deepdive/runsite-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2387385"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "196497"
+              }
+            ],
+            "format": {
+              "duration": "89.625000",
+              "size": "28957557"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.47,
+            "peak_dbfs": -5.65,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 15.14,
+            "sub_bass_power_ratio": 0.000283,
+            "low_bass_power_ratio": 0.001673,
+            "voice_to_low_db": 27.26,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 19.15,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "rust-market-syndicate-promo",
+      "status": "pass",
+      "mode": "receipt_captions_humanized",
+      "narration_word_count": 18,
+      "caption_file": "",
+      "receipt_file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.receipt.json",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 1
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-mobile.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/rust-market-syndicate-promo/rust-market-syndicate-promo-mobile.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "3194265"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194416"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "11106950"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.11,
+            "peak_dbfs": -5.72,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 16.9,
+            "sub_bass_power_ratio": 0.000392,
+            "low_bass_power_ratio": 0.001508,
+            "voice_to_low_db": 27.69,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 19.9,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.mp4",
+          "duration_seconds": 26.333,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/rust-market-syndicate-promo/rust-market-syndicate-promo.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "5079401"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "194416"
+              }
+            ],
+            "format": {
+              "duration": "26.333333",
+              "size": "17312188"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.11,
+            "peak_dbfs": -5.72,
+            "high_band_power_ratio": 7e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 16.9,
+            "sub_bass_power_ratio": 0.000392,
+            "low_bass_power_ratio": 0.001508,
+            "voice_to_low_db": 27.69,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 19.9,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.webm",
+          "duration_seconds": 26.35,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/rust-market-syndicate-promo/rust-market-syndicate-promo.webm.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "26.354000",
+              "size": "7979352"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -26.07,
+            "peak_dbfs": -5.71,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10535.2,
+            "tone_peak_prominence_db": 24.47,
+            "sub_bass_power_ratio": 0.000386,
+            "low_bass_power_ratio": 0.001493,
+            "voice_to_low_db": 27.73,
+            "low_tone_peak_hz": 82.0,
+            "low_tone_peak_prominence_db": 20.91,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "table-pulse-90s-deepdive",
+      "status": "pass",
+      "mode": "legacy_longform_script_humanized",
+      "narration_word_count": 174,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/table-pulse-90s-deepdive.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": true,
+        "beat_count": 9
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/horizons/table-pulse-90s-deepdive.mp4",
+          "duration_seconds": 89.583,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/table-pulse-90s-deepdive/table-pulse-90s-deepdive.mp4.before-unmixr-audio",
+          "fit_mode": "stretched_0.860",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1280,
+                "height": 720,
+                "bit_rate": "2105329"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "197004"
+              }
+            ],
+            "format": {
+              "duration": "89.583333",
+              "size": "25788984"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -23.1,
+            "peak_dbfs": -5.59,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10500.0,
+            "tone_peak_prominence_db": 10.59,
+            "sub_bass_power_ratio": 0.000266,
+            "low_bass_power_ratio": 0.002442,
+            "voice_to_low_db": 25.51,
+            "low_tone_peak_hz": 105.5,
+            "low_tone_peak_prominence_db": 22.15,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "turn-1-newsreel",
+      "status": "pass",
+      "mode": "caption_file_humanized",
+      "narration_word_count": 150,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 11
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.mp4",
+          "duration_seconds": 20.167,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/turn-1-newsreel/turn-1-newsreel.mp4.before-unmixr-audio",
+          "fit_mode": "sped_up_1.180",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "7526636"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "198287"
+              }
+            ],
+            "format": {
+              "duration": "20.166667",
+              "size": "19419085"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -22.64,
+            "peak_dbfs": -5.68,
+            "high_band_power_ratio": 5e-06,
+            "tone_peak_hz": 10523.4,
+            "tone_peak_prominence_db": 12.35,
+            "sub_bass_power_ratio": 0.000177,
+            "low_bass_power_ratio": 0.001876,
+            "voice_to_low_db": 26.77,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 21.95,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.webm",
+          "duration_seconds": 20.182,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/turn-1-newsreel/turn-1-newsreel.webm.before-unmixr-audio",
+          "fit_mode": "sped_up_1.180",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "20.187000",
+              "size": "10425837"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -22.58,
+            "peak_dbfs": -5.62,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10558.6,
+            "tone_peak_prominence_db": 19.69,
+            "sub_bass_power_ratio": 0.000166,
+            "low_bass_power_ratio": 0.001835,
+            "voice_to_low_db": 26.87,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 24.52,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "group_key": "turn-2-newsreel",
+      "status": "pass",
+      "mode": "caption_file_humanized",
+      "narration_word_count": 144,
+      "caption_file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.vtt",
+      "receipt_file": "",
+      "provider": {
+        "provider": "edge-tts-premium-news",
+        "voice": "en-US-GuyNeural",
+        "voice_policy": "premium_news_anchor",
+        "voice_reused_from_cache": false,
+        "beat_count": 11
+      },
+      "files": [
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.mp4",
+          "duration_seconds": 24.133,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/turn-2-newsreel/turn-2-newsreel.mp4.before-unmixr-audio",
+          "fit_mode": "sped_up_1.180",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080,
+                "bit_rate": "7424008"
+              },
+              {
+                "codec_name": "aac",
+                "codec_type": "audio",
+                "sample_rate": "96000",
+                "channels": 1,
+                "bit_rate": "198143"
+              }
+            ],
+            "format": {
+              "duration": "24.133333",
+              "size": "22943968"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -22.79,
+            "peak_dbfs": -5.68,
+            "high_band_power_ratio": 6e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 9.5,
+            "sub_bass_power_ratio": 0.000101,
+            "low_bass_power_ratio": 0.001328,
+            "voice_to_low_db": 28.2,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 22.08,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        },
+        {
+          "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.webm",
+          "duration_seconds": 24.157,
+          "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/turn-2-newsreel/turn-2-newsreel.webm.before-unmixr-audio",
+          "fit_mode": "sped_up_1.180",
+          "probe": {
+            "programs": [],
+            "streams": [
+              {
+                "codec_name": "vp9",
+                "codec_type": "video",
+                "width": 1920,
+                "height": 1080
+              },
+              {
+                "codec_name": "opus",
+                "codec_type": "audio",
+                "sample_rate": "48000",
+                "channels": 1
+              }
+            ],
+            "format": {
+              "duration": "24.154000",
+              "size": "11971966"
+            }
+          },
+          "audio_streams": 1,
+          "video_streams": 1,
+          "quality": {
+            "status": "pass",
+            "reasons": [],
+            "rms_dbfs": -22.74,
+            "peak_dbfs": -5.65,
+            "high_band_power_ratio": 4e-06,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 23.73,
+            "sub_bass_power_ratio": 9.3e-05,
+            "low_bass_power_ratio": 0.001305,
+            "voice_to_low_db": 28.28,
+            "low_tone_peak_hz": 117.2,
+            "low_tone_peak_prominence_db": 24.63,
+            "silence_gate_dbfs": -42.0,
+            "max_silence_seconds": 0.0,
+            "first_audible_seconds": 0.0,
+            "tail_silence_seconds": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

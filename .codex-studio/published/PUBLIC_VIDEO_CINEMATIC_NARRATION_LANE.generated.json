@@ -1,0 +1,1087 @@
+{
+  "contract_name": "chummer.public_video_cinematic_narration_lane.v1",
+  "generated_at_utc": "2026-06-20T18:14:48Z",
+  "status": "pass",
+  "media_root": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media",
+  "policy": {
+    "video_assets_require_audio_stream": true,
+    "spoken_assets_require_caption_or_receipt_source": true,
+    "ambient_only_assets_must_declare_boundary": true,
+    "provider_posture": "Use checked-in captions/receipts as the source script. Prefer a verified premium voice provider; fall back only with explicit receipt."
+  },
+  "video_group_count": 27,
+  "audio_only_asset_count": 6,
+  "issues": [],
+  "video_groups": [
+    {
+      "group_key": "alice-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.vtt",
+      "caption_segments": 10,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "calm female guide voice; concise, practical, not chatbot-branded",
+      "variants": [
+        {
+          "public_path": "/media/horizons/alice-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/black-ledger-90s-deepdive.vtt",
+      "caption_segments": 8,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/black-ledger-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-epic-90s",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/black-ledger-epic-90s.vtt",
+      "caption_segments": 8,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/black-ledger-epic-90s.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.75,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "community-hub-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/community-hub-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/community-hub-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "jackpoint-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/jackpoint-90s-deepdive.vtt",
+      "caption_segments": 8,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/jackpoint-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "karma-forge-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/karma-forge-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/karma-forge-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "nexus-pan-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/nexus-pan-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "nexus-pan-epic-90s",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-epic-90s.vtt",
+      "caption_segments": 10,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/nexus-pan-epic-90s.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.667,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.vtt",
+      "caption_segments": 10,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "cinematic audiobook narration; intimate runner-story pacing before any build advice",
+      "variants": [
+        {
+          "public_path": "/media/horizons/origin-dossier-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/horizons/origin-dossier-90s-deepdive.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.027,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-the-name-she-chose",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.vtt",
+      "caption_segments": 11,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "cinematic audiobook narration; intimate runner-story pacing before any build advice",
+      "variants": [
+        {
+          "public_path": "/media/horizons/origin-dossier-the-name-she-chose.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/horizons/origin-dossier-the-name-she-chose.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.027,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "origin-dossier-the-name-she-chose-20260619",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.vtt",
+      "caption_segments": 11,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "cinematic audiobook narration; intimate runner-story pacing before any build advice",
+      "variants": [
+        {
+          "public_path": "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/horizons/origin-dossier-the-name-she-chose-20260619.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.027,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "runbook-press-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/runbook-press-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.667,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "runsite-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/runsite-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.625,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "table-pulse-90s-deepdive",
+      "root": "horizons",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/table-pulse-90s-deepdive.vtt",
+      "caption_segments": 9,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/horizons/table-pulse-90s-deepdive.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "ashline-circle-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-AvaNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/ashline-circle-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/ashline-circle-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/ashline-circle-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.361,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "barrens-free-wardens-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-ChristopherNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/barrens-free-wardens-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/barrens-free-wardens-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/barrens-free-wardens-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.354,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "ghostline-network-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-DavisNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/ghostline-network-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/ghostline-network-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/ghostline-network-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.354,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "glass-tower-compact-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-GuyNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/glass-tower-compact-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/glass-tower-compact-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/glass-tower-compact-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.354,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "neon-docks-union-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-BrianNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/neon-docks-union-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/neon-docks-union-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/neon-docks-union-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.354,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "rust-market-syndicate-promo",
+      "root": "ledger/factions",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "receipt_narration",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts",
+      "voice": "en-US-AndrewNeural",
+      "voice_direction": "short faction teaser narration; noir energy, no rules authority",
+      "variants": [
+        {
+          "public_path": "/media/ledger/factions/rust-market-syndicate-promo-mobile.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/rust-market-syndicate-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.333,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/factions/rust-market-syndicate-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 26.354,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-video-globe-idle",
+      "root": "ledger/globe",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "ambient_only",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "first-party cinematic ambient bed; no gameplay or rules claim rides on the audio",
+      "variants": [
+        {
+          "public_path": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 14.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 14.02,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "turn-1-newsreel",
+      "root": "ledger/newsreels",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.vtt",
+      "caption_segments": 10,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "broadcast newsroom cadence; clear and current, not melodramatic",
+      "variants": [
+        {
+          "public_path": "/media/ledger/newsreels/turn-1-newsreel.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 20.167,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/newsreels/turn-1-newsreel.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 20.187,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "turn-2-newsreel",
+      "root": "ledger/newsreels",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.vtt",
+      "caption_segments": 11,
+      "receipt": "",
+      "tour_manifest": "",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "broadcast newsroom cadence; clear and current, not melodramatic",
+      "variants": [
+        {
+          "public_path": "/media/ledger/newsreels/turn-2-newsreel.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 24.133,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/ledger/newsreels/turn-2-newsreel.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 24.154,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "black-ledger-3dvista-flythrough",
+      "root": "ledger/tours",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "ambient_only",
+      "caption": "",
+      "caption_segments": 0,
+      "receipt": "",
+      "tour_manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-tour-exports.manifest.json",
+      "narration_provider": "",
+      "voice": "",
+      "voice_direction": "first-party cinematic ambient bed; no gameplay or rules claim rides on the audio",
+      "variants": [
+        {
+          "public_path": "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 60.233,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "all-horizons-90s-magicfit-promo",
+      "root": "promo",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.vtt",
+      "caption_segments": 9,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "edge-tts",
+      "voice": "en-GB-ThomasNeural",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/promo/all-horizons-90s-magicfit-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/promo/all-horizons-90s-magicfit-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.027,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "chummer6-flagship-promo",
+      "root": "promo",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt",
+      "caption_segments": 11,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "unmixr-short-tts-beats",
+      "voice": "premium_unmixr_narrator_preferred",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/promo/chummer6-flagship-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.0,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/promo/chummer6-flagship-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 90.062,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    },
+    {
+      "group_key": "every-wonder-horizon-promo",
+      "root": "promo",
+      "status": "pass",
+      "issues": [],
+      "source_mode": "captions",
+      "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.vtt",
+      "caption_segments": 7,
+      "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.receipt.json",
+      "tour_manifest": "",
+      "narration_provider": "edge-tts",
+      "voice": "en-GB-ThomasNeural",
+      "voice_direction": "premium cinematic narrator over restrained music bed",
+      "variants": [
+        {
+          "public_path": "/media/promo/every-wonder-horizon-promo.mp4",
+          "kind": "mp4",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.583,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "aac"
+          ]
+        },
+        {
+          "public_path": "/media/promo/every-wonder-horizon-promo.webm",
+          "kind": "webm",
+          "status": "pass",
+          "issues": [],
+          "duration_seconds": 89.611,
+          "video_streams": 1,
+          "audio_streams": 1,
+          "audio_codecs": [
+            "opus"
+          ]
+        }
+      ]
+    }
+  ],
+  "audio_only_assets": [
+    {
+      "public_path": "/media/ledger/factions/ashline-circle-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    },
+    {
+      "public_path": "/media/ledger/factions/barrens-free-wardens-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    },
+    {
+      "public_path": "/media/ledger/factions/ghostline-network-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    },
+    {
+      "public_path": "/media/ledger/factions/glass-tower-compact-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    },
+    {
+      "public_path": "/media/ledger/factions/neon-docks-union-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    },
+    {
+      "public_path": "/media/ledger/factions/rust-market-syndicate-promo-audio.m4a",
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 26.345,
+      "audio_streams": 1,
+      "audio_codecs": [
+        "aac"
+      ]
+    }
+  ]
+}

@@ -13,7 +13,8 @@
     "durationSeconds": 60.233,
     "resolution": "1280x720",
     "codec": "h264",
-    "audio": "none",
+    "audio": "first_party_subtle_ambient_bed_present",
+    "audioClaimBoundary": "Ambient bed only; this remains a provider sample capture, not Chummer-authored tactical, route, map, or campaign truth.",
     "captureBoundary": "Generated from the public 3DVista New York Loft sample for viewer/fly-through validation only; not Chummer-authored tactical truth."
   },
   "exports": [
