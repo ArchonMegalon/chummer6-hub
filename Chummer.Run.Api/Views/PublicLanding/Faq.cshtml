@@ -1,3 +1,4 @@
+@using Chummer.Run.Api.Services
 @model FaqPageViewModel
 @{
     ViewData["Title"] = Model.Heading;
@@ -95,6 +96,8 @@
 
         return null;
     }
+
+    string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="trust-page-hero">
@@ -106,7 +109,7 @@
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@PublicText(action.Label)</a>
         }
     </div>
 </section>
@@ -122,15 +125,15 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <h3>@PublicText(choice.Title)</h3>
+                <p>@PublicText(choice.Summary)</p>
                 <div class="route-choice-card__highlights">
                     @foreach (var item in choice.Highlights)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@ContextualPreviewHref(choice.Href)">@choice.Label</a>
+                <a class="editorial-strip__action" href="@ContextualPreviewHref(choice.Href)">@PublicText(choice.Label)</a>
             </article>
         }
     </div>
@@ -149,19 +152,19 @@
     @foreach (var faqSection in Model.Sections)
     {
         <article class="faq-block" data-faq-section>
-            <p class="eyebrow">@faqSection.Title</p>
+            <p class="eyebrow">@PublicText(faqSection.Title)</p>
             <div class="faq-list">
                 @foreach (var entry in faqSection.Entries)
                 {
                     <details class="faq-item" data-faq-item data-faq-text="@($"{faqSection.Title} {entry.Question} {entry.Answer}")">
-                        <summary>@entry.Question</summary>
-                        <p>@entry.Answer</p>
+                        <summary>@PublicText(entry.Question)</summary>
+                        <p>@PublicText(entry.Answer)</p>
                         @{
                             var answerAction = FaqActionFor(faqSection.Title, entry.Question, Model.Chrome.Authenticated);
                         }
                         @if (answerAction is not null)
                         {
-                            <p><a class="inline-link" href="@ContextualPreviewHref(answerAction.Href)">@answerAction.Label</a></p>
+                            <p><a class="inline-link" href="@ContextualPreviewHref(answerAction.Href)">@PublicText(answerAction.Label)</a></p>
                         }
                     </details>
                 }

@@ -36,6 +36,8 @@
         return resolvedHref;
     }
 
+    string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
     static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
     {
         "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
@@ -244,12 +246,12 @@
                 var fallbackAction = HelpFallbackActionFor(choice.Id, Model.Chrome.Authenticated);
                 <article class="minimal-help-card" id="@choice.Id">
                     <span>@choice.Badge</span>
-                    <h3>@choice.Title</h3>
-                    <p>@choice.Summary</p>
-                    <a class="inline-link" href="@choice.Href">@choice.Label</a>
+                    <h3>@PublicText(choice.Title)</h3>
+                    <p>@PublicText(choice.Summary)</p>
+                    <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
                     @if (fallbackAction is not null)
                     {
-                        <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@fallbackAction.Label</a></p>
+                        <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
                     }
                 </article>
             }
@@ -265,14 +267,14 @@
             {
                 <article>
                     <details>
-                        <summary>@pageSection.Heading</summary>
-                        <p>@pageSection.Body</p>
+                        <summary>@PublicText(pageSection.Heading)</summary>
+                        <p>@PublicText(pageSection.Body)</p>
                         @if (pageSection.Bullets is { Count: > 0 })
                         {
                             <ul>
                                 @foreach (var bullet in pageSection.Bullets)
                                 {
-                                    <li>@bullet</li>
+                                    <li>@PublicText(bullet)</li>
                                 }
                             </ul>
                         }
