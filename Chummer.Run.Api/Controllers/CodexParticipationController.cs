@@ -787,10 +787,10 @@ public sealed class CodexParticipationController : Controller
                 currentCode = "ready_to_start",
                 steps = new[]
                 {
-                    new { key = "intent", label = "Intent", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Waiting for you to open a lane." },
+                    new { key = "intent", label = "Intent", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Waiting for you to start a session." },
                     new { key = "consent", label = "Consent", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Consent is recorded only after you explicitly continue." },
-                    new { key = "authorize", label = "Authorize", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "A one-time code appears only after lane start." },
-                    new { key = "activation", label = "Activation", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Fleet lane activation stays pending until authorization succeeds." }
+                    new { key = "authorize", label = "Authorize", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "A one-time code appears only after the session starts." },
+                    new { key = "activation", label = "Activation", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Activation starts after authorization succeeds." }
                 }
             };
         }
@@ -811,11 +811,11 @@ public sealed class CodexParticipationController : Controller
 
         string activationState = laneReady ? "complete" : terminalStop ? "stopped" : authDone ? "in_progress" : "pending";
         string activationSummary = laneReady
-            ? "Lane is active and ready for bounded contribution work."
+            ? "This session is active and ready for bounded contribution work."
             : terminalStop
-                ? "This lane is no longer active. Start a fresh lane when you want to contribute again."
+                ? "This session is no longer active. Start a fresh session when you want to contribute again."
                 : authDone
-                    ? "Authorization is complete; activation is waiting on slot and host readiness."
+                    ? "Authorization is complete; activation is waiting for the next available slot."
                     : "Activation starts after consent and authorization complete.";
 
         return new
@@ -824,9 +824,9 @@ public sealed class CodexParticipationController : Controller
             currentCode = string.IsNullOrWhiteSpace(normalizedStatus) ? "tracked" : normalizedStatus,
             steps = new[]
             {
-                new { key = "intent", label = "Intent", state = intentDone ? "complete" : "pending", happenedAtUtc = intentDone ? session.CreatedAtUtc : (DateTimeOffset?)null, summary = "Contribution intent is tracked on your account rail." },
-                new { key = "consent", label = "Consent", state = consentDone ? "complete" : "pending", happenedAtUtc = session.ConsentedAtUtc, summary = consentDone ? "Consent recorded and attached to this sponsor session." : "Consent is still required before device authorization starts." },
-                new { key = "authorize", label = "Authorize", state = authDone ? "complete" : "pending", happenedAtUtc = session.AuthorizedAtUtc, summary = authDone ? "ChatGPT authorization succeeded for this session." : "Waiting for one-time device-auth confirmation." },
+                new { key = "intent", label = "Intent", state = intentDone ? "complete" : "pending", happenedAtUtc = intentDone ? session.CreatedAtUtc : (DateTimeOffset?)null, summary = "Contribution intent is tracked on your account." },
+                new { key = "consent", label = "Consent", state = consentDone ? "complete" : "pending", happenedAtUtc = session.ConsentedAtUtc, summary = consentDone ? "Consent recorded for this session." : "Consent is still required before authorization starts." },
+                new { key = "authorize", label = "Authorize", state = authDone ? "complete" : "pending", happenedAtUtc = session.AuthorizedAtUtc, summary = authDone ? "ChatGPT authorization succeeded for this session." : "Waiting for one-time code confirmation." },
                 new { key = "activation", label = "Activation", state = activationState, happenedAtUtc = activationAtUtc, summary = activationSummary }
             }
         };
@@ -861,7 +861,7 @@ public sealed class CodexParticipationController : Controller
             {
                 level = "warning",
                 title = "Host reachability issue",
-                summary = "The host could not refresh lane status. Keep your account flow on the same rail and retry from this screen.",
+                summary = "Chummer could not refresh this session. Keep the page open and retry from this screen.",
                 nextSafeAction = "Retry from Participate. If this continues, open Account > Support and mention the current contribution id."
             };
         }
@@ -872,7 +872,7 @@ public sealed class CodexParticipationController : Controller
             {
                 level = "info",
                 title = "No active failure",
-                summary = "Start only when you want a fresh lane and one-time code.",
+                summary = "Start only when you want a fresh session and one-time code.",
                 nextSafeAction = "Choose 'I want to participate' to generate a new authorization code."
             };
         }
@@ -883,22 +883,22 @@ public sealed class CodexParticipationController : Controller
             {
                 level = "warning",
                 title = "Capacity wait",
-                summary = "Authorization can still be valid while lane capacity is temporarily full.",
+                summary = "Authorization can still be valid while capacity is temporarily full.",
                 nextSafeAction = "Keep this page open for automatic polling, or request a fresh code if the current authorization expires."
             },
             "stopped" => new
             {
                 level = "info",
-                title = "Lane stopped",
-                summary = "This lane was stopped intentionally and will not process new work.",
+                title = "Session stopped",
+                summary = "This session was stopped intentionally and will not process new work.",
                 nextSafeAction = "Start a new contribution session when you are ready to continue."
             },
             "revoked" => new
             {
                 level = "warning",
-                title = "Lane revoked",
-                summary = "This lane was revoked and cannot be resumed.",
-                nextSafeAction = "Start a fresh lane and complete consent + authorization again."
+                title = "Session revoked",
+                summary = "This session was revoked and cannot be resumed.",
+                nextSafeAction = "Start a fresh session and complete consent + authorization again."
             },
             _ => new
             {
@@ -916,13 +916,13 @@ public sealed class CodexParticipationController : Controller
             "intent_created" => "Intent recorded",
             "consented" => "Consent recorded",
             "pending_auth" => "Waiting for authorization",
-            "fleet_lane_created" => "Fleet lane created",
+            "fleet_lane_created" => "Session created",
             "auth_ready" => "Authorization ready",
             "lane_pending" => "Activation in progress",
             "waiting_for_slot" => session.AuthorizedAtUtc is null ? "Queued before authorization" : "Queued after authorization",
-            "active" => "Lane active",
-            "stopped" => "Lane stopped",
-            "revoked" => "Lane revoked",
+            "active" => "Session active",
+            "stopped" => "Session stopped",
+            "revoked" => "Session revoked",
             _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase((session.Status ?? "tracked").Replace('_', ' '))
         };
 
@@ -933,10 +933,10 @@ public sealed class CodexParticipationController : Controller
             "consent_recorded" => "Consent recorded",
             "device_auth_started" => "Authorization started",
             "device_auth_ready" => "Authorization ready",
-            "lane_created" => "Lane created",
-            "lane_activated" => "Lane activated",
-            "lane_stopped" => "Lane stopped",
-            "lane_revoked" => "Lane revoked",
+            "lane_created" => "Session created",
+            "lane_activated" => "Session activated",
+            "lane_stopped" => "Session stopped",
+            "lane_revoked" => "Session revoked",
             _ => string.IsNullOrWhiteSpace(kind)
                 ? "Decision event"
                 : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(kind.Replace('_', ' '))
@@ -1010,7 +1010,7 @@ public sealed class CodexParticipationController : Controller
         var user = _accounts.EnsureUser(subjectId, subjectId);
         if (!string.Equals(session.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
         {
-            denied = Problem(statusCode: StatusCodes.Status403Forbidden, detail: "sponsor session does not belong to the authenticated subject.");
+            denied = Problem(statusCode: StatusCodes.Status403Forbidden, detail: "session does not belong to the authenticated account.");
             return null;
         }
 

@@ -32,7 +32,7 @@
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What you need ready</p>
             <h3>Your browser and ChatGPT</h3>
-            <p>When you start, Chummer requests a fresh device-auth code, opens the ChatGPT confirmation page, and waits for the browser to finish. If the code expires, you can request a new one from the wizard.</p>
+            <p>When you start, Chummer requests a fresh one-time code, opens the ChatGPT confirmation page, and waits for the browser to finish. If the code expires, you can request a new one from the wizard.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What Chummer stores</p>
@@ -407,7 +407,7 @@ function showPreparingState() {
   ui.setText(nodes.heading, "Preparing a fresh authorization code");
   ui.setText(nodes.support, "Chummer is opening a fresh participation challenge for this session.");
   ui.setText(nodes.statusLine, "Codes are only generated after you explicitly start.");
-  ui.setText(nodes.lifecycleStateLine, "Lifecycle: preparing new lane.");
+  ui.setText(nodes.lifecycleStateLine, "Preparing a new session.");
   nodes.lifecycleSteps.hidden = true;
   nodes.decisionBreadcrumbs.hidden = true;
   nodes.failureGuidance.hidden = true;
@@ -433,7 +433,7 @@ function renderError(error) {
   nodes.lifecycleSteps.hidden = true;
   nodes.decisionBreadcrumbs.hidden = true;
   nodes.failureGuidance.hidden = false;
-  ui.setText(nodes.failureGuidanceSummary, "The request failed before a stable lane status was confirmed.");
+  ui.setText(nodes.failureGuidanceSummary, "The request failed before a stable session status was confirmed.");
   ui.setText(nodes.failureGuidanceNext, "Next safe action: retry this flow. If retries fail, open Account > Support with the approximate time of this attempt.");
   nodes.technicalDetails.hidden = true;
   setWizardStep("start", "error");
