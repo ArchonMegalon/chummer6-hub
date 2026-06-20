@@ -28,10 +28,10 @@
         => AppendFilter($"/api/v1/public/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}", ResolveSourceContextFilterKey(fallbackFilterKey));
     string SourceDetailActionLabel(string fallbackFilterKey, string fallbackFilterLabel)
         => detail.FilterApplied
-            ? "Open source drilldown with same filter"
+            ? "Open source details with same filter"
             : !string.Equals(fallbackFilterKey, "all", StringComparison.Ordinal)
                 ? $"Open {fallbackFilterLabel.ToLowerInvariant()}"
-                : "Open source drilldown";
+                : "Open source details";
     string ThreadDetailHref(string dispatchReceiptId)
         => AppendCurrentFilter($"/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceiptId)}");
     string ThreadArtifactHref(string dispatchReceiptId)
@@ -44,9 +44,9 @@
     <p class="page-copy">@detail.Summary</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@detail.BackHref">@detail.BackLabel</a>
-        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Open detail artifact</a>
-        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Open aggregate artifact</a>
-        <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Search another bounded drilldown</a>
+        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Open details</a>
+        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Open summary</a>
+        <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Search another item</a>
         @if (!string.IsNullOrWhiteSpace(detail.RelatedHref) && !string.IsNullOrWhiteSpace(detail.RelatedLabel))
         {
             <a class="button-like button-like--ghost" href="@detail.RelatedHref">@detail.RelatedLabel</a>
@@ -57,18 +57,18 @@
 
 @if (savedPivots.Length > 0)
 {
-    <section class="status-decision-strip" aria-label="Saved pivots">
+    <section class="status-decision-strip" aria-label="Saved filters">
         @foreach (var pivot in savedPivots)
         {
             <article class="status-decision-strip__card">
-                <span class="tag">@(pivot.Current ? "Current pivot" : "Saved pivot")</span>
+                <span class="tag">@(pivot.Current ? "Current filter" : "Saved filter")</span>
                 <h2>@pivot.Label · @pivot.Count thread@(pivot.Count == 1 ? string.Empty : "s")</h2>
                 <p>@pivot.Summary</p>
                 <div class="stacked-actions">
                     <a class="button-like @(pivot.Current ? "button-like--primary" : "button-like--secondary")" href="@pivot.Href">
-                        @(pivot.Current ? "Viewing this pivot" : "Open this pivot")
+                        @(pivot.Current ? "Viewing this filter" : "Open this filter")
                     </a>
-                    <a class="button-like button-like--ghost" href="@pivot.ArtifactHref">Open pivot artifact</a>
+                    <a class="button-like button-like--ghost" href="@pivot.ArtifactHref">Open filter details</a>
                 </div>
             </article>
         }
@@ -78,18 +78,18 @@
 <section class="status-decision-strip" aria-label="Drilldown summary">
     <article class="status-decision-strip__card">
         <span class="tag">Activity</span>
-        <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this drilldown.</h2>
-        <p>@dispatchReceipts.Length dispatch record@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey record@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
+        <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this view.</h2>
+        <p>@dispatchReceipts.Length message record@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length follow-up record@(journeyReceipts.Length == 1 ? string.Empty : "s") are joined here.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Queue posture</span>
-        <h2>@queueReceipts.Length bounded queue candidate@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this drilldown.</h2>
+        <span class="tag">Queue status</span>
+        <h2>@queueReceipts.Length queue item@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this view.</h2>
         <p>@closeoutReceipts.Length closeout follow-up record@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing record@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Public-safe detail</span>
-        <h2>Raw delivery payloads still stay out of first-party storage.</h2>
-        <p>This page only uses bounded metadata, hashed recipient identity, and Chummer closeout state.</p>
+        <span class="tag">Private details</span>
+        <h2>Raw delivery bodies stay out of Chummer storage.</h2>
+        <p>This page only uses limited metadata, hashed recipient identity, and Chummer closeout state.</p>
     </article>
 </section>
 
@@ -98,8 +98,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Current filter</p>
-            <h2 class="editorial-title">@detail.FilterLabel are currently isolated on this drilldown.</h2>
-            <p class="editorial-copy">The thread, dispatch, outcome, and journey sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the bounded pivot you selected.</p>
+            <h2 class="editorial-title">@detail.FilterLabel are currently isolated on this view.</h2>
+            <p class="editorial-copy">The thread, message, outcome, and follow-up sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the filter you selected.</p>
         </div>
     </section>
 }
@@ -109,8 +109,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Source record</p>
-            <h2 class="editorial-title">The originating source record stays visible as the root of this drilldown.</h2>
-            <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, dispatch, outcome, and journey state.</p>
+            <h2 class="editorial-title">The originating source record stays visible as the root of this view.</h2>
+            <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, message, outcome, and follow-up state.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -151,7 +151,7 @@
                 }
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@SourceDetailHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">@SourceDetailActionLabel(sourceReceipt.HotFilterKey, sourceReceipt.HotFilterLabel)</a>
-                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open source artifact</a>
+                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open source details</a>
                 </div>
             </article>
         </div>
@@ -163,8 +163,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Activity</p>
-            <h2 class="editorial-title">Routing, closeout status, and queue readiness stay clear before any delivery update lands.</h2>
-            <p class="editorial-copy">This keeps support boundaries, voter follow-up, and outbox readiness on the same page as the later delivery timeline, including recipient threads, dispatch updates, outcome updates, journey writeback, and saved pivots.</p>
+            <h2 class="editorial-title">Routing, closeout status, and queue status stay clear before any delivery update is sent.</h2>
+            <p class="editorial-copy">This keeps support boundaries, voter follow-up, and send status on the same page as the later delivery timeline, including recipient threads, message updates, outcome updates, follow-up, and saved filters.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in routingReceipts)
@@ -185,7 +185,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
                     </div>
                 </article>
             }
@@ -205,7 +205,7 @@
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
                         {
-                            <span>No public delivery claim</span>
+                            <span>Not public</span>
                         }
                     </div>
                     @if (!detail.FilterApplied)
@@ -214,7 +214,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
                     </div>
                 </article>
             }
@@ -237,11 +237,11 @@
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.ReadyForOutbox)
                         {
-                            <span>Ready for Hub outbox</span>
+                            <span>Ready to send</span>
                         }
                         else
                         {
-                            <span>Outbox blocked</span>
+                            <span>Send blocked</span>
                         }
                     </div>
                     @if (!detail.FilterApplied)
@@ -250,7 +250,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
                     </div>
                 </article>
             }
@@ -263,8 +263,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Filtered result</p>
-            <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this bounded drilldown.</h2>
-            <p class="editorial-copy">Use the saved pivots above to reopen the full source record or jump straight to another bounded state without leaving this page.</p>
+            <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this filtered view.</h2>
+            <p class="editorial-copy">Use the saved filters above to reopen the full source record or jump straight to another filtered state without leaving this page.</p>
         </div>
     </section>
 }
@@ -274,8 +274,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Recipient threads</p>
-            <h2 class="editorial-title">The dispatch spine, latest outcome update, and journey detail now sit on one bounded recipient timeline.</h2>
-            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected source or dispatch spine.</p>
+            <h2 class="editorial-title">The message history, latest outcome update, and follow-up detail now sit on one recipient timeline.</h2>
+            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected source or message history.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var thread in recipientThreads)
@@ -301,12 +301,12 @@
                         <span>@thread.LastTouchedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         @if (!thread.PublicClaimAllowed)
                         {
-                            <span>No public thread claim</span>
+                            <span>Not public</span>
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread drilldown</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Open thread artifact</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread details</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Open thread data</a>
                     </div>
                 </article>
             }
@@ -318,9 +318,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Dispatch records</p>
-            <h2 class="editorial-title">Every first-party outbound attempt stays visible as a dispatch record.</h2>
-            <p class="editorial-copy">This keeps send status, suppression state, retry timing, and delivery identity aligned to one dispatch view.</p>
+            <p class="eyebrow">Message records</p>
+            <h2 class="editorial-title">Every outbound message attempt stays visible.</h2>
+            <p class="editorial-copy">This keeps send status, suppression state, retry timing, and delivery identity aligned to one message view.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in dispatchReceipts)
@@ -362,12 +362,12 @@
                         }
                         @if (!receipt.PublicClaimAllowed)
                         {
-                            <span>No public send claim</span>
+                            <span>Not public</span>
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread drilldown</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Open thread artifact</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread details</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Open thread data</a>
                     </div>
                 </article>
             }
@@ -380,15 +380,15 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Delivery updates</p>
-            <h2 class="editorial-title">Delivery updates stay bounded and attributable.</h2>
-            <p class="editorial-copy">Identity match mode, recipient matching, and delivery state stay visible without storing raw payload bodies.</p>
+            <h2 class="editorial-title">Delivery updates stay clear and attributable.</h2>
+            <p class="editorial-copy">Identity match mode, recipient matching, and delivery state stay visible without storing raw delivery bodies.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in deliveryOutcomes)
             {
                 <article class="route-choice-card">
                     <span class="tag">@receipt.StatusLabel</span>
-                    <h3>@receipt.Provider · @receipt.ProviderState</h3>
+                    <h3>Delivery update · @receipt.ProviderState</h3>
                     <p>@receipt.Summary</p>
                     @if (!string.IsNullOrWhiteSpace(receipt.Reason))
                     {
@@ -417,8 +417,8 @@
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread drilldown</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Open thread artifact</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread details</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Open thread data</a>
                     </div>
                 </article>
             }
@@ -430,9 +430,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Journey writeback</p>
-            <h2 class="editorial-title">Journey detail only lands after the first-party closeout timeline actually completes.</h2>
-            <p class="editorial-copy">These rows show bounded voter notifications tied to the same governor decision and release record used by the dispatch timeline.</p>
+            <p class="eyebrow">Follow-up</p>
+            <h2 class="editorial-title">Follow-up detail only appears after the closeout timeline completes.</h2>
+            <p class="editorial-copy">These rows show voter notifications tied to the same review decision and release record used by the message timeline.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in journeyReceipts)
@@ -450,7 +450,7 @@
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
                         {
-                            <span>No public journey claim</span>
+                            <span>Not public</span>
                         }
                     </div>
                     @if (!detail.FilterApplied)
@@ -459,7 +459,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
                     </div>
                 </article>
             }
