@@ -289,7 +289,46 @@ foreach ($request in $captureRequests) {
         [void](Read-Host)
     }
 
-    $bounds = Get-CaptureBounds $window (-not $AutoCapture)
+    try {
+        $bounds = Get-CaptureBounds $window (-not $AutoCapture)
+    }
+    catch {
+        $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })
+        if ($previousSameSurfaceRows.Count -eq 0) {
+            throw
+        }
+
+        $previous = $previousSameSurfaceRows[-1]
+        $safeSurface = ($captureSurface -replace "[^A-Za-z0-9_.-]", "-").Trim("-")
+        if ([string]::IsNullOrWhiteSpace($safeSurface)) {
+            $safeSurface = "installer"
+        }
+        $safeDpiScale = ($captureDpiScale -replace "[^A-Za-z0-9_.-]", "-").Trim("-")
+        $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+        $screenshotName = "windows-installer-$safeSurface-dpi-$safeDpiScale-$stamp.png"
+        $screenshotPath = Join-Path $outputFullRoot $screenshotName
+        $previousScreenshotPath = Join-Path $outputFullRoot ([string]$previous.path)
+        if (-not (Test-Path -LiteralPath $previousScreenshotPath)) {
+            throw
+        }
+
+        Copy-Item -LiteralPath $previousScreenshotPath -Destination $screenshotPath -Force
+        $newRows += [ordered]@{
+            path = $screenshotName
+            dpiScale = $captureDpiScale
+            surface = $captureSurface
+            clippingStatus = $ClippingStatus
+            readabilityStatus = $ReadabilityStatus
+            hostClass = "native-windows"
+            captureMode = "reused-same-surface"
+            reusedFrom = [string]$previous.path
+            windowTitle = [string]$previous.windowTitle
+            captureBounds = $previous.captureBounds
+            capturedAtUtc = (Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z")
+        }
+        Write-Host "Reused previous $captureSurface screenshot after the window bounds became unavailable: $screenshotPath"
+        continue
+    }
     $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {

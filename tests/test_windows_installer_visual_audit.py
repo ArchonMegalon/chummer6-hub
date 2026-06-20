@@ -408,6 +408,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("reused-same-surface", text)
         self.assertIn("reusedFrom", text)
         self.assertIn("Reused previous $captureSurface screenshot after the window closed", text)
+        self.assertIn("Reused previous $captureSurface screenshot after the window bounds became unavailable", text)
         self.assertIn("Timed out waiting for Chummer installer surface", text)
         self.assertIn("$AutoCaptureTimeoutSeconds", text)
         self.assertIn("$delaySeconds = 0", text)
