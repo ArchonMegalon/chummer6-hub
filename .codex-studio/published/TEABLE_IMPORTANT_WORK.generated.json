@@ -1,17 +1,18 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T12:26:27Z",
+  "generated_at_utc": "2026-06-20T13:28:32Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
-  "row_count": 27,
+  "row_count": 28,
   "summary": {
     "priority_counts": {
-      "P0": 20,
+      "P0": 21,
       "P1": 6,
       "P2": 1
     },
     "status_counts": {
       "active": 20,
+      "blocked-until-next-publish": 1,
       "design-active": 1,
       "design-ready": 2,
       "policy-active": 1,
@@ -33,7 +34,7 @@
       "Origin Dossier": 1,
       "Packaging": 1,
       "Provider governance": 2,
-      "Release": 1,
+      "Release": 2,
       "Rules engine": 1,
       "Support": 1,
       "Testing": 1,
@@ -185,6 +186,18 @@
       "why_it_matters": "The installer is the first desktop impression and currently has oversized clipped text.",
       "next_action": "Redesign installer layout, typography, DPI behavior, progress, and completion states.",
       "acceptance_gate": "Windows installer screenshots at 100 percent and 150 percent DPI show no clipping and feel consistent with Chummer."
+    },
+    {
+      "item_id": "windows-installer-current-shelf-proof",
+      "title": "Current Windows shelf installer proof",
+      "area": "Release",
+      "priority": "P0",
+      "status": "blocked-until-next-publish",
+      "cadence": "next scheduled 08:00 publish",
+      "source": "Windows installer gold proof runs 27872347490 and 27872430827",
+      "why_it_matters": "Fresh installer code now passes visual proof, but the currently published shelf installer is still the older build and cannot complete the proof chain.",
+      "next_action": "At the next scheduled morning publish, promote the Windows build that contains the modeless completion prompt and rerun the native installer gold proof against the promoted shelf artifact.",
+      "acceptance_gate": "The promoted Windows installer artifact SHA matches the proof receipt and has progress plus completion screenshots at 100 percent and 150 percent DPI."
     },
     {
       "item_id": "aur-linux-package",
@@ -370,14 +383,14 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-20T12:26:27Z",
-    "finished_at_utc": "2026-06-20T12:27:12Z",
+    "started_at_utc": "2026-06-20T13:28:32Z",
+    "finished_at_utc": "2026-06-20T13:29:26Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bseQCIXVnYLcq2KiWzN",
     "table_id": "tbl5UEwrkhI27HOlwkT",
     "table_name": "Chummer Important Work",
-    "synced_count": 27,
-    "created_count": 0,
+    "synced_count": 28,
+    "created_count": 1,
     "updated_count": 27,
     "failed_count": 0,
     "errors": []

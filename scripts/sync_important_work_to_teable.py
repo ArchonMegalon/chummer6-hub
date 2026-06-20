@@ -203,6 +203,18 @@ def important_work_items() -> list[ImportantWorkItem]:
             acceptance_gate="Windows installer screenshots at 100 percent and 150 percent DPI show no clipping and feel consistent with Chummer.",
         ),
         ImportantWorkItem(
+            item_id="windows-installer-current-shelf-proof",
+            title="Current Windows shelf installer proof",
+            area="Release",
+            priority="P0",
+            status="blocked-until-next-publish",
+            cadence="next scheduled 08:00 publish",
+            source="Windows installer gold proof runs 27872347490 and 27872430827",
+            why_it_matters="Fresh installer code now passes visual proof, but the currently published shelf installer is still the older build and cannot complete the proof chain.",
+            next_action="At the next scheduled morning publish, promote the Windows build that contains the modeless completion prompt and rerun the native installer gold proof against the promoted shelf artifact.",
+            acceptance_gate="The promoted Windows installer artifact SHA matches the proof receipt and has progress plus completion screenshots at 100 percent and 150 percent DPI.",
+        ),
+        ImportantWorkItem(
             item_id="aur-linux-package",
             title="AUR package for Arch-based Linux",
             area="Packaging",
