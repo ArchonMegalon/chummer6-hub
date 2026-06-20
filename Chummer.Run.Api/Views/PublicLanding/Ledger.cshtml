@@ -30,7 +30,7 @@
         "rust-market-syndicate" => "Everything is available. Nothing is free.",
         "ashline-circle" => "Power is easy. Control is hard.",
         "neon-docks-union" => "Routes move. Drones complain. We keep the city breathing.",
-        "ghostline-network" => "If you heard it, verify it. If you verified it, redact it.",
+        "ghostline-network" => "If you heard it, test it. If it holds, redact it.",
         "barrens-free-wardens" => "Less nuyen. More backbone.",
         _ => "Pressure moves faster than certainty."
     };
@@ -47,7 +47,7 @@
     Func<string, string> ledgerReason = label => label switch
     {
         "Permit Leverage" => "Contract wins, district calm, and public-facing cleanups raise it.",
-        "Public Trust" => "Receipts, low heat, and successful dispatches push it upward.",
+        "Public Trust" => "Clean history, low heat, and successful dispatches push it upward.",
         "Contract Capture" => "District control and package pressure wins move it.",
         "Debt Shield" => "Low debt heat and stable holdings improve it.",
         "Debt Heat" => "Favors, pressure spikes, and visible scarcity raise it.",
@@ -62,7 +62,7 @@
         "Drone Load" => "Cargo demand and route churn raise it.",
         "Cargo Pressure" => "Package traffic and event spikes move it.",
         "Maintenance Debt" => "Heat and accumulated strain raise it.",
-        "Intel Confidence" => "Low rumor noise and verified dispatches improve it.",
+        "Intel Confidence" => "Low rumor noise and trusted dispatches improve it.",
         "Rumor Noise" => "Volatility and conflicting signals raise it.",
         "Signal Discipline" => "Cleaner routing and safer dispatches improve it.",
         "Exposure Risk" => "Public heat and conflict arcs raise it.",
@@ -210,7 +210,7 @@
             <p>Latest dispatches, table hooks, and the current bulletin.</p>
         </a>
         <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@accountCtaLabel">
-            <span class="tag">Faction rail</span>
+            <span class="tag">Faction workspace</span>
             <strong>@accountCtaLabel</strong>
             <p>Step from the public board into the account-side faction workspace.</p>
         </a>
@@ -332,11 +332,11 @@
                                             <span class="tag">@beat.ActorKind</span>
                                             <h4>@beat.BeatLabel</h4>
                                             <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@beat.VisualHook</p>
-                                            <p>@beat.ActionSummary</p>
-                                            <p class="ledger-newsreel-broadcast__action-stakes">@beat.Stakes</p>
-                                            <p class="ledger-newsreel-broadcast__action-stakes">@beat.ConsequenceLine</p>
-                        <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.VisualHook)</p>
+                                            <p>@PublicFacingCopyHumanizer.Clean(beat.ActionSummary)</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@PublicFacingCopyHumanizer.Clean(beat.Stakes)</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@PublicFacingCopyHumanizer.Clean(beat.ConsequenceLine)</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
                                         </article>
                                     }
                                 </div>
@@ -345,14 +345,14 @@
                         <article class="route-choice-card">
                             <span class="tag">@newsreelBroadcast.PackageLabel</span>
                             <h3>Broadcast posture</h3>
-                            <p>@newsreelBroadcast.AudioPosture</p>
-                            <p>@newsreelBroadcast.MusicPosture</p>
-                            <p>@newsreelBroadcast.PublicSafetyNote</p>
+                            <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.AudioPosture)</p>
+                            <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.MusicPosture)</p>
+                            <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.PublicSafetyNote)</p>
                             <p>@newsreelBroadcast.ReconstructionNote</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
-                                <a href="@newsreelBroadcast.ReceiptsHref">Source receipts</a>
+                                <a href="@newsreelBroadcast.ReceiptsHref">Source details</a>
                                 <a href="@newsreelBroadcast.FeedbackHref">Feedback</a>
                             </div>
                         </article>
@@ -411,7 +411,7 @@
             </div>
             <div class="trust-claim__microproof">
                 <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
-                <span>Delivery: first-party email rail</span>
+                <span>Delivery: first-party email</span>
                             <span>Clips: @Model.NewsreelStatus.ReceiptCount</span>
             </div>
         </section>
@@ -512,7 +512,7 @@
                 <article class="route-choice-card">
                     <span class="tag">Storyboard</span>
                     <h3>Faction intro video</h3>
-                    <p>Video verification is still pending, so this page stays on a simple fallback.</p>
+                    <p>Video playback status is still pending, so this page stays on a simple fallback.</p>
                     <div class="trust-claim__microproof">
                         <a class="inline-link" href="/ledger/factions/@slug/promo">Promo page</a>
                         <a class="inline-link" href="/ledger/factions/@slug/promo.json">JSON brief</a>

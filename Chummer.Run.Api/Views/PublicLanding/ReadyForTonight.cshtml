@@ -9,11 +9,11 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__microproof">
             @foreach (var point in Model.SummaryPoints)
             {
-                <span>@point</span>
+                <span>@PublicFacingCopyHumanizer.Clean(point)</span>
             }
         </div>
     </div>
@@ -33,9 +33,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Session-start verdict</p>
+        <p class="eyebrow">Session start</p>
         <h2 class="editorial-title">Make the next game start calmer.</h2>
-        <p class="editorial-copy">@Model.VerdictSummary</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.VerdictSummary)</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var verdict in Model.Verdicts)
@@ -43,7 +43,7 @@
             <article class="route-choice-card">
                 <span class="tag">@verdict.RoleLabel</span>
                 <h3>@verdict.StatusLabel</h3>
-                <p>@verdict.Summary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(verdict.Summary)</p>
                 <div class="route-choice-card__proof">
                     <span>Status: @verdict.Status</span>
                     <span>Next: @verdict.NextBestScreen</span>
@@ -52,14 +52,14 @@
                 <ul>
                     @foreach (var item in verdict.BlockingReasons)
                     {
-                        <li>@item</li>
+                        <li>@PublicFacingCopyHumanizer.Clean(item)</li>
                     }
                 </ul>
                 <p><strong>Changed since last session</strong></p>
                 <ul>
                     @foreach (var item in verdict.ChangedSinceLastSession)
                     {
-                        <li>@item</li>
+                        <li>@PublicFacingCopyHumanizer.Clean(item)</li>
                     }
                 </ul>
                 <div class="stacked-actions">
@@ -69,9 +69,9 @@
                     }
                 </div>
                 <div class="trust-claim__microproof">
-                    @foreach (var proof in verdict.ProofReceipts)
+                    @foreach (var detail in verdict.ProofReceipts)
                     {
-                        <span>@proof</span>
+                        <span>@PublicFacingCopyHumanizer.Clean(detail)</span>
                     }
                 </div>
             </article>
@@ -82,8 +82,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Starter kits</p>
-        <h2 class="editorial-title">Download the bounded loadout that matches the table lane.</h2>
-        <p class="editorial-copy">Starter kits stay small on purpose: enough to reduce session-start anxiety, not an excuse to pretend the deep builder disappeared.</p>
+        <h2 class="editorial-title">Download the small loadout that matches your table role.</h2>
+        <p class="editorial-copy">Starter kits stay small on purpose: enough to reduce session-start anxiety without replacing the full builder.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var kit in Model.RoleKits)
@@ -91,11 +91,11 @@
             <article class="route-choice-card">
                 <span class="tag">@kit.RoleLane</span>
                 <h3>@kit.Label</h3>
-                <p>@kit.Summary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(kit.Summary)</p>
                 <div class="route-choice-card__proof">
                     @foreach (var item in kit.Highlights)
                     {
-                        <span>@item</span>
+                        <span>@PublicFacingCopyHumanizer.Clean(item)</span>
                     }
                 </div>
                 <a class="editorial-strip__action" href="@kit.DownloadHref">Download starter loadout JSON</a>
@@ -106,9 +106,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Packets and handoff</p>
-        <h2 class="editorial-title">Carry the packet into print, export, or mobile without losing provenance.</h2>
-        <p class="editorial-copy">The file routes below are first-party. They keep the session-start packet, machine-readable copy, and mobile return path attached to the same public-safe rail.</p>
+        <p class="eyebrow">Files and handoff</p>
+        <h2 class="editorial-title">Carry the session notes into print, export, or mobile.</h2>
+        <p class="editorial-copy">The file routes below stay first-party. They keep the session-start notes, machine-readable copy, and mobile return path together.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var packet in Model.Packets)
@@ -116,7 +116,7 @@
             <article class="route-choice-card">
                 <span class="tag">@packet.RoleId</span>
                 <h3>@packet.Label</h3>
-                <p>@packet.Summary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(packet.Summary)</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@packet.MarkdownHref">Download packet</a>
                     <a class="button-like button-like--secondary" href="@packet.JsonHref">Open packet JSON</a>
@@ -126,7 +126,7 @@
         <article class="route-choice-card">
             <span class="tag">mobile</span>
             <h3>Mobile handoff</h3>
-            <p>Keep the packet family, install rail, and continuity rail attached when the session moves off the desktop.</p>
+            <p>Keep the session files, install path, and return path together when the session moves off the desktop.</p>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="/ready/handoff/mobile.json">Open handoff JSON</a>
                 <a class="button-like button-like--secondary" href="/mobile">Open mobile and PWA</a>

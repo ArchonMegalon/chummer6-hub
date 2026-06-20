@@ -3281,8 +3281,8 @@
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationSubmitNotes">@(correctionResubmission ? "Correction notes" : "Submission notes")</label>
                                     <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="@(correctionResubmission
-                                        ? "State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage."
-                                        : "Ground why this publication is ready for governed moderation.")"></textarea>
+                                        ? "State what changed so this corrected packet can return to review without losing its source history."
+                                        : "Explain why this publication is ready for review.")"></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit corrected packet" : "Submit for review")</button>
                                     </div>
@@ -3294,7 +3294,7 @@
                                 <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/approve">
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationApproveNotes">Approval notes</label>
-                                    <textarea id="creatorPublicationApproveNotes" name="notes" rows="3" placeholder="Record the provenance, lineage, and trust evidence that makes this safe to advance."></textarea>
+                                    <textarea id="creatorPublicationApproveNotes" name="notes" rows="3" placeholder="Record the source history and reason this is safe to advance."></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--primary" type="submit">Approve review</button>
                                     </div>
@@ -3302,7 +3302,7 @@
                                 <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/reject">
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationRejectNotes">Revision notes</label>
-                                    <textarea id="creatorPublicationRejectNotes" name="notes" rows="3" placeholder="State what needs to change before this draft can re-enter governed review."></textarea>
+                                    <textarea id="creatorPublicationRejectNotes" name="notes" rows="3" placeholder="State what needs to change before this draft returns to review."></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--secondary" type="submit">Request changes</button>
                                     </div>

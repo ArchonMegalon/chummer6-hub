@@ -28,6 +28,14 @@ public static partial class PublicFacingCopyHumanizer
         ("evidence", "details"),
         ("proof", "status"),
         ("receipt", "record"),
+        ("verification", "confirmation"),
+        ("verified", "confirmed"),
+        ("validated", "reviewed"),
+        ("validation", "review"),
+        ("audit", "review"),
+        ("audits", "reviews"),
+        ("verdict", "status"),
+        ("checks", "details"),
         ("trust posture", "status"),
         ("support posture", "support status"),
         ("release posture", "release status"),
@@ -101,6 +109,6 @@ public static partial class PublicFacingCopyHumanizer
     [GeneratedRegex(@"\b(?:an|a)\s+help\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ArticleHelpRegex();
 
-    [GeneratedRegex(@"\ban\s+(linked|path|status|record|file|service|source|page|tool|roadmap|Chummer)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\ban\s+(linked|path|status|record|file|service|source|page|tool|roadmap|review|confirmation|Chummer)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ArticleConsonantReplacementRegex();
 }
