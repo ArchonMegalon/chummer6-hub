@@ -113,11 +113,11 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Origin Dossier starts with the story",
             area="Origin Dossier",
             priority="P0",
-            status="active",
+            status="book-first-ui-pushed",
             cadence="daily until released",
             source="Product direction",
             why_it_matters="The feature should feel like creating a book, not filling an internal options form.",
-            next_action="Default to race and archetype only, collapse advanced steering, generate the story first, then book/PDF/audio/video.",
+            next_action="Verify the next installed desktop build starts from race/metatype and archetype, shows the story first, and labels the primary handoff as a book before audio/video.",
             acceptance_gate="A user can start a dossier, read the story first, open the FlipLink-style book, then request audio/video without touching advanced controls.",
         ),
         ImportantWorkItem(
