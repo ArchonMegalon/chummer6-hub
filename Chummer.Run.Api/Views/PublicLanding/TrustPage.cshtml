@@ -3,11 +3,13 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-trust-page";
     var helpPage = string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase);
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
+    ViewData["SurfaceClass"] = helpPage
+        ? "surface-help surface-minimal"
+        : "surface-trust-page";
     ViewData["ContextSidebarHeading"] = helpPage ? "Help" : "Page sections";
     ViewData["ContextSidebarSummary"] = helpPage
         ? "Jump to the help path that matches the problem."
@@ -143,11 +145,11 @@
     }
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+<section class="@(helpPage ? "minimal-page-hero" : "trust-page-hero")">
+    <div class="@(helpPage ? string.Empty : "trust-page-hero__copy")">
+        <p class="@(helpPage ? "minimal-kicker" : "eyebrow")">@Model.Eyebrow</p>
+        <h1 class="@(helpPage ? string.Empty : "page-title")">@Model.Heading</h1>
+        <p class="@(helpPage ? string.Empty : "page-copy")">@Model.Intro</p>
         @if (!helpPage && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
         {
             <div class="trust-claim__microproof">
@@ -171,12 +173,23 @@
             </div>
         }
     </div>
-    <div class="stacked-actions">
-        @foreach (var action in Model.Actions)
-        {
-            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
-        }
-    </div>
+    @if (helpPage)
+    {
+        <div class="minimal-status-pill" aria-label="Help posture">
+            <span>Start here</span>
+            <strong>Pick one path</strong>
+            <span>Install, account, support, or FAQ</span>
+        </div>
+    }
+    else
+    {
+        <div class="stacked-actions">
+            @foreach (var action in Model.Actions)
+            {
+                <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
+            }
+        </div>
+    }
 </section>
 
 @if (Model.SignedInStatus is not null && !deferSupportPanels)
@@ -220,68 +233,50 @@
 
 @if (helpPage)
 {
-    <section class="editorial-block">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Help</p>
-            <h2 class="editorial-title">Choose the right path.</h2>
-            <p class="editorial-copy">Pick the page that matches the problem. Chummer keeps installs, recovery, bugs, and product questions on separate paths so the next step stays clear.</p>
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Choose the right path</h2>
+            <p>Start with the page that matches the problem. Each path has one primary next step and one fallback.</p>
         </div>
-        <div class="route-choice-grid">
+        <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
             {
-                <article class="route-choice-card" id="@choice.Id">
-                    <span class="tag">@choice.Badge</span>
+                var fallbackAction = HelpFallbackActionFor(choice.Id, Model.Chrome.Authenticated);
+                <article class="minimal-help-card" id="@choice.Id">
+                    <span>@choice.Badge</span>
                     <h3>@choice.Title</h3>
                     <p>@choice.Summary</p>
-                    @if (choice.Proof.Length > 0)
+                    <a class="inline-link" href="@choice.Href">@choice.Label</a>
+                    @if (fallbackAction is not null)
                     {
-                        <div class="route-choice-card__proof">
-                            @foreach (var item in choice.Proof)
-                            {
-                                <span>@item</span>
-                            }
-                        </div>
+                        <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@fallbackAction.Label</a></p>
                     }
-                    <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
                 </article>
             }
         </div>
     </section>
 
-    <section class="workflow-band">
-        <div class="workflow-band__lead">
-            <p class="eyebrow">Page detail</p>
-            <h2 class="editorial-title">First-party help keeps the next step concrete.</h2>
-            <p class="editorial-copy">Each page answers one question quickly: where to get the right build, how to recover access, when to open a private case, and when a plain answer should be enough.</p>
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Details</h2>
         </div>
-        <div class="workflow-grid">
+        <div class="minimal-platform-list">
             @foreach (var pageSection in Model.Sections)
             {
-                var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
-                var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
-                <article class="workflow-card" id="@pageSection.Id">
-                    <div class="workflow-card__copy">
-                        <span class="tag">@pageSection.Eyebrow</span>
-                        <h3>@pageSection.Heading</h3>
+                <article>
+                    <details>
+                        <summary>@pageSection.Heading</summary>
                         <p>@pageSection.Body</p>
                         @if (pageSection.Bullets is { Count: > 0 })
                         {
-                            <ul class="workflow-card__points">
+                            <ul>
                                 @foreach (var bullet in pageSection.Bullets)
                                 {
                                     <li>@bullet</li>
                                 }
                             </ul>
                         }
-                        @if (quickAction is not null)
-                        {
-                            <a class="inline-link" href="@ContextualPreviewHref(quickAction.Href)">@quickAction.Label</a>
-                        }
-                        @if (fallbackAction is not null)
-                        {
-                            <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@fallbackAction.Label</a></p>
-                        }
-                    </div>
+                    </details>
                 </article>
             }
         </div>

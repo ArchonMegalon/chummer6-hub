@@ -8055,13 +8055,13 @@ body {
 
 /* Minimal public front door, June 2026 redesign. */
 .surface-minimal {
-  --minimal-page: #f7f6f2;
-  --minimal-surface: #fffefa;
+  --minimal-page: #f7f8fa;
+  --minimal-surface: #ffffff;
   --minimal-ink: #151515;
-  --minimal-muted: #5f5b52;
+  --minimal-muted: #5f6673;
   --minimal-line: rgba(21, 21, 21, 0.14);
-  --minimal-accent: #2f5f4b;
-  --minimal-soft: #ece8df;
+  --minimal-accent: #2e6248;
+  --minimal-soft: #edf1f5;
   color-scheme: light;
   background: var(--minimal-page);
   color: var(--minimal-ink);
@@ -8110,7 +8110,7 @@ body {
 .surface-minimal .site-header__inner {
   border-radius: 0;
   border-color: var(--minimal-line);
-  background: rgba(255, 253, 248, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: none;
 }
 
@@ -8322,6 +8322,7 @@ body {
 .minimal-three article,
 .minimal-download-strip__item,
 .minimal-platform-list article,
+.minimal-help-card,
 .minimal-facts article,
 .minimal-empty {
   padding: clamp(1rem, 2.8vw, 1.55rem);
@@ -8329,6 +8330,7 @@ body {
 
 .minimal-three h3,
 .minimal-platform-list h3,
+.minimal-help-card h3,
 .minimal-facts h3 {
   margin: 0;
   color: var(--minimal-ink);
@@ -8338,6 +8340,7 @@ body {
 
 .minimal-three p,
 .minimal-platform-list p,
+.minimal-help-card p,
 .minimal-lane-card p,
 .minimal-empty p,
 .minimal-facts p {
@@ -8453,6 +8456,42 @@ body {
 
 .minimal-platform-list {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.minimal-help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--minimal-line);
+  background: var(--minimal-line);
+}
+
+.minimal-help-card {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  background: var(--minimal-surface);
+}
+
+.minimal-help-card > span {
+  color: var(--minimal-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.surface-minimal details {
+  color: var(--minimal-ink);
+}
+
+.surface-minimal summary {
+  cursor: pointer;
+  color: var(--minimal-ink);
+  font-weight: 700;
+}
+
+.surface-minimal details p,
+.surface-minimal details li {
+  color: var(--minimal-muted);
 }
 
 .minimal-facts {

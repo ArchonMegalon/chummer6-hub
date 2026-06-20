@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-faq";
+    ViewData["SurfaceClass"] = "surface-faq surface-minimal";
     var accessPosture = Model.AccessPosture;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
