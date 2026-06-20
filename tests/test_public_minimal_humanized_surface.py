@@ -121,6 +121,9 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Nightly" in downloads
     assert "Windows" in downloads
     assert "Linux" in downloads
+    assert "stableAndNightlyMatch" in downloads
+    assert "Nightly currently matches Stable" in downloads
+    assert "There is no newer Nightly available" in downloads
 
     for forbidden in (
         "Signed-in download",

@@ -52,6 +52,35 @@
         return platformOptions.FirstOrDefault(option => MatchesReleaseLane(option.Artifact, laneIds))
             ?? (allowFallback ? platformOptions.FirstOrDefault() : null);
     }
+
+    var stablePlatformOptions = platforms
+        .Select(platform => new
+        {
+            PlatformId = platform.Item1,
+            PlatformLabel = platform.Item2,
+            Option = ResolveLanePlatformOption(platform.Item1, stableLaneIds, allowFallback: true)
+        })
+        .ToArray();
+    var nightlyPlatformOptions = platforms
+        .Select(platform => new
+        {
+            PlatformId = platform.Item1,
+            PlatformLabel = platform.Item2,
+            Option = ResolveLanePlatformOption(platform.Item1, nightlyLaneIds, allowFallback: true)
+        })
+        .ToArray();
+    var stableArtifactIds = stablePlatformOptions
+        .Where(platform => platform.Option is not null)
+        .Select(platform => platform.Option!.Artifact.Id)
+        .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    var nightlyArtifactIds = nightlyPlatformOptions
+        .Where(platform => platform.Option is not null)
+        .Select(platform => platform.Option!.Artifact.Id)
+        .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    var stableAndNightlyMatch = stableArtifactIds.Length > 0
+        && stableArtifactIds.SequenceEqual(nightlyArtifactIds, StringComparer.OrdinalIgnoreCase);
 }
 
 <section class="minimal-page-hero">
@@ -85,12 +114,12 @@ else
                 <p>The default choice for regular play.</p>
             </div>
             <div class="minimal-platform-actions">
-                @foreach (var platform in platforms)
+                @foreach (var platform in stablePlatformOptions)
                 {
-                    var option = ResolveLanePlatformOption(platform.Item1, stableLaneIds, allowFallback: true);
+                    var option = platform.Option;
                     if (option is not null)
                     {
-                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.Item1" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.Item2">@platform.Item2</a>
+                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.PlatformId" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
                     }
                 }
             </div>
@@ -109,14 +138,18 @@ else
                 <span>Nightly</span>
                 <h2>Latest published build</h2>
                 <p>Use this when you want the newest Windows or Linux release.</p>
+                @if (stableAndNightlyMatch)
+                {
+                    <p>Nightly currently matches Stable. There is no newer Nightly available.</p>
+                }
             </div>
             <div class="minimal-platform-actions">
-                @foreach (var platform in platforms)
+                @foreach (var platform in nightlyPlatformOptions)
                 {
-                    var option = ResolveLanePlatformOption(platform.Item1, nightlyLaneIds, allowFallback: true);
+                    var option = platform.Option;
                     if (option is not null)
                     {
-                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.Item1" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.Item2">@platform.Item2</a>
+                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.PlatformId" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
                     }
                 }
             </div>
