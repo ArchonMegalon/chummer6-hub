@@ -41,7 +41,7 @@ def test_public_copy_leak_gate_allows_minimal_human_product_copy():
 def test_minimal_public_routes_block_ai_proof_and_campaign_city_language():
     module = load_module()
 
-    text = "Alice and the assistant can open Black Ledger proof receipts from the operator artifact lane."
+    text = "Alice and the assistant can open Black Ledger proof receipts from the operator artifact lane after validation checks."
     hits = module.minimal_route_forbidden_hits(text)
 
     assert any("Alice" in hit for hit in hits)
@@ -51,6 +51,9 @@ def test_minimal_public_routes_block_ai_proof_and_campaign_city_language():
     assert any("receipt" in hit for hit in hits)
     assert any("operator" in hit for hit in hits)
     assert any("artifact" in hit for hit in hits)
+    assert any("validation" in hit for hit in hits)
+    assert any("checks" in hit for hit in hits)
+    assert any("lane" in hit for hit in hits)
 
 
 def test_minimal_route_detection_keeps_special_routes_out_of_first_visit_tier():
