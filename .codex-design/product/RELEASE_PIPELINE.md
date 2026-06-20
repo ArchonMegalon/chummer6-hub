@@ -167,7 +167,7 @@ Forbidden posture:
 
 1. `chummer6-core` produces runtime-bundle outputs and fingerprints.
 2. `chummer6-ui` produces installer-ready desktop bundles for Windows `.exe`, macOS `.dmg`, and Linux `.deb`, plus any machine update payloads needed by the updater lane.
-3. When a self-hosted downloads target is configured, the successful mainline desktop build automatically replaces the previous public downloads bundle and prunes superseded desktop artifacts so `/downloads` stays latest-only.
+3. When a self-hosted downloads target is configured, the scheduled public promotion replaces the previous public downloads bundle with the newest qualified Windows/Linux artifacts and prunes superseded desktop artifacts so `/downloads` stays latest-only.
 4. `fleet` expands the release matrix, runs verify/promotion/signoff/signing/notarization orchestration, and prepares a registry publication payload.
 5. `chummer6-hub-registry` becomes the source of truth for promoted channels, installer/download records, desktop release heads, update-feed metadata, compatibility, and runtime-bundle heads.
 6. `chummer6-hub` reads registry truth, serves `/downloads`, mints optional download receipts and install-claim tickets, and renders account-aware install UX without changing the underlying artifact.
@@ -369,9 +369,9 @@ Fleet may orchestrate the packaging/promotion wave, but the desktop head owns th
 
 The public `/downloads` surface is a latest-build shelf, not a long archive listing.
 
-When the desktop build pipeline is configured with a deploy target, each successful build must:
+When the desktop build pipeline is configured with a deploy target, each scheduled public promotion must:
 
-* publish the freshly generated bundle into the active downloads root
+* publish the newest qualified bundle into the active downloads root
 * replace the compatibility and canonical release manifests in that root
 * remove superseded desktop artifacts from that root
 

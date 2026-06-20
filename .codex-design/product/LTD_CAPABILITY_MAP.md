@@ -35,7 +35,7 @@ It does not imply that every owned tool must be integrated.
 * `Crezlo Tours` - explorable GM run-site artifacts
 * `Deftform` - structured intake and concierge handoff lane
 * `First Book ai` - long-form player, GM, and creator authoring lane
-* `Lunacal` - booking and human-escalation lane
+* `Lunacal` - invitation-only scheduling lane for creator consults, press/research, GM office hours, and rare publisher or premium review sessions; not normal Chummer support
 * `MarkupGo` - bounded document rendering and formatted artifact output
 * `AvoMap` - route and location visualization lane
 * `PeekShot` - preview/share-card adapter lane
@@ -108,7 +108,7 @@ Working rule:
 Working rule:
 
 * `FacePop` is bounded to public, low-risk trust surfaces with a kill switch and first-party fallback.
-* `Lunacal` may provide human escalation and booking, but it may not become support-case or campaign truth.
+* `Lunacal` may provide invitation-only scheduling for creator consults, press/research, GM office hours, and rare publisher or premium review sessions, but it may not appear in the normal Chummer help flow or become support-case, campaign, install, or release truth.
 * `Deftform` may provide structured intake, but Hub-owned receipts and first-party followthrough remain canonical.
 * `Signitic` may amplify public recruitment, release, world-tick, or faction-war campaigns, but those campaigns remain projections into first-party pages rather than notification truth, world truth, or authorization truth.
 * `Emailit` may send claim/install mail, support closure, open-run invitations, world-tick digests, faction newsletters, creator-program mail, and ProductLift closeout only when Hub owns the notification event and suppression state.
@@ -130,7 +130,7 @@ Working rule:
 * `ClickRank` - `chummer6-hub` for public site crawl and metadata remediation, `chummer6-design` for search-visibility policy and source-truth boundaries, `executive-assistant` for findings normalization, `fleet` for weekly pulse evidence synthesis
 * `FacePop` - `chummer6-hub` for public-surface routing, consent, fallback, and intake receipt mirroring; `chummer6-media-factory` for moderated testimonial derivative support
 * `Deftform` - `chummer6-hub` for structured intake routing and receipt mirroring
-* `Lunacal` - `chummer6-hub` for booking linkage and escalation routing
+* `Lunacal` - `chummer6-hub` for invitation-only booking linkage outside normal Chummer support
 * `NextStep` - `fleet` for governed process execution and mirrored operator runbooks
 * `Signitic` - `chummer6-hub` for destination shaping, segment routing, UTM naming, and public recruitment/release/world-tick campaign routing; `chummer6-design` for public-safe claim boundaries; `fleet` for bounded measurement review
 * `Subscribr.ai` - `chummer6-media-factory` for creator/video preproduction drafts, `chummer6-design` for approved source-packet boundaries, and `executive-assistant` for channel brief normalization; credentials stay in the external account vault and are not repo content

@@ -108,7 +108,7 @@ Download-facing copy must not say:
 * instant fix availability from merged code
 * auto-update guarantees that outrun registry or UI truth
 * tell users to double-click an unsigned downloaded `.command` when the actual supported path is a copy-paste Terminal command
-* call a preview lane flagship-complete unless `FLAGSHIP_RELEASE_ACCEPTANCE.yaml` is actually satisfied
+* call a nightly lane flagship-complete unless `FLAGSHIP_RELEASE_ACCEPTANCE.yaml` is actually satisfied
 * present fallback apps or archive packages as equal defaults when the primary shelf route is different
 * let artifact-factory output, proof screenshots, or explainer bundles read like substitute release authority for the posted install shelf
 * let proof-gallery or packet-detail routes blur the difference between an inspectable artifact and the actual recommended download route

@@ -124,7 +124,7 @@ Public trust surfaces may consume owned LTDs only through bounded public-concier
 Current public-surface posture:
 
 * Hub-owned public trust surfaces such as `/downloads`, `/now`, public help entry pages, artifact pages, creator pages, and tokenized invite pages that expose no private truth may use `FacePop` as a bounded public concierge or trust-widget lane
-* public intake or guided escalation may use `Deftform` for structured intake and `Lunacal` for human booking only when Chummer-owned fallback paths and receipt mirroring remain intact
+* public intake or guided escalation may use `Deftform` for structured intake; `Lunacal` is limited to invitation-only creator consults, press/research, GM office hours, and rare publisher or premium review sessions, never normal Chummer support
 * public or network-visible open-run discovery may use `FacePop`, `Deftform`, and `Lunacal` for first contact, application intake, and booking projection only when accepted-roster truth, meeting-handoff truth, and observer-consent truth remain first-party
 * community-run play surfaces such as Discord, Teams, Foundry, Roll20, or generic meeting URLs may receive handoff and export packages only when Chummer remains the first-party authority for run, roster, rule-environment, and closeout truth
 * passive outreach and recruitment projection may use `Signitic` only when the CTA lands on first-party Chummer pages and any resulting intake still lands in Chummer-owned receipts or routes
@@ -404,7 +404,8 @@ A public concierge widget may:
 
 * help the user choose between help paths
 * route to Deftform or Hub support intake
-* route to Lunacal for human escalation
+* route normal support to Chummer Instant Help or first-party intake
+* route invitation-only consults, GM office hours, press/research, or publisher review sessions to Lunacal
 * show a short human greeting or explainer
 
 A public concierge widget may not:
@@ -925,13 +926,14 @@ Structured prescreen and intake lane.
 
 ### Role
 
-Follow-up booking and human-escalation lane.
+Invitation-only booking lane outside normal Chummer support.
 
 ### Architectural use
 
 * GM follow-up calls
 * creator clinics
-* setup or onboarding calls
+* press or research sessions
+* publisher or premium review sessions
 * organizer or BLACK LEDGER pilot sessions
 
 ### Owner
@@ -941,6 +943,7 @@ Follow-up booking and human-escalation lane.
 ### Hard boundary
 
 * not support-case truth
+* not normal setup or update help
 * not campaign truth
 * not final approval truth
 
