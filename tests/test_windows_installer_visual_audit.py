@@ -318,10 +318,16 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("Launching installer for visual capture", text)
         self.assertLess(text.index('Add-Type @"'), text.index("Launching installer for visual capture"))
         self.assertLess(text.index("Launching installer for visual capture"), text.index("foreach ($request in $captureRequests)"))
+        self.assertIn("$previousSameSurfaceRows", text)
+        self.assertIn("reused-same-surface", text)
+        self.assertIn("reusedFrom", text)
+        self.assertIn("Reused previous $captureSurface screenshot after the window closed", text)
         self.assertIn("Timed out waiting for Chummer installer surface", text)
         self.assertIn("$AutoCaptureTimeoutSeconds", text)
         self.assertIn("$delaySeconds = 0", text)
         self.assertIn("$delaySeconds = [Math]::Max($delaySeconds, 8)", text)
+        self.assertIn('$requiredSurfaces = @("install-progress", "completion")', text)
+        self.assertIn("$requiredSurfaces -notcontains (Normalize-Surface $_.surface)", text)
         self.assertIn("surfaceCoverage", text)
 
     def test_windows_gold_proof_helper_writes_startup_receipt_and_delegates_visual_capture(self) -> None:

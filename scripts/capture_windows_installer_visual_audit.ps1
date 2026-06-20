@@ -205,12 +205,52 @@ $newRows = @()
 foreach ($request in $captureRequests) {
     $captureSurface = [string]$request.Surface
     $captureDpiScale = [string]$request.DpiScale
+    $canonicalCaptureSurface = Normalize-Surface $captureSurface
     $window = $null
     Write-Host "Put the Windows installer surface to audit on screen, then press Enter."
     Write-Host "Surface: $captureSurface; DPI label: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
     if ($AutoCapture) {
         Write-Host "Waiting up to $AutoCaptureTimeoutSeconds seconds for the $captureSurface window."
-        $window = Wait-ForInstallerSurface $captureSurface $AutoCaptureTimeoutSeconds
+        try {
+            $window = Wait-ForInstallerSurface $captureSurface $AutoCaptureTimeoutSeconds
+        }
+        catch {
+            $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })
+            if ($previousSameSurfaceRows.Count -eq 0) {
+                throw
+            }
+
+            $previous = $previousSameSurfaceRows[-1]
+            $safeSurface = ($captureSurface -replace "[^A-Za-z0-9_.-]", "-").Trim("-")
+            if ([string]::IsNullOrWhiteSpace($safeSurface)) {
+                $safeSurface = "installer"
+            }
+            $safeDpiScale = ($captureDpiScale -replace "[^A-Za-z0-9_.-]", "-").Trim("-")
+            $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+            $screenshotName = "windows-installer-$safeSurface-dpi-$safeDpiScale-$stamp.png"
+            $screenshotPath = Join-Path $outputFullRoot $screenshotName
+            $previousScreenshotPath = Join-Path $outputFullRoot ([string]$previous.path)
+            if (-not (Test-Path -LiteralPath $previousScreenshotPath)) {
+                throw
+            }
+
+            Copy-Item -LiteralPath $previousScreenshotPath -Destination $screenshotPath -Force
+            $newRows += [ordered]@{
+                path = $screenshotName
+                dpiScale = $captureDpiScale
+                surface = $captureSurface
+                clippingStatus = $ClippingStatus
+                readabilityStatus = $ReadabilityStatus
+                hostClass = "native-windows"
+                captureMode = "reused-same-surface"
+                reusedFrom = [string]$previous.path
+                windowTitle = [string]$previous.windowTitle
+                captureBounds = $previous.captureBounds
+                capturedAtUtc = (Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z")
+            }
+            Write-Host "Reused previous $captureSurface screenshot after the window closed: $screenshotPath"
+            continue
+        }
         Write-Host "Matched window: $($window.MainWindowTitle)"
         [void][ChummerInstallerCapture.NativeMethods]::SetForegroundWindow($window.MainWindowHandle)
         Start-Sleep -Milliseconds 250
@@ -278,12 +318,17 @@ $existingScreenshots = @()
 if ((Test-MapHasKey $source "screenshots") -and $null -ne (Get-MapValue $source "screenshots")) {
     $existingScreenshots = @(Get-MapValue $source "screenshots")
 }
+$requiredSurfaces = @("install-progress", "completion")
+if ($CaptureRequiredSet) {
+    $existingScreenshots = @($existingScreenshots | Where-Object {
+        $requiredSurfaces -notcontains (Normalize-Surface $_.surface)
+    })
+}
 
 $screenshots = @($existingScreenshots + $newRows)
 $allPass = $true
 $hasDefaultDpi = $false
 $hasScaledDpi = $false
-$requiredSurfaces = @("install-progress", "completion")
 $surfaceCoverage = @{}
 foreach ($requiredSurface in $requiredSurfaces) {
     $surfaceCoverage[$requiredSurface] = @{
