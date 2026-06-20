@@ -9,7 +9,7 @@ on:
         default: ""
         type: string
       auto_capture_visuals:
-        description: "Capture visual audit screenshots automatically for human review"
+        description: "Capture visual audit screenshots automatically"
         required: false
         default: true
         type: boolean
