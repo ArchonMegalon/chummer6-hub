@@ -56,6 +56,14 @@ def test_projection_rows_have_teable_ready_fields():
         assert row["acceptance_gate"]
 
 
+def test_teable_field_definition_omits_unsupported_validation_flags():
+    module = load_module()
+
+    field = module.teable_field_definition({"name": "Item Id", "type": "singleLineText", "unique": True, "notNull": True})
+
+    assert field == {"name": "Item Id", "type": "singleLineText", "description": ""}
+
+
 def test_main_writes_dry_run_artifact_without_teable_credentials(tmp_path, monkeypatch):
     module = load_module()
     output = tmp_path / "TEABLE_IMPORTANT_WORK.generated.json"
@@ -85,6 +93,78 @@ def test_sync_without_credentials_fails_closed_without_token_text():
     assert result["state"] == "blocked"
     assert result["errors"] == ["teable_api_key_missing"]
     assert "Bearer" not in json.dumps(result)
+
+
+def test_send_json_uses_teable_compatible_headers(monkeypatch):
+    module = load_module()
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+
+    module.send_json("GET", "https://app.teable.ai/api/base/base-demo/table", "demo-token")
+
+    request = captured["request"]
+    assert request.get_header("Authorization") == "Bearer demo-token"
+    assert request.get_header("Accept") == "application/json, text/plain, */*"
+    assert request.get_header("Origin") == "https://app.teable.ai"
+    assert request.get_header("Referer") == "https://app.teable.ai/"
+    assert request.get_header("User-agent") == "Mozilla/5.0"
+
+
+def test_resolve_api_base_url_accepts_teable_base_url(monkeypatch):
+    module = load_module()
+    monkeypatch.delenv("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL", raising=False)
+    monkeypatch.delenv("TEABLE_API_BASE_URL", raising=False)
+    monkeypatch.setenv("TEABLE_BASE_URL", "https://app.teable.ai")
+
+    assert module.resolve_api_base_url() == "https://app.teable.ai/api"
+
+
+def test_parse_args_uses_ea_teable_base_fallback(monkeypatch):
+    module = load_module()
+    monkeypatch.delenv("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID", raising=False)
+    monkeypatch.setenv("EA_ENV_TEABLE_BASE_ID", "base-ea")
+
+    args = module.parse_args([])
+
+    assert args.base_id == "base-ea"
+
+
+def test_sync_setup_failure_writes_failed_state_without_token(monkeypatch):
+    module = load_module()
+
+    def fail_setup(*args, **kwargs):
+        raise RuntimeError("teable_http_403:blocked")
+
+    monkeypatch.setattr(module, "resolve_or_create_table", fail_setup)
+
+    result = module.sync_to_teable(
+        api_key="demo-token",
+        api_base_url="https://app.teable.ai/api",
+        base_id="base-demo",
+        table_id=None,
+        table_name="Chummer Important Work",
+    )
+
+    assert result["state"] == "failed"
+    assert result["failed_count"] == len(module.important_work_items())
+    assert result["errors"] == ["teable_setup:teable_http_403:blocked"]
+    assert "demo-token" not in json.dumps(result)
 
 
 def test_sync_upserts_to_configured_table(monkeypatch):

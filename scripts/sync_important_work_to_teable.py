@@ -17,6 +17,7 @@ from typing import Any
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.generated.json"
+DEFAULT_TEABLE_ORIGIN = "https://app.teable.ai"
 DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
 DEFAULT_TABLE_NAME = "Chummer Important Work"
 DEFAULT_DB_TABLE_NAME = "chummer_important_work"
@@ -385,16 +386,11 @@ def important_work_items() -> list[ImportantWorkItem]:
 
 
 def teable_field_definition(field: dict[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {
+    return {
         "name": field["name"],
         "type": field["type"],
         "description": field.get("description", ""),
     }
-    if field.get("unique"):
-        result["unique"] = True
-    if field.get("notNull"):
-        result["notNull"] = True
-    return result
 
 
 def teable_fields_for_row(item: ImportantWorkItem, synced_at: str) -> dict[str, str]:
@@ -454,7 +450,10 @@ def send_json(method: str, url: str, api_key: str, payload: dict[str, Any] | Non
     data: bytes | None = None
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": DEFAULT_TEABLE_ORIGIN,
+        "Referer": f"{DEFAULT_TEABLE_ORIGIN}/",
+        "User-Agent": "Mozilla/5.0",
     }
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
@@ -584,20 +583,35 @@ def sync_to_teable(
         }
     resolved_base_id = base_id
     resolved_table_id = table_id
-    if not resolved_table_id:
-        if not resolved_base_id:
-            resolved_base_id = discover_base_id(api_base_url, api_key)
-        if not resolved_base_id:
-            return {
-                "state": "blocked",
-                "attempted": True,
-                "started_at_utc": started_at,
-                "synced_count": 0,
-                "failed_count": len(important_work_items()),
-                "errors": ["teable_base_id_required_when_table_id_is_missing"],
-            }
-        resolved_table_id = resolve_or_create_table(api_base_url, api_key, resolved_base_id, table_name)
-    ensure_fields(api_base_url, api_key, resolved_table_id)
+    try:
+        if not resolved_table_id:
+            if not resolved_base_id:
+                resolved_base_id = discover_base_id(api_base_url, api_key)
+            if not resolved_base_id:
+                return {
+                    "state": "blocked",
+                    "attempted": True,
+                    "started_at_utc": started_at,
+                    "synced_count": 0,
+                    "failed_count": len(important_work_items()),
+                    "errors": ["teable_base_id_required_when_table_id_is_missing"],
+                }
+            resolved_table_id = resolve_or_create_table(api_base_url, api_key, resolved_base_id, table_name)
+        ensure_fields(api_base_url, api_key, resolved_table_id)
+    except Exception as exc:
+        return {
+            "state": "failed",
+            "attempted": True,
+            "started_at_utc": started_at,
+            "finished_at_utc": now_iso(),
+            "api_base_url": api_base_url,
+            "base_id": resolved_base_id,
+            "table_id": resolved_table_id,
+            "table_name": table_name,
+            "synced_count": 0,
+            "failed_count": len(important_work_items()),
+            "errors": [f"teable_setup:{str(exc)[:180]}"],
+        }
     synced_at = now_iso()
     created = 0
     updated = 0
@@ -629,13 +643,24 @@ def sync_to_teable(
     }
 
 
+def resolve_api_base_url() -> str:
+    explicit_api = normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL")) or normalize(os.environ.get("TEABLE_API_BASE_URL"))
+    if explicit_api:
+        return explicit_api.rstrip("/")
+    configured_base = normalize(os.environ.get("TEABLE_BASE_URL")) or normalize(os.environ.get("TEABLE_RUNTIME_BASE_URL"))
+    if not configured_base:
+        return DEFAULT_API_BASE_URL
+    configured_base = configured_base.rstrip("/")
+    return configured_base if configured_base.endswith("/api") else f"{configured_base}/api"
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Project the important Chummer workstreams into Teable.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
-    parser.add_argument("--api-base-url", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL")) or normalize(os.environ.get("TEABLE_API_BASE_URL")) or DEFAULT_API_BASE_URL)
+    parser.add_argument("--api-base-url", default=resolve_api_base_url())
     parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
-    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")))
+    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")) or normalize(os.environ.get("EA_ENV_TEABLE_BASE_ID")))
     parser.add_argument("--table-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID")))
     parser.add_argument("--table-name", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME")) or DEFAULT_TABLE_NAME)
     return parser.parse_args(argv)

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T11:29:34Z",
+  "generated_at_utc": "2026-06-20T12:26:27Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 27,
@@ -368,9 +368,17 @@
     }
   ],
   "sync": {
-    "state": "not_requested",
-    "attempted": false,
-    "synced_count": 0,
+    "state": "passed",
+    "attempted": true,
+    "started_at_utc": "2026-06-20T12:26:27Z",
+    "finished_at_utc": "2026-06-20T12:27:12Z",
+    "api_base_url": "https://app.teable.ai/api",
+    "base_id": "bseQCIXVnYLcq2KiWzN",
+    "table_id": "tbl5UEwrkhI27HOlwkT",
+    "table_name": "Chummer Important Work",
+    "synced_count": 27,
+    "created_count": 0,
+    "updated_count": 27,
     "failed_count": 0,
     "errors": []
   }
