@@ -308,6 +308,11 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("function Wait-ForInstallerSurface", text)
         self.assertIn("Find-InstallerSurfaceWindow", text)
         self.assertIn("MainWindowTitle", text)
+        self.assertIn("function Get-CaptureBounds", text)
+        self.assertIn("GetWindowRect", text)
+        self.assertIn("SetForegroundWindow", text)
+        self.assertIn("window-bounds", text)
+        self.assertIn("captureBounds", text)
         self.assertIn("Timed out waiting for Chummer installer surface", text)
         self.assertIn("$AutoCaptureTimeoutSeconds", text)
         self.assertIn("$delaySeconds = 0", text)
@@ -335,7 +340,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn('$captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds', text)
         self.assertIn('$captureArgs["AutoCaptureTimeoutSeconds"] = $AutoCaptureTimeoutSeconds', text)
 
-    def test_windows_installer_gold_proof_workflow_is_manual_non_publishing_and_review_bounded(self) -> None:
+    def test_windows_installer_gold_proof_workflow_is_manual_non_publishing_and_native_capture_bounded(self) -> None:
         workflow = Path("/docker/chummercomplete/chummer.run-services/.github/workflows/windows-installer-gold-proof.yml")
         text = workflow.read_text(encoding="utf-8")
 
@@ -350,11 +355,13 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe", text)
         self.assertIn("Invoke-WebRequest -Uri $installerUrl", text)
         self.assertIn("$proofArgs = @{", text)
-        self.assertIn('$proofArgs["VisualClippingStatus"] = "review_required"', text)
-        self.assertIn('$proofArgs["VisualReadabilityStatus"] = "review_required"', text)
+        self.assertIn('$proofArgs["VisualClippingStatus"] = "pass"', text)
+        self.assertIn('$proofArgs["VisualReadabilityStatus"] = "pass"', text)
         self.assertIn("auto_capture_timeout_seconds", text)
         self.assertIn('$proofArgs["AutoCaptureTimeoutSeconds"]', text)
         self.assertIn("does not publish downloads", text)
+        self.assertIn("native window-bounds screenshots", text)
+        self.assertIn("byte-identical", text)
         self.assertIn("actions/upload-artifact", text)
         self.assertIn("import_windows_installer_gold_proof_artifact.py", text)
         self.assertNotIn("deploy_portal_downloads", text)

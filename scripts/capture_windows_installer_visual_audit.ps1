@@ -133,6 +133,55 @@ if ($LaunchInstaller) {
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace ChummerInstallerCapture
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    public static class NativeMethods
+    {
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+    }
+}
+"@
+
+function Get-CaptureBounds([object]$Window) {
+    $fallbackBounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    if ($null -eq $Window) {
+        return $fallbackBounds
+    }
+
+    if ($Window.MainWindowHandle -eq [IntPtr]::Zero) {
+        return $fallbackBounds
+    }
+
+    $rect = New-Object ChummerInstallerCapture.Rect
+    if (-not [ChummerInstallerCapture.NativeMethods]::GetWindowRect($Window.MainWindowHandle, [ref]$rect)) {
+        return $fallbackBounds
+    }
+
+    $width = [Math]::Max(0, $rect.Right - $rect.Left)
+    $height = [Math]::Max(0, $rect.Bottom - $rect.Top)
+    if ($width -lt 240 -or $height -lt 160) {
+        return $fallbackBounds
+    }
+
+    return New-Object System.Drawing.Rectangle $rect.Left, $rect.Top, $width, $height
+}
 
 $captureRequests = @()
 if ($CaptureRequiredSet) {
@@ -151,12 +200,15 @@ $newRows = @()
 foreach ($request in $captureRequests) {
     $captureSurface = [string]$request.Surface
     $captureDpiScale = [string]$request.DpiScale
+    $window = $null
     Write-Host "Put the Windows installer surface to audit on screen, then press Enter."
     Write-Host "Surface: $captureSurface; DPI label: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
     if ($AutoCapture) {
         Write-Host "Waiting up to $AutoCaptureTimeoutSeconds seconds for the $captureSurface window."
         $window = Wait-ForInstallerSurface $captureSurface $AutoCaptureTimeoutSeconds
         Write-Host "Matched window: $($window.MainWindowTitle)"
+        [void][ChummerInstallerCapture.NativeMethods]::SetForegroundWindow($window.MainWindowHandle)
+        Start-Sleep -Milliseconds 250
         $delaySeconds = $AutoCaptureDelaySeconds
         if ((Normalize-Surface $captureSurface) -eq "install-progress") {
             $delaySeconds = 0
@@ -170,7 +222,7 @@ foreach ($request in $captureRequests) {
         [void](Read-Host)
     }
 
-    $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $bounds = Get-CaptureBounds $window
     $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
@@ -198,6 +250,14 @@ foreach ($request in $captureRequests) {
         clippingStatus = $ClippingStatus
         readabilityStatus = $ReadabilityStatus
         hostClass = "native-windows"
+        captureMode = $(if ($AutoCapture) { "window-bounds" } else { "manual-screen" })
+        windowTitle = $(if ($null -ne $window) { [string]$window.MainWindowTitle } else { "" })
+        captureBounds = [ordered]@{
+            left = $bounds.Left
+            top = $bounds.Top
+            width = $bounds.Width
+            height = $bounds.Height
+        }
         capturedAtUtc = (Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z")
     }
     Write-Host "Captured screenshot: $screenshotPath"
