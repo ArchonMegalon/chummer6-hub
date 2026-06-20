@@ -136,16 +136,17 @@ if ($CaptureVisualAudit) {
         throw "Visual audit capture script not found: $captureScript"
     }
 
-    $captureArgs = @(
-        "-InstallerPath", $installerFullPath,
-        "-OutputRoot", (Join-Path $downloadsFullRoot "visual-audit\windows-installer"),
-        "-CaptureRequiredSet",
-        "-ScaledDpiScale", $ScaledDpiScale,
-        "-ClippingStatus", $VisualClippingStatus,
-        "-ReadabilityStatus", $VisualReadabilityStatus
-    )
+    $captureArgs = @{
+        InstallerPath = $installerFullPath
+        OutputRoot = (Join-Path $downloadsFullRoot "visual-audit\windows-installer")
+        CaptureRequiredSet = $true
+        ScaledDpiScale = $ScaledDpiScale
+        ClippingStatus = $VisualClippingStatus
+        ReadabilityStatus = $VisualReadabilityStatus
+    }
     if ($AutoCaptureVisualAudit) {
-        $captureArgs += @("-AutoCapture", "-AutoCaptureDelaySeconds", "$AutoCaptureDelaySeconds")
+        $captureArgs["AutoCapture"] = $true
+        $captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds
     }
 
     & $captureScript @captureArgs

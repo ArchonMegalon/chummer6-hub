@@ -255,11 +255,13 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("$normalized = @{}", text)
         self.assertIn("function Test-MapHasKey", text)
         self.assertIn("Get-MapValue $releaseChannel \"version\"", text)
-        self.assertIn("-CaptureRequiredSet", text)
-        self.assertIn("-ClippingStatus\", $VisualClippingStatus", text)
-        self.assertIn("-ReadabilityStatus\", $VisualReadabilityStatus", text)
+        self.assertIn("$captureArgs = @{", text)
+        self.assertIn("CaptureRequiredSet = $true", text)
+        self.assertIn('$captureArgs["AutoCapture"] = $true', text)
+        self.assertIn("ClippingStatus = $VisualClippingStatus", text)
+        self.assertIn("ReadabilityStatus = $VisualReadabilityStatus", text)
         self.assertIn("$AutoCaptureVisualAudit", text)
-        self.assertIn("-AutoCaptureDelaySeconds", text)
+        self.assertIn('$captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds', text)
 
     def test_windows_installer_gold_proof_workflow_is_manual_non_publishing_and_review_bounded(self) -> None:
         workflow = Path("/docker/chummercomplete/chummer.run-services/.github/workflows/windows-installer-gold-proof.yml")
