@@ -1,3 +1,4 @@
+@using Chummer.Run.Api.Services
 @model PublicSignalOperationsDetailPageViewModel
 @{
     ViewData["Title"] = Model.Detail.Heading;
@@ -26,12 +27,20 @@
         => AppendFilter($"/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}", ResolveSourceContextFilterKey(fallbackFilterKey));
     string SourceArtifactHref(string sourceReceiptId, string fallbackFilterKey = "all")
         => AppendFilter($"/api/v1/public/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}", ResolveSourceContextFilterKey(fallbackFilterKey));
+    string PublicFeedbackText(string? value)
+        => PublicFacingCopyHumanizer.Clean(value)
+            .Replace("source item", "original item", StringComparison.OrdinalIgnoreCase)
+            .Replace("source details", "related details", StringComparison.OrdinalIgnoreCase)
+            .Replace("source", "related", StringComparison.OrdinalIgnoreCase)
+            .Replace("record(s)", "update(s)", StringComparison.OrdinalIgnoreCase)
+            .Replace("records", "updates", StringComparison.OrdinalIgnoreCase)
+            .Replace("record", "update", StringComparison.OrdinalIgnoreCase);
     string SourceDetailActionLabel(string fallbackFilterKey, string fallbackFilterLabel)
         => detail.FilterApplied
-            ? "Open source details with same filter"
+            ? "Open related details with same filter"
             : !string.Equals(fallbackFilterKey, "all", StringComparison.Ordinal)
-                ? $"Open {fallbackFilterLabel.ToLowerInvariant()}"
-                : "Open source details";
+                ? $"Open {PublicFeedbackText(fallbackFilterLabel).ToLowerInvariant()}"
+                : "Open related details";
     string ThreadDetailHref(string dispatchReceiptId)
         => AppendCurrentFilter($"/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceiptId)}");
     string ThreadArtifactHref(string dispatchReceiptId)
@@ -84,7 +93,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Queue status</span>
         <h2>@queueReceipts.Length queue item@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this view.</h2>
-        <p>@closeoutReceipts.Length closeout follow-up update@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing update@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
+        <p>@closeoutReceipts.Length closeout follow-up update@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing update@(routingReceipts.Length == 1 ? string.Empty : "s") keep the support boundary visible.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Private details</span>
@@ -108,8 +117,8 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Source item</p>
-            <h2 class="editorial-title">The originating source item stays visible as the root of this view.</h2>
+            <p class="eyebrow">Original item</p>
+            <h2 class="editorial-title">The original item stays visible as the root of this view.</h2>
             <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, message, outcome, and follow-up state.</p>
         </div>
         <div class="route-choice-grid">
@@ -121,7 +130,7 @@
                     <span>@sourceReceipt.BoardLabel</span>
                     <span>@sourceReceipt.EventType</span>
                     <span>@sourceReceipt.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                    <span>@sourceReceipt.HotFilterLabel · @sourceReceipt.HotFilterCount thread@(sourceReceipt.HotFilterCount == 1 ? string.Empty : "s")</span>
+                    <span>@PublicFeedbackText(sourceReceipt.HotFilterLabel) · @sourceReceipt.HotFilterCount thread@(sourceReceipt.HotFilterCount == 1 ? string.Empty : "s")</span>
                     @if (sourceReceipt.ProviderOccurredAtUtc is { } providerOccurredAtUtc)
                     {
                         <span>@providerOccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
@@ -145,11 +154,11 @@
                 </div>
                 @if (!detail.FilterApplied)
                 {
-                    <p class="muted-copy">@sourceReceipt.HotFilterSummary</p>
+                    <p class="muted-copy">@PublicFeedbackText(sourceReceipt.HotFilterSummary)</p>
                 }
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@SourceDetailHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">@SourceDetailActionLabel(sourceReceipt.HotFilterKey, sourceReceipt.HotFilterLabel)</a>
-                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open source details</a>
+                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open related data</a>
                 </div>
             </article>
         </div>
@@ -173,15 +182,15 @@
                     <p>@receipt.Summary</p>
                     <div class="route-choice-card__proof">
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
+                        <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                     </div>
                     @if (!detail.FilterApplied)
                     {
-                        <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                        <p class="muted-copy">@PublicFeedbackText(receipt.SourceHotFilterSummary)</p>
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open related data</a>
                     </div>
                 </article>
             }
@@ -194,7 +203,7 @@
                     <div class="route-choice-card__proof">
                         <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
+                        <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
                         {
                             <span>Not public</span>
@@ -202,11 +211,11 @@
                     </div>
                     @if (!detail.FilterApplied)
                     {
-                        <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                        <p class="muted-copy">@PublicFeedbackText(receipt.SourceHotFilterSummary)</p>
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open related data</a>
                     </div>
                 </article>
             }
@@ -220,7 +229,7 @@
                     <div class="route-choice-card__proof">
                         <span>@receipt.QueueState</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
+                        <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.ReadyForOutbox)
                         {
                             <span>Ready to send</span>
@@ -232,11 +241,11 @@
                     </div>
                     @if (!detail.FilterApplied)
                     {
-                        <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                        <p class="muted-copy">@PublicFeedbackText(receipt.SourceHotFilterSummary)</p>
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open related data</a>
                     </div>
                 </article>
             }
@@ -250,7 +259,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Filtered result</p>
             <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this filtered view.</h2>
-            <p class="editorial-copy">Use the saved filters above to reopen the full source item or jump straight to another filtered state without leaving this page.</p>
+            <p class="editorial-copy">Use the saved filters above to reopen the full original item or jump straight to another filtered state without leaving this page.</p>
         </div>
     </section>
 }
@@ -261,7 +270,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Recipient threads</p>
             <h2 class="editorial-title">The message history, latest outcome update, and follow-up detail now sit on one recipient timeline.</h2>
-            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected source or message history.</p>
+            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected item or message history.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var thread in recipientThreads)
@@ -271,7 +280,7 @@
                     <h3>Recipient thread</h3>
                     <p>@thread.Summary</p>
                     <div class="route-choice-card__proof">
-                        <span>@thread.SourceLabel</span>
+                        <span>@PublicFeedbackText(thread.SourceLabel)</span>
                         <span>@thread.QueueStatusLabel</span>
                         <span>@thread.DispatchStatusLabel</span>
                         @if (!string.IsNullOrWhiteSpace(thread.OutcomeStatusLabel))
@@ -406,7 +415,7 @@
                     <div class="route-choice-card__proof">
                         <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
+                        <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
                         {
                             <span>Not public</span>
@@ -414,11 +423,11 @@
                     </div>
                     @if (!detail.FilterApplied)
                     {
-                        <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                        <p class="muted-copy">@PublicFeedbackText(receipt.SourceHotFilterSummary)</p>
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open related data</a>
                     </div>
                 </article>
             }

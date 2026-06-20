@@ -6,7 +6,7 @@
         ? "Chummer follow-up examples are visible now."
         : "First-party follow-up is not posted here yet.";
     string followThroughSummary = followThroughReady
-        ? $"{Model.CloseoutDispatchSentCount} follow-up record(s) have already landed, and shipped updates stay tied to /changelog."
+        ? $"{Model.CloseoutDispatchSentCount} follow-up update(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
             ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
             : "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.";
@@ -36,7 +36,7 @@
             <h3>@followThroughHeading</h3>
             <p>@followThroughSummary</p>
             <div class="route-choice-card__proof">
-                <span>@Model.CloseoutDispatchSentCount posted follow-up record@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
+                <span>@Model.CloseoutDispatchSentCount posted follow-up update@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.CloseoutQueueReadyCount ready follow-up candidate@(Model.CloseoutQueueReadyCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.JourneyReceiptCount follow-up signals</span>
             </div>

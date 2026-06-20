@@ -288,6 +288,7 @@ def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
 
 def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -> None:
     feedback_operations = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsDetail.cshtml")
+    signal_operations = read("Chummer.Run.Api/Views/Shared/_PublicSignalOperationsPacket.cshtml")
 
     for forbidden in (
         "<span>@sourceReceipt.ReceiptId</span>",
@@ -312,12 +313,24 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
         "routing record",
         "source record",
         "release record",
+        "<p class=\"eyebrow\">Source item</p>",
+        "The originating source item",
+        "Open source details",
         "ReleaseProofReceiptId",
         "ReleaseProofRoute",
     ):
         assert forbidden not in feedback_operations
 
-    assert "Source item" in feedback_operations
+    for forbidden in (
+        "follow-up record",
+        "posted follow-up record",
+    ):
+        assert forbidden not in signal_operations
+
+    assert "Original item" in feedback_operations
+    assert "Open related details" in feedback_operations
+    assert "Open related data" in feedback_operations
+    assert "posted follow-up update" in signal_operations
     assert "message update" in feedback_operations
     assert "follow-up update" in feedback_operations
     assert "routing update" in feedback_operations
