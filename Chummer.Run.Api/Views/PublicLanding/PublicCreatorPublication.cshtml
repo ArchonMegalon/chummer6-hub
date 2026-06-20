@@ -79,7 +79,7 @@
         {
             Badge = "Downloads",
             Title = "Leave this page when the next job is installing the product",
-            Summary = "The publication page should never compete with the recommended build, platform posture, or install help. Downloads still owns that decision.",
+            Summary = "The publication page should never compete with the recommended build, platform status, or install help. Downloads still owns that decision.",
             Href = "/downloads",
             Label = "Open downloads",
             Details = new[] { "Install path", "Known issues nearby", "No fake build path" }
@@ -183,7 +183,7 @@
         </article>
         <article class="trust-rail">
             <span class="tag">Trust</span>
-            <p>@(Model.Publication.TrustSummary ?? "Trust posture is not available yet.")</p>
+            <p>@PublicFacingCopyHumanizer.Clean(Model.Publication.TrustSummary ?? "Trust status is not available yet.")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Discovery</span>

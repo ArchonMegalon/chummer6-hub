@@ -31,7 +31,7 @@
             return string.Empty;
         }
 
-        return value
+        return PublicFacingCopyHumanizer.Clean(value
             .Replace("Canonical Roadmap Truth", "Roadmap decisions", StringComparison.OrdinalIgnoreCase)
             .Replace("Release Truth", "Release status", StringComparison.OrdinalIgnoreCase)
             .Replace("Support Case Truth", "Support cases", StringComparison.OrdinalIgnoreCase)
@@ -51,7 +51,7 @@
             .Replace("Deftform", "structured pre-screen", StringComparison.OrdinalIgnoreCase)
             .Replace("FacePop", "public invitation", StringComparison.OrdinalIgnoreCase)
             .Replace("Lunacal", "scheduled follow-up", StringComparison.OrdinalIgnoreCase)
-            .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase);
+            .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase));
     }
 
     var authorityFlow = Model.AuthorityFlow.Take(4).ToArray();

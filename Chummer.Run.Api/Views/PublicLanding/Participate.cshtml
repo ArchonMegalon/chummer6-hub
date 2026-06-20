@@ -288,8 +288,8 @@
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">@beHuman.StatusLabel</span>
-                <h3>@beHuman.Verdict</h3>
-                <p>Current setup: <code class="mono-receipt">@beHuman.OperatingMode</code></p>
+                <h3>@PublicFacingCopyHumanizer.Clean(beHuman.Verdict)</h3>
+                <p>Current setup: <code class="mono-receipt">@PublicFacingCopyHumanizer.Clean(beHuman.OperatingMode)</code></p>
                 <p>
                     @if (beHuman.CapacityClaimAllowed && beHuman.VerifiedRegistrationCapacity is > 0)
                     {
@@ -450,7 +450,7 @@
 </section>
 
 <section class="release-footnote">
-    <p class="eyebrow">Current page posture</p>
+    <p class="eyebrow">Current page</p>
     <h2 class="editorial-title">Broader participation stays separate from the dedicated public-signal loop.</h2>
     <p class="editorial-copy">The current Chummer loop is explicit now: public feedback lives on <code class="mono-receipt">/feedback</code>, planned movement lives on <code class="mono-receipt">/roadmap</code>, and shipped updates live on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional signed-in paths while hosted mirroring remains downstream of Chummer review.</p>
     <p class="muted-copy">

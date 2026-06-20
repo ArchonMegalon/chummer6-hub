@@ -9,12 +9,12 @@
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Signed-in notifications</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
         <div class="trust-claim__microproof">
-            <span>Status: @Model.Status.StatusLabel</span>
-            <span>Policy: @Model.Status.Policy</span>
-            <span>Records: @Model.Status.ReceiptCount</span>
+            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)</span>
+            <span>Policy: @PublicFacingCopyHumanizer.Clean(Model.Status.Policy)</span>
+            <span>Messages: @Model.Status.ReceiptCount</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
@@ -62,7 +62,7 @@
             <a class="ledger-flagship__nav-card" href="/ledger/map#ledger-map">
                 <span class="tag">Public</span>
                 <strong>Open the public globe</strong>
-                <p>Compare the signed-in inbox posture against the public-safe world presentation.</p>
+                <p>Compare the signed-in inbox with the public world view.</p>
             </a>
         </div>
     </div>
@@ -74,11 +74,11 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Table Pulse Live</p>
             <h2 class="editorial-title">@Model.TablePulsePacket.Heading</h2>
-            <p class="editorial-copy">@Model.TablePulsePacket.Summary</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Summary)</p>
         </div>
         <div class="trust-claim__microproof">
-            <span>Verdict: @Model.TablePulsePacket.VerdictLabel</span>
-            <span>@Model.TablePulsePacket.ConsentPosture</span>
+            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.VerdictLabel)</span>
+            <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.ConsentPosture)</span>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -98,7 +98,7 @@
                 <article class="route-choice-card">
                     <span class="tag">@cue.Label</span>
                     <h3>@cue.StatusLabel</h3>
-                    <p>@cue.Summary</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <div class="route-choice-card__proof">
                         <a href="@cue.Href">Open</a>
                     </div>
@@ -108,33 +108,33 @@
         @if (!string.IsNullOrWhiteSpace(Model.TablePulsePacket.AdjudicationSummary))
         {
             <div class="trust-claim__microproof">
-                <span>@Model.TablePulsePacket.AdjudicationSummary</span>
+                <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AdjudicationSummary)</span>
             </div>
         }
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
-                <span class="tag">Heat posture</span>
-                <p>@Model.TablePulsePacket.HeatPosture</p>
+                <span class="tag">Heat</span>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.HeatPosture)</p>
             </article>
             <article class="route-choice-card">
-                <span class="tag">Notification posture</span>
-                <p>@Model.TablePulsePacket.NotificationPosture</p>
+                <span class="tag">Notifications</span>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.NotificationPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Remote reaction</span>
-                <p>@Model.TablePulsePacket.RemoteReactionPosture</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.RemoteReactionPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Signal Deck</span>
-                <p>@Model.TablePulsePacket.SignalDeckPosture</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.SignalDeckPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Runner Passport</span>
-                <p>@Model.TablePulsePacket.RunnerPassportPosture</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.RunnerPassportPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
-                <p>@Model.TablePulsePacket.AftermathPosture</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AftermathPosture)</p>
                 <div class="route-choice-card__proof">
                     <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath</a>
                 </div>
@@ -242,7 +242,7 @@
                         <source src="@Model.WorldTurnBriefing.Broadcast.VideoMp4Href" type="video/mp4" />
                         <source src="@Model.WorldTurnBriefing.Broadcast.VideoWebmHref" type="video/webm" />
                         <track kind="captions" src="@Model.WorldTurnBriefing.Broadcast.CaptionsHref" srclang="en" label="English" default />
-                        Your browser does not support HTML5 video playback for this route.
+                        Your browser cannot play this video here.
                     </video>
                     <div class="trust-claim__microproof">
                         <span>Anchor: @Model.WorldTurnBriefing.Broadcast.AnchorName</span>
@@ -311,14 +311,14 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Delivery status</p>
         <h2 class="editorial-title">@Model.Status.StatusLabel</h2>
-        <p class="editorial-copy">@Model.Status.Summary</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Status.Summary)</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var note in Model.DeliveryNotes)
         {
             <article class="route-choice-card">
                 <span class="tag">Policy note</span>
-                <p>@note</p>
+                <p>@PublicFacingCopyHumanizer.Clean(note)</p>
             </article>
         }
     </div>
@@ -336,9 +336,9 @@
             @foreach (var receipt in Model.Status.Receipts)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@receipt.Status</span>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
                     <h3>@receipt.ReceiptId</h3>
-                    <p>@receipt.Summary</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
                     <div class="route-choice-card__proof">
                         <span>Recipient: @receipt.RecipientLabel</span>
                         <span>Attempted: @receipt.AttemptedAtUtc</span>

@@ -137,6 +137,41 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
     assert "planned work" in combined
 
 
+def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
+    sources = [
+        read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerLeaderBriefing.cshtml"),
+    ]
+    combined = "\n".join(sources)
+
+    for forbidden in (
+        "Posture:",
+        "Executive posture",
+        "Current page posture",
+        "Table posture",
+        "Broadcast posture",
+        "Quality checklist",
+        "Your browser does not support HTML5 video playback for this route.",
+        "platform posture",
+        "Trust posture is not available",
+        "aggregate install posture",
+        "faction posture",
+        "management posture",
+        "Cross-district posture",
+        "Verdict:",
+    ):
+        assert forbidden not in combined
+
+    assert "PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)" in combined
+    assert "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)" in combined
+    assert "Your browser cannot play this video here." in combined
+
+
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 

@@ -35,7 +35,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Continuity</p>
         <h2 class="editorial-title">Claimed installs and reconnect paths are visible without leaking private device history.</h2>
-        <p class="editorial-copy">@Model.VerdictSummary</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.VerdictSummary)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -77,7 +77,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Continuity details</p>
         <h2 class="editorial-title">See how continuity stays bounded.</h2>
-        <p class="editorial-copy">These details show the continuity contract: aggregate install posture, reconnect handoff, and the public/private boundary around deeper runboard state.</p>
+        <p class="editorial-copy">These details show the continuity contract: aggregate install state, reconnect handoff, and the public/private boundary around deeper runboard state.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var receipt in Model.Receipts)
@@ -85,7 +85,7 @@
             <article class="route-choice-card">
                 <span class="tag">@receipt.Status</span>
                 <h3>@receipt.Topic</h3>
-                <p>@receipt.Summary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
                 <div class="route-choice-card__proof">
                     <span>@receipt.ReceiptId</span>
                     <span>@receipt.Route</span>

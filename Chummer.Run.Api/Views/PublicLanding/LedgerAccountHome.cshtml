@@ -9,8 +9,8 @@
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Faction command</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">This is the internal campaign city bridgehead: one globe, one board state, one faction posture, and one professional world-turn briefing.</p>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <p class="ledger-flagship__support">This is the signed-in campaign city view: one globe, one board state, one faction state, and one professional world-turn briefing.</p>
         <div class="trust-claim__microproof">
             <span>Faction: @Model.Faction.PublicName</span>
             <span>Membership: @Model.Allegiance.MembershipType</span>
@@ -75,11 +75,11 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">World turn inbox</p>
             <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
-            <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)</p>
         </div>
         <div class="trust-claim__microproof">
-            <span>Policy: @Model.NewsreelStatus.Policy</span>
-            <span>Records: @Model.NewsreelStatus.ReceiptCount</span>
+            <span>Policy: @PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Policy)</span>
+            <span>Messages: @Model.NewsreelStatus.ReceiptCount</span>
             <span>Recipients sent: @Model.NewsreelStatus.RecipientCount</span>
         </div>
         <div class="stacked-actions">
@@ -96,7 +96,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Advisory command</p>
             <h2 class="editorial-title">@Model.AdvisorySummary.Heading</h2>
-            <p class="editorial-copy">@Model.AdvisorySummary.NoDemocracyNote</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -125,12 +125,12 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">@Model.WorldTurnBriefing.TransitionLabel</p>
             <h2 class="editorial-title">@Model.WorldTurnBriefing.InboxHeadline</h2>
-            <p class="editorial-copy">@Model.WorldTurnBriefing.NewsreelLead</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">World state</span>
-                <p>@Model.WorldTurnBriefing.StateSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.StateSummary)</p>
             </article>
             @foreach (var item in Model.WorldTurnBriefing.NewsreelBullets.Take(2))
             {
@@ -149,7 +149,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Leader readout</p>
             <h2 class="editorial-title">@Model.LeaderDigest.Heading</h2>
-            <p class="editorial-copy">@Model.LeaderDigest.Summary</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
@@ -173,20 +173,20 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Next actions</p>
             <h2 class="editorial-title">@Model.FollowThroughPacket.Heading</h2>
-            <p class="editorial-copy">@Model.FollowThroughPacket.Summary</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Signal Deck</span>
-                <p>@Model.FollowThroughPacket.SignalDeckSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.SignalDeckSummary)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Runner Passport</span>
-                <p>@Model.FollowThroughPacket.RunnerPassportSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.RunnerPassportSummary)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living Newsroom</span>
-                <p>@Model.FollowThroughPacket.LivingNewsroomSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.LivingNewsroomSummary)</p>
                 <div class="route-choice-card__proof">
                     <a href="@Model.FollowThroughPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
@@ -194,14 +194,14 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
-                <p>@Model.FollowThroughPacket.AftermathSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.AftermathSummary)</p>
                 <div class="route-choice-card__proof">
                     <a href="@Model.FollowThroughPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Boundary</span>
-                <p>@Model.FollowThroughPacket.BoundaryLine</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.BoundaryLine)</p>
             </article>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
@@ -210,7 +210,7 @@
                 <article class="route-choice-card">
                     <span class="tag">@cue.Label</span>
                     <h3>@cue.StatusLabel</h3>
-                    <p>@cue.Summary</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <div class="route-choice-card__proof">
                         <a href="@cue.Href">Open</a>
                     </div>
@@ -224,7 +224,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Identity loop</p>
         <h2 class="editorial-title">Welcome kit and first task</h2>
-        <p class="editorial-copy">Faction welcome kit, badge, runner passport stamp, rank posture, and weekly dispatch hooks all start here.</p>
+        <p class="editorial-copy">Faction welcome kit, badge, runner passport stamp, rank state, and weekly dispatch hooks all start here.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var item in Model.WelcomeKit)
@@ -243,14 +243,14 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction promo</p>
             <h2 class="editorial-title">Faction video draft</h2>
-            <p class="editorial-copy">@Model.PromoArtifact.CampaignHook</p>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.CampaignHook)</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
-                <span class="tag">@Model.PromoArtifact.ProviderStatus</span>
+                <span class="tag">@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)</span>
                 <h3>@Model.PromoArtifact.PublicName</h3>
-                <p>Format: @Model.PromoArtifact.RenderMode</p>
-                <p>@Model.PromoArtifact.AudiencePromise</p>
+                <p>Format: @PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.RenderMode)</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.AudiencePromise)</p>
                 <div class="route-choice-card__proof">
                     @foreach (var format in Model.PromoArtifact.FormatLabels)
                     {
@@ -280,7 +280,7 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">Detail</span>
-                    <p>@check</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(check)</p>
                 </article>
             }
         </div>

@@ -12,7 +12,7 @@
         <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
             <span>@Model.ScopeLabel</span>
-            <span>@Model.VerdictLabel</span>
+            <span>@PublicFacingCopyHumanizer.Clean(Model.VerdictLabel)</span>
             <span>Chummer packet, not book text</span>
         </div>
     </div>
@@ -26,17 +26,17 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Ruleset status</p>
         <h2 class="editorial-title">Not an SR5 skin. Not an SR6 mode.</h2>
-        <p class="editorial-copy">This path treats Shadowrun Anarchy as its own rules-light profile: fast runner sheets, dispatch-compatible consequence, mobile return, and explainable JSON export without copying sourcebook text into the product.</p>
+        <p class="editorial-copy">This path treats Shadowrun Anarchy as its own rules-light profile: fast runner sheets, dispatch-compatible consequence, mobile return, and clear export without copying sourcebook text into the product.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@Model.RulesetId</span>
             <h3>@Model.FeaturedProfile.Handle</h3>
             <p>@Model.FeaturedProfile.Concept</p>
-            <p class="muted-copy">@Model.FeaturedProfile.PostureLabel</p>
+            <p class="muted-copy">@PublicFacingCopyHumanizer.Clean(Model.FeaturedProfile.PostureLabel)</p>
         </article>
         <article class="route-choice-card">
-            <span class="tag">@Model.FeaturedProfile.VerdictLabel</span>
+            <span class="tag">@PublicFacingCopyHumanizer.Clean(Model.FeaturedProfile.VerdictLabel)</span>
             <h3>Public claim ceiling</h3>
             <p>Shipped rules-light path for campaign city dispatches and mobile play. Not full book-level rules completeness.</p>
         </article>
@@ -63,7 +63,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Narrative cues</span>
-            <h3>Table posture</h3>
+            <h3>Table state</h3>
             <p>@string.Join(" · ", Model.FeaturedProfile.NarrativeCues)</p>
             <p class="muted-copy">Capabilities: @string.Join(", ", Model.FeaturedProfile.Capabilities)</p>
         </article>

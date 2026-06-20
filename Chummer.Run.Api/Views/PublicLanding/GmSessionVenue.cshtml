@@ -30,7 +30,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Venue status</span>
         <h2>@Model.VenueStatus</h2>
-        <p>Room: @Model.Provider. Visibility: @Model.Visibility.</p>
+        <p>Room: @PublicFacingCopyHumanizer.Clean(Model.Provider). Visibility: @PublicFacingCopyHumanizer.Clean(Model.Visibility).</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Scheduled time</span>
@@ -101,7 +101,7 @@
             <article class="route-choice-card">
                 <span class="tag">Create mode</span>
                 <h3>@(Model.ProviderCreateAvailable ? "Room creation available" : "Room creation unavailable")</h3>
-                <p>@Model.ProviderCreateDisabledReason</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.ProviderCreateDisabledReason)</p>
             </article>
         </div>
     </section>

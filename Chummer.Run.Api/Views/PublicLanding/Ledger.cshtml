@@ -310,7 +310,7 @@
                             <source src="@newsreelBroadcast.VideoMp4Href" type="video/mp4" />
                             <source src="@newsreelBroadcast.VideoWebmHref" type="video/webm" />
                             <track kind="captions" src="@newsreelBroadcast.CaptionsHref" srclang="en" label="English" default />
-                            Your browser does not support HTML5 video playback for this route.
+                            Your browser cannot play this video here.
                         </video>
                         <div class="trust-claim__microproof">
                             <span>Anchor: @newsreelBroadcast.AnchorName</span>
@@ -344,11 +344,11 @@
                         }
                         <article class="route-choice-card">
                             <span class="tag">@newsreelBroadcast.PackageLabel</span>
-                            <h3>Broadcast posture</h3>
+                            <h3>Broadcast mix</h3>
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.AudioPosture)</p>
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.MusicPosture)</p>
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.PublicSafetyNote)</p>
-                            <p>@newsreelBroadcast.ReconstructionNote</p>
+                            <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.ReconstructionNote)</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>

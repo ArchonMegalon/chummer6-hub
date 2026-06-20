@@ -9,8 +9,8 @@
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Controlled signal</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">@Model.Summary.NoDemocracyNote</p>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <p class="ledger-flagship__support">@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="/account/ledger/notifications">Open inbox</a>
             <a class="button-like button-like--secondary" href="/account/ledger">Back to command</a>
@@ -61,7 +61,7 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Governance</span>
-            <p>@Model.Summary.NoDemocracyNote</p>
+            <p>@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
         </article>
     </div>
 </section>
@@ -80,9 +80,9 @@
                 <article class="route-choice-card">
                     <span class="tag">@ballot.AudienceLabel</span>
                     <h3>@ballot.Heading</h3>
-                    <p>@ballot.Summary</p>
-                    <p><strong>Posture:</strong> @ballot.AdvisoryPosture</p>
-                    <p><strong>Destination:</strong> @ballot.ResultDestination</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(ballot.Summary)</p>
+                    <p><strong>State:</strong> @PublicFacingCopyHumanizer.Clean(ballot.AdvisoryPosture)</p>
+                    <p><strong>Destination:</strong> @PublicFacingCopyHumanizer.Clean(ballot.ResultDestination)</p>
                     @if (ballot.UserMayVote)
                     {
                         <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
@@ -122,9 +122,9 @@
                 <article class="route-choice-card">
                     <span class="tag">@ballot.AudienceLabel</span>
                     <h3>@ballot.Heading</h3>
-                    <p>@ballot.Summary</p>
-                    <p><strong>Posture:</strong> @ballot.AdvisoryPosture</p>
-                    <p><strong>Destination:</strong> @ballot.ResultDestination</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(ballot.Summary)</p>
+                    <p><strong>State:</strong> @PublicFacingCopyHumanizer.Clean(ballot.AdvisoryPosture)</p>
+                    <p><strong>Destination:</strong> @PublicFacingCopyHumanizer.Clean(ballot.ResultDestination)</p>
                     @if (ballot.UserMayVote)
                     {
                         <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
@@ -164,8 +164,8 @@
                 <article class="route-choice-card">
                     <span class="tag">Leader brief</span>
                     <h3>@summary.Heading</h3>
-                    <p>@summary.Summary</p>
-                    <p><strong>Executive posture:</strong> @summary.ExecutivePosture</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(summary.Summary)</p>
+                    <p><strong>Leader state:</strong> @PublicFacingCopyHumanizer.Clean(summary.ExecutivePosture)</p>
                     <div class="route-choice-card__proof">
                         @foreach (var item in summary.Highlights)
                         {

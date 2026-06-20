@@ -269,11 +269,11 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Humanize public and desktop copy",
             area="Copy",
             priority="P0",
-            status="local-public-gate-passed",
+            status="campaign-city-source-pass-pushed",
             cadence="continuous; live after scheduled publish",
             source="Human tester feedback",
             why_it_matters="Generated-sounding copy undermines trust even when the feature works.",
-            next_action="Keep the local public leak gate green after scheduled publish, then continue the same loop through installer, desktop dialogs, and Origin Dossier output.",
+            next_action="Publish the campaign-city copy cleanup at the next 08:00 release window, rerun the live leak gate, then continue the same loop through installer, desktop dialogs, and Origin Dossier output.",
             acceptance_gate="Public and primary desktop surfaces avoid AI, provider, proof, audit, and internal workflow wording unless directly useful.",
         ),
         ImportantWorkItem(

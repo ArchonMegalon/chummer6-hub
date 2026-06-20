@@ -50,6 +50,8 @@ public static partial class PublicFacingCopyHumanizer
         ("verified", "confirmed"),
         ("validated", "reviewed"),
         ("validation", "review"),
+        ("quality checklist", "quality list"),
+        ("checklist", "list"),
         ("governed", "reviewed"),
         ("grounded", "clear"),
         ("audit", "review"),

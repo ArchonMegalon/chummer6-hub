@@ -15,9 +15,9 @@
         <h1 class="editorial-title">@Model.Heading</h1>
         <p class="editorial-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
-            <span>Status: @Model.Promo.ProviderStatus</span>
-            <span>Format: @Model.Promo.RenderMode</span>
-            <span>Fallback: @Model.Promo.FallbackRenderMode</span>
+            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)</span>
+            <span>Format: @PublicFacingCopyHumanizer.Clean(Model.Promo.RenderMode)</span>
+            <span>Fallback: @PublicFacingCopyHumanizer.Clean(Model.Promo.FallbackRenderMode)</span>
             <span>Safety: public</span>
         </div>
         <div class="stacked-actions">
@@ -39,8 +39,8 @@
         <div class="trust-claim__microproof">
             <span>Mode: @Model.Promo.PlaybackLabel</span>
             <span>Captions: included</span>
-            <span>Narration: @Model.Promo.NarratorPosture</span>
-            <span>Pipeline: @Model.Promo.RenderPipelineLabel</span>
+            <span>Narration: @PublicFacingCopyHumanizer.Clean(Model.Promo.NarratorPosture)</span>
+            <span>Build: @PublicFacingCopyHumanizer.Clean(Model.Promo.RenderPipelineLabel)</span>
         </div>
         <video class="faction-promo-video"
                controls
@@ -50,7 +50,7 @@
             <source src="@Model.Promo.VideoMp4Href" type="video/mp4" />
             <source src="@Model.Promo.VideoWebmHref" type="video/webm" />
             <track kind="captions" src="@Model.Promo.CaptionsHref" srclang="en" label="English" default />
-            Your browser does not support HTML5 video playback for this route.
+            Your browser cannot play this video here.
         </video>
         <div class="trust-claim__microproof">
             <span>Fallback mode: storyboard bulletin</span>
@@ -122,7 +122,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Review</p>
-        <h2 class="editorial-title">Quality checklist</h2>
+        <h2 class="editorial-title">Quality list</h2>
         <p class="editorial-copy">Before this is promoted, the promo should play like a real scene: clear motion, clear captions, clean audio, and no private material.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
