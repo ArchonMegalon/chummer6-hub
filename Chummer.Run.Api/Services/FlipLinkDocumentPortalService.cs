@@ -255,8 +255,8 @@ public sealed class FlipLinkDocumentPortalService
         [
             title,
             string.Empty,
-            "Generated and owned by Chummer.",
-            "FlipLink is the optional governed viewer layer; the Chummer route remains the truth owner.",
+            "Created and owned by Chummer.",
+            "FlipLink can be an optional viewer; the Chummer page remains the source.",
             string.Empty
         ];
 

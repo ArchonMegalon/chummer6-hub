@@ -292,6 +292,9 @@
         };
     }
 
+    static string PublicText(string? value)
+        => PublicFacingCopyHumanizer.Clean(value);
+
     static string RuleEnvironmentLifecycleLabel(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
         => environment.ApprovalState.Trim().ToLowerInvariant() switch
         {
@@ -638,7 +641,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Linked install path</span>
                             <strong>@accountRailInstallSummary</strong>
-                            <p>The artifact stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
+                            <p>The download stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
@@ -677,7 +680,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Linked install path</span>
                     <strong>@accountRailInstallSummary</strong>
-                    <p>The artifact stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
+                    <p>The download stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
@@ -1164,7 +1167,7 @@
                     </div>
                     <div class="settings-summary-row">
                         <span>Cross-device recovery</span>
-                        <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} artifacts · {restoreEntitlementCount} entitlements")</strong>
+                            <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} files · {restoreEntitlementCount} entitlements")</strong>
                     </div>
                     @if (entitlementSyncReceipts is not null)
                     {
@@ -2668,15 +2671,15 @@
                                         <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No reviewed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} package(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Publication posture</span>
-                                        <strong>@selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary</strong>
+                                        <span>Publication status</span>
+                                        <strong>@PublicText(selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary)</strong>
                                     </div>
                                 </div>
                                 <p><strong>Return path:</strong> @selectedWorkspace.ReturnSummary</p>
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
-                                        <summary>Artifact shelf posture</summary>
+                                        <summary>Recap files</summary>
                                         <ul class="muted-copy">
                                             @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
                                             {
@@ -2684,11 +2687,11 @@
                                                     ? Model.CampaignSpine.CreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
                                                     : null;
                                                 <li>
-                                                    <strong>@item.Label</strong>: @item.Summary
+                                                    <strong>@PublicText(item.Label)</strong>: @PublicText(item.Summary)
                                                     <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
                                                     @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
                                                     {
-                                                        <span> Ownership: @item.OwnershipSummary</span>
+                                                        <span> Ownership: @PublicText(item.OwnershipSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.PublicationState))
                                                     {
@@ -2701,15 +2704,15 @@
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                     {
-                                                        <span> @item.PublicationSummary</span>
+                                                        <span> @PublicText(item.PublicationSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.CompatibilitySummary))
                                                     {
-                                                        <span> Compatibility: @item.CompatibilitySummary</span>
+                                                        <span> Compatibility: @PublicText(item.CompatibilitySummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.LineageSummary))
                                                     {
-                                                        <span> Lineage: @item.LineageSummary</span>
+                                                        <span> Lineage: @PublicText(item.LineageSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
                                                     {
@@ -2717,23 +2720,23 @@
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
                                                     {
-                                                        <span> Discovery: @linkedPublication.DiscoverySummary</span>
+                                                        <span> Discovery: @PublicText(linkedPublication.DiscoverySummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                                                     {
-                                                        <span> Lineage: @linkedPublication.LineageSummary</span>
+                                                        <span> Lineage: @PublicText(linkedPublication.LineageSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
                                                     {
-                                                        <span> Return: @linkedPublication.CampaignReturnSummary</span>
+                                                        <span> Return: @PublicText(linkedPublication.CampaignReturnSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
                                                     {
-                                                        <span> Support: @linkedPublication.SupportClosureSummary</span>
+                                                        <span> Support: @PublicText(linkedPublication.SupportClosureSummary)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                     {
-                                                        <span> Next: @item.NextSafeAction</span>
+                                                        <span> Next: @PublicText(item.NextSafeAction)</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
                                                     {
@@ -3145,8 +3148,8 @@
                             @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.TrustSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Trust posture</span>
-                                    <strong>@selectedCreatorPublication.TrustSummary</strong>
+                                    <span>Trust status</span>
+                                    <strong>@PublicText(selectedCreatorPublication.TrustSummary)</strong>
                                 </div>
                             }
                             <div class="settings-summary-row">
@@ -3636,15 +3639,15 @@
                                                 ? Model.CampaignSpine.CreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
                                                 : null;
                                             <li>
-                                                <strong>@item.Label</strong>: @item.Summary
+                                                <strong>@PublicText(item.Label)</strong>: @PublicText(item.Summary)
                                                 <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
                                                 @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
                                                 {
-                                                    <span> Ownership: @item.OwnershipSummary</span>
+                                                    <span> Ownership: @PublicText(item.OwnershipSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                                                 {
-                                                    <span> Source: @item.ProvenanceSummary</span>
+                                                    <span> Source: @PublicText(item.ProvenanceSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                                                 {
@@ -3652,11 +3655,11 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.CompatibilitySummary))
                                                 {
-                                                    <span> Compatibility: @item.CompatibilitySummary</span>
+                                                    <span> Compatibility: @PublicText(item.CompatibilitySummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.LineageSummary))
                                                 {
-                                                    <span> Lineage: @item.LineageSummary</span>
+                                                    <span> Lineage: @PublicText(item.LineageSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.PublicationState))
                                                 {
@@ -3669,7 +3672,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                 {
-                                                    <span> @item.PublicationSummary</span>
+                                                    <span> @PublicText(item.PublicationSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
                                                 {
@@ -3677,35 +3680,35 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
                                                 {
-                                                    <span> Discovery: @linkedPublication.DiscoverySummary</span>
+                                                    <span> Discovery: @PublicText(linkedPublication.DiscoverySummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
                                                 {
-                                                    <span> Trust: @linkedPublication.TrustSummary</span>
+                                                    <span> Trust: @PublicText(linkedPublication.TrustSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.ComparisonSummary))
                                                 {
-                                                    <span> Compare by: @linkedPublication.ComparisonSummary</span>
+                                                    <span> Compare by: @PublicText(linkedPublication.ComparisonSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                                                 {
-                                                    <span> Lineage: @linkedPublication.LineageSummary</span>
+                                                    <span> Lineage: @PublicText(linkedPublication.LineageSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
                                                 {
-                                                    <span> Return: @linkedPublication.CampaignReturnSummary</span>
+                                                    <span> Return: @PublicText(linkedPublication.CampaignReturnSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
                                                 {
-                                                    <span> Support: @linkedPublication.SupportClosureSummary</span>
+                                                    <span> Support: @PublicText(linkedPublication.SupportClosureSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.ModerationSummary))
                                                 {
-                                                    <span> Moderation: @linkedPublication.ModerationSummary</span>
+                                                    <span> Moderation: @PublicText(linkedPublication.ModerationSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                 {
-                                                    <span> Next: @item.NextSafeAction</span>
+                                                    <span> Next: @PublicText(item.NextSafeAction)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.ArtifactId))
                                                 {
@@ -4312,8 +4315,8 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Current release</span>
                                         <div class="app-rail__copy">
-                                            <h3>Current release posture</h3>
-                                            <p>Point members to the live release posture, current recommendation, and known caution state without translating repo status by hand.</p>
+                                            <h3>Current release status</h3>
+                                            <p>Point members to the live release, current recommendation, and known caution state without translating repo status by hand.</p>
                                         </div>
                                         <a class="inline-link" href="/now">Open current release</a>
                                     </article>
@@ -4328,7 +4331,7 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Help &amp; trust</span>
                                         <div class="app-rail__copy">
-                                            <h3>Known help and trust posture</h3>
+                                            <h3>Help and privacy</h3>
                                             <p>Help, contact, and privacy-boundary guidance stay on the same first-party surface so organizers can point members to the real recovery path.</p>
                                         </div>
                                         <a class="inline-link" href="/help">Open help and trust</a>
@@ -4336,7 +4339,7 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Support closure</span>
                                         <div class="app-rail__copy">
-                                            <h3>@(openSupportCases == 0 ? "Quiet support posture" : "Tracked support continuity")</h3>
+                                            <h3>@(openSupportCases == 0 ? "Quiet support" : "Tracked support continuity")</h3>
                                             <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help pages." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
                                             <p class="muted-copy">@op.SupportEscalationSummary</p>
                                         </div>
@@ -4406,7 +4409,7 @@
                             <strong>@HumanizeStatus(Model.User.Visibility, "Private")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Recovery posture</span>
+                            <span>Recovery status</span>
                             <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
                         </div>
                     </div>
@@ -4602,8 +4605,8 @@
                 <dd>@Model.Links.ChannelLinks.Count</dd>
             </div>
             <div>
-                <dt>Recovery posture</dt>
-                <dd>@Model.Links.RecoveryPosture</dd>
+                <dt>Recovery status</dt>
+                <dd>@PublicText(Model.Links.RecoveryPosture)</dd>
             </div>
             <div>
                 <dt>Follow horizons</dt>

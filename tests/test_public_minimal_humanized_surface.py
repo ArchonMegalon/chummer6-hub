@@ -135,3 +135,26 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
 
     assert "Maintenance" in combined
     assert "planned work" in combined
+
+
+def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
+    account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+
+    for forbidden in (
+        "The artifact stays the same for everyone",
+        "Artifact shelf posture",
+        "Current release posture",
+        "Known help and trust posture",
+        "Quiet support posture",
+        "Recovery posture",
+        "Trust posture",
+        "artifacts ·",
+    ):
+        assert forbidden not in account
+
+    assert "The download stays the same for everyone" in account
+    assert "Recap files" in account
+    assert "Current release status" in account
+    assert "Help and privacy" in account
+    assert "Recovery status" in account
+    assert "PublicText(" in account

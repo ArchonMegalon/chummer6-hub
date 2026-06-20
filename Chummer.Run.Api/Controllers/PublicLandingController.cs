@@ -8565,17 +8565,17 @@ Boundary:
         {
             return new BuildGhostSignedInBenchViewModel(
                 StatusLabel: "Signed in, waiting for a build handoff",
-                Summary: "ALICE is ready to open your first-party build bench as soon as a runner, workspace, or guided build path has produced a governed handoff.",
+                Summary: "Character help is ready as soon as a runner, workspace, or guided build path has produced a reviewed handoff.",
                 EntryHref: "/account/alice/open",
-                EntryLabel: "Open ALICE workbench",
+                EntryLabel: "Open character help",
                 LeadHandoffHref: "/account/work",
                 LeadHandoffTitle: "No build handoff yet",
-                LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare history, planner coverage, and apply-safe output lanes.",
+                LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare history, planner coverage, and safe output paths.",
                 ProofPoints:
                 [
-                    "Account-owned handoff lane",
-                    "No provider-side apply authority",
-                    "Receipts stay first-party"
+                    "Account-owned next step",
+                    "Only Chummer applies changes",
+                    "Records stay with Chummer"
                 ]);
         }
 
@@ -8587,10 +8587,10 @@ Boundary:
         ];
 
         return new BuildGhostSignedInBenchViewModel(
-            StatusLabel: "Signed-in ALICE bench ready",
-            Summary: "Your account already has a governed build handoff. Open the named ALICE bench to inspect tradeoffs, planner coverage, rule-environment diff, and output history on the first-party account rail.",
+            StatusLabel: "Signed-in helper ready",
+            Summary: "Your account already has a reviewed build handoff. Open character help to inspect tradeoffs, planner coverage, rules setup changes, and output history on the account page.",
             EntryHref: "/account/alice/open",
-            EntryLabel: "Open ALICE workbench",
+            EntryLabel: "Open character help",
             LeadHandoffHref: $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
             LeadHandoffTitle: leadHandoff.Title,
             LeadHandoffSummary: leadHandoff.Summary,
@@ -8748,17 +8748,17 @@ Boundary:
                 new TrustPageSectionViewModel(
                     "document_portal_boundary",
                     "Boundary",
-                    "Viewer, not truth owner",
-                    "Chummer remains the source of truth for document content, version, classification, and release posture. FlipLink may present, embed, and measure approved documents only.",
+                    "Viewer, not source",
+                    "Chummer owns document content, version, access, and safety. FlipLink can present approved documents later without changing the Chummer page.",
                     [
                         "No sourcebook PDF hosting",
-                        "No entitlement or payment truth",
+                        "No entitlement or payment status",
                         "No private GM archive by default"
                     ]),
                 new TrustPageSectionViewModel(
                     "document_portal_provider_posture",
-                    "Provider posture",
-                    "Operator publication first",
+                    "External viewer",
+                    "Chummer page first",
                     "The Chummer page and PDF are available now. The external FlipLink viewer can be linked later without changing the user path.",
                     [
                         "Chummer page and PDF fallback are current",
@@ -8887,7 +8887,7 @@ Boundary:
                     [
                         "Presentation only",
                         "Analytics are engagement-only",
-                        "Chummer remains source of truth"
+                        "Chummer page remains primary"
                     ]),
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",

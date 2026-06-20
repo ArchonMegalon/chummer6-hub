@@ -35,7 +35,10 @@ public sealed class PublicLandingIdentityPolishTests
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
 
-        Assert.Contains("StatusLabel: \"ALICE compare bench\"", controller, StringComparison.Ordinal);
+        Assert.Contains("StatusLabel: \"Character compare bench\"", controller, StringComparison.Ordinal);
+        Assert.Contains("StatusLabel: \"Signed-in helper ready\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("ALICE compare bench", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Signed-in ALICE bench ready", controller, StringComparison.Ordinal);
         Assert.Contains("title: \"TABLE PULSE\"", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"TABLE PULSE\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: \"JACKPOINT\"", controller, StringComparison.Ordinal);

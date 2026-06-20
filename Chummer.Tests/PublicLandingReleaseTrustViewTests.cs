@@ -15,9 +15,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current stable build", view, StringComparison.Ordinal);
         Assert.Contains("Latest published build", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help if install or update does not behave as expected.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
-        Assert.Contains("Release notes", view, StringComparison.Ordinal);
-        Assert.Contains("Known issues", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes and install requirements stay on this page.", view, StringComparison.Ordinal);
     }
 
@@ -87,9 +88,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
         Assert.Contains("Use this when you want the newest Windows or Linux release.", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help if install or update does not behave as expected.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
-        Assert.Contains("Release notes", view, StringComparison.Ordinal);
-        Assert.Contains("Known issues", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
         Assert.Contains("AUR-compatible package source for Arch-based distributions.", view, StringComparison.Ordinal);
@@ -628,7 +630,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open helper report", view, StringComparison.Ordinal);
         Assert.Contains("Open public feedback", view, StringComparison.Ordinal);
         Assert.Contains("/contact?kind=bug_report", service, StringComparison.Ordinal);
-        Assert.Contains("/feedback?topic=build-ghosts", service, StringComparison.Ordinal);
+        Assert.Contains("/feedback?topic=character-helper", service, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -667,9 +669,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("heading: \"Document Portal\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: document.Title", controller, StringComparison.Ordinal);
         Assert.Contains("heading: document.Title", controller, StringComparison.Ordinal);
-        Assert.Contains("FlipLink is the optional governed viewer layer", controller, StringComparison.Ordinal);
-        Assert.Contains("Chummer owns the source document, version, access policy, and safety boundary.", controller, StringComparison.Ordinal);
-        Assert.Contains("This document is generated and owned by Chummer. FlipLink is the viewer.", controller, StringComparison.Ordinal);
+        Assert.Contains("Viewer, not source", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer owns document content, version, access, and safety.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("governed viewer layer", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("source of truth", controller, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("generated and owned", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Download PDF", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Quickstart embed boundary\"", controller, StringComparison.Ordinal);
     }
