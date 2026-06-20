@@ -23,7 +23,9 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
 
     def test_feedback_public_view_stays_on_participation_surface(self) -> None:
         text = FEEDBACK_VIEW.read_text(encoding="utf-8")
-        self.assertIn('href="/participate"', text)
+        self.assertIn('href="/feedback"', text)
+        self.assertIn('href="/roadmap"', text)
+        self.assertIn('href="/help"', text)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
 
 

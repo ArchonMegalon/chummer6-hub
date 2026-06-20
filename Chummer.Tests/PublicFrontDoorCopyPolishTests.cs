@@ -380,8 +380,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("handoff", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("callback", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("manual open", visibleText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("claim this copy", visibleText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Keep this install attached to your account.", visibleText, StringComparison.Ordinal);
+        Assert.Contains("Claiming only connects this copy to your account.", visibleText, StringComparison.Ordinal);
+        Assert.Contains("Keep this copy attached to your account.", visibleText, StringComparison.Ordinal);
     }
 
     private static readonly string[] ForbiddenVisibleMarkers =

@@ -52,9 +52,10 @@ public sealed class ParticipationDashboardViewTests
         string leaderboardView = File.ReadAllText(leaderboardViewPath);
         string workflowCanon = File.ReadAllText(workflowCanonPath);
 
-        Assert.Contains("Public Codex contribution code", consoleView, StringComparison.Ordinal);
-        Assert.Contains("counts the tokens used through it", consoleView, StringComparison.Ordinal);
-        Assert.Contains("Codex usage", leaderboardView, StringComparison.Ordinal);
+        Assert.Contains("Public contribution code", consoleView, StringComparison.Ordinal);
+        Assert.Contains("Chummer attaches this code to your contribution session", consoleView, StringComparison.Ordinal);
+        Assert.Contains("Contribution usage", leaderboardView, StringComparison.Ordinal);
+        Assert.Contains("Contribution code", leaderboardView, StringComparison.Ordinal);
         Assert.Contains("Codex contribution code", workflowCanon, StringComparison.Ordinal);
         Assert.Contains("participant_total_tokens", workflowCanon, StringComparison.Ordinal);
     }

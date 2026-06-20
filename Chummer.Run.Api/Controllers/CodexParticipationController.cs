@@ -59,7 +59,7 @@ public sealed class CodexParticipationController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var model = new ParticipationConsolePageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Participate", "Start contributing from one signed-in surface, authorize with your OpenAI account in ChatGPT, then leave with a clean status and account trail.", "/participate/codex", user.DisplayName, user.Email),
+                Chrome: _chrome.BuildAuthenticatedChrome("Participate", "Start contributing from one signed-in surface, authorize in ChatGPT, then leave with a clean status and account trail.", "/participate/codex", user.DisplayName, user.Email),
                 User: user,
                 Links: _links.GetSummary(subject.SubjectId),
                 Experience: _experience.GetOrCreate(subject.SubjectId));
@@ -657,7 +657,7 @@ public sealed class CodexParticipationController : Controller
                 status = "ready_to_start",
                 phase = "start",
                 heading = "Start contributing",
-                support = "Authorize a temporary Codex contribution lane with your OpenAI account in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.",
+                support = "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.",
                 statusLine = "You can stop or revoke this later from your account.",
                 auth = new
                 {
@@ -722,7 +722,7 @@ public sealed class CodexParticipationController : Controller
             status = session?.Status ?? "unavailable",
             phase = "unavailable",
             heading = "Participation is unavailable right now",
-            support = "This host can't open or refresh contribution lanes at the moment.",
+            support = "This host can't open or refresh contribution sessions at the moment.",
             statusLine = session is null
                 ? "Try again later. Your account is still signed in and nothing was lost."
                 : "Try again later. Your saved contribution record is still intact.",
@@ -826,7 +826,7 @@ public sealed class CodexParticipationController : Controller
             {
                 new { key = "intent", label = "Intent", state = intentDone ? "complete" : "pending", happenedAtUtc = intentDone ? session.CreatedAtUtc : (DateTimeOffset?)null, summary = "Contribution intent is tracked on your account rail." },
                 new { key = "consent", label = "Consent", state = consentDone ? "complete" : "pending", happenedAtUtc = session.ConsentedAtUtc, summary = consentDone ? "Consent recorded and attached to this sponsor session." : "Consent is still required before device authorization starts." },
-                new { key = "authorize", label = "Authorize", state = authDone ? "complete" : "pending", happenedAtUtc = session.AuthorizedAtUtc, summary = authDone ? "OpenAI/ChatGPT authorization succeeded for this lane." : "Waiting for one-time device-auth verification." },
+                new { key = "authorize", label = "Authorize", state = authDone ? "complete" : "pending", happenedAtUtc = session.AuthorizedAtUtc, summary = authDone ? "ChatGPT authorization succeeded for this session." : "Waiting for one-time device-auth confirmation." },
                 new { key = "activation", label = "Activation", state = activationState, happenedAtUtc = activationAtUtc, summary = activationSummary }
             }
         };
@@ -891,7 +891,7 @@ public sealed class CodexParticipationController : Controller
                 level = "info",
                 title = "Lane stopped",
                 summary = "This lane was stopped intentionally and will not process new work.",
-                nextSafeAction = "Start a new contribution lane when you are ready to continue."
+                nextSafeAction = "Start a new contribution session when you are ready to continue."
             },
             "revoked" => new
             {
@@ -963,7 +963,7 @@ public sealed class CodexParticipationController : Controller
         return phase switch
         {
             "complete" => "Thanks, you're set",
-            "authorize" => "Authorize with OpenAI",
+            "authorize" => "Authorize in ChatGPT",
             _ => "Start contributing"
         };
     }
@@ -979,23 +979,23 @@ public sealed class CodexParticipationController : Controller
 
         return phase switch
         {
-            "complete" => "Your contribution lane is linked. Chummer will only count accepted work after review.",
-            "authorize" => "Open the authorization page, sign in to ChatGPT with your OpenAI account, enter the one-time code, and keep this page open while Chummer watches for confirmation. If the code expires, ask for a fresh one here.",
-            _ => "Authorize a temporary Codex contribution lane with your OpenAI account in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
+            "complete" => "Your contribution session is linked. Chummer will only count accepted work after review.",
+            "authorize" => "Open the authorization page, sign in to ChatGPT, enter the one-time code, and keep this page open while Chummer watches for confirmation. If the code expires, ask for a fresh one here.",
+            _ => "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
         };
     }
 
     private static string ResolveContributionStatusLine(SponsorSessionStatusDto session)
         => session.Status switch
         {
-            "lane_pending" => "Authorization is confirmed. Chummer is finishing lane setup.",
+            "lane_pending" => "Authorization is confirmed. Chummer is finishing session setup.",
             "active" => "You can leave this page now. Stop or revoke later from your account settings.",
             "waiting_for_slot" => session.AuthorizedAtUtc is null
                 ? "All contribution slots are currently busy. Chummer saved your request and will move you forward when a slot opens."
                 : "Authorization is complete. Chummer is waiting for the next available contribution slot.",
-            "stopped" => "This contribution lane has been stopped. You can start again whenever you want.",
-            "revoked" => "This contribution lane has been revoked. Start a new one if you want to contribute again.",
-            _ => "Waiting for confirmation from your OpenAI account in ChatGPT..."
+            "stopped" => "This contribution session has been stopped. You can start again whenever you want.",
+            "revoked" => "This contribution session has been revoked. Start a new one if you want to contribute again.",
+            _ => "Waiting for confirmation from ChatGPT..."
         };
 
     private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)

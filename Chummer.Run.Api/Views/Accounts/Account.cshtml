@@ -403,7 +403,7 @@
         {
             "intent_created" => "Record consent to continue this access request.",
             "consented" => "Start device authorization from the participation flow.",
-            "pending_auth" => "Open the ChatGPT confirmation page for your OpenAI account and enter the one-time code.",
+            "pending_auth" => "Open the ChatGPT confirmation page and enter the one-time code.",
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
             "lane_pending" => "Keep this page open while activation completes.",
             "waiting_for_slot" => "Stay on this page and retry for a fresh code if authorization expires.",
@@ -1481,7 +1481,7 @@
                     @if (Model.CampaignSpine.Restore.RecentArtifacts.Count > 0)
                     {
                         <details class="details-drawer">
-                            <summary>Artifacts and reconnect receipts</summary>
+                            <summary>Files and reconnect history</summary>
                             <ul class="muted-copy">
                                 @foreach (var artifact in Model.CampaignSpine.Restore.RecentArtifacts)
                                 {
@@ -1576,7 +1576,7 @@
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Legacy migration receipts</span>
+                        <span>Legacy migration records</span>
                         <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -2619,7 +2619,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var launch in selectedWorkspacePrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Receipt: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Record: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2799,7 +2799,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var package in selectedWorkspaceAftermathPackages)
                                             {
-                                                <li><strong>@package.Title:</strong> @package.Summary <span> Receipt: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
+                                                <li><strong>@package.Title:</strong> @package.Summary <span> Record: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                             }
                                         </ul>
                                     </details>
@@ -3757,7 +3757,7 @@
                                                 }
                                                 @if (consequence.Receipts.Count > 0)
                                                 {
-                                                    <span> Receipt: @consequence.Receipts[0].SourceKind @consequence.Receipts[0].ReceiptId</span>
+                                                    <span> Record: @consequence.Receipts[0].SourceKind @consequence.Receipts[0].ReceiptId</span>
                                                 }
                                             </li>
                                         }

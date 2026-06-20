@@ -141,10 +141,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
         Assert.Contains("guided contribution tools tied to your account", view, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
-        Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
-        Assert.Contains("authorize with your OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
-        Assert.Contains("Public Codex contribution code", consoleView, StringComparison.Ordinal);
-        Assert.Contains("counts the tokens used through it", consoleView, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
+        Assert.Contains("Start a temporary contribution session", consoleView, StringComparison.Ordinal);
+        Assert.Contains("authorize in ChatGPT", controller, StringComparison.Ordinal);
+        Assert.Contains("Public contribution code", consoleView, StringComparison.Ordinal);
+        Assert.Contains("Chummer attaches this code to your contribution session", consoleView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -171,7 +173,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
         Assert.Contains("Votes show demand. Chummer decides what ships. Good reports include context and reproduction steps.", feedbackView, StringComparison.Ordinal);
-        Assert.Contains("Safe public signal", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("Public by default", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("No private logs", feedbackView, StringComparison.Ordinal);
         Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Open milestones", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Shipped updates", changelogView, StringComparison.Ordinal);
@@ -910,9 +913,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
-        Assert.Contains("The next page claims this copy with your running Chummer app in this browser tab.", view, StringComparison.Ordinal);
-        Assert.Contains("If it stalls, use the claim button again from the same browser.", view, StringComparison.Ordinal);
-        Assert.Contains("The next page opens Chummer to claim this copy.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep Chummer open while the browser finishes the claim.", view, StringComparison.Ordinal);
+        Assert.Contains("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("manual open button", view, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1138,7 +1140,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("You followed an old link", nowView, StringComparison.Ordinal);
         Assert.Contains("Release notes now live on <code class=\"mono-receipt\">/changelog</code>", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?source=feedback#public-feedback", nowView, StringComparison.Ordinal);
-        Assert.Contains("Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("Create the account when you want feedback, installs, support, and roadmap follow-up to return to one place.", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Private logs and account issues belong in Help, not public feedback.", feedbackView, StringComparison.Ordinal);
     }
 

@@ -257,7 +257,7 @@ public sealed class BoostSessionService
                 {
                     return QueueForCapacityLocked(
                         state,
-                        "Another contribution lane is already occupying the current project slot. Your sponsor session is queued for the next available slot.",
+                        "Another contribution session is already occupying the current project slot. Your sponsor session is queued for the next available slot.",
                         includeLaneId: false);
                 }
             }
@@ -331,7 +331,7 @@ public sealed class BoostSessionService
             {
                 return QueueForCapacityLocked(
                     state,
-                    "Another contribution lane is already occupying the current project slot. Chummer will finish activation when the next slot opens.",
+                    "Another contribution session is already occupying the current project slot. Chummer will finish activation when the next slot opens.",
                     includeLaneId: true);
             }
         }

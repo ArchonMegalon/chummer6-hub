@@ -399,7 +399,7 @@ static IResult GetSelfHostedDocs()
 <body>
   <main>
     <h1>Self-hosted OpenAPI explorer</h1>
-    <p>Chummer Hub exposes first-party health, release, account, campaign, support, and public proof routes from this host.</p>
+    <p>Chummer Hub exposes first-party health, release, account, campaign, support, and public information routes from this host.</p>
     <ul>
       <li><a href="/api/health">Health JSON</a></li>
       <li><a href="/downloads/releases.json">Public release manifest</a></li>

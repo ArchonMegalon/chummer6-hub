@@ -547,7 +547,7 @@ public sealed class SupportProgressEmailWorkflowService
                 $"Kind: {supportCase.Kind}",
                 $"Owner lane: {supportCase.CandidateOwnerRepo}",
                 "",
-                "Chummer has attached this report to the tracked support lane and will send a follow-up once the audit decision lands.",
+                "Chummer has attached this report to your support case and will send a follow-up after review.",
             });
 
     private static string BuildAuditedDecisionContent(
@@ -561,7 +561,7 @@ public sealed class SupportProgressEmailWorkflowService
             "\n",
             new[]
             {
-                $"Your request was audited for case {supportCase.CaseId}.",
+                $"Your request was reviewed for case {supportCase.CaseId}.",
                 $"Decision: {(decisionOutcome == "approved" ? "approved" : "denied")}",
                 $"Implementation posture: {HumanizeImplementationPosture(implementationPosture)}",
                 $"Reason: {reason}",

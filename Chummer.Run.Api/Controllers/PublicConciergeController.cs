@@ -223,8 +223,8 @@ public sealed class PublicConciergeController : Controller
     {
         string? returnRoute = ResolvePublicationReturnRoute(publicationId);
         SiteChromeViewModel chrome = await BuildChromeAsync(
-            "Public proof capture",
-            "Bounded testimonial and moderated public-proof routing.",
+            "Public stories",
+            "Share a moderated note for the publication page.",
             "/testimonials/concierge",
             cancellationToken);
         PublicConciergePageViewModel model = _concierge.BuildPage(
