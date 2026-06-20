@@ -79,12 +79,12 @@
     <article class="status-decision-strip__card">
         <span class="tag">Activity</span>
         <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this view.</h2>
-        <p>@dispatchReceipts.Length message record@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length follow-up record@(journeyReceipts.Length == 1 ? string.Empty : "s") are joined here.</p>
+        <p>@dispatchReceipts.Length message update@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length follow-up update@(journeyReceipts.Length == 1 ? string.Empty : "s") are joined here.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Queue status</span>
         <h2>@queueReceipts.Length queue item@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this view.</h2>
-        <p>@closeoutReceipts.Length closeout follow-up record@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing record@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
+        <p>@closeoutReceipts.Length closeout follow-up update@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing update@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Private details</span>
@@ -108,8 +108,8 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Source record</p>
-            <h2 class="editorial-title">The originating source record stays visible as the root of this view.</h2>
+            <p class="eyebrow">Source item</p>
+            <h2 class="editorial-title">The originating source item stays visible as the root of this view.</h2>
             <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, message, outcome, and follow-up state.</p>
         </div>
         <div class="route-choice-grid">
@@ -118,10 +118,8 @@
                 <h3>@sourceReceipt.CategoryLabel · @sourceReceipt.ItemReference</h3>
                 <p>@sourceReceipt.ActionLabel</p>
                 <div class="route-choice-card__proof">
-                    <span>@sourceReceipt.ReceiptId</span>
                     <span>@sourceReceipt.BoardLabel</span>
                     <span>@sourceReceipt.EventType</span>
-                    <span>@sourceReceipt.ProviderEventId</span>
                     <span>@sourceReceipt.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                     <span>@sourceReceipt.HotFilterLabel · @sourceReceipt.HotFilterCount thread@(sourceReceipt.HotFilterCount == 1 ? string.Empty : "s")</span>
                     @if (sourceReceipt.ProviderOccurredAtUtc is { } providerOccurredAtUtc)
@@ -174,8 +172,6 @@
                     <h3>@receipt.RouteKind</h3>
                     <p>@receipt.Summary</p>
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
-                        <span>@receipt.TargetPath</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                     </div>
@@ -193,14 +189,10 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">@receipt.StatusLabel</span>
-                    <h3>@receipt.TemplateId · @receipt.DeliveryState</h3>
+                    <h3>Closeout @receipt.DeliveryState</h3>
                     <p>@receipt.Summary</p>
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
-                        <span>@receipt.RecipientScopeRef</span>
                         <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
-                        <span>@receipt.ConsentSourceRef</span>
-                        <span>@receipt.DeliveryReason</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
@@ -226,13 +218,7 @@
                     <p>@receipt.Summary</p>
                     <p class="muted-copy">@receipt.QueueReason</p>
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
                         <span>@receipt.QueueState</span>
-                        <span>@receipt.DispatchTool</span>
-                        <span>@receipt.DispatchAction</span>
-                        <span>@receipt.JourneyEventKey</span>
-                        <span>@PublicFacingCopyHumanizer.Clean(receipt.ReleaseProofRoute)</span>
-                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.ReadyForOutbox)
@@ -264,7 +250,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Filtered result</p>
             <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this filtered view.</h2>
-            <p class="editorial-copy">Use the saved filters above to reopen the full source record or jump straight to another filtered state without leaving this page.</p>
+            <p class="editorial-copy">Use the saved filters above to reopen the full source item or jump straight to another filtered state without leaving this page.</p>
         </div>
     </section>
 }
@@ -282,11 +268,10 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">@thread.CurrentStageLabel</span>
-                    <h3>@thread.RecipientRef</h3>
+                    <h3>Recipient thread</h3>
                     <p>@thread.Summary</p>
                     <div class="route-choice-card__proof">
                         <span>@thread.SourceLabel</span>
-                        <span>@thread.AddressHash</span>
                         <span>@thread.QueueStatusLabel</span>
                         <span>@thread.DispatchStatusLabel</span>
                         @if (!string.IsNullOrWhiteSpace(thread.OutcomeStatusLabel))
@@ -297,7 +282,6 @@
                         {
                             <span>@thread.JourneyStatusLabel</span>
                         }
-                        <span>@thread.DispatchReceiptId</span>
                         <span>@thread.LastTouchedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         @if (!thread.PublicClaimAllowed)
                         {
@@ -318,7 +302,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Message records</p>
+            <p class="eyebrow">Message updates</p>
             <h2 class="editorial-title">Every outbound message attempt stays visible.</h2>
             <p class="editorial-copy">This keeps send status, suppression state, retry timing, and delivery identity aligned to one message view.</p>
         </div>
@@ -327,30 +311,17 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">@receipt.StatusLabel</span>
-                    <h3>@receipt.TemplateId · @receipt.DeliveryState</h3>
+                    <h3>Message attempt · @receipt.DeliveryState</h3>
                     <p>@receipt.Summary</p>
                     @if (!string.IsNullOrWhiteSpace(receipt.Error))
                     {
                         <p class="muted-copy">@receipt.Error</p>
                     }
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
-                        <span>@receipt.DeliveryId</span>
-                        <span>@receipt.RecipientRef</span>
-                        <span>@receipt.AddressHash</span>
-                        <span>@receipt.TemplateVersion</span>
-                        <span>@receipt.ConsentSourceRef</span>
-                        <span>@receipt.SuppressionCheck</span>
-                        <span>@receipt.GovernorDecisionRef</span>
-                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         @if (receipt.AcceptedAtUtc is { } acceptedAtUtc)
                         {
                             <span>@acceptedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(receipt.ProviderMessageId))
-                        {
-                            <span>@receipt.ProviderMessageId</span>
                         }
                         @if (!string.IsNullOrWhiteSpace(receipt.LastProviderState))
                         {
@@ -395,18 +366,9 @@
                         <p class="muted-copy">@receipt.Reason</p>
                     }
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
-                        <span>@receipt.DispatchReceiptId</span>
-                        <span>@receipt.RecipientRef</span>
-                        <span>@receipt.AddressHash</span>
                         <span>@receipt.IdentityMatchMode</span>
-                        <span>@receipt.SuppressionCheck</span>
                         <span>@receipt.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                        @if (!string.IsNullOrWhiteSpace(receipt.ProviderMessageId))
-                        {
-                            <span>@receipt.ProviderMessageId</span>
-                        }
                         @if (receipt.RetryAtUtc is { } retryAtUtc)
                         {
                             <span>@retryAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
@@ -432,19 +394,16 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Follow-up</p>
             <h2 class="editorial-title">Follow-up detail only appears after the closeout timeline completes.</h2>
-            <p class="editorial-copy">These rows show voter notifications tied to the same review decision and release record used by the message timeline.</p>
+            <p class="editorial-copy">These rows show voter notifications tied to the same review decision and release status used by the message timeline.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in journeyReceipts)
             {
                 <article class="route-choice-card">
                     <span class="tag">@receipt.StatusLabel</span>
-                    <h3>@receipt.EventKey</h3>
+                    <h3>Follow-up sent</h3>
                     <p>@receipt.Summary</p>
                     <div class="route-choice-card__proof">
-                        <span>@receipt.ReceiptId</span>
-                        <span>@receipt.GovernorDecisionRef</span>
-                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? "Release status attached" : "Release status pending")</span>
                         <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>

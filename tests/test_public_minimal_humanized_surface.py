@@ -284,3 +284,44 @@ def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
     assert "Delivery attempt" in sources["ledger_notifications"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Provenance)" in sources["knowledge_fabric"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Route)" in sources["nexus_pan"]
+
+
+def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -> None:
+    feedback_operations = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsDetail.cshtml")
+
+    for forbidden in (
+        "<span>@sourceReceipt.ReceiptId</span>",
+        "<span>@sourceReceipt.ProviderEventId</span>",
+        "<span>@receipt.ReceiptId</span>",
+        "<span>@receipt.DeliveryId</span>",
+        "<span>@receipt.RecipientRef</span>",
+        "<span>@receipt.AddressHash</span>",
+        "<span>@receipt.TemplateVersion</span>",
+        "<span>@receipt.ConsentSourceRef</span>",
+        "<span>@receipt.SuppressionCheck</span>",
+        "<span>@receipt.GovernorDecisionRef</span>",
+        "<span>@receipt.ProviderMessageId</span>",
+        "<span>@receipt.DispatchReceiptId</span>",
+        "<span>@thread.AddressHash</span>",
+        "<span>@thread.DispatchReceiptId</span>",
+        "<h3>@thread.RecipientRef</h3>",
+        "<h3>@receipt.TemplateId",
+        "<h3>@receipt.EventKey</h3>",
+        "message record",
+        "follow-up record",
+        "routing record",
+        "source record",
+        "release record",
+        "ReleaseProofReceiptId",
+        "ReleaseProofRoute",
+    ):
+        assert forbidden not in feedback_operations
+
+    assert "Source item" in feedback_operations
+    assert "message update" in feedback_operations
+    assert "follow-up update" in feedback_operations
+    assert "routing update" in feedback_operations
+    assert "Recipient thread" in feedback_operations
+    assert "Message updates" in feedback_operations
+    assert "Message attempt" in feedback_operations
+    assert "Follow-up sent" in feedback_operations
