@@ -38,6 +38,18 @@ def test_public_copy_leak_gate_allows_minimal_human_product_copy():
     assert hits == []
 
 
+def test_visible_text_includes_accessibility_labels_and_alt_text():
+    module = load_module()
+
+    text = module.visible_text(
+        '<main><img alt="Proof gallery"><button aria-label="AI assistant">Open</button><a title="provider route">More</a></main>'
+    )
+
+    assert "Proof gallery" in text
+    assert "AI assistant" in text
+    assert "provider route" in text
+
+
 def test_minimal_public_routes_block_ai_proof_and_campaign_city_language():
     module = load_module()
 

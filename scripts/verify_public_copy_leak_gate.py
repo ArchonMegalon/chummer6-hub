@@ -175,7 +175,11 @@ class VisibleTextParser(HTMLParser):
             or attrs_map.get("aria-hidden", "").lower() == "true"
         )
         if tag_name in self.VOID_TAGS:
+            if not hidden:
+                self._append_accessibility_text(attrs_map)
             return
+        if not hidden and not self._hidden_depth:
+            self._append_accessibility_text(attrs_map)
         self._hidden_stack.append(hidden)
         if hidden:
             self._hidden_depth += 1
@@ -191,6 +195,12 @@ class VisibleTextParser(HTMLParser):
         text = html.unescape(data).strip()
         if text:
             self._parts.append(text)
+
+    def _append_accessibility_text(self, attrs_map: dict[str, str]) -> None:
+        for key in ("aria-label", "alt", "title"):
+            value = html.unescape(attrs_map.get(key, "")).strip()
+            if value:
+                self._parts.append(value)
 
     @property
     def text(self) -> str:
