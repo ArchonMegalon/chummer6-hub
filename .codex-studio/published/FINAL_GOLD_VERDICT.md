@@ -1,6 +1,6 @@
 # NOT_GOLD
 
-Generated: 2026-06-20T01:08:13Z
+Generated: 2026-06-20T20:04:06Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -26,7 +26,7 @@ Accepted boundaries: yes
 - PASS `table_pulse_scenario_replay`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json`
 - PASS `ui_layout_exit_gate`: `pass` at `/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json`
 - FAIL `windows_installer_visual_audit`: `fail` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json`
-  - visual audit failures: Windows installer visual audit source is not pass, Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png, Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png, Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png, Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png, Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png, Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png, Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png, Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png, Windows installer screenshots for distinct required surfaces are byte-identical: 0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3 covers completion, install-progress
+  - visual audit failures: Windows installer visual audit source digest does not match promoted installer
   - next actions:
     - Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.
     - Preferred remote path: trigger GitHub Actions workflow 'Windows Installer Gold Proof' (.github/workflows/windows-installer-gold-proof.yml); it captures native Windows evidence only and does not publish downloads.

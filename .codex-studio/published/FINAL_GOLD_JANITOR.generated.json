@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-20T01:08:13Z",
+  "generated_at_utc": "2026-06-20T20:04:06Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -22,7 +22,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-20T00:44:30Z",
+      "generated_at_utc": "2026-06-20T19:39:45Z",
       "fresh_within_hours": 24,
       "pass": true,
       "rulesets": {
@@ -42,6 +42,7 @@
           "verification_matrix_failed_gates": [],
           "verification_matrix_unexpected_failed_gates": [],
           "verification_matrix_expected_ready_blockers": [],
+          "schema_failures": [],
           "provider_group_coverage": {
             "enforced": true,
             "provider_fact_counts": {
@@ -176,6 +177,7 @@
           "verification_matrix_failed_gates": [],
           "verification_matrix_unexpected_failed_gates": [],
           "verification_matrix_expected_ready_blockers": [],
+          "schema_failures": [],
           "provider_group_coverage": {
             "enforced": true,
             "provider_fact_counts": {
@@ -308,6 +310,7 @@
           "verification_matrix_failed_gates": [],
           "verification_matrix_unexpected_failed_gates": [],
           "verification_matrix_expected_ready_blockers": [],
+          "schema_failures": [],
           "provider_group_coverage": {
             "enforced": true,
             "provider_fact_counts": {
@@ -503,7 +506,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:38:49Z",
+      "generated_at_utc": "2026-06-20T18:37:22Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -567,7 +570,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:38:49Z",
+      "generated_at_utc": "2026-06-20T18:37:22Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -595,7 +598,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-20T01:07:33Z",
+      "generated_at_utc": "2026-06-20T14:31:32Z",
       "fresh_within_hours": 24,
       "pass": true
     },
@@ -611,20 +614,11 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-06-20T01:04:49Z",
+      "generated_at_utc": "2026-06-20T20:03:48Z",
       "fresh_within_hours": 24,
       "pass": false,
       "failures": [
-        "Windows installer visual audit source is not pass",
-        "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
-        "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
-        "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
-        "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
-        "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
-        "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
-        "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
-        "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
-        "Windows installer screenshots for distinct required surfaces are byte-identical: 0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3 covers completion, install-progress"
+        "Windows installer visual audit source digest does not match promoted installer"
       ],
       "nextActions": [
         "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
@@ -647,10 +641,10 @@
       "visualAuditSource": {
         "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
         "exists": true,
-        "status": "review_required",
+        "status": "pass",
         "platform": "windows",
         "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
-        "artifactSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
+        "artifactSha256": "1d6cc812dab45939d451026deeed627025d9e58f4247dd45bbb25b924158ad1d",
         "screenshotCount": 4,
         "defaultDpiScreenshotCount": 2,
         "scaledDpiScreenshotCount": 2,

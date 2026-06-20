@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.windows_installer_visual_audit",
-  "generated_at_utc": "2026-06-20T01:04:49Z",
+  "generated_at_utc": "2026-06-20T20:03:48Z",
   "status": "fail",
   "release": {
     "version": "run-258",
@@ -23,10 +23,10 @@
   "visualAuditSource": {
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
     "exists": true,
-    "status": "review_required",
+    "status": "pass",
     "platform": "windows",
     "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
-    "artifactSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
+    "artifactSha256": "1d6cc812dab45939d451026deeed627025d9e58f4247dd45bbb25b924158ad1d",
     "screenshotCount": 4,
     "defaultDpiScreenshotCount": 2,
     "scaledDpiScreenshotCount": 2,
@@ -37,61 +37,88 @@
   },
   "screenshots": [
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T174600Z.png",
       "exists": true,
-      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "sha256": "66935f2d86115b35f781d76a499af020a7a0fdea8f156506430641c10d6e7110",
       "dpiScale": "1.0",
       "surface": "install-progress",
       "canonicalSurface": "install-progress",
-      "clippingStatus": "review_required",
-      "readabilityStatus": "review_required",
-      "hostClass": "native-windows"
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "captureBounds": {
+        "left": 74,
+        "top": 130,
+        "width": 876,
+        "height": 459
+      },
+      "reusedFrom": "",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer - Installing"
     },
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T174646Z.png",
       "exists": true,
-      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
-      "dpiScale": "1.0",
-      "surface": "completion",
-      "canonicalSurface": "completion",
-      "clippingStatus": "review_required",
-      "readabilityStatus": "review_required",
-      "hostClass": "native-windows"
-    },
-    {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
-      "exists": true,
-      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "sha256": "66935f2d86115b35f781d76a499af020a7a0fdea8f156506430641c10d6e7110",
       "dpiScale": "1.5",
       "surface": "install-progress",
       "canonicalSurface": "install-progress",
-      "clippingStatus": "review_required",
-      "readabilityStatus": "review_required",
-      "hostClass": "native-windows"
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "reused-same-surface",
+      "captureBounds": {
+        "left": 74,
+        "top": 130,
+        "width": 876,
+        "height": 459
+      },
+      "reusedFrom": "windows-installer-install-progress-dpi-1.0-20260620T174600Z.png",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer - Installing"
     },
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T174649Z.png",
       "exists": true,
-      "sha256": "0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3",
+      "sha256": "3702acdb23bffbfcee7c9d705687d66ae21ea3d7eaecb143ee62b41ba9e760c4",
+      "dpiScale": "1.0",
+      "surface": "completion",
+      "canonicalSurface": "completion",
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "captureBounds": {
+        "left": 74,
+        "top": 130,
+        "width": 876,
+        "height": 459
+      },
+      "reusedFrom": "",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer - Install Complete"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T174653Z.png",
+      "exists": true,
+      "sha256": "3702acdb23bffbfcee7c9d705687d66ae21ea3d7eaecb143ee62b41ba9e760c4",
       "dpiScale": "1.5",
       "surface": "completion",
       "canonicalSurface": "completion",
-      "clippingStatus": "review_required",
-      "readabilityStatus": "review_required",
-      "hostClass": "native-windows"
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "captureBounds": {
+        "left": 74,
+        "top": 130,
+        "width": 876,
+        "height": 459
+      },
+      "reusedFrom": "",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer - Install Complete"
     }
   ],
   "failures": [
-    "Windows installer visual audit source is not pass",
-    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
-    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T010210Z.png",
-    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
-    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T010213Z.png",
-    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
-    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T010216Z.png",
-    "Windows installer screenshot clipping check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
-    "Windows installer screenshot readability check is not pass: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T010219Z.png",
-    "Windows installer screenshots for distinct required surfaces are byte-identical: 0d5e82879c06009ac4238f528956bc2b36807508981fab4ef7365061ca0cb5e3 covers completion, install-progress"
+    "Windows installer visual audit source digest does not match promoted installer"
   ],
   "nextActions": [
     "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
