@@ -1,3 +1,4 @@
+@using Chummer.Run.Api.Services
 @model FeatureDetailPageViewModel
 @{
     ViewData["Title"] = Model.Heading;
@@ -21,10 +22,12 @@
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
+    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
     var routeChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
     var seenRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    void AddRouteChoice(string badge, string title, string summary, string href, string label, params string[] proof)
+    void AddRouteChoice(string badge, string title, string summary, string href, string label, params string[] details)
     {
         var normalized = NormalizeDetailRoute(href);
         if (!seenRoutes.Add(normalized))
@@ -32,7 +35,7 @@
             return;
         }
 
-        routeChoices.Add((badge, title, summary, href, label, proof));
+        routeChoices.Add((PublicText(badge), PublicText(title), PublicText(summary), href, PublicText(label), details.Select(PublicText).ToArray()));
     }
 
     var primaryRouteTitle = Model.Family switch
@@ -49,7 +52,7 @@
         "preview-concept" => $"{Model.PrimaryAction.Label} shows what you can use today.",
         _ => $"{Model.PrimaryAction.Label} continues from this feature."
     };
-    var primaryRouteProof = Model.Family switch
+    var primaryRouteDetails = Model.Family switch
     {
         "roadmap" => new[] { "Next step", "Current status", "Help nearby" },
         "live-proof" => new[] { "Product page", "Downloads nearby", "Help nearby" },
@@ -120,7 +123,7 @@
                 Proof: new[] { "Roadmap", "Related pages", "Current status" })
         };
 
-    AddRouteChoice("Best next page", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteProof);
+    AddRouteChoice("Best next page", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteDetails);
     AddRouteChoice(compareRoute.Title.Contains("Install or update", StringComparison.Ordinal) ? "Install" : "Status", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
     AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Proof);
     AddRouteChoice(
@@ -136,18 +139,18 @@
 
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicText(Model.Heading)</h1>
+        <p class="page-copy">@PublicText(Model.Intro)</p>
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>
             @if (Model.SecondaryAction is not null
                 && !string.Equals(
                     NormalizeDetailRoute(Model.SecondaryAction.Href),
                     NormalizeDetailRoute(Model.PrimaryAction.Href),
                     StringComparison.OrdinalIgnoreCase))
             {
-                <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+                <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@PublicText(Model.SecondaryAction.Label)</a>
             }
         </div>
     </div>
@@ -186,15 +189,15 @@
 
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
-        <p class="eyebrow">@Model.StatusEyebrow</p>
-        <h2 class="editorial-title">@Model.StatusHeading</h2>
+        <p class="eyebrow">@PublicText(Model.StatusEyebrow)</p>
+        <h2 class="editorial-title">@PublicText(Model.StatusHeading)</h2>
     </div>
     <div class="trust-rail-list">
         @foreach (var fact in Model.Facts)
         {
             <article class="trust-rail">
-                <span class="tag">@fact.Label</span>
-                <p>@fact.Body</p>
+                <span class="tag">@PublicText(fact.Label)</span>
+                <p>@PublicText(fact.Body)</p>
             </article>
         }
     </div>
@@ -221,8 +224,8 @@
     <h2 class="editorial-title">Use the feature detail to answer one question, then move to the page that owns the next job.</h2>
     <p class="editorial-copy">Take the explicit next action when the card is clear, compare against current release status when availability matters, and leave for help as soon as the issue becomes private, recovery-bound, or support-owned.</p>
     <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="cta-link cta-link--secondary" href="@deeperRoute.Href">@deeperRoute.Label</a>
+        <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>
+        <a class="cta-link cta-link--secondary" href="@deeperRoute.Href">@PublicText(deeperRoute.Label)</a>
         <a class="cta-link cta-link--ghost" href="/help">Open help</a>
     </div>
 </section>

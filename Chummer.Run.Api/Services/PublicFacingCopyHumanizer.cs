@@ -6,6 +6,14 @@ public static partial class PublicFacingCopyHumanizer
 {
     private static readonly (string From, string To)[] Replacements =
     [
+        ("Public Proof Shelf", "Public Files"),
+        ("Proof Shelf", "Files"),
+        ("Rule Environment Studio", "Rules Setup"),
+        ("Rule-environment studio", "Rules setup"),
+        ("rule-environment", "rules setup"),
+        ("Before-after diffs", "Changes"),
+        ("Explain receipts", "Explanations"),
+        ("Explain receipt", "Explanation"),
         ("AI assistant", "help"),
         ("ALICE", "character help"),
         ("Alice", "character help"),
