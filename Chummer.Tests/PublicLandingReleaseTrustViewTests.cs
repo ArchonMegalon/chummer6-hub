@@ -359,6 +359,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("A tracked fix or next step is waiting", homeView, StringComparison.Ordinal);
         Assert.Contains("install return, support, and campaign return", homeView, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Recent return artifact", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("governed view", homeView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Governed output", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("first grounded handoff", homeView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Open grounded rule context", homeView, StringComparison.Ordinal);
 
         Assert.Contains("Open detail view", shelfView, StringComparison.Ordinal);
         Assert.Contains("signed-in view", shelfView, StringComparison.Ordinal);

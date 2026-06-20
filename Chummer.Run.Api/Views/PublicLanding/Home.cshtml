@@ -271,7 +271,7 @@
             "replay_timeline" => "Replay timeline",
             "session_recap" => "Session recap",
             "run_module" => "Run module",
-            _ => HumanizeStatus(kind, "Governed output")
+            _ => HumanizeStatus(kind, "Output")
         };
 
     var leadTravelDevice = leadWorkspaceServerPlane?.TravelMode.Devices.FirstOrDefault();
@@ -678,7 +678,7 @@ else
                                                             }
                                                             else if (workspace.RecapShelf.Count > 0)
                                                             {
-                                                                <span> Recent return artifact: @workspace.RecapShelf[0].Summary</span>
+                                                                <span> Recent return: @workspace.RecapShelf[0].Summary</span>
                                                             }
                                                             @if (leadWorkspaceServerPlane is not null
                                                                 && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
@@ -1021,7 +1021,7 @@ else
                                                                     }
                                                                 }
                                                                 <span> League: @leadCommunityOperation.LeagueOperationsSummary</span>
-                                                                <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed view." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay in the same view.")</span>
+                                                                <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one shared view." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay in the same view.")</span>
                                                                 @if (leadCommunitySponsorSession is not null)
                                                                 {
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
@@ -1077,7 +1077,7 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Build handoff</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>Continuity is ready for the first grounded handoff</h3>
+                                                        <h3>Continuity is ready for the first build handoff</h3>
                                                         <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
                                                     </div>
                                                     <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Start from downloads</a>
@@ -1209,7 +1209,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                                                         {
-                                                                            <span> Output status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Governed").</span>
+                                                                            <span> Output status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Ready").</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
@@ -1263,7 +1263,7 @@ else
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open grounded rule context</a>
+                                                        <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open rule context</a>
                                                     </article>
                                                 }
                                             }
