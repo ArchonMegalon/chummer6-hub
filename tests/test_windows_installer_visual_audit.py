@@ -452,6 +452,8 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("RELEASE_CHANNEL.generated.json", text)
         self.assertIn("avalonia-win-x64-installer", text)
         self.assertIn("https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe", text)
+        self.assertIn("$installerUrl = \"${{ inputs.installer_url }}\"", text)
+        self.assertIn("[string]::IsNullOrWhiteSpace($installerUrl) -and (Test-Path -LiteralPath $installerPath)", text)
         self.assertIn("Invoke-WebRequest -Uri $installerUrl", text)
         self.assertIn("$proofArgs = @{", text)
         self.assertIn('$proofArgs["VisualClippingStatus"] = "pass"', text)

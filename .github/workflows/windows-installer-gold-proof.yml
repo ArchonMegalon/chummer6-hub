@@ -51,12 +51,12 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $installerPath = "Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe"
-          if (Test-Path -LiteralPath $installerPath) {
+          $installerUrl = "${{ inputs.installer_url }}"
+          if ([string]::IsNullOrWhiteSpace($installerUrl) -and (Test-Path -LiteralPath $installerPath)) {
             "Installer already present: $installerPath"
             return
           }
 
-          $installerUrl = "${{ inputs.installer_url }}"
           if ([string]::IsNullOrWhiteSpace($installerUrl)) {
             $releaseChannelPath = "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
             if (Test-Path -LiteralPath $releaseChannelPath) {
