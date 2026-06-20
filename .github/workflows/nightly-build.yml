@@ -1,12 +1,12 @@
-name: Nightly Build
+name: Legacy Nightly GitHub Release
 
 on:
-  schedule:
-    # Run daily at 00:00 UTC (midnight)
-    - cron: '0 0 * * *'
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch: # Legacy/manual only. Downloads publication is owned by the presentation Desktop Downloads Matrix.
 
-# Prevent multiple nightly builds from running simultaneously
+# Legacy GitHub-release workflow. Do not schedule this workflow: the canonical
+# Windows/Linux public download publish runs once per day at 08:00 Europe/Vienna
+# from chummer-presentation/.github/workflows/desktop-downloads-matrix.yml.
+
 concurrency:
   group: nightly-build
   cancel-in-progress: false # Don't cancel if one is already running, just queue
@@ -355,4 +355,3 @@ jobs:
         if ("${{ steps.check_commit.outputs.skip }}" -eq "true") {
           Write-Host "- ⚠️ Build was skipped (duplicate commit)" >> $env:GITHUB_STEP_SUMMARY
         }
-

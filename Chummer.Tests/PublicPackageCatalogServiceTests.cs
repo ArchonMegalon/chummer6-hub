@@ -7,6 +7,47 @@ namespace Chummer.Tests;
 public sealed class PublicPackageCatalogServiceTests
 {
     [Fact]
+    public void Public_package_catalog_user_facing_copy_avoids_internal_audit_terms()
+    {
+        PublicPackageCatalogService service = new();
+        string[] copy = service.ListPackageClasses()
+            .SelectMany(static packageClass => new[] { packageClass.Label, packageClass.Summary }.Concat(packageClass.Rules))
+            .Concat(service.ListPackages().SelectMany(static package => new[]
+            {
+                package.Title,
+                package.Summary,
+                package.PackageClassLabel,
+                package.StatusLabel,
+                package.EvidenceSummary,
+                package.PrimaryActionLabel,
+                package.AccountSummary,
+                package.OperatorSummary
+            }
+            .Concat(package.CompatibilityNotes)
+            .Concat(package.GovernanceNotes)))
+            .ToArray();
+
+        Assert.Contains(copy, text => string.Equals(text, "Current desktop installer", StringComparison.Ordinal));
+        foreach (string forbidden in new[]
+        {
+            "proof",
+            "receipt",
+            "operator",
+            "governed",
+            "governance",
+            "first-party",
+            "rail",
+            "lane",
+            "provenance",
+            "package browser",
+            "preview lane"
+        })
+        {
+            Assert.All(copy, text => Assert.DoesNotContain(forbidden, text, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Fact]
     public void Public_package_receipts_emit_shared_public_safe_envelopes()
     {
         PublicPackageCatalogService service = new();

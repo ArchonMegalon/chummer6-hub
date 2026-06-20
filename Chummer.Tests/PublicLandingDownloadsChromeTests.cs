@@ -106,7 +106,7 @@ public sealed class PublicLandingDownloadsChromeTests
     }
 
     [Fact]
-    public void RebindDownloadsHeaderActionsRepointsPrimaryGuestCtaToRecommendedMacInstallRoute()
+    public void RebindDownloadsHeaderActionsUsesDownloadsShelfWhenAnyGuestInstallerIsAvailable()
     {
         var releaseExperience = BuildGuestMacReleaseExperience();
         var chrome = new SiteChromeViewModel(
@@ -139,7 +139,7 @@ public sealed class PublicLandingDownloadsChromeTests
 
         Assert.Equal(releaseExperience.GuestGateSecondaryHref, signIn.Href);
         Assert.Equal(releaseExperience.GuestGatePrimaryHref, primary.Href);
-        Assert.Equal("/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", primary.Href);
+        Assert.Equal("/downloads", primary.Href);
         Assert.NotNull(rebound.PublicPrimaryCta);
         Assert.Equal(releaseExperience.GuestGatePrimaryHref, rebound.PublicPrimaryCta!.Href);
     }
@@ -178,7 +178,7 @@ public sealed class PublicLandingDownloadsChromeTests
 
         Assert.Equal("/login?next=%2Fstatus", signIn.Href);
         Assert.Equal(releaseExperience.GuestGatePrimaryHref, primary.Href);
-        Assert.Equal("/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", primary.Href);
+        Assert.Equal("/downloads", primary.Href);
         Assert.NotNull(rebound.PublicPrimaryCta);
         Assert.Equal(releaseExperience.GuestGatePrimaryHref, rebound.PublicPrimaryCta!.Href);
     }

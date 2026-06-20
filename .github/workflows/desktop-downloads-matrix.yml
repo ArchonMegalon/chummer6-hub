@@ -196,7 +196,7 @@ jobs:
   deploy-downloads:
     name: Deploy Downloads Bundle
     needs: generate-manifest
-    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != '' }}
     runs-on: ubuntu-latest
     env:
       CHUMMER_HUB_REGISTRY_ROOT: ${{ github.workspace }}/../chummer-hub-registry
@@ -279,7 +279,7 @@ jobs:
   deploy-downloads-object-storage:
     name: Deploy Downloads Bundle (Object Storage)
     needs: generate-manifest
-    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != '' }}
     runs-on: ubuntu-latest
     env:
       CHUMMER_HUB_REGISTRY_ROOT: ${{ github.workspace }}/../chummer-hub-registry

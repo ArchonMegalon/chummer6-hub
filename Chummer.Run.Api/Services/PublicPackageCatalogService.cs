@@ -43,43 +43,43 @@ public sealed class PublicPackageCatalogService
             "Desktop install package",
             "The build people install on a workstation, laptop, or travel machine.",
             [
-                "Public acquisition starts on Downloads, not a raw binary shelf.",
-                "Compatibility is explicit by channel, platform, and guided handoff posture.",
+                "Get it from Downloads, not from a loose file shelf.",
+                "Compatibility is clear by channel, platform, and account claim path.",
                 "Account value starts after install with claim, recovery, and support continuity."
             ]),
         new(
             "rules_source_package",
-            "Rules and source package",
-            "Rules coverage and explainable source material that changes what the runtime can prove.",
+            "Rules data package",
+            "Rules coverage and explanation data that changes what Chummer can show.",
             [
-                "Compatibility binds to rules runtime, explain receipts, and import posture.",
-                "Approval and rollback posture stay explicit before broader adoption claims.",
-                "Public parity claims stay blocked until proof receipts say otherwise."
+                "Compatibility comes from the rules runtime, explanations, and import status.",
+                "Changes need a clear review path before they are described as broadly ready.",
+                "Parity claims stay quiet until current checks support them."
             ]),
         new(
             "house_rule_package",
             "House-rule amendment package",
-            "Table or campaign-specific amendments that must stay governed and reversible.",
+            "Table or campaign-specific amendments that must stay reviewed and reversible.",
             [
                 "Scope starts at table or campaign, not at the public front door.",
-                "Rollback, portability, and disclosure posture stay attached to the package.",
+                "Rollback, portability, and disclosure stay attached to the package.",
                 "Community demand can inform the package, but does not directly publish it."
             ]),
         new(
             "artifact_media_package",
-            "Artifact and media package",
-            "Artifacts, briefings, primers, and preview media that travel with provenance.",
+            "File and media package",
+            "Briefings, primers, recaps, and media files that travel with a clear history.",
             [
                 "Artifacts never become the system of record for rules or account truth.",
-                "Publication trust, provenance, and visibility posture stay attached.",
-                "Preview media can support proof, but cannot outrank live product routes."
+                "Publication trust, history, and visibility stay attached.",
+                "Preview media can support a page, but cannot outrank the working product routes."
             ]),
         new(
             "community_proposal_package",
             "Community proposal package",
-            "A governed proposal that stays in first-party discovery until compatibility and moderation are clear.",
+            "A reviewed proposal that stays in Chummer until compatibility and moderation are clear.",
             [
-                "First-party vote and follow receipts stay inside Chummer-owned routes.",
+                "Votes and follows stay inside Chummer-owned routes.",
                 "Moderation, duplicate handling, and compatibility review block fast-publish folklore.",
                 "Proposal posture must stay honest about research versus release readiness."
             ])
@@ -329,113 +329,113 @@ public sealed class PublicPackageCatalogService
         [
             new(
                 "desktop-preview",
-                "Current preview desktop package",
-                "The current desktop install package with the calmest first-run and account handoff posture.",
+                "Current desktop installer",
+                "The current desktop install path with the calmest first launch and account claim flow.",
                 "desktop_install_package",
                 "Desktop install package",
                 "Live now",
                 [
-                    "Matches the current release channels on Downloads across Windows, macOS, and Linux.",
+                    "Matches the current release channels on Downloads: Windows and Linux public, macOS guided support only.",
                     "Guided claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
-                    "The public package route explains the package class; Downloads still owns the actual acquisition decision."
+                    "This page explains the choice. Downloads is still where you get the app."
                 ],
                 [
-                    "Public acquisition starts at /downloads and the package browser must not compete with that shelf.",
+                    "Public download starts at /downloads.",
                     "Account value begins after install through claim, recovery, updates, and support continuity.",
-                    "Release truth still lives on status, downloads, and the release proof rails."
+                    "Status and Downloads remain the source of what is current."
                 ],
-                "Downloads, status, and linked-install history already point here.",
+                "Downloads, Status, and account claim history already point here.",
                 "Open downloads",
                 "/downloads",
-                "Track the linked install, recovery state, and support history from the account package rail.",
+                "Track the linked install, recovery state, and support history from your account page.",
                 "Keep this package as the public install anchor and compatibility reference."),
             new(
                 "sr5-rules-core",
-                "SR5 rules coverage package",
-                "The current rules-and-source package for the explainable SR5 coverage that the proof view can already inspect.",
+                "SR5 rules data",
+                "The current rules data for the SR5 coverage Chummer can explain today.",
                 "rules_source_package",
-                "Rules and source package",
+                "Rules data package",
                 "Inspectable",
                 [
-                    "Binds to the deterministic rules runtime, explanation trail, and current release status view.",
-                    "Compatibility posture depends on the current explain receipt and import/export boundaries, not on route existence alone.",
+                    "Binds to the deterministic rules runtime, explanation path, and current release status view.",
+                    "Compatibility depends on current explanations and import/export boundaries, not on route existence alone.",
                     "Public detail can point to current availability, but cannot overstate overall ruleset seriousness."
                 ],
                 [
-                    "Proof must stay attached before broader parity language becomes public copy.",
-                    "Rollback and boundary posture stay explicit when this package changes explainable rules behavior.",
-                    "The package browser shows compatibility and status; it does not replace the rules proof audit."
+                    "Current checks must stay attached before broader parity language becomes public copy.",
+                    "Rollback and boundaries stay explicit when this package changes rules behavior.",
+                    "This page shows compatibility and status; it does not replace rules review."
                 ],
-                "The current release status view already points to the explanation trail and live rules posture.",
+                "The current release status view already points to the explanation path and live rules state.",
                 "Open what works today",
                 "/now#real-rules-truth",
                 "Account package tracking keeps follows and votes attached to the same signed-in return path.",
-                "Treat this package as proof-backed rules coverage, not as a blanket parity claim."),
+                "Treat this package as current rules coverage, not as a blanket parity claim."),
             new(
                 "campaign-amend-pack",
                 "Campaign amendment package",
-                "A governed table-scoped amendment package for house rules, return-path notes, and rollback-safe scope decisions.",
+                "A table-scoped package for house rules, return notes, and reversible scope decisions.",
                 "house_rule_package",
                 "House-rule amendment package",
-                "Preview lane",
+                "Preview",
                 [
                     "Compatibility starts at table or campaign scope before broader community rollout.",
-                    "Portable exchange, approvals, and rollback posture stay attached to the same package summary.",
+                    "Portable exchange, approvals, and rollback stay attached to the same package summary.",
                     "The public route explains what the package class means before any install or publication decision."
                 ],
                 [
                     "KARMA FORGE discovery and campaign approvals must exist before a broader release claim.",
-                    "Private table context and spoilers stay out of public package receipts.",
+                    "Private table context and spoilers stay out of public package history.",
                     "Rollback, portability, and user-visible scope remain explicit even when the package starts as a community suggestion."
                 ],
-                "KARMA FORGE and campaign continuity docs already point to the need for governed package posture.",
+                "KARMA FORGE and campaign continuity docs already point to the need for reviewed package boundaries.",
                 "Open KARMA FORGE",
                 "/participate/karma-forge",
-                "Account package tracking keeps the follow and approval trail visible next to support and campaign work.",
-                "Operator review should treat this as governed discovery first, not a fast-publish lane."),
+                "Account package tracking keeps the follow and approval history visible next to support and campaign work.",
+                "Review should treat this as discovery first, not a fast-publish path."),
             new(
                 "artifact-brief-bundle",
-                "Artifact briefing bundle",
-                "A provenance-bound artifact package for primers, briefings, recaps, and shared output bundles.",
+                "Briefing bundle",
+                "A file package for primers, briefings, recaps, and shared output bundles.",
                 "artifact_media_package",
-                "Artifact and media package",
-                "Preview lane",
+                "File and media package",
+                "Preview",
                 [
-                    "Compatibility depends on publication trust, artifact shelf posture, and provenance receipts.",
-                    "The package can travel across the proof view without becoming the source of product truth.",
+                    "Compatibility depends on publication trust, the file shelf, and clear history.",
+                    "The package can be shown in review views without becoming the source of product truth.",
                     "Creator, campaign, and public views can differ while the package lineage stays explicit."
                 ],
                 [
-                    "Media and artifact packages may support proof, but they cannot replace route, install, or rules evidence.",
-                    "Publication and moderation posture stay attached to the package before broader discovery claims.",
-                    "Artifact detail and shelf routes remain the first-party surfaces for discovery and return."
+                    "Media and file packages may support a page, but they cannot replace route, install, or rules checks.",
+                    "Publication and moderation stay attached to the package before broader discovery claims.",
+                    "Artifact detail and shelf routes remain the Chummer surfaces for discovery and return."
                 ],
-                "The artifact shelf already proves that publication, recap, and preview outputs can stay first-party.",
+                "The artifact shelf already shows that publication, recap, and preview outputs can stay inside Chummer.",
                 "Open artifacts",
                 "/artifacts",
-                "Account package tracking ties creator and continuity receipts back to the same return path.",
-                "Keep artifact packages bounded by provenance and trust posture rather than media hype."),
+                "Account package tracking ties creator and continuity records back to the same return path.",
+                "Keep file packages bounded by history and trust rather than media hype."),
             new(
                 "community-proposal-sandbox",
                 "Community proposal sandbox package",
-                "A governed proposal package for ideas that need first-party clustering, compatibility review, and moderation before they become product work.",
+                "A proposal package for ideas that need clustering, compatibility review, and moderation before they become product work.",
                 "community_proposal_package",
                 "Community proposal package",
                 "Research",
                 [
-                    "Compatibility stays advisory until first-party review promotes the proposal into a clearer package lane.",
+                    "Compatibility stays advisory until Chummer review promotes the proposal into a clearer package path.",
                     "Public votes and follows can exist now without pretending the proposal is installable or approved.",
-                    "The package route makes the governance boundary explicit before any roadmap or release language moves."
+                    "The package route makes the review boundary explicit before any roadmap or release language moves."
                 ],
                 [
                     "Moderation, duplicate handling, privacy, and package compatibility must stay inside Chummer-owned routes.",
-                    "Follow receipts are first-party and should not leak external board or operator tooling names.",
+                    "Follow records are Chummer-owned and should not leak external board or maintainer tooling names.",
                     "Research posture must remain honest even when interest is high."
                 ],
-                "The public participate and feedback rails already separate safe public signal from private support and install work.",
+                "The public participate and feedback pages already separate safe public signal from private support and install work.",
                 "Open feedback",
                 "/feedback",
-                "Account package tracking keeps your follows and votes on the same signed-in rail as support and continuity.",
-                "Treat this package as a governed proposal surface with explicit moderation and compatibility posture.")
+                "Account package tracking keeps your follows and votes on the same signed-in page as support and continuity.",
+                "Treat this package as a reviewed proposal surface with explicit moderation and compatibility posture.")
         ];
 }
