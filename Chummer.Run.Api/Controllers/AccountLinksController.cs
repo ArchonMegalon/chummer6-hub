@@ -11,6 +11,7 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AccountLinksController : ControllerBase
 {
     private readonly IdentityLinkService _links;
+    private readonly ExecutiveAssistantChannelMessagingService _channelMessaging;
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly HubBrowserAuthService _browserAuth;
@@ -18,12 +19,14 @@ public sealed class AccountLinksController : ControllerBase
 
     public AccountLinksController(
         IdentityLinkService links,
+        ExecutiveAssistantChannelMessagingService channelMessaging,
         HubIdentityClient identity,
         AccountService accounts,
         HubBrowserAuthService browserAuth,
         HubEmailLinkVerificationService emailLinks)
     {
         _links = links;
+        _channelMessaging = channelMessaging;
         _identity = identity;
         _accounts = accounts;
         _browserAuth = browserAuth;
@@ -126,6 +129,88 @@ public sealed class AccountLinksController : ControllerBase
         => Problem(
             statusCode: StatusCodes.Status410Gone,
             detail: "Provider links are created through verified provider callbacks, not this API.");
+
+    [HttpGet("channels/{channelKind}/messages")]
+    [ProducesResponseType<IReadOnlyList<ExecutiveAssistantChannelConversationDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ExecutiveAssistantChannelConversationDto>>> ListChannelConversations(
+        string channelKind,
+        [FromQuery] int take = 24,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            return Ok(_channelMessaging.ListConversations(subject.SubjectId, channelKind, take));
+        }
+        catch (ArgumentException ex)
+        {
+            return ValidationProblem(detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("channels/{channelKind}/messages/{conversationId}")]
+    [ProducesResponseType<ExecutiveAssistantChannelConversationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExecutiveAssistantChannelConversationDto>> GetChannelConversation(
+        string channelKind,
+        string conversationId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            ExecutiveAssistantChannelConversationDto? conversation = _channelMessaging.GetConversation(
+                subject.SubjectId,
+                channelKind,
+                conversationId);
+            return conversation is null ? NotFound() : Ok(conversation);
+        }
+        catch (ArgumentException ex)
+        {
+            return ValidationProblem(detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("channels/{channelKind}/messages")]
+    [ValidateAntiForgeryToken]
+    [ProducesResponseType<ExecutiveAssistantChannelSendResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ExecutiveAssistantChannelSendResult>> SendChannelMessage(
+        string channelKind,
+        [FromBody] ExecutiveAssistantChannelSendRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("channel message payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            return Ok(await _channelMessaging.SendMessageAsync(subject.SubjectId, channelKind, request, cancellationToken));
+        }
+        catch (ArgumentException ex)
+        {
+            return ValidationProblem(detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 
     [HttpPost("channels")]
     [ValidateAntiForgeryToken]

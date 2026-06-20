@@ -162,12 +162,13 @@ jobs:
         run: |
           set -euo pipefail
           RELEASE_PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          RELEASE_VERSION="$(date -u +run-%Y%m%d-%H%M%S)"
           SOURCE_MANIFEST_PATH="legacy/tooling/docker/Docker/Downloads/RELEASE_CHANNEL.generated.json" \
           RELEASE_PROOF_PATH="Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json" \
           DOWNLOADS_DIR="dist/files" \
           MANIFEST_PATH="dist/releases.json" \
           PORTAL_MANIFEST_PATH="dist/releases.json" \
-          RELEASE_VERSION="run-${GITHUB_RUN_NUMBER:-local}" \
+          RELEASE_VERSION="${RELEASE_VERSION}" \
           RELEASE_CHANNEL="docker" \
           RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT}" \
           bash scripts/generate-releases-manifest.sh

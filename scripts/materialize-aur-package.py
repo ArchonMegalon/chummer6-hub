@@ -67,14 +67,48 @@ def find_linux_deb(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return candidates[0]
 
 
-def package_version(release_version: str) -> str:
+def timestamp_package_version(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    parsed = parsed.astimezone(timezone.utc)
+    return parsed.strftime("%Y%m%d.%H%M%S")
+
+
+def package_version(release_version: str, *, generated_at: object = "") -> str:
     match = re.fullmatch(r"run-(\d{8})-(\d{6})", release_version.strip())
     if match:
         return f"{match.group(1)}.{match.group(2)}"
 
+    timestamp_version = timestamp_package_version(generated_at)
+    if timestamp_version:
+        return timestamp_version
+
     normalized = re.sub(r"[^A-Za-z0-9._+]+", "_", release_version.strip())
     normalized = normalized.strip("._+")
     return normalized or "0"
+
+
+def artifact_timestamp(payload: dict[str, Any], artifact: dict[str, Any]) -> object:
+    for source in (artifact, payload):
+        for key in (
+            "generatedAt",
+            "generated_at",
+            "publishedAt",
+            "published_at",
+            "releasePublishedAt",
+            "release_published_at",
+        ):
+            value = source.get(key)
+            if str(value or "").strip():
+                return value
+    return ""
 
 
 def render_pkgbuild(*, pkgver: str, deb_file_name: str, deb_url: str, deb_sha256: str) -> str:
@@ -227,7 +261,7 @@ def main() -> None:
     deb_url = str(linux_deb.get("downloadUrl") or linux_deb.get("url") or "").strip()
     if not deb_url:
         deb_url = file_url(args.downloads_prefix, deb_file_name)
-    pkgver = package_version(release_version)
+    pkgver = package_version(release_version, generated_at=artifact_timestamp(payload, linux_deb))
 
     pkgbuild = render_pkgbuild(pkgver=pkgver, deb_file_name=deb_file_name, deb_url=deb_url, deb_sha256=actual_deb_sha)
     srcinfo = render_srcinfo(pkgver=pkgver, deb_file_name=deb_file_name, deb_url=deb_url, deb_sha256=actual_deb_sha)

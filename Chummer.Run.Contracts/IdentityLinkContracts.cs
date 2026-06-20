@@ -86,3 +86,56 @@ public sealed record ChannelDeepLinkResponse(
     string DeepLink,
     string QrImageUrl,
     string? AlternateDeepLink = null);
+
+public sealed record ExecutiveAssistantChannelMessageDto(
+    string MessageId,
+    string ConversationId,
+    string ChannelKind,
+    string Direction,
+    string Text,
+    string SafetyLabel,
+    string DeliveryStatus,
+    string? CounterpartyHandle,
+    string? DeliveryRef,
+    string? FailureReason,
+    string? IdempotencyKey,
+    DateTimeOffset CreatedAtUtc);
+
+public sealed record ExecutiveAssistantChannelConversationDto(
+    string ConversationId,
+    string UserId,
+    string ChannelKind,
+    string CounterpartyHandle,
+    string CounterpartyHash,
+    string Status,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    IReadOnlyList<ExecutiveAssistantChannelMessageDto> Messages);
+
+public sealed record ExecutiveAssistantChannelSendRequest(
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false), System.ComponentModel.DataAnnotations.StringLength(2048)]
+    string MessageText,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? CounterpartyHandle,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? ConversationId = null,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? IdempotencyKey = null);
+
+public sealed record ExecutiveAssistantChannelIncomingMessageRequest(
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? SubjectId,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? RecipientHandle,
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false), System.ComponentModel.DataAnnotations.StringLength(128)]
+    string CounterpartyHandle,
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false), System.ComponentModel.DataAnnotations.StringLength(2048)]
+    string MessageText,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? MessageId = null,
+    [System.ComponentModel.DataAnnotations.StringLength(128)] string? ConversationId = null,
+    DateTimeOffset? ReceivedAtUtc = null);
+
+public sealed record ExecutiveAssistantChannelSendResult(
+    string ConversationId,
+    string MessageId,
+    string Status,
+    string? DeliveryRef,
+    string? FailureReason,
+    string IdempotencyKey,
+    DateTimeOffset AttemptedAtUtc,
+    bool Duplicate);

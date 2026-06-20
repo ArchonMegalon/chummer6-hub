@@ -58,6 +58,8 @@ public sealed class CommunityStore
     public List<HeyyScamChatDigestReceipt> HeyyScamChatDigestReceipts { get; } = new();
     public List<HeyyScamChatApprovalReceipt> HeyyScamChatApprovalReceipts { get; } = new();
     public List<HeyyScamChatOperatorSummaryReceipt> HeyyScamChatOperatorSummaryReceipts { get; } = new();
+    public List<ExecutiveAssistantChannelConversationState> ExecutiveAssistantChannelConversations { get; } = new();
+    public List<ExecutiveAssistantChannelMessageState> ExecutiveAssistantChannelMessages { get; } = new();
     public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -145,6 +147,12 @@ public sealed class CommunityStore
             HeyyScamChatOperatorSummaryReceipts: HeyyScamChatOperatorSummaryReceipts
                 .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
+            ExecutiveAssistantChannelConversations: ExecutiveAssistantChannelConversations
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray(),
+            ExecutiveAssistantChannelMessages: ExecutiveAssistantChannelMessages
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
             Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
             CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -228,6 +236,8 @@ public sealed class CommunityStore
         HeyyScamChatDigestReceipts.Clear();
         HeyyScamChatApprovalReceipts.Clear();
         HeyyScamChatOperatorSummaryReceipts.Clear();
+        ExecutiveAssistantChannelConversations.Clear();
+        ExecutiveAssistantChannelMessages.Clear();
         DossiersById.Clear();
         CrewsById.Clear();
         CampaignSpinesById.Clear();
@@ -315,6 +325,8 @@ public sealed class CommunityStore
         HeyyScamChatDigestReceipts.AddRange(snapshot.HeyyScamChatDigestReceipts ?? Array.Empty<HeyyScamChatDigestReceipt>());
         HeyyScamChatApprovalReceipts.AddRange(snapshot.HeyyScamChatApprovalReceipts ?? Array.Empty<HeyyScamChatApprovalReceipt>());
         HeyyScamChatOperatorSummaryReceipts.AddRange(snapshot.HeyyScamChatOperatorSummaryReceipts ?? Array.Empty<HeyyScamChatOperatorSummaryReceipt>());
+        ExecutiveAssistantChannelConversations.AddRange(snapshot.ExecutiveAssistantChannelConversations ?? Array.Empty<ExecutiveAssistantChannelConversationState>());
+        ExecutiveAssistantChannelMessages.AddRange(snapshot.ExecutiveAssistantChannelMessages ?? Array.Empty<ExecutiveAssistantChannelMessageState>());
 
         foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
         {
@@ -459,6 +471,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<HeyyScamChatDigestReceipt>? HeyyScamChatDigestReceipts = null,
     IReadOnlyList<HeyyScamChatApprovalReceipt>? HeyyScamChatApprovalReceipts = null,
     IReadOnlyList<HeyyScamChatOperatorSummaryReceipt>? HeyyScamChatOperatorSummaryReceipts = null,
+    IReadOnlyList<ExecutiveAssistantChannelConversationState>? ExecutiveAssistantChannelConversations = null,
+    IReadOnlyList<ExecutiveAssistantChannelMessageState>? ExecutiveAssistantChannelMessages = null,
     IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,

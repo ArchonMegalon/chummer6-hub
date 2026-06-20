@@ -79,6 +79,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
         services.AddHttpClient<ParticipationOperatorNotificationService>();
+        services.AddHttpClient<ExecutiveAssistantChannelMessagingService>();
         services.AddHttpClient<HeyyScamChatService>();
         services.AddHostedService<HeyyScamChatDigestWorker>();
         services.AddSingleton<BlackLedgerNewsRecipientResolver>();
