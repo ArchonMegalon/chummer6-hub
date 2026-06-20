@@ -95,10 +95,12 @@ def screenshot_rows(source_path: Path, source: dict[str, Any]) -> list[dict[str,
             continue
         path = source_screenshot_path(source_path, row.get("path"))
         surface = normalized_surface(row.get("surface"))
+        screenshot_sha = sha256_file(path) if path.is_file() else ""
         normalized_rows.append(
             {
                 "path": str(path),
                 "exists": path.is_file(),
+                "sha256": screenshot_sha,
                 "dpiScale": row.get("dpiScale"),
                 "surface": str(row.get("surface") or "").strip(),
                 "canonicalSurface": surface,
@@ -193,6 +195,18 @@ def build_payload(
             failures.append(f"Windows installer screenshot clipping check is not pass: {row['path']}")
         if row["readabilityStatus"] != "pass":
             failures.append(f"Windows installer screenshot readability check is not pass: {row['path']}")
+    rows_by_hash: dict[str, set[str]] = {}
+    for row in screenshots:
+        screenshot_sha = str(row.get("sha256") or "")
+        surface = str(row.get("canonicalSurface") or "")
+        if screenshot_sha and surface in REQUIRED_SURFACES:
+            rows_by_hash.setdefault(screenshot_sha, set()).add(surface)
+    for screenshot_sha, surfaces in sorted(rows_by_hash.items()):
+        if len(surfaces) > 1:
+            failures.append(
+                "Windows installer screenshots for distinct required surfaces are byte-identical: "
+                f"{screenshot_sha} covers {', '.join(sorted(surfaces))}"
+            )
 
     next_actions = []
     if failures:

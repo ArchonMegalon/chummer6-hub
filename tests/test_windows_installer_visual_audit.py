@@ -168,8 +168,8 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             )
             source = downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
             source.parent.mkdir(parents=True)
-            for name in ["progress-default.png", "progress-scaled.png", "completion-default.png", "completion-scaled.png"]:
-                (source.parent / name).write_bytes(b"png")
+            for index, name in enumerate(["progress-default.png", "progress-scaled.png", "completion-default.png", "completion-scaled.png"]):
+                (source.parent / name).write_bytes(f"png-{index}".encode("utf-8"))
             source.write_text(
                 json.dumps(
                     {
@@ -222,6 +222,66 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertEqual([], payload["failures"])
         self.assertEqual([], payload["nextActions"])
         self.assertEqual(["install-progress", "completion"], payload["visualAuditSource"]["requiredSurfaces"])
+        self.assertTrue(all(row["sha256"] for row in payload["screenshots"]))
+
+    def test_distinct_required_surfaces_must_not_be_byte_identical(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-installer-visual-identical-") as temp_dir:
+            root = Path(temp_dir)
+            downloads_root, release_channel, sha = self._write_release_fixture(root)
+            startup = downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+            startup.parent.mkdir()
+            startup.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "artifactDigest": f"sha256:{sha}",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            source = downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            source.parent.mkdir(parents=True)
+            for name in ["progress-default.png", "completion-default.png"]:
+                (source.parent / name).write_bytes(b"same screenshot")
+            source.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "platform": "windows",
+                        "hostClass": "native-windows-11",
+                        "artifactSha256": sha,
+                        "screenshots": [
+                            {
+                                "path": "progress-default.png",
+                                "dpiScale": 1.0,
+                                "surface": "install-progress",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
+                            {
+                                "path": "completion-default.png",
+                                "dpiScale": 1.5,
+                                "surface": "completion",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            payload = module.build_payload(
+                release_channel_path=release_channel,
+                downloads_root=downloads_root,
+                startup_receipt_path=startup,
+                source_path=source,
+            )
+
+        self.assertEqual("fail", payload["status"])
+        self.assertTrue(
+            any("distinct required surfaces are byte-identical" in item for item in payload["failures"])
+        )
 
     def test_windows_capture_helper_updates_source_receipt_without_manual_json_editing(self) -> None:
         script = Path("/docker/chummercomplete/chummer.run-services/scripts/capture_windows_installer_visual_audit.ps1")
