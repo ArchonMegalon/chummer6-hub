@@ -92,9 +92,12 @@ $startupReceiptPath = Join-Path $startupRoot "startup-smoke-$HeadId-$Rid.receipt
 
 $startedAtUtc = (Get-Date).ToUniversalTime()
 $processPath = $null
-if ($LaunchInstaller) {
+if ($LaunchInstaller -and -not $CaptureVisualAudit) {
     $process = Start-Process -FilePath $installerFullPath -PassThru
     $processPath = $process.Path
+}
+elseif ($LaunchInstaller) {
+    $processPath = $installerFullPath
 }
 $completedAtUtc = (Get-Date).ToUniversalTime()
 $os = Get-CimInstance Win32_OperatingSystem
@@ -149,6 +152,9 @@ if ($CaptureVisualAudit) {
         $captureArgs["AutoCapture"] = $true
         $captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds
         $captureArgs["AutoCaptureTimeoutSeconds"] = $AutoCaptureTimeoutSeconds
+    }
+    if ($LaunchInstaller) {
+        $captureArgs["LaunchInstaller"] = $true
     }
 
     & $captureScript @captureArgs

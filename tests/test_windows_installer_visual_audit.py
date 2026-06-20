@@ -327,6 +327,8 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn('readyCheckpoint = "pre_ui_event_loop"', text)
         self.assertIn('hostClass = "native-windows"', text)
         self.assertIn('artifactDigest = "sha256:$artifactHash"', text)
+        self.assertIn("if ($LaunchInstaller -and -not $CaptureVisualAudit)", text)
+        self.assertIn("elseif ($LaunchInstaller)", text)
         self.assertIn("capture_windows_installer_visual_audit.ps1", text)
         self.assertIn("$normalized = @{}", text)
         self.assertIn("function Test-MapHasKey", text)
@@ -339,6 +341,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("$AutoCaptureVisualAudit", text)
         self.assertIn('$captureArgs["AutoCaptureDelaySeconds"] = $AutoCaptureDelaySeconds', text)
         self.assertIn('$captureArgs["AutoCaptureTimeoutSeconds"] = $AutoCaptureTimeoutSeconds', text)
+        self.assertIn('$captureArgs["LaunchInstaller"] = $true', text)
 
     def test_windows_installer_gold_proof_workflow_is_manual_non_publishing_and_native_capture_bounded(self) -> None:
         workflow = Path("/docker/chummercomplete/chummer.run-services/.github/workflows/windows-installer-gold-proof.yml")
