@@ -823,7 +823,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.ProvenanceSummary))
                                                                     {
-                                                                        <span> Source: @leadAftermathShelfEntry.ProvenanceSummary</span>
+                                                                        <span> Details: @PublicFacingCopyHumanizer.Clean(leadAftermathShelfEntry.ProvenanceSummary)</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.AuditSummary))
                                                                     {
@@ -1200,7 +1200,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                                                         {
-                                                                            <span> Output source: @output.ProvenanceSummary.</span>
+                                                                            <span> Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary).</span>
                                                                         }
                                                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -1243,7 +1243,7 @@ else
                                                             <h3>@answer.Question</h3>
                                                             <p>
                                                                 @answer.ShortAnswer
-                                                                <span> Source: @answer.ProvenanceLabel.</span>
+                                                                <span> Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel).</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Note: @answer.EvidenceLines[0]</span>
@@ -1306,7 +1306,7 @@ else
                                                         <h3>@publication.Title</h3>
                                                         <p>
                                                             @publication.Summary
-                                                            <span>Source: @publication.ProvenanceSummary.</span>
+                                                            <span>Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary).</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @publication.DiscoverySummary</span>

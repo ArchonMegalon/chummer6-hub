@@ -34,7 +34,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
-            <span>@Model.SubmissionId</span>
+            <span>Submission saved</span>
             <span>@Model.TrackTitle</span>
             <span>@queueStatusLabel</span>
         </div>
@@ -95,7 +95,7 @@
                 <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__proof">
-                    <span>@stage.ReceiptId</span>
+                    <span>Step saved</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))

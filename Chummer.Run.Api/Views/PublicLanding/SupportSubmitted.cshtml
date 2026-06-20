@@ -21,15 +21,15 @@
         responseRoutes.Add((
             Badge: Model.Chrome.Authenticated ? "Tracked return" : "Tracked follow-up",
             Title: Model.Chrome.Authenticated
-                ? "Keep this case on the account support page"
+                ? "Keep this report on the account support page"
                 : "Create an account if you want tracked support history here",
             Summary: Model.Chrome.Authenticated
-                ? "The next tracked update should stay on the same case id inside Chummer instead of vanishing into side channels."
+                ? "The next tracked update should stay inside Chummer instead of vanishing into side channels."
                 : "Guest follow-up still works on reply email, but an account keeps later support history, linked installs, and recovery on one calmer return path.",
             Href: primaryAction.Href,
             Label: primaryAction.Label,
             Details: Model.Chrome.Authenticated
-                ? new[] { "Same case id", "Tracked updates", "Private by default" }
+                ? new[] { "Same report", "Tracked updates", "Private by default" }
                 : new[] { "Guest still works", "History in Account", "No personalized binary" }));
     }
 
@@ -79,7 +79,7 @@
     }
     else
     {
-        helperFacts.Add(("Keep the case id nearby", $"Use {Model.CaseId} whenever you need to refer back to this report from support, downloads, or a later signed-in return path."));
+        helperFacts.Add(("Keep this page handy", "Use this confirmation page whenever you need to return to the report from support, downloads, or a later signed-in return path."));
         helperFacts.Add((Model.Chrome.Authenticated ? "Watch Account > Support" : "Watch your reply email",
             Model.Chrome.Authenticated
                 ? "Tracked cases stay in the account surface, so tracked fixes and reporter-ready updates should reappear there instead of vanishing into side channels."
@@ -97,7 +97,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
-            <span>@Model.CaseId</span>
+            <span>Report saved</span>
             <span>@Model.StatusLabel.Replace('_', ' ')</span>
         </div>
     </div>
@@ -112,7 +112,7 @@
 <section class="continuity-band support-submitted-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">What happens next</p>
-        <h2 class="editorial-title">The case is in Chummer now, with one stable id and the next honest page attached.</h2>
+        <h2 class="editorial-title">The report is in Chummer now, with a clear next page attached.</h2>
         <p class="editorial-copy">@Model.ResponseExpectation</p>
     </div>
     <div class="continuity-band__panel">

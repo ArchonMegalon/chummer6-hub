@@ -325,3 +325,32 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
     assert "Message updates" in feedback_operations
     assert "Message attempt" in feedback_operations
     assert "Follow-up sent" in feedback_operations
+
+
+def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> None:
+    support_submitted = read("Chummer.Run.Api/Views/PublicLanding/SupportSubmitted.cshtml")
+    karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
+    home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
+    combined = "\n".join((support_submitted, karma_submitted, home))
+
+    for forbidden in (
+        "<span>@Model.CaseId</span>",
+        "Keep the case id nearby",
+        "one stable id",
+        "same case id",
+        "<span>@Model.SubmissionId</span>",
+        "<span>@stage.ReceiptId</span>",
+        "Source: @leadAftermathShelfEntry.ProvenanceSummary",
+        "Output source: @output.ProvenanceSummary",
+        "Source: @answer.ProvenanceLabel",
+        "Source: @publication.ProvenanceSummary",
+    ):
+        assert forbidden not in combined
+
+    assert "Report saved" in support_submitted
+    assert "Submission saved" in karma_submitted
+    assert "Step saved" in karma_submitted
+    assert "Details: @PublicFacingCopyHumanizer.Clean(leadAftermathShelfEntry.ProvenanceSummary)" in home
+    assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
+    assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
+    assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
