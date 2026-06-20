@@ -15,8 +15,8 @@ PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 REQUIRED_HTML_PHRASES = (
     "Votes show demand. Chummer decides what ships.",
     "The loop closes only after people can use it",
-    "First-party follow-up is not posted here yet.",
-    "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.",
+    "Use the page that matches the job.",
+    "Public feedback is for ideas and safe bugs.",
 )
 FORBIDDEN_HTML_PHRASES = (
     "webhook verification",

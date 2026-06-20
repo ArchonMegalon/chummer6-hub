@@ -42,7 +42,6 @@ MINIMAL_PUBLIC_ROUTES = {
     "/status",
     "/help",
     "/faq",
-    "/feedback",
     "/what-is-chummer",
     "/login",
 }

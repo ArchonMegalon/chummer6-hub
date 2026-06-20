@@ -29,6 +29,11 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
 
     assert "Votes show demand. Chummer decides what ships." in feedback
     assert "The loop closes only after people can use it" in feedback
+    assert "Use the page that matches the job." in feedback
+    assert "Public feedback is for ideas and safe bugs." in feedback
+    assert "Public Feedback And Content Registry" not in feedback
+    assert "Open the Alice compare bench" not in feedback
+    assert "BLACK LEDGER" not in feedback
     assert "release-backed closeout" not in feedback
     assert "First-party follow-up is not posted here yet." in operations
     assert "account-backed follow-up waits until the shipped path is available on this host" in operations

@@ -3,17 +3,9 @@
     ViewData["Title"] = "Feedback";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
-    var codexHref = Model.Chrome.Authenticated
-        ? "/participate/codex"
-        : "/participate";
     var signalLoop = Model.SignalLoop;
-    var signalProjection = Model.SignalProjection;
-    var signalOperations = Model.SignalOperations;
     var followSettingsHref = signalLoop.FollowSettingsHref;
     var followSettingsLabel = signalLoop.FollowSettingsLabel;
-    var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
-    var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
-    var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
     var routeChoices = new[]
     {
         new
@@ -21,8 +13,8 @@
             Badge = "Public board",
             Title = "Feature idea, UX friction, or safe public bug",
             Summary = "Use this page when the issue can stay public and does not need logs, private campaign detail, install recovery, or account repair.",
-            Href = "#feedback-public-lanes",
-            Label = "Review public signal pages",
+            Href = "#feedback-public-pages",
+            Label = "Review public options",
             Details = new[] { "Public by default", "Votes show demand", "No private logs" }
         },
         new
@@ -53,7 +45,7 @@
             Details = new[] { "Setup help", "Account help", "Private by default" }
         }
     };
-    var signalStages = new[]
+    var feedbackStages = new[]
     {
         new
         {
@@ -61,7 +53,7 @@
             Title = "Post one clear public item",
             Summary = "A public feature request, UX pain point, or safe public bug should live on one public page instead of scattering across comments and replies.",
             Note = "Start here when the issue can stay public.",
-            Href = "#feedback-public-lanes",
+            Href = "#feedback-public-pages",
             Label = "Review the public pages"
         },
         new
@@ -77,7 +69,7 @@
         {
             Badge = "Ship it",
             Title = "The loop closes only after people can use it",
-            Summary = "A signal is not done because code merged. It is done when a release, live page, or guide lets people actually use the result.",
+            Summary = "A report is not done because code merged. It is done when a release, live page, or guide lets people actually use the result.",
             Note = "The changelog shows what is available now.",
             Href = "/changelog",
             Label = "Open changelog"
@@ -86,20 +78,20 @@
         {
             Badge = "Take it private",
             Title = "Move to help when the issue stops being public",
-            Summary = "If the issue needs recovery, logs, support history, or account detail, move it to Chummer help early instead of keeping it on a public signal page.",
-            Note = "Private help stays in Chummer even while the hosted public mirror catches up.",
+            Summary = "If the issue needs recovery, logs, support history, or account detail, move it to Chummer help early instead of keeping it on a public page.",
+            Note = "Private help stays in Chummer.",
             Href = "/help",
             Label = "Open help"
         }
     };
-    var operatingRails = new[]
+    var operatingCards = new[]
     {
         new
         {
             Badge = "Stay public",
-            Title = "Leave one searchable signal instead of scattering the same issue",
+            Title = "Leave one searchable report instead of scattering the same issue",
             Summary = "Keep feature requests, safe public bugs, and UX friction on one visible page so demand is legible before roadmap or release language changes.",
-            Href = "#feedback-public-lanes",
+            Href = "#feedback-public-pages",
             Label = "Review public pages"
         },
         new
@@ -121,40 +113,12 @@
     };
 }
 
-@if (signalProjection is not null)
-{
-    <section class="editorial-block">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Feedback boundary</p>
-            <h2 class="editorial-title">Public feedback can show direction without pretending something already shipped.</h2>
-            <p class="editorial-copy">This page keeps feedback connected to Chummer review before demand turns into release language.</p>
-        </div>
-        <div class="support-operations-panel">
-            @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
-        </div>
-    </section>
-}
-
-@if (signalOperations is not null)
-{
-    <section class="editorial-block">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Maintenance</p>
-            <h2 class="editorial-title">Public feedback needs routing and closeout discipline.</h2>
-            <p class="editorial-copy">The public board works only when intake, categories, and update routes stay easy to follow.</p>
-        </div>
-        <div class="support-operations-panel">
-            @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
-        </div>
-    </section>
-}
-
 <section class="release-footnote route-anchor-target" id="public-feedback">
     <p class="eyebrow">Feedback</p>
     <h1 class="page-title">Share product ideas and safe public bugs in one place</h1>
     <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="#feedback-public-lanes">Review public pages</a>
+        <a class="button-like button-like--primary" href="#feedback-public-pages">Review public pages</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </div>
@@ -169,7 +133,7 @@
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Signal loop snapshot">
+<section class="status-decision-strip" aria-label="Feedback overview">
     <article class="status-decision-strip__card">
         <span class="tag">Roadmap</span>
         <h2>@signalLoop.OpenMilestoneCount named slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") are visible on the public roadmap.</h2>
@@ -193,7 +157,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right page</p>
-        <h2 class="editorial-title">Public signal, roadmap direction, shipped updates, and private support should not blur together.</h2>
+        <h2 class="editorial-title">Public feedback, roadmap direction, shipped updates, and private support should not blur together.</h2>
         <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback starts the conversation; it is not the shipped status page or the private support inbox.</p>
     </div>
     <div class="route-choice-grid">
@@ -217,12 +181,12 @@
 
 <section class="workflow-band">
     <div class="workflow-band__lead">
-        <p class="eyebrow">Signal loop</p>
-        <h2 class="editorial-title">A public signal should start in one place and end on a page people can actually use.</h2>
-        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped updates, or private support. Public feedback can still show demand, while account-backed follow-up waits until the shipped path is available on this host.</p>
+        <p class="eyebrow">Feedback path</p>
+        <h2 class="editorial-title">Public feedback should start in one place and end on a page people can actually use.</h2>
+        <p class="editorial-copy">This keeps feedback visible without pretending that comments are the same thing as roadmap commitments, shipped updates, or private support.</p>
     </div>
     <div class="workflow-grid">
-        @foreach (var stage in signalStages)
+        @foreach (var stage in feedbackStages)
         {
             <article class="workflow-card">
                 <div class="workflow-card__copy">
@@ -239,75 +203,54 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Release follow-up posture</p>
+        <p class="eyebrow">After something ships</p>
         <h2 class="editorial-title">Shipped updates stay upstream of public celebration.</h2>
         <p class="editorial-copy">The public board can show demand now, but shipped updates only land after the update path is ready.</p>
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Public signal operating rules">
-    @foreach (var rail in operatingRails)
+<section class="status-decision-strip" aria-label="Public feedback rules">
+    @foreach (var card in operatingCards)
     {
         <article class="status-decision-strip__card">
-            <span class="tag">@PublicFacingCopyHumanizer.Clean(rail.Badge)</span>
-            <h2>@PublicFacingCopyHumanizer.Clean(rail.Title)</h2>
-            <p>@PublicFacingCopyHumanizer.Clean(rail.Summary)</p>
-            <a class="button-like button-like--ghost" href="@rail.Href">@PublicFacingCopyHumanizer.Clean(rail.Label)</a>
+            <span class="tag">@PublicFacingCopyHumanizer.Clean(card.Badge)</span>
+            <h2>@PublicFacingCopyHumanizer.Clean(card.Title)</h2>
+            <p>@PublicFacingCopyHumanizer.Clean(card.Summary)</p>
+            <a class="button-like button-like--ghost" href="@card.Href">@PublicFacingCopyHumanizer.Clean(card.Label)</a>
         </article>
     }
 </section>
 
-<section class="editorial-block editorial-block--lanes" id="feedback-public-lanes">
-    <div class="lane-strip-list">
-        <article class="lane-strip">
-            <div class="lane-strip__copy">
-                <span class="tag">Current public pages</span>
-                <h2>Safe public signal starts here</h2>
-                <p>These Chummer pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths.</p>
-                <div class="compact-rail">
-                    @foreach (var card in Model.PublicLane)
-                    {
-                        var sectionId = card.Action.Href.Contains('#', StringComparison.Ordinal)
-                            ? card.Action.Href[(card.Action.Href.LastIndexOf('#') + 1)..]
-                            : card.Card.Id.Replace('_', '-');
-                        <article class="compact-rail__item" id="@sectionId">
-                            <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
-                            </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                        </article>
-                    }
-                </div>
-            </div>
+<section class="editorial-block" id="feedback-public-pages">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Public pages</p>
+        <h2 class="editorial-title">Use the page that matches the job.</h2>
+        <p class="editorial-copy">Public feedback is for ideas and safe bugs. Roadmap is for what may come next. Changelog is for what people can use. Help is for private details.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Feedback</span>
+            <h3>Ideas and safe public bugs</h3>
+            <p>Use this page when the discussion can stay public.</p>
+            <a class="editorial-strip__action" href="/feedback">Stay here</a>
         </article>
-
-        <article class="lane-strip">
-            <div class="lane-strip__copy">
-                <span class="tag">Deeper participation</span>
-                <h2>Signed-in contribution paths stay optional</h2>
-                <p>Public product signal should work without turning this page into a contributor-only or account-gated surface. Signed-in participation remains available when you need the deeper path.</p>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@codexHref">@(Model.Chrome.Authenticated ? "Open codex participation" : "Open participation")</a>
-                    <a class="button-like button-like--secondary" href="/participate">Open guided contribution</a>
-                    <a class="button-like button-like--ghost" href="/participate">Open broader participation</a>
-                </div>
-                @if (Model.SignedInLane.Count > 0)
-                {
-                    <div class="compact-rail">
-                        @foreach (var card in Model.SignedInLane)
-                        {
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>@card.Card.Title</h3>
-                                    <p>@card.Card.Summary</p>
-                                </div>
-                                <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                            </article>
-                        }
-                    </div>
-                }
-            </div>
+        <article class="route-choice-card">
+            <span class="tag">Roadmap</span>
+            <h3>What may come next</h3>
+            <p>Use roadmap when you want direction without treating it as shipped.</p>
+            <a class="editorial-strip__action" href="/roadmap">Open roadmap</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Changelog</span>
+            <h3>What is available now</h3>
+            <p>Use changelog when you need the current shipped answer.</p>
+            <a class="editorial-strip__action" href="/changelog">Open changelog</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Help</span>
+            <h3>Private details</h3>
+            <p>Use help for logs, account detail, install recovery, or private table material.</p>
+            <a class="editorial-strip__action" href="/help">Open help</a>
         </article>
     </div>
 </section>
@@ -315,71 +258,26 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">What happens after</p>
-        <h2 class="editorial-title">One public signal should connect to a roadmap page, a shipped page, or a help page.</h2>
+        <h2 class="editorial-title">One public report should connect to a roadmap page, a shipped page, or a help page.</h2>
         <p class="editorial-copy">Public feedback stays in Chummer. The next visible step can stay clear without turning this page into an operations board.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Roadmap</span>
             <h3>What active product movement looks like right now</h3>
-            <p>Signals that matter should turn into named roadmap movement instead of vague comment-thread promises.</p>
-            @if (milestoneFollowUp.Length > 0)
-            {
-                <div class="compact-rail">
-                    @foreach (var milestone in milestoneFollowUp)
-                    {
-                        <article class="compact-rail__item">
-                            <div class="compact-rail__copy">
-                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
-                                <p>@milestone.CasualSummary</p>
-                            </div>
-                            <span class="tag">@milestone.StatusLabel · @milestone.DifficultyLabel</span>
-                        </article>
-                    }
-                </div>
-            }
+            <p>Reports that matter should turn into named roadmap movement instead of vague comment-thread promises.</p>
             <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open roadmap</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">What might come next</span>
             <h3>What public movement looks like before anything is called shipped</h3>
-            <p>The next public explanation should land on a named horizon with a clear next page, not as a promise buried in feedback replies.</p>
-            @if (roadmapFollowUp.Length > 0)
-            {
-                <div class="compact-rail">
-                    @foreach (var card in roadmapFollowUp)
-                    {
-                        <article class="compact-rail__item">
-                            <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
-                            </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                        </article>
-                    }
-                </div>
-            }
-            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse roadmap</a>
+            <p>The next public explanation should land on a clear roadmap page, not as a promise buried in feedback replies.</p>
+            <a class="editorial-strip__action" href="/roadmap">Browse roadmap</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">What works today</span>
             <h3>What a real shipped example already looks like</h3>
-            <p>Public signal only closes when a release, live page, or guide lets a person actually reach the result. That record lives here, not in a vote count.</p>
-            @if (shippedFollowUp.Length > 0)
-            {
-                <div class="compact-rail">
-                    @foreach (var card in shippedFollowUp)
-                    {
-                        <article class="compact-rail__item">
-                            <div class="compact-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
-                            </div>
-                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
-                        </article>
-                    }
-                </div>
-            }
+            <p>Public feedback only closes when a release, live page, or guide lets a person actually reach the result. That status lives in the changelog, not in a vote count.</p>
             <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
     </div>
@@ -387,12 +285,12 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Account-aware follow-up</p>
-    <h2 class="editorial-title">Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.</h2>
+    <h2 class="editorial-title">Create the account when you want feedback, installs, support, and roadmap follow-up to return to one place.</h2>
     <p class="editorial-copy">The public board still works without an account. The account becomes useful once you want device return, support return, roadmap follows, and future install linking attached to one calmer place.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@followSettingsHref">@followSettingsLabel</a>
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
         <a class="cta-link cta-link--ghost" href="/help">Open help</a>
     </div>
-    <p class="muted-copy">The paths stay split on purpose: <a class="inline-link" href="/feedback">public signal</a>, <a class="inline-link" href="/roadmap">planned movement</a>, <a class="inline-link" href="/changelog">shipped updates</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
+    <p class="muted-copy">The paths stay split on purpose: <a class="inline-link" href="/feedback">public feedback</a>, <a class="inline-link" href="/roadmap">planned movement</a>, <a class="inline-link" href="/changelog">shipped updates</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
 </section>
