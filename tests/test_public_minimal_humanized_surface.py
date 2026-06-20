@@ -149,11 +149,44 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "Recovery posture",
         "Trust posture",
         "artifacts ·",
+        "Restore posture",
+        "Recent return artifact",
+        "Move governed roster state",
+        "Transfer governed roster state",
+        "Staleness posture",
+        "Conflict posture",
+        "Recoverability posture",
+        "Continue posture",
+        "Governed prep",
+        "governed prep",
+        "Governed packet",
+        "governed packet",
+        "GM operations posture",
+        "Search posture",
+        "Binding posture",
+        "Artifact publication",
+        "governed operator view",
+        "governed view",
+        "Issue governed",
+        "No governed",
+        "Recent governed",
+        "governed public discovery",
+        "workspace lanes",
+        "Grounded rule answer",
+        "Package posture",
+        "Recap and artifact shelf",
+        "waiting for governed",
     ):
         assert forbidden not in account
 
     assert "The download stays the same for everyone" in account
     assert "Recap files" in account
+    assert "Restore status" in account
+    assert "Move roster state" in account
+    assert "Prep packet" in account
+    assert "GM operations status" in account
+    assert "Binding status" in account
+    assert "Package status" in account
     assert "Current release status" in account
     assert "Help and privacy" in account
     assert "Recovery status" in account
