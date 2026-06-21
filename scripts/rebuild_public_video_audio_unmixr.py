@@ -51,6 +51,8 @@ UNMIXR_API_KEY_ENV_KEYS = (
     "UNMIXR_API_KEY_FALLBACK_1",
     "UNMIXR_API_KEY_FALLBACK_2",
 )
+UNMIXR_API_KEYS_BULK_ENV = "UNMIXR_API_KEYS"
+UNMIXR_API_KEY_DYNAMIC_PREFIX = "UNMIXR_API_KEY_"
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -128,19 +130,95 @@ def _voice_id_sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest() if value else ""
 
 
+def _unquote_env_value(raw_value: str) -> str:
+    value = raw_value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    return value.strip()
+
+
+def _is_unmixr_api_key_name(key: str) -> bool:
+    if key.endswith("_FILE"):
+        return False
+    return key == "UNMIXR_API_KEY" or key.startswith(UNMIXR_API_KEY_DYNAMIC_PREFIX)
+
+
+def _split_bulk_unmixr_api_keys(value: str) -> list[str]:
+    return [part.strip() for part in re.split(r"[,;\s]+", value) if part.strip()]
+
+
+def _unmixr_secret_env_files() -> tuple[Path, ...]:
+    files = [
+        *(Path(path) for path in getattr(LEGACY, "ENV_FILES", ())),
+        REPO / ".env.local",
+        Path("/docker/EA/.env.local"),
+        Path("/docker/EA/ea/.env.local"),
+    ]
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for file in files:
+        key = str(file)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(file)
+    return tuple(unique)
+
+
+def _env_file_unmixr_api_key_assignments() -> list[tuple[str, str]]:
+    assignments: list[tuple[str, str]] = []
+    for env_file in _unmixr_secret_env_files():
+        if not env_file.is_file():
+            continue
+        for raw_line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, raw_value = line.split("=", 1)
+            key = key.strip()
+            value = _unquote_env_value(raw_value)
+            if key == UNMIXR_API_KEYS_BULK_ENV:
+                for index, api_key in enumerate(_split_bulk_unmixr_api_keys(value), start=1):
+                    assignments.append((f"{UNMIXR_API_KEYS_BULK_ENV}[{index}]", api_key))
+                continue
+            if _is_unmixr_api_key_name(key):
+                assignments.append((key, value))
+    return assignments
+
+
 def _unmixr_api_keys(preferred_env: str = "") -> list[tuple[str, str]]:
     keys: list[tuple[str, str]] = []
     seen_values: set[str] = set()
-    env_keys = list(UNMIXR_API_KEY_ENV_KEYS)
-    if preferred_env in env_keys:
-        env_keys.remove(preferred_env)
-        env_keys.insert(0, preferred_env)
-    for env_key in env_keys:
-        value = LEGACY.env_or_file(env_key)
+    seen_labels: dict[str, int] = {}
+
+    def add_candidate(label: str, value: str) -> None:
+        value = _unquote_env_value(value)
         if not value or value in seen_values:
-            continue
-        keys.append((env_key, value))
+            return
         seen_values.add(value)
+        seen_labels[label] = seen_labels.get(label, 0) + 1
+        display_label = label if seen_labels[label] == 1 else f"{label}#{seen_labels[label]}"
+        keys.append((display_label, value))
+
+    for env_key in UNMIXR_API_KEY_ENV_KEYS:
+        add_candidate(env_key, LEGACY.env_or_file(env_key))
+
+    for index, api_key in enumerate(_split_bulk_unmixr_api_keys(LEGACY.env_or_file(UNMIXR_API_KEYS_BULK_ENV)), start=1):
+        add_candidate(f"{UNMIXR_API_KEYS_BULK_ENV}[{index}]", api_key)
+
+    for env_key in sorted(os.environ):
+        if env_key == UNMIXR_API_KEYS_BULK_ENV:
+            for index, api_key in enumerate(_split_bulk_unmixr_api_keys(os.environ.get(env_key, "")), start=1):
+                add_candidate(f"{UNMIXR_API_KEYS_BULK_ENV}[{index}]", api_key)
+            continue
+        if _is_unmixr_api_key_name(env_key):
+            add_candidate(env_key, os.environ.get(env_key, ""))
+
+    for label, value in _env_file_unmixr_api_key_assignments():
+        add_candidate(label, value)
+
+    if preferred_env:
+        keys.sort(key=lambda item: 0 if item[0] == preferred_env else 1)
     return keys
 
 
@@ -265,8 +343,8 @@ def _discover_unmixr_voice_by_label(group_key: str, label: str) -> dict[str, Any
     cache_key = (group_key, normalized_label)
     if cache_key in _UNMIXR_DISCOVERY_CACHE:
         return dict(_UNMIXR_DISCOVERY_CACHE[cache_key])
-    api_key = LEGACY.env_or_file("UNMIXR_API_KEY")
-    if not api_key:
+    api_keys = _unmixr_api_keys()
+    if not api_keys:
         return {}
     for use_case in _unmixr_voice_discovery_use_cases(group_key):
         query = urllib.parse.urlencode(
@@ -276,37 +354,38 @@ def _discover_unmixr_voice_by_label(group_key: str, label: str) -> dict[str, Any
                 "fields": VOICE_DISCOVERY_FIELDS,
             }
         )
-        request = urllib.request.Request(
-            f"{UNMIXR_VOICE_DISCOVERY_API}?{query}",
-            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-        )
-        try:
-            payload = json.loads(urllib.request.urlopen(request, timeout=20).read().decode("utf-8"))
-        except Exception:
-            continue
-        rows = payload.get("results") if isinstance(payload, dict) else payload
-        if isinstance(rows, dict):
-            rows = rows.get("results") or rows.get("voices") or []
-        for row in rows or []:
-            if not isinstance(row, dict):
+        for _, api_key in api_keys:
+            request = urllib.request.Request(
+                f"{UNMIXR_VOICE_DISCOVERY_API}?{query}",
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+            )
+            try:
+                payload = json.loads(urllib.request.urlopen(request, timeout=20).read().decode("utf-8"))
+            except Exception:
                 continue
-            character = str(row.get("character") or row.get("name") or row.get("label") or "").strip()
-            if character.lower() != normalized_label:
-                continue
-            voice_id = str(row.get("uuid") or "").strip()
-            if not voice_id:
-                continue
-            result = {
-                "voice_id": voice_id,
-                "voice_source_env": f"discovery:unmixr:{use_case}:{character}",
-                "voice_label": character,
-                "voice_gender": str(row.get("gender") or ""),
-                "voice_quality": str(row.get("quality") or ""),
-                "voice_language": str(row.get("language") or ""),
-                "voice_use_cases": row.get("use_cases") if isinstance(row.get("use_cases"), list) else [],
-            }
-            _UNMIXR_DISCOVERY_CACHE[cache_key] = dict(result)
-            return result
+            rows = payload.get("results") if isinstance(payload, dict) else payload
+            if isinstance(rows, dict):
+                rows = rows.get("results") or rows.get("voices") or []
+            for row in rows or []:
+                if not isinstance(row, dict):
+                    continue
+                character = str(row.get("character") or row.get("name") or row.get("label") or "").strip()
+                if character.lower() != normalized_label:
+                    continue
+                voice_id = str(row.get("uuid") or "").strip()
+                if not voice_id:
+                    continue
+                result = {
+                    "voice_id": voice_id,
+                    "voice_source_env": f"discovery:unmixr:{use_case}:{character}",
+                    "voice_label": character,
+                    "voice_gender": str(row.get("gender") or ""),
+                    "voice_quality": str(row.get("quality") or ""),
+                    "voice_language": str(row.get("language") or ""),
+                    "voice_use_cases": row.get("use_cases") if isinstance(row.get("use_cases"), list) else [],
+                }
+                _UNMIXR_DISCOVERY_CACHE[cache_key] = dict(result)
+                return result
     return {}
 
 

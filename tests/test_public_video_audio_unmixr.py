@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -76,6 +78,59 @@ class PublicVideoAudioUnmixrTests(unittest.TestCase):
 
         self.assertEqual(voice_id, "alice-female")
         self.assertEqual(source_env, "UNMIXR_ALICE_VOICE_ID")
+
+    def test_unmixr_api_key_discovery_supports_more_than_three_accounts(self) -> None:
+        original_env_or_file = MODULE.LEGACY.env_or_file
+        original_secret_env_files = MODULE._unmixr_secret_env_files
+
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env.local"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "UNMIXR_API_KEY=main-key",
+                        "UNMIXR_API_KEY_FALLBACK_1=backup-one",
+                        "UNMIXR_API_KEY_FALLBACK_2=",
+                        "UNMIXR_API_KEY_FALLBACK_3=backup-three",
+                        "UNMIXR_API_KEY_PERSONAL=personal-key",
+                        "UNMIXR_API_KEYS=bulk-one,bulk-two",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            def fake_env_or_file(key: str) -> str:
+                values = {
+                    "UNMIXR_API_KEY": "main-key",
+                    "UNMIXR_API_KEY_FALLBACK_1": "backup-one",
+                    "UNMIXR_API_KEY_FALLBACK_2": "",
+                    "UNMIXR_API_KEYS": "bulk-one,bulk-two",
+                }
+                return values.get(key, "")
+
+            try:
+                MODULE.LEGACY.env_or_file = fake_env_or_file
+                MODULE._unmixr_secret_env_files = lambda: (env_file,)
+                with patch.dict(os.environ, {}, clear=True):
+                    keys = MODULE._unmixr_api_keys()
+                    preferred = MODULE._unmixr_api_keys("UNMIXR_API_KEY_PERSONAL")
+            finally:
+                MODULE.LEGACY.env_or_file = original_env_or_file
+                MODULE._unmixr_secret_env_files = original_secret_env_files
+
+        self.assertEqual(
+            [label for label, _ in keys],
+            [
+                "UNMIXR_API_KEY",
+                "UNMIXR_API_KEY_FALLBACK_1",
+                "UNMIXR_API_KEYS[1]",
+                "UNMIXR_API_KEYS[2]",
+                "UNMIXR_API_KEY_FALLBACK_3",
+                "UNMIXR_API_KEY_PERSONAL",
+            ],
+        )
+        self.assertEqual([value for _, value in keys], ["main-key", "backup-one", "bulk-one", "bulk-two", "backup-three", "personal-key"])
+        self.assertEqual(preferred[0], ("UNMIXR_API_KEY_PERSONAL", "personal-key"))
 
 
 if __name__ == "__main__":
