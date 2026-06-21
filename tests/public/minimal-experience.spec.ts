@@ -11,10 +11,8 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const desktop = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1366, height: 768 } });
 
   await desktop.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  const navPanelOpen = await desktop.evaluate(() => document.body.classList.contains('nav-panel-open'));
-  if (navPanelOpen) {
-    failures.push('homepage: navigation panel is open by default');
-  }
+  await expect(desktop.locator('.site-nav')).toBeVisible();
+  await expect(desktop.locator('[data-nav-toggle]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
   await expect(desktop.locator('.minimal-hero__lead')).toContainText('without losing the details between sessions');
   const heroActions = await desktop.locator('.minimal-hero .minimal-actions a.button-like').allTextContents();
@@ -43,7 +41,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const captionTrack = productVideo.locator('track[kind="captions"]');
   await expect(captionTrack).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo.vtt');
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toContainText('Get the app');
-  results.push({ surface: 'home', nav_panel_open: navPanelOpen, hero_image_loaded: heroImageComplete, product_video_sources: videoSources });
+  results.push({ surface: 'home', inline_nav_visible: await desktop.locator('.site-nav').isVisible(), hero_image_loaded: heroImageComplete, product_video_sources: videoSources });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
   const stableLane = desktop.locator('#stable');

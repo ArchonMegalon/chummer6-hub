@@ -89,8 +89,7 @@
         .ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
-    var defaultNavOpen = false;
-    var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass} {(defaultNavOpen ? "nav-panel-open" : string.Empty)}".Trim();
+    var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
@@ -103,13 +102,7 @@
     var supplementalSignalLinks = publicSignalLinks
         .Where(link => !string.Equals(link.Href, "/roadmap", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var primaryDrawerLinks = chrome.PrimaryNavigation;
-    var compactDrawerLinks = chrome.PrimaryNavigation
-        .Concat(supplementalSignalLinks)
-        .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
-        .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
-        .Select(group => group.First())
-        .ToArray();
+    var primarySiteLinks = chrome.PrimaryNavigation;
     var footerLinks = (compactFooter ? footerProductLinks : footerProductLinks.Concat(supplementalSignalLinks))
         .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
         .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
@@ -343,6 +336,20 @@
                     <span class="site-brand__wordmark">CHUMMER</span>
                     <span class="site-brand__surface">Shadowrun character manager</span>
                 </a>
+                <nav class="site-nav" aria-label="Primary navigation">
+                    @foreach (var link in primarySiteLinks)
+                    {
+                        var current = isContextualRouteCurrent(link.Href);
+                        if (current)
+                        {
+                            <span class="site-nav__current">@link.Label</span>
+                        }
+                        else
+                        {
+                            <a href="@link.Href">@link.Label</a>
+                        }
+                    }
+                </nav>
                 <div class="site-actions site-actions--quiet">
                     <a class="site-actions__link" href="/help">Help</a>
                     <a class="site-actions__link" href="/faq">FAQ</a>
@@ -370,14 +377,20 @@
                     <span class="site-brand__wordmark">CHUMMER</span>
                     <span class="site-brand__surface">Shadowrun character manager</span>
                 </a>
-                <button
-                    class="site-nav__toggle button-like button-like--ghost"
-                    type="button"
-                    data-nav-toggle
-                    aria-expanded="false"
-                    aria-controls="site-nav-panel">
-                    Menu
-                </button>
+                <nav class="site-nav" aria-label="Primary navigation">
+                    @foreach (var link in primarySiteLinks)
+                    {
+                        var current = isContextualRouteCurrent(link.Href);
+                        if (current)
+                        {
+                            <span class="site-nav__current">@link.Label</span>
+                        }
+                        else
+                        {
+                            <a href="@link.Href">@link.Label</a>
+                        }
+                    }
+                </nav>
                 <div class="site-actions">
                     @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
                     {
@@ -422,100 +435,29 @@
                 </div>
             </div>
         </header>
-        <div class="site-sidebar-backdrop" data-nav-backdrop hidden></div>
-        <aside class="site-sidebar" id="site-nav-panel" data-nav-panel aria-hidden="@(defaultNavOpen ? "false" : "true")"@(defaultNavOpen ? null : " hidden inert")>
-            <div class="site-sidebar__panel">
-                <div class="site-sidebar__masthead">
-                    <strong class="site-sidebar__title">@pageTitle</strong>
-                    <button class="site-sidebar__close button-like button-like--ghost" type="button" data-nav-close aria-label="Close navigation panel">Close</button>
-                </div>
-                <div class="site-sidebar__section">
-                    <p class="site-sidebar__heading sr-only">Menu</p>
-                    <nav class="site-sidebar__nav" aria-label="Primary navigation">
-                        @foreach (var link in primaryDrawerLinks)
+    }
+
+    @if (contextSidebarLinks.Count > 0 && !string.IsNullOrWhiteSpace(contextSidebarHeading))
+    {
+        <div class="site-context-nav" aria-label="@contextSidebarHeading">
+            <div class="site-context-nav__inner">
+                <span class="site-context-nav__heading">@contextSidebarHeading</span>
+                <nav class="site-context-nav__links" aria-label="@contextSidebarHeading">
+                    @foreach (var link in contextSidebarLinks)
+                    {
+                        var current = isContextualRouteCurrent(link.Href);
+                        if (current)
                         {
-                            var current = isContextualRouteCurrent(link.Href);
-                            if (current)
-                            {
-                                <span class="site-sidebar__current">@link.Label</span>
-                            }
-                            else
-                            {
-                                <a href="@link.Href">@link.Label</a>
-                            }
+                            <span class="site-context-nav__current">@link.Label</span>
                         }
-                    </nav>
-                </div>
-                @if (contextSidebarLinks.Count > 0 && !string.IsNullOrWhiteSpace(contextSidebarHeading))
-                {
-                    <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">@contextSidebarHeading</p>
-                        @if (!string.IsNullOrWhiteSpace(contextSidebarSummary))
+                        else
                         {
-                            <p class="site-sidebar__summary">@contextSidebarSummary</p>
+                            <a href="@link.Href">@link.Label</a>
                         }
-                        <nav class="site-sidebar__nav" aria-label="@contextSidebarHeading">
-                            @foreach (var link in contextSidebarLinks)
-                            {
-                                var current = isContextualRouteCurrent(link.Href);
-                                if (current)
-                                {
-                                    <span class="site-sidebar__current">@link.Label</span>
-                                }
-                                else
-                                {
-                                    <a href="@link.Href">@link.Label</a>
-                                }
-                            }
-                        </nav>
-                    </div>
-                }
-                @if (chrome.Authenticated)
-                {
-                    <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Account</p>
-                        <div class="site-sidebar__actions" role="group" aria-label="Account actions">
-                            @foreach (var action in nonBuildHeaderActions)
-                            {
-                                var renderedActionLabel = routeKey is "landing"
-                                    && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
-                                    ? "Download"
-                                    : action.Label;
-                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <form method="post" action="/logout" class="action-form">
-                                        @Html.AntiForgeryToken()
-                                        <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
-                                    </form>
-                                }
-                                else if (action.Current)
-                                {
-                                    <span class="action-pill action-pill--current">@renderedActionLabel</span>
-                                }
-                                else
-                                {
-                                    var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
-                                        ? "site-actions__link"
-                                        : $"action-pill action-pill--{action.Tone}";
-                                    <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
-                                }
-                            }
-                            @if (buildAction is not null)
-                            {
-                                if (buildAction.Current)
-                                {
-                                    <span class="action-pill action-pill--current">@buildAction.Label</span>
-                                }
-                                else
-                                {
-                                    <a class="action-pill action-pill--secondary" href="@buildAction.Href">@buildAction.Label</a>
-                                }
-                            }
-                        </div>
-                    </div>
-                }
+                    }
+                </nav>
             </div>
-        </aside>
+        </div>
     }
 
     <main id="main" class="site-main">

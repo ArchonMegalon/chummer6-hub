@@ -6,43 +6,22 @@ namespace Chummer.Tests;
 public sealed class FeedbackOperatingLoopViewTests
 {
     [Fact]
-    public void FeedbackPageKeepsPublicFollowThroughVisibleWithoutReadingLikeAnOperatorBoard()
+    public void PublicFeedbackAndParticipatePagesAreDeletedAndRedirectedToProductLift()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
-        string view = File.ReadAllText(viewPath);
+        string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
+        string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Public feedback should start in one place and end on a page people can actually use.", view, StringComparison.Ordinal);
-        Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
-        Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
-        Assert.Contains("Open roadmap", view, StringComparison.Ordinal);
-        Assert.Contains("Open changelog", view, StringComparison.Ordinal);
-        Assert.Contains("Open help", view, StringComparison.Ordinal);
-        Assert.Contains("This page stays public-facing on purpose.", view, StringComparison.Ordinal);
-        Assert.Contains("Use the page that matches the job.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Proof-backed closeout", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("private work queue", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Milestone pressure", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Signal loop snapshot", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("named slice", view, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("release notes", view, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("public-safe boundary", view, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void ParticipatePageUsesTheSameLiveLoopDataInsteadOfStayingAStaticCommunityExplainer()
-    {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
-        string view = File.ReadAllText(viewPath);
-
-        Assert.Contains("Participation works best when it points at live milestones, planned work, and shipped updates.", view, StringComparison.Ordinal);
-        Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
-        Assert.Contains("Participation overview", view, StringComparison.Ordinal);
-        Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
-        Assert.Contains("Open milestones", view, StringComparison.Ordinal);
-        Assert.Contains("Browse campaign tools", view, StringComparison.Ordinal);
-        Assert.Contains("Open shipped updates", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("open milestone slice", view, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("real delivery pressure", view, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(feedbackViewPath));
+        Assert.False(File.Exists(participateViewPath));
+        Assert.Contains("private const string DefaultProductLiftFeedbackUrl = \"https://chummer6.productlift.dev\";", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult ParticipatePage()", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Participate.cshtml\"", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -79,7 +58,8 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge))", controller, StringComparison.Ordinal);
         Assert.Contains("SignalLoop: signalLoop", controller, StringComparison.Ordinal);
         Assert.Contains("public sealed record PublicSignalLoopSnapshotViewModel(", viewModels, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PublicSignalLoopSnapshotViewModel SignalLoop", viewModels, StringComparison.Ordinal);
+        Assert.Contains("public sealed record NowPageViewModel(", viewModels, StringComparison.Ordinal);
+        Assert.Contains("public sealed record RoadmapPageViewModel(", viewModels, StringComparison.Ordinal);
         Assert.Contains("int OpenMilestoneCount", viewModels, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyList<ProgramMilestoneSummaryViewModel> MilestoneFollowUp", viewModels, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyList<ResolvedPublicCardViewModel> RoadmapFollowUp", viewModels, StringComparison.Ordinal);

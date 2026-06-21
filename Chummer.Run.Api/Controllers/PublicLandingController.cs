@@ -8460,53 +8460,6 @@ Boundary:
         return DefaultProductLiftFeedbackUrl;
     }
 
-    private async Task<ParticipatePageViewModel> BuildParticipatePageModel(
-        string title,
-        string description,
-        string currentPath,
-        CancellationToken cancellationToken)
-    {
-        var surface = _landing.LoadSurface();
-        var cards = _landing.CardsForBucket(surface, "participate");
-        var assets = new AssetCatalogViewModel(surface.Assets);
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
-        var signalLoop = BuildPublicSignalLoopSnapshot(surface, assets, chrome.Authenticated, currentPath);
-        var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
-        var signalOperations = string.Equals(currentPath, "/feedback", StringComparison.OrdinalIgnoreCase)
-            ? BuildOptionalSignalOperationsPacket()
-            : null;
-
-        return new ParticipatePageViewModel(
-            Chrome: chrome,
-            Surface: surface,
-            Assets: assets,
-            PublicLane: ResolveCards(
-                cards.Where(card =>
-                        !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal)
-                        && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal))
-                    .ToArray(),
-                assets,
-                authenticated: false,
-                currentPath),
-            SignedInLane: ResolveCards(
-                cards.Where(card =>
-                        string.Equals(card.Id, "participate_booster", StringComparison.Ordinal)
-                        || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal))
-                    .ToArray(),
-                assets,
-                authenticated: chrome.Authenticated,
-                currentPath),
-            SignalLoop: signalLoop,
-            BuildGhostConcierge: BuildBuildGhostConciergeTeaser(),
-            SignalProjection: signalProjection,
-            SignalOperations: signalOperations,
-            BeHumanEventAdapter: BuildBeHumanEventAdapterPanel(),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
-    }
-
     private BuildGhostConciergeTeaserViewModel BuildBuildGhostConciergeTeaser()
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();

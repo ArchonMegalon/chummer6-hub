@@ -2045,8 +2045,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(robotsText.Contains("Disallow: /account/", StringComparison.Ordinal), "robots.txt should keep private account routes blocked.");
     Assert(robotsText.Contains("Sitemap: https://chummer.run/sitemap.xml", StringComparison.Ordinal), "robots.txt should advertise the public sitemap.");
     var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
-    Assert(layoutSource.Contains("data-nav-sheet", StringComparison.Ordinal), "layout should keep the compact mobile navigation sheet wired into the public shell.");
-    Assert(layoutSource.Contains("aria-controls=\"site-nav-sheet\"", StringComparison.Ordinal), "layout should expose the compact navigation sheet through the header toggle.");
+    Assert(layoutSource.Contains("<nav class=\"site-nav\" aria-label=\"Primary navigation\">", StringComparison.Ordinal), "layout should expose primary navigation inline in the public shell.");
+    Assert(!layoutSource.Contains("data-nav-sheet", StringComparison.Ordinal), "layout should not keep a hidden mobile navigation sheet in the public shell.");
+    Assert(!layoutSource.Contains("aria-controls=\"site-nav-sheet\"", StringComparison.Ordinal), "layout should not expose a navigation sheet toggle.");
     Assert(!layoutSource.Contains("site-bottom-cta", StringComparison.Ordinal), "layout should stop auto-injecting a sticky bottom CTA on every public route.");
     Assert(!layoutSource.Contains("Help and legal", StringComparison.Ordinal), "public shell copy should stop using the older help-and-legal footer framing.");
     Assert(!layoutSource.Contains("Truth boundary", StringComparison.Ordinal), "public shell footer should stop projecting canon/projection disclosure copy.");

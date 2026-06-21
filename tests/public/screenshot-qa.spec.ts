@@ -58,8 +58,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const workflow = page.locator('[data-homepage-section="workflow"]');
     const downloads = page.locator('[data-homepage-section="downloads"]');
     const help = page.locator('[data-homepage-section="help"]');
-    const sidebar = page.locator('.site-sidebar');
-    const navLinks = page.locator('[aria-label="Primary navigation"] a, [aria-label="Primary navigation"] .site-sidebar__current');
+    const navLinks = page.locator('.site-nav a, .site-nav__current');
 
     await expect(heroTitle).toContainText('Chummer');
     await expect(primaryCta).toContainText('Stable');
@@ -95,8 +94,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
       hero_visible: !!heroBox,
       cta_visible: !!ctaBox,
       footer_visible: await footer.isVisible(),
-      sidebar_visible: await sidebar.isVisible(),
-      nav_panel_open: await page.evaluate(() => document.body.classList.contains('nav-panel-open')),
+      inline_nav_visible: await page.locator('.site-nav').isVisible(),
       screenshot: screenshotName,
       status: overflow <= 1 && heroBox && ctaBox ? 'pass' : 'fail',
     });

@@ -9,7 +9,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   const sections = page.locator('[data-homepage-section]');
   await expect(sections).toHaveCount(4);
 
-  const navLabels = await page.locator('[aria-label="Primary navigation"] a, [aria-label="Primary navigation"] .site-sidebar__current').evaluateAll((items) =>
+  const navLabels = await page.locator('.site-nav a, .site-nav__current').evaluateAll((items) =>
     items.map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
   );
   expect(navLabels).toEqual(['Home', 'Get Chummer', 'Help']);

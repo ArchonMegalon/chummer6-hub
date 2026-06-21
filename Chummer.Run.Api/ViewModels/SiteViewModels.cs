@@ -1295,20 +1295,6 @@ public sealed record FaqPageViewModel(
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     PublicAccessPostureViewModel? AccessPosture = null);
 
-public sealed record ParticipatePageViewModel(
-    SiteChromeViewModel Chrome,
-    PublicLandingSurfaceDto Surface,
-    AssetCatalogViewModel Assets,
-    IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
-    IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane,
-    PublicSignalLoopSnapshotViewModel SignalLoop,
-    BuildGhostConciergeTeaserViewModel? BuildGhostConcierge = null,
-    PublicSignalProjectionPacketViewModel? SignalProjection = null,
-    PublicSignalOperationsPacketViewModel? SignalOperations = null,
-    BeHumanEventAdapterPanelViewModel? BeHumanEventAdapter = null,
-    PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
-
 public sealed record BuildGhostConciergeTeaserViewModel(
     string StatusLabel,
     string Summary,

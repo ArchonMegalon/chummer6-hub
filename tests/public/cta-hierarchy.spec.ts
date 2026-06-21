@@ -35,17 +35,15 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     if (supportPrimaryTop <= heroPrimaryTop) {
       failures.push(`${viewport.name}: support CTA surfaced above hero CTA`);
     }
-    const navPanelOpen = await page.evaluate(() => document.body.classList.contains('nav-panel-open'));
-    if (navPanelOpen) {
-      failures.push(`${viewport.name}: navigation panel is open on first paint`);
-    }
+    await expect(page.locator('.site-nav')).toBeVisible();
+    await expect(page.locator('[data-nav-toggle]')).toHaveCount(0);
 
     results.push({
       viewport: viewport.name,
       hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
       support_primary_top: supportPrimaryTop,
-      nav_panel_open: navPanelOpen,
+      inline_nav_visible: await page.locator('.site-nav').isVisible(),
     });
 
     await page.close();

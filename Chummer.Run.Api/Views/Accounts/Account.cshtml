@@ -35,7 +35,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account area.";
+    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the section links.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))

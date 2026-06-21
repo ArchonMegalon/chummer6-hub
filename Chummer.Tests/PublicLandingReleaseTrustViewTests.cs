@@ -129,20 +129,20 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void ParticipatePageKeepsPublicCodexInvitationGenericWhileDeepAuthFlowNamesProvider()
+    public void ParticipatePageRedirectsWhileDeepCodexFlowKeepsProviderCopyOutOfPublicShell()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string publicViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string consoleViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "CodexParticipation", "Console.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CodexParticipationController.cs");
+        string publicControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
 
-        string view = File.ReadAllText(viewPath);
         string consoleView = File.ReadAllText(consoleViewPath);
         string controller = File.ReadAllText(controllerPath);
+        string publicController = File.ReadAllText(publicControllerPath);
 
-        Assert.Contains("Account participation", view, StringComparison.Ordinal);
-        Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
-        Assert.Contains("guided contribution tools tied to your account", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
+        Assert.False(File.Exists(publicViewPath));
+        Assert.Contains("public IActionResult ParticipatePage()", publicController, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(ResolveProductLiftFeedbackUrl());", publicController, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
         Assert.Contains("Start a temporary contribution session", consoleView, StringComparison.Ordinal);
@@ -168,8 +168,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("=> Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
         Assert.Contains("ProductLiftFeedbackUrlEnvironmentVariable", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Changelog.cshtml\", model);", controller, StringComparison.Ordinal);
-        Assert.Contains("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildRoadmapMilestones()", controller, StringComparison.Ordinal);
@@ -1022,7 +1023,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void LayoutAndSiteScriptWireTheCompactNavigationInsteadOfLeavingDeadToggleHooks()
+    public void LayoutKeepsPrimaryNavigationInlineInsteadOfUsingAHiddenDrawer()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
         string scriptPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "site.js");
@@ -1032,17 +1033,21 @@ public sealed class PublicLandingReleaseTrustViewTests
         string script = File.ReadAllText(scriptPath);
         string css = File.ReadAllText(cssPath);
 
-        Assert.Contains("data-nav-toggle", layout, StringComparison.Ordinal);
-        Assert.Contains("data-nav-panel", layout, StringComparison.Ordinal);
-        Assert.Contains("site-nav-panel", layout, StringComparison.Ordinal);
+        Assert.Contains("<nav class=\"site-nav\" aria-label=\"Primary navigation\">", layout, StringComparison.Ordinal);
+        Assert.Contains("site-context-nav", layout, StringComparison.Ordinal);
         Assert.Contains("chrome.PublicSignalNavigation", layout, StringComparison.Ordinal);
         Assert.Contains("Help", layout, StringComparison.Ordinal);
-        Assert.Contains("Account", layout, StringComparison.Ordinal);
-        Assert.Contains("closeNavPanel", script, StringComparison.Ordinal);
-        Assert.Contains("nav-sheet-open", script, StringComparison.Ordinal);
-        Assert.Contains("event.key === \"Escape\"", script, StringComparison.Ordinal);
-        Assert.Contains("body.nav-sheet-open", css, StringComparison.Ordinal);
-        Assert.Contains(".site-nav__toggle", css, StringComparison.Ordinal);
+        Assert.Contains(".site-nav {", css, StringComparison.Ordinal);
+        Assert.Contains(".site-context-nav", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-nav-toggle", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-nav-panel", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("site-nav-panel", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("closeNavPanel", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("nav-sheet-open", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("event.key === \"Escape\" && document.body.classList.contains(\"nav-panel-open\")", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("body.nav-sheet-open", css, StringComparison.Ordinal);
+        Assert.DoesNotContain(".site-nav__toggle", css, StringComparison.Ordinal);
+        Assert.DoesNotContain(".site-sidebar", css, StringComparison.Ordinal);
     }
 
     [Fact]

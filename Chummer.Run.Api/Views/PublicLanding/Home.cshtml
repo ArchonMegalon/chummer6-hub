@@ -12,7 +12,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-home";
     ViewData["ContextSidebarHeading"] = "Home sections";
-    ViewData["ContextSidebarSummary"] = "Keep account access and work sections in the shared side panel.";
+    ViewData["ContextSidebarSummary"] = "Use the section links to move between access, work, and setup.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();

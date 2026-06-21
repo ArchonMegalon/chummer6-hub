@@ -13,7 +13,7 @@
     ViewData["ContextSidebarHeading"] = helpPage ? "Help" : "Page sections";
     ViewData["ContextSidebarSummary"] = helpPage
         ? "Jump to the help path that matches the problem."
-        : "Jump between the current trust sections from the shared side panel.";
+        : "Jump between the current sections.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
         .ToArray();

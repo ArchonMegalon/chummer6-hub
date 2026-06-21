@@ -80,7 +80,7 @@ function isButtonLike(meta: {
   if (meta.role === 'button') {
     return true;
   }
-  if (/\bbutton-like\b|\bcta\b|\bcard-link\b|\bnav-link\b|\bsite-sidebar__nav\b/i.test(meta.className)) {
+  if (/\bbutton-like\b|\bcta\b|\bcard-link\b|\bnav-link\b|\bsite-nav\b/i.test(meta.className)) {
     return true;
   }
   if (meta.tagName === 'a' && meta.hrefOrAction) {
