@@ -142,12 +142,13 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("ALICE generated an AI proof receipt for the Black Ledger operator lane.");
 
-        Assert.Equal("Help prepared an update for the campaign city workspace path.", cleaned);
+        Assert.Equal("An update is ready for the campaign city.", cleaned);
         Assert.DoesNotContain("Alice", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("AI", cleaned, StringComparison.Ordinal);
         Assert.DoesNotContain("assistant", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("receipt", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("workspace path", cleaned, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

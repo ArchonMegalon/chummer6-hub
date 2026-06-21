@@ -68,9 +68,11 @@ public static partial class PublicFacingCopyHumanizer
         ("support posture", "support status"),
         ("release posture", "release status"),
         ("posture", "status"),
-        ("operator lane", "workspace path"),
+        ("operator lane", "workspace"),
         ("operators", "maintainers"),
         ("operator", "maintainer"),
+        ("campaign city workspace", "campaign city"),
+        ("workspace path", "workspace"),
         ("claim tickets", "pending claims"),
         ("claim ticket", "pending claim"),
         ("install ticket", "claim link"),
@@ -114,6 +116,7 @@ public static partial class PublicFacingCopyHumanizer
         cleaned = AUpdateRegex().Replace(cleaned, "an update");
         cleaned = ReviewPassedRegex().Replace(cleaned, "The return path is ready.");
         cleaned = HelpPreparedStatusRegex().Replace(cleaned, "help prepared an update");
+        cleaned = HelpPreparedUpdateForRegex().Replace(cleaned, "An update is ready for $1.");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         cleaned = cleaned.Trim();
@@ -163,6 +166,9 @@ public static partial class PublicFacingCopyHumanizer
 
     [GeneratedRegex(@"\bhelp\s+prepared\s+(?:a\s+)?status\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex HelpPreparedStatusRegex();
+
+    [GeneratedRegex(@"\bhelp\s+prepared\s+an?\s+update\s+for\s+(.+?)\.?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex HelpPreparedUpdateForRegex();
 
     [GeneratedRegex(@"\ba\s+update\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AUpdateRegex();
