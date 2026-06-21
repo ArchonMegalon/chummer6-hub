@@ -187,7 +187,7 @@
                     <p>@PublicChangelogText(card.Card.Summary)</p>
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                     {
-                        <p class="workflow-card__proof">@PublicChangelogText(card.Card.ProofNote)</p>
+                        <p class="workflow-card__note">@PublicChangelogText(card.Card.ProofNote)</p>
                     }
                     <a class="inline-link" href="@card.Action.Href">@PublicChangelogText(card.Action.Label)</a>
                 </div>

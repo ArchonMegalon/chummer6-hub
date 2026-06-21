@@ -66,6 +66,19 @@ def test_homepage_has_minimal_product_video_surface() -> None:
         assert forbidden not in landing
 
 
+def test_public_views_use_neutral_note_markup_instead_of_proof_markup() -> None:
+    public_views = [
+        "Chummer.Run.Api/Views/PublicLanding/Changelog.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/Feedback.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml",
+    ]
+
+    for view_path in public_views:
+        source = read(view_path)
+        assert "workflow-card__proof" not in source
+        assert "workflow-card__note" in source
+
+
 def test_participation_surface_uses_plain_character_helper_copy() -> None:
     participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
 
