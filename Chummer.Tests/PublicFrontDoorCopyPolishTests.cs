@@ -189,7 +189,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string publicFaq = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FAQ_REGISTRY.yaml"));
         string publicHelp = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_HELP_COPY.md"));
-        string combined = string.Join(Environment.NewLine, publicFaq, publicHelp);
+        string canonicalPublicHelp = File.ReadAllText(RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_HELP_COPY.md"));
+        string combined = string.Join(Environment.NewLine, publicFaq, publicHelp, canonicalPublicHelp);
 
         Assert.Contains("schedule and session details", publicFaq, StringComparison.Ordinal);
         Assert.Contains("## Public feedback", publicHelp, StringComparison.Ordinal);
@@ -217,6 +218,73 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         {
             Assert.DoesNotContain(forbidden, combined, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    [Fact]
+    public void Public_guide_policy_and_export_manifest_use_plain_source_copy()
+    {
+        string[] sources =
+        [
+            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_GUIDE_POLICY.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_GUIDE_POLICY.md"),
+            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_GUIDE_EXPORT_MANIFEST.yaml"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_GUIDE_EXPORT_MANIFEST.yaml")
+        ];
+
+        string combined = string.Join(Environment.NewLine, sources.Select(File.ReadAllText));
+
+        foreach (string forbidden in new[]
+        {
+            "proof shelf",
+            "preview-proof",
+            "first-party proofs",
+            "source of truth",
+            "help/support lane",
+            "support lane",
+            "operator jargon",
+            "public intake lanes",
+            "approved source packets",
+            "source-registry changes",
+            "generated guide output",
+            "Clear proof links",
+            "repo truth",
+            "public guide truth",
+            "AI-search",
+            "core_product` lanes",
+            "expansion_bet` lanes",
+            "folded_into_product` lanes",
+            "route through an explicit public-guide verdict",
+            "omission receipt",
+            "proof artifact",
+            "provider lane",
+            "runtime surface",
+            "media lanes",
+            "source overrides",
+            "public projections only",
+            "roadmap truth",
+            "first useful routes",
+            "operator state-machine terms",
+            "guided contribution lane",
+            "Chummer-owned source truth",
+            "release or availability proof",
+            "release matrix artifact",
+            "honest artifact format",
+            "bounded fallback and recovery routes",
+            "implementation-truth trailheads",
+            "future lanes"
+        })
+        {
+            Assert.DoesNotContain(forbidden, combined, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains("product homepage and invitation surface", combined, StringComparison.Ordinal);
+        Assert.Contains("preview cards or first-party pages", combined, StringComparison.Ordinal);
+        Assert.Contains("approved Chummer copy, screenshots, and release notes", combined, StringComparison.Ordinal);
+        Assert.Contains("Clear deeper links", combined, StringComparison.Ordinal);
+        Assert.Contains("generation report", combined, StringComparison.Ordinal);
+        Assert.Contains("public planning views", combined, StringComparison.Ordinal);
+        Assert.Contains("first useful pages", combined, StringComparison.Ordinal);
+        Assert.Contains("release or availability status", combined, StringComparison.Ordinal);
     }
 
     [Fact]
