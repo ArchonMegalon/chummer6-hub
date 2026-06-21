@@ -13,7 +13,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.Outputs.Take(3)", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.Outputs.Count - 3", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
-        Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("PublicText(output.ProvenanceSummary)", view, StringComparison.Ordinal);
         Assert.Contains("BuildLabOutputLaneLabel(output.Kind)", view, StringComparison.Ordinal);
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
         Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
@@ -34,7 +34,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Conditional state", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.SourceHintSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.SourceHintLines.Take(3)", view, StringComparison.Ordinal);
-        Assert.Contains("Source-linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("Linked hints:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.BuildSurfaceSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.BuildSurfaceLines.Take(4)", view, StringComparison.Ordinal);
         Assert.Contains("Build surface:", view, StringComparison.Ordinal);
@@ -48,7 +48,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner coverage", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Source hint:", view, StringComparison.Ordinal);
+        Assert.Contains("Hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.Summary", view, StringComparison.Ordinal);
     }
 
@@ -86,8 +86,8 @@ public sealed class AccountBuildLabHandoffViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Compatibility: @item.CompatibilitySummary", view, StringComparison.Ordinal);
-        Assert.Contains("Lineage: @item.LineageSummary", view, StringComparison.Ordinal);
+        Assert.Contains("Compatibility: @PublicText(item.CompatibilitySummary)", view, StringComparison.Ordinal);
+        Assert.Contains("Lineage: @PublicText(item.LineageSummary)", view, StringComparison.Ordinal);
     }
 
     [Fact]

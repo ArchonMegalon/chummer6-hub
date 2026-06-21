@@ -15,7 +15,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.DoesNotContain("Output lanes continue:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.Outputs.Count - 8", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
-        Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)", view, StringComparison.Ordinal);
         Assert.Contains("BuildLabOutputLaneLabel(output.Kind)", view, StringComparison.Ordinal);
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
         Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
@@ -33,8 +33,8 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Conditional note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Source-linked hints:", view, StringComparison.Ordinal);
-        Assert.Contains("Source hint:", view, StringComparison.Ordinal);
+        Assert.Contains("Linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("Hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.BuildSurfaceSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.BuildSurfaceLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Build surface:", view, StringComparison.Ordinal);
@@ -50,7 +50,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner note:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
-        Assert.Contains("Output source:", view, StringComparison.Ordinal);
+        Assert.Contains("Output details:", view, StringComparison.Ordinal);
         Assert.Contains("Output type:", view, StringComparison.Ordinal);
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
         Assert.Contains("Output status:", view, StringComparison.Ordinal);
