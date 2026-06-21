@@ -233,6 +233,61 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_copy_humanizer_cleans_black_ledger_command_jargon()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("Signal Deck command rail keeps governed consequence posture, receipts, and bounded aftermath on first-party rails.");
+
+        Assert.Equal("Signal Deck command path keeps reviewed consequence status, records, and limited aftermath on Chummer paths.", cleaned);
+        Assert.DoesNotContain("rail", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("governed", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("posture", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("receipt", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bounded", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Black_ledger_connected_lane_copy_avoids_internal_process_words()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string connectedLaneSource = string.Join(
+            '\n',
+            new[]
+            {
+                SliceSource(controller, "private static BlackLedgerFollowThroughPacketViewModel BuildLedgerFollowThroughPacket"),
+                SliceSource(controller, "private static BlackLedgerConnectedLanePacketViewModel BuildRunnerPassportConnectedLanePacket"),
+                SliceSource(controller, "private static BlackLedgerConnectedLanePacketViewModel BuildSignalDeckConnectedLanePacket"),
+                SliceSource(controller, "private static BlackLedgerConnectedLanePacketViewModel BuildLivingWorldConnectedLanePacket"),
+                SliceSource(controller, "private static BlackLedgerConnectedLanePacketViewModel BuildLedgerWorkspaceConnectedLanePacket"),
+                SliceSource(controller, "private static BlackLedgerTablePulsePacketViewModel BuildLedgerTablePulsePacket"),
+                SliceSource(controller, "private static BlackLedgerGmCockpitPacketViewModel BuildLedgerGmCockpitPacket")
+            });
+
+        foreach (string phrase in new[]
+                 {
+                     "command rail",
+                     "continuity rail",
+                     "aftermath rail",
+                     "Trust rail",
+                     "signed-in account lane",
+                     "first-party rails",
+                     "recipient lane",
+                     "promo rail",
+                     "advisory lane",
+                     "GM bounded",
+                     "private return lane",
+                     "world authority",
+                     "detached minigame truth",
+                     "governed consequence posture",
+                     "governed return-loop rail",
+                     "governed aftermath rail",
+                     "participation receipt(s)"
+                 })
+        {
+            Assert.DoesNotContain(phrase, connectedLaneSource, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
