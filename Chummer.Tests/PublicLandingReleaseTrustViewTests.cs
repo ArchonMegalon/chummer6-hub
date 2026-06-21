@@ -155,28 +155,27 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void PublicProductLiftFallbackRoutesStayHonestAcrossFeedbackRoadmapAndShippedProof()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
-        string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string changelogViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
-        string feedbackView = File.ReadAllText(feedbackViewPath);
         string roadmapView = File.ReadAllText(roadmapViewPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
-        Assert.Contains("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("private const string DefaultProductLiftFeedbackUrl = \"https://chummer6.productlift.dev\";", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult ParticipatePage()", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
+        Assert.Contains("ProductLiftFeedbackUrlEnvironmentVariable", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Changelog.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildRoadmapMilestones()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
-        Assert.Contains("route-anchor-target", feedbackView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Votes show demand. Chummer decides what ships. Good reports include context and reproduction steps.", feedbackView, StringComparison.Ordinal);
-        Assert.Contains("Public by default", feedbackView, StringComparison.Ordinal);
-        Assert.Contains("No private logs", feedbackView, StringComparison.Ordinal);
         Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Open milestones", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Shipped updates", changelogView, StringComparison.Ordinal);

@@ -32,6 +32,8 @@ public sealed class PublicLandingController : Controller
 {
     private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
+    private const string ProductLiftFeedbackUrlEnvironmentVariable = "CHUMMER_PRODUCTLIFT_FEEDBACK_URL";
+    private const string DefaultProductLiftFeedbackUrl = "https://chummer6.productlift.dev";
 
     private readonly PublicLandingService _landing;
     private readonly FlipLinkDocumentPortalService _flipLinkDocumentPortal;
@@ -2019,15 +2021,8 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/participate")]
     [Produces("text/html")]
-    public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
-    {
-        var model = await BuildParticipatePageModel(
-            title: "Participate",
-            description: "Public product signal stays visible here, while signed-in contribution access remains optional and account-linked.",
-            currentPath: "/participate",
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/Participate.cshtml", model);
-    }
+    public IActionResult ParticipatePage()
+        => Redirect(ResolveProductLiftFeedbackUrl());
 
     [HttpGet("/participate/build-ghosts")]
     [Produces("text/html")]
@@ -3795,19 +3790,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/feedback")]
     [Produces("text/html")]
-    public async Task<IActionResult> FeedbackPage(CancellationToken cancellationToken)
-    {
-        var model = await BuildParticipatePageModel(
-            title: "Feedback",
-            description: "Public ideas, votes, safe bug reports, and shipped follow-up stay on a dedicated first-party signal rail.",
-            currentPath: "/feedback",
-            cancellationToken);
-        return View("~/Views/PublicLanding/Feedback.cshtml", model);
-    }
+    public IActionResult FeedbackPage()
+        => Redirect(ResolveProductLiftFeedbackUrl());
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
-        => Redirect("/feedback");
+        => Redirect(ResolveProductLiftFeedbackUrl());
 
     [HttpPost("/feedback/providers/productlift/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
@@ -8458,6 +8446,18 @@ Boundary:
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
         return _campaignSpine.GetAccountSummary(user, installLinking);
+    }
+
+    private string ResolveProductLiftFeedbackUrl()
+    {
+        string configured = (_configuration[ProductLiftFeedbackUrlEnvironmentVariable] ?? string.Empty).Trim();
+        if (Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+        {
+            return uri.ToString();
+        }
+
+        return DefaultProductLiftFeedbackUrl;
     }
 
     private async Task<ParticipatePageViewModel> BuildParticipatePageModel(
