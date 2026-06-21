@@ -454,7 +454,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Use this page", liveProof, StringComparison.Ordinal);
         Assert.Contains("Useful cues", liveProof, StringComparison.Ordinal);
+        Assert.Contains("Use your signed-in detail view", liveProof, StringComparison.Ordinal);
         Assert.Contains("signed-in detail view", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail trail", liveProof, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof shelf", liveProof, StringComparison.Ordinal);
         Assert.DoesNotContain("Verification markers", liveProof, StringComparison.Ordinal);
 
@@ -466,6 +468,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("signed-in detail view", roadmap, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", roadmap, StringComparison.Ordinal);
+        Assert.DoesNotContain("dead external handoff", roadmap, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

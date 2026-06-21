@@ -520,7 +520,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "Recent bounded drilldown",
             "Composite bounded receipt match",
             "full feedback rail",
-            "source receipt id, dispatch receipt id"
+            "source receipt id, dispatch receipt id",
+            "detail trail",
+            "dead external handoff"
         ];
 
         foreach (string file in sourceFiles)

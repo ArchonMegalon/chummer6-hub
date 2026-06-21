@@ -339,7 +339,7 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Travel note" in account
     assert "Prep note" in account
     assert "Package note" in account
-    assert "Linked hints" in account
+    assert "Hint: @sourceHintLine" in account
     assert "You do not currently manage a campaign" in account
     assert "No reviewed season or event activity is attached yet." in account
     assert "A participation event was saved." in account
@@ -432,7 +432,7 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
 
     assert "Original item" in feedback_operations
     assert "Open related details" in feedback_operations
-    assert "Open related data" in feedback_operations
+    assert "Download related data" in feedback_operations
     assert "posted follow-up update" in signal_operations
     assert "message update" in feedback_operations
     assert "follow-up update" in feedback_operations
@@ -472,7 +472,6 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
-    assert "Linked hints" in home
     assert "Hint: @sourceHintLine" in home
 
 
@@ -567,4 +566,4 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "Open activity" in package_detail
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Details</span>" in publication
-    assert "required detail" in publication
+    assert "supporting detail" in publication
