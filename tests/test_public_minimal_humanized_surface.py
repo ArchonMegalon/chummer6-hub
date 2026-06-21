@@ -642,7 +642,7 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "Open activity" in package_detail
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Details</span>" in publication
-    assert "supporting detail" in publication
+    assert "related detail" in publication
 
 
 def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -> None:
@@ -747,3 +747,30 @@ def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy()
     assert "Shared publications with limited detail" in shelf
     assert "shorter public summary" in shelf
     assert "Broader comparisons return when they are useful and current." in shelf
+
+
+def test_publication_detail_page_uses_plain_labels() -> None:
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+
+    for forbidden in (
+        "Limited public state",
+        "Route:",
+        "Known issues nearby",
+        "No fake build path",
+        "No auth wall for discovery",
+        "Current desktop coverage still keeps this public wording limited.",
+        "Trust</span>",
+        "Lineage</span>",
+        "supporting detail",
+    ):
+        assert forbidden not in publication
+
+    assert "Limited detail" in publication
+    assert "Page: @routeStateLabel" in publication
+    assert "Install notes nearby" in publication
+    assert "Clear install path" in publication
+    assert "Public discovery stays open" in publication
+    assert "Some desktop work is still open, so this public summary stays short." in publication
+    assert "Status</span>" in publication
+    assert "History</span>" in publication
+    assert "related detail" in publication

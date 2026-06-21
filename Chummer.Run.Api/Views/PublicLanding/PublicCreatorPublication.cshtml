@@ -4,7 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
-    // Current direct route records still keep public comparison language limited.
+    // Keep comparisons narrow until the related page records are current.
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -51,7 +51,7 @@
 
     string PublicationAvailabilityLabel(bool discoverable)
         => publicationRouteReviewRequired && discoverable
-            ? "Limited public state"
+            ? "Limited detail"
             : discoverable
                 ? "Ready now"
                 : "Limited release";
@@ -61,7 +61,7 @@
         : "Why this publication is live";
     var publicationPostureCopy = publicationRouteReviewRequired
         ? "This page keeps the useful detail and next step together while public availability stays limited."
-        : "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.";
+        : "This page keeps discovery, status, comparison, history, moderation, and the next step together instead of scattering them across separate pages.";
     var routeStateLabel = HumanizeStatus(Model.RouteState, "Limited");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
@@ -100,7 +100,7 @@
             Summary = "The publication page should never compete with the recommended build, platform status, or install help. Downloads still owns that decision.",
             Href = "/downloads",
             Label = "Open downloads",
-            Details = new[] { "Install path", "Known issues nearby", "No fake build path" }
+            Details = new[] { "Install path", "Install notes nearby", "Clear install path" }
         },
         new
         {
@@ -113,7 +113,7 @@
             Label = signedInShelfLabel,
             Details = Model.Chrome.Authenticated
                 ? new[] { "Personal and campaign returns", "Creator next steps", "Same detail view" }
-                : new[] { "Public first", "Account adds return paths", "No auth wall for discovery" }
+                : new[] { "Public first", "Account adds return paths", "Public discovery stays open" }
         },
         new
         {
@@ -170,12 +170,12 @@
             <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
             <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
             <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
-            <span>Route: @routeStateLabel</span>
+            <span>Page: @routeStateLabel</span>
         </div>
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
-            <p class="muted-copy">Current desktop coverage still keeps this public wording limited.</p>
+            <p class="muted-copy">Some desktop work is still open, so this public summary stays short.</p>
         }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
@@ -200,7 +200,7 @@
             <p>@PublicPublicationText(Model.Publication.ProvenanceSummary)</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Trust</span>
+            <span class="tag">Status</span>
             <p>@PublicPublicationText(Model.Publication.TrustSummary, "Status is not available yet.")</p>
         </article>
         <article class="trust-rail">
@@ -216,12 +216,12 @@
             }
             else
             {
-                <p class="muted-copy">This publication stays limited until a current public update is attached.</p>
+                <p class="muted-copy">This publication stays brief until a current public update is attached.</p>
             }
         </article>
         <article class="trust-rail">
             <span class="tag">Supporting details</span>
-            <p>@Model.RequiredReceiptRefs.Count supporting detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") available.</p>
+            <p>@Model.RequiredReceiptRefs.Count related detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") available.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {
@@ -233,7 +233,7 @@
         @if (!string.IsNullOrWhiteSpace(Model.Publication.LineageSummary))
         {
             <article class="trust-rail">
-                <span class="tag">Lineage</span>
+                <span class="tag">History</span>
                 <p>@PublicPublicationText(Model.Publication.LineageSummary)</p>
             </article>
         }

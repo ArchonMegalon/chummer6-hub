@@ -1090,7 +1090,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string shelfView = File.ReadAllText(shelfViewPath);
 
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Limited public state", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Limited detail", publicationView, StringComparison.Ordinal);
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", shelfView, StringComparison.Ordinal);
         Assert.Contains("Limited detail", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("review-required", shelfView, StringComparison.Ordinal);
@@ -1109,7 +1109,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Use this page to inspect the publication, then move to the page that owns the next job.", publicationView, StringComparison.Ordinal);
         Assert.Contains("Open detail view", publicationView, StringComparison.Ordinal);
         Assert.Contains("Supporting details", publicationView, StringComparison.Ordinal);
-        Assert.Contains("supporting detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : \"s\") available.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("related detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : \"s\") available.", publicationView, StringComparison.Ordinal);
         Assert.Contains("This page is linked to the current publication history.", publicationView, StringComparison.Ordinal);
         Assert.Contains("PublicPublicationText(Model.Publication.ProvenanceSummary)", publicationView, StringComparison.Ordinal);
         Assert.Contains("PublicPublicationText(Model.Publication.LineageSummary)", publicationView, StringComparison.Ordinal);

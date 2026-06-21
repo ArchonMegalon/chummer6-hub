@@ -25,7 +25,7 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
         self.assertIn("publicationRouteReviewRequired", source)
         self.assertIn("Why this publication is still limited", source)
-        self.assertIn("Current desktop coverage still keeps this public wording limited.", source)
+        self.assertIn("Some desktop work is still open, so this public summary stays short.", source)
 
     def test_publication_shelf_view_switches_discovery_copy_when_route_is_review_required(self) -> None:
         source = SHELF_VIEW.read_text(encoding="utf-8")
