@@ -42,6 +42,8 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("Open notification history", accountView, StringComparison.Ordinal);
         Assert.Contains("Open turn review", accountView, StringComparison.Ordinal);
         Assert.Contains("Open turn review", notificationsView, StringComparison.Ordinal);
+        Assert.Contains("Current turn details", accountView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current world-turn packet", accountView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Inbox queue", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Actual messages, not just status", notificationsView, StringComparison.Ordinal);
         Assert.Contains("pressure, not people", ledgerView, StringComparison.Ordinal);

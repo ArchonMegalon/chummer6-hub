@@ -831,6 +831,7 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
         "public globe route",
         "Open watch route",
         "Major and challenger routes",
+        "Current world-turn packet",
     ):
         assert forbidden not in combined
 
@@ -841,6 +842,7 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
     assert "Use the inbox as the Table Pulse Live entry point" in notifications
     assert "public globe page" in ledger
     assert "Open watch page" in ledger
+    assert "Current turn details" in account_home
     assert "signed-in page that mails and inbox items point back to" in advisory
     assert "Major and challenger paths" in onboarding
 
