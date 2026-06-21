@@ -801,6 +801,36 @@ def test_public_release_copy_uses_install_notes_instead_of_issue_checking_langua
     assert "easier to use" in feature_live
 
 
+def test_now_page_cleans_dynamic_public_copy_before_rendering() -> None:
+    now = read("Chummer.Run.Api/Views/PublicLanding/Now.cshtml")
+
+    for expected in (
+        "static string PublicNowText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicNowText(Model.ReleaseExperience.ReleaseNotesSummary)",
+        "@PublicNowText(Model.ReleaseExperience.KnownIssuesLabel)",
+        "@PublicNowText(Model.ReleaseExperience.UpdatePostureSummary)",
+        "@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)",
+        "<h3>@PublicNowText(card.Card.Title)</h3>",
+        "<p>@PublicNowText(card.Card.Summary)</p>",
+        "@PublicNowText(card.Card.ProofNote)",
+        "@PublicNowText(card.Action.Label)",
+        "@PublicNowText(overlay.Title)",
+    ):
+        assert expected in now
+
+    for forbidden in (
+        "<p>@Model.ReleaseExperience.ReleaseNotesSummary</p>",
+        ">@Model.ReleaseExperience.KnownIssuesLabel</a>",
+        "@PublicFacingCopyHumanizer.Clean(Model.ReleaseExperience.UpdatePostureSummary)",
+        "<span class=\"tag\">@card.Card.Badge</span>",
+        "<h3>@card.Card.Title</h3>",
+        "<p>@card.Card.Summary</p>",
+        ">@card.Action.Label</a>",
+        "<span>@overlay.Title</span>",
+    ):
+        assert forbidden not in now
+
+
 def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy() -> None:
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
 

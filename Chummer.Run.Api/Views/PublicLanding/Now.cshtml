@@ -38,6 +38,8 @@
             .ToUniversalTime()
             .ToString("yyyy-MM-dd");
 
+    static string PublicNowText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
     string ContextualPreviewHref(string? href)
     {
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
@@ -146,7 +148,7 @@
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>Current release</h3>
-                    <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
+                    <p>@PublicNowText(Model.ReleaseExperience.ReleaseNotesSummary)</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
             </article>
@@ -155,12 +157,12 @@
                     <h3>Install notes and help</h3>
                     <p>Use download help before you commit a fresh device to the current downloads page.</p>
                 </div>
-                <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+                <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@PublicNowText(Model.ReleaseExperience.KnownIssuesLabel)</a>
             </article>
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>Update path</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(Model.ReleaseExperience.UpdatePostureSummary)</p>
+                    <p>@PublicNowText(Model.ReleaseExperience.UpdatePostureSummary)</p>
                 </div>
                 <span class="readiness-tag">@Model.ReleaseExperience.Display.ChannelLabel</span>
             </article>
@@ -192,14 +194,14 @@
                     </div>
                 }
                 <div class="workflow-card__copy">
-                    <span class="tag">@card.Card.Badge</span>
-                    <h3>@card.Card.Title</h3>
-                    <p>@card.Card.Summary</p>
+                    <span class="tag">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                    <h3>@PublicNowText(card.Card.Title)</h3>
+                    <p>@PublicNowText(card.Card.Summary)</p>
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                     {
-                        <p class="workflow-card__note">@PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
+                        <p class="workflow-card__note">@PublicNowText(card.Card.ProofNote)</p>
                     }
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    <a class="inline-link" href="@card.Action.Href">@PublicNowText(card.Action.Label)</a>
                 </div>
             </article>
         }
@@ -217,11 +219,11 @@
                     {
                         <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
                             <div class="evidence-row__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
+                                <h3>@PublicNowText(card.Card.Title)</h3>
+                                <p>@PublicNowText(card.Card.Summary)</p>
                             </div>
                             <span class="readiness-tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                            <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
+                            <a class="button-like button-like--ghost" href="@card.Action.Href">@PublicNowText(card.Action.Label)</a>
                         </article>
                     }
                 </div>
@@ -239,7 +241,7 @@
         <div class="trust-claim__details">
             @foreach (var overlay in signedInBenefits)
             {
-                <span>@overlay.Title</span>
+                <span>@PublicNowText(overlay.Title)</span>
             }
         </div>
     }
