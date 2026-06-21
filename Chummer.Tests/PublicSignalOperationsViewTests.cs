@@ -66,13 +66,15 @@ public sealed class PublicSignalOperationsViewTests
     }
 
     [Fact]
-    public void LookupViewSurfacesSearchControlsAndBoundedResults()
+    public void LookupViewSurfacesSearchControlsAndPrivateFeedbackResults()
     {
         string lookupViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeedbackOperationsLookup.cshtml");
         string lookupView = File.ReadAllText(lookupViewPath);
 
         Assert.Contains("@model PublicSignalOperationsLookupPageViewModel", lookupView, StringComparison.Ordinal);
-        Assert.Contains("Open bounded lookup", lookupView, StringComparison.Ordinal);
+        Assert.Contains("Search feedback", lookupView, StringComparison.Ordinal);
+        Assert.Contains("Private details stay private", lookupView, StringComparison.Ordinal);
+        Assert.DoesNotContain("bounded", lookupView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Open lookup data", lookupView, StringComparison.Ordinal);
         Assert.Contains("Lookup results", lookupView, StringComparison.Ordinal);
         Assert.Contains("Items and threads", lookupView, StringComparison.Ordinal);

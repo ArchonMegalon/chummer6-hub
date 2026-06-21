@@ -18,10 +18,10 @@
     <p class="muted-copy">Search by item id, message id, recipient ref, address hash, delivery id, or item reference.</p>
 </section>
 
-<section class="status-decision-strip" aria-label="Bounded lookup controls">
+<section class="status-decision-strip" aria-label="Feedback lookup controls">
     <article class="status-decision-strip__card">
         <span class="tag">Lookup controls</span>
-        <h2>Search one bounded area instead of scanning the whole archive.</h2>
+        <h2>Search one saved feedback area instead of scanning the whole archive.</h2>
         <form class="auth-form" method="get" action="/feedback/operations/lookup">
             <label class="field" for="feedbackOperationsLookupQuery">
                 <span>Search query</span>
@@ -36,7 +36,7 @@
                 </select>
             </label>
             <div class="stacked-actions">
-                <button class="button-like button-like--secondary" type="submit">Open bounded lookup</button>
+                <button class="button-like button-like--secondary" type="submit">Search feedback</button>
                 <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open lookup data</a>
             </div>
         </form>
@@ -47,7 +47,7 @@
         <p>@lookup.ResultCount result@(lookup.ResultCount == 1 ? string.Empty : "s") are currently in view.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Bounded only</span>
+        <span class="tag">Private details stay private</span>
         <h2>Lookup stays inside Chummer history and hashed identity.</h2>
         <p>No raw delivery payload body, no raw recipient email, and no public claim beyond the saved state.</p>
     </article>
@@ -57,13 +57,13 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Lookup results</p>
         <h2 class="editorial-title">Recent results and exact matches share one public-safe page.</h2>
-        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across saved items and recipient threads using Chummer identifiers only.</p>
+        <p class="editorial-copy">When no query is present, this page shows recent saved feedback areas. When a query is present, it narrows the search across saved items and recipient threads using Chummer identifiers only.</p>
     </div>
     @if (results.Length == 0)
     {
         <div class="route-choice-grid">
             <article class="route-choice-card">
-                <span class="tag">No bounded match</span>
+                <span class="tag">No match</span>
                 <h3>No item or thread matched this query</h3>
                 <p>Try an item id, dispatch id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
             </article>
