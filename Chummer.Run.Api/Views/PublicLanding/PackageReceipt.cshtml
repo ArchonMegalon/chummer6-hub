@@ -1,6 +1,6 @@
 @model PackageActionReceiptPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicPackageText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-package-receipt";
 
@@ -11,7 +11,7 @@
             return string.Empty;
         }
 
-        return value
+        return PublicFacingCopyHumanizer.Clean(value)
             .Replace("receipts", "updates", StringComparison.OrdinalIgnoreCase)
             .Replace("receipt", "update", StringComparison.OrdinalIgnoreCase)
             .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
@@ -32,10 +32,10 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicPackageText(Model.PrimaryAction.Label)</a>
         @if (Model.SecondaryAction is not null)
         {
-            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@PublicPackageText(Model.SecondaryAction.Label)</a>
         }
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
@@ -50,11 +50,11 @@
     <div class="continuity-band__panel">
         <article class="continuity-band__fact">
             <span>Actor</span>
-            <strong>@Model.Receipt.ActorLabel</strong>
+            <strong>@PublicPackageText(Model.Receipt.ActorLabel)</strong>
         </article>
         <article class="continuity-band__fact">
             <span>Package</span>
-            <strong>@Model.Package.Title</strong>
+            <strong>@PublicPackageText(Model.Package.Title)</strong>
         </article>
         <article class="continuity-band__fact">
             <span>Recorded</span>
@@ -74,7 +74,7 @@
             <span class="tag">Package detail</span>
             <h3>Return to the package page</h3>
             <p>Keep class, compatibility, and package status attached to the same detail page.</p>
-            <a class="editorial-strip__action" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="editorial-strip__action" href="@Model.PrimaryAction.Href">@PublicPackageText(Model.PrimaryAction.Label)</a>
         </article>
         @if (Model.SecondaryAction is not null)
         {
@@ -82,7 +82,7 @@
                 <span class="tag">Account page</span>
                 <h3>Keep tracked package work together</h3>
                 <p>Use the account package page when you want your follows, votes, and later return path to stay grouped.</p>
-                <a class="editorial-strip__action" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+                <a class="editorial-strip__action" href="@Model.SecondaryAction.Href">@PublicPackageText(Model.SecondaryAction.Label)</a>
             </article>
         }
         <article class="route-choice-card">

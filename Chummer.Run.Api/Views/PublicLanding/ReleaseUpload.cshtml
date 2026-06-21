@@ -4,6 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
     var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
+    static string PublicReleaseUploadText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="recommended-download" id="release-upload-command">
@@ -49,8 +50,8 @@
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Signed-in release upload</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Summary</p>
+        <h1 class="page-title">@PublicReleaseUploadText(Model.Heading)</h1>
+        <p class="page-copy">@PublicReleaseUploadText(Model.Summary)</p>
         <p class="release-stage__note">
             This page handles release upload in Chummer: one authenticated access code, one setup command, and one recovery-aware status path.
         </p>
@@ -88,7 +89,7 @@
     <article class="release-guidance__item">
         <span class="tag tag--quiet">Windows too</span>
         <h2>Same endpoint, same contract</h2>
-        <p>@Model.WindowsUploadNote</p>
+        <p>@PublicReleaseUploadText(Model.WindowsUploadNote)</p>
         <ul class="trust-page-section__list">
             <li>Upload endpoint: <a href="@Model.UploadUrl">@Model.UploadUrl</a></li>
             <li>Runbook: <a href="@Model.ReadmeUrl">@Model.ReadmeUrl</a></li>

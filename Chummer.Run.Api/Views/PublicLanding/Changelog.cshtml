@@ -182,7 +182,7 @@
                     </div>
                 }
                 <div class="workflow-card__copy">
-                    <span class="tag">@card.Card.Badge</span>
+                    <span class="tag">@PublicChangelogText(card.Card.Badge)</span>
                     <h3>@PublicChangelogText(card.Card.Title)</h3>
                     <p>@PublicChangelogText(card.Card.Summary)</p>
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))

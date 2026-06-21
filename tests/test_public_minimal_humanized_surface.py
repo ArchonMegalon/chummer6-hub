@@ -999,6 +999,18 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
     ):
         assert forbidden not in combined
 
+    assert "static string PublicReleaseUploadText(string? value) => PublicFacingCopyHumanizer.Clean(value);" in release_upload
+    assert "@PublicReleaseUploadText(Model.Heading)" in release_upload
+    assert "@PublicReleaseUploadText(Model.Summary)" in release_upload
+    assert "@PublicReleaseUploadText(Model.WindowsUploadNote)" in release_upload
+
+    for forbidden in (
+        "<h1 class=\"page-title\">@Model.Heading</h1>",
+        "<p class=\"page-copy\">@Model.Summary</p>",
+        "<p>@Model.WindowsUploadNote</p>",
+    ):
+        assert forbidden not in release_upload
+
     assert "participation history" in codex
     assert "keeps the history" in codex
     assert "desktop app" in release_upload
@@ -1014,9 +1026,10 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
 def test_package_and_publication_pages_use_activity_and_details_language() -> None:
     packages = read("Chummer.Run.Api/Views/PublicLanding/Packages.cshtml")
     package_detail = read("Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml")
+    package_receipt = read("Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml")
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
-    combined = "\n".join((packages, package_detail, shelf, publication))
+    combined = "\n".join((packages, package_detail, package_receipt, shelf, publication))
 
     for forbidden in (
         "Your recent package records",
@@ -1036,6 +1049,12 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "Recent activity" in package_detail
     assert "Open activity" in package_detail
     assert "@PublicPackageText(receipt.ActorLabel)" in packages
+    assert 'ViewData["Title"] = PublicPackageText(Model.Heading);' in package_receipt
+    assert "PublicFacingCopyHumanizer.Clean(value)" in package_receipt
+    assert "@PublicPackageText(Model.PrimaryAction.Label)" in package_receipt
+    assert "@PublicPackageText(Model.SecondaryAction.Label)" in package_receipt
+    assert "@PublicPackageText(Model.Receipt.ActorLabel)" in package_receipt
+    assert "@PublicPackageText(Model.Package.Title)" in package_receipt
     assert "@PublicPackageText(Model.PrimaryAction.Label)" in package_detail
     assert "@PublicPackageText(Model.SecondaryAction.Label)" in package_detail
     assert "@PublicPackageText(Model.VoteActionLabel)" in package_detail
@@ -1047,6 +1066,10 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "@Model.SecondaryAction.Label" not in package_detail
     assert "@Model.VoteActionLabel" not in package_detail
     assert "@Model.FollowActionLabel" not in package_detail
+    assert "@Model.PrimaryAction.Label" not in package_receipt
+    assert "@Model.SecondaryAction.Label" not in package_receipt
+    assert "@Model.Receipt.ActorLabel" not in package_receipt
+    assert "@Model.Package.Title" not in package_receipt
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Details</span>" in publication
     assert "related detail" in publication
@@ -1095,6 +1118,8 @@ def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -
     assert "Video: Chummer motion" in ledger
     assert "Video: Chummer motion" in ledger_onboarding
     assert "product improvements" in changelog
+    assert "@PublicChangelogText(card.Card.Badge)" in changelog
+    assert "<span class=\"tag\">@card.Card.Badge</span>" not in changelog
 
 
 def test_public_pages_use_plain_promises_and_summaries_instead_of_claim_jargon() -> None:
