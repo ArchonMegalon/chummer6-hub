@@ -394,8 +394,11 @@ public sealed class PublicPrivacyBoundaryService
     private static IReadOnlyList<string> HeadingAliases(string heading)
         => heading switch
         {
-            "Help tool traces" => ["Help and assistant service traces"],
-            "Help tool surfaces" => ["Help and assistant surfaces"],
+            "Support cases" => ["Support-case truth"],
+            "Help tool traces" => ["Help and assistant service traces", "Provider traces and assistant grounding packs"],
+            "Help and assistant service traces" => ["Provider traces and assistant grounding packs"],
+            "Help tool surfaces" => ["Help and assistant surfaces", "Provider-backed assistant surfaces"],
+            "Help and assistant surfaces" => ["Provider-backed assistant surfaces"],
             _ => Array.Empty<string>()
         };
 

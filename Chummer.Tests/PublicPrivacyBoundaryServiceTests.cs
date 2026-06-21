@@ -40,6 +40,22 @@ public sealed class PublicPrivacyBoundaryServiceTests
         Assert.Equal(3, document.RootElement.GetProperty("surfaceRules").GetArrayLength());
     }
 
+    [Fact]
+    public void BuildPanelAlsoReadsProductionDesignPrivacyHeadings()
+    {
+        using var fixture = new PublicPrivacyBoundaryFixture();
+        fixture.WriteSupportFiles();
+        fixture.WriteProductionDesignPrivacyBoundaries();
+
+        var panel = fixture.CreateService().BuildPanel("help");
+
+        Assert.Equal("Support and feedback data expire on a clear schedule", panel.Heading);
+        Assert.Equal("/privacy", panel.PrimaryAction.Href);
+        Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Support cases", StringComparison.Ordinal) && item.RetentionSummary.Contains("18 months", StringComparison.Ordinal));
+        Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Help tools", StringComparison.Ordinal) && item.RetentionSummary.Contains("30 days", StringComparison.Ordinal));
+        Assert.Contains(panel.SurfaceRules, static item => string.Equals(item.Label, "Help tools", StringComparison.Ordinal) && item.Summary.Contains("curated canonical sources", StringComparison.Ordinal));
+    }
+
     private sealed class PublicPrivacyBoundaryFixture : IDisposable
     {
         private readonly string _root;
@@ -182,6 +198,84 @@ public_routes:
   - path: /contact
 registered_routes:
   - path: /progress
+""");
+        }
+
+        public void WriteProductionDesignPrivacyBoundaries()
+        {
+            string productRoot = Path.Combine(_canonRoot, ".codex-design", "product");
+            File.WriteAllText(
+                Path.Combine(productRoot, "PRIVACY_AND_RETENTION_BOUNDARIES.md"),
+                """
+# Privacy and retention boundaries
+
+## Retention domains
+
+### Support-case truth
+
+Owner: `chummer6-hub`
+
+Retention posture:
+
+* case timeline and user-visible status events: retain for 18 months after the last state change
+
+Redaction baseline:
+
+* remove secrets, local paths, and unrelated identity data from user-visible case history
+
+### Claim and install linkage
+
+Owner: `chummer6-hub` plus `chummer6-hub-registry`
+
+Retention posture:
+
+* claim tickets and install-link events: retain for 365 days after last install activity
+
+Redaction baseline:
+
+* keep person, install, device-role, and campaign scopes explicit instead of flattening them into a single sync blob
+
+### Survey and follow-up results
+
+Owner: `chummer6-hub`
+
+Retention posture:
+
+* post-fix follow-up invites and answer summaries: retain for 365 days
+
+Redaction baseline:
+
+* keep survey truth out of public guide copy until synthesized into canon
+
+### Provider traces and assistant grounding packs
+
+Owner: `executive-assistant` plus the owning product surface
+
+Retention posture:
+
+* raw provider request/response traces: retain for 30 days unless a narrower provider contract says less
+* lane-level scorecards, challenger briefs, and grounding-pack summaries: retain for 180 days
+
+Redaction baseline:
+
+* grounding packs should prefer case IDs, release IDs, and rule receipt IDs over raw user text where possible
+
+## Surface redaction rules
+
+### Public surfaces
+
+* may expose support status, known issues, release posture, compatibility, provenance, and channel-aware fix availability
+* may not expose private case notes, raw crash envelopes, provider traces, or account-internal survey payloads
+
+### Signed-in user surfaces
+
+* may expose case timeline, install posture, claimed-device state, and the user-safe slice of crash/support data
+* may not expose unrelated reporter data, operator-only packet deliberation, or private moderation notes
+
+### Provider-backed assistant surfaces
+
+* must ground answers in curated canonical sources, registry truth, or support-case truth
+* must not become the system of record for support or release state
 """);
         }
 
