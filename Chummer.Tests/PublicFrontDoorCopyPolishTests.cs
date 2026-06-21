@@ -112,7 +112,40 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                 "After-action packet",
                 "optional-acceleration lane",
                 "Open the acceleration receipt",
-                "capability and policy packet rails"
+                "capability and policy packet rails",
+                "source traces and modifier trails",
+                "artifact bundles with provenance",
+                "mobile and PWA projection lane",
+                "desktop rules truth",
+                "package routes",
+                "losing Chummer provenance",
+                "approved origin canon into contacts, debts, scars, secrets, media packets",
+                "one noisy lane",
+                "Open the governed rules lane",
+                "public route instead of only research wording",
+                "severing provenance",
+                "mission packets",
+                "first-party rail",
+                "first-class artifacts",
+                "signed-in return rails",
+                "trusted lanes",
+                "Hidden lab route",
+                "event trail",
+                "truthful channel label",
+                "Inspect the runsite pack",
+                "credible mission packet",
+                "Inspect the dossier brief",
+                "Inspect the campaign primer",
+                "Inspect the primer-video lane",
+                "approved run packets",
+                "Inspect the mission-brief lane",
+                "Inspect the after-action preview",
+                "Projection only",
+                "Public roadmap projection",
+                "artifact proof",
+                "Closeout proof",
+                "governed discovery packets",
+                "product review routing"
             })
             {
                 Assert.DoesNotContain(forbidden, registry, StringComparison.Ordinal);
@@ -138,6 +171,16 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("Open the replay page", registry, StringComparison.Ordinal);
             Assert.Contains("LOCAL CO-PROCESSOR now has a named public page", registry, StringComparison.Ordinal);
             Assert.Contains("Open the acceleration details", registry, StringComparison.Ordinal);
+            Assert.Contains("Publish primers, briefing reels, and bundles without losing context.", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the continuity page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the rules page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the runsite pack", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the primer video", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the mission brief", registry, StringComparison.Ordinal);
+            Assert.Contains("Public roadmap", registry, StringComparison.Ordinal);
+            Assert.Contains("Roadmap cards are planning signals", registry, StringComparison.Ordinal);
+            Assert.Contains("Chummer checks the update before voter notifications are sent.", registry, StringComparison.Ordinal);
+            Assert.Contains("focused discovery with first-party prompts", registry, StringComparison.Ordinal);
         }
     }
 
