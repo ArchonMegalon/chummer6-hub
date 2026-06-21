@@ -103,8 +103,8 @@ public sealed class HubPageChromeServiceTests
             "ALICE generated an AI proof receipt for the Black Ledger operator lane.",
             "/status");
 
-        Assert.Equal("campaign city status", chrome.Title);
-        Assert.Equal("character help created a status for the campaign city user path.", chrome.Description);
+        Assert.Equal("Campaign city status", chrome.Title);
+        Assert.Equal("An update is ready for the campaign city.", chrome.Description);
         Assert.DoesNotContain("Alice", chrome.Description, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("AI", chrome.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("proof", chrome.Description, StringComparison.OrdinalIgnoreCase);
