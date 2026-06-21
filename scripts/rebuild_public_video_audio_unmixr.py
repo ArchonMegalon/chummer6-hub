@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import math
@@ -10,6 +11,8 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,20 +38,26 @@ SILENCE_GATE_DBFS = -42.0
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
+UNMIXR_VOICE_DISCOVERY_API = "https://unmixr.com/api/v1/voice-list/"
+DEFAULT_PREMIUM_VOICE_LABEL = "Blue"
+ALICE_PREMIUM_FEMALE_VOICE_LABEL = "Ava"
+UNMIXR_VOICE_POLICY = "unmixr_premium_required_no_edge_fallback"
+ALICE_VOICE_POLICY = "unmixr_premium_female_required_no_edge_fallback"
+VOICE_DISCOVERY_FIELDS = "uuid,character,gender,language,quality,use_cases,is_available"
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
     "UNMIXR_NARRATOR_VOICE_ID",
-    "UNMIXR_VOICE_ID",
 )
 
 VOICE_ENV_BY_GROUP = {
     ALICE_CLEAN_AUDIO_GROUP: (
         "UNMIXR_ALICE_VOICE_ID",
         "UNMIXR_FEMALE_NARRATOR_VOICE_ID",
-        *DEFAULT_VOICE_ENV_KEYS,
     ),
 }
+
+_UNMIXR_DISCOVERY_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 @dataclass(frozen=True)
 class VideoGroup:
@@ -62,6 +71,10 @@ class VideoGroup:
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
 
 
 def run(*command: str, capture: bool = False) -> str:
@@ -104,22 +117,115 @@ def load_legacy_audio_module() -> Any:
 LEGACY = load_legacy_audio_module()
 
 
+def _voice_id_sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest() if value else ""
+
+
+def _unmixr_voice_policy_for_group(group_key: str) -> str:
+    return ALICE_VOICE_POLICY if group_key == ALICE_CLEAN_AUDIO_GROUP else UNMIXR_VOICE_POLICY
+
+
+def _preferred_unmixr_voice_label(group_key: str) -> str:
+    env_key = "UNMIXR_ALICE_PREMIUM_VOICE_LABEL" if group_key == ALICE_CLEAN_AUDIO_GROUP else "UNMIXR_PREMIUM_NARRATOR_VOICE_LABEL"
+    default = ALICE_PREMIUM_FEMALE_VOICE_LABEL if group_key == ALICE_CLEAN_AUDIO_GROUP else DEFAULT_PREMIUM_VOICE_LABEL
+    return LEGACY.env_or_file(env_key) or default
+
+
+def _unmixr_voice_discovery_use_cases(group_key: str) -> tuple[str, ...]:
+    raw = LEGACY.env_or_file("UNMIXR_PUBLIC_VIDEO_VOICE_DISCOVERY_USE_CASES")
+    if raw:
+        return tuple(part.strip() for part in re.split(r"[,;]+", raw) if part.strip())
+    if group_key == ALICE_CLEAN_AUDIO_GROUP:
+        return ("documentary-voices", "narration-voices", "audiobook-voices")
+    return ("documentary-voices", "narration-voices", "audiobook-voices")
+
+
+def _discover_unmixr_voice_by_label(group_key: str, label: str) -> dict[str, Any]:
+    normalized_label = label.strip().lower()
+    if not normalized_label:
+        return {}
+    cache_key = (group_key, normalized_label)
+    if cache_key in _UNMIXR_DISCOVERY_CACHE:
+        return dict(_UNMIXR_DISCOVERY_CACHE[cache_key])
+    api_key = LEGACY.env_or_file("UNMIXR_API_KEY")
+    if not api_key:
+        return {}
+    for use_case in _unmixr_voice_discovery_use_cases(group_key):
+        query = urllib.parse.urlencode(
+            {
+                "c": use_case,
+                "page_size": 80,
+                "fields": VOICE_DISCOVERY_FIELDS,
+            }
+        )
+        request = urllib.request.Request(
+            f"{UNMIXR_VOICE_DISCOVERY_API}?{query}",
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+        )
+        try:
+            payload = json.loads(urllib.request.urlopen(request, timeout=20).read().decode("utf-8"))
+        except Exception:
+            continue
+        rows = payload.get("results") if isinstance(payload, dict) else payload
+        if isinstance(rows, dict):
+            rows = rows.get("results") or rows.get("voices") or []
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            character = str(row.get("character") or row.get("name") or row.get("label") or "").strip()
+            if character.lower() != normalized_label:
+                continue
+            voice_id = str(row.get("uuid") or "").strip()
+            if not voice_id:
+                continue
+            result = {
+                "voice_id": voice_id,
+                "voice_source_env": f"discovery:unmixr:{use_case}:{character}",
+                "voice_label": character,
+                "voice_gender": str(row.get("gender") or ""),
+                "voice_quality": str(row.get("quality") or ""),
+                "voice_language": str(row.get("language") or ""),
+                "voice_use_cases": row.get("use_cases") if isinstance(row.get("use_cases"), list) else [],
+            }
+            _UNMIXR_DISCOVERY_CACHE[cache_key] = dict(result)
+            return result
+    return {}
+
+
 def resolve_voice_id(group_key: str) -> tuple[str, str]:
+    resolved = resolve_voice(group_key)
+    return str(resolved.get("voice_id") or ""), str(resolved.get("voice_source_env") or "")
+
+
+def resolve_voice(group_key: str) -> dict[str, Any]:
     for key in VOICE_ENV_BY_GROUP.get(group_key, DEFAULT_VOICE_ENV_KEYS):
         value = LEGACY.env_or_file(key)
         if value:
-            return value, key
-    return "", ""
+            return {
+                "voice_id": value,
+                "voice_source_env": key,
+                "voice_label": "",
+                "voice_gender": "female" if key in {"UNMIXR_ALICE_VOICE_ID", "UNMIXR_FEMALE_NARRATOR_VOICE_ID"} else "",
+                "voice_quality": "premium" if "PREMIUM" in key or key in {"UNMIXR_ALICE_VOICE_ID", "UNMIXR_FEMALE_NARRATOR_VOICE_ID"} else "",
+                "voice_language": "",
+                "voice_use_cases": [],
+            }
+    discovered = _discover_unmixr_voice_by_label(group_key, _preferred_unmixr_voice_label(group_key))
+    if discovered:
+        return discovered
+    return {}
 
 
 @contextmanager
 def unmixr_voice_override(group_key: str):
-    voice_id, source_env = resolve_voice_id(group_key)
+    resolved = resolve_voice(group_key)
+    voice_id = str(resolved.get("voice_id") or "")
+    source_env = str(resolved.get("voice_source_env") or "")
     old_values = {key: os.environ.get(key) for key in DEFAULT_VOICE_ENV_KEYS}
     try:
         if voice_id:
             os.environ["UNMIXR_PREMIUM_NARRATOR_VOICE_ID"] = voice_id
-        yield voice_id, source_env
+        yield resolved
     finally:
         for key, value in old_values.items():
             if value is None:
@@ -369,25 +475,52 @@ def render_unmixr_narration(
     beat_dir = work / "beats"
     beat_dir.mkdir(parents=True, exist_ok=True)
     stitched = work / "unmixr-narration.wav"
-    voice_id, source_env = resolve_voice_id(group_key)
-    if stitched.is_file() and stitched.stat().st_size > 0 and not force_tts:
+    meta_file = work / "unmixr-narration.meta.json"
+    resolved = resolve_voice(group_key)
+    voice_id = str(resolved.get("voice_id") or "")
+    source_env = str(resolved.get("voice_source_env") or "")
+    voice_policy = _unmixr_voice_policy_for_group(group_key)
+    if not voice_id:
+        raise RuntimeError(f"unmixr_premium_voice_required:{group_key}")
+    script_sha = _sha256_bytes(text.encode("utf-8"))
+    voice_sha = _voice_id_sha256(voice_id)
+    cached_meta: dict[str, Any] = {}
+    if meta_file.is_file():
+        try:
+            cached_meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            cached_meta = {}
+    cache_matches = (
+        stitched.is_file()
+        and stitched.stat().st_size > 0
+        and str(cached_meta.get("script_sha256") or "") == script_sha
+        and str(cached_meta.get("voice_id_sha256") or "") == voice_sha
+        and str(cached_meta.get("voice_policy") or "") == voice_policy
+    )
+    if cache_matches and not force_tts:
         return stitched, {
             "provider": UNMIXR_PROVIDER,
             "voice_id_redacted": redact(voice_id),
             "voice_source_env": source_env,
-            "voice_policy": "unmixr_required_no_edge_fallback",
+            "voice_policy": voice_policy,
+            "voice_label": str(resolved.get("voice_label") or cached_meta.get("voice_label") or ""),
+            "voice_gender": str(resolved.get("voice_gender") or cached_meta.get("voice_gender") or ""),
+            "voice_quality": str(resolved.get("voice_quality") or cached_meta.get("voice_quality") or ""),
+            "voice_language": str(resolved.get("voice_language") or cached_meta.get("voice_language") or ""),
             "voice_reused_from_cache": True,
-            "language": "",
-            "speaking_rate": "",
-            "speaking_pitch": "",
-            "speaking_volume": "",
+            "language": str(cached_meta.get("language") or ""),
+            "speaking_rate": str(cached_meta.get("speaking_rate") or ""),
+            "speaking_pitch": str(cached_meta.get("speaking_pitch") or ""),
+            "speaking_volume": str(cached_meta.get("speaking_volume") or ""),
             "beat_count": len(beats),
             "failures": [],
         }
 
     parts: list[Path] = []
     failures: list[str] = []
-    with unmixr_voice_override(group_key) as (voice_id, source_env):
+    with unmixr_voice_override(group_key) as resolved:
+        voice_id = str(resolved.get("voice_id") or "")
+        source_env = str(resolved.get("voice_source_env") or "")
         for index, beat in enumerate(beats, start=1):
             raw = beat_dir / f"beat-{index:02d}.mp3"
             ok = LEGACY.render_unmixr_tts(beat, raw)
@@ -404,11 +537,31 @@ def render_unmixr_narration(
                 parts.append(pause)
     concat_wavs(parts, stitched)
     config = LEGACY.unmixr_config() or {}
+    meta = {
+        "script_sha256": script_sha,
+        "voice_id_sha256": voice_sha,
+        "voice_source_env": source_env,
+        "voice_policy": voice_policy,
+        "voice_label": str(resolved.get("voice_label") or ""),
+        "voice_gender": str(resolved.get("voice_gender") or ""),
+        "voice_quality": str(resolved.get("voice_quality") or ""),
+        "voice_language": str(resolved.get("voice_language") or ""),
+        "language": config.get("language", ""),
+        "speaking_rate": config.get("speaking_rate", ""),
+        "speaking_pitch": config.get("speaking_pitch", ""),
+        "speaking_volume": config.get("speaking_volume", ""),
+        "beat_count": len(beats),
+    }
+    meta_file.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     return stitched, {
         "provider": UNMIXR_PROVIDER,
         "voice_id_redacted": redact(voice_id or config.get("voice_id", "")),
         "voice_source_env": source_env,
-        "voice_policy": "unmixr_required_no_edge_fallback",
+        "voice_policy": voice_policy,
+        "voice_label": meta["voice_label"],
+        "voice_gender": meta["voice_gender"],
+        "voice_quality": meta["voice_quality"],
+        "voice_language": meta["voice_language"],
         "voice_reused_from_cache": False,
         "language": config.get("language", ""),
         "speaking_rate": config.get("speaking_rate", ""),
@@ -893,7 +1046,7 @@ def main() -> int:
             "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
-            "alice_voice_policy": "unmixr_required_no_edge_fallback",
+            "alice_voice_policy": ALICE_VOICE_POLICY,
             "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed except Alice, which uses clean audiobook-style speech-only narration; noise-bed-only output is rejected by review policy",
         },
         "provider_posture": {

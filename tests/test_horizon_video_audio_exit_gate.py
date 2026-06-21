@@ -125,4 +125,6 @@ def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -
 
     assert result["status"] == "fail"
     assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_unmixr_receipt" in result["issues"]
-    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_no_edge_fallback_receipt" in result["issues"]
+    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_female_no_edge_receipt" in result["issues"]
+    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_female_receipt" in result["issues"]
+    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_receipt" in result["issues"]
