@@ -1002,7 +1002,7 @@
                     </form>
                 </details>
                 <details class="details-drawer">
-                    <summary>Ask Rule Ghost</summary>
+                    <summary>Rules help</summary>
                     <form id="ruleGhostForm" class="settings-form">
                         <div class="field">
                             <label for="ruleGhostQuery">Ask a Shadowrun rules question</label>
@@ -1017,7 +1017,7 @@
                             </select>
                         </div>
                         <button class="button-like button-like--secondary" type="submit">Summarize rule</button>
-                        <p class="muted-copy">Rule Ghost summarizes owned Shadowrun material in plain language. It avoids book wording, long excerpts, and table reproduction.</p>
+                        <p class="muted-copy">Chummer summarizes owned Shadowrun material in plain language. It avoids book wording, long excerpts, and table reproduction.</p>
                         <p id="ruleGhostStatusNotice" class="muted-copy" hidden></p>
                         <div id="ruleGhostAnswer" class="stacked-copy" hidden></div>
                         <div id="ruleGhostFollowUps" class="stacked-actions" hidden></div>
@@ -5554,20 +5554,20 @@
 
       const confidence = payload.confidence ? ` (${payload.confidence.replaceAll("_", " ")})` : "";
       const posture = payload.refused
-        ? "Rule Ghost returned a safe refusal."
+        ? "Rules help returned a safe refusal."
         : payload.clarificationNeeded
-          ? "Rule Ghost needs one more detail before it should go narrower."
-          : "Rule Ghost loaded a safe summary.";
+          ? "Rules help needs one more detail before it should go narrower."
+          : "Rules help loaded a safe summary.";
       ui.setNotice(notice, `${posture}${confidence}`);
     } catch (error) {
       const rateLimited = setRateLimitNotice(
         notice,
         error,
-        "Rule Ghost is pacing requests so answers stay grounded and readable.",
+        "Rules help is pacing requests so answers stay clear and readable.",
         "Wait for the timer, then retry with one mechanic and one edition."
       );
       if (!rateLimited) {
-        ui.setNotice(notice, ui.describeError(error, "Rule Ghost could not load right now."), true);
+        ui.setNotice(notice, ui.describeError(error, "Rules help could not load right now."), true);
       }
     } finally {
       ui.setButtonBusy(button, false, "Summarizing...");

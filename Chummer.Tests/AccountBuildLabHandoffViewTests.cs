@@ -101,6 +101,9 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("AI support channels", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Ask the grounded support assistant", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Executive Assistant linked to channel", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ask Rule Ghost", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule Ghost summarizes", view, StringComparison.Ordinal);
+        Assert.Contains("Rules help", view, StringComparison.Ordinal);
         Assert.Contains("asking what questions you have", view, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("purpose: \"ai_support_only\"", view, StringComparison.Ordinal);
         Assert.Contains("aiSupportOpeningPrompt", view, StringComparison.Ordinal);

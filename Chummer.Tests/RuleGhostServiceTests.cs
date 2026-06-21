@@ -16,6 +16,8 @@ public sealed class RuleGhostServiceTests
         Assert.True(response.Refused);
         Assert.DoesNotContain("sourcebook", response.Answer, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("page", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Rule Ghost", response.Citations[0].Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Rules help", response.Citations[0].Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

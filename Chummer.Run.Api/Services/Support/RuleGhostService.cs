@@ -42,7 +42,7 @@ public sealed class RuleGhostService
                 rulesetId,
                 "I can help with public rules summaries, but I should not infer private campaign state or hidden GM material.",
                 "Core privacy boundary",
-                "Private campaign and hidden-GM material stays outside the assistant boundary.");
+                "Private campaign and hidden-GM material stays outside support answers.");
         }
 
         if (RefusalTerms.Any(lowered.Contains))
@@ -51,7 +51,7 @@ public sealed class RuleGhostService
                 rulesetId,
                 "I can explain the rule in my own words, but I will not reproduce book wording or structured mechanic grids. Ask for the mechanic and edition instead.",
                 "Owned-rule summary only",
-                "Rule Ghost summarizes owned material instead of reproducing it.");
+                "Rules help summarizes owned material instead of reproducing it.");
         }
 
         if (rulesetId == "auto" && AmbiguousTerms.Any(lowered.Contains))
