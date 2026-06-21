@@ -31,7 +31,7 @@
                 ? "#preview-artifacts"
                 : "#artifact-route-map";
     var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in account return view" : "Create account for signed-in account return";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Account return view" : "Create account for account return";
     var routeChoices = new[]
     {
         new
@@ -54,12 +54,12 @@
         },
         new
         {
-            Badge = "Signed-in account return",
+            Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Personal, campaign, creator, and public returns stay in one signed-in view"
+                ? "Personal, campaign, creator, and public returns stay in one account view"
                 : "Sign in when you want the private account-return view as well as public detail pages",
             Summary = Model.Chrome.Authenticated
-                ? "The signed-in view keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
+                ? "The account view keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
                 : "Public detail pages work without an account. Sign in only when you want private account return and campaign or creator-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
@@ -183,7 +183,7 @@
             }
             @if (Model.Chrome.Authenticated)
             {
-                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) signed-in history card(s)</span>
+                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) account history card(s)</span>
             }
         </div>
     </div>
@@ -197,7 +197,7 @@
 <section class="editorial-block" id="artifact-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick details, downloads, signed-in history, or help without mixing their jobs.</h2>
+        <h2 class="editorial-title">Pick details, downloads, account history, or help without mixing their jobs.</h2>
         <p class="editorial-copy">The detail view should make outputs and background tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
@@ -292,7 +292,7 @@
 {
     <section class="continuity-band" id="signed-in-detail-view">
         <div class="continuity-band__copy">
-            <p class="eyebrow">Signed-in account return view</p>
+            <p class="eyebrow">Account return view</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
             <div class="stacked-actions">
@@ -307,7 +307,7 @@
             <article class="continuity-band__fact">
                 <span>Visible recap cards</span>
                 <strong>@signedInRecapShelf.Length</strong>
-                <p>Aftermath, replay, and Table Pulse Aftermath return items that stay in this signed-in view.</p>
+                <p>Aftermath, replay, and Table Pulse Aftermath return items that stay in this account view.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Visible creator cards</span>
@@ -322,7 +322,7 @@
             <article class="continuity-band__fact">
                 <span>Boundary</span>
                 <strong>@(publicationRouteReviewRequired ? "Public wording still reviewed" : "Public wording ready now")</strong>
-                <p>Signed-in account return can stay useful even while the public publication page is still limited.</p>
+                <p>Account return can stay useful even while the public publication page is still limited.</p>
             </article>
         </div>
     </section>
@@ -336,7 +336,7 @@
                     : null;
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
-                        <span class="tag">Signed-in history</span>
+                        <span class="tag">Account history</span>
                         <h3>@PublicText(item.Label)</h3>
                         <p>@PublicText(item.Summary)</p>
                         <div class="trust-claim__details">

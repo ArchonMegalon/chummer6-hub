@@ -392,7 +392,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Needs attention", homeView, StringComparison.Ordinal);
 
         Assert.Contains("Open detail view", shelfView, StringComparison.Ordinal);
-        Assert.Contains("signed-in view", shelfView, StringComparison.Ordinal);
+        Assert.Contains("account view", shelfView, StringComparison.Ordinal);
         Assert.Contains("detail view", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", shelfView, StringComparison.Ordinal);
 

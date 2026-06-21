@@ -1630,6 +1630,33 @@ def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy()
     assert "Broader comparisons return when they are useful and current." in shelf
 
 
+def test_public_detail_page_uses_account_language_instead_of_signed_in_labels() -> None:
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+
+    for expected in (
+        "Account return view",
+        "Account return",
+        "one account view",
+        "The account view keeps aftermath",
+        "account history card(s)",
+        "account history, or help",
+        "Account history",
+    ):
+        assert expected in shelf
+
+    for forbidden in (
+        "Signed-in account return view",
+        "Signed-in account return",
+        "one signed-in view",
+        "The signed-in view keeps aftermath",
+        "signed-in history card(s)",
+        "signed-in history, or help",
+        "Signed-in history",
+        "this signed-in view",
+    ):
+        assert forbidden not in shelf
+
+
 def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> None:
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")
