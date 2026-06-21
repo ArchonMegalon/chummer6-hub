@@ -27,7 +27,11 @@ public sealed record ChannelLinkDto(
     bool NotificationsEnabled,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
-    string? Note = null);
+    string? Note = null)
+{
+    public string Purpose { get; init; } = string.Empty;
+    public string AiSupportOpeningPrompt { get; init; } = string.Empty;
+}
 
 public sealed record AccountLinkSummaryDto(
     HubUserDto User,
@@ -74,11 +78,16 @@ public sealed record LinkChannelRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     [Required(AllowEmptyStrings = false), StringLength(64)] string ChannelKind,
     string? ChannelHandle = null,
-    bool NotificationsEnabled = true);
+    bool NotificationsEnabled = true,
+    string? Purpose = null,
+    string? AiSupportOpeningPrompt = null);
 
 public sealed record LinkChannelToExecutiveAssistantRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    string? ChannelHandle = null);
+    string? ChannelHandle = null,
+    string? Purpose = null,
+    string? AiSupportOpeningPrompt = null,
+    bool? NotificationsEnabled = null);
 
 public sealed record ChannelDeepLinkResponse(
     string ChannelKind,

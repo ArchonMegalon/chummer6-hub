@@ -4,6 +4,12 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class IdentityLinkService
 {
+    private const string AiSupportOnlyPurpose = "ai_support_only";
+    private const string WhatsappAiSupportOpeningPrompt =
+        "Ask what questions the user has before giving product guidance.";
+    private const string WhatsappAiSupportNote =
+        "WhatsApp is stored only for AI support outreach. When support reaches out, it asks what questions the user has before helping. It is not used for account access, recovery, marketing, or public profile display.";
+
     private static readonly string[] SupportedIdentityProviders =
     {
         "email",
@@ -308,11 +314,13 @@ public sealed class IdentityLinkService
             var note = channelKind switch
             {
                 "telegram_official_bot" => "Telegram companion linking stays pending until the official bot confirms the account handshake.",
-                "whatsapp_official_business" => "WhatsApp companion linking is configured as a connected operator destination.",
+                "whatsapp_official_business" => WhatsappAiSupportNote,
                 "telegram_user_bot" => "Bring-your-own Telegram bots are intentionally deferred until ownership, verification, and policy controls are stronger.",
                 _ => null
             };
             var official = channelKind is "telegram_official_bot" or "whatsapp_official_business";
+            var purpose = ResolveChannelPurpose(channelKind, request.Purpose);
+            var aiSupportOpeningPrompt = ResolveAiSupportOpeningPrompt(channelKind, request.AiSupportOpeningPrompt);
 
             if (existingIndex >= 0)
             {
@@ -322,7 +330,9 @@ public sealed class IdentityLinkService
                     Status = status,
                     NotificationsEnabled = request.NotificationsEnabled,
                     UpdatedAtUtc = now,
-                    Note = note
+                    Note = note,
+                    Purpose = purpose,
+                    AiSupportOpeningPrompt = aiSupportOpeningPrompt
                 };
                 _store.ChannelLinks[existingIndex] = updated;
                 _store.PersistLocked();
@@ -339,7 +349,11 @@ public sealed class IdentityLinkService
                 NotificationsEnabled: request.NotificationsEnabled,
                 CreatedAtUtc: now,
                 UpdatedAtUtc: now,
-                Note: note);
+                Note: note)
+            {
+                Purpose = purpose,
+                AiSupportOpeningPrompt = aiSupportOpeningPrompt
+            };
             _store.ChannelLinks.Add(created);
             _store.PersistLocked();
             return created;
@@ -355,6 +369,11 @@ public sealed class IdentityLinkService
             AccountService.NormalizeOptional(request.ChannelHandle));
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
+        var purpose = ResolveChannelPurpose(normalizedChannelKind, request.Purpose);
+        var aiSupportOpeningPrompt = ResolveAiSupportOpeningPrompt(normalizedChannelKind, request.AiSupportOpeningPrompt);
+        var note = normalizedChannelKind == "whatsapp_official_business"
+            ? WhatsappAiSupportNote
+            : "Executive Assistant is now linked to this channel.";
 
         lock (_store.Gate)
         {
@@ -377,10 +396,14 @@ public sealed class IdentityLinkService
                     DisplayLabel: requestedChannelHandle,
                     Status: "ea_linked",
                     OfficialChannel: normalizedChannelKind is "telegram_official_bot" or "whatsapp_official_business",
-                    NotificationsEnabled: true,
+                    NotificationsEnabled: ResolveChannelNotificationsEnabled(normalizedChannelKind, request.NotificationsEnabled, existing: null),
                     CreatedAtUtc: now,
                     UpdatedAtUtc: now,
-                    Note: "Executive Assistant is now linked to this channel handle.");
+                    Note: note)
+                {
+                    Purpose = purpose,
+                    AiSupportOpeningPrompt = aiSupportOpeningPrompt
+                };
 
                 _store.ChannelLinks.Add(created);
                 _store.PersistLocked();
@@ -396,9 +419,11 @@ public sealed class IdentityLinkService
             {
                 DisplayLabel = displayLabel,
                 Status = "ea_linked",
-                NotificationsEnabled = existing.NotificationsEnabled,
+                NotificationsEnabled = ResolveChannelNotificationsEnabled(normalizedChannelKind, request.NotificationsEnabled, existing.NotificationsEnabled),
                 UpdatedAtUtc = now,
-                Note = "Executive Assistant is now linked to this channel."
+                Note = note,
+                Purpose = purpose,
+                AiSupportOpeningPrompt = aiSupportOpeningPrompt
             };
 
             _store.ChannelLinks[existingIndex] = updated;
@@ -455,6 +480,41 @@ public sealed class IdentityLinkService
         {
             Note = null,
         };
+
+    private static string ResolveChannelPurpose(string channelKind, string? requestedPurpose)
+    {
+        if (string.Equals(channelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase))
+        {
+            return AiSupportOnlyPurpose;
+        }
+
+        return AccountService.NormalizeOptional(requestedPurpose) ?? string.Empty;
+    }
+
+    private static string ResolveAiSupportOpeningPrompt(string channelKind, string? requestedPrompt)
+    {
+        if (string.Equals(channelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase))
+        {
+            return AccountService.NormalizeOptional(requestedPrompt) ?? WhatsappAiSupportOpeningPrompt;
+        }
+
+        return AccountService.NormalizeOptional(requestedPrompt) ?? string.Empty;
+    }
+
+    private static bool ResolveChannelNotificationsEnabled(string channelKind, bool? requested, bool? existing)
+    {
+        if (requested.HasValue)
+        {
+            return requested.Value;
+        }
+
+        if (existing.HasValue)
+        {
+            return existing.Value;
+        }
+
+        return !string.Equals(channelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase);
+    }
 
     private void DemotePrimaryAuthLocked(string userId)
     {

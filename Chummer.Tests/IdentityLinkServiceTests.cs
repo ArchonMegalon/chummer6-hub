@@ -26,6 +26,9 @@ public sealed class IdentityLinkServiceTests
             Assert.Equal("linked", link.Status);
             Assert.Equal("436647916419", link.DisplayLabel);
             Assert.Contains("WhatsApp", link.Note ?? string.Empty);
+            Assert.Equal("ai_support_only", link.Purpose);
+            Assert.Contains("what questions", link.AiSupportOpeningPrompt, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("AI support", store.ChannelLinks[0].Note ?? string.Empty);
         }
         finally
         {
@@ -101,6 +104,9 @@ public sealed class IdentityLinkServiceTests
             Assert.Equal("whatsapp_official_business", updated.ChannelKind);
             Assert.Equal("ea_linked", updated.Status);
             Assert.Equal("436647916419", updated.DisplayLabel);
+            Assert.Equal("ai_support_only", updated.Purpose);
+            Assert.Contains("what questions", updated.AiSupportOpeningPrompt, StringComparison.OrdinalIgnoreCase);
+            Assert.False(updated.NotificationsEnabled);
             Assert.Single(store.ChannelLinks);
             Assert.Equal(updated.ChannelLinkId, store.ChannelLinks[0].ChannelLinkId);
         }
@@ -132,6 +138,33 @@ public sealed class IdentityLinkServiceTests
             Assert.True(updated.OfficialChannel);
             Assert.Single(store.ChannelLinks);
             Assert.Equal("436641234455", store.ChannelLinks[0].DisplayLabel);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void LinkChannelToExecutiveAssistantCanOptIntoWhatsappNotificationsSeparately()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            CommunityStore store = new(BuildConfiguration(tempRoot), NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            IdentityLinkService links = new(store, accounts);
+            accounts.EnsureUserWithStatus("subject.ea.runner", "Runner Prime", "runner@example.com");
+
+            ChannelLinkDto updated = links.LinkChannelToExecutiveAssistant(
+                "whatsapp_official_business",
+                new LinkChannelToExecutiveAssistantRequest(
+                    "subject.ea.runner",
+                    "+43 664 791 6419",
+                    NotificationsEnabled: true));
+
+            Assert.True(updated.NotificationsEnabled);
+            Assert.Equal("ai_support_only", updated.Purpose);
         }
         finally
         {

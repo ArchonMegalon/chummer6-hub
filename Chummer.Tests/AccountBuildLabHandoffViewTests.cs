@@ -89,4 +89,20 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Compatibility: @item.CompatibilitySummary", view, StringComparison.Ordinal);
         Assert.Contains("Lineage: @item.LineageSummary", view, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AccountSettingsRendersWhatsappAiSupportOnlyControls()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("WhatsApp number for AI support only", view, StringComparison.Ordinal);
+        Assert.Contains("ask what questions you have", view, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("purpose: \"ai_support_only\"", view, StringComparison.Ordinal);
+        Assert.Contains("aiSupportOpeningPrompt", view, StringComparison.Ordinal);
+        Assert.Contains("Link WhatsApp to AI support", view, StringComparison.Ordinal);
+        Assert.Contains("Table Pulse updates", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger involvement", view, StringComparison.Ordinal);
+        Assert.Contains("whatsappNotificationsEnabled", view, StringComparison.Ordinal);
+    }
 }

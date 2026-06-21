@@ -38,8 +38,14 @@ MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
 MIN_ALICE_TTS_COVERAGE_RATIO = 0.95
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
+RUNSITE_CLEAN_AUDIO_GROUP = "runsite-90s-deepdive"
+CLEAN_SPEECH_AUDIO_GROUPS = {
+    ALICE_CLEAN_AUDIO_GROUP,
+    RUNSITE_CLEAN_AUDIO_GROUP,
+}
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
+RUNSITE_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 UNMIXR_VOICE_DISCOVERY_API = "https://unmixr.com/api/v1/voice-list/"
 DEFAULT_PREMIUM_VOICE_LABEL = "Blue"
 ALICE_PREMIUM_FEMALE_VOICE_LABEL = "Ava"
@@ -447,6 +453,17 @@ SCRIPT_KEY_BY_GROUP = {
 
 
 EXTRA_SCRIPT_BY_GROUP = {
+    RUNSITE_CLEAN_AUDIO_GROUP: (
+        "Runsite begins with a simple truth: a location is not ready just because a map exists. "
+        "A flat floor plan can tell the table where the walls are, but it cannot tell the crew where the pressure lives. "
+        "Runsite turns a mission space into something the players can read before the first door opens: approach routes, exposure, exits, camera lines, chokepoints, and the places where a quiet plan starts becoming loud. "
+        "The player view stays clean enough to act on. The GM view keeps the teeth behind the curtain. "
+        "A warehouse stops being a rectangle and becomes a layered problem: outside light, security habits, blind corners, maintenance paths, alarms that matter, and consequences waiting just off-screen. "
+        "The point is not to script the route. The point is to make the site strong enough for improvisation. "
+        "If the crew scouts, the space rewards attention. If they rush, the space pushes back. If they split up, the table still understands what each choice costs. "
+        "Runsite gives the GM a place that can breathe under pressure and gives the players a location worth planning around. "
+        "Before the breach, during the run, and after the fallout, the site remains legible, dangerous, and memorable."
+    ),
     "origin-dossier-90s-deepdive": (
         "Origin Dossier starts where the character sheet stops. It takes the events that shaped a runner and turns them into things the table can actually use: contacts, enemies, debts, scars, secrets, beliefs, and unfinished consequences. "
         "The player keeps control. The GM keeps the campaign steer. Nothing becomes part of the game until both sides approve it. "
@@ -810,7 +827,7 @@ def bed_filter(total_duration: float, style: str) -> str:
     )
 
 
-def build_clean_audiobook_style_audio(narration: Path, total_duration: float, output: Path) -> str:
+def build_clean_audiobook_style_audio(narration: Path, total_duration: float, output: Path, group_key: str = ALICE_CLEAN_AUDIO_GROUP) -> str:
     trimmed = output.with_name(f"{output.stem}.alice-clean-source.wav")
     run(
         "ffmpeg",
@@ -833,7 +850,7 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     target_voice = max(total_duration, 1.0)
     if source_duration < target_voice * MIN_ALICE_TTS_COVERAGE_RATIO:
         raise RuntimeError(
-            f"alice_unmixr_narration_too_short_for_natural_pacing:"
+            f"{group_key}_unmixr_narration_too_short_for_natural_pacing:"
             f"{source_duration:.3f}s_for_{target_voice:.3f}s"
         )
     tempo = min(max(source_duration / target_voice, 1.0), 1.16)
@@ -886,8 +903,8 @@ def build_mixed_audio_for_group(group_key: str, narration: Path | None, total_du
         )
         return "ambient_bed_only"
 
-    if group_key == ALICE_CLEAN_AUDIO_GROUP:
-        return build_clean_audiobook_style_audio(narration, total_duration, output)
+    if group_key in CLEAN_SPEECH_AUDIO_GROUPS:
+        return build_clean_audiobook_style_audio(narration, total_duration, output, group_key)
 
     source_duration = duration(narration)
     target_voice = max(total_duration - 2.7, 1.0)
@@ -1161,17 +1178,22 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
         backup = work / f"{video.name}.before-unmixr-audio"
         shutil.copy2(video, backup)
         remux(video, mixed, video, total_duration)
-        alice_clean_audio = group.key == ALICE_CLEAN_AUDIO_GROUP
-        quality = audio_quality(video, allow_clean_speech_pauses=alice_clean_audio)
+        clean_speech_audio = group.key in CLEAN_SPEECH_AUDIO_GROUPS
+        quality = audio_quality(video, allow_clean_speech_pauses=clean_speech_audio)
         info = probe(video)
         streams = info.get("streams") or []
+        audio_style = "premium_news_anchor_continuous_bed"
+        if group.key == ALICE_CLEAN_AUDIO_GROUP:
+            audio_style = ALICE_CLEAN_AUDIO_STYLE
+        elif group.key == RUNSITE_CLEAN_AUDIO_GROUP:
+            audio_style = RUNSITE_CLEAN_AUDIO_STYLE
         file_receipts.append(
             {
                 "file": str(video.relative_to(REPO)),
                 "duration_seconds": round(total_duration, 3),
                 "backup": str(backup),
                 "fit_mode": fit_mode,
-                "audio_style": ALICE_CLEAN_AUDIO_STYLE if alice_clean_audio else "premium_news_anchor_continuous_bed",
+                "audio_style": audio_style,
                 "probe": info,
                 "audio_streams": sum(1 for stream in streams if stream.get("codec_type") == "audio"),
                 "video_streams": sum(1 for stream in streams if stream.get("codec_type") == "video"),
@@ -1185,7 +1207,7 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     for receipt in file_receipts:
         if receipt["audio_streams"] != 1 or receipt["video_streams"] != 1 or receipt["quality"].get("status") != "pass":
             status = "fail"
-    if group.key == ALICE_CLEAN_AUDIO_GROUP and str(provider_meta.get("provider") or "") != UNMIXR_PROVIDER:
+    if group.key in CLEAN_SPEECH_AUDIO_GROUPS and str(provider_meta.get("provider") or "") != UNMIXR_PROVIDER:
         status = "fail"
     return {
         "group_key": group.key,
@@ -1222,7 +1244,7 @@ def main() -> int:
                         "video_streams": sum(1 for stream in streams if stream.get("codec_type") == "video"),
                         "quality": audio_quality(
                             video,
-                            allow_clean_speech_pauses=group.key == ALICE_CLEAN_AUDIO_GROUP,
+                            allow_clean_speech_pauses=group.key in CLEAN_SPEECH_AUDIO_GROUPS,
                         ),
                     }
                 )
@@ -1261,7 +1283,7 @@ def main() -> int:
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
             "alice_voice_policy": ALICE_VOICE_POLICY,
-            "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed except Alice, which uses clean audiobook-style speech-only narration; noise-bed-only output is rejected by review policy",
+            "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed except clean speech groups such as Alice and Runsite, which use speech-only narration with no synthetic bed or white-noise floor; noise-bed-only output is rejected by review policy",
         },
         "provider_posture": {
             "narration_provider": "unmixr-short-tts",

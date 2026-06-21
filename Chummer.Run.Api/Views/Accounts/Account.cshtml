@@ -797,18 +797,18 @@
             @if (showSettingsSection && showChannelsSection)
             {
                 <details class="details-drawer">
-                    <summary>Linked channels</summary>
+                    <summary>AI support channels</summary>
                     <section id="channels" class="settings-section" data-account-panel>
                         <div class="settings-section__header">
-                            <h2>Linked channels</h2>
-                            <p>Companion channels stay separate from account access and recovery.</p>
+                            <h2>AI support channels</h2>
+                            <p>These contacts are for AI support only. They stay separate from account access, recovery, marketing, and public profile fields.</p>
                         </div>
                             <div class="settings-summary-row">
                                 <span>Telegram companion</span>
                                 <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>WhatsApp companion</span>
+                                <span>WhatsApp AI support</span>
                                 <strong>@(whatsappChannel is null ? "Not connected" : $"{whatsappChannel.DisplayLabel} ({HumanizeStatus(whatsappChannel.Status, "Ready")})")</strong>
                             </div>
                         <form id="telegramForm" class="settings-form">
@@ -821,10 +821,15 @@
                         </form>
                         <form id="whatsappForm" class="settings-form">
                             <div class="field">
-                                <label for="whatsappHandle">WhatsApp number</label>
-                                <input id="whatsappHandle" placeholder="+436647916419" value="@(whatsappChannel?.DisplayLabel ?? string.Empty)" />
+                                <label for="whatsappHandle">WhatsApp number for AI support only</label>
+                                <input id="whatsappHandle" type="tel" inputmode="tel" autocomplete="tel" aria-describedby="whatsappSupportOnlyCopy" placeholder="+436647916419" value="@(whatsappChannel?.DisplayLabel ?? string.Empty)" />
+                                <p id="whatsappSupportOnlyCopy" class="muted-copy">Used only so Chummer.run AI support can reach out and ask what questions you have. It is not used for sign-in, recovery, marketing, or public profile display.</p>
+                                <label class="check-row">
+                                    <input id="whatsappNotificationsEnabled" type="checkbox" @(whatsappChannel is not null && whatsappChannel.NotificationsEnabled ? "checked" : null) />
+                                    <span>Also allow WhatsApp notifications when I opt into Table Pulse updates, Black Ledger involvement, or support follow-up notices.</span>
+                                </label>
                             </div>
-                            <button class="button-like button-like--secondary" type="submit">Connect WhatsApp</button>
+                            <button class="button-like button-like--secondary" type="submit">Save WhatsApp support number</button>
                             <p id="whatsappStatusNotice" class="muted-copy" hidden></p>
                         </form>
                         <div class="settings-form">
@@ -835,7 +840,7 @@
                             </div>
                             <div class="settings-summary-row">
                                 <button class="button-like button-like--secondary" type="button" id="telegramToEaButton">Link Telegram to Executive Assistant</button>
-                                <button class="button-like button-like--secondary" type="button" id="whatsappToEaButton">Link WhatsApp to Executive Assistant</button>
+                                <button class="button-like button-like--secondary" type="button" id="whatsappToEaButton">Link WhatsApp to AI support</button>
                             </div>
                             <p id="telegramToEaNotice" class="muted-copy" hidden></p>
                             <p id="whatsappToEaNotice" class="muted-copy" hidden></p>
@@ -5043,12 +5048,14 @@
           subjectId,
           channelKind: "whatsapp_official_business",
           channelHandle: document.getElementById("whatsappHandle").value,
-          notificationsEnabled: true
+          notificationsEnabled: document.getElementById("whatsappNotificationsEnabled").checked,
+          purpose: "ai_support_only",
+          aiSupportOpeningPrompt: "Ask what questions the user has before giving product guidance."
         }
       });
-      ui.setNotice(notice, "WhatsApp companion settings saved.");
+      ui.setNotice(notice, "WhatsApp AI support number saved. Outreach starts by asking what questions you have.");
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "WhatsApp companion settings could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "WhatsApp AI support number could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }
@@ -5081,18 +5088,30 @@
     ui.clearNotice(noticeNode);
     ui.setButtonBusy(button, true, "Linking to EA...");
     try {
+      const supportMetadata = channelKind === "whatsapp_official_business"
+        ? {
+            purpose: "ai_support_only",
+            aiSupportOpeningPrompt: "Ask what questions the user has before giving product guidance.",
+            notificationsEnabled: document.getElementById("whatsappNotificationsEnabled")?.checked === true
+          }
+        : {};
       await ui.requestJson(`/api/v1/accounts/me/channels/${encodeURIComponent(channelKind)}/executive-assistant`, {
         method: "POST",
         json: {
           subjectId,
-          channelHandle
+          channelHandle,
+          ...supportMetadata
         }
       });
-      setChannelToEaNotice(noticeNode, "Executive Assistant linked to channel.");
+      setChannelToEaNotice(
+        noticeNode,
+        channelKind === "whatsapp_official_business"
+          ? "WhatsApp AI support linked. Outreach starts by asking what questions you have."
+          : "Executive Assistant linked to channel.");
     } catch (error) {
       setChannelToEaNotice(noticeNode, ui.describeError(error, `Could not link ${channelKind} to Executive Assistant.`), true);
     } finally {
-      ui.setButtonBusy(button, false, "Link to Executive Assistant");
+      ui.setButtonBusy(button, false, channelKind === "whatsapp_official_business" ? "Link WhatsApp to AI support" : "Link to Executive Assistant");
     }
   };
 
