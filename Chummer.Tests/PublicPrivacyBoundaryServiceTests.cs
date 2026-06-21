@@ -15,11 +15,14 @@ public sealed class PublicPrivacyBoundaryServiceTests
 
         var panel = fixture.CreateService().BuildPanel("privacy");
 
-        Assert.Equal("Support, survey, and assistant data stay on a bounded clock", panel.Heading);
+        Assert.Equal("Support and feedback data expire on a clear schedule", panel.Heading);
         Assert.Equal("/help", panel.PrimaryAction.Href);
-        Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Provider-backed help", StringComparison.Ordinal) && item.RetentionSummary.Contains("30 days", StringComparison.Ordinal));
+        Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Help tools", StringComparison.Ordinal) && item.RetentionSummary.Contains("30 days", StringComparison.Ordinal));
         Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Install linkage", StringComparison.Ordinal) && item.RetentionSummary.Contains("365 days", StringComparison.Ordinal));
         Assert.Contains(panel.SurfaceRules, static item => string.Equals(item.Label, "Public surfaces", StringComparison.Ordinal));
+        Assert.DoesNotContain("bounded", panel.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("assistant data", panel.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(panel.Domains, static item => item.Label.Contains("Provider-backed", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -74,7 +77,7 @@ public sealed class PublicPrivacyBoundaryServiceTests
 
 ## Retention domains
 
-### Support-case truth
+### Support cases
 
 Owner: `chummer6-hub`
 
@@ -105,40 +108,40 @@ Owner: `chummer6-hub`
 Retention posture:
 
 * post-fix follow-up invites and answer summaries: retain for 365 days
-* raw free-text survey payloads: summarize or redact within 180 days unless still tied to an open product-governor packet
+* raw free-text survey payloads: summarize or redact within 180 days unless still tied to open product work
 
 Redaction baseline:
 
-* keep survey truth out of public guide copy until synthesized into canon
+* keep survey conclusions out of public guide copy until they are reviewed
 
-### Provider traces and assistant grounding packs
+### Help tool traces
 
-Owner: `executive-assistant` plus the owning product surface
+Owner: `chummer6-hub` plus the owning product surface
 
 Retention posture:
 
-* raw provider request/response traces: retain for 30 days unless a narrower provider contract says less
-* lane-level scorecards, challenger briefs, and grounding-pack summaries: retain for 180 days
+* raw external-service request/response traces: retain for 30 days unless a narrower service contract says less
+* help summaries and review notes: retain for 180 days
 
 Redaction baseline:
 
-* grounding packs should prefer case IDs, release IDs, and rule receipt IDs over raw user text where possible
+* help summaries should prefer case IDs, release IDs, and rule explanation IDs over raw user text where possible
 
 ## Surface redaction rules
 
 ### Public surfaces
 
-* may expose support status, known issues, release posture, compatibility, provenance, and channel-aware fix availability
-* may not expose private case notes, raw crash envelopes, provider traces, or account-internal survey payloads
+* may expose support status, known issues, release status, compatibility, provenance, and channel-aware fix availability
+* may not expose private case notes, raw crash envelopes, external-service traces, or account-internal survey payloads
 
 ### Signed-in user surfaces
 
-* may expose case timeline, install posture, claimed-device state, and the user-safe slice of crash/support data
-* may not expose unrelated reporter data, operator-only packet deliberation, or private moderation notes
+* may expose case timeline, install status, claimed-device state, and the user-safe slice of crash/support data
+* may not expose unrelated reporter data, maintainer-only deliberation, or private moderation notes
 
-### Provider-backed assistant surfaces
+### Help tool surfaces
 
-* must ground answers in curated canonical sources, registry truth, or support-case truth
+* must base answers on reviewed Chummer sources, release records, or support-case records
 * must not become the system of record for support or release state
 """);
             File.WriteAllText(

@@ -16,35 +16,35 @@ public sealed class PublicPrivacyBoundaryService
     private static readonly BoundaryDomainSpec[] BoundaryDomains =
     [
         new(
-            MarkdownHeading: "Support-case truth",
+            MarkdownHeading: "Support cases",
             Id: "support_case_truth",
             Label: "Support cases",
-            PublicProjection: "Public routes may show known issues, fix availability, and bounded support status.",
+            PublicProjection: "Public routes may show known issues, fix availability, and limited support status.",
             SignedInProjection: "Signed-in routes may show the reporter-safe case timeline and closure state."),
         new(
             MarkdownHeading: "Claim and install linkage",
             Id: "claim_install_linkage",
             Label: "Install linkage",
-            PublicProjection: "Public routes may show release posture, install help, and channel-aware fix visibility.",
-            SignedInProjection: "Signed-in routes may show claimed-install state, access posture, and linked-device context."),
+            PublicProjection: "Public routes may show release status, install help, and channel-aware fix visibility.",
+            SignedInProjection: "Signed-in routes may show claimed-install state, access status, and linked-device context."),
         new(
             MarkdownHeading: "Survey and follow-up results",
             Id: "survey_follow_up",
             Label: "Survey follow-up",
-            PublicProjection: "Public routes may summarize learned product changes after canon absorbs the signal.",
+            PublicProjection: "Public routes may summarize learned product changes after review.",
             SignedInProjection: "Signed-in routes may show that follow-up happened without replaying raw survey text."),
         new(
-            MarkdownHeading: "Provider traces and assistant grounding packs",
+            MarkdownHeading: "Help tool traces",
             Id: "provider_traces",
-            Label: "Provider-backed help",
-            PublicProjection: "Public help may show grounded answers and cited truth, not raw provider transcripts.",
-            SignedInProjection: "Signed-in help may show the curated answer path without turning help into the system of record.")
+            Label: "Help tools",
+            PublicProjection: "Public help may show short answers and source links, not raw transcripts.",
+            SignedInProjection: "Signed-in help may show the answer path without becoming the account record.")
     ];
     private static readonly BoundarySurfaceRuleSpec[] BoundarySurfaceRules =
     [
         new("Public surfaces", "public_surfaces", "Public surfaces"),
         new("Signed-in user surfaces", "signed_in_user_surfaces", "Signed-in user surfaces"),
-        new("Provider-backed assistant surfaces", "provider_backed_assistant_surfaces", "Provider-backed help")
+        new("Help tool surfaces", "provider_backed_assistant_surfaces", "Help tools")
     ];
 
     private readonly PublicCanonFileLoader _canon;
@@ -155,8 +155,8 @@ public sealed class PublicPrivacyBoundaryService
             ContractName = DefaultContractName,
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
             Eyebrow = "Privacy boundary",
-            Heading = "Support, survey, and assistant data stay on a bounded clock",
-            Summary = "Chummer keeps support, install, survey, and provider-backed help surfaces on explicit retention windows and redaction rules instead of stockpiling raw payloads.",
+            Heading = "Support and feedback data expire on a clear schedule",
+            Summary = "Chummer keeps support, install, feedback, and help data on clear retention windows instead of stockpiling raw payloads.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
                 .Select(spec => BuildDomain(spec, retentionDomains))
