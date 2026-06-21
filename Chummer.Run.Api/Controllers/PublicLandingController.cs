@@ -2838,21 +2838,21 @@ public sealed class PublicLandingController : Controller
         var model = await BuildHorizonPreviewPageModel(
             pageId: "foundry-export-boundary",
             title: "Foundry export boundary",
-            description: "Foundry-facing export remains a bounded interoperability surface, not a separate flagship claim.",
+            description: "Foundry export remains a limited handoff path, not a separate flagship feature.",
             currentPath: "/exports/foundry",
-            eyebrow: "Boundary surface",
+            eyebrow: "Export support",
             heading: "Foundry export boundary",
-            intro: "This route exists to make the interoperability boundary explicit. It documents what Chummer can hand off toward Foundry-style targets without pretending that a separate parked feature still owns the public product story.",
+            intro: "This route explains what Chummer can hand off toward Foundry-style targets without making export support look like a separate product.",
             summaryPoints:
             [
-                "Interop boundary",
-                "No separate public Foundry feature claim",
-                "Export truth stays first-party"
+                "Export path",
+                "No separate public Foundry feature",
+                "Chummer keeps the campaign state"
             ],
             sections:
             [
-                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim export", "Foundry-facing export is an interoperability boundary. Packet truth, moderation status, and active campaign authority stay first-party even when an external VTT target exists.", ["Interop only", "Chummer-owned", "No third-party truth owner"]),
-                new TrustPageSectionViewModel("foundry-next", "Current status", "Use the shipped paths", "The shipped product story now lives on the active native and public features. This route remains as a boundary explainer for export targets, not as a parked roadmap promise.", ["Shipped features elsewhere", "Boundary stays explicit", "No stale parked claim"])
+                new TrustPageSectionViewModel("foundry-boundary", "Export limits", "Use export as a handoff", "Foundry-style export is a handoff. Chummer keeps campaign state, moderation status, and active table work in Chummer even when a VTT target exists.", ["Export only", "Chummer keeps the record", "No outside owner"]),
+                new TrustPageSectionViewModel("foundry-next", "Current status", "Use the shipped paths", "The shipped product story now lives on the active native and public features. This route remains as a simple export explainer, not as a parked roadmap promise.", ["Shipped features elsewhere", "Export stays clear", "No stale parked claim"])
             ],
             actions:
             [

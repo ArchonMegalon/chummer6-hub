@@ -2036,3 +2036,38 @@ def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> Non
         "no_public_surveillance",
     ):
         assert expected in controller
+
+
+def test_foundry_export_copy_uses_limited_handoff_language() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+
+    for forbidden in (
+        "Foundry-facing export remains a bounded interoperability surface, not a separate flagship claim.",
+        "Boundary surface",
+        "This route exists to make the interoperability boundary explicit.",
+        "separate parked feature still owns the public product story",
+        "Interop boundary",
+        "No separate public Foundry feature claim",
+        "Export truth stays first-party",
+        "Foundry-facing export is an interoperability boundary.",
+        "Packet truth, moderation status, and active campaign authority stay first-party",
+        "No third-party truth owner",
+        "Boundary stays explicit",
+    ):
+        assert forbidden not in controller
+
+    for expected in (
+        "Foundry export remains a limited handoff path, not a separate flagship feature.",
+        "Export support",
+        "This route explains what Chummer can hand off toward Foundry-style targets without making export support look like a separate product.",
+        "Export path",
+        "No separate public Foundry feature",
+        "Chummer keeps the campaign state",
+        "Foundry-style export is a handoff.",
+        "Chummer keeps campaign state, moderation status, and active table work in Chummer even when a VTT target exists.",
+        "Export only",
+        "Chummer keeps the record",
+        "No outside owner",
+        "Export stays clear",
+    ):
+        assert expected in controller
