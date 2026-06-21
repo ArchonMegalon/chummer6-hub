@@ -145,7 +145,29 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                 "artifact proof",
                 "Closeout proof",
                 "governed discovery packets",
-                "product review routing"
+                "product review routing",
+                "fuzzy assistants",
+                "ALICE context",
+                "assistant folklore",
+                "non-authoritative",
+                "first-party continuity",
+                "first-party trust records",
+                "first-party open-run",
+                "first-party rules-light",
+                "first-party support",
+                "first-party aggregate",
+                "first-party download",
+                "typed GM-control APIs",
+                "Typed GM-control APIs",
+                "typed starter/recovery APIs",
+                "Typed starter/recovery APIs",
+                "typed edition-head APIs",
+                "Typed edition-head APIs",
+                "typed jump-target APIs",
+                "Typed jump APIs",
+                "typed capability/policy APIs",
+                "operator ritual",
+                "first-party prompts"
             })
             {
                 Assert.DoesNotContain(forbidden, registry, StringComparison.Ordinal);
@@ -157,19 +179,23 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("Readable records", registry, StringComparison.Ordinal);
             Assert.Contains("download details are live right now", registry, StringComparison.Ordinal);
             Assert.Contains("See the explanation trail", registry, StringComparison.Ordinal);
-            Assert.Contains("NEXUS-PAN now has a first-party continuity page", registry, StringComparison.Ordinal);
+            Assert.Contains("NEXUS-PAN now has a Chummer continuity page", registry, StringComparison.Ordinal);
+            Assert.Contains("vague suggestions", registry, StringComparison.Ordinal);
+            Assert.Contains("later build-help context", registry, StringComparison.Ordinal);
+            Assert.Contains("Derived projections", registry, StringComparison.Ordinal);
             Assert.Contains("Compare grounded tradeoffs with readable history", registry, StringComparison.Ordinal);
             Assert.Contains("Open the briefing", registry, StringComparison.Ordinal);
             Assert.Contains("Open the prep page", registry, StringComparison.Ordinal);
             Assert.Contains("Open the public page", registry, StringComparison.Ordinal);
-            Assert.Contains("RUN CONTROL now has a named public page", registry, StringComparison.Ordinal);
-            Assert.Contains("ONRAMP now has a named public page", registry, StringComparison.Ordinal);
-            Assert.Contains("EDITION STUDIO now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("working GM-control support", registry, StringComparison.Ordinal);
+            Assert.Contains("working starter/recovery support", registry, StringComparison.Ordinal);
+            Assert.Contains("working edition support", registry, StringComparison.Ordinal);
+            Assert.Contains("Chummer open-run support", registry, StringComparison.Ordinal);
             Assert.Contains("Open Anarchy", registry, StringComparison.Ordinal);
             Assert.Contains("Reviewable export", registry, StringComparison.Ordinal);
             Assert.Contains("Replay and after-action history", registry, StringComparison.Ordinal);
             Assert.Contains("Open the replay page", registry, StringComparison.Ordinal);
-            Assert.Contains("LOCAL CO-PROCESSOR now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("working capability controls", registry, StringComparison.Ordinal);
             Assert.Contains("Open the acceleration details", registry, StringComparison.Ordinal);
             Assert.Contains("Publish primers, briefing reels, and bundles without losing context.", registry, StringComparison.Ordinal);
             Assert.Contains("Open the continuity page", registry, StringComparison.Ordinal);
@@ -180,7 +206,53 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("Public roadmap", registry, StringComparison.Ordinal);
             Assert.Contains("Roadmap cards are planning signals", registry, StringComparison.Ordinal);
             Assert.Contains("Chummer checks the update before voter notifications are sent.", registry, StringComparison.Ordinal);
-            Assert.Contains("focused discovery with first-party prompts", registry, StringComparison.Ordinal);
+            Assert.Contains("focused discovery with Chummer prompts", registry, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Public_landing_asset_registry_uses_plain_alt_and_caption_copy()
+    {
+        string[] registryPaths =
+        [
+            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_ASSET_REGISTRY.yaml"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_LANDING_ASSET_REGISTRY.yaml")
+        ];
+
+        foreach (string registryPath in registryPaths)
+        {
+            string registry = File.ReadAllText(registryPath);
+
+            foreach (string forbidden in new[]
+            {
+                "operator relationship",
+                "blue proof light",
+                "verification image",
+                "evidence markers",
+                "Future lanes image",
+                "solo operator",
+                "Creator proof image",
+                "Player lane image",
+                "GM lane image",
+                "Creator lane image",
+                "Secure contribution lane",
+                "verification pressure cues",
+                "Participation lane image"
+            })
+            {
+                Assert.DoesNotContain(forbidden, registry, StringComparison.OrdinalIgnoreCase);
+            }
+
+            Assert.Contains("support relationship", registry, StringComparison.Ordinal);
+            Assert.Contains("blue desk light", registry, StringComparison.Ordinal);
+            Assert.Contains("Rules review image", registry, StringComparison.Ordinal);
+            Assert.Contains("Future areas image", registry, StringComparison.Ordinal);
+            Assert.Contains("one maintainer", registry, StringComparison.Ordinal);
+            Assert.Contains("Creator review image", registry, StringComparison.Ordinal);
+            Assert.Contains("Player path image", registry, StringComparison.Ordinal);
+            Assert.Contains("GM path image", registry, StringComparison.Ordinal);
+            Assert.Contains("Creator path image", registry, StringComparison.Ordinal);
+            Assert.Contains("Participation image", registry, StringComparison.Ordinal);
         }
     }
 

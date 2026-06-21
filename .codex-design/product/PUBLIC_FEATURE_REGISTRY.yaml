@@ -204,12 +204,12 @@ cards:
     external_ok: true
     pain: My devices drift and the table loses confidence.
     payoff: Shared state survives device churn without the GM rebuilding the run from memory.
-    proof_note: "NEXUS-PAN now has a first-party continuity page instead of reading like a future-only explainer."
+    proof_note: "NEXUS-PAN now has a Chummer continuity page instead of reading like a future-only explainer."
     microproof: Continuity page|Shared state recovery|Offline honesty
   - id: horizon_alice
     bucket: coming_next
     title: ALICE
-    summary: Builders get grounded what-if analysis without trusting fuzzy assistants.
+    summary: Builders get grounded what-if analysis without trusting vague suggestions.
     href: /alice
     badge: Shipped MVP
     audience: public
@@ -227,7 +227,7 @@ cards:
   - id: horizon_origin_dossier
     bucket: coming_next
     title: ORIGIN DOSSIER
-    summary: Turn approved origin canon into contacts, debts, scars, secrets, media, and later ALICE context.
+    summary: Turn an approved origin into contacts, debts, scars, secrets, media, and later build-help context.
     href: https://chummer.run/media/horizons/origin-dossier-90s-deepdive.mp4
     badge: Shipped MVP
     audience: public
@@ -278,9 +278,9 @@ cards:
     fallback_label: Read the horizon brief
     external_ok: true
     pain: Rules answers are expensive, repetitive, and still easy to hallucinate.
-    payoff: Derived projections stay grounded instead of becoming assistant folklore.
+    payoff: Derived projections stay grounded instead of becoming guesswork.
     proof_note: "KNOWLEDGE FABRIC anchors to the Chummer rules surface and live explanation view instead of only research framing."
-    microproof: Rules surface|Live explanation|Derived non-authoritative projections
+    microproof: Rules surface|Live explanation|Derived projections
   - id: horizon_karma_forge
     bucket: coming_next
     title: KARMA FORGE
@@ -320,7 +320,7 @@ cards:
     pain: I want mission briefs that do not feel like a copy-paste graveyard.
     payoff: Grounded handouts can feel polished without pretending to be canon.
     proof_note: "JACKPOINT now has a named briefing, public-safe files, and a signed-in publication desk instead of reading like an export teaser."
-    microproof: Briefing|Named signed-in desk|Typed publication page
+    microproof: Briefing|Named signed-in desk|Publication page
   - id: horizon_runsite
     bucket: coming_next
     title: RUNSITE
@@ -340,7 +340,7 @@ cards:
     pain: Spatial prep is tedious and scattered.
     payoff: The venue becomes a visible, inspectable run surface.
     proof_note: "RUNSITE now has a named prep page, public packs, and a signed-in prep bench instead of staying a static file tease."
-    microproof: Prep page|Named prep bench|Typed workspace and run support
+    microproof: Prep page|Named prep bench|Workspace and run support
   - id: horizon_run_control
     bucket: coming_next
     title: RUN CONTROL
@@ -357,10 +357,10 @@ cards:
     fallback_route: /run-control
     fallback_label: Open the public page
     external_ok: true
-    pain: GMs still stitch session control together from notes, memory, and chat when the operations page is not first-party.
+    pain: GMs still stitch session control together from notes, memory, and chat when the operations page is not inside Chummer.
     payoff: The current run, continuity, and next safe action stay visible inside Chummer.
-    proof_note: "RUN CONTROL now has a named public page, public-safe session notes, a signed-in control desk, and typed GM-control APIs instead of only future horizon copy."
-    microproof: Control page|Signed-in desk|Typed GM-control APIs
+    proof_note: "RUN CONTROL now has a named public page, public-safe session notes, a signed-in control desk, and working GM-control support instead of only future copy."
+    microproof: Control page|Signed-in desk|GM-control support
   - id: onramp
     bucket: supporting_reads
     title: ONRAMP
@@ -379,8 +379,8 @@ cards:
     external_ok: true
     pain: New or rusty users still bounce off jargon, legality, and account recovery before they reach a playable first session.
     payoff: The first safe path into Chummer stays calm and guided without turning tutorial copy into rules authority.
-    proof_note: "ONRAMP now has a named public page, starter and recovery notes, a signed-in starter desk, and typed starter/recovery APIs instead of only future horizon copy."
-    microproof: Starter page|Signed-in starter desk|Typed starter and recovery APIs
+    proof_note: "ONRAMP now has a named public page, starter and recovery notes, a signed-in starter desk, and working starter/recovery support instead of only future copy."
+    microproof: Starter page|Signed-in starter desk|Starter and recovery support
   - id: horizon_edition_studio
     bucket: coming_next
     title: EDITION STUDIO
@@ -399,8 +399,8 @@ cards:
     external_ok: true
     pain: Multiple rulesets can share one shell while still losing the mental-model differences that make them understandable.
     payoff: SR4, SR5, and SR6 keep distinct handling in one product instead of flattening into generic chrome.
-    proof_note: "EDITION STUDIO now has a named public page, SR4/SR5/SR6 edition notes, a signed-in edition desk, and typed edition-head APIs instead of only future flagship copy."
-    microproof: Ruleset page|Signed-in edition desk|Typed edition-head APIs
+    proof_note: "EDITION STUDIO now has a named public page, SR4/SR5/SR6 edition notes, a signed-in edition desk, and working edition support instead of only future copy."
+    microproof: Ruleset page|Signed-in edition desk|Edition support
   - id: horizon_runbook_press
     bucket: coming_next
     title: RUNBOOK PRESS
@@ -418,7 +418,7 @@ cards:
     fallback_label: Read the horizon brief
     external_ok: true
     pain: Table onboarding still depends on heroic patience.
-    payoff: Grounded primers become first-class Chummer outputs instead of random PDFs.
+    payoff: Grounded primers become finished Chummer outputs instead of random PDFs.
     proof_note: "RUNBOOK PRESS now has a Chummer public page backed by the primer and primer-video surfaces instead of only preview framing."
     microproof: Public page|Primer|Primer-video surface
   - id: horizon_community_hub
@@ -439,8 +439,8 @@ cards:
     external_ok: true
     pain: Finding a table still means juggling community rules, approvals, chats, calendars, and follow-up by hand.
     payoff: Chummer becomes the structured layer above community chats, calendars, and play surfaces instead of another disconnected app.
-    proof_note: "COMMUNITY HUB now has a named public page, a signed-in board, and first-party open-run orchestration APIs instead of only roadmap copy."
-    microproof: Public board|Signed-in board|Typed open-run APIs
+    proof_note: "COMMUNITY HUB now has a named public page, a signed-in board, and Chummer open-run support instead of only roadmap copy."
+    microproof: Public board|Signed-in board|Open-run support
   - id: horizon_runner_passport
     bucket: coming_next
     title: RUNNER PASSPORT
@@ -459,7 +459,7 @@ cards:
     external_ok: true
     pain: Cross-table trust collapses when every organizer has to reconstruct runner history by hand.
     payoff: Public-safe continuity stays visible while signed-in return keeps command and aftermath attached.
-    proof_note: "RUNNER PASSPORT now has a named public page, a named signed-in continuity bench, and first-party trust records instead of generic preview copy."
+    proof_note: "RUNNER PASSPORT now has a named public page, a signed-in continuity bench, and Chummer trust records instead of generic preview copy."
     microproof: Public trust records|Signed-in continuity bench|Table Pulse return
   - id: horizon_quicksilver
     bucket: coming_next
@@ -479,12 +479,12 @@ cards:
     external_ok: true
     pain: Expert users still lose tempo when trusted pages are real but too many clicks apart.
     payoff: The next safe jump stays fast without flattening legality, explainability, or ownership.
-    proof_note: "QUICKSILVER now has a named public page, a signed-in command deck, and typed jump-target APIs instead of future-only speed copy."
-    microproof: Command page|Signed-in speed deck|Typed jump APIs
+    proof_note: "QUICKSILVER now has a named public page, a signed-in command deck, and working jump support instead of future-only speed copy."
+    microproof: Command page|Signed-in speed deck|Jump support
   - id: horizon_anarchy
     bucket: coming_next
     title: ANARCHY
-    summary: A first-party rules-light mode for mobile play, dispatches, and Black Ledger consequence.
+    summary: A built-in rules-light mode for mobile play, dispatches, and campaign-city consequence.
     href: /anarchy
     badge: Shipped MVP
     audience: public
@@ -497,10 +497,10 @@ cards:
     fallback_route: /anarchy
     fallback_label: Open the public page
     external_ok: true
-    pain: Rules-light tables still need first-party support instead of being flattened into an SR5 or SR6 skin.
+    pain: Rules-light tables still need built-in support instead of being flattened into an SR5 or SR6 skin.
     payoff: Anarchy stays dedicated, dispatch-backed, mobile-friendly, and explainable without pretending to be dense-book completeness.
     proof_note: "ANARCHY now has a named public page, a play shell, a ledger mode, and reviewable export/explain surfaces instead of only preview language."
-    microproof: Public ruleset mode|Play shell|Reviewable export
+    microproof: Ruleset mode|Play shell|Reviewable export
   - id: horizon_black_ledger
     bucket: coming_next
     title: BLACK LEDGER
@@ -539,7 +539,7 @@ cards:
     external_ok: true
     pain: People remember the drama and forget the sequence.
     payoff: After-action review can point at event history instead of table folklore.
-    proof_note: "GHOSTWIRE now has a named public page, replay and after-action notes, and a first-party aggregate view instead of only roadmap framing."
+    proof_note: "GHOSTWIRE now has a named public page, replay and after-action notes, and a Chummer aggregate view instead of only roadmap framing."
     microproof: Replay timeline|After-action notes|Consequence chain
   - id: horizon_local_co_processor
     bucket: working_now
@@ -559,7 +559,7 @@ cards:
     external_ok: false
     pain: Some heavy local workflows still need more muscle.
     payoff: Local acceleration stays optional and bounded instead of becoming a mystery dependency.
-    proof_note: "LOCAL CO-PROCESSOR now has a named public page, capability and policy notes, signed-in profile pages, and typed capability/policy APIs."
+    proof_note: "LOCAL CO-PROCESSOR now has a named public page, capability and policy notes, signed-in profile pages, and working capability controls."
     microproof: Capability matrix|Policy boundary|Hosted-first fallback
   - id: artifact_preview_build
     bucket: featured_artifacts
@@ -576,7 +576,7 @@ cards:
     detail_primary_label: Open downloads
     pain: Early-access products stop feeling real when the current build is vague or hard to check.
     payoff: One visible build, one clear channel label, and one clean install path make the release feel dependable instead of improvised.
-    proof_note: "Detail: the current release has a real installer path, clear platform status, and a first-party download path."
+    proof_note: "Detail: the current release has a real installer path, clear platform status, and a Chummer download path."
     microproof: Installer path|Release channel|Account-aware handoff
   - id: artifact_mac_release_pipeline
     bucket: featured_artifacts
@@ -594,7 +594,7 @@ cards:
     fallback_route: /artifacts/mac-release-pipeline
     fallback_label: Read the full runbook
     pain: Mac release work falls apart when cloning, signing, notarization, publication, and live checks live in separate tribal steps.
-    payoff: One bootstrap turns a Mac release session into a repeatable public release flow instead of a manual operator ritual.
+    payoff: One bootstrap turns a Mac release session into a repeatable public release flow instead of a manual maintainer ritual.
     proof_note: "Paste `bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)` into the Mac shell, then let the bootstrap build, sign, notarize, publish, and check the release with the current supported chummer.run topology."
     microproof: Clone and pin refs|Codesign and notarize|Publish and check live release
   - id: artifact_rules_receipt
@@ -727,7 +727,7 @@ cards:
   - id: participate_future
     bucket: participate
     title: Start KARMA FORGE discovery
-    summary: Turn house-rule pain into focused discovery with first-party prompts, product review, and clear follow-up.
+    summary: Turn house-rule pain into focused discovery with Chummer prompts, product review, and clear follow-up.
     href: /participate/karma-forge
     badge: Public
     audience: public

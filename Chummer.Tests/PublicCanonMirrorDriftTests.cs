@@ -8,6 +8,7 @@ public sealed class PublicCanonMirrorDriftTests
     [InlineData("PUBLIC_RELEASE_EXPERIENCE.yaml")]
     [InlineData("PUBLIC_LANDING_MANIFEST.yaml")]
     [InlineData("PUBLIC_FEATURE_REGISTRY.yaml")]
+    [InlineData("PUBLIC_LANDING_ASSET_REGISTRY.yaml")]
     [InlineData("PUBLIC_DOWNLOADS_POLICY.md")]
     [InlineData("PUBLIC_LANDING_POLICY.md")]
     [InlineData("PUBLIC_GUIDE_POLICY.md")]

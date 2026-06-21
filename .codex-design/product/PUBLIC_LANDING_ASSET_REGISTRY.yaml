@@ -12,7 +12,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/hero-shadowrun-assistant-nightdesk.avif
     mobile_poster_webp_url: /media/campaign/hero-shadowrun-assistant-nightdesk.webp
     loop_url:
-    alt: Rain-heavy intake bay with dossiers, prep hardware, and a visible operator relationship behind the Chummer front door.
+    alt: Rain-heavy intake bay with dossiers, prep hardware, and a visible support relationship behind the Chummer front door.
     caption: Landing hero image
     motion_policy: premium_still_or_short_muted_loop
     fallback_style: boulevard_glass
@@ -26,7 +26,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/capability-build-runner.avif
     mobile_poster_webp_url: /media/campaign/capability-build-runner.webp
     loop_url:
-    alt: Runner build workspace with dossier fragments, cyberware parts, and visible tradeoff review under blue proof light.
+    alt: Runner build workspace with dossier fragments, cyberware parts, and visible tradeoff review under blue desk light.
     caption: Build runner image
     motion_policy: stills_only
     fallback_style: dossier_lamplight
@@ -54,8 +54,8 @@ assets:
     mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
     mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
     loop_url:
-    alt: Rules verification desk with source fragments, evidence markers, and grounded blue lighting.
-    caption: Rules verification image
+    alt: Rules review desk with source fragments, detail markers, and grounded blue lighting.
+    caption: Rules review image
     motion_policy: stills_only
     fallback_style: simulation_amber
   - asset_slot: release_current_build
@@ -124,8 +124,8 @@ assets:
     mobile_poster_avif_url: /media/campaign/future-blue-boulevard.avif
     mobile_poster_webp_url: /media/campaign/future-blue-boulevard.webp
     loop_url:
-    alt: Blue boulevard reflections and horizon markers suggesting future Chummer lanes without entertainment-poster excess.
-    caption: Future lanes image
+    alt: Blue boulevard reflections and future Chummer areas without entertainment-poster excess.
+    caption: Future areas image
     motion_policy: stills_only
     fallback_style: future_boulevard
   - asset_slot: scene_simulation_bench
@@ -166,7 +166,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
     mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Contribution workstation with intake trays, verification cues, and a solo operator connected to a wider trusted system.
+    alt: Contribution workstation with intake trays, review cues, and one maintainer connected to a wider trusted system.
     caption: Participation image
     motion_policy: stills_only
     fallback_style: solo_cockpit
@@ -181,7 +181,7 @@ assets:
     mobile_poster_webp_url: /media/campaign/scene-prop-cluster.webp
     loop_url:
     alt: Creator workstation with scanner, camera, sealed packets, and careful publishing review under blue desk light.
-    caption: Creator proof image
+    caption: Creator review image
     motion_policy: stills_only
     fallback_style: prop_table
   - asset_slot: lane_player
@@ -195,7 +195,7 @@ assets:
     mobile_poster_webp_url: /media/campaign/lane-player.webp
     loop_url:
     alt: Player prep scene with dossier review, gear planning, and grounded pressure before the run.
-    caption: Player lane image
+    caption: Player path image
     motion_policy: stills_only
     fallback_style: solo_cockpit
   - asset_slot: lane_gm
@@ -209,7 +209,7 @@ assets:
     mobile_poster_webp_url: /media/campaign/lane-gm.webp
     loop_url:
     alt: GM planning scene with route overlays, threat markers, and composed run orchestration.
-    caption: GM lane image
+    caption: GM path image
     motion_policy: stills_only
     fallback_style: dossier_lamplight
   - asset_slot: lane_creator
@@ -223,7 +223,7 @@ assets:
     mobile_poster_webp_url: /media/campaign/lane-creator.webp
     loop_url:
     alt: Creator workstation with package fragments, polished media pieces, and careful rules stewardship.
-    caption: Creator lane image
+    caption: Creator path image
     motion_policy: stills_only
     fallback_style: prop_table
   - asset_slot: participation_ops_lane
@@ -236,7 +236,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
     mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Secure contribution lane setup with one operator, clean devices, and visible verification pressure cues.
-    caption: Participation lane image
+    alt: Secure contribution setup with one maintainer, clean devices, and visible review cues.
+    caption: Participation image
     motion_policy: stills_only
     fallback_style: solo_cockpit
