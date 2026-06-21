@@ -4,8 +4,6 @@ version: 1
 primary_nav:
   - label: Home
     href: /
-  - label: Get Chummer
-    href: /downloads
   - label: Participate
     href: https://chummer6.productlift.dev
   - label: Help

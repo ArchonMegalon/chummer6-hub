@@ -102,7 +102,9 @@
     var supplementalSignalLinks = publicSignalLinks
         .Where(link => !string.Equals(link.Href, "/roadmap", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var primarySiteLinks = chrome.PrimaryNavigation;
+    var primarySiteLinks = chrome.PrimaryNavigation
+        .Where(link => !minimalSurface || !string.Equals(link.Href, "/downloads", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
     var footerLinks = (compactFooter ? footerProductLinks : footerProductLinks.Concat(supplementalSignalLinks))
         .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
         .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)

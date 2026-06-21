@@ -79,12 +79,11 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "Get Chummer", "Participate", "Help"],
+            ["Home", "Participate", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("/downloads", chrome.PrimaryNavigation[1].Href);
-        Assert.Equal("https://chummer6.productlift.dev", chrome.PrimaryNavigation[2].Href);
-        Assert.Equal("/help", chrome.PrimaryNavigation[3].Href);
+        Assert.Equal("https://chummer6.productlift.dev", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
     }
 
     [Fact]

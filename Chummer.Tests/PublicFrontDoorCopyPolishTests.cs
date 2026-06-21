@@ -408,14 +408,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         Assert.Contains("label: Home", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /", navigation, StringComparison.Ordinal);
-        Assert.Contains("label: Get Chummer", navigation, StringComparison.Ordinal);
-        Assert.Contains("href: /downloads", navigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("label: Get Chummer", firstVisitSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("href: /downloads", firstVisitSource, StringComparison.Ordinal);
         Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);
         Assert.Contains("href: https://chummer6.productlift.dev", navigation, StringComparison.Ordinal);
         Assert.Contains("label: Help", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /help", navigation, StringComparison.Ordinal);
-        Assert.Contains("@foreach (var link in primaryDrawerLinks)", layout, StringComparison.Ordinal);
-        Assert.DoesNotContain("@foreach (var link in compactDrawerLinks)", layout, StringComparison.Ordinal);
+        Assert.Contains("<nav class=\"site-nav\" aria-label=\"Primary navigation\">", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("primaryDrawerLinks", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("compactDrawerLinks", layout, StringComparison.Ordinal);
 
         foreach (string hiddenRoute in new[]
         {

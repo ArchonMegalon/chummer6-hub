@@ -565,9 +565,12 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
 def test_minimal_palette_stays_neutral_and_readable() -> None:
     site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
-    assert "--minimal-page: #f7f8fa;" in site_css
+    assert "--minimal-page: #fcfdfc;" in site_css
     assert "--minimal-surface: #ffffff;" in site_css
-    assert "rgba(255, 255, 255, 0.92)" in site_css
+    assert "--minimal-ink: #0d0d0d;" in site_css
+    assert "--minimal-muted: #5d5d5d;" in site_css
+    assert "--minimal-line: #e4e7eb;" in site_css
+    assert "rgba(255, 255, 255, 0.96)" in site_css
     assert "--minimal-page: #f7f6f2;" not in site_css
     assert "--minimal-surface: #fffefa;" not in site_css
     assert "--minimal-soft: #ece8df;" not in site_css
