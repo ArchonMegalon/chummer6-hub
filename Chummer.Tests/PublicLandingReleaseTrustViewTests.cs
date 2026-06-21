@@ -204,7 +204,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The build currently available from Chummer.", view, StringComparison.Ordinal);
         Assert.Contains("Release", view, StringComparison.Ordinal);
         Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.ReleaseSummary", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
         Assert.Contains("IsReleaseAvailable(Model.Manifest.ProofStatus)", view, StringComparison.Ordinal);
         Assert.Contains("normalized.Contains(\"ready\"", view, StringComparison.Ordinal);
         Assert.Contains("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
@@ -282,8 +282,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("@Model.ReleaseSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.ReleaseSummary", view, StringComparison.Ordinal);
+        Assert.Contains("static string PublicStatusText(string? value) => PublicFacingCopyHumanizer.Clean(value);", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(platform.Summary)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.ReleaseSummary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@platform.Summary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("CustomerStatusText(", view, StringComparison.Ordinal);
         Assert.DoesNotContain("FindLaunchHealthValue(", view, StringComparison.Ordinal);
     }

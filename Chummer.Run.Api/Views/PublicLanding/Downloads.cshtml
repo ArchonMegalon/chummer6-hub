@@ -81,6 +81,8 @@
         .ToArray();
     var stableAndNightlyMatch = stableArtifactIds.Length > 0
         && stableArtifactIds.SequenceEqual(nightlyArtifactIds, StringComparer.OrdinalIgnoreCase);
+
+    static string PublicDownloadText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="minimal-page-hero">
@@ -100,7 +102,7 @@
 {
     <section class="minimal-empty">
         <h2>No download is available right now</h2>
-        <p>@Model.Manifest.Message</p>
+        <p>@PublicDownloadText(Model.Manifest.Message)</p>
         <a class="button-like button-like--primary" href="/status">Open status</a>
     </section>
 }
@@ -174,12 +176,12 @@ else
             <div class="minimal-platform-list">
                 @foreach (var package in aurPackages)
                 {
-                    <article>
-                        <h3>@package.PlatformLabel</h3>
-                        <p>@package.Summary</p>
-                        <div class="minimal-actions">
-                            <a href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
-                            <a href="@package.PkgbuildUrl">PKGBUILD</a>
+                <article>
+                    <h3>@package.PlatformLabel</h3>
+                    <p>@PublicDownloadText(package.Summary)</p>
+                    <div class="minimal-actions">
+                        <a href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
+                        <a href="@package.PkgbuildUrl">PKGBUILD</a>
                         </div>
                     </article>
                 }
@@ -196,7 +198,7 @@ else
             {
                 <article>
                     <h3>@platform.PlatformLabel</h3>
-                    <p>@platform.Summary</p>
+                    <p>@PublicDownloadText(platform.Summary)</p>
                 </article>
             }
         </div>

@@ -121,6 +121,31 @@ def test_faq_page_cleans_dynamic_public_copy_before_rendering() -> None:
         assert forbidden not in faq
 
 
+def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> None:
+    downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
+    status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
+    combined = "\n".join((downloads, status))
+
+    for expected in (
+        "static string PublicDownloadText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicDownloadText(Model.Manifest.Message)",
+        "@PublicDownloadText(package.Summary)",
+        "@PublicDownloadText(platform.Summary)",
+        "static string PublicStatusText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicStatusText(Model.ReleaseSummary)",
+        "@PublicStatusText(platform.Summary)",
+    ):
+        assert expected in combined
+
+    for forbidden in (
+        "<p>@Model.Manifest.Message</p>",
+        "<p>@package.Summary</p>",
+        "<p>@platform.Summary</p>",
+        "<p>@Model.ReleaseSummary</p>",
+    ):
+        assert forbidden not in combined
+
+
 def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     horizons = read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml")

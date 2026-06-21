@@ -11,6 +11,8 @@
         ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
             .ToUniversalTime()
             .ToString("yyyy-MM-dd");
+
+    static string PublicStatusText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 @functions {
@@ -46,7 +48,7 @@
         <article class="route-choice-card">
             <span class="tag">Release</span>
             <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
-            <p>@Model.ReleaseSummary</p>
+            <p>@PublicStatusText(Model.ReleaseSummary)</p>
         </article>
         <article>
             <span>Build</span>
@@ -79,7 +81,7 @@
             {
                 <article id="status-platform-@platform.PlatformId">
                     <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this device)" : string.Empty)</h3>
-                    <p>@platform.Summary</p>
+                    <p>@PublicStatusText(platform.Summary)</p>
                 </article>
             }
         </div>
