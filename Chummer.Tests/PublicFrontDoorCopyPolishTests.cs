@@ -83,7 +83,36 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                 "verify the release",
                 "Explanation receipt trail",
                 "The proof view",
-                "Inspect the receipt trail"
+                "Inspect the receipt trail",
+                "Proof: NEXUS-PAN",
+                "continuity route",
+                "Compare grounded tradeoffs with receipts",
+                "Proof: Origin Dossier",
+                "receipt-backed",
+                "citations and receipts",
+                "Inspect the live explanation",
+                "Open the briefing receipt",
+                "fictional truth",
+                "packet rails",
+                "Open the prep receipt",
+                "Open the control receipt",
+                "Open the public route",
+                "ops lane",
+                "Chummer-owned truth",
+                "Inspect the starter receipt",
+                "first safe route into Chummer",
+                "Inspect the ruleset-head receipt",
+                "first-party lane",
+                "primer packet",
+                "Open the Anarchy lane",
+                "Inspect the runtime receipt",
+                "Receipt-backed export",
+                "after-action truth",
+                "Inspect the replay receipt",
+                "After-action packet",
+                "optional-acceleration lane",
+                "Open the acceleration receipt",
+                "capability and policy packet rails"
             })
             {
                 Assert.DoesNotContain(forbidden, registry, StringComparison.Ordinal);
@@ -95,6 +124,20 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("Readable records", registry, StringComparison.Ordinal);
             Assert.Contains("download details are live right now", registry, StringComparison.Ordinal);
             Assert.Contains("See the explanation trail", registry, StringComparison.Ordinal);
+            Assert.Contains("NEXUS-PAN now has a first-party continuity page", registry, StringComparison.Ordinal);
+            Assert.Contains("Compare grounded tradeoffs with readable history", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the briefing", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the prep page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the public page", registry, StringComparison.Ordinal);
+            Assert.Contains("RUN CONTROL now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("ONRAMP now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("EDITION STUDIO now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open Anarchy", registry, StringComparison.Ordinal);
+            Assert.Contains("Reviewable export", registry, StringComparison.Ordinal);
+            Assert.Contains("Replay and after-action history", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the replay page", registry, StringComparison.Ordinal);
+            Assert.Contains("LOCAL CO-PROCESSOR now has a named public page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the acceleration details", registry, StringComparison.Ordinal);
         }
     }
 
