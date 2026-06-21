@@ -211,6 +211,19 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_copy_humanizer_removes_plural_proof_receipt_and_check_language()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("Proof receipts and public proofs show provider validation checks passed.");
+
+        Assert.Equal("Status details and public status details show service review ready.", cleaned);
+        Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("receipt", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("provider", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("validation", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
