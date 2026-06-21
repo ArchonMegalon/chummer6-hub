@@ -40,6 +40,9 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "Public feedback stays easy to route." in operations
     assert "Decision context" in projection
     assert "Decision sources" not in projection
+    assert "Open the Chummer page" in projection
+    assert "Open first-party fallback" not in projection
+    assert "Boundary conditions" not in projection
     assert "Before it ships" in projection
     assert "The /feedback public copy stays clear, public-safe, and honest about what has shipped." in GATE_SCRIPT.read_text(encoding="utf-8")
     assert "webhook verification" not in feedback

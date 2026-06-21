@@ -11,13 +11,18 @@ public sealed class PublicSignalProjectionBridgeViewTests
         string partial = File.ReadAllText(partialPath);
 
         Assert.Contains("@model PublicSignalProjectionPacketViewModel", partial, StringComparison.Ordinal);
-        Assert.Contains("Open first-party fallback", partial, StringComparison.Ordinal);
+        Assert.Contains("Open the Chummer page", partial, StringComparison.Ordinal);
         Assert.Contains("@Model.CoreRule", partial, StringComparison.Ordinal);
-        Assert.Contains("Boundary conditions", partial, StringComparison.Ordinal);
+        Assert.Contains("Limits", partial, StringComparison.Ordinal);
         Assert.Contains("Required public warning", partial, StringComparison.Ordinal);
         Assert.Contains("Product review", partial, StringComparison.Ordinal);
         Assert.Contains("Decision context", partial, StringComparison.Ordinal);
         Assert.Contains("Planning and shipped updates stay separate from the public board.", partial, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open first-party fallback", partial, StringComparison.Ordinal);
+        Assert.DoesNotContain("Boundary conditions", partial, StringComparison.Ordinal);
+        Assert.DoesNotContain("sourceReceipts", partial, StringComparison.Ordinal);
+        Assert.DoesNotContain("canonicalSources", partial, StringComparison.Ordinal);
+        Assert.DoesNotContain("journeyProofEvents", partial, StringComparison.Ordinal);
     }
 
     [Fact]

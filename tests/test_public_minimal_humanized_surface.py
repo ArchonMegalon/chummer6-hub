@@ -84,6 +84,26 @@ def test_participation_surface_uses_plain_character_helper_copy() -> None:
         assert forbidden not in participate
 
 
+def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
+    packet = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
+
+    assert "Open the Chummer page" in packet
+    assert "How this works" in packet
+    assert "Limits" in packet
+    assert "Public feedback can move into review" in packet
+    assert "guided review path" in packet
+
+    for forbidden in (
+        "Open first-party fallback",
+        "Boundary conditions",
+        "sourceReceipts",
+        "canonicalSources",
+        "journeyProofEvents",
+        "guided synthesis lane",
+    ):
+        assert forbidden not in packet
+
+
 def test_public_humanizer_cleans_plural_internal_terms() -> None:
     humanizer = read("Chummer.Run.Api/Services/PublicFacingCopyHumanizer.cs")
 

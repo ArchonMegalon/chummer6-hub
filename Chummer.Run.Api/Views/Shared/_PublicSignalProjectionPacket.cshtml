@@ -47,7 +47,7 @@
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
             .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
             .Replace("productlift_idea_clustered", "public feedback signal", StringComparison.OrdinalIgnoreCase)
-            .Replace("Icanpreneur", "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
+            .Replace("Icanpreneur", "guided review path", StringComparison.OrdinalIgnoreCase)
             .Replace("Deftform", "structured pre-screen", StringComparison.OrdinalIgnoreCase)
             .Replace("FacePop", "public invitation", StringComparison.OrdinalIgnoreCase)
             .Replace("Lunacal", "scheduled follow-up", StringComparison.OrdinalIgnoreCase)
@@ -57,7 +57,7 @@
     var authorityFlow = Model.AuthorityFlow.Take(4).ToArray();
     var decisionRoutes = Model.DecisionRoutes.Take(4).ToArray();
     var forbidden = Model.Forbidden.Take(4).ToArray();
-    var canonicalSources = Model.CanonicalSources
+    var decisionContextItems = Model.CanonicalSources
         .Select(FormatProjectionLabel)
         .Select(SanitizeProjectionText)
         .Where(static item => !string.IsNullOrWhiteSpace(item))
@@ -67,10 +67,10 @@
         .Select(SanitizeProjectionText)
         .Take(6)
         .ToArray();
-    var journeyProofEvents = Model.JourneyProofEventRefs
+    var milestoneItems = Model.JourneyProofEventRefs
         .Take(4)
         .ToArray();
-    var sourceReceipts = new[]
+    var sourceRecords = new[]
     {
         FormatProjectionLabel(Model.PolicySource),
         FormatProjectionLabel(Model.PipelineSource),
@@ -91,7 +91,7 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
-            <h3>Open first-party fallback</h3>
+            <h3>Open the Chummer page</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__details">
                 <span>Role: @Model.Role</span>
@@ -99,10 +99,10 @@
                 <span>Chummer path: @Model.FallbackPath</span>
                 <span>@SanitizeProjectionText(Model.TruthPosture)</span>
             </div>
-            <a class="editorial-strip__action" href="@Model.FallbackPath">Open Chummer path</a>
+            <a class="editorial-strip__action" href="@Model.FallbackPath">Open page</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Core rule</span>
+            <span class="tag">How this works</span>
             <h3>@Model.CoreRule</h3>
             <p>The public board can collect visible demand, but Chummer review still decides what changes.</p>
             @if (authorityFlow.Length > 0)
@@ -121,9 +121,9 @@
             }
         </article>
         <article class="route-choice-card">
-            <span class="tag">Boundary conditions</span>
+            <span class="tag">Limits</span>
             <h3>Decision paths stay explicit.</h3>
-            <p>Public signal can move into review tracks, but it cannot become support, roadmap, or release status by itself.</p>
+            <p>Public feedback can move into review, but it cannot become support, roadmap, or release status by itself.</p>
             @if (decisionRoutes.Length > 0)
             {
                 <div class="route-choice-card__details">
@@ -157,22 +157,22 @@
             <span class="tag">Product review</span>
             <h3>Planning and shipped updates stay separate from the public board.</h3>
             <p>These links keep feedback connected to product review without turning public comments into promises.</p>
-            @if (sourceReceipts.Length > 0)
+            @if (sourceRecords.Length > 0)
             {
                 <div class="route-choice-card__details">
-                    @foreach (var receipt in sourceReceipts)
+                    @foreach (var record in sourceRecords)
                     {
-                        <span>@receipt</span>
+                        <span>@record</span>
                     }
                 </div>
             }
             <div class="compact-rail">
-                @if (canonicalSources.Length > 0)
+                @if (decisionContextItems.Length > 0)
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                         <h3>Decision context</h3>
-                        <p>@string.Join(" / ", canonicalSources)</p>
+                        <p>@string.Join(" / ", decisionContextItems)</p>
                         </div>
                     </article>
                 }
@@ -194,12 +194,12 @@
                         </div>
                     </article>
                 }
-                @if (journeyProofEvents.Length > 0)
+                @if (milestoneItems.Length > 0)
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>Milestone links</h3>
-                            <p>@string.Join(" / ", journeyProofEvents.Select(item => SanitizeProjectionText(item.EventKey)))</p>
+                            <p>@string.Join(" / ", milestoneItems.Select(item => SanitizeProjectionText(item.EventKey)))</p>
                         </div>
                     </article>
                 }
