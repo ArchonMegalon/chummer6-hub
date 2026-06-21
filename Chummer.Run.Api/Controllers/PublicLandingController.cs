@@ -577,12 +577,12 @@ public sealed class PublicLandingController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var model = await BuildPackageCatalogPageModel(
                 currentPath: currentPath,
-                chromeTitle: "Package operator summary",
-                chromeDescription: "Private summary of package classes, compatibility posture, and Chummer-owned vote or follow history.",
-                eyebrow: "Bounded operator summary",
-                heading: "Package operator summary",
-                intro: "The account view keeps public package class posture, compatibility pressure, and Chummer-owned history together without turning the package browser into a hidden admin-only surface.",
-                scopeLabel: "Operator summary",
+                chromeTitle: "Package maintenance summary",
+                chromeDescription: "Private summary of package classes, compatibility status, and Chummer vote or follow history.",
+                eyebrow: "Maintenance summary",
+                heading: "Package maintenance summary",
+                intro: "The account view keeps public package status, compatibility pressure, and Chummer history together without turning the package browser into a hidden admin-only page.",
+                scopeLabel: "Maintenance summary",
                 signedInScope: true,
                 operatorScope: true,
                 detailBasePath: "/packages",
@@ -597,7 +597,7 @@ public sealed class PublicLandingController : Controller
         }
         catch (HubRequestAuthException ex)
         {
-            _logger.LogWarning(ex, "Package operator summary could not confirm the signed-in identity.");
+            _logger.LogWarning(ex, "Package maintenance summary could not confirm the signed-in identity.");
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
@@ -1686,7 +1686,7 @@ public sealed class PublicLandingController : Controller
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "Supplemental Windows installer",
-            "Direct Windows installer for support outside the main recommended shelf.",
+            "Direct Windows installer for support outside the main downloads page.",
             $"/downloads/install/{artifactId}",
             cancellationToken: cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
@@ -1697,7 +1697,7 @@ public sealed class PublicLandingController : Controller
             Chrome: chrome,
             Eyebrow: "Supplemental Windows installer",
             Heading: $"{headLabel} Windows setup",
-            Summary: "This direct Windows installer stays available for support when this specific build is not on the main recommended shelf.",
+            Summary: "This direct Windows installer stays available for support when this specific build is not on the main recommended downloads page.",
             DispatchNote: "Use this route only when support points to this installer.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
             ArtifactSupportLine: "Direct Windows installer for support.",
@@ -1726,7 +1726,7 @@ public sealed class PublicLandingController : Controller
                     ["kind"] = SupportCaseKinds.InstallHelp,
                     ["title"] = $"{headLabel} Windows supplemental install help",
                     ["summary"] = "Windows supplemental installer needs help on this device.",
-                    ["detail"] = "The Windows supplemental installer path needs help on this device. Keep support on the same install rail.",
+                    ["detail"] = "The Windows supplemental installer path needs help on this device. Keep support on the same install page.",
                     ["applicationVersion"] = manifest.Version,
                     ["releaseChannel"] = manifest.Channel,
                     ["headId"] = proofInstaller.Head,

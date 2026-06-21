@@ -507,7 +507,11 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "provider setup",
             "operating posture",
             "send posture",
-            "release-facing trail"
+            "release-facing trail",
+            "Package operator summary",
+            "Private summary of package classes, compatibility posture",
+            "main recommended shelf",
+            "same install rail"
         ];
 
         foreach (string file in sourceFiles)

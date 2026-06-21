@@ -8,7 +8,6 @@
             || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
             || Model.BootstrapFeatureCards.Count > 0
             || !string.IsNullOrWhiteSpace(Model.CurrentReleaseSummary));
-    // .Replace( legacy source marker: Support stays on the same install rail as the downloaded copy. )
     var routeChoices = new[]
     {
         new
