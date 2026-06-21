@@ -7541,7 +7541,7 @@ Boundary:
             MonetizationRelevance: "retention");
         HouseRuleDemandPacketProjection packet = new(
             Id: "hrp_2026_05_09_sample_karma_forge",
-            Title: "Sample campaign amendment packet",
+            Title: "Sample campaign amendment request",
             Source: new KarmaForgeSourceProjection(
                 IntakeChannel: "Hub Participate",
                 CanonicalLane: "KARMA_FORGE",
@@ -7557,13 +7557,13 @@ Boundary:
                 ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>(),
                 JourneyProofEventRefs:
                 [
-                    new("karma_request_submitted", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The public discovery request entered the first-party KARMA FORGE intake lane."),
-                    new("karma_interview_completed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "Guided follow-up completed inside the bounded KARMA FORGE discovery chain."),
-                    new("karma_demand_packet_created", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The intake normalized into a Chummer-owned demand packet before Product Governor review."),
-                    new("karma_candidate_reviewed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The candidate is visible on the governed review rail instead of staying provider-owned.")
+                    new("karma_request_submitted", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The public discovery request entered the KARMA FORGE intake."),
+                    new("karma_interview_completed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "Guided follow-up completed inside the KARMA FORGE review path."),
+                    new("karma_demand_packet_created", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The intake became a Chummer request before product review."),
+                    new("karma_candidate_reviewed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The request is visible on the review path instead of staying with an outside tool.")
                 ]),
             UserWords: new KarmaForgeUserWordsProjection(
-                Summary: "We need a governed table amendment that survives continuity and rollback without hiding the approval trail.",
+                Summary: "We need a table amendment that survives continuity and rollback without hiding the approval trail.",
                 CurrentWorkaround: "We keep the rule in chat and manually restate it before every session."),
             InterpretedNeed: new KarmaForgeInterpretedNeedProjection(
                 Summary: "Campaign-scoped amendment package with visible compatibility, portability, and rollback posture.",
@@ -7586,13 +7586,13 @@ Boundary:
                 CurrentStatus: "candidate",
                 DecisionNeeded: true,
                 CandidateDecision: "campaign_rule_package",
-                CandidateDecisionMeaning: "Needs a governed campaign package lane before broader rollout.",
+                CandidateDecisionMeaning: "Needs a campaign package path before broader rollout.",
                 ProposedRoute: "KARMA_FORGE"),
             NextSteps:
             [
                 "Review the campaign scope and rollback posture.",
                 "Attach compatibility and portability notes before approval.",
-                "Keep the public receipt bounded to first-party package language."
+                "Keep the public note limited to Chummer-owned request language."
             ],
             OperatorNotes: new KarmaForgeOperatorNotesProjection(
                 FeedbackPrompt: "What needs to stay stable when the campaign amendment changes?",
@@ -7605,7 +7605,7 @@ Boundary:
             TrackKey: "gm_house_rule_track",
             TrackTitle: "GM house rule track",
             CandidateDecision: "campaign_rule_package",
-            CandidateDecisionMeaning: "Needs a governed campaign package lane before broader rollout.",
+            CandidateDecisionMeaning: "Needs a campaign package path before broader rollout.",
             ProposedRoute: "KARMA_FORGE",
             GovernorDecisionRequired: true,
             Confidence: "high",
@@ -7628,8 +7628,8 @@ Boundary:
             SubmittedAtUtc: new DateTimeOffset(2026, 5, 9, 7, 30, 0, TimeSpan.Zero),
             IntakeStatus: "packet_normalized",
             QueueStatus: "queued_for_product_governor",
-            QueueSummary: "Sample seeded receipt proving the KARMA FORGE submission route with a first-party packet payload.",
-            ReporterNextAction: "Open the package or campaign decision rail when you need the next governed step.",
+            QueueSummary: "Sample request saved through the KARMA FORGE submission route.",
+            ReporterNextAction: "Open the campaign decision path when you need the next review step.",
             ConsentSummary: "Sample seeded record with follow-up and quote posture enabled for this route.",
             AuthenticatedSubmission: true,
             FollowUpAllowed: true,
@@ -8925,7 +8925,7 @@ Boundary:
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "KARMA FORGE",
-            "Chummer-owned intake for house-rule, campaign, and trust-friction discovery packets.",
+            "Chummer-owned intake for house-rule, campaign, and table-friction requests.",
             "/participate/karma-forge",
             cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
@@ -8933,9 +8933,9 @@ Boundary:
 
         return new KarmaForgeIntakePageViewModel(
             Chrome: chrome,
-            Eyebrow: "Governed discovery intake",
+            Eyebrow: "Request intake",
             Heading: "KARMA FORGE",
-            Intro: "Turn one table pain into named Chummer-owned packets before it drifts into generic feedback, unsupported roadmap claims, or implementation guesswork.",
+            Intro: "Turn one table pain into a clear Chummer request before it drifts into generic feedback, unsupported roadmap claims, or implementation guesswork.",
             CanonicalLane: _karmaForge.CanonicalLane,
             EntryLane: _karmaForge.EntryLane,
             Dashboard: _karmaForge.GetDashboardSummary(),
@@ -9077,8 +9077,8 @@ Boundary:
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
-            "KARMA FORGE packet receipt",
-            "The normalized packet, decision path, and next-step questions for one KARMA FORGE submission.",
+            "KARMA FORGE request saved",
+            "The saved request, review path, and next questions for one KARMA FORGE submission.",
             $"/participate/karma-forge/submitted/{submission.SubmissionId}",
             cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
@@ -9100,9 +9100,9 @@ Boundary:
 
         return new KarmaForgeSubmittedPageViewModel(
             Chrome: chrome,
-            Eyebrow: "KARMA FORGE intake receipt",
+            Eyebrow: "KARMA FORGE request saved",
             Heading: "KARMA FORGE submission captured",
-            Intro: "The intake is now visible as a Chummer packet, with the next questions and the likely review route still explicit.",
+            Intro: "The request is saved. Chummer can now show the likely review route and the next questions.",
             SubmissionId: submission.SubmissionId,
             TrackTitle: submission.Candidate.TrackTitle,
             QueueStatus: HumanizeToken(submission.QueueStatus, "Queued"),
@@ -9289,7 +9289,7 @@ Boundary:
 
         if (!request.ConsentAccepted)
         {
-            errors.Add("Consent must be accepted before the intake can become a Chummer packet.");
+            errors.Add("Consent must be accepted before Chummer can save the request.");
         }
 
         if (!authenticated && request.FollowUpAllowed && string.IsNullOrWhiteSpace(request.ReplyEmail))

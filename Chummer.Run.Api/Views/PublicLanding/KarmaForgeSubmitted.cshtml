@@ -10,7 +10,7 @@
     {
         new PublicNavigationLink("Next questions", "#next-questions"),
         new PublicNavigationLink("Next steps", "#next-steps"),
-        new PublicNavigationLink("Saved details", "#packet-json"),
+        new PublicNavigationLink("Saved details", "#saved-details"),
     };
     var governedDecisionLabel = string.Concat("Product", " Governor");
     var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Reviewed product decision", StringComparison.OrdinalIgnoreCase);
@@ -31,6 +31,9 @@
             .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
             .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
             .Replace("normalized", "saved", StringComparison.OrdinalIgnoreCase)
+            .Replace("packet", "request", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "note", StringComparison.OrdinalIgnoreCase)
+            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
             .Replace("HouseRuleDemandPacket", "rules request", StringComparison.OrdinalIgnoreCase)
             .Replace("KarmaForgeCandidate", "saved request", StringComparison.OrdinalIgnoreCase);
 
@@ -122,7 +125,7 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>@SanitizePublicText(journeyRef.EventKey)</h3>
+                <h3>@SanitizePublicText(journeyRef.EventKey.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</h3>
                 <p>@SanitizePublicText(journeyRef.Summary)</p>
             </div>
         </article>
@@ -156,7 +159,7 @@
             <p class="muted-copy">Anonymous quote permission is @(Model.QuoteAllowed ? "enabled" : "disabled").</p>
         </article>
 
-        <article class="trust-page-section" id="packet-json">
+        <article class="trust-page-section" id="saved-details">
             <p class="eyebrow">Saved details</p>
             <h2>The saved details are visible here</h2>
             <p>These previews show what Chummer saved for this submission.</p>

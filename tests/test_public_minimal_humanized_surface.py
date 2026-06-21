@@ -283,19 +283,46 @@ def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
 
 
 def test_karma_forge_surfaces_use_plain_review_language() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     karma_forge = read("Chummer.Run.Api/Views/PublicLanding/KarmaForge.cshtml")
     karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
-    combined = "\n".join((karma_forge, karma_submitted))
+    combined = "\n".join((controller, karma_forge, karma_submitted))
 
     assert "guided review path" in combined
     assert "review path" in combined
     assert "id=\"review-next-steps\"" in karma_submitted
+    assert "Request intake" in controller
+    assert "Turn one table pain into a clear Chummer request" in controller
+    assert "KARMA FORGE request saved" in controller
+    assert "The request is saved. Chummer can now show the likely review route and the next questions." in controller
+    assert "Consent must be accepted before Chummer can save the request." in controller
+    assert "new PublicNavigationLink(\"Saved details\", \"#saved-details\")" in karma_submitted
+    assert "id=\"saved-details\"" in karma_submitted
+    assert 'journeyRef.EventKey.Replace("_", " ", StringComparison.OrdinalIgnoreCase)' in karma_submitted
 
     for forbidden in (
         "guided synthesis lane",
         "guided review lane",
         "bounded-followthrough",
         "new PublicNavigationLink(\"Next steps\", \"#bounded-followthrough\")",
+        "Chummer-owned intake for house-rule, campaign, and trust-friction discovery packets.",
+        "Governed discovery intake",
+        "Turn one table pain into named Chummer-owned packets",
+        "KARMA FORGE packet receipt",
+        "The normalized packet, decision path",
+        "KARMA FORGE intake receipt",
+        "The intake is now visible as a Chummer packet",
+        "Consent must be accepted before the intake can become a Chummer packet.",
+        "Sample campaign amendment packet",
+        "Sample seeded receipt proving",
+        "first-party packet payload",
+        "governed campaign package lane",
+        "Keep the public receipt bounded",
+        "demand packet before Product Governor",
+        "governed review rail",
+        "new PublicNavigationLink(\"Saved details\", \"#packet-json\")",
+        "id=\"packet-json\"",
+        "<h3>@SanitizePublicText(journeyRef.EventKey)</h3>",
     ):
         assert forbidden not in combined
 
@@ -1164,7 +1191,7 @@ def test_submitted_pages_clean_dynamic_public_copy_before_rendering() -> None:
         "@SanitizePublicText(action.Label)",
         "@SanitizePublicText(stage.Status.Replace",
         "@SanitizePublicText(stage.ActionLabel)",
-        "@SanitizePublicText(journeyRef.EventKey)",
+        "@SanitizePublicText(journeyRef.EventKey.Replace",
     ):
         assert expected in karma_submitted
 
