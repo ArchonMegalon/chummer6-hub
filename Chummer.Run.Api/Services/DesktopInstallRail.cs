@@ -98,10 +98,10 @@ internal static class DesktopInstallRail
 
         return new DesktopInstallRailContext(
             ReturnHref: $"/downloads/install/{Uri.EscapeDataString(normalizedArtifactId)}",
-            ReturnLabel: recoveryMode ? "Return to recovery handoff" : "Return to guided installer",
+            ReturnLabel: recoveryMode ? "Return to recovery" : "Return to installer",
             Summary: recoveryMode
-                ? "This case stays with the same linked copy. Go back to the guided handoff when you are ready to retry recovery, and only use a recovery code if Chummer entered recovery mode on that device."
-                : "This case stays with the same linked copy. Go back to the guided handoff when you are ready to retry install, first launch, or update on that device.",
+                ? "This case stays with the same linked copy. Go back to recovery when you are ready to retry, and only use a recovery code if Chummer entered recovery mode on that device."
+                : "This case stays with the same linked copy. Go back to the installer when you are ready to retry install, first launch, or update on that device.",
             RecoveryModeOnly: recoveryMode);
     }
 
@@ -127,9 +127,9 @@ internal static class DesktopInstallRail
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."
                 : "Continue in the installer or desktop app so the linked copy can claim this account without another browser step.",
-            UpdateAction: "Use the desktop app update lane or signed-in installer for this same channel and build before filing a new support case.",
+            UpdateAction: "Use the desktop update screen or signed-in installer for this same channel and build before filing a new support case.",
             RollbackAction: "If update or setup fails, keep the previous installed copy and return to Devices and access or tracked support for this same linked copy. Keep the fix, update, rollback, and verification on this same linked install.",
-            SupportContinuation: "Support stays on the same install rail with this linked copy, including its current claim, build, channel, fallback, and recovery context.");
+            SupportContinuation: "Support stays with this linked copy, including its current claim, build, channel, fallback, and recovery context.");
     }
 
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)
@@ -143,7 +143,7 @@ internal static class DesktopInstallRail
     {
         string baseDetail = recoveryMode
             ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same linked copy."
-            : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same linked copy.";
+            : "The signed-in installer, first launch, or update step needs help on this device. Continue the fix on the same linked copy.";
         string? receiptId = NormalizeSupportPrefill(installedBuildReceiptId);
         return receiptId is null
             ? baseDetail
