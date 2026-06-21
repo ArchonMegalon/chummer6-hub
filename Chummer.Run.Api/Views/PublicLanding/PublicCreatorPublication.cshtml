@@ -32,6 +32,23 @@
         };
     }
 
+    static string PublicPublicationText(string? value, string fallback = "")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return PublicFacingCopyHumanizer.Clean(value)
+            .Replace("provenance", "origin", StringComparison.OrdinalIgnoreCase)
+            .Replace("lineage", "history", StringComparison.OrdinalIgnoreCase)
+            .Replace("route", "page", StringComparison.OrdinalIgnoreCase)
+            .Replace("creator" + " concierge", "creator help", StringComparison.OrdinalIgnoreCase)
+            .Replace("testimonial" + " wrapper", "testimonial page", StringComparison.OrdinalIgnoreCase)
+            .Replace("discovery family", "gallery", StringComparison.OrdinalIgnoreCase)
+            .Replace("publication packet", "publication", StringComparison.OrdinalIgnoreCase);
+    }
+
     string PublicationAvailabilityLabel(bool discoverable)
         => publicationRouteReviewRequired && discoverable
             ? "Limited public state"
@@ -48,7 +65,7 @@
     var routeStateLabel = HumanizeStatus(Model.RouteState, "Limited");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
-        ?? "No visible publication history is attached to this outward-facing publication yet.";
+        ?? "No visible publication history is attached to this public page yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
     var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in account return view" : "Create account for signed-in account return";
     var signedInShelfSummary = Model.Chrome.Authenticated
@@ -61,19 +78,19 @@
         new
         {
             Badge = "Publication discovery",
-            Title = "Stay in publication discovery when the job is lineage, provenance, or comparison",
-            Summary = "This publication detail page belongs to the discovery family. Use the gallery and discovery pages when you want to inspect related outputs instead of jumping straight to downloads.",
+            Title = "Stay in the gallery when you want history, origin, or comparison",
+            Summary = "This publication detail page belongs to the gallery. Use it when you want related items instead of jumping straight to downloads.",
             Href = Model.BackHref,
             Label = "Back to publication discovery",
             Details = new[] { "Details first", "Related items", "Comparison nearby" }
         },
         new
         {
-            Badge = "Creator routing",
-            Title = "Use the creator concierge when the next job is consult, intake, or creator next steps",
-            Summary = "The creator wrapper keeps creator intake and follow-up separate from downloads, support, and account settings.",
+            Badge = "Creator help",
+            Title = "Use creator help when the next job is intake or creator follow-up",
+            Summary = "Creator help keeps creator intake and follow-up separate from downloads, support, and account settings.",
             Href = creatorConciergeHref,
-            Label = "Open creator concierge",
+            Label = "Open creator help",
             Details = new[] { "Creator intake", "Follow-up visible", "No install confusion" }
         },
         new
@@ -101,10 +118,10 @@
         new
         {
             Badge = "Public testimonials",
-            Title = "Use the testimonial wrapper when you want moderated public feedback instead of support follow-up",
-            Summary = "The testimonial route keeps ratings, media captures, and moderation separate from support cases, install recovery, and publication approval.",
+            Title = "Use the testimonial page when you want moderated public feedback instead of support follow-up",
+            Summary = "The testimonial page keeps ratings, media captures, and moderation separate from support cases, install recovery, and publication approval.",
             Href = testimonialConciergeHref,
-            Label = "Open testimonial wrapper",
+            Label = "Open testimonial page",
             Details = new[] { "Moderated feedback", "Optional media", "Support stays separate" }
         },
         new
@@ -122,8 +139,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Choose discovery, downloads, signed-in account return, or help on purpose.</h2>
-        <p class="editorial-copy">A publication detail page should make trust and provenance tangible. It should not pretend to be the install page, a support queue, or a disguised account wall.</p>
+        <h2 class="editorial-title">Choose gallery, downloads, signed-in account return, or help on purpose.</h2>
+        <p class="editorial-copy">A publication detail page should make origin, comparison, and the next step clear. It should not pretend to be the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -176,26 +193,25 @@
     <div class="trust-rail-list">
         <article class="trust-rail">
             <span class="tag">Publication kind</span>
-            <p>@HumanizeStatus(Model.Publication.Kind, "Publication packet")</p>
+            <p>@HumanizeStatus(Model.Publication.Kind, "Publication")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Details</span>
-            <p>@PublicFacingCopyHumanizer.Clean(Model.Publication.ProvenanceSummary)</p>
+            <p>@PublicPublicationText(Model.Publication.ProvenanceSummary)</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Trust</span>
-            <p>@PublicFacingCopyHumanizer.Clean(Model.Publication.TrustSummary ?? "Trust status is not available yet.")</p>
+            <p>@PublicPublicationText(Model.Publication.TrustSummary, "Status is not available yet.")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Discovery</span>
-            <p>@Model.Publication.DiscoverySummary</p>
+            <p>@PublicPublicationText(Model.Publication.DiscoverySummary)</p>
         </article>
         <article class="trust-rail">
             <span class="tag">History</span>
-            <p>@routeReceiptSummary</p>
+            <p>@PublicPublicationText(routeReceiptSummary)</p>
             @if (Model.RouteReceipt is not null)
             {
-                <p class="muted-copy">Linked update @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute</p>
                 <p class="muted-copy">This page is linked to the current publication history.</p>
             }
             else
@@ -204,49 +220,49 @@
             }
         </article>
         <article class="trust-rail">
-            <span class="tag">Required details</span>
-            <p>@Model.RequiredReceiptRefs.Count required detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") attached.</p>
+            <span class="tag">Supporting details</span>
+            <p>@Model.RequiredReceiptRefs.Count supporting detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") available.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {
             <article class="trust-rail">
                 <span class="tag">Compare by</span>
-                <p>@Model.Publication.ComparisonSummary</p>
+                <p>@PublicPublicationText(Model.Publication.ComparisonSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.LineageSummary))
         {
             <article class="trust-rail">
                 <span class="tag">Lineage</span>
-                <p>@Model.Publication.LineageSummary</p>
+                <p>@PublicPublicationText(Model.Publication.LineageSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ModerationSummary))
         {
             <article class="trust-rail">
                 <span class="tag">Moderation</span>
-                <p>@Model.Publication.ModerationSummary</p>
+                <p>@PublicPublicationText(Model.Publication.ModerationSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.CampaignReturnSummary))
         {
             <article class="trust-rail">
                 <span class="tag">Return</span>
-                <p>@Model.Publication.CampaignReturnSummary</p>
+                <p>@PublicPublicationText(Model.Publication.CampaignReturnSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.SupportClosureSummary))
         {
             <article class="trust-rail">
                 <span class="tag">Support</span>
-                <p>@Model.Publication.SupportClosureSummary</p>
+                <p>@PublicPublicationText(Model.Publication.SupportClosureSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.NextSafeAction))
         {
             <article class="trust-rail">
                 <span class="tag">Next</span>
-                <p>@Model.Publication.NextSafeAction</p>
+                <p>@PublicPublicationText(Model.Publication.NextSafeAction)</p>
             </article>
         }
     </div>

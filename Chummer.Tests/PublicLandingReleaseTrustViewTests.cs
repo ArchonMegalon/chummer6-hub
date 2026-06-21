@@ -1059,12 +1059,22 @@ public sealed class PublicLandingReleaseTrustViewTests
         string publicationViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml");
         string publicationView = File.ReadAllText(publicationViewPath);
 
-        Assert.Contains("Choose discovery, downloads, signed-in account return, or help on purpose.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Choose gallery, downloads, signed-in account return, or help on purpose.", publicationView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Stay in publication discovery when the job is lineage, provenance, or comparison", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Stay in the gallery when you want history, origin, or comparison", publicationView, StringComparison.Ordinal);
         Assert.Contains("Leave this page when the next job is installing the product", publicationView, StringComparison.Ordinal);
         Assert.Contains("Use this page to inspect the publication, then move to the page that owns the next job.", publicationView, StringComparison.Ordinal);
         Assert.Contains("Open detail view", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Supporting details", publicationView, StringComparison.Ordinal);
+        Assert.Contains("supporting detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : \"s\") available.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("This page is linked to the current publication history.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("PublicPublicationText(Model.Publication.ProvenanceSummary)", publicationView, StringComparison.Ordinal);
+        Assert.Contains("PublicPublicationText(Model.Publication.LineageSummary)", publicationView, StringComparison.Ordinal);
+        Assert.DoesNotContain("lineage, provenance", publicationView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("creator concierge", publicationView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("testimonial wrapper", publicationView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Linked update @Model.RouteReceipt.ReceiptId", publicationView, StringComparison.Ordinal);
+        Assert.DoesNotContain("required detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : \"s\") attached", publicationView, StringComparison.Ordinal);
     }
 
     [Fact]
