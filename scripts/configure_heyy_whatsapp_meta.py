@@ -247,8 +247,9 @@ def main() -> int:
     )
     parser.add_argument("--env-file", default=str(DEFAULT_ENV_PATH))
     parser.add_argument("--graph-version", default="v21.0")
-    parser.add_argument("--allowed-recipient", default="")
-    parser.add_argument("--blocked-recipient", default="")
+    parser.add_argument("--test-recipient", default="")
+    parser.add_argument("--allowed-recipient", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--blocked-recipient", default="", help=argparse.SUPPRESS)
     parser.add_argument("--seed-ea-db", action="store_true")
     parser.add_argument("--ea-binding-id", default="heyy-whatsapp-business")
     parser.add_argument("--use-ea-db-phone-number-id-if-missing", action="store_true")
@@ -322,10 +323,6 @@ def main() -> int:
         "CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID": phone_number_id,
         "CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION": args.graph_version.strip() or "v21.0",
     }
-    if args.allowed_recipient.strip():
-        updates["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = args.allowed_recipient.strip()
-    if args.blocked_recipient.strip():
-        updates["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = args.blocked_recipient.strip()
 
     env_path = Path(args.env_file)
     if not args.dry_run:
@@ -341,13 +338,14 @@ def main() -> int:
 
     send_result = None
     if args.send_test_after_configure:
-        if not args.allowed_recipient.strip():
-            send_result = {"status": "blocked", "blockers": ["allowed_recipient_required_for_send_test"]}
+        test_recipient = args.test_recipient.strip() or args.allowed_recipient.strip()
+        if not test_recipient:
+            send_result = {"status": "blocked", "blockers": ["test_recipient_required_for_send_test"]}
         elif restart_result is not None and restart_result.get("status") == "failed":
             send_result = {"status": "blocked", "blockers": ["portal_restart_failed"]}
         else:
             send_result = run_live_test(
-                args.allowed_recipient.strip(),
+                test_recipient,
                 include_ea_db=args.include_ea_db_in_send_check,
                 dry_run=args.dry_run or args.send_test_dry_run,
             )
@@ -361,8 +359,7 @@ def main() -> int:
                 "access_token_source": access_source,
                 "phone_number_id": mask_value(phone_number_id),
                 "phone_number_id_source": phone_source,
-                "allowed_recipient_digits_present": bool(phone_digits(args.allowed_recipient)),
-                "blocked_recipient_digits_present": bool(phone_digits(args.blocked_recipient)),
+                "test_recipient_digits_present": bool(phone_digits(args.test_recipient or args.allowed_recipient)),
                 "meta_validation": validation_result,
                 "ea_db": ea_result,
                 "restart": restart_result,

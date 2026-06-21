@@ -1,37 +1,49 @@
 WEBVTT
 
 1
-00:00:00.000 --> 00:00:09.940
+00:00:00.000 --> 00:00:07.455
 Every table invents house rules.
 
 2
-00:00:09.940 --> 00:00:19.880
+00:00:07.455 --> 00:00:14.910
 Very few tables remember exactly when they did it, who agreed, what broke, or why everyone still argues about it three sessions later.
 
 3
-00:00:19.880 --> 00:00:29.819
-KARMA FORGE treats a rule change as something powerful enough to deserve ceremony. Name it. Scope it. Preview it.
+00:00:14.910 --> 00:00:22.365
+Karma Forge treats a rule change as something powerful enough to deserve ceremony. Name it. Scope it. Preview it.
 
 4
-00:00:29.819 --> 00:00:39.759
+00:00:22.365 --> 00:00:29.819
 Show the blast radius before anyone mistakes enthusiasm for safety.
 
 5
-00:00:39.759 --> 00:00:49.699
+00:00:29.819 --> 00:00:37.274
 A good change should arrive with clear notes: who it touches, what it shifts, where it could bend the campaign, and how to reverse it if the table hates what it becomes.
 
 6
-00:00:49.699 --> 00:00:59.639
-Players should react in context, not excavate old chat logs like archaeologists looking for permission. Campaigns evolve.
+00:00:37.274 --> 00:00:44.729
+Players should react in context, not excavate old chat logs looking for permission. Campaigns evolve. Their rule environment can evolve with them.
 
 7
-00:00:59.639 --> 00:01:09.579
-Their rule environment can evolve with them.
+00:00:44.729 --> 00:00:52.184
+But that evolution should feel table-approved, legible, reversible, and connected to the campaign that asked for it.
 
 8
-00:01:09.579 --> 00:01:19.519
-But that evolution should feel table-approved, legible, and reversible, not like a private fork mutating in the dark.
+00:00:52.184 --> 00:00:59.639
+The GM remains the final authority.
 
 9
-00:01:19.519 --> 00:01:29.458
-KARMA FORGE is for tables that want custom play without surrendering coherence.
+00:00:59.639 --> 00:01:07.094
+The software can show risk, collect reaction, preserve history, and make the next version easier to understand.
+
+10
+00:01:07.094 --> 00:01:14.549
+It should not smuggle private preference into public rules.
+
+11
+00:01:14.549 --> 00:01:22.003
+A proposed change should carry context: the problem it solves, the characters it touches, the sessions it may affect, and the fallback if the table changes its mind.
+
+12
+00:01:22.003 --> 00:01:29.458
+Karma Forge is for tables that want custom play without surrendering coherence: a place where house rules can become understandable, testable, and safe enough to try.

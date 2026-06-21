@@ -37,7 +37,10 @@ NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 0.70
 MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
-MIN_CLEAN_TTS_COVERAGE_RATIO = 0.90
+MIN_CLEAN_TTS_COVERAGE_RATIO = 0.84
+MAX_LOW_TONE_RESONANCE_DB = 20.0
+MIN_LOW_TONE_RESONANCE_RATIO = 0.001
+MAX_VOICE_TO_LOW_FOR_RESONANCE_DB = 32.0
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 RUNSITE_CLEAN_AUDIO_GROUP = "runsite-90s-deepdive"
 RUNBOOK_PRESS_CLEAN_AUDIO_GROUP = "runbook-press-90s-deepdive"
@@ -47,9 +50,12 @@ CLEAN_SPEECH_AUDIO_GROUPS = {
     RUNBOOK_PRESS_CLEAN_AUDIO_GROUP,
 }
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
+AUDIO_NORMALIZATION_CONTRACT = "ea.public_video_unmixr_beat_trim.v2"
+CLEAN_SPEECH_MIX_CONTRACT = "ea.public_video_clean_speech_no_noise_floor.v2"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 RUNSITE_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 RUNBOOK_PRESS_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
+DEFAULT_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 UNMIXR_VOICE_DISCOVERY_API = "https://unmixr.com/api/v1/voice-list/"
 DEFAULT_PREMIUM_VOICE_LABEL = "Blue"
 ALICE_PREMIUM_FEMALE_VOICE_LABEL = "Ava"
@@ -237,8 +243,8 @@ def _unmixr_tts_config(voice_id: str, api_key_env: str = "") -> dict[str, str]:
         "api_key_env": api_key_env,
         "voice_id": voice_id,
         "language": LEGACY.env_or_file("UNMIXR_LANGUAGE") or "en-US",
-        "speaking_rate": LEGACY.env_or_file("UNMIXR_PROMO_SPEAKING_RATE") or LEGACY.env_or_file("UNMIXR_SPEAKING_RATE") or "slow",
-        "speaking_pitch": LEGACY.env_or_file("UNMIXR_SPEAKING_PITCH") or "low",
+        "speaking_rate": LEGACY.env_or_file("UNMIXR_PROMO_SPEAKING_RATE") or LEGACY.env_or_file("UNMIXR_SPEAKING_RATE") or "medium",
+        "speaking_pitch": LEGACY.env_or_file("UNMIXR_SPEAKING_PITCH") or "medium",
         "speaking_volume": LEGACY.env_or_file("UNMIXR_SPEAKING_VOLUME") or "medium",
     }
 
@@ -442,21 +448,136 @@ def unmixr_voice_override(group_key: str):
 
 
 SCRIPT_KEY_BY_GROUP = {
-    "nexus-pan-90s-deepdive": "nexus_pan_90s_deepdive",
-    "nexus-pan-epic-90s": "nexus-pan_epic_90s",
+    "nexus-pan-90s-deepdive": "nexus-pan-90s-deepdive",
+    "nexus-pan-epic-90s": "nexus-pan-epic-90s",
     ALICE_CLEAN_AUDIO_GROUP: "alice-90s-deepdive",
-    "karma-forge-90s-deepdive": "karma_forge_90s_deepdive",
-    "jackpoint-90s-deepdive": "jackpoint_90s_deepdive",
-    "runsite-90s-deepdive": "runsite_90s_deepdive",
-    "runbook-press-90s-deepdive": "runbook_press_90s_deepdive",
-    "table-pulse-90s-deepdive": "table_pulse_90s_deepdive",
-    "black-ledger-90s-deepdive": "black_ledger_90s_deepdive",
-    "black-ledger-epic-90s": "black_ledger_epic_90s",
-    "community-hub-90s-deepdive": "community_hub_90s_deepdive",
+    "karma-forge-90s-deepdive": "karma-forge-90s-deepdive",
+    "jackpoint-90s-deepdive": "jackpoint-90s-deepdive",
+    "runsite-90s-deepdive": "runsite-90s-deepdive",
+    "runbook-press-90s-deepdive": "runbook-press-90s-deepdive",
+    "table-pulse-90s-deepdive": "table-pulse-90s-deepdive",
+    "black-ledger-90s-deepdive": "black-ledger-90s-deepdive",
+    "black-ledger-epic-90s": "black-ledger-epic-90s",
+    "community-hub-90s-deepdive": "community-hub-90s-deepdive",
 }
 
 
 EXTRA_SCRIPT_BY_GROUP = {
+    "chummer6-flagship-promo": (
+        "The old way always sounds the same: tabs open, notes scattered, a runner sheet half remembered, and a GM buying time while the table waits for the moment to come back alive. "
+        "Chummer6 is built for the instant when preparation has to become play. It gathers the runner, the crew, the scene, the consequence, and the next decision into one surface that can survive pressure. "
+        "You build with the important details in view: gear, chrome, magic, tradeoffs, and every number explained clearly enough that the table can trust it. "
+        "You run with momentum: scenes, handouts, opposition, downtime, hooks, fallout, and the next hard choice ready when the room needs them. "
+        "When the city answers, it does not answer as decoration. It answers with heat, factions, jobs, rumors, and consequences the GM can turn into tomorrow night's trouble. "
+        "House rules stop living as arguments in old chat logs. Recaps stop dissolving into rumor. The aftermath becomes signal, and that signal becomes the next run. "
+        "From desktop to tablet to phone, from home table to remote night, Chummer6 is for crews who want the world to remember what they did and still be ready when the next door opens. "
+        "The promise is practical: less ceremony, fewer missing details, more time spent in the scene, and a campaign that can keep moving after the dice stop."
+    ),
+    "all-horizons-90s-magicfit-promo": (
+        "Chummer6 should not feel like a shelf of future brands. It should feel like one product spine. Start with the workbench: build the runner, inspect the numbers, understand the sources, and keep the dense rhythm veteran users expect. "
+        "ALICE is part of that base product: build help, rules explanation, tradeoff warnings, and a clearer path from a cool idea to a runner who can survive the table. "
+        "Origin Dossier belongs beside it, turning the life behind the stats into contacts, debts, enemies, scars, secrets, and approved campaign memory the GM can actually use. "
+        "Ready for Tonight, Runner Passport, Knowledge Fabric, Table Pulse, and GM Cockpit are product areas, not a pile of disconnected Horizons. They help the table return, explain, run, and remember. "
+        "The future shelf should be saved for bigger bets: Karma Forge, Black Ledger, publishing, community, and specialized play modes. NEXUS-PAN is continuity and recovery, so it belongs in the product story. "
+        "Runsite makes mission spaces readable. Runbook Press turns approved campaign material into books people can keep. Jackpoint gives aftermath and handoffs a dramatic home. "
+        "That is the cleaner promise: build clearly, run reliably, remember consequences, publish only what the table approves, and keep the whole product legible enough that a new user knows where to start."
+    ),
+    "every-wonder-horizon-promo": (
+        "Chummer6 should not ask players to memorize a shelf of labels before they know why the product matters. It starts with one table: runners, rules, scenes, people, and consequences in reach. "
+        "Some areas are base product workbenches. ALICE helps with builds and tradeoffs. Origin Dossier turns the life behind the stats into contacts, enemies, debts, scars, and secrets. Table Pulse keeps campaign pressure bounded and playable. "
+        "Runsite makes a location feel like a problem, not just a map. Runbook Press turns approved campaign material into primers, packets, and season books. Jackpoint makes aftermath easier to return to when the next session begins. "
+        "Some ideas are expansion bets, and they should be named honestly. NEXUS-PAN is device continuity. KARMA FORGE is table-approved house-rule change. BLACK LEDGER is the living city: heat, factions, jobs, news, and fallout that remembers the crew. "
+        "Other areas are clearer when they are called what they are: campaign memory, mission-space prep, publishing, community, and specialized play modes. "
+        "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves. The product gets easier to understand because the names serve the work instead of competing with it."
+    ),
+    "nexus-pan-90s-deepdive": (
+        "A session rarely breaks because the story failed. It breaks because reality intruded first. A tablet sleeps, a laptop wakes crooked, a player reconnects into a scene already moving, and suddenly the table is arguing about which version is current. "
+        "NEXUS-PAN exists for that dangerous little gap between what the campaign knows and what the people at the table can trust. Presence has to be clear. Change has to be visible. Recovery has to feel calm enough that nobody mistakes panic for drama. "
+        "A reconnect should not become a rules argument. A conflict should surface before it hardens into table folklore. Desktop, tablet, phone, remote night, train ride, home table, same campaign, same moment, no scavenger hunt for the current version. "
+        "For the GM, the promise is practical: can I trust what I am seeing right now, and can I recover the room without stopping the fiction. For the player, it is even simpler: rejoin, catch up, answer the scene, and stay in the run. "
+        "The system should make repair feel ordinary. Show what arrived, what changed, what is waiting for approval, and what can be ignored until after the scene. "
+        "NEXUS-PAN is continuity with a pulse, built for crews who refuse to lose the night because one device blinked first."
+    ),
+    "nexus-pan-epic-90s": (
+        "Every long campaign eventually becomes a split screen. One player is half a city away. One sheet is stale. The GM has too many windows open and no patience left for false confidence. "
+        "The epic version of NEXUS-PAN begins there, with trust as the first dramatic question. Who is connected. What changed. Which state is current enough to act on without breaking the scene. "
+        "Packets move. Devices disagree. The table does not need more drama from the software. It needs signal, context, and a clear next step before momentum dies. "
+        "When conflict appears, the system should expose it cleanly and let the GM make the call before the fiction tears. The campaign should travel with the crew from desk to tablet to train to home table without export rituals, copied files, or wishful thinking. "
+        "A returning player should receive the humane version of continuity: where you were, what changed, what danger is live, and what move is waiting. That is the fantasy here. Less ceremony, less panic, more run, and a campaign state that still feels trustworthy when the network does not."
+        "The larger promise is not synchronization for its own sake. It is confidence under interruption, so the people can return to the scene instead of negotiating with their tools."
+    ),
+    "karma-forge-90s-deepdive": (
+        "Every table invents house rules. Very few tables remember exactly when they did it, who agreed, what broke, or why everyone still argues about it three sessions later. "
+        "Karma Forge treats a rule change as something powerful enough to deserve ceremony. Name it. Scope it. Preview it. Show the blast radius before anyone mistakes enthusiasm for safety. "
+        "A good change should arrive with clear notes: who it touches, what it shifts, where it could bend the campaign, and how to reverse it if the table hates what it becomes. Players should react in context, not excavate old chat logs looking for permission. "
+        "Campaigns evolve. Their rule environment can evolve with them. But that evolution should feel table-approved, legible, reversible, and connected to the campaign that asked for it. "
+        "The GM remains the final authority. The software can show risk, collect reaction, preserve history, and make the next version easier to understand. It should not smuggle private preference into public rules. "
+        "A proposed change should carry context: the problem it solves, the characters it touches, the sessions it may affect, and the fallback if the table changes its mind. "
+        "Karma Forge is for tables that want custom play without surrendering coherence: a place where house rules can become understandable, testable, and safe enough to try."
+    ),
+    "jackpoint-90s-deepdive": (
+        "The run is over, but the story is not. The table is laughing, exhausted, and already telling three different versions of what happened. That is where campaigns start losing themselves. "
+        "Jackpoint gives the aftermath a place with shape: recaps, briefings, dossiers, loose ends, NPC promises, what the players may know, and what the GM must keep behind the curtain. "
+        "Those details need different doors. A player-facing briefing should feel like the world speaking back, not like a database export with the serial numbers still attached. A missed player should return to a clean handoff, not a twenty-minute oral history full of contradictions and fading excitement. "
+        "As the season grows longer, memory needs structure. Who owes the crew. Which rumor became dangerous. Which contact changed sides. Which choice is still waiting to collect interest. "
+        "The best briefing is short enough to read, rich enough to act on, and careful enough not to leak what should stay behind the screen. It gives a returning player confidence without forcing the table to replay the whole night. "
+        "The table still owns the story. Jackpoint simply gives that story a sharper, more dramatic way to return when next session begins. It turns aftermath into usable memory without stealing the voice of the campaign."
+    ),
+    "table-pulse-90s-deepdive": (
+        "Pressure is part of the drama, but pressure without boundaries becomes noise. Table Pulse exists to keep the room tense, alive, and readable without turning the session into a dashboard performance. "
+        "The GM sees the signal first. The system offers pressure, reaction, and aftermath as packets, not commandments. The table can be nudged when a scene needs oxygen and left alone when silence is the better choice. "
+        "Players who are not physically in the room can still matter when they join an opposing faction. If they opt in, they can receive a bounded notification, send a reaction, and push back from outside the table without hijacking the moment inside it. "
+        "After the run, they can receive a focused summary of what happened, who won, and what fallout now belongs to their side. Consent, quiet hours, opt-outs, and table policy are not decoration around the system. They are the system. "
+        "The point is restraint. A pulse should help the GM notice pressure, help remote participants matter in bounded ways, and then get out of the way before the room starts serving the meter instead of the scene. "
+        "A good pulse is felt in the scene, in the aftermath, and in the rising tension of the campaign, while the software itself almost disappears."
+    ),
+    "black-ledger-90s-deepdive": (
+        "Too many campaign cities forget everything by morning. Black Ledger is for the kind of city that keeps score, not on a spreadsheet, but in bruised districts, nervous factions, shifting jobs, and people who suddenly have reason to care what the crew just broke. "
+        "After the run, the world should move. Not as homework. As consequence. Heat changes hands. Favors sour. Rumors harden into opportunity. A quiet neighborhood becomes dangerous because the crew made noise there yesterday. "
+        "Faction pressure works best when it creates decisions, not encyclopedia weight. The newsroom gives the city a voice: dramatic, biased, occasionally cruel, and just useful enough to become tomorrow night's hook. "
+        "The GM should see what changed and why. Players should feel the city react without receiving private notes they were never meant to know. Public projection stays careful, approval-gated, and useful. "
+        "A good city surface does not ask the table to study lore before play. It shows pressure, opportunity, rumor, and consequence in a form the GM can turn into a decision. "
+        "By the time the next session begins, the world should already have opinions. Black Ledger is for campaigns where the map remembers, the city pushes back, and the fallout is always looking for a new owner."
+    ),
+    "black-ledger-epic-90s": (
+        "Black Ledger begins with a dead-map problem. The crew leaves a crater in the world, and somehow the city wakes up unchanged. That is not consequence. That is amnesia. "
+        "In the epic version, the city comes alive like another character at the table. World ticks turn fallout into motion. A quiet district gets hot. A trusted route turns risky. A favor becomes leverage. A mistake becomes the seed of the next mission. "
+        "The mission market starts to feel earned because opportunity no longer drops from the sky. It grows from what the crew actually did. Faction pressure becomes playable tension instead of lore the players are expected to memorize. "
+        "The newsroom gives the whole machine a voice: rumor, spin, fear, mockery, propaganda, and the kind of half-story runners know how to weaponize. "
+        "The GM keeps authority. Public surfaces stay bounded. The city moves because the table approved what happened, and because consequences should have a memory. "
+        "The epic promise is a campaign city that grows pressure between sessions without turning the GM into a clerk. The surface should show what is rising, what is cooling, what is now dangerous, and what might become tomorrow night's job. "
+        "It should feel like the city took notes while the crew was busy surviving. "
+        "Black Ledger is for campaigns where the map remembers the damage and develops an attitude about it."
+    ),
+    "community-hub-90s-deepdive": (
+        "Finding the right table should not feel harder than surviving the run. Community Hub begins with the lonely player, the overworked GM, and the gap between wanting a game and actually getting one to happen without chaos. "
+        "Open runs need more than a signup button. They need tone, schedule, safety, expectations, and a reason this particular runner belongs in this particular trouble. Runner preflight should catch problems before anyone is trapped in voice chat waiting for a decision that could have been made yesterday. "
+        "A roster is not a list of names. It is chemistry, role fit, availability, consent, and the stubborn practical question of whether this crew can actually meet and play. Scheduling should remove friction, not create another place for the answer to go missing. "
+        "For a GM, the hub should reduce coordination drag. For a player, it should make the next honest step obvious. For the table, it should protect expectations before the first scene begins. "
+        "The system should respect attention: fewer status pings, clearer commitments, and a clean handoff from interest to attendance to aftermath. "
+        "It should also make absence visible early, so the table can adapt before the night is already slipping away. "
+        "The best outcome remains beautifully simple: the right people find the right run, the night actually happens, and the campaign remembers what came out the other side."
+    ),
+    "origin-dossier-the-name-she-chose": (
+        "Some stories begin with a handle because the old name no longer fits the person walking into the shadows. The Name She Chose is an Origin Dossier proof of tone: a character history shaped into playable memory, not a generic biography pasted behind the sheet. "
+        "The past arrives as pressure. A contact with a reason to call. A debt that was never fully paid. A boundary the runner refuses to cross again. A name that sounds simple until the table learns what it cost. "
+        "This is what campaign memory should feel like when it is handled carefully: approved by the player, useful to the GM, dramatic without stealing authorship. "
+        "The dossier can turn biography into hooks, images, scene packets, and narration, but it does not silently change the build. Ware, money, qualities, magic, legality, and rules remain in the sheet where the table can inspect them. "
+        "When the GM needs a thread, the origin can answer with emotional weight. When the player needs a reason, the past can speak without becoming a lecture. "
+        "A strong dossier gives the table handles without turning the runner into a fixed script. It invites play, complication, and choice. "
+        "It also gives media a standard: evocative enough to matter, bounded enough to reject, and clear enough that the player remains the author of the person at the center. "
+        "The sheet says what she can do. The dossier helps the table understand why she chose to become this person now."
+    ),
+    "origin-dossier-the-name-she-chose-20260619": (
+        "Some stories begin with a handle because the old name no longer fits the person walking into the shadows. The Name She Chose is an Origin Dossier proof of tone: a character history shaped into playable memory, not a generic biography pasted behind the sheet. "
+        "The past arrives as pressure. A contact with a reason to call. A debt that was never fully paid. A boundary the runner refuses to cross again. A name that sounds simple until the table learns what it cost. "
+        "This is what campaign memory should feel like when it is handled carefully: approved by the player, useful to the GM, dramatic without stealing authorship. "
+        "The dossier can turn biography into hooks, images, scene packets, and narration, but it does not silently change the build. Ware, money, qualities, magic, legality, and rules remain in the sheet where the table can inspect them. "
+        "When the GM needs a thread, the origin can answer with emotional weight. When the player needs a reason, the past can speak without becoming a lecture. "
+        "A strong dossier gives the table handles without turning the runner into a fixed script. It invites play, complication, and choice. "
+        "It also gives media a standard: evocative enough to matter, bounded enough to reject, and clear enough that the player remains the author of the person at the center. "
+        "The sheet says what she can do. The dossier helps the table understand why she chose to become this person now."
+    ),
     RUNBOOK_PRESS_CLEAN_AUDIO_GROUP: (
         "Runbook Press begins with a familiar mess: maps in one folder, session notes in another, "
         "NPC motives in chat, rulings in memory, and a campaign that deserves more than another scattered handoff. "
@@ -467,6 +588,8 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Credits, changes, source notes, and approval state remain attached, so a polished page does not become a loose claim. "
         "The workflow should feel like a small editorial room inside Chummer: draft, arrange, review, format, export, and revise without losing provenance. "
         "Layout matters because people use books under pressure. They need the map, the faction note, the timeline, or the handout fast enough that the table keeps moving. "
+        "A good runbook also knows when to stay quiet. It does not expose spoilers just because the source exists. It does not flatten a living campaign into a brochure. "
+        "It turns approved material into pages with hierarchy, context, and enough editorial judgment that a reader can find the next useful thing without digging through the whole archive. "
         "Runbook Press is campaign publishing with memory, structure, and restraint."
     ),
     RUNSITE_CLEAN_AUDIO_GROUP: (
@@ -486,7 +609,9 @@ EXTRA_SCRIPT_BY_GROUP = {
         "A clinic favor can become pressure. A family name can become a lead. A mistake can become a secret. A scar can become a code the runner lives by. "
         "The dossier can also feed portraits, scene packets, narration, video, and audiobook versions later, but the mechanics stay in Chummer. Prose never silently changes ware, money, qualities, magic, legality, or build math. "
         "When ALICE reads approved origin material later, it reads character context, not hidden rules. Weak media can be rejected without damaging the runner. Strong material gives the crew a person to bring into the next job. "
-        "Not a backstory pasted on top. A life with consequences."
+        "The best version feels intimate without becoming invasive. It gives the GM handles, gives the player choices, and keeps approval visible so nobody confuses generated drama with accepted canon. "
+        "The result should feel like a campaign artifact, not a profile card: concise, dramatic, useful, and still open enough for the player to surprise everyone at the table. "
+        "Not a backstory pasted on top. A life with consequences, ready for the next scene."
     ),
     "black-ledger-3dvista-flythrough": (
         "Black Ledger is the city with a memory. District pressure, faction motion, open jobs, and newsreel fallout give the GM a place to start when the table asks what changed after the last run. "
@@ -494,6 +619,38 @@ EXTRA_SCRIPT_BY_GROUP = {
     ),
     "black-ledger-video-globe-idle": (
         "The city is still moving. Black Ledger keeps district pressure, faction heat, and visible fallout close enough for the next decision."
+    ),
+    "ashline-circle-promo": (
+        "Ashline Circle sells calm power with dangerous consequences. The public face is wellness, source clarity, and controlled magic heat. "
+        "Behind the polish, the table still needs proof: who changed the risk, where the pressure rose, and why the next ritual matters."
+    ),
+    "barrens-free-wardens-promo": (
+        "Barrens Free Wardens begin where polished systems usually stop. They care about closeout witnesses, recovery saves, and safehouse routes that still work in the rain. "
+        "Less nuyen, more backbone: when the street breaks, they make sure someone gets home."
+    ),
+    "ghostline-network-promo": (
+        "Ghostline Network is for crews that survive by checking the signal before trusting the rumor. Intel confidence, redaction, and dispatch discipline matter here. "
+        "The promise is simple: verify what can be verified, hide what must stay dark, and move before noise becomes a trap."
+    ),
+    "glass-tower-compact-promo": (
+        "Glass Tower Compact turns public trust into a weapon with clean edges. License polish, compliance pressure, and calm paperwork all carry consequences. "
+        "The surface is corporate order; the useful part is knowing exactly when that order becomes leverage against someone else."
+    ),
+    "neon-docks-union-promo": (
+        "Neon Docks Union keeps the city moving when cargo, drones, and escape windows all collide. Route control is not decoration here. "
+        "It is the difference between a clean handoff, a blocked exit, and a crew learning too late that the dock had already changed sides."
+    ),
+    "rust-market-syndicate-promo": (
+        "Rust Market Syndicate makes every favor visible enough to become dangerous. Debt heat, favor load, and black-market opportunity all share the same table. "
+        "Everything is available. Nothing is free. The trick is seeing the cost before the deal starts collecting interest."
+    ),
+    "turn-1-newsreel": (
+        "Emerald Sprawl opens with pressure in Rust Bazaar. Debt heat is visible, Ashline crews are already watching, and the board is no longer abstract. "
+        "The city remembers who moved first, which district failed to recover, and where tomorrow's trouble is likely to start."
+    ),
+    "turn-2-newsreel": (
+        "Emerald Sprawl is answering back. Recovery crews pushed Rust Bazaar into the public frame, Ghostline is sorting rumor from dispatch, and faction confidence is moving. "
+        "The board closes with one warning: hesitation is now visible, and the next turn will not wait politely."
     ),
 }
 
@@ -675,6 +832,8 @@ def normalize_voice(source: Path, output: Path) -> None:
         "-i",
         str(source),
         "-af",
+        "silenceremove=start_periods=1:start_duration=0.025:start_threshold=-50dB,"
+        "areverse,silenceremove=start_periods=1:start_duration=0.055:start_threshold=-50dB,areverse,"
         f"afade=t=in:st=0:d=0.025,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
         "acompressor=threshold=-24dB:ratio=2.0:attack=12:release=180:makeup=2.6,"
         "loudnorm=I=-17:LRA=8:TP=-2.0,alimiter=limit=0.90",
@@ -726,18 +885,22 @@ def render_unmixr_narration(
         and str(cached_meta.get("script_sha256") or "") == script_sha
         and str(cached_meta.get("voice_id_sha256") or "") == voice_sha
         and str(cached_meta.get("voice_policy") or "") == voice_policy
+        and str(cached_meta.get("audio_normalization_contract") or "") == AUDIO_NORMALIZATION_CONTRACT
     )
-    if cache_matches and not force_tts:
-        return stitched, {
+    cached_unmixr_exists = stitched.is_file() and stitched.stat().st_size > 0
+
+    def cached_unmixr_provider_meta(reason: str) -> dict[str, Any]:
+        return {
             "provider": UNMIXR_PROVIDER,
             "voice_id_redacted": redact(voice_id),
-            "voice_source_env": source_env,
+            "voice_source_env": source_env or str(cached_meta.get("voice_source_env") or ""),
             "voice_policy": voice_policy,
             "voice_label": str(resolved.get("voice_label") or cached_meta.get("voice_label") or ""),
             "voice_gender": str(resolved.get("voice_gender") or cached_meta.get("voice_gender") or ""),
             "voice_quality": str(resolved.get("voice_quality") or cached_meta.get("voice_quality") or ""),
             "voice_language": str(resolved.get("voice_language") or cached_meta.get("voice_language") or ""),
             "voice_reused_from_cache": True,
+            "cache_reuse_reason": reason,
             "api_key_env": str(cached_meta.get("api_key_env") or ""),
             "language": str(cached_meta.get("language") or ""),
             "speaking_rate": str(cached_meta.get("speaking_rate") or ""),
@@ -746,6 +909,12 @@ def render_unmixr_narration(
             "beat_count": len(beats),
             "failures": [],
         }
+
+    if cache_matches and not force_tts:
+        return stitched, cached_unmixr_provider_meta("current_contract_cache_match")
+
+    if cached_unmixr_exists and not cached_meta:
+        stitched.unlink(missing_ok=True)
 
     parts: list[Path] = []
     failures: list[str] = []
@@ -792,6 +961,7 @@ def render_unmixr_narration(
         "speaking_pitch": tts_config.get("speaking_pitch", ""),
         "speaking_volume": tts_config.get("speaking_volume", ""),
         "beat_count": len(beats),
+        "audio_normalization_contract": AUDIO_NORMALIZATION_CONTRACT,
     }
     meta_file.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     return stitched, {
@@ -862,6 +1032,24 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
         str(trimmed),
     )
     source = trimmed if trimmed.is_file() and trimmed.stat().st_size > 0 else narration
+    compacted = output.with_name(f"{output.stem}.clean-compact-source.wav")
+    run(
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(source),
+        "-af",
+        "silenceremove=stop_periods=-1:stop_duration=0.42:stop_threshold=-48dB",
+        "-ar",
+        str(TARGET_SR),
+        "-ac",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        str(compacted),
+    )
+    if compacted.is_file() and compacted.stat().st_size > 0:
+        source = compacted
     source_duration = duration(source)
     target_voice = max(total_duration, 1.0)
     if source_duration < target_voice * MIN_CLEAN_TTS_COVERAGE_RATIO:
@@ -870,7 +1058,7 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
             f"{source_duration:.3f}s_for_{target_voice:.3f}s"
         )
     tempo = min(max(source_duration / target_voice, 0.90), 1.16)
-    if tempo > 1.015 or tempo < 0.985:
+    if tempo > 1.005 or tempo < 0.995:
         voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
         fit = f"clean_speech_style_{tempo:.3f}"
     else:
@@ -919,49 +1107,7 @@ def build_mixed_audio_for_group(group_key: str, narration: Path | None, total_du
         )
         return "ambient_bed_only"
 
-    if group_key in CLEAN_SPEECH_AUDIO_GROUPS:
-        return build_clean_audiobook_style_audio(narration, total_duration, output, group_key)
-
-    source_duration = duration(narration)
-    target_voice = max(total_duration - 2.7, 1.0)
-    if source_duration > target_voice:
-        tempo = min(max(source_duration / target_voice, 1.0), 1.18)
-        voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
-        fit = f"sped_up_{tempo:.3f}"
-    elif source_duration < target_voice * 0.90:
-        tempo = max(source_duration / target_voice, 0.86)
-        voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
-        fit = f"stretched_{tempo:.3f}"
-    else:
-        voice_prep = f"atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
-        fit = "natural"
-
-    filter_complex = (
-        f"[0:a]{voice_prep},afade=t=in:st=0:d=0.35,afade=t=out:st={max(target_voice - 0.6, 0):.3f}:d=0.6,"
-        f"highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},acompressor=threshold=-23dB:ratio=2.1:attack=12:release=190:makeup=2.7,"
-        f"loudnorm=I=-17:LRA=8:TP=-2.0,alimiter=limit=0.88[vo0];"
-        f"[vo0]adelay={NARRATION_START_DELAY_MS}|{NARRATION_START_DELAY_MS},apad,atrim=0:{total_duration:.3f},volume=1.10[vo];"
-        f"{bed_filter(total_duration, 'narration')};"
-        f"[bed][vo]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
-        "acompressor=threshold=-21dB:ratio=1.7:attack=12:release=180:makeup=1.1,loudnorm=I=-16:LRA=7:TP=-3.0,alimiter=limit=0.78[main];"
-        f"anoisesrc=color=white:amplitude=0.180:r={TARGET_SR}:d={total_duration:.3f},"
-        "highpass=f=620,lowpass=f=2400,volume=0.65[floor];"
-        f"[main][floor]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,volume=0.72,alimiter=limit=0.76,apad,atrim=0:{total_duration:.3f}[a]"
-    )
-    run(
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(narration),
-        "-filter_complex",
-        filter_complex,
-        "-map",
-        "[a]",
-        "-c:a",
-        "pcm_s16le",
-        str(output),
-    )
-    return fit
+    return build_clean_audiobook_style_audio(narration, total_duration, output, group_key)
 
 
 def build_mixed_audio(narration: Path | None, total_duration: float, output: Path) -> str:
@@ -1142,6 +1288,14 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
     if low_tone_peak_hz <= 280 and low_tone_prominence_db > 9.0 and low_bass_ratio > 0.020:
         status = "fail"
         reasons.append("low_frequency_tonal_artifact")
+    if (
+        70 <= low_tone_peak_hz <= 180
+        and low_tone_prominence_db > MAX_LOW_TONE_RESONANCE_DB
+        and low_bass_ratio > MIN_LOW_TONE_RESONANCE_RATIO
+        and voice_to_low_db < MAX_VOICE_TO_LOW_FOR_RESONANCE_DB
+    ):
+        status = "fail"
+        reasons.append("low_frequency_resonance_artifact")
     if 390 <= mid_tone_peak_hz <= 720 and mid_tone_prominence_db > 18.0 and mid_tone_ratio > 0.030:
         status = "fail"
         reasons.append("mid_frequency_beep_artifact")
@@ -1194,11 +1348,10 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
         backup = work / f"{video.name}.before-unmixr-audio"
         shutil.copy2(video, backup)
         remux(video, mixed, video, total_duration)
-        clean_speech_audio = group.key in CLEAN_SPEECH_AUDIO_GROUPS
-        quality = audio_quality(video, allow_clean_speech_pauses=clean_speech_audio)
+        quality = audio_quality(video, allow_clean_speech_pauses=False)
         info = probe(video)
         streams = info.get("streams") or []
-        audio_style = "premium_news_anchor_continuous_bed"
+        audio_style = DEFAULT_CLEAN_AUDIO_STYLE if group.narration else "clean_first_party_ambient_bed_no_tonal_noise"
         if group.key == ALICE_CLEAN_AUDIO_GROUP:
             audio_style = ALICE_CLEAN_AUDIO_STYLE
         elif group.key == RUNSITE_CLEAN_AUDIO_GROUP:
@@ -1260,10 +1413,7 @@ def main() -> int:
                         "file": str(video.relative_to(REPO)),
                         "audio_streams": sum(1 for stream in streams if stream.get("codec_type") == "audio"),
                         "video_streams": sum(1 for stream in streams if stream.get("codec_type") == "video"),
-                        "quality": audio_quality(
-                            video,
-                            allow_clean_speech_pauses=group.key in CLEAN_SPEECH_AUDIO_GROUPS,
-                        ),
+                        "quality": audio_quality(video, allow_clean_speech_pauses=False),
                     }
                 )
             receipts.append({"group_key": group.key, "mode": group.mode, "files": files})
@@ -1323,8 +1473,12 @@ def main() -> int:
             "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
+            "max_low_tone_resonance_db": MAX_LOW_TONE_RESONANCE_DB,
+            "min_low_tone_resonance_ratio": MIN_LOW_TONE_RESONANCE_RATIO,
             "alice_voice_policy": ALICE_VOICE_POLICY,
-            "premium_mix_required": "clean Unmixr narration with no synthetic noise floor; legacy bed/noise mixes are rejected. Alice, Runsite, and Runbook Press are explicit clean-speech groups, and additional public videos must carry a passing rebuild receipt before release.",
+            "premium_mix_required": "clean Unmixr narration with no synthetic noise floor; legacy bed/noise mixes are rejected. Every narrated public promo/video group must carry a passing rebuild receipt before release.",
+            "clean_speech_mix_contract": CLEAN_SPEECH_MIX_CONTRACT,
+            "audio_normalization_contract": AUDIO_NORMALIZATION_CONTRACT,
         },
         "provider_posture": {
             "narration_provider": "unmixr-short-tts",

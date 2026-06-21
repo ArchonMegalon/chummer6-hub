@@ -14,8 +14,6 @@ DEFAULT_CONTAINER = "chummer6-hub-chummer-portal-1"
 
 HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED",
-    "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS",
-    "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS",
     "CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN",
     "CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID",
     "CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION",
@@ -75,15 +73,6 @@ def enabled(values: dict[str, str], key: str) -> bool:
 def normalize_phone(value: str | None) -> str | None:
     digits = "".join(ch for ch in str(value or "") if ch.isdigit())
     return digits if len(digits) >= 7 else None
-
-
-def split_phones(value: str | None) -> set[str]:
-    result: set[str] = set()
-    for part in str(value or "").replace(";", ",").split(","):
-        normalized = normalize_phone(part)
-        if normalized:
-            result.add(normalized)
-    return result
 
 
 def base_url_is_real(values: dict[str, str]) -> bool:
@@ -147,8 +136,6 @@ def inspect_ea_db_binding() -> dict[str, Any]:
 
 
 def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any]:
-    allowed = split_phones(values.get("CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"))
-    blocked = split_phones(values.get("CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"))
     recipient_digits = normalize_phone(recipient)
     meta_ready = (
         enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED")
@@ -165,20 +152,13 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
         )
         and base_url_is_real(values)
     )
-    recipient_allowed = recipient_digits in allowed if recipient_digits else False
-    recipient_blocked = recipient_digits in blocked if recipient_digits else False
-
     blockers: list[str] = []
     if not enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"):
         blockers.append("whatsapp_disabled")
-    if recipient_digits and not recipient_allowed:
-        blockers.append("recipient_not_allowlisted")
-    if recipient_digits and recipient_blocked:
-        blockers.append("recipient_blocked")
+    if recipient and not recipient_digits:
+        blockers.append("recipient_invalid")
     if not meta_ready and not ea_ready:
         blockers.append("live_provider_unconfigured")
-    if not blocked:
-        blockers.append("blocked_recipient_list_empty")
 
     return {
         "status": "ready" if not blockers else "blocked",
@@ -186,13 +166,10 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
         "recipient": {
             "provided": bool(recipient),
             "digits_present": bool(recipient_digits),
-            "allowlisted": recipient_allowed,
-            "blocked": recipient_blocked,
+            "valid": bool(recipient_digits),
         },
         "config": {
             "whatsapp_enabled": enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"),
-            "allowed_recipient_count": len(allowed),
-            "blocked_recipient_count": len(blocked),
             "meta_access_token_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"),
             "meta_phone_number_id_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"),
             "ea_base_url_real": base_url_is_real(values),

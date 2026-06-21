@@ -72,11 +72,13 @@ artifacts/
 *.tli
 *.tlh
 *.tmp
+*.tmp.mp4
 *.tmp_proj
 *.log
 *.vspscc
 *.vssscc
 .builds
+.runtime-temp/
 *.pidb
 *.svclog
 *.scc

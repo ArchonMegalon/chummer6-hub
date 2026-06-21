@@ -329,16 +329,14 @@ public sealed class ExecutiveAssistantChannelMessagingService
             }
         }
 
-        if (recipientHandle is null)
-        {
-            throw new ArgumentException($"Either {nameof(subjectId)} or {nameof(recipientHandle)} is required for incoming {channelKind} message routing.");
-        }
-
         HubUserDto? resolved = FindUserByChannelRecipient(channelKind, normalizedCounterpartyHandle);
         if (resolved is null)
         {
+            string recipientDetail = recipientHandle is null
+                ? "no recipient handle was supplied"
+                : $"recipient handle {recipientHandle} was supplied";
             throw new ArgumentException(
-                $"Unable to route incoming {channelKind} message to an EA-linked user for recipient {normalizedCounterpartyHandle}.");
+                $"Unable to route incoming {channelKind} message to an EA-linked user for counterparty {normalizedCounterpartyHandle}; {recipientDetail}.");
         }
 
         return resolved;
@@ -346,35 +344,38 @@ public sealed class ExecutiveAssistantChannelMessagingService
 
     private HubUserDto? FindUserByChannelRecipient(string channelKind, string normalizedRecipient)
     {
-        string? userId = null;
-        foreach (ChannelLinkDto link in _store.ChannelLinks)
+        lock (_store.Gate)
         {
-            if (!string.Equals(link.ChannelKind, channelKind, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(link.Status, "ea_linked", StringComparison.OrdinalIgnoreCase))
+            string? userId = null;
+            foreach (ChannelLinkDto link in _store.ChannelLinks)
             {
-                continue;
+                if (!string.Equals(link.ChannelKind, channelKind, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(link.Status, "ea_linked", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string normalizedStored = NormalizeCounterpartyHandle(channelKind, link.DisplayLabel);
+                if (!string.Equals(normalizedStored, normalizedRecipient, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (userId is null)
+                {
+                    userId = link.UserId;
+                    continue;
+                }
+
+                if (!string.Equals(userId, link.UserId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Ambiguous incoming {channelKind} counterparty routing; {normalizedRecipient} matches multiple linked users.");
+                }
             }
 
-            string normalizedStored = NormalizeCounterpartyHandle(channelKind, link.DisplayLabel);
-            if (!string.Equals(normalizedStored, normalizedRecipient, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (userId is null)
-            {
-                userId = link.UserId;
-                continue;
-            }
-
-            if (!string.Equals(userId, link.UserId, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"Ambiguous incoming {channelKind} recipient routing; {normalizedRecipient} matches multiple linked users.");
-            }
+            return userId is null ? null : _accounts.GetById(userId);
         }
-
-        return userId is null ? null : _accounts.GetById(userId);
     }
 
     private ExecutiveAssistantChannelConversationState GetOrCreateConversationLocked(

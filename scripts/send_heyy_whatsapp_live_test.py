@@ -142,22 +142,6 @@ def main() -> int:
         )
         return readiness_code if readiness_code else 2
 
-    if readiness.get("recipient", {}).get("blocked"):
-        print(
-            json.dumps(
-                {
-                    "status": "blocked",
-                    "stage": "recipient",
-                    "recipientMasked": mask_phone(args.recipient),
-                    "failureReason": "recipient_blocked",
-                    "readiness": readiness,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
-        return 2
-
     conversation_id = args.conversation_id.strip() or f"heyy-wa-live-test-{int(time.time())}"
     base_url = args.api_base_url.rstrip("/")
     ingest = post_json(

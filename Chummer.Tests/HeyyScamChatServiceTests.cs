@@ -172,8 +172,6 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -203,7 +201,7 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
-    public async Task ApproveDraftWhatsappModeIsBlockedWhenRecipientNotAllowed()
+    public async Task ApproveDraftWhatsappModeIgnoresLegacyAllowBlockRecipientLists()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
         {
@@ -211,17 +209,21 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
         });
         await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
-                ConversationId: "conv-whatsapp-not-allowed",
+                ConversationId: "conv-whatsapp-legacy-lists",
                 CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
         HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
-            "conv-whatsapp-not-allowed",
+            "conv-whatsapp-legacy-lists",
             new HeyyScamChatApproveDraftRequest(
                 OperatorId: "tibor",
                 DeliveryMode: "whatsapp_approved",
@@ -230,9 +232,13 @@ public sealed class HeyyScamChatServiceTests
                 DryRun: false),
             CancellationToken.None);
 
-        Assert.Equal("suppressed_whatsapp_recipient_blocked", approval.Status);
-        Assert.Equal("recipient_blocked", approval.FailureReason);
-        Assert.Empty(fixture.Handler.Requests);
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Null(approval.FailureReason);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        using JsonDocument json = JsonDocument.Parse(request.Body);
+        JsonElement payload = json.RootElement.GetProperty("payload_json");
+        Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
+        Assert.Equal(ScammerFixturePhone, payload.GetProperty("recipient").GetString());
     }
 
     [Fact]
@@ -242,8 +248,6 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -288,8 +292,6 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -370,7 +372,6 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = $"{MetaTestPhone};{AlternateFixturePhone}",
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -399,7 +400,7 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
-    public async Task FiveIncomingTurnsCreateOperatorSummaryReceiptButBlockNotAllowedWhatsappRecipient()
+    public async Task FiveIncomingTurnsCreateOperatorWhatsappSummaryIgnoresLegacyAllowlist()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
         {
@@ -409,6 +410,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550103",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -428,10 +430,11 @@ public sealed class HeyyScamChatServiceTests
         HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-whatsapp-summary-blocked");
         Assert.NotNull(conversation);
         HeyyScamChatOperatorSummaryResponse summary = Assert.Single(conversation.OperatorSummaries);
-        Assert.Equal("suppressed_whatsapp_recipient_not_allowed", summary.Status);
-        Assert.Equal("recipient_not_allowed", summary.FailureReason);
+        Assert.Equal("sent_whatsapp", summary.Status);
+        Assert.Null(summary.FailureReason);
         Assert.Equal("whatsapp", summary.Channel);
-        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        Assert.Contains("\"to\":\"15555550101\"", request.Body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

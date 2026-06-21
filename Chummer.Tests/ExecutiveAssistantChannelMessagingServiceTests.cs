@@ -296,6 +296,33 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
     }
 
     [Fact]
+    public void IngestIncomingMessage_routesWhatsappByEaLinkedCounterpartyWhenSubjectMissing()
+    {
+        using Fixture fixture = new();
+
+        const string subjectId = "subject.ea.incoming.whatsapp.counterparty";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelMessageDto message = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: null,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 791 6419",
+                MessageText: "Can Chummer call me back here?",
+                MessageId: "wa-message-1"));
+
+        Assert.Equal("incoming", message.Direction);
+        Assert.Equal("received", message.DeliveryStatus);
+        Assert.Equal("wa-message-1", message.MessageId);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelConversations);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelMessages);
+        Assert.Equal("436647916419", fixture.Store.ExecutiveAssistantChannelConversations[0].CounterpartyHandle);
+    }
+
+    [Fact]
     public void IngestIncomingMessage_requiresRoutableIncomingTarget()
     {
         using Fixture fixture = new();
