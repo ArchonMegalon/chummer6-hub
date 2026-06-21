@@ -66,10 +66,10 @@
     {
         helperFacts.Add(("Current case state", $"{Model.TrackedCaseSummary.StatusLabel} · {Model.TrackedCaseSummary.StageLabel} · {Model.TrackedCaseSummary.UpdatedLabel}"));
         helperFacts.Add(("Next safe action", Model.TrackedCaseSummary.NextSafeAction));
-        helperFacts.Add(("Follow-up status", Model.TrackedCaseSummary.FollowUpLaneSummary));
-        helperFacts.Add(("Release status", Model.TrackedCaseSummary.ReleaseProgressSummary));
+        helperFacts.Add(("Follow-up", Model.TrackedCaseSummary.FollowUpLaneSummary));
+        helperFacts.Add(("Release", Model.TrackedCaseSummary.ReleaseProgressSummary));
         helperFacts.Add(("Linked install state", Model.TrackedCaseSummary.InstallReadinessSummary));
-        helperFacts.Add(("Fix status", Model.TrackedCaseSummary.VerificationSummary));
+        helperFacts.Add(("Fix", Model.TrackedCaseSummary.VerificationSummary));
         if (!string.IsNullOrWhiteSpace(Model.TrackedCaseSummary.AffectedInstallSummary))
         {
             helperFacts.Add(("Affected install", Model.TrackedCaseSummary.AffectedInstallSummary!));
@@ -157,8 +157,8 @@
         <h2 class="editorial-title">Keep the case moving on the same support path.</h2>
         <p class="editorial-copy">
             @(Model.TrackedCaseSummary is null
-                ? "This pack keeps the case id, reply path, and account return visible until the next tracked update lands."
-                : "This pack keeps the current case state, install readiness, release progress, and follow-up status visible without forcing you back into guesswork.")
+                ? "This page keeps the case id, reply path, and account return visible until the next update arrives."
+                : "This page keeps the current case state, install readiness, release progress, and follow-up visible without forcing you back into guesswork.")
         </p>
     </div>
     <section class="compact-rail">
@@ -167,7 +167,7 @@
             <article class="compact-rail__item">
                 <div class="compact-rail__copy">
                     <h3>@fact.Heading</h3>
-                    <p>@fact.Summary</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(fact.Summary)</p>
                 </div>
             </article>
         }

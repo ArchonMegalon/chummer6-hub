@@ -3,10 +3,7 @@
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
-    var releaseState = HumanizeStatusToken(
-        string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
-        "Not mirrored");
-    var releaseAvailabilityLabel = releaseState.Contains("Passed", StringComparison.OrdinalIgnoreCase)
+    var releaseAvailabilityLabel = IsReleaseAvailable(Model.Manifest.ProofStatus)
         ? "Available"
         : "Unavailable";
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
@@ -17,18 +14,17 @@
 }
 
 @functions {
-    private static string HumanizeStatusToken(string? value, string fallback)
+    private static bool IsReleaseAvailable(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return fallback;
+            return false;
         }
 
-        return string.Join(
-            " ",
-            value.Trim()
-                .Split(['_', '-'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+        var normalized = value.Trim();
+        return normalized.Contains("pass", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("ready", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("available", StringComparison.OrdinalIgnoreCase);
     }
 }
 

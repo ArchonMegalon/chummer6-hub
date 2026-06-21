@@ -205,6 +205,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Release", view, StringComparison.Ordinal);
         Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
         Assert.Contains("@Model.ReleaseSummary", view, StringComparison.Ordinal);
+        Assert.Contains("IsReleaseAvailable(Model.Manifest.ProofStatus)", view, StringComparison.Ordinal);
+        Assert.Contains("normalized.Contains(\"ready\"", view, StringComparison.Ordinal);
         Assert.Contains("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
         Assert.Contains("Open support", view, StringComparison.Ordinal);
@@ -313,6 +315,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
         Assert.Contains("The build currently available from Chummer.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@HumanizeStatusToken(Model.Manifest.RolloutState, \"Current release\")", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Not mirrored", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("HumanizeStatusToken", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Current release at a glance.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Status poster", view, StringComparison.Ordinal);

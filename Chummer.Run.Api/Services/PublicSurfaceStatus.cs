@@ -73,7 +73,7 @@ public static class PublicSurfaceStatus
                 "gm" or "game_master" or "game-master" => "Game masters",
                 "player" => "Players",
                 "creator" => "Creators",
-                "operator" or "community_operator" or "community-operator" => "Operators",
+                "operator" or "community_operator" or "community-operator" => "Maintainers",
                 _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(part.Replace('_', ' ').Replace('-', ' '))
             })
             .Distinct(StringComparer.OrdinalIgnoreCase)

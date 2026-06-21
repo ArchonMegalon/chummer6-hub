@@ -1,3 +1,4 @@
+using Chummer.Run.Api.Services;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -83,5 +84,12 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("IReadOnlyList<ProgramMilestoneSummaryViewModel> MilestoneFollowUp", viewModels, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyList<ResolvedPublicCardViewModel> RoadmapFollowUp", viewModels, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyList<ResolvedPublicCardViewModel> ShippedFollowUp", viewModels, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicAudienceLabelsUseMaintainerLanguageInsteadOfOperatorLanguage()
+    {
+        Assert.Equal("Maintainers", PublicSurfaceStatus.AudienceLabel("operator"));
+        Assert.Equal("Maintainers", PublicSurfaceStatus.AudienceLabel("community_operator"));
     }
 }
