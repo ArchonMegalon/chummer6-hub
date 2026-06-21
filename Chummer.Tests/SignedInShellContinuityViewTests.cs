@@ -56,7 +56,7 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceDecisionNotices", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspacePortableExchangeSummary", view, StringComparison.Ordinal);
-        Assert.Contains("A previous campaign workspace needs review before you continue. Open the workspace lanes below for the safe next step.", view, StringComparison.Ordinal);
+        Assert.Contains("A previous campaign workspace needs review before you continue. Open the workspace sections below for the safe next step.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@selectedWorkspacePortableExchangeNotice.Summary", view, StringComparison.Ordinal);
     }
