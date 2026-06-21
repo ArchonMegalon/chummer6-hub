@@ -16,6 +16,10 @@ If you already know Chummer5a and care about migration, read [From Chummer5a to 
 
 Open [What Chummer6 Is](WHAT_CHUMMER6_IS.md). This is starter help, not another grand product shelf. It exists for the overloaded-reader problem: too many names, too many paths, and one tired reader who only needs the next good click.
 
+## I am planning the next product wave
+
+Use [Next 12 Biggest Wins](NEXT_12_BIGGEST_WINS_GUIDE.md), then check [Campaign OS gap and change](CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md) and [Privacy and retention boundaries](PRIVACY_AND_RETENTION_BOUNDARIES.md) before expanding scope.
+
 ## I care about campaign play
 
 Start with [Runner Passport](RUNNER_PASSPORT.md), [Living World](LIVING_WORLD.md), and [Campaign tools](HORIZONS/README.md).
