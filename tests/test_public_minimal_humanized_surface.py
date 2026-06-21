@@ -561,15 +561,19 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
 def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     ledger_account = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
     ledger_advisory = read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml")
+    ledger_onboarding = read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml")
+    ledger_create = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionCreate.cshtml")
+    ledger_promo = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml")
+    ledger_leader = read("Chummer.Run.Api/Views/PublicLanding/LedgerLeaderBriefing.cshtml")
     sources = [
         read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
         ledger_account,
         ledger_advisory,
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml"),
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml"),
+        ledger_onboarding,
+        ledger_promo,
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml"),
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerLeaderBriefing.cshtml"),
+        ledger_leader,
     ]
     combined = "\n".join(sources)
 
@@ -635,6 +639,88 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
             "<span>@option.Label: @option.VoteCount vote(s)</span>",
             "<h3>@summary.Heading</h3>",
             "<span>@item</span>",
+        ):
+            assert forbidden not in source
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+        "PublicFacingCopyHumanizer.Clean(step.Label)",
+        "PublicFacingCopyHumanizer.Clean(Model.ExistingFactionSummary)",
+        "PublicFacingCopyHumanizer.Clean(faction.Type)",
+        "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(faction.Summary)",
+        "PublicFacingCopyHumanizer.Clean(Model.MajorFounderSummary)",
+        "PublicFacingCopyHumanizer.Clean(Model.ChallengerFounderSummary)",
+        "PublicFacingCopyHumanizer.Clean(Model.MajorSlotsWarning)",
+    ):
+        assert required in ledger_onboarding
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+        "PublicFacingCopyHumanizer.Clean(archetype.Name)",
+        "PublicFacingCopyHumanizer.Clean(rival.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(perk.Name)",
+        "PublicFacingCopyHumanizer.Clean(flaw.Name)",
+    ):
+        assert required in ledger_create
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.StaticCardLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.CampaignHook)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.StorylineSummary)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.PlaybackLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(frame.Label)",
+        "PublicFacingCopyHumanizer.Clean(frame.VisualHook)",
+        "PublicFacingCopyHumanizer.Clean(frame.ActionBeat)",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.CaptionLines[index])",
+        "PublicFacingCopyHumanizer.Clean(Model.Promo.AudiencePromise)",
+        "PublicFacingCopyHumanizer.Clean(scene.Label)",
+        "PublicFacingCopyHumanizer.Clean(scene.Purpose)",
+        "PublicFacingCopyHumanizer.Clean(scene.VisualDirection)",
+        "PublicFacingCopyHumanizer.Clean(scene.NarratorLine)",
+        "PublicFacingCopyHumanizer.Clean(format)",
+    ):
+        assert required in ledger_promo
+
+    assert 'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);' in ledger_leader
+    assert "PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName)" in ledger_leader
+
+    for source in (ledger_onboarding, ledger_create, ledger_promo, ledger_leader):
+        for forbidden in (
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<h1 class=\"editorial-title\">@Model.Heading</h1>",
+            "<p class=\"page-copy\">@Model.Intro</p>",
+            "<p class=\"editorial-copy\">@Model.Intro</p>",
+            "<p class=\"editorial-copy\">@Model.ExistingFactionSummary</p>",
+            "<span class=\"tag\">@faction.Type</span>",
+            "<h3>@faction.PublicName</h3>",
+            "<p class=\"muted-copy\">@faction.Summary</p>",
+            "<p>@Model.MajorFounderSummary</p>",
+            "<p>@Model.ChallengerFounderSummary</p>",
+            ">@archetype.Name</option>",
+            ">@rival.PublicName</option>",
+            "@perk.Name (@perk.Cost)",
+            "@flaw.Name (@(-flaw.Cost))",
+            "<span>Faction: @Model.Digest.PublicName</span>",
+            "<h2 class=\"editorial-title\">@Model.Digest.PublicName right now</h2>",
+            "<h2 class=\"editorial-title\">@Model.Promo.StaticCardLabel</h2>",
+            "<p class=\"editorial-copy\">@Model.Promo.StorylineSummary</p>",
+            "<span>Mode: @Model.Promo.PlaybackLabel</span>",
+            "<span class=\"tag\">@frame.Label</span>",
+            "<h3>@Model.Promo.PublicName</h3>",
+            "<p class=\"faction-storyboard-frame__visual\">@frame.VisualHook</p>",
+            "<p class=\"faction-storyboard-frame__action\">@frame.ActionBeat</p>",
+            "@Model.Promo.CaptionLines[index]",
+            "<p class=\"editorial-copy\">@Model.Promo.AudiencePromise</p>",
+            "<p>@scene.Purpose</p>",
+            "<p>@scene.VisualDirection</p>",
+            "<p>@scene.NarratorLine</p>",
+            "<p>@format</p>",
         ):
             assert forbidden not in source
 

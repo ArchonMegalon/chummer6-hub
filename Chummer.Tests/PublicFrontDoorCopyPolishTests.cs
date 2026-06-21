@@ -676,6 +676,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     public void Media_and_ledger_dynamic_templates_clean_public_copy_before_rendering()
     {
         string media = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "MediaArtifactHorizon.cshtml"));
+        string onboarding = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerOnboarding.cshtml"));
+        string factionCreate = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionCreate.cshtml"));
+        string factionPromo = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"));
         string leaderBriefing = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerLeaderBriefing.cshtml"));
         string factionWorkspace = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
 
@@ -689,8 +692,66 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.Summary)", leaderBriefing, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.BoundaryLine)", leaderBriefing, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.Summary)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName)", leaderBriefing, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.GmCockpitPacket.Summary</p>", leaderBriefing, StringComparison.Ordinal);
         Assert.DoesNotContain("<p>@Model.GmCockpitPacket.BoundaryLine</p>", leaderBriefing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Faction: @Model.Digest.PublicName</span>", leaderBriefing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2 class=\"editorial-title\">@Model.Digest.PublicName right now</h2>", leaderBriefing, StringComparison.Ordinal);
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+            "PublicFacingCopyHumanizer.Clean(step.Label)",
+            "PublicFacingCopyHumanizer.Clean(Model.ExistingFactionSummary)",
+            "PublicFacingCopyHumanizer.Clean(faction.Type)",
+            "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
+            "PublicFacingCopyHumanizer.Clean(faction.Summary)",
+            "PublicFacingCopyHumanizer.Clean(Model.MajorFounderSummary)",
+            "PublicFacingCopyHumanizer.Clean(Model.ChallengerFounderSummary)",
+            "PublicFacingCopyHumanizer.Clean(Model.MajorSlotsWarning)"
+        })
+        {
+            Assert.Contains(required, onboarding, StringComparison.Ordinal);
+        }
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+            "PublicFacingCopyHumanizer.Clean(archetype.Name)",
+            "PublicFacingCopyHumanizer.Clean(rival.PublicName)",
+            "PublicFacingCopyHumanizer.Clean(perk.Name)",
+            "PublicFacingCopyHumanizer.Clean(flaw.Name)"
+        })
+        {
+            Assert.Contains(required, factionCreate, StringComparison.Ordinal);
+        }
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.StaticCardLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.CampaignHook)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.StorylineSummary)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.PlaybackLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.PublicName)",
+            "PublicFacingCopyHumanizer.Clean(frame.Label)",
+            "PublicFacingCopyHumanizer.Clean(frame.VisualHook)",
+            "PublicFacingCopyHumanizer.Clean(frame.ActionBeat)",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.CaptionLines[index])",
+            "PublicFacingCopyHumanizer.Clean(Model.Promo.AudiencePromise)",
+            "PublicFacingCopyHumanizer.Clean(scene.Label)",
+            "PublicFacingCopyHumanizer.Clean(scene.Purpose)",
+            "PublicFacingCopyHumanizer.Clean(scene.VisualDirection)",
+            "PublicFacingCopyHumanizer.Clean(scene.NarratorLine)",
+            "PublicFacingCopyHumanizer.Clean(format)"
+        })
+        {
+            Assert.Contains(required, factionPromo, StringComparison.Ordinal);
+        }
 
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);

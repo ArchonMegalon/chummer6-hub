@@ -1,6 +1,6 @@
 @model BlackLedgerLeaderBriefingPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
@@ -12,7 +12,7 @@
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
             <span>Leader: @Model.Digest.LeaderHandle</span>
-            <span>Faction: @Model.Digest.PublicName</span>
+            <span>Faction: @PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName)</span>
             @if (Model.WorldTurnBriefing is not null)
             {
                 <span>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</span>
@@ -29,7 +29,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Pressure calls</p>
-        <h2 class="editorial-title">@Model.Digest.PublicName right now</h2>
+        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName) right now</h2>
         <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Digest.Summary)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">

@@ -10,8 +10,8 @@
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Faction charter builder</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
             <span>Major slots available: @Model.MajorSlotsAvailable</span>
             <span>Major: 100 points / 3 AP</span>
@@ -46,7 +46,7 @@
             <select name="archetypeId">
                 @foreach (var archetype in Model.Archetypes)
                 {
-                    <option value="@archetype.Id" selected="@(challenger ? archetype.Id == "matrix_cell" : archetype.Id == "creator_press")">@archetype.Name</option>
+                    <option value="@archetype.Id" selected="@(challenger ? archetype.Id == "matrix_cell" : archetype.Id == "creator_press")">@PublicFacingCopyHumanizer.Clean(archetype.Name)</option>
                 }
             </select>
         </label>
@@ -68,7 +68,7 @@
                 <option value="">No named rival</option>
                 @foreach (var rival in Model.RivalFactions)
                 {
-                    <option value="@rival.FactionId.Replace('-', '_')" selected="@(rival.FactionId == "ashline-circle" ? "selected" : null)">@rival.PublicName</option>
+                    <option value="@rival.FactionId.Replace('-', '_')" selected="@(rival.FactionId == "ashline-circle" ? "selected" : null)">@PublicFacingCopyHumanizer.Clean(rival.PublicName)</option>
                 }
             </select>
         </label>
@@ -81,7 +81,7 @@
                 {
                     <label>
                         <input type="checkbox" name="perkIds" value="@perk.Id" @(challenger ? (perk.Id is "underdog_momentum" or "dispatch_desk" ? "checked" : null) : (perk.Id is "dispatch_desk" or "public_trust" ? "checked" : null)) />
-                        @perk.Name (@perk.Cost)@(perk.ChallengerOnly ? " · Challenger only" : string.Empty)
+                        @PublicFacingCopyHumanizer.Clean(perk.Name) (@perk.Cost)@(perk.ChallengerOnly ? " · Challenger only" : string.Empty)
                     </label>
                 }
             </article>
@@ -92,7 +92,7 @@
                 {
                     <label>
                         <input type="checkbox" name="flawIds" value="@flaw.Id" @(challenger ? (flaw.Id is "overexposed" or "thin_resources" or "rival_target" ? "checked" : null) : (flaw.Id is "overexposed" or "thin_resources" ? "checked" : null)) />
-                        @flaw.Name (@(-flaw.Cost))
+                        @PublicFacingCopyHumanizer.Clean(flaw.Name) (@(-flaw.Cost))
                     </label>
                 }
             </article>
