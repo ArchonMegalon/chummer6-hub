@@ -13,7 +13,11 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("Choose the right path", trustView, StringComparison.Ordinal);
         Assert.Contains("Each path has a clear next step and a second option if that does not fit.", trustView, StringComparison.Ordinal);
         Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);
-        Assert.Contains("Public feedback, tracked return, and install recovery stay nearby.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Public feedback, account return, and install recovery stay nearby.", trustView, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", trustView, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
         Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the trust boundary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the rule boundary first, then the full terms.", trustView, StringComparison.Ordinal);

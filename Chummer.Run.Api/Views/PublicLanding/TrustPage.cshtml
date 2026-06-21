@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model TrustPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     var helpPage = string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase);
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
@@ -149,9 +149,9 @@
 
 <section class="@(helpPage ? "minimal-page-hero" : "trust-page-hero")">
     <div class="@(helpPage ? string.Empty : "trust-page-hero__copy")">
-        <p class="@(helpPage ? "minimal-kicker" : "eyebrow")">@Model.Eyebrow</p>
-        <h1 class="@(helpPage ? string.Empty : "page-title")">@Model.Heading</h1>
-        <p class="@(helpPage ? string.Empty : "page-copy")">@Model.Intro</p>
+        <p class="@(helpPage ? "minimal-kicker" : "eyebrow")">@PublicText(Model.Eyebrow)</p>
+        <h1 class="@(helpPage ? string.Empty : "page-title")">@PublicText(Model.Heading)</h1>
+        <p class="@(helpPage ? string.Empty : "page-copy")">@PublicText(Model.Intro)</p>
         @if (!helpPage && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
         {
             <div class="trust-claim__details">
@@ -170,7 +170,7 @@
             <div class="trust-claim__details">
                 @foreach (var point in Model.SummaryPoints)
                 {
-                    <span>@point</span>
+                    <span>@PublicText(point)</span>
                 }
             </div>
         }
@@ -188,7 +188,7 @@
         <div class="stacked-actions">
             @foreach (var action in Model.Actions)
             {
-                <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
+                <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@PublicText(action.Label)</a>
             }
         </div>
     }
@@ -220,9 +220,9 @@
             @foreach (var fact in policyFacts)
             {
                 <article class="continuity-band__fact">
-                    <span>@fact.Tag</span>
-                    <strong>@fact.Heading</strong>
-                    <p>@fact.Summary</p>
+                    <span>@PublicText(fact.Tag)</span>
+                    <strong>@PublicText(fact.Heading)</strong>
+                    <p>@PublicText(fact.Summary)</p>
                     @if (!string.Equals(fact.Href, "#", StringComparison.Ordinal))
                     {
                         <a class="inline-link" href="@fact.Href">Open section</a>
@@ -245,7 +245,7 @@
             {
                 var fallbackAction = HelpFallbackActionFor(choice.Id, Model.Chrome.Authenticated);
                 <article class="minimal-help-card" id="@choice.Id">
-                    <span>@choice.Badge</span>
+                    <span>@PublicText(choice.Badge)</span>
                     <h3>@PublicText(choice.Title)</h3>
                     <p>@PublicText(choice.Summary)</p>
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
@@ -291,15 +291,15 @@ else if (!contactPage)
             @foreach (var pageSection in Model.Sections)
             {
                 <article class="trust-page-section" id="@pageSection.Id">
-                    <p class="eyebrow">@pageSection.Eyebrow</p>
-                    <h2>@pageSection.Heading</h2>
-                    <p>@pageSection.Body</p>
+                    <p class="eyebrow">@PublicText(pageSection.Eyebrow)</p>
+                    <h2>@PublicText(pageSection.Heading)</h2>
+                    <p>@PublicText(pageSection.Body)</p>
                     @if (pageSection.Bullets is { Count: > 0 })
                     {
                         <ul class="trust-page-section__list">
                             @foreach (var bullet in pageSection.Bullets)
                             {
-                                <li>@bullet</li>
+                                <li>@PublicText(bullet)</li>
                             }
                         </ul>
                     }
@@ -314,12 +314,12 @@ else if (!contactPage)
     <section class="trust-page-sections" id="support-intake">
         <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support intake</p>
-            <h2>@Model.SupportIntake.Heading</h2>
-            <p>@Model.SupportIntake.Intro</p>
+            <h2>@PublicText(Model.SupportIntake.Heading)</h2>
+            <p>@PublicText(Model.SupportIntake.Intro)</p>
 
             @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.SubmissionNotice))
             {
-                <p class="status-copy status-copy--success">@Model.SupportIntake.SubmissionNotice</p>
+                <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
             }
 
             <div class="editorial-block__lead trust-page-section__lead">
@@ -332,8 +332,8 @@ else if (!contactPage)
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>@option.Label</h3>
-                            <p>@option.Description</p>
+                            <h3>@PublicText(option.Label)</h3>
+                            <p>@PublicText(option.Description)</p>
                         </div>
                     </article>
                 }
@@ -346,7 +346,7 @@ else if (!contactPage)
                     <select id="supportKind" name="kind" required>
                         @foreach (var option in Model.SupportIntake.Options)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.SupportIntake.DefaultKind, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.SupportIntake.DefaultKind, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@PublicText(option.Label)</option>
                         }
                     </select>
                 </div>
@@ -373,7 +373,7 @@ else if (!contactPage)
                     <summary>Optional environment details</summary>
                     @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.ContextHint))
                     {
-                        <p class="muted-copy">@Model.SupportIntake.ContextHint</p>
+                        <p class="muted-copy">@PublicText(Model.SupportIntake.ContextHint)</p>
                     }
                     <div class="field">
                         <label for="supportPlatform">Platform</label>
@@ -402,7 +402,7 @@ else if (!contactPage)
                 </details>
                 <details class="details-drawer">
                     <summary>Attachments</summary>
-                    <p class="muted-copy">@Model.SupportIntake.AttachmentHelp</p>
+                    <p class="muted-copy">@PublicText(Model.SupportIntake.AttachmentHelp)</p>
                     <div class="field">
                         <label for="supportAttachments">Screenshots, logs, or small bundles</label>
                         <input id="supportAttachments" name="attachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
@@ -410,11 +410,11 @@ else if (!contactPage)
                 </details>
                 <div class="stacked-actions">
                     <button class="button-like button-like--primary" type="submit">Submit support case</button>
-                    <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@Model.SupportIntake.AccountSupportLabel</a>
-                    <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@Model.SupportIntake.InstallAccessLabel</a>
+                    <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>
+                    <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>
                 </div>
             </form>
-            <p class="muted-copy">@Model.SupportIntake.ResponseExpectation</p>
+            <p class="muted-copy">@PublicText(Model.SupportIntake.ResponseExpectation)</p>
             @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailHref)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
@@ -423,9 +423,9 @@ else if (!contactPage)
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Recovery stays on this install page" : "Return to the guided installer after support")</h3>
-                            <p>@Model.SupportIntake.InstallRailSummary</p>
+                            <p>@PublicText(Model.SupportIntake.InstallRailSummary)</p>
                         </div>
-                        <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@Model.SupportIntake.InstallRailLabel</a>
+                        <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a>
                     </article>
                 </div>
             }
@@ -444,16 +444,16 @@ else if (!contactPage)
                 @foreach (var choice in contactRouteChoices)
                 {
                     <article class="route-choice-card" id="@choice.Id">
-                        <span class="tag">@choice.Badge</span>
-                        <h3>@choice.Title</h3>
-                        <p>@choice.Summary</p>
+                        <span class="tag">@PublicText(choice.Badge)</span>
+                        <h3>@PublicText(choice.Title)</h3>
+                        <p>@PublicText(choice.Summary)</p>
                         <div class="route-choice-card__details">
                             @foreach (var item in choice.Details)
                             {
-                                <span>@item</span>
+                                <span>@PublicText(item)</span>
                             }
                         </div>
-                        <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                        <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
                     </article>
                 }
             </div>

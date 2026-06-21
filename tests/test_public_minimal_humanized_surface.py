@@ -30,6 +30,64 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'other routes below' not in trust_page
 
 
+def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
+    trust_page = read("Chummer.Run.Api/Views/PublicLanding/TrustPage.cshtml")
+
+    for expected in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "@PublicText(Model.Eyebrow)",
+        "@PublicText(Model.Heading)",
+        "@PublicText(Model.Intro)",
+        "@PublicText(action.Label)",
+        "@PublicText(point)",
+        "@PublicText(fact.Tag)",
+        "@PublicText(fact.Heading)",
+        "@PublicText(fact.Summary)",
+        "@PublicText(choice.Badge)",
+        "@PublicText(choice.Label)",
+        "@PublicText(pageSection.Eyebrow)",
+        "@PublicText(pageSection.Body)",
+        "@PublicText(Model.SupportIntake.Heading)",
+        "@PublicText(Model.SupportIntake.Intro)",
+        "@PublicText(Model.SupportIntake.SubmissionNotice)",
+        "@PublicText(option.Label)",
+        "@PublicText(option.Description)",
+        "@PublicText(Model.SupportIntake.AccountSupportLabel)",
+        "@PublicText(Model.SupportIntake.InstallAccessLabel)",
+        "@PublicText(Model.SupportIntake.ResponseExpectation)",
+        "@PublicText(Model.SupportIntake.InstallRailSummary)",
+        "@PublicText(Model.SupportIntake.InstallRailLabel)",
+    ):
+        assert expected in trust_page
+
+    for forbidden in (
+        'ViewData["Title"] = Model.Heading;',
+        ">@Model.Eyebrow</p>",
+        ">@Model.Heading</h1>",
+        ">@Model.Intro</p>",
+        ">@action.Label</a>",
+        "<span>@point</span>",
+        "<span>@fact.Tag</span>",
+        "<strong>@fact.Heading</strong>",
+        "<p>@fact.Summary</p>",
+        "<span>@choice.Badge</span>",
+        ">@choice.Label</a>",
+        "<p class=\"eyebrow\">@pageSection.Eyebrow</p>",
+        "<p>@pageSection.Body</p>",
+        "<h2>@Model.SupportIntake.Heading</h2>",
+        "<p>@Model.SupportIntake.Intro</p>",
+        "@Model.SupportIntake.SubmissionNotice</p>",
+        "<h3>@option.Label</h3>",
+        "<p>@option.Description</p>",
+        ">@Model.SupportIntake.AccountSupportLabel</a>",
+        ">@Model.SupportIntake.InstallAccessLabel</a>",
+        "<p class=\"muted-copy\">@Model.SupportIntake.ResponseExpectation</p>",
+        "<p>@Model.SupportIntake.InstallRailSummary</p>",
+        ">@Model.SupportIntake.InstallRailLabel</a>",
+    ):
+        assert forbidden not in trust_page
+
+
 def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     horizons = read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml")
