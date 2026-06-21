@@ -37,22 +37,22 @@ public sealed class PublicSignalOperationsViewTests
     }
 
     [Fact]
-    public void DrilldownViewSurfacesDetailArtifactsAndBoundedTimelineSections()
+    public void DetailViewSurfacesFeedbackActivityWithoutInternalCloseoutCopy()
     {
         string detailViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeedbackOperationsDetail.cshtml");
         string detailView = File.ReadAllText(detailViewPath);
 
         Assert.Contains("@model PublicSignalOperationsDetailPageViewModel", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open details", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open summary", detailView, StringComparison.Ordinal);
-        Assert.Contains("Drilldown summary", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download item data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download summary", detailView, StringComparison.Ordinal);
+        Assert.Contains("Activity summary", detailView, StringComparison.Ordinal);
         Assert.Contains("Activity", detailView, StringComparison.Ordinal);
         Assert.Contains("Original item", detailView, StringComparison.Ordinal);
         Assert.Contains("Saved filters", detailView, StringComparison.Ordinal);
         Assert.Contains("Current filter", detailView, StringComparison.Ordinal);
         Assert.Contains("Open filter details", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open thread data", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open related data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download thread data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download related data", detailView, StringComparison.Ordinal);
         Assert.Contains("Open thread details", detailView, StringComparison.Ordinal);
         Assert.Contains("Open related details", detailView, StringComparison.Ordinal);
         Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
@@ -63,6 +63,12 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("detail.FilterLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("savedPivots", detailView, StringComparison.Ordinal);
         Assert.Contains("Search another item", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("support boundary", detailView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("closeout eligibility", detailView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("closeout status", detailView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("queue status stay clear", detailView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("No public outcome claim", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Drilldown summary", detailView, StringComparison.Ordinal);
     }
 
     [Fact]
