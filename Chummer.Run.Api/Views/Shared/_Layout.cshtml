@@ -35,9 +35,17 @@
 
         return candidate.Trim().TrimEnd('/');
     };
+    Func<string?, bool> isExternalNavigationHref = href =>
+        Uri.TryCreate(href, UriKind.Absolute, out Uri? uri)
+        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
     var normalizedCurrentPath = normalizeHeaderActionPath(chrome.CurrentPath);
     Func<string?, bool> isContextualRouteCurrent = href =>
     {
+        if (isExternalNavigationHref(href))
+        {
+            return false;
+        }
+
         var candidate = normalizeHeaderActionPath(href);
         return candidate switch
         {
