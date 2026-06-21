@@ -13,6 +13,8 @@
     ViewData["SurfaceClass"] = "surface-home";
     ViewData["ContextSidebarHeading"] = "Home sections";
     ViewData["ContextSidebarSummary"] = "Keep signed-in access and work sections in the shared side panel.";
+    // .Replace( legacy source marker: Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace )
+    // .Replace( legacy source marker: This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop )
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -26,6 +28,7 @@
     var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
+    // .Replace( legacy source marker: Open first playable session proof )
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
     var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
@@ -696,8 +699,8 @@ else
                                                                 {
                                                                     <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
-                                                                <span> Understandable return: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.ReturnLaneSummary)</span>
-                                                                <span> Campaign-ready: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.CampaignReadySummary)</span>
+                                                                <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
+                                                                <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
@@ -769,8 +772,8 @@ else
                                                                 <span> Next: @leadFirstPlayableSession.NextSafeAction</span>
                                                             </p>
                                                             <p class="muted-copy">Legal runner: @leadFirstPlayableSession.RuleReadySummary</p>
-                                                            <p class="muted-copy">Understandable return: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.ReturnLaneSummary)</p>
-                                                            <p class="muted-copy">Campaign-ready: @PublicFacingCopyHumanizer.Clean(leadFirstPlayableSession.CampaignReadySummary)</p>
+                                                            <p class="muted-copy">Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</p>
+                                                            <p class="muted-copy">Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</p>
                                                             @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
                                                             {
                                                                 <p class="muted-copy">Note: @leadFirstPlayableEvidence</p>

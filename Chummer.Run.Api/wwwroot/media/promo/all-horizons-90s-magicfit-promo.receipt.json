@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-19T06:25:35Z",
+  "generated_at_utc": "2026-06-20T19:57:41Z",
   "status": "published",
   "asset_id": "all-horizons-90s-magicfit-promo",
   "title": "Chummer6 Product Threads 90s MagicFit Promo",
@@ -92,18 +92,20 @@
         "codec_name": "h264",
         "codec_type": "video",
         "width": 1280,
-        "height": 720
+        "height": 720,
+        "bit_rate": "4049319"
       },
       {
         "codec_name": "aac",
         "codec_type": "audio",
-        "sample_rate": "48000",
-        "channels": 1
+        "sample_rate": "96000",
+        "channels": 1,
+        "bit_rate": "200260"
       }
     ],
     "format": {
       "duration": "90.000000",
-      "size": "47727125"
+      "size": "47890947"
     }
   },
   "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
@@ -180,5 +182,13 @@
       "caption": "One product spine: build, explain, run, remember, publish.",
       "narration": "One product spine: build the runner, explain the choices, run the table, remember the consequences, and publish only what the table approves."
     }
-  ]
+  ],
+  "public_mp4": "/media/promo/all-horizons-90s-magicfit-promo.mp4?v=20260620-audio2",
+  "output_audio_duration_seconds": 0.0,
+  "size_bytes": 47890947,
+  "has_audio": true,
+  "has_video": true,
+  "audio_mean_volume_db": -18.0,
+  "audio_max_volume_db": -0.7,
+  "audio_quality_status": "pass"
 }

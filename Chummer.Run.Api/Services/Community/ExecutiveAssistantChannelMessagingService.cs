@@ -16,6 +16,10 @@ public sealed class ExecutiveAssistantChannelMessagingService
 
     private const string TelegramChannelKind = "telegram_official_bot";
     private const string WhatsappChannelKind = "whatsapp_official_business";
+    private const string TelegramDeliveryChannel = "telegram";
+    private const string WhatsappDeliveryChannel = "whatsapp";
+    private const string WhatsappBusinessTransport = "whatsapp_business";
+    private const string WhatsappWebSessionTransport = "whatsapp_web_session";
 
     private const string SubjectMessageSafetyLabel = "safe";
     private const string MessageDirectionIncoming = "incoming";
@@ -466,12 +470,18 @@ public sealed class ExecutiveAssistantChannelMessagingService
     {
         string principalId = ResolveEaPrincipalId();
         string bindingId = ResolveEaBindingId(channelKind);
+        string deliveryChannel = ResolveEaDeliveryChannel(channelKind);
+        string deliveryTransport = ResolveEaDeliveryTransport(channelKind, bindingId);
         var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
             ["event_type"] = "executive_assistant_channel_send",
+            ["source_service"] = "chummer_hub_account_channel",
             ["user_id"] = user.UserId,
             ["subject_id"] = user.SubjectId,
             ["channel_kind"] = channelKind,
+            ["account_channel_kind"] = channelKind,
+            ["delivery_channel"] = deliveryChannel,
+            ["delivery_transport"] = deliveryTransport,
             ["recipient"] = recipientHandle
         };
         var payload = new
@@ -482,7 +492,7 @@ public sealed class ExecutiveAssistantChannelMessagingService
             {
                 principal_id = principalId,
                 binding_id = bindingId,
-                channel = channelKind,
+                channel = deliveryChannel,
                 recipient = recipientHandle,
                 subject = $"Message from Chummer account {user.Handle}",
                 content = messageText,
@@ -655,12 +665,38 @@ public sealed class ExecutiveAssistantChannelMessagingService
 
     private string ResolveEaBindingId(string channelKind)
         => string.Equals(channelKind, WhatsappChannelKind, StringComparison.OrdinalIgnoreCase)
-            ? AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"])
+            ? AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"])
+                ?? AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"])
                 ?? AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_BINDING_ID"])
                 ?? string.Empty
             : AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_TELEGRAM_BINDING_ID"])
                 ?? AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_BINDING_ID"])
                 ?? string.Empty;
+
+    private string ResolveEaDeliveryChannel(string channelKind)
+        => string.Equals(channelKind, WhatsappChannelKind, StringComparison.OrdinalIgnoreCase)
+            ? WhatsappDeliveryChannel
+            : TelegramDeliveryChannel;
+
+    private string ResolveEaDeliveryTransport(string channelKind, string bindingId)
+    {
+        if (!string.Equals(channelKind, WhatsappChannelKind, StringComparison.OrdinalIgnoreCase))
+        {
+            return "telegram_bot";
+        }
+
+        string? configuredTransport = AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT"]);
+        if (configuredTransport is not null)
+        {
+            return configuredTransport;
+        }
+
+        string? webBindingId = AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"]);
+        return !string.IsNullOrWhiteSpace(webBindingId)
+            && string.Equals(bindingId, webBindingId, StringComparison.OrdinalIgnoreCase)
+                ? WhatsappWebSessionTransport
+                : WhatsappBusinessTransport;
+    }
 
     private string ResolveEaApiToken()
         => (_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] ?? string.Empty).Trim();

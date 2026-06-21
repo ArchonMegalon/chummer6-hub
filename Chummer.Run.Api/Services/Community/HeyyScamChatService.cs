@@ -296,6 +296,11 @@ public sealed class HeyyScamChatService
                 status = "suppressed_whatsapp_recipient_missing";
                 failureReason = "recipient_missing";
             }
+            else if (IsWhatsappRecipientBlocked(recipient))
+            {
+                status = "suppressed_whatsapp_recipient_blocked";
+                failureReason = "recipient_blocked";
+            }
             else if (!IsWhatsappRecipientAllowed(recipient))
             {
                 status = "suppressed_whatsapp_recipient_not_allowed";
@@ -994,8 +999,16 @@ public sealed class HeyyScamChatService
         }
         else if (summaryChannel == OperatorSummaryChannelWhatsapp && !IsWhatsappRecipientAllowed(recipient))
         {
-            status = "suppressed_whatsapp_recipient_not_allowed";
-            failureReason = "recipient_not_allowed";
+            if (IsWhatsappRecipientBlocked(recipient))
+            {
+                status = "suppressed_whatsapp_recipient_blocked";
+                failureReason = "recipient_blocked";
+            }
+            else
+            {
+                status = "suppressed_whatsapp_recipient_not_allowed";
+                failureReason = "recipient_not_allowed";
+            }
         }
         else if (summaryChannel == OperatorSummaryChannelWhatsapp)
         {
@@ -1731,6 +1744,11 @@ public sealed class HeyyScamChatService
             return false;
         }
 
+        if (IsWhatsappRecipientBlocked(normalizedRecipient))
+        {
+            return false;
+        }
+
         string? allowed = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"]);
         if (allowed is null)
         {
@@ -1742,6 +1760,27 @@ public sealed class HeyyScamChatService
             .Select(NormalizeRecipientForAllowlist)
             .Any(allowedRecipient => !string.IsNullOrWhiteSpace(allowedRecipient)
                 && string.Equals(allowedRecipient, normalizedRecipient, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsWhatsappRecipientBlocked(string recipient)
+    {
+        string? normalizedRecipient = NormalizeRecipientForAllowlist(recipient);
+        if (normalizedRecipient is null)
+        {
+            return true;
+        }
+
+        string? blocked = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"]);
+        if (blocked is null)
+        {
+            return false;
+        }
+
+        return blocked
+            .Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(NormalizeRecipientForAllowlist)
+            .Any(blockedRecipient => !string.IsNullOrWhiteSpace(blockedRecipient)
+                && string.Equals(blockedRecipient, normalizedRecipient, StringComparison.OrdinalIgnoreCase));
     }
 
     private bool IsValidWhatsAppBindingConfig()

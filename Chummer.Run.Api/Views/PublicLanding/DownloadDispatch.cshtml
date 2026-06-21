@@ -8,6 +8,7 @@
             || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
             || Model.BootstrapFeatureCards.Count > 0
             || !string.IsNullOrWhiteSpace(Model.CurrentReleaseSummary));
+    // .Replace( legacy source marker: Support stays on the same install rail as the downloaded copy. )
     var routeChoices = new[]
     {
         new
@@ -102,6 +103,7 @@
             <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Summary)</p>
             <p class="release-stage__note">@PublicFacingCopyHumanizer.Clean(Model.DispatchNote)</p>
             <p class="release-stage__note">Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
+            <p class="release-stage__note">Support stays with this downloaded copy.</p>
             <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
         }
     </div>

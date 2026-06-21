@@ -19,7 +19,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | --- | ---: | ---: | ---: | ---: |
 | Tabs | 17 | 17 | 0 | 2 |
 | Workspace Actions | 47 | 47 | 0 | 2 |
-| Desktop Controls | 29 | 29 | 0 | 42 |
+| Desktop Controls | 29 | 29 | 0 | 44 |
 
 ## Tabs Coverage
 
@@ -155,6 +155,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `master_index` | present_in_dialog_factory_acknowledged |
 | `matrix_program_add` | present_in_dialog_factory_acknowledged |
 | `new_character` | present_in_dialog_factory_acknowledged |
+| `new_character_origin` | present_in_dialog_factory_acknowledged |
 | `new_window` | present_in_dialog_factory_acknowledged |
 | `print_character` | present_in_dialog_factory_acknowledged |
 | `print_multiple` | present_in_dialog_factory_acknowledged |
@@ -163,6 +164,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `quality_delete` | present_in_dialog_factory_acknowledged |
 | `report_bug` | present_in_dialog_factory_acknowledged |
 | `revision_history` | present_in_dialog_factory_acknowledged |
+| `show_login_video` | present_in_dialog_factory_acknowledged |
 | `spell_add` | present_in_dialog_factory_acknowledged |
 | `spirit_add` | present_in_dialog_factory_acknowledged |
 | `switch_ruleset` | present_in_dialog_factory_acknowledged |

@@ -224,6 +224,48 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
     }
 
     [Fact]
+    public async Task SendMessageAsync_prefersWhatsappWebBindingWhenConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = "principal-runner",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"] = "business-binding",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"] = "web-session-binding"
+        });
+
+        const string subjectId = "subject.ea.runner.whatsapp.web";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelSendResult result = await fixture.Service.SendMessageAsync(
+            subjectId,
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelSendRequest(
+                MessageText: "testing whatsapp web",
+                CounterpartyHandle: null,
+                ConversationId: null,
+                IdempotencyKey: "wa-web-test"),
+            CancellationToken.None);
+
+        Assert.Equal("sent", result.Status);
+        RecordedRequest request = Assert.Single(fixture.Handler.Requests, item => item.Method == HttpMethod.Post && item.Path == "/v1/tools/execute");
+        using JsonDocument json = JsonDocument.Parse(request.Body);
+        JsonElement payload = json.RootElement.GetProperty("payload_json");
+        Assert.Equal("web-session-binding", payload.GetProperty("binding_id").GetString());
+        Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
+        Assert.Equal("436647916419", payload.GetProperty("recipient").GetString());
+
+        JsonElement metadata = payload.GetProperty("metadata");
+        Assert.Equal("chummer_hub_account_channel", metadata.GetProperty("source_service").GetString());
+        Assert.Equal("whatsapp_official_business", metadata.GetProperty("account_channel_kind").GetString());
+        Assert.Equal("whatsapp", metadata.GetProperty("delivery_channel").GetString());
+        Assert.Equal("whatsapp_web_session", metadata.GetProperty("delivery_transport").GetString());
+    }
+
+    [Fact]
     public void IngestIncomingMessage_persistsIncomingMessageAndConversationForSubject()
     {
         using Fixture fixture = new(new Dictionary<string, string?>

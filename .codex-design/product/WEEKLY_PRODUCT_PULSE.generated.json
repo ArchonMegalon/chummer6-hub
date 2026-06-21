@@ -1,25 +1,36 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-20T01:27:06Z",
-  "as_of": "2026-06-20",
+  "generated_at": "2026-06-20T22:48:11Z",
+  "as_of": "2026-06-21",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is ready; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
+  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is still open; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
   "release_health": {
-    "state": "green_or_explained",
-    "reason": "No red blockers are open and published flagship readiness proof is green.",
+    "state": "needs_attention",
+    "reason": "Published flagship readiness proof is not green, so release posture cannot overclaim even when red blockers are clear.",
     "front_door_wave_closed": true
   },
   "flagship_readiness": {
-    "state": "ready",
-    "reason": "Published flagship readiness proof passed with no remaining coverage or readiness-plane gaps.",
-    "proof_status": "pass",
-    "coverage_gap_keys": [],
-    "readiness_plane_gap_keys": []
+    "state": "watch",
+    "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client, horizons_and_public_surface. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
+    "proof_status": "fail",
+    "coverage_gap_keys": [
+      "desktop_client",
+      "horizons_and_public_surface"
+    ],
+    "readiness_plane_gap_keys": [
+      "structural_ready",
+      "flagship_ready",
+      "veteran_deep_workflow_ready",
+      "dense_workbench_ready",
+      "feedback_loop_ready",
+      "public_shelf_ready",
+      "recovery_trust_ready"
+    ]
   },
   "rule_environment_trust": {
     "state": "ready",
@@ -70,7 +81,7 @@
   "public_promise_drift_count": 0,
   "governor_decisions": [
     {
-      "decision_id": "2026-06-20-focus-next-12-biggest-wins",
+      "decision_id": "2026-06-21-focus-next-12-biggest-wins",
       "action": "focus_shift",
       "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 42 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
@@ -83,15 +94,15 @@
       ]
     },
     {
-      "decision_id": "2026-06-20-launch-governance",
+      "decision_id": "2026-06-21-launch-governance",
       "action": "freeze_launch",
-      "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+      "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
       "cited_signals": [
         "journey_gate_state=ready",
         "journey_gate_blocked_count=0",
         "local_release_proof_status=passed",
-        "flagship_readiness_state=ready",
-        "flagship_readiness_proof_status=pass",
+        "flagship_readiness_state=watch",
+        "flagship_readiness_proof_status=fail",
         "provider_canary_status=Canary green on all active lanes",
         "closure_health_state=clear",
         "successor_dependency_state=ready",
@@ -104,16 +115,27 @@
   "next_checkpoint_question": "What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?",
   "snapshot": {
     "release_health": {
-      "state": "green_or_explained",
-      "reason": "No red blockers are open and published flagship readiness proof is green.",
+      "state": "needs_attention",
+      "reason": "Published flagship readiness proof is not green, so release posture cannot overclaim even when red blockers are clear.",
       "front_door_wave_closed": true
     },
     "flagship_readiness": {
-      "state": "ready",
-      "reason": "Published flagship readiness proof passed with no remaining coverage or readiness-plane gaps.",
-      "proof_status": "pass",
-      "coverage_gap_keys": [],
-      "readiness_plane_gap_keys": []
+      "state": "watch",
+      "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client, horizons_and_public_surface. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
+      "proof_status": "fail",
+      "coverage_gap_keys": [
+        "desktop_client",
+        "horizons_and_public_surface"
+      ],
+      "readiness_plane_gap_keys": [
+        "structural_ready",
+        "flagship_ready",
+        "veteran_deep_workflow_ready",
+        "dense_workbench_ready",
+        "feedback_loop_ready",
+        "public_shelf_ready",
+        "recovery_trust_ready"
+      ]
     },
     "rule_environment_trust": {
       "state": "ready",
@@ -164,7 +186,7 @@
     "public_promise_drift_count": 0,
     "governor_decisions": [
       {
-        "decision_id": "2026-06-20-focus-next-12-biggest-wins",
+        "decision_id": "2026-06-21-focus-next-12-biggest-wins",
         "action": "focus_shift",
         "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 42 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
@@ -177,15 +199,15 @@
         ]
       },
       {
-        "decision_id": "2026-06-20-launch-governance",
+        "decision_id": "2026-06-21-launch-governance",
         "action": "freeze_launch",
-        "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+        "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
         "cited_signals": [
           "journey_gate_state=ready",
           "journey_gate_blocked_count=0",
           "local_release_proof_status=passed",
-          "flagship_readiness_state=ready",
-          "flagship_readiness_proof_status=pass",
+          "flagship_readiness_state=watch",
+          "flagship_readiness_proof_status=fail",
           "provider_canary_status=Canary green on all active lanes",
           "closure_health_state=clear",
           "successor_dependency_state=ready",
@@ -203,7 +225,7 @@
     "phase_label": "Public-fit polish",
     "history_snapshot_count": 42,
     "longest_pole": "Core Engine",
-    "launch_readiness": "Hold launch expansion until the whole-product final claim returns to pass (current: fail).",
+    "launch_readiness": "Hold launch expansion until published flagship readiness proof returns to ready posture.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
       "canary_status": "Canary green on all active lanes",
@@ -225,7 +247,7 @@
       "summary": "Successor launch dependencies are closed in the next-90-day registry."
     },
     "flagship_product_readiness_source": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
-    "flagship_product_readiness_status": "pass",
+    "flagship_product_readiness_status": "fail",
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
     "active_wave_registry": "products/chummer/NEXT_12_BIGGEST_WINS_REGISTRY.yaml",

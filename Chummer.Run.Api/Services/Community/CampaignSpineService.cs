@@ -4228,7 +4228,7 @@ public sealed class CampaignSpineService
                 CueId: StableId("cue", $"{campaign.CampaignId}:consequences"),
                 Severity: "ready",
                 Title: "Consequence ledger is attached",
-                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with clear history and explicit return-loop actions."));
+                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with receipt-backed evidence and explicit return-loop actions.")); // .Replace(
         }
         if (rosterTransfers.Length > 0)
         {

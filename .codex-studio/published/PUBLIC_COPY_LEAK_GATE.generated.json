@@ -1,13 +1,13 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-20T01:07:33Z",
-  "base_url": "https://chummer.run",
+  "generated_at_utc": "2026-06-20T14:31:32Z",
+  "base_url": "http://127.0.0.1:5123",
   "status": "pass",
   "summary": {
     "route_count": 16,
     "failed_route_count": 0,
-    "forbidden_pattern_count": 65,
-    "minimal_route_forbidden_pattern_count": 18,
+    "forbidden_pattern_count": 67,
+    "minimal_route_forbidden_pattern_count": 26,
     "failed_routes": []
   },
   "forbidden_patterns": [
@@ -55,6 +55,8 @@
     "\\bproof shelf\\b",
     "\\bproof trail\\b",
     "\\bProof:\\b",
+    "\\bChecked\\b",
+    "\\bStatus ready\\b",
     "\\bpublic shelf\\b",
     "\\brelease truth\\b",
     "\\bposted-shelf\\b",
@@ -89,6 +91,14 @@
     "\\boperator\\b",
     "\\bprovider\\b",
     "\\bgoverned\\b",
+    "\\bvalidation\\b",
+    "\\bverification\\b",
+    "\\baudit\\b",
+    "\\bverdict\\b",
+    "\\bposture\\b",
+    "\\bchecks?\\b",
+    "\\brails?\\b",
+    "\\blanes?\\b",
     "\\bartifact\\b",
     "\\bregistry\\b",
     "\\bhorizon\\b",
@@ -100,7 +110,7 @@
   "routes": [
     {
       "route": "/",
-      "url": "https://chummer.run/",
+      "url": "http://127.0.0.1:5123/",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -110,7 +120,7 @@
     },
     {
       "route": "/downloads",
-      "url": "https://chummer.run/downloads",
+      "url": "http://127.0.0.1:5123/downloads",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -120,7 +130,7 @@
     },
     {
       "route": "/status",
-      "url": "https://chummer.run/status",
+      "url": "http://127.0.0.1:5123/status",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -130,7 +140,7 @@
     },
     {
       "route": "/help",
-      "url": "https://chummer.run/help",
+      "url": "http://127.0.0.1:5123/help",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -140,7 +150,7 @@
     },
     {
       "route": "/faq",
-      "url": "https://chummer.run/faq",
+      "url": "http://127.0.0.1:5123/faq",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -150,7 +160,7 @@
     },
     {
       "route": "/horizons",
-      "url": "https://chummer.run/horizons",
+      "url": "http://127.0.0.1:5123/horizons",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -160,7 +170,7 @@
     },
     {
       "route": "/roadmap",
-      "url": "https://chummer.run/roadmap",
+      "url": "http://127.0.0.1:5123/roadmap",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -170,7 +180,7 @@
     },
     {
       "route": "/changelog",
-      "url": "https://chummer.run/changelog",
+      "url": "http://127.0.0.1:5123/changelog",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -180,7 +190,7 @@
     },
     {
       "route": "/ledger",
-      "url": "https://chummer.run/ledger",
+      "url": "http://127.0.0.1:5123/ledger",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -190,7 +200,7 @@
     },
     {
       "route": "/ledger/map",
-      "url": "https://chummer.run/ledger/map",
+      "url": "http://127.0.0.1:5123/ledger/map",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -200,7 +210,7 @@
     },
     {
       "route": "/packages",
-      "url": "https://chummer.run/packages",
+      "url": "http://127.0.0.1:5123/packages",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -210,7 +220,7 @@
     },
     {
       "route": "/participate",
-      "url": "https://chummer.run/participate",
+      "url": "http://127.0.0.1:5123/participate",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -220,7 +230,7 @@
     },
     {
       "route": "/feedback",
-      "url": "https://chummer.run/feedback",
+      "url": "http://127.0.0.1:5123/feedback",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -230,7 +240,7 @@
     },
     {
       "route": "/artifacts",
-      "url": "https://chummer.run/artifacts",
+      "url": "http://127.0.0.1:5123/artifacts",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -240,7 +250,7 @@
     },
     {
       "route": "/what-is-chummer",
-      "url": "https://chummer.run/what-is-chummer",
+      "url": "http://127.0.0.1:5123/what-is-chummer",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
@@ -250,7 +260,7 @@
     },
     {
       "route": "/login?next=%2Faccount%2Faccess",
-      "url": "https://chummer.run/login?next=%2Faccount%2Faccess",
+      "url": "http://127.0.0.1:5123/login?next=%2Faccount%2Faccess",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],

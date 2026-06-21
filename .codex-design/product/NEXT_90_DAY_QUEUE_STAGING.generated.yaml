@@ -909,7 +909,7 @@ items:
   - python3 -m unittest tests/test_workspace_restore_queue_identity.py
   - python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py
       tests/test_workspace_restore_queue_identity.py
-  - dotnet test --project Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests"
+  - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests"
       --no-restore
   allowed_paths:
   - Chummer.Run.Api

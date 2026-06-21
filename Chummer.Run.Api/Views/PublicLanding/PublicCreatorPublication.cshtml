@@ -4,6 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
+    // Current direct parity proof receipts still keep the public parity claim under review.
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -43,7 +44,7 @@
         : "Why this publication is live";
     var publicationPostureCopy = publicationRouteReviewRequired
         ? "This page keeps the useful detail and next step together while public availability stays limited."
-        : "This page keeps the useful detail and next step together.";
+        : "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.";
     var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
@@ -194,11 +195,12 @@
             <p>@routeReceiptSummary</p>
             @if (Model.RouteReceipt is not null)
             {
+                <p class="muted-copy">Receipt @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute</p>
                 <p class="muted-copy">This page is linked to the current publication history.</p>
             }
             else
             {
-                <p class="muted-copy">This publication stays bounded until current outward-facing history is attached.</p>
+                <p class="muted-copy">This publication stays bounded until a current outward-facing receipt is attached.</p>
             }
         </article>
         <article class="trust-rail">

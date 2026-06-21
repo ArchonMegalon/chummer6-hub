@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-19T06:24:35Z",
+  "generated_at_utc": "2026-06-20T19:57:45Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
   "title": "Chummer6 Product Spine Promo",
@@ -9,7 +9,7 @@
   "narration_provider": "edge-tts",
   "voice": "en-GB-ThomasNeural",
   "scene_count": 12,
-  "duration_seconds": 90.0,
+  "duration_seconds": 89.542,
   "continuous_audio_track": "spoken_narration_plus_low_music_bed",
   "scene_narration": [
     {
@@ -98,18 +98,20 @@
         "codec_name": "h264",
         "codec_type": "video",
         "width": 1280,
-        "height": 720
+        "height": 720,
+        "bit_rate": "2726496"
       },
       {
         "codec_name": "aac",
         "codec_type": "audio",
-        "sample_rate": "48000",
-        "channels": 1
+        "sample_rate": "96000",
+        "channels": 1,
+        "bit_rate": "199241"
       }
     ],
     "format": {
-      "duration": "90.000000",
-      "size": "32699428"
+      "duration": "89.542000",
+      "size": "32829954"
     }
   },
   "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
@@ -192,5 +194,13 @@
       "caption": "One product spine: build, run, remember, publish.",
       "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     }
-  ]
+  ],
+  "public_mp4": "/media/promo/every-wonder-horizon-promo.mp4?v=20260620-audio2",
+  "output_audio_duration_seconds": 0.0,
+  "size_bytes": 32829954,
+  "has_audio": true,
+  "has_video": true,
+  "audio_mean_volume_db": -18.1,
+  "audio_max_volume_db": -0.6,
+  "audio_quality_status": "pass"
 }

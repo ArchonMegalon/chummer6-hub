@@ -2,6 +2,9 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class ImportRouteParityProofGuardService
 {
+    private const string MissingDirectProofReceiptReason =
+        "the current local release-proof package does not publish direct proof receipts for translator, XML amendment, Hero Lab, and adjacent import routes";
+
     public static readonly string[] RequiredDirectProofReceiptIds =
     [
         "menu:translator",
@@ -47,7 +50,7 @@ public sealed class ImportRouteParityProofGuardService
         {
             return new ImportRouteParityProofGuardSnapshot(
                 false,
-                $"the current release status package does not include translator, XML amendment, Hero Lab, and adjacent import routes: {string.Join(", ", missingReceiptIds)}");
+                $"{MissingDirectProofReceiptReason}: {string.Join(", ", missingReceiptIds)}");
         }
 
         return new ImportRouteParityProofGuardSnapshot(true, null);

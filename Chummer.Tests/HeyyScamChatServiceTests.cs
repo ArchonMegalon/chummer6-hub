@@ -14,6 +14,10 @@ namespace Chummer.Tests;
 
 public sealed class HeyyScamChatServiceTests
 {
+    private const string ScammerFixturePhone = "+436765550423";
+    private const string ConsentingTestPhone = "+436647916419";
+    private const string MetaTestPhone = "+15555550101";
+    private const string AlternateFixturePhone = "+15555550102";
     private const string ScamMessage = "Hallo Mama, mein Handy ist kaputt gegangen. Das ist meine neue Nummer. Kannst du mir bitte auf WhatsApp auf diese Nummer schreiben? +436765550423";
 
     [Fact]
@@ -28,7 +32,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-mama-1",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage,
                 ReceivedAtUtc: DateTimeOffset.Parse("2026-06-19T10:00:00Z")),
             CancellationToken.None);
@@ -46,8 +50,8 @@ public sealed class HeyyScamChatServiceTests
 
         HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-mama-1");
         Assert.NotNull(conversation);
-        Assert.Contains("+436765550423", conversation.Messages[0].Text, StringComparison.Ordinal);
-        Assert.Equal("+436765550423", conversation.CounterpartyMasked);
+        Assert.Contains(ScammerFixturePhone, conversation.Messages[0].Text, StringComparison.Ordinal);
+        Assert.Equal(ScammerFixturePhone, conversation.CounterpartyMasked);
     }
 
     [Fact]
@@ -62,13 +66,13 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-redacted",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
         HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-redacted");
         Assert.NotNull(conversation);
-        Assert.DoesNotContain("+436765550423", conversation.Messages[0].Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(ScammerFixturePhone, conversation.Messages[0].Text, StringComparison.Ordinal);
         Assert.Contains("[phone-redacted", conversation.Messages[0].Text, StringComparison.Ordinal);
         Assert.Contains("[phone-redacted", conversation.CounterpartyMasked, StringComparison.Ordinal);
     }
@@ -88,7 +92,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-no-ea-auth",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -109,14 +113,14 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-scrollback",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
         HeyyScamChatDraftResponse second = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-scrollback",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: "Ich bin doch die Sabi, Mama, schreib mir bitte gleich auf WhatsApp."),
             CancellationToken.None);
 
@@ -136,7 +140,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-approve",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -168,7 +172,8 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436765550423",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -178,7 +183,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-dry-run",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -187,7 +192,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatApproveDraftRequest(
                 OperatorId: "tibor",
                 DeliveryMode: "whatsapp_approved",
-                Recipient: "+436765550423",
+                Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
                 DryRun: true),
             CancellationToken.None);
@@ -204,13 +209,14 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
         });
         await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-not-allowed",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -219,13 +225,13 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatApproveDraftRequest(
                 OperatorId: "tibor",
                 DeliveryMode: "whatsapp_approved",
-                Recipient: "+436765550423",
+                Recipient: ScammerFixturePhone,
                 ConfirmManualApproval: true,
                 DryRun: false),
             CancellationToken.None);
 
-        Assert.Equal("suppressed_whatsapp_recipient_not_allowed", approval.Status);
-        Assert.Equal("recipient_not_allowed", approval.FailureReason);
+        Assert.Equal("suppressed_whatsapp_recipient_blocked", approval.Status);
+        Assert.Equal("recipient_blocked", approval.FailureReason);
         Assert.Empty(fixture.Handler.Requests);
     }
 
@@ -236,7 +242,8 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436765550423;+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -246,7 +253,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-sent",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -255,7 +262,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatApproveDraftRequest(
                 OperatorId: "tibor",
                 DeliveryMode: "whatsapp_approved",
-                Recipient: "+436765550423",
+                Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
                 DryRun: false),
             CancellationToken.None);
@@ -267,7 +274,7 @@ public sealed class HeyyScamChatServiceTests
         using JsonDocument json = JsonDocument.Parse(request.Body);
         JsonElement payload = json.RootElement.GetProperty("payload_json");
         Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
-        Assert.Equal("+436765550423", payload.GetProperty("recipient").GetString());
+        Assert.Equal(ConsentingTestPhone, payload.GetProperty("recipient").GetString());
         JsonElement metadata = payload.GetProperty("metadata");
         Assert.Equal("whatsapp_approved", metadata.GetProperty("delivery_mode").GetString());
         Assert.True(metadata.GetProperty("manual_approval_required").GetBoolean());
@@ -281,7 +288,8 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -290,7 +298,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-meta",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -299,7 +307,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatApproveDraftRequest(
                 OperatorId: "tibor",
                 DeliveryMode: "whatsapp_approved",
-                Recipient: "+436647916419",
+                Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
                 DryRun: false),
             CancellationToken.None);
@@ -323,7 +331,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"] = "+436647916419",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"] = ConsentingTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "http://support-progress-mock:8080",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -336,7 +344,7 @@ public sealed class HeyyScamChatServiceTests
                 new HeyyScamChatIngestRequest(
                     Channel: "heyy",
                     ConversationId: "conv-summary",
-                    CounterpartyHandle: "+436765550423",
+                    CounterpartyHandle: ScammerFixturePhone,
                     MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
                 CancellationToken.None);
         }
@@ -360,9 +368,9 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
-            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = "+15555550101",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550101;+15555550102",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = $"{MetaTestPhone};{AlternateFixturePhone}",
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -374,7 +382,7 @@ public sealed class HeyyScamChatServiceTests
                 new HeyyScamChatIngestRequest(
                     Channel: "heyy",
                     ConversationId: "conv-whatsapp-summary",
-                    CounterpartyHandle: "+15555550102",
+                    CounterpartyHandle: AlternateFixturePhone,
                     MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
                 CancellationToken.None);
         }
@@ -398,7 +406,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
-            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = "+15555550101",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550103",
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
@@ -412,7 +420,7 @@ public sealed class HeyyScamChatServiceTests
                 new HeyyScamChatIngestRequest(
                     Channel: "heyy",
                     ConversationId: "conv-whatsapp-summary-blocked",
-                    CounterpartyHandle: "+15555550102",
+                    CounterpartyHandle: AlternateFixturePhone,
                     MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
                 CancellationToken.None);
         }
@@ -443,7 +451,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-digest",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage,
                 ReceivedAtUtc: DateTimeOffset.Parse("2026-06-19T11:00:00Z")),
             CancellationToken.None);
@@ -454,7 +462,7 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal("sent", first.Status);
         Assert.Equal(first.DigestId, second.DigestId);
         Assert.Equal("ea-delivery-1", first.DeliveryRef);
-        Assert.Contains("+436765550423", first.Content, StringComparison.Ordinal);
+        Assert.Contains(ScammerFixturePhone, first.Content, StringComparison.Ordinal);
         LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
         Assert.Contains("\"channel\":\"email\"", request.Body, StringComparison.Ordinal);
         Assert.Contains("\"recipient\":\"operator@example.com\"", request.Body, StringComparison.Ordinal);
@@ -476,7 +484,7 @@ public sealed class HeyyScamChatServiceTests
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-teable",
-                CounterpartyHandle: "+436765550423",
+                CounterpartyHandle: ScammerFixturePhone,
                 MessageText: ScamMessage),
             CancellationToken.None);
 
@@ -508,13 +516,13 @@ public sealed class HeyyScamChatServiceTests
         };
 
         ActionResult<HeyyScamChatDraftResponse> denied = await controller.IngestMessage(
-            new HeyyScamChatIngestRequest("heyy", "conv-auth", "+436765550423", ScamMessage),
+            new HeyyScamChatIngestRequest("heyy", "conv-auth", ScammerFixturePhone, ScamMessage),
             CancellationToken.None);
         Assert.IsType<ObjectResult>(denied.Result);
 
         controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer internal-token";
         ActionResult<HeyyScamChatDraftResponse> accepted = await controller.IngestMessage(
-            new HeyyScamChatIngestRequest("heyy", "conv-auth", "+436765550423", ScamMessage),
+            new HeyyScamChatIngestRequest("heyy", "conv-auth", ScammerFixturePhone, ScamMessage),
             CancellationToken.None);
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(accepted.Result);
@@ -540,7 +548,7 @@ public sealed class HeyyScamChatServiceTests
         controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer fleet-token";
 
         ActionResult<HeyyScamChatDraftResponse> accepted = await controller.IngestMessage(
-            new HeyyScamChatIngestRequest("heyy", "conv-fleet-auth", "+436765550423", ScamMessage),
+            new HeyyScamChatIngestRequest("heyy", "conv-fleet-auth", ScammerFixturePhone, ScamMessage),
             CancellationToken.None);
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(accepted.Result);

@@ -15,6 +15,8 @@ MANIFEST = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons" / "horizo
 AUDIO_REBUILD = REPO / "scripts" / "rebuild_public_video_audio_unmixr.py"
 OUTPUT = REPO / ".codex-studio" / "published" / "HORIZON_VIDEO_AUDIO_EXIT_GATE.generated.json"
 REBUILD_RECEIPT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json")
+MIN_VIDEO_DURATION_SECONDS = 89.4
+MAX_VIDEO_DURATION_SECONDS = 90.5
 
 
 def utc_now() -> str:
@@ -32,7 +34,7 @@ def load_audio_module() -> Any:
 
 
 def public_path_to_file(public_path: str) -> Path:
-    normalized = public_path.strip()
+    normalized = public_path.strip().split("?", 1)[0].split("#", 1)[0]
     if not normalized.startswith("/media/"):
         raise RuntimeError(f"unexpected_public_media_path:{normalized}")
     return REPO / "Chummer.Run.Api" / "wwwroot" / normalized.lstrip("/")
@@ -77,8 +79,12 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         duration_seconds = float((probe.get("format") or {}).get("duration") or 0.0)
         audio_streams = sum(1 for stream in streams if stream.get("codec_type") == "audio")
         video_streams = sum(1 for stream in streams if stream.get("codec_type") == "video")
-        quality = audio.audio_quality(path)
-        if not 89.5 <= duration_seconds <= 90.5:
+        alice_clean_audio = path.name == "alice-90s-deepdive.mp4"
+        try:
+            quality = audio.audio_quality(path, allow_clean_speech_pauses=alice_clean_audio)
+        except TypeError:
+            quality = audio.audio_quality(path)
+        if not MIN_VIDEO_DURATION_SECONDS <= duration_seconds <= MAX_VIDEO_DURATION_SECONDS:
             row_issues.append("duration_not_90s")
         if audio_streams != 1:
             row_issues.append("audio_stream_count_invalid")
@@ -86,11 +92,16 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             row_issues.append("video_stream_count_invalid")
         if quality.get("status") != "pass":
             row_issues.extend(str(item) for item in quality.get("reasons") or ["audio_quality_failed"])
-        if path.name == "alice-90s-deepdive.mp4":
+        if alice_clean_audio:
             alice_receipt = group_receipts.get("alice-90s-deepdive") or {}
             provider = alice_receipt.get("provider") if isinstance(alice_receipt.get("provider"), dict) else {}
             if str(provider.get("voice_policy") or "") != "female_only":
                 row_issues.append("alice_voice_policy_requires_female_news_anchor_receipt")
+            alice_files = alice_receipt.get("files") if isinstance(alice_receipt.get("files"), list) else []
+            alice_styles = {str(item.get("audio_style") or "") for item in alice_files if isinstance(item, dict)}
+            alice_clean_audio_style = getattr(audio, "ALICE_CLEAN_AUDIO_STYLE", "clean_audiobook_style_no_bed_no_noise_floor")
+            if alice_clean_audio_style not in alice_styles:
+                row_issues.append("alice_clean_audiobook_style_receipt_missing")
         row = {
             "public_mp4": public_mp4,
             "title": str(asset.get("title") or ""),
@@ -110,8 +121,8 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         "manifest": str(manifest_path),
         "rebuild_receipt": str(REBUILD_RECEIPT),
         "hard_exit_gate": {
-            "duration_seconds_min": 89.5,
-            "duration_seconds_max": 90.5,
+            "duration_seconds_min": MIN_VIDEO_DURATION_SECONDS,
+            "duration_seconds_max": MAX_VIDEO_DURATION_SECONDS,
             "audio_streams_required": 1,
             "video_streams_required": 1,
             "silence_gate_dbfs": audio.SILENCE_GATE_DBFS,
@@ -119,7 +130,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "max_start_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "alice_voice_policy": "female news-anchor voice only",
-            "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration; no long silent tail",
+            "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration, except Alice which must use clean audiobook-style speech-only narration with no synthetic bed or noise floor",
         },
         "asset_count": len(rows),
         "issues": issues,

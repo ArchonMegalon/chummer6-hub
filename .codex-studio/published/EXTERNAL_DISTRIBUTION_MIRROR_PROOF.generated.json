@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-19T19:02:20Z",
+  "generated_at_utc": "2026-06-19T23:39:07Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "external_required": false,
   "distribution_resilience_status": "optional_external_mirrors_degraded",
@@ -22,16 +22,16 @@
           "id": "avalonia-linux-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-linux-x64-installer.deb",
-          "size": 36890650,
-          "sha256": "dc27498e5d520b9b47111152f27dccfd95dd02bcc8479e85e31d68c3cc548030",
+          "size": 36870300,
+          "sha256": "0d2fbf54d4e02bf4f95405fd7bbdbf3bce6650508ecbba30633eeeaccd2befe3",
           "status": "pass"
         },
         {
           "id": "avalonia-win-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64-installer.exe",
-          "size": 98957230,
-          "sha256": "4bc6e4c9e066f7831eb29dd6ea0cdf1697023909f530704e8edf56a001411e31",
+          "size": 98973352,
+          "sha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
           "status": "pass"
         }
       ]
@@ -46,7 +46,7 @@
           "access_class": "open_public",
           "status_code": 206,
           "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-          "content_range": "bytes 0-0/36890650",
+          "content_range": "bytes 0-0/36870300",
           "content_length": 1,
           "streamed_size": null,
           "streamed_sha256": "",
@@ -59,7 +59,7 @@
           "access_class": "open_public",
           "status_code": 206,
           "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "content_range": "bytes 0-0/98957230",
+          "content_range": "bytes 0-0/98973352",
           "content_length": 1,
           "streamed_size": null,
           "streamed_sha256": "",

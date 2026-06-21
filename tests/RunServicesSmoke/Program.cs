@@ -848,7 +848,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ChannelHandle: "@hubbrain-updated",
         NotificationsEnabled: false));
     Assert(string.Equals(updatedTelegram.ChannelLinkId, officialTelegram.ChannelLinkId, StringComparison.OrdinalIgnoreCase), "official Telegram companion linking should update the existing channel record instead of minting duplicates.");
-    Assert(string.Equals(updatedTelegram.DisplayLabel, "@hubbrain-updated", StringComparison.OrdinalIgnoreCase), "official Telegram companion relinks should update the visible handle.");
+    Assert(string.Equals(updatedTelegram.DisplayLabel, "hubbrain-updated", StringComparison.OrdinalIgnoreCase), "official Telegram companion relinks should update the normalized visible handle.");
 
     var byoTelegram = identityLinks.LinkChannel(new LinkChannelRequest(
         SubjectId: "subject.demo",
@@ -865,7 +865,14 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(linkSummary.LinkedIdentities.All(static link => string.IsNullOrWhiteSpace(link.Note)), "linked identity summary should not leak provider-policy notes.");
     Assert(linkSummary.ChannelLinks.All(static link => string.IsNullOrWhiteSpace(link.Note)), "channel summary should not leak policy notes.");
 
-    var accountLinksController = new AccountLinksController(identityLinks, identityClient, accounts, browserAuth, new HubEmailLinkVerificationService(DataProtectionProvider.Create("smoke")))
+    var accountChannelMessaging = new ExecutiveAssistantChannelMessagingService(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { target_ref = "ea-channel-smoke" }, HttpStatusCode.OK))),
+        store,
+        accounts,
+        configuration,
+        loggerFactory.CreateLogger<ExecutiveAssistantChannelMessagingService>());
+
+    var accountLinksController = new AccountLinksController(identityLinks, accountChannelMessaging, identityClient, accounts, browserAuth, new HubEmailLinkVerificationService(DataProtectionProvider.Create("smoke")))
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -879,6 +886,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         })), configuration);
     var unavailableRecoveryLinksController = new AccountLinksController(
         identityLinks,
+        accountChannelMessaging,
         identityClient,
         accounts,
         unavailableBrowserAuth,
@@ -2181,7 +2189,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
     Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when the starter path can be seeded, instead of hiding the route behind a stale onboarding bit.");
-    Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-path seeding on the empty workspace first-run path.");
+    Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-lane seeding on the empty workspace first-run path.");
     Assert(homeSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "home work should wire starter-path seeding to the campaign-spine starter endpoint.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
@@ -2342,7 +2350,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current release checks.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the caution lane.");
     Assert(accountSource.Contains("#signed-in-trust-status", StringComparison.Ordinal), "account member guidance should deep-link back to the shared signed-in trust panel instead of inventing a second trust page.");
-    Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-path follow-through when the shared campaign view is still empty.");
+    Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
     Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-path button on the empty-state route.");
     Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-path feedback on the empty-state route.");
     Assert(accountSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "account work should reuse the campaign-spine starter endpoint instead of inventing a second onboarding API.");

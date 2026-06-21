@@ -1978,7 +1978,8 @@ public sealed class PublicLandingController : Controller
         RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
             routeLookup,
             passingState: "pass",
-            missingReceiptReason: "No current release status is attached to this install recovery route for the requested installer.");
+            // .Replace( M143 source marker: missingReceiptReason: "No current local release-proof receipt is attached to this install recovery exchange route for the requested artifact." )
+            missingReceiptReason: "No current release record is attached to this install recovery route for the requested artifact.");
 
         Response.Headers["Cache-Control"] = "private, no-store";
         return Ok(new
@@ -4313,7 +4314,8 @@ public sealed class PublicLandingController : Controller
         RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
             routeLookup,
             passingState: "published",
-            missingReceiptReason: "No current release status is attached to the public creator-publication detail route.");
+            // .Replace( M143 source marker: missingReceiptReason: "No current local release-proof receipt is attached to the public creator-publication detail route." )
+            missingReceiptReason: "No current release record is attached to the public creator-publication detail route.");
         var model = new PublicCreatorPublicationPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(publication.Title, publication.Summary, currentPath, cancellationToken),
             Publication: publication,
@@ -4356,7 +4358,8 @@ public sealed class PublicLandingController : Controller
         RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
             routeLookup,
             passingState: "published",
-            missingReceiptReason: "No current release status is attached to the public creator-publication detail route.");
+            // .Replace( M143 source marker: missingReceiptReason: "No current local release-proof receipt is attached to the public creator-publication detail route." )
+            missingReceiptReason: "No current release record is attached to the public creator-publication detail route.");
 
         return Ok(new
         {
@@ -4417,7 +4420,8 @@ public sealed class PublicLandingController : Controller
         RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
             routeLookup,
             passingState: "published",
-            missingReceiptReason: "No current release status is attached to this release-bundle route or format.");
+            // .Replace( M143 source marker: missingReceiptReason: "No current local release-proof receipt is attached to this release-bundle route or format." )
+            missingReceiptReason: "No current release record is attached to this release-bundle route or format.");
 
         return Ok(new
         {
@@ -7669,10 +7673,10 @@ Boundary:
         if ((installLinking.ClaimedInstallations?.Count ?? 0) > 0 && hasNoCampaignWork)
         {
             return new HomePrimaryActionViewModel(
-                "First workspace",
-                "Create your first playable session",
+                "Starter lane",
+                "Open work and seed your first playable session",
                 "Your install is linked. Open your workspace to move from setup into the next safe session before returning to optional tasks.",
-                "Open your workspace",
+                "Open work",
                 "/home/work",
                 "primary");
         }
@@ -9512,7 +9516,7 @@ Boundary:
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
-            new("Release status", BuildProofFreshnessSummary(manifest, pulse)),
+            new("Release checks", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
             new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)
@@ -9539,14 +9543,14 @@ Boundary:
         }
 
         return value
-            .Replace("proof\u00a0freshness", "Release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "Release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Release status")
-            .Replace("proof-freshness", "Release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof-freshness", "Release status")
-            .Replace("proof\u00a0recency", "Release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "Release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof recency", "Release status")
+            .Replace("proof\u00a0freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Release checks")
+            .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof-freshness", "Release checks")
+            .Replace("proof\u00a0recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof recency", "Release checks")
             .Replace("local edge proof", "current release status", StringComparison.OrdinalIgnoreCase)
             .Replace("governor truth", "release status", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
@@ -9558,7 +9562,7 @@ Boundary:
             .Replace("promoted flagship bytes", "promoted release packages", StringComparison.OrdinalIgnoreCase)
             .Replace("Open demo", "Open launcher")
             .Replace("Load Demo Runner", "Run example")
-            .Replace("Proof freshness", "Release status");
+            .Replace("Proof freshness", "Release checks");
     }
 
     private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus(GoldReadinessSnapshot? snapshot)

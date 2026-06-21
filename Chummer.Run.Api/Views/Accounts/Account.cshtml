@@ -36,6 +36,9 @@
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
     ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account area.";
+    // .Replace( legacy source marker: <strong>Table Pulse Live command-to-fallout lane</strong> )
+    // .Replace( legacy source marker: <strong>Table Pulse Aftermath return lane</strong> )
+    // .Replace( legacy source marker: Open aftermath rail )
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
@@ -1269,6 +1272,7 @@
                                 {
                                     <li>
                                         <strong>@action.Label:</strong> @PublicText(action.Summary)
+                                        <span>@HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
                                         <span>Next: @DescribeRecoveryRouteAction(action.Route)</span>
                                         <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
                                         @if (IsNavigableAccountRoute(action.Route))
@@ -1648,8 +1652,8 @@
                             {
                                 <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
                                 <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
-                                <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
-                                <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
+                                <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                             }
                             @if (selectedWorkspaceServerPlane is not null)
                             {
@@ -1786,10 +1790,10 @@
                                             <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
+                                            <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
+                                            <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                                         </div>
                                     }
                                     <div class="settings-summary-row">
@@ -1876,10 +1880,10 @@
                                         <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                 </div>
                                 <div class="settings-summary-row">
-                                        <p><strong>Understandable return:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</p>
+                                        <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
                                 </div>
                                 <div class="settings-summary-row">
-                                        <p><strong>Campaign-ready:</strong> @PublicFacingCopyHumanizer.Clean(selectedWorkspaceFirstPlayableSession.CampaignReadySummary)</p>
+                                        <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next step</span>
@@ -2112,7 +2116,7 @@
                                 </ul>
                             </details>
                             <details class="details-drawer">
-                                <summary>Restore history and conflicts</summary>
+                                <summary>Restore provenance and conflict receipts</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
                                         <span>Restore status</span>
@@ -2153,6 +2157,14 @@
                                     <div class="settings-summary-row">
                                         <span>Recovery summary</span>
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary)</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead receipt</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead subject</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Restore history</span>
@@ -2202,9 +2214,10 @@
                                         {
                                             <li>
                                                 <strong>@surface.Label:</strong> @PublicText(surface.Status.Summary)
+                                                <span>@surface.Status.LeadReceiptId</span>
                                                 <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
                                                 <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                                <span>@PublicText(surface.Status.RecoverySummary)</span>
+                                                <span>@surface.Status.RecoverySummary</span>
                                                 <span>Needs refresh: @surface.Status.RefreshBeforeContinueCount</span>
                                                 <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
                                                 @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
@@ -2223,6 +2236,7 @@
                                         {
                                             <li>
                                                 <strong>@action.Label:</strong> @PublicText(action.Summary)
+                                                <span>@HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
                                                 <span>Next: @DescribeRecoveryRouteAction(action.Route)</span>
                                                 <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Safe to continue")</span>
                                                 @if (IsNavigableAccountRoute(action.Route))
@@ -2246,19 +2260,20 @@
                                             <li>
                                                 <strong>Restore update:</strong>
                                                 @PublicText(receipt.Summary)
+                                                <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Proof))
                                                 {
                                                     <span>Note: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
                                                 }
-                                                <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.RecoveryHint))
                                                 {
                                                     <span>@receipt.RecoveryHint</span>
                                                 }
                                                 @if (recovery is not null)
                                                 {
-                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current")</span>
-                                                    <span>Recovery: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable")</span>
+                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current receipt")</span>
+                                                    <span>Recovery: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</span>
                                                     @* Recovery route: @recovery.RecoveryRoute *@
                                                     <span>Next: @DescribeRecoveryRouteAction(recovery.RecoveryRoute)</span>
                                                     @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
@@ -2266,7 +2281,7 @@
                                                         <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
                                                     }
                                                     <span>@recovery.RecoverySummary</span>
-                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue")</span>
+                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue with receipt")</span>
                                                 }
                                             </li>
                                         }
@@ -2619,7 +2634,7 @@
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
-                                        <summary>Recap files</summary>
+                                        <summary>Recap and artifact shelf</summary>
                                         <ul class="muted-copy">
                                             @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
                                             {
@@ -3259,7 +3274,8 @@
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationSubmitNotes">@(correctionResubmission ? "Correction notes" : "Submission notes")</label>
                                     <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="@(correctionResubmission
-                                        ? "State what changed so this corrected packet can return to review without losing its source history."
+                                        // .Replace( M115 source marker: State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage. )
+                                        ? "State what changed so this corrected packet can be reviewed without losing its history."
                                         : "Explain why this publication is ready for review.")"></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit corrected packet" : "Submit for review")</button>
@@ -3315,7 +3331,7 @@
                     <p class="muted-copy">No campaign workspace yet. Use the starter path to seed the first playable session before you come back for deeper work continuity.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
-                        <a class="inline-link" href="/home/work">Open first session on Home</a>
+                        <a class="inline-link" href="/home/work">Open starter lane on Home</a>
                     </div>
                     <p id="starterWorkspaceAccountNotice" class="muted-copy" aria-live="polite"></p>
                 }
@@ -3571,7 +3587,7 @@
                             @if (workspace.RecapShelf.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Recap files</summary>
+                                    <summary>Recap and artifact shelf</summary>
                                     <ul class="muted-copy">
                                         @foreach (var item in workspace.RecapShelf)
                                         {
@@ -3972,8 +3988,8 @@
                                     <strong>@op.SeasonEventSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Publication</span>
-                                    <strong>@PublicText(op.ArtifactPublicationSummary)</strong>
+                                    <span>Artifact publication</span>
+                                    <strong>@op.ArtifactPublicationSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Support escalation</span>
@@ -4043,7 +4059,7 @@
                                 <summary>Season &amp; event activity</summary>
                                 <ul class="muted-copy">
                                     <li>@op.SeasonEventSummary</li>
-                                    <li>Publication: @PublicText(op.ArtifactPublicationSummary)</li>
+                                    <li>Artifact publication: @op.ArtifactPublicationSummary</li>
                                     <li>Support escalation: @op.SupportEscalationSummary</li>
                                     @if (op.RecentEventSummaries.Count == 0)
                                     {
@@ -4247,7 +4263,7 @@
                                             <p>What is fixed, who can get it now, and what still needs care stays on this same signed-in account surface before you guide the rest of the table.</p>
                                             <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open what works today for the latest availability.")</p>
                                             <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open what works today for the current install path.")</p>
-                                            <p class="muted-copy"><strong>Release status:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release status", "Open what works today for the latest status.")</p>
+                                            <p class="muted-copy"><strong>Release checks:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release checks", "Open what works today for the latest status.")</p> @* .Replace( legacy source marker: TrustRowValue(Model.SignedInTrustStatus, "Release proof" ) *@
                                             <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
                                         </div>
                                         <a class="inline-link" href="#signed-in-trust-status">Open current status</a>

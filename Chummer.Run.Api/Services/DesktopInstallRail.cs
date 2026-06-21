@@ -127,9 +127,9 @@ internal static class DesktopInstallRail
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."
                 : "Continue in the installer or desktop app so the linked copy can claim this account without another browser step.",
-            UpdateAction: "Use the desktop app updater or signed-in installer for this same channel and build before filing a new support case.",
-            RollbackAction: "If update or setup fails, keep the previous installed copy and return to Devices and access or tracked support for this same linked copy.",
-            SupportContinuation: "Support stays with this linked copy, including its current claim, build, channel, fallback, and recovery context.");
+            UpdateAction: "Use the desktop app update lane or signed-in installer for this same channel and build before filing a new support case.",
+            RollbackAction: "If update or setup fails, keep the previous installed copy and return to Devices and access or tracked support for this same linked copy. Keep the fix, update, rollback, and verification on this same linked install.",
+            SupportContinuation: "Support stays on the same install rail with this linked copy, including its current claim, build, channel, fallback, and recovery context.");
     }
 
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)

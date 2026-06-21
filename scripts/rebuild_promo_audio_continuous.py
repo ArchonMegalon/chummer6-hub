@@ -19,10 +19,11 @@ from typing import Any
 WORKSPACE = Path("/docker/chummercomplete")
 REPO = WORKSPACE / "chummer.run-services"
 PUBLIC = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
-HORIZON_VIDEOS = WORKSPACE / "_completion" / "horizon_flagship_reels_20260602" / "videos"
+HORIZON_PUBLIC = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons"
 OUT = WORKSPACE / "_completion" / "promo_audio_continuous_20260602"
 TTS_PYTHON = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_venv" / "bin" / "python"
 DOCUMENTARY_VOICE = "en-GB-ThomasNeural"
+FEMALE_DOCUMENTARY_VOICE = "en-US-JennyNeural"
 UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
 UNMIXR_PROMO_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -72,75 +73,96 @@ SCRIPTS: dict[str, str] = {
         "Other lanes are clearer when they are called what they are: campaign memory, mission-space prep, publishing, community, and specialized play modes. "
         "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     ),
-    "nexus_pan_90s_deepdive": (
+    "nexus-pan-90s-deepdive": (
         "A session never breaks because the fiction failed. It breaks because reality intruded first. A tablet sleeps. A laptop wakes crooked. A player reconnects into a scene already moving. "
         "NEXUS-PAN exists for that dangerous little gap between what the campaign knows and what the people at the table can trust. Presence has to be clear. Change has to be visible. Recovery has to feel calm enough that nobody mistakes panic for drama. "
         "A reconnect should not become a rules argument. A conflict should surface before it hardens into table folklore. Desktop, tablet, phone, remote night, train ride, home table, same campaign, same moment, no scavenger hunt for the truth. "
         "For the GM, the promise is simple: can I trust what I am seeing right now. For the player, it is even simpler: rejoin, catch up, answer the scene, stay in the run. "
         "NEXUS-PAN is continuity with a pulse, built for crews who refuse to lose the night because one device blinked first."
     ),
-    "nexus-pan_epic_90s": (
+    "nexus-pan-epic-90s": (
         "Every long campaign eventually becomes a split screen. One player is half a city away. One sheet is stale. The GM has too many windows open and no patience left for false confidence. "
         "The epic version of NEXUS-PAN begins there, with trust as the first dramatic question. Who is connected. What changed. Which state is current enough to act on without breaking the scene. "
         "Packets move. Devices disagree. The table does not need more drama from the software. It needs signal. It needs context. It needs a clear next step before momentum dies. "
         "When conflict appears, the system should expose it cleanly and let the GM make the call before the fiction tears. The campaign should travel with the crew from desk to tablet to train to home table without export rituals, copied files, or wishful thinking. "
         "The returning player should receive the humane version of continuity: where you were, what changed, and what move is waiting. That is the fantasy here. Less ceremony. Less panic. More run."
     ),
-    "alice_90s_deepdive": (
+    "alice-90s-deepdive": (
         "A flashy runner is easy to imagine and much harder to keep alive. ALICE begins where style collides with table reality, in that narrow space where a character concept either becomes a professional or folds under the first real job. "
         "The question is never just which build looks coolest. It is which build can carry the weight, absorb the tradeoffs, and still feel like the runner the player wanted to bring into the shadows. "
         "The numbers should tell a story. What became sharper. What became fragile. What was quietly sacrificed to buy the trick. Gear is not a shopping list. Chrome is not flavor. Magic is not free. Every choice leaves a shape on the sheet and a consequence in play. "
         "ALICE should not sound like a lecture from above. It should feel like a sharp-eyed coach standing beside the player, pointing at the weak seam before the first bad roll tears it open. "
         "By the end, the runner still belongs completely to the player. They are simply clearer, stronger, and more ready for the table to test them."
     ),
-    "karma_forge_90s_deepdive": (
+    "karma-forge-90s-deepdive": (
         "Every table invents house rules. Very few tables remember exactly when they did it, who agreed, what broke, or why everyone still argues about it three sessions later. "
         "KARMA FORGE treats a rule change as something powerful enough to deserve ceremony. Name it. Scope it. Preview it. Show the blast radius before anyone mistakes enthusiasm for safety. "
         "A good change should arrive with receipts: who it touches, what it shifts, where it could bend the campaign, and how to reverse it if the table hates what it becomes. Players should react in context, not excavate old chat logs like archaeologists looking for permission. "
         "Campaigns evolve. Their rule environment can evolve with them. But that evolution should feel governed, legible, and reversible, not like a private fork mutating in the dark. "
         "KARMA FORGE is for tables that want custom play without surrendering coherence."
     ),
-    "jackpoint_90s_deepdive": (
+    "jackpoint-90s-deepdive": (
         "The run is over, but the story is not. The table is laughing, exhausted, and already telling three different versions of what happened. That is where campaigns start losing themselves. "
         "JACKPOINT gives the aftermath a place with shape. Recaps. Briefings. Dossiers. Loose ends. NPC promises. What the players may know. What the GM must keep behind the curtain. "
         "Those truths need different doors. A player-facing briefing should feel like the world speaking back, not like a database export with the serial numbers still attached. A missed player should return to a clean handoff, not a twenty-minute oral history full of contradictions and fading excitement. "
         "As the season grows longer, JACKPOINT keeps memory from collapsing into vibes, screenshots, and disputed recollection. The table still owns the story. JACKPOINT simply gives that story a sharper, more dramatic way to return when next session begins."
     ),
-    "runsite_90s_deepdive": (
+    "runsite-90s-deepdive": (
         "A bad map shrinks a good mission. A flat location turns danger into bookkeeping. RUNSITE is for the kind of space that should feel legible, threatening, and worth arguing about before the first door even opens. "
         "A site unfolds in layers. Approach. Floor plan. Cameras. Exits. Hidden routes. Astral residue. Pressure points. The corners players will immediately try to exploit and the mistakes that will wake the building up around them. "
         "Player view stays readable. GM view keeps the teeth behind the curtain. Hotspots prepare the moments that matter without scripting the route in advance. The crew can scout, fight, improvise, and plan around a place instead of a paragraph. "
         "If they go loud, the site should answer like a living problem. If they go quiet, it should still have texture. RUNSITE makes locations matter before the breach, during the run, and in the memory that follows."
     ),
-    "runbook_press_90s_deepdive": (
+    "runbook-press-90s-deepdive": (
         "Campaign material accumulates like weather. Notes, districts, NPCs, rulings, handouts, recaps, lore, and all the strange little truths that only make sense after the fifth session have a way of drifting into separate corners. "
         "RUNBOOK PRESS turns that drifting mass into an artifact with intention. A primer. A district guide. A mission packet. A season book. A handoff worthy of the campaign that created it. "
         "Structure matters here. What the players can know. What the GM must protect. What belongs in the appendix. What needs to be findable in five seconds when the room is waiting and the night is already moving. Layout is not decoration. It is retrieval under pressure. "
         "When a new player joins, the book should welcome them into the season. When the campaign ends, it should leave behind something the table wants to keep. RUNBOOK PRESS is not about export. It is about memory made readable."
     ),
-    "table_pulse_90s_deepdive": (
+    "table-pulse-90s-deepdive": (
         "Pressure is part of the drama, but pressure without boundaries becomes noise. TABLE PULSE exists to keep the room tense, alive, and readable without turning the session into a dashboard performance. "
         "The GM sees the signal first. The system offers pressure, reaction, and aftermath as packets, not commandments. The table can be nudged when a scene needs oxygen and left alone when silence is the better choice. "
         "Players who are not physically in the room can still matter when they join an opposing faction. If they opt in, they can receive a bounded notification, send a reaction, and push back from outside the table without hijacking the moment inside it. After the run, they can receive a focused summary of what happened, who won, and what fallout now belongs to their side. "
         "Consent, quiet hours, opt-outs, and table policy are not decoration around the system. They are the system. A good pulse is felt in the scene, in the aftermath, and in the rising tension of the campaign, while the software itself almost disappears."
     ),
-    "black_ledger_90s_deepdive": (
+    "black-ledger-90s-deepdive": (
         "Too many campaign cities forget everything by morning. BLACK LEDGER is for the kind of city that keeps score, not on a spreadsheet, but in bruised districts, nervous factions, shifting jobs, and people who suddenly have reason to care what the crew just broke. "
         "After the run, the world should move. Not as homework. As consequence. Heat changes hands. Favors sour. Rumors harden into opportunity. A quiet neighborhood becomes dangerous because the crew made noise there yesterday. "
         "Faction pressure works best when it creates decisions, not encyclopedia weight. The newsroom gives the city a voice: dramatic, biased, occasionally cruel, and just useful enough to become tomorrow night's hook. "
         "By the time the next session begins, the world should already have opinions. BLACK LEDGER is for campaigns where the map remembers, the city pushes back, and the fallout is always looking for a new owner."
     ),
-    "community_hub_90s_deepdive": (
+    "community-hub-90s-deepdive": (
         "Finding the right table should not feel harder than surviving the run. COMMUNITY HUB begins with the lonely player, the overworked GM, and the gap between wanting a game and actually getting one to happen without chaos. "
         "Open runs need more than a signup button. They need tone, schedule, safety, expectations, and a reason this particular runner belongs in this particular trouble. Runner preflight should catch problems before anyone is trapped in voice chat waiting for a decision that could have been made yesterday. "
         "A roster is not a list of names. It is chemistry, role fit, availability, consent, and the stubborn practical question of whether this crew can actually meet and play. Scheduling should remove friction, not create another place for the truth to go missing. "
         "The best outcome remains beautifully simple: the right people find the right run, the night actually happens, and the campaign remembers what came out the other side."
     ),
-    "black_ledger_epic_90s": (
+    "black-ledger-epic-90s": (
         "BLACK LEDGER begins with a dead-map problem. The crew leaves a crater in the world, and somehow the city wakes up unchanged. That is not consequence. That is amnesia. "
         "In the epic version, the city comes alive like another character at the table. World ticks turn fallout into motion. A quiet district gets hot. A trusted route turns risky. A favor becomes leverage. A mistake becomes the seed of the next mission. "
         "The mission market starts to feel earned because opportunity no longer drops from the sky. It grows from what the crew actually did. Faction pressure becomes playable tension instead of lore the players are expected to memorize. "
         "And the newsroom gives the whole machine a voice: rumor, spin, fear, mockery, propaganda, and the kind of half-truth runners know how to weaponize. BLACK LEDGER is for campaigns where the city remembers the damage and develops an attitude about it."
+    ),
+    "origin-dossier-90s-deepdive": (
+        "A runner sheet can tell you what someone can do. It rarely tells you why they keep doing it when the job turns ugly. "
+        "Origin Dossier begins in that gap between numbers and motive. It turns biography into playable pressure: contacts who expect something, enemies who remember too much, debts that pull at the wrong moment, and scars that still shape the next decision. "
+        "The goal is not to replace the player. It is to give the player sharper material to approve, reject, and bring to the table with confidence. "
+        "When the GM needs a hook, the dossier should already know which thread has emotional weight. When the crew needs a reason to care, the past can answer without becoming a lecture. "
+        "A good origin does not trap the runner in backstory. It gives the campaign handles. Origin Dossier makes those handles clear, useful, and ready for trouble."
+    ),
+    "origin-dossier-the-name-she-chose": (
+        "Some stories begin with a handle because the old name no longer fits the person walking into the shadows. "
+        "The Name She Chose is an Origin Dossier proof of tone: a character history shaped into playable memory, not a generic biography pasted behind the sheet. "
+        "The past arrives as pressure. A contact with a reason to call. A debt that was never fully paid. A boundary the runner refuses to cross again. A name that sounds simple until the table learns what it cost. "
+        "This is what campaign memory should feel like when it is handled carefully. Approved by the player. Useful to the GM. Dramatic without stealing authorship. "
+        "The sheet says what she can do. The dossier helps the table understand why she chose to become this person now."
+    ),
+    "origin-dossier-the-name-she-chose-20260619": (
+        "Some stories begin with a handle because the old name no longer fits the person walking into the shadows. "
+        "The Name She Chose is an Origin Dossier proof of tone: a character history shaped into playable memory, not a generic biography pasted behind the sheet. "
+        "The past arrives as pressure. A contact with a reason to call. A debt that was never fully paid. A boundary the runner refuses to cross again. A name that sounds simple until the table learns what it cost. "
+        "This is what campaign memory should feel like when it is handled carefully. Approved by the player. Useful to the GM. Dramatic without stealing authorship. "
+        "The sheet says what she can do. The dossier helps the table understand why she chose to become this person now."
     ),
 }
 
@@ -150,19 +172,23 @@ VOICE_BY_ASSET: dict[str, str] = {
         "chummer6-flagship-promo",
         "all-horizons-90s-magicfit-promo",
         "every-wonder-horizon-promo",
-        "nexus_pan_90s_deepdive",
-        "alice_90s_deepdive",
-        "karma_forge_90s_deepdive",
-        "jackpoint_90s_deepdive",
-        "runsite_90s_deepdive",
-        "runbook_press_90s_deepdive",
-        "table_pulse_90s_deepdive",
-        "black_ledger_90s_deepdive",
-        "community_hub_90s_deepdive",
-        "black_ledger_epic_90s",
-        "nexus-pan_epic_90s",
+        "nexus-pan-90s-deepdive",
+        "alice-90s-deepdive",
+        "karma-forge-90s-deepdive",
+        "jackpoint-90s-deepdive",
+        "runsite-90s-deepdive",
+        "runbook-press-90s-deepdive",
+        "table-pulse-90s-deepdive",
+        "black-ledger-90s-deepdive",
+        "community-hub-90s-deepdive",
+        "black-ledger-epic-90s",
+        "nexus-pan-epic-90s",
+        "origin-dossier-90s-deepdive",
+        "origin-dossier-the-name-she-chose",
+        "origin-dossier-the-name-she-chose-20260619",
     ]
 }
+VOICE_BY_ASSET["alice-90s-deepdive"] = FEMALE_DOCUMENTARY_VOICE
 
 
 def utc_now() -> str:
@@ -302,7 +328,7 @@ async def render_edge_tts(text: str, voice: str, output: Path) -> bool:
         "import asyncio, edge_tts, pathlib, sys\n"
         "async def main():\n"
         "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-9%', pitch='-7Hz')\n"
+        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-4Hz', volume='+12%')\n"
         "    await communicate.save(str(output))\n"
         "asyncio.run(main())\n",
         encoding="utf-8",
@@ -410,18 +436,14 @@ def render_stitched_narration(plan: AudioPlan, work: Path) -> tuple[Path, str, s
 
 
 def cinematic_bed_filter(target_duration: float) -> str:
-    fade_out = min(2.8, max(target_duration / 3.0, 0.3))
+    fade_out = 0.08
     return (
-        "aevalsrc="
-        f"'0.030*sin(2*PI*(43+1.7*sin(2*PI*0.05*t))*t)+"
-        "0.018*sin(2*PI*(86+2.4*sin(2*PI*0.037*t))*t)+"
-        "0.011*sin(2*PI*129*t)+0.007*sin(2*PI*172*t)+0.004*sin(2*PI*258*t)'"
-        f":s=48000:d={target_duration:.3f},"
-        "highpass=f=32,lowpass=f=3600,bass=g=2.8:f=94:w=0.8,"
-        "tremolo=f=0.16:d=0.18,acompressor=threshold=-30dB:ratio=1.8:attack=30:release=280:makeup=1.5,"
+        f"anoisesrc=color=pink:amplitude=0.080:r=48000:d={target_duration:.3f},"
+        "highpass=f=320,lowpass=f=3000,bass=g=-12:f=150:w=0.8,treble=g=-4:f=3000:w=0.7,"
+        "acompressor=threshold=-31dB:ratio=1.25:attack=35:release=260:makeup=1.0,"
         f"afade=t=in:st=0:d={min(1.4, max(target_duration / 3.0, 0.2)):.3f},"
         f"afade=t=out:st={max(target_duration - fade_out, 0):.3f}:d={fade_out:.3f},"
-        "volume=1.32[bed]"
+        "volume=0.62[bed]"
     )
 
 
@@ -441,11 +463,14 @@ def audio_filter_for(narration: Path, target_duration: float) -> str:
         fit_mode = "natural_slow"
     return (
         f"[0:a]{prep},afade=t=in:st=0:d=0.45,afade=t=out:st={max(target_vo - 0.75, 0):.3f}:d=0.75,"
-        "highpass=f=72,lowpass=f=9000,bass=g=2.4:f=110:w=0.65,"
+        "highpass=f=120,lowpass=f=9000,bass=g=-3.5:f=130:w=0.75,"
         "acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0];"
-        f"[vo0]adelay=1200|1200,apad,atrim=0:{target_duration:.3f},volume=1.10[vo];"
+        f"[vo0]adelay=1200|1200,apad,atrim=0:{target_duration:.3f},volume=1.18[vo];"
         f"{cinematic_bed_filter(target_duration)};"
-        f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,{HIGH_TONE_CLEANUP_FILTER},alimiter=limit=0.91[a]"
+        f"[bed][vo]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,{HIGH_TONE_CLEANUP_FILTER},apad,atrim=0:{target_duration:.3f},alimiter=limit=0.91[main];"
+        f"anoisesrc=color=white:amplitude=0.180:r=48000:d={target_duration:.3f},"
+        "highpass=f=620,lowpass=f=2400,volume=0.65[floor];"
+        f"[main][floor]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,volume=0.72,alimiter=limit=0.76,apad,atrim=0:{target_duration:.3f}[a]"
         f" # {fit_mode}"
     )
 
@@ -461,6 +486,8 @@ def build_audio(narration: Path, target_duration: float, output: Path) -> None:
         filter_complex,
         "-map",
         "[a]",
+        "-t",
+        f"{target_duration:.3f}",
         "-c:a",
         "pcm_s16le",
         str(output),
@@ -487,7 +514,8 @@ def remux(video: Path, audio: Path, output: Path, target_duration: float) -> Non
         "-c:a",
         "aac",
         "-b:a",
-        "192k",
+        "256k",
+        "-shortest",
         "-movflags",
         "+faststart",
         str(temp),
@@ -505,22 +533,45 @@ def plans(selected: set[str] | None) -> list[AudioPlan]:
         ]
     ]
     for asset in [
-        "nexus_pan_90s_deepdive",
-        "alice_90s_deepdive",
-        "karma_forge_90s_deepdive",
-        "jackpoint_90s_deepdive",
-        "runsite_90s_deepdive",
-        "runbook_press_90s_deepdive",
-        "table_pulse_90s_deepdive",
-        "black_ledger_90s_deepdive",
-        "community_hub_90s_deepdive",
-        "black_ledger_epic_90s",
-        "nexus-pan_epic_90s",
+        "nexus-pan-90s-deepdive",
+        "alice-90s-deepdive",
+        "karma-forge-90s-deepdive",
+        "jackpoint-90s-deepdive",
+        "runsite-90s-deepdive",
+        "runbook-press-90s-deepdive",
+        "table-pulse-90s-deepdive",
+        "black-ledger-90s-deepdive",
+        "community-hub-90s-deepdive",
+        "black-ledger-epic-90s",
+        "nexus-pan-epic-90s",
+        "origin-dossier-90s-deepdive",
+        "origin-dossier-the-name-she-chose",
+        "origin-dossier-the-name-she-chose-20260619",
     ]:
-        items.append(AudioPlan(asset, HORIZON_VIDEOS / f"{asset}.mp4", f"{asset} v3 Continuous Audio", SCRIPTS[asset], voice=VOICE_BY_ASSET[asset]))
+        items.append(AudioPlan(asset, HORIZON_PUBLIC / f"{asset}.mp4", f"{asset} v3 Continuous Audio", SCRIPTS[asset], voice=VOICE_BY_ASSET[asset]))
     if selected:
         items = [item for item in items if item.asset_id in selected]
     return items
+
+
+def audio_stream_duration(path: Path) -> float:
+    data = json.loads(
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=duration",
+            "-of",
+            "json",
+            str(path),
+            capture=True,
+        )
+    )
+    durations = [float(stream.get("duration") or 0.0) for stream in data.get("streams") or []]
+    return max(durations or [0.0])
 
 
 def rebuild(plan: AudioPlan) -> dict[str, Any]:
@@ -556,6 +607,7 @@ def rebuild(plan: AudioPlan) -> dict[str, Any]:
         "script": plan.script,
         "script_word_count": len(plan.script.split()),
         "target_duration_seconds": target_duration,
+        "output_audio_duration_seconds": audio_stream_duration(plan.video),
         "narration_duration_seconds": duration(tts),
         "mp4_probe": result_probe,
     }
@@ -583,13 +635,14 @@ def main() -> int:
         item = {
             "asset_id": receipt["asset_id"],
             "duration_seconds": length,
+            "audio_duration_seconds": receipt["output_audio_duration_seconds"],
             "audio_streams": audio,
             "video_streams": video,
             "word_count": receipt["script_word_count"],
             "narration_duration_seconds": receipt["narration_duration_seconds"],
             "no_scene_audio_cuts": receipt["no_scene_audio_cuts"],
         }
-        if length < 89.5 or audio != 1 or video != 1:
+        if length < 89.5 or audio != 1 or video != 1 or float(receipt["output_audio_duration_seconds"]) < length - 0.35:
             gate["status"] = "fail"
         gate["assets"].append(item)
     (OUT / "CONTINUOUS_PROMO_AUDIO_GATE.generated.json").write_text(json.dumps(gate, indent=2) + "\n", encoding="utf-8")

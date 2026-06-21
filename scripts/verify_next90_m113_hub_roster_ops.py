@@ -64,7 +64,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "public sealed record DossierMovementPlannerProjection(",
         "public sealed record DossierMovementReceiptProjection(",
         "bool EventChanged,",
-        "RosterTransferProjection TransferReceipt);",
+        "RosterTransferProjection TransferReceipt,",
+        "ReceiptEnvelope? Envelope = null);",
     ],
     "Chummer.Run.Api/Controllers/CampaignSpineController.cs": [
         '[HttpGet("me/workspaces/{workspaceId}/dossier-movement-plan")]',

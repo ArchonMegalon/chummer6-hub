@@ -84,7 +84,7 @@ public sealed class CampaignFederationOrchestrationService
         string routeState = allSourcePacksPublished ? "queued" : "bounded_failure";
         string? boundedFailureReason = allSourcePacksPublished
             ? null
-            : "One or more governed source packs are not published on the outward-facing shelf yet, so this exchange batch stays bounded until visible source records are live.";
+            : "One or more governed source packs are not published on the outward-facing shelf yet, so this exchange batch stays bounded until visible source receipts are live.";
         string nextSafeAction = allSourcePacksPublished
             ? "Current public source-pack records are attached; follow the queued publication batch until the requested outward-facing outputs publish their own records."
             : "Publish or re-review the bounded source packs first, then relaunch this exchange batch after the outward-facing shelf exposes current source records.";

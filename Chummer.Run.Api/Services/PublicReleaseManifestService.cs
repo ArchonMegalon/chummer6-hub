@@ -968,7 +968,7 @@ public sealed class PublicReleaseManifestService
                 $"Treat the current release as limited because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
-                "Translator, XML amendment, Hero Lab, and adjacent import paths are not current yet, so parity-sensitive routes stay with support."),
+                "Translator, XML amendment, Hero Lab, and adjacent import parity receipts are not current yet, so parity-sensitive routes stay with support."),
             FixAvailabilitySummary = AppendDistinctSentence(
                 manifest.FixAvailabilitySummary,
                 "Use linked-install recovery and Chummer support until translator, XML, Hero Lab, and import paths are current.")

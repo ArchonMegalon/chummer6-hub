@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-19T10:06:07Z",
+  "generated_at_utc": "2026-06-20T19:57:43Z",
   "status": "published",
   "asset_id": "chummer6-flagship-promo",
   "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
@@ -51,14 +51,14 @@
       {
         "codec_name": "aac",
         "codec_type": "audio",
-        "sample_rate": "48000",
+        "sample_rate": "96000",
         "channels": 1,
-        "bit_rate": "178928"
+        "bit_rate": "200641"
       }
     ],
     "format": {
       "duration": "90.000000",
-      "size": "43392581"
+      "size": "43655949"
     }
   },
   "narration_provider": "unmixr-short-tts-beats",
@@ -102,5 +102,14 @@
       "duration": "90.013000",
       "size": "27214712"
     }
-  }
+  },
+  "duration_seconds": 90.0,
+  "public_mp4": "/media/promo/chummer6-flagship-promo.mp4?v=20260620-audio2",
+  "output_audio_duration_seconds": 0.0,
+  "size_bytes": 43655949,
+  "has_audio": true,
+  "has_video": true,
+  "audio_mean_volume_db": -18.0,
+  "audio_max_volume_db": -0.7,
+  "audio_quality_status": "pass"
 }

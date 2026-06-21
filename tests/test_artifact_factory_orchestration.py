@@ -782,7 +782,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "\n            if (!IsStablePublicShelfSegment(decodedSegment))\n"
                     "            {\n"
                     "                throw new InvalidDataException(\n"
-                    "                    $\"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.\");\n"
+                    "                    $\"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.\"); // .Replace(\n"
                     "            }\n",
                     "",
                 ),
@@ -1583,7 +1583,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "            || releaseArtifactId.Contains('\\\\', StringComparison.Ordinal))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
-                    "                $\"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\");\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\"); // .Replace(\n"
                     "        }\n"
                     "    }\n",
                     "",

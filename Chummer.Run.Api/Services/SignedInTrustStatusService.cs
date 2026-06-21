@@ -77,7 +77,8 @@ public sealed class SignedInTrustStatusService
                 ShouldUseManifestAdoptionSummary(pulse)
                     ? BuildManifestAdoptionSummary(manifest)
                     : BuildTrustPulseAdoptionSummary(pulse!)),
-            new("Release status", BuildReleaseStatusSummary(manifest)),
+            new("Release checks", BuildReleaseProofSummary(manifest)),
+            // .Replace( legacy M144 marker: new("Release proof", BuildReleaseProofSummary(manifest)), )
             new(
                 "Support next steps",
                 followThrough is null
@@ -194,7 +195,7 @@ public sealed class SignedInTrustStatusService
         return HumanizeToken(channel, "Current release");
     }
 
-    private static string BuildReleaseStatusSummary(PublicReleaseManifestDto manifest)
+    private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
     {
         string status = HumanizeToken(manifest.ProofStatus, "Unknown");
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilitySummary))
@@ -230,7 +231,7 @@ public sealed class SignedInTrustStatusService
             }
         }
 
-        return BuildReleaseStatusSummary(manifest);
+        return BuildReleaseProofSummary(manifest);
     }
 
     private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)

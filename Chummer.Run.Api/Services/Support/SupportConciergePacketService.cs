@@ -314,7 +314,7 @@ public sealed class SupportConciergePacketService
         List<string> blockers = [];
         if (!installedBuildComplete)
         {
-            blockers.Add("installed build status is incomplete");
+            blockers.Add("installed build truth is incomplete");
         }
 
         if (!releaseArtifactReady)
@@ -334,7 +334,7 @@ public sealed class SupportConciergePacketService
 
         if (presentation.NeedsInstallUpdate)
         {
-            blockers.Add("the reporter still needs to update before closing the case");
+            blockers.Add("the reporter still needs an update before verification");
         }
 
         return blockers.Count == 0

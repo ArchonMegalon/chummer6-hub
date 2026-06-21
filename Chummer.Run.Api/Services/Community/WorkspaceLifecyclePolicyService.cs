@@ -112,7 +112,7 @@ public sealed class WorkspaceLifecyclePolicyService
 
         return candidate
             .Select(item => TryResolveExistingObservation(existingObservedById, ResolveProvenanceReceiptObservationKeys(item), out RestoreReceiptCarryForward carryForward)
-                ? item with { ObservedAtUtc = carryForward.ObservedAtUtc, Envelope = carryForward.Envelope }
+                ? CarryForwardProvenanceReceiptObservation(item, carryForward)
                 : item)
             .ToArray();
     }
@@ -130,9 +130,25 @@ public sealed class WorkspaceLifecyclePolicyService
 
         return candidate
             .Select(item => TryResolveExistingObservation(existingObservedById, ResolveConflictReceiptObservationKeys(item), out RestoreReceiptCarryForward carryForward)
-                ? item with { ObservedAtUtc = carryForward.ObservedAtUtc, Envelope = carryForward.Envelope }
+                ? CarryForwardConflictReceiptObservation(item, carryForward)
                 : item)
             .ToArray();
+    }
+
+    private static WorkspaceRestoreProvenanceReceipt CarryForwardProvenanceReceiptObservation(
+        WorkspaceRestoreProvenanceReceipt item,
+        RestoreReceiptCarryForward carryForward)
+    {
+        DateTimeOffset observedAtUtc = carryForward.ObservedAtUtc;
+        return (item with { ObservedAtUtc = observedAtUtc }) with { Envelope = carryForward.Envelope };
+    }
+
+    private static WorkspaceRestoreConflictReceipt CarryForwardConflictReceiptObservation(
+        WorkspaceRestoreConflictReceipt item,
+        RestoreReceiptCarryForward carryForward)
+    {
+        DateTimeOffset observedAtUtc = carryForward.ObservedAtUtc;
+        return (item with { ObservedAtUtc = observedAtUtc }) with { Envelope = carryForward.Envelope };
     }
 
     private static Dictionary<string, RestoreReceiptCarryForward> BuildProvenanceObservationMap(

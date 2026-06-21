@@ -1,12 +1,12 @@
 {
   "status": "pass",
-  "base_url": "https://chummer.run",
-  "final_url": "https://chummer.run",
+  "base_url": "https://chummer.run/",
+  "final_url": "https://chummer.run/",
   "http_status": 200,
-  "cloudflare_ray": "a0dcad8778dee864-FRA",
+  "cloudflare_ray": "a0efb5e7087ed9d7-FRA",
   "server": "cloudflare",
   "detected_error_code": null,
   "failure_reason": null,
-  "generated_at": "2026-06-18T19:25:04.509522Z",
-  "body_excerpt": "<!doctype html>\n<html lang=\"en\" data-theme=\"hub-front-door\">\n<head>\n    <meta charset=\"utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Chummer &#x2014; Shadowrun character and campaign companion \u00b7 Chummer</title>\n    <meta name=\"description\" content=\"Download Chummer, open or import a character, and keep sessions moving with explainable rules math, durable local state, and clear recovery paths.\" />\n    <meta name=\"theme-color\" content=\"#07131c\" />\n    <meta name=\"apple-mobile-web-app-capable\" content=\"yes\" />\n    <meta name=\"apple-mobile-web-app-..."
+  "generated_at": "2026-06-21T02:51:16.919327Z",
+  "body_excerpt": "<!doctype html>\n<html lang=\"en\" data-theme=\"hub-front-door\">\n<head>\n    <meta charset=\"utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Chummer &#x2014; Shadowrun character manager \u00b7 Chummer</title>\n    <meta name=\"description\" content=\"Desktop character manager for Shadowrun.\" />\n    <meta name=\"theme-color\" content=\"#07131c\" />\n    <meta name=\"apple-mobile-web-app-capable\" content=\"yes\" />\n    <meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\" />\n    <meta name=\"apple-mobile-web-app-title\" content=\"Chummer\" />\n    <me..."
 }
