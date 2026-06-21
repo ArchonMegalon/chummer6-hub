@@ -14,19 +14,19 @@ public sealed class ReadyForTonightService
             Summary: "Starter runner packet is usable now, but the first session still expects a quick legality and gear check before dice hit the table.",
             BlockingReasons:
             [
-                "Confirm one starter loadout that matches your table lane.",
-                "Carry the session packet or mobile handoff before you leave Downloads."
+                "Confirm one starter loadout that matches your table role.",
+                "Carry the session file or mobile setup before you leave Downloads."
             ],
             ChangedSinceLastSession:
             [
-                "Turn-0 loadouts now expose a bounded legal-baseline checklist.",
-                "The player packet now names the next join and support rails explicitly."
+                "Turn-0 loadouts now include a short legal-baseline checklist.",
+                "The player file now names the next join and support steps clearly."
             ],
             FixNowActions:
             [
                 new ReadyAction("Download player packet", "/ready/packet/player.md", "primary"),
                 new ReadyAction("Open mage starter loadout", "/ready/loadout/mage.json", "secondary"),
-                new ReadyAction("Open mobile handoff", "/ready/handoff/mobile.json", "ghost")
+                new ReadyAction("Open mobile setup", "/ready/handoff/mobile.json", "ghost")
             ],
             NextBestScreen: "/mobile",
             ProofReceipts:
@@ -40,16 +40,16 @@ public sealed class ReadyForTonightService
             RoleLabel: "GM",
             Status: "warning",
             StatusLabel: "Prep packet ready",
-            Summary: "The GM packet, roster check, and export handoff are real now, but the route still stops short of pretending the full deep workbench is replaced.",
+            Summary: "The GM file, roster check, and export path are ready now, while the full deep workbench stays in the desktop app.",
             BlockingReasons:
             [
                 "Confirm roster and opposition summary before opening the table.",
-                "Export or print the bounded prep packet before session start."
+                "Export or print the prep file before session start."
             ],
             ChangedSinceLastSession:
             [
-                "GM prep now includes a bounded preflight checklist and export rail.",
-                "Run packet links stay first-party instead of falling back to vague route prose."
+                "GM prep now includes a short preflight checklist and export path.",
+                "Run file links stay clear instead of falling back to vague route text."
             ],
             FixNowActions:
             [
@@ -68,15 +68,15 @@ public sealed class ReadyForTonightService
             RoleLabel: "Organizer",
             Status: "ready",
             StatusLabel: "Publishable public-run packet",
-            Summary: "Safety, quickstart, and public-run handoff stay bounded and inspectable without exposing private account or campaign data.",
+            Summary: "Safety, quickstart, and public-run setup stay limited and readable without exposing private account or campaign data.",
             BlockingReasons:
             [
                 "None on the public-safe starter packet."
             ],
             ChangedSinceLastSession:
             [
-                "Organizer packet now points at participation and moderation follow-up explicitly.",
-                "The same first-party packet now carries the mobile continuity handoff."
+                "Organizer file now points at participation and moderation follow-up clearly.",
+                "The same Chummer file now carries the mobile setup path."
             ],
             FixNowActions:
             [
@@ -98,7 +98,7 @@ public sealed class ReadyForTonightService
             KitId: "street-samurai",
             RoleLane: "Player",
             Label: "Street Samurai starter",
-            Summary: "Bounded combat-ready starter with ammo, armor, medkit, and a short legality checklist.",
+            Summary: "Combat-ready starter with ammo, armor, medkit, and a short legality checklist.",
             DownloadHref: "/ready/loadout/street-samurai.json",
             Highlights:
             [
@@ -110,33 +110,33 @@ public sealed class ReadyForTonightService
             KitId: "mage",
             RoleLane: "Player",
             Label: "Mage starter",
-            Summary: "Bounded awakened starter with focus, drain, and quick spell readiness cues for tonight.",
+            Summary: "Awakened starter with focus, drain, and quick spell readiness cues for tonight.",
             DownloadHref: "/ready/loadout/mage.json",
             Highlights:
             [
                 "Drain and focus reminder",
                 "Spell visibility checklist",
-                "Join/run rail stays attached"
+                "Join/run next step stays attached"
             ]),
         new(
             KitId: "gm-quickstart",
             RoleLane: "GM",
             Label: "GM quickstart kit",
-            Summary: "Roster, consequences, and packet export checklist for the fastest honest table-open path.",
+            Summary: "Roster, consequences, and packet export checklist for the fastest honest start.",
             DownloadHref: "/ready/loadout/gm-quickstart.json",
             Highlights:
             [
                 "Roster completeness",
                 "Consequence and reward sweep",
-                "Export before table-open"
+                "Export before the table starts"
             ])
     ];
 
     private static readonly IReadOnlyList<ReadyPacketAsset> PacketAssets =
     [
-        new("player", "Player packet", "Printable player-safe session packet with join, loadout, and support rails.", "/ready/packet/player.md", "/ready/packet/player.json"),
+        new("player", "Player packet", "Printable player-safe session file with join, loadout, and support steps.", "/ready/packet/player.md", "/ready/packet/player.json"),
         new("gm", "GM packet", "Prep packet with roster, opposition, and export-safe session notes.", "/ready/packet/gm.md", "/ready/packet/gm.json"),
-        new("organizer", "Organizer packet", "Public-run packet with safety, publication, and moderation posture.", "/ready/packet/organizer.md", "/ready/packet/organizer.json")
+        new("organizer", "Organizer packet", "Public-run file with safety, publication, and moderation notes.", "/ready/packet/organizer.md", "/ready/packet/organizer.json")
     ];
 
     public IReadOnlyList<ReadyRoleVerdict> ListRoleVerdicts() => RoleVerdicts;

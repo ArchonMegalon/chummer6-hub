@@ -246,6 +246,38 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Ready_for_tonight_copy_uses_plain_session_language()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReadyForTonightService.cs"));
+        string combined = string.Join(Environment.NewLine, controller, service);
+
+        Assert.Contains("role status, starter loadouts, session files, and mobile setup", combined, StringComparison.Ordinal);
+        Assert.Contains("table role", combined, StringComparison.Ordinal);
+        Assert.Contains("export path", combined, StringComparison.Ordinal);
+
+        foreach (string forbidden in new[]
+        {
+            "session-start rail",
+            "table lane",
+            "mobile handoff",
+            "export handoff",
+            "export rail",
+            "support rails",
+            "bounded legal-baseline",
+            "bounded prep packet",
+            "Bounded combat-ready",
+            "Bounded awakened",
+            "Join/run rail",
+            "public-run handoff",
+            "moderation posture"
+        })
+        {
+            Assert.DoesNotContain(forbidden, combined, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void Black_ledger_connected_lane_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));

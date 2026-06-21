@@ -7499,12 +7499,12 @@ Boundary:
             Eyebrow: "Session-start mode",
             Heading: "Ready for Tonight",
             Intro: "This page answers the only urgent question before a game starts: are you ready, what still blocks you, and which packet should you carry into the session right now.",
-            VerdictSummary: "Chummer now ships one bounded first-party session-start rail: role verdict, starter loadout, packet export, and mobile handoff in one place.",
+            VerdictSummary: "Chummer now keeps role status, starter loadouts, session files, and mobile setup in one place.",
             SummaryPoints:
             [
                 "Role-aware readiness verdicts",
                 "Starter loadouts with downloadable JSON",
-                "Printable packets and mobile handoff"
+                "Printable packets and mobile setup"
             ],
             Verdicts: verdicts,
             RoleKits: kits,
