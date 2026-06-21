@@ -570,8 +570,18 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("support history", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", packageCatalogService, StringComparison.Ordinal);
         Assert.Contains("Publication status, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("The file library already shows that publication, recap, and preview outputs can stay inside Chummer.", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("Research status must remain honest even when interest is high.", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("clear moderation and compatibility status", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("Publication trust, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("artifact shelf", packageCatalogService, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Research posture", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("compatibility posture", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("broader release claim", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("Chummer-owned routes", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("package lineage", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("/now#real-rules-truth", packageCatalogService, StringComparison.Ordinal);
 
         string ledgerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml");
         string ledger = File.ReadAllText(ledgerPath);

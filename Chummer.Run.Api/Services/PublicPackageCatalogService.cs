@@ -79,7 +79,7 @@ public sealed class PublicPackageCatalogService
             "Community proposal package",
             "A reviewed proposal that stays in Chummer until compatibility and moderation are clear.",
             [
-                "Votes and follows stay inside Chummer-owned routes.",
+                "Votes and follows stay inside Chummer pages.",
                 "Moderation, duplicate handling, and compatibility review block fast-publish folklore.",
                 "Proposal status must stay honest about research versus release readiness."
             ])
@@ -336,7 +336,7 @@ public sealed class PublicPackageCatalogService
                 "Live now",
                 [
                     "Matches the current release channels on Downloads: Windows and Linux public, macOS guided support only.",
-                    "Guided claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
+                    "Claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
                     "This page explains the choice. Downloads is still where you get the app."
                 ],
                 [
@@ -357,18 +357,18 @@ public sealed class PublicPackageCatalogService
                 "Rules data package",
                 "Inspectable",
                 [
-                    "Binds to the deterministic rules runtime, explanation path, and current release status view.",
+                    "Works with Chummer's rules engine, explanation path, and current release status view.",
                     "Compatibility depends on current explanations and import/export boundaries, not on route existence alone.",
                     "Public detail can point to current availability, but cannot overstate overall ruleset seriousness."
                 ],
                 [
-                    "Current status must stay attached before broader parity language becomes public copy.",
+                    "Current status must be visible before broader parity language becomes public copy.",
                     "Rollback and boundaries stay explicit when this package changes rules behavior.",
                     "This page shows compatibility and status; it does not replace rules review."
                 ],
-                "The current release status view already points to the explanation path and live rules state.",
+                "The current release status view already points to the explanation path and current rules state.",
                 "Open what works today",
-                "/now#real-rules-truth",
+                "/now",
                 "Account package tracking keeps follows and votes attached to the same signed-in return path.",
                 "Treat this package as current rules coverage, not as a blanket parity claim."),
             new(
@@ -384,11 +384,11 @@ public sealed class PublicPackageCatalogService
                     "The public route explains what the package class means before any install or publication decision."
                 ],
                 [
-                    "KARMA FORGE discovery and campaign approvals must exist before a broader release claim.",
+                    "KARMA FORGE discovery and campaign approvals must exist before a broader release promise.",
                     "Private table context and spoilers stay out of public package history.",
                     "Rollback, portability, and user-visible scope remain explicit even when the package starts as a community suggestion."
                 ],
-                "KARMA FORGE and campaign continuity docs already point to the need for reviewed package boundaries.",
+                "KARMA FORGE and campaign continuity docs already point to the need for reviewed package limits.",
                 "Open KARMA FORGE",
                 "/participate/karma-forge",
                 "Account package tracking keeps the follow and approval history visible next to support and campaign work.",
@@ -402,19 +402,19 @@ public sealed class PublicPackageCatalogService
                 "Preview",
                 [
                     "Compatibility depends on publication trust, the file shelf, and clear history.",
-                    "The package can be shown in review views without becoming the source of product decisions.",
-                    "Creator, campaign, and public views can differ while the package lineage stays explicit."
+                    "The package can be shown in review pages without becoming the source of product decisions.",
+                    "Creator, campaign, and public views can differ while the package history stays clear."
                 ],
                 [
                     "Media and file packages may support a page, but they cannot replace route, install, or rules status.",
-                    "Publication and moderation stay attached to the package before broader discovery claims.",
-                    "Artifact detail and shelf routes remain the Chummer surfaces for discovery and return."
+                    "Publication status and moderation notes stay attached to the package before broader discovery claims.",
+                    "File detail and library pages remain the Chummer surfaces for discovery and return."
                 ],
-                "The artifact shelf already shows that publication, recap, and preview outputs can stay inside Chummer.",
-                "Open artifacts",
+                "The file library already shows that publication, recap, and preview outputs can stay inside Chummer.",
+                "Open files",
                 "/artifacts",
                 "Account package tracking ties creator and continuity records back to the same return path.",
-                "Keep file packages bounded by history and trust rather than media hype."),
+                "Keep file packages grounded in history and usefulness rather than media hype."),
             new(
                 "community-proposal-sandbox",
                 "Community proposal sandbox package",
@@ -423,19 +423,19 @@ public sealed class PublicPackageCatalogService
                 "Community proposal package",
                 "Research",
                 [
-                    "Compatibility stays advisory until Chummer review promotes the proposal into a clearer package path.",
+                    "Compatibility stays advisory until Chummer review moves the proposal into a clearer package path.",
                     "Public votes and follows can exist now without pretending the proposal is installable or approved.",
                     "The package route makes the review boundary explicit before any roadmap or release language moves."
                 ],
                 [
-                    "Moderation, duplicate handling, privacy, and package compatibility must stay inside Chummer-owned routes.",
+                    "Moderation, duplicate handling, privacy, and package compatibility must stay inside Chummer pages.",
                     "Follow records are Chummer-owned and should not leak external board or maintainer tooling names.",
-                    "Research posture must remain honest even when interest is high."
+                    "Research status must remain honest even when interest is high."
                 ],
                 "The public participate and feedback pages already separate safe public signal from private support and install work.",
                 "Open feedback",
                 "/feedback",
                 "Account package tracking keeps your follows and votes on the same signed-in page as support and continuity.",
-                "Treat this package as a reviewed proposal surface with explicit moderation and compatibility posture.")
+                "Treat this package as a reviewed proposal surface with clear moderation and compatibility status.")
         ];
 }
