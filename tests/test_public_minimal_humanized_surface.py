@@ -1996,3 +1996,43 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         "Use the command deck when you want the current jump targets before opening a build, rule, workspace, or publication surface.",
     ):
         assert expected in controller
+
+
+def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+
+    for forbidden in (
+        "Live pressure stays on the signed-in command path.",
+        "GM-private aftermath packages stay separate",
+        "The live view is the in-world packet and reaction system.",
+        "GM-controlled heat packets on the signed-in ledger notifications route.",
+        "Bounded remote reaction submissions with explicit GM adjudication.",
+        "Aftermath is a separate GM-private recap and carry-forward packet system.",
+        "Workspace aftermath recap packages stay attached.",
+        "moderation truth",
+        "Live heat packets are real now",
+        "GM-private aftermath packages are real now",
+        "GM-controlled heat packets, bounded reactions, and adjudicated fallout stay on the signed-in command path.",
+        "GM-private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path.",
+        "no_automatic_world_authority",
+        "no_public_surveillance_truth",
+    ):
+        assert forbidden not in controller
+
+    for expected in (
+        "Live pressure stays in the account inbox.",
+        "Private aftermath stays separate",
+        "The live view is the in-world signal and reaction system.",
+        "GM-controlled heat updates in the account inbox.",
+        "Remote reactions wait for explicit GM adjudication.",
+        "Aftermath is a separate private recap and carry-forward system for the GM.",
+        "Workspace aftermath recaps stay attached.",
+        "not public scoring or moderation.",
+        "Live heat updates are real now",
+        "Private aftermath recaps are real now",
+        "GM-controlled heat updates, remote reactions, and adjudicated fallout stay in the account inbox.",
+        "Private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path.",
+        "no_automatic_world_changes",
+        "no_public_surveillance",
+    ):
+        assert expected in controller

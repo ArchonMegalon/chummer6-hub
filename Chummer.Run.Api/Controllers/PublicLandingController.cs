@@ -2253,28 +2253,28 @@ public sealed class PublicLandingController : Controller
             currentPath: "/table-pulse",
             eyebrow: "Live table",
             heading: "TABLE PULSE",
-            intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command path. GM-private aftermath packages stay separate so heat, recap, and next steps do not collapse into surveillance or vague drama text.",
+            intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays in the account inbox. Private aftermath stays separate so heat, recap, and next steps do not collapse into surveillance or vague drama text.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "table_pulse_live",
                     "Live table",
                     "What is live now",
-                    "The live view is the in-world packet and reaction system.",
+                    "The live view is the in-world signal and reaction system.",
                     [
-                        "GM-controlled heat packets on the signed-in ledger notifications route.",
-                        "Bounded remote reaction submissions with explicit GM adjudication.",
+                        "GM-controlled heat updates in the account inbox.",
+                        "Remote reactions wait for explicit GM adjudication.",
                         "World pressure remains inspectable before it affects the wider city."
                     ]),
                 new TrustPageSectionViewModel(
                     "table_pulse_aftermath",
                     "Aftermath",
                     "What aftermath owns",
-                    "Aftermath is a separate GM-private recap and carry-forward packet system.",
+                    "Aftermath is a separate private recap and carry-forward system for the GM.",
                     [
-                        "Workspace aftermath recap packages stay attached.",
+                        "Workspace aftermath recaps stay attached.",
                         "Downtime, carry-forward, and campaign-memory cues stay in one reviewed return path.",
-                        "Aftermath is private GM recap and next-step work, not public scoring or moderation truth."
+                        "Aftermath is private GM recap and next-step work, not public scoring or moderation."
                     ]),
                 new TrustPageSectionViewModel(
                     "table_pulse_boundary",
@@ -2296,8 +2296,8 @@ public sealed class PublicLandingController : Controller
             cancellationToken: cancellationToken,
             summaryPoints:
             [
-                "Live heat packets are real now",
-                "GM-private aftermath packages are real now",
+                "Live heat updates are real now",
+                "Private aftermath recaps are real now",
                 "Live play and aftermath stay separate on purpose"
             ]);
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
@@ -2316,7 +2316,7 @@ public sealed class PublicLandingController : Controller
                 Status = "live",
                 NotificationsHref = "/account/ledger/notifications",
                 ReactionPostHref = "/account/ledger/notifications/table-pulse/react",
-                Summary = "GM-controlled heat packets, bounded reactions, and adjudicated fallout stay on the signed-in command path."
+                Summary = "GM-controlled heat updates, remote reactions, and adjudicated fallout stay in the account inbox."
             },
             AftermathRail = new
             {
@@ -2327,13 +2327,13 @@ public sealed class PublicLandingController : Controller
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath"
                 },
-                Summary = "GM-private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path."
+                Summary = "Private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path."
             },
             Boundaries = new[]
             {
-                "no_automatic_world_authority",
+                "no_automatic_world_changes",
                 "no_player_scoring",
-                "no_public_surveillance_truth"
+                "no_public_surveillance"
             }
         });
 
