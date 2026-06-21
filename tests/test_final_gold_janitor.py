@@ -21,6 +21,19 @@ def load_module():
 
 
 class FinalGoldJanitorTests(unittest.TestCase):
+    def test_materializers_build_provider_receipts_before_ltd_stack(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        icanpreneur_index = commands.index("python3 scripts/verify_icanpreneur_discovery_lane.py")
+        provider_index = commands.index("python3 scripts/verify_provider_proof_discoverability.py")
+        ltd_index = commands.index("python3 scripts/materialize_ltd_optimization_stack.py")
+
+        self.assertLess(icanpreneur_index, provider_index)
+        self.assertLess(provider_index, ltd_index)
+        self.assertIn("icanpreneur_discovery_lane", module.REQUIRED_RECEIPTS)
+        self.assertIn("icanpreneur_discovery_lane", module.FRESHNESS_REQUIRED_GATES)
+
     def test_payload_uses_current_v20_root(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             module = load_module()
