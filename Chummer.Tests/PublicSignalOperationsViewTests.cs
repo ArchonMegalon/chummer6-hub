@@ -43,16 +43,16 @@ public sealed class PublicSignalOperationsViewTests
         string detailView = File.ReadAllText(detailViewPath);
 
         Assert.Contains("@model PublicSignalOperationsDetailPageViewModel", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download item data", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download summary", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download item details", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download activity summary", detailView, StringComparison.Ordinal);
         Assert.Contains("Activity summary", detailView, StringComparison.Ordinal);
         Assert.Contains("Activity", detailView, StringComparison.Ordinal);
         Assert.Contains("Original item", detailView, StringComparison.Ordinal);
         Assert.Contains("Saved filters", detailView, StringComparison.Ordinal);
         Assert.Contains("Current filter", detailView, StringComparison.Ordinal);
         Assert.Contains("Open filter details", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download thread data", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download related data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download message details", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download related details", detailView, StringComparison.Ordinal);
         Assert.Contains("Open thread details", detailView, StringComparison.Ordinal);
         Assert.Contains("Open related details", detailView, StringComparison.Ordinal);
         Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
@@ -77,6 +77,9 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("queue status stay clear", detailView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("No public outcome claim", detailView, StringComparison.Ordinal);
         Assert.DoesNotContain("Drilldown summary", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download item data", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download thread data", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download related data", detailView, StringComparison.Ordinal);
     }
 
     [Fact]

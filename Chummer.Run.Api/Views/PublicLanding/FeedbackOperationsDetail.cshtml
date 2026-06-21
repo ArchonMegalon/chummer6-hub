@@ -53,8 +53,8 @@
     <p class="page-copy">@detail.Summary</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@detail.BackHref">@detail.BackLabel</a>
-        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Download item data</a>
-        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Download summary</a>
+        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Download item details</a>
+        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Download activity summary</a>
         <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Search another item</a>
         @if (!string.IsNullOrWhiteSpace(detail.RelatedHref) && !string.IsNullOrWhiteSpace(detail.RelatedLabel))
         {
@@ -158,7 +158,7 @@
                 }
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@SourceDetailHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">@SourceDetailActionLabel(sourceReceipt.HotFilterKey, sourceReceipt.HotFilterLabel)</a>
-                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Download related data</a>
+                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Download related details</a>
                 </div>
             </article>
         </div>
@@ -190,7 +190,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related data</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related details</a>
                     </div>
                 </article>
             }
@@ -215,7 +215,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related data</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related details</a>
                     </div>
                 </article>
             }
@@ -245,7 +245,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related data</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related details</a>
                     </div>
                 </article>
             }
@@ -299,7 +299,7 @@
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Download thread data</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Download message details</a>
                     </div>
                 </article>
             }
@@ -347,7 +347,7 @@
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Download thread data</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Download message details</a>
                     </div>
                 </article>
             }
@@ -389,7 +389,7 @@
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Download thread data</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Download message details</a>
                     </div>
                 </article>
             }
@@ -427,7 +427,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related data</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Download related details</a>
                     </div>
                 </article>
             }

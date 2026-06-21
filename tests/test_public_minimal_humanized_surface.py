@@ -492,6 +492,9 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
         "Open source details",
         "ReleaseProofReceiptId",
         "ReleaseProofRoute",
+        "Download related data",
+        "Download thread data",
+        "Download item data",
     ):
         assert forbidden not in feedback_operations
 
@@ -503,7 +506,9 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
 
     assert "Original item" in feedback_operations
     assert "Open related details" in feedback_operations
-    assert "Download related data" in feedback_operations
+    assert "Download related details" in feedback_operations
+    assert "Download message details" in feedback_operations
+    assert "Download item details" in feedback_operations
     assert "posted follow-up update" in signal_operations
     assert "message update" in feedback_operations
     assert "follow-up update" in feedback_operations
