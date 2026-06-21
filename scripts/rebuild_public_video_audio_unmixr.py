@@ -24,7 +24,6 @@ MEDIA_ROOT = REPO / "Chummer.Run.Api" / "wwwroot" / "media"
 OUT_ROOT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619")
 LEGACY_PROMO_AUDIO = REPO / "scripts" / "rebuild_promo_audio_continuous.py"
 UNMIXR_PROVIDER = "unmixr-short-tts"
-EDGE_TTS_PYTHON = Path("/docker/chummercomplete/_completion/promo_video_rework_20260602/tts_venv/bin/python")
 TARGET_SR = 48000
 HIGH_TONE_CLEANUP_FILTER = "equalizer=f=11730:width_type=h:width=420:g=-48,lowpass=f=9800"
 LOW_RUMBLE_HIGHPASS_HZ = 90
@@ -33,16 +32,9 @@ NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 0.70
 MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
-PREMIUM_NEWS_VOICE = "en-US-GuyNeural"
-ALICE_PREMIUM_NEWS_VOICE = "en-US-JennyNeural"
-EDGE_TTS_DEFAULT = True
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
-ALICE_CLEAN_AUDIO_APPENDIX = (
-    "On the final pass, ALICE turns the sheet back to the player: the concept still has style, "
-    "but now the weak points are visible before the job starts."
-)
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -57,11 +49,6 @@ VOICE_ENV_BY_GROUP = {
         *DEFAULT_VOICE_ENV_KEYS,
     ),
 }
-
-EDGE_VOICE_BY_GROUP = {
-    ALICE_CLEAN_AUDIO_GROUP: ALICE_PREMIUM_NEWS_VOICE,
-}
-
 
 @dataclass(frozen=True)
 class VideoGroup:
@@ -123,17 +110,6 @@ def resolve_voice_id(group_key: str) -> tuple[str, str]:
         if value:
             return value, key
     return "", ""
-
-
-def edge_voice_for_group(group_key: str) -> str:
-    return EDGE_VOICE_BY_GROUP.get(group_key, PREMIUM_NEWS_VOICE)
-
-
-def prefer_edge_tts() -> bool:
-    raw = str(os.getenv("CHUMMER_PUBLIC_VIDEO_AUDIO_PREFER_EDGE_TTS") or "").strip().lower()
-    if raw:
-        return raw in {"1", "true", "yes", "on"}
-    return EDGE_TTS_DEFAULT
 
 
 @contextmanager
@@ -298,7 +274,6 @@ def narration_for_group(key: str, caption_file: Path | None, receipt_file: Path 
     if legacy_script:
         text = humanize_public_narration(legacy_script)
         if key == ALICE_CLEAN_AUDIO_GROUP:
-            text = f"{text} {ALICE_CLEAN_AUDIO_APPENDIX}"
             return text, "legacy_longform_script_humanized_alice_full_length_clean_audio"
         return text, "legacy_longform_script_humanized"
     if key in EXTRA_SCRIPT_BY_GROUP:
@@ -357,31 +332,6 @@ def render_pause(output: Path, seconds: float) -> None:
     )
 
 
-def render_edge_tts(text: str, voice: str, output: Path) -> bool:
-    if not EDGE_TTS_PYTHON.is_file():
-        return False
-    helper = OUT_ROOT / "render_edge_tts_public_video.py"
-    helper.parent.mkdir(parents=True, exist_ok=True)
-    helper.write_text(
-        "import asyncio, edge_tts, pathlib, sys\n"
-        "async def main():\n"
-        "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-2Hz')\n"
-        "    await communicate.save(str(output))\n"
-        "asyncio.run(main())\n",
-        encoding="utf-8",
-    )
-    completed = subprocess.run(
-        [str(EDGE_TTS_PYTHON), str(helper), voice, text, str(output)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0:
-        return False
-    return output.is_file() and output.stat().st_size > 0
-
-
 def normalize_voice(source: Path, output: Path) -> None:
     run(
         "ffmpeg",
@@ -425,6 +375,7 @@ def render_unmixr_narration(
             "provider": UNMIXR_PROVIDER,
             "voice_id_redacted": redact(voice_id),
             "voice_source_env": source_env,
+            "voice_policy": "unmixr_required_no_edge_fallback",
             "voice_reused_from_cache": True,
             "language": "",
             "speaking_rate": "",
@@ -457,6 +408,7 @@ def render_unmixr_narration(
         "provider": UNMIXR_PROVIDER,
         "voice_id_redacted": redact(voice_id or config.get("voice_id", "")),
         "voice_source_env": source_env,
+        "voice_policy": "unmixr_required_no_edge_fallback",
         "voice_reused_from_cache": False,
         "language": config.get("language", ""),
         "speaking_rate": config.get("speaking_rate", ""),
@@ -464,43 +416,6 @@ def render_unmixr_narration(
         "speaking_volume": config.get("speaking_volume", ""),
         "beat_count": len(beats),
         "failures": failures,
-    }
-
-
-def render_edge_narration(group_key: str, text: str, work: Path, *, force_tts: bool = False) -> tuple[Path, dict[str, Any]]:
-    beats = LEGACY.split_script_into_beats(text)
-    beat_dir = work / "beats"
-    beat_dir.mkdir(parents=True, exist_ok=True)
-    stitched = work / "edge-narration.wav"
-    voice = edge_voice_for_group(group_key)
-    if stitched.is_file() and stitched.stat().st_size > 0 and not force_tts:
-        return stitched, {
-            "provider": "edge-tts-premium-news",
-            "voice": voice,
-            "voice_policy": "female_only" if group_key == ALICE_CLEAN_AUDIO_GROUP else "premium_news_anchor",
-            "voice_reused_from_cache": True,
-            "beat_count": len(beats),
-        }
-    parts: list[Path] = []
-    for index, beat in enumerate(beats, start=1):
-        raw = beat_dir / f"edge-beat-{index:02d}.mp3"
-        if not render_edge_tts(beat, voice, raw):
-            raise RuntimeError(f"Edge TTS failed for {work.name} beat {index}")
-        normalized = beat_dir / f"edge-beat-{index:02d}.wav"
-        normalize_voice(raw, normalized)
-        parts.append(normalized)
-        if index < len(beats):
-            pause = beat_dir / f"edge-pause-{index:02d}.wav"
-            pause_seconds = min(max(0.10 + len(beat.split()) * 0.003, 0.12), 0.28)
-            render_pause(pause, pause_seconds)
-            parts.append(pause)
-    concat_wavs(parts, stitched)
-    return stitched, {
-        "provider": "edge-tts-premium-news",
-        "voice": voice,
-        "voice_policy": "female_only" if group_key == ALICE_CLEAN_AUDIO_GROUP else "premium_news_anchor",
-        "voice_reused_from_cache": False,
-        "beat_count": len(beats),
     }
 
 
@@ -554,7 +469,7 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     source = trimmed if trimmed.is_file() and trimmed.stat().st_size > 0 else narration
     source_duration = duration(source)
     target_voice = max(total_duration, 1.0)
-    tempo = min(max(source_duration / target_voice, 0.72), 1.16)
+    tempo = min(max(source_duration / target_voice, 0.60), 1.16)
     if abs(tempo - 1.0) > 0.015:
         voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
         fit = f"alice_clean_audiobook_style_{tempo:.3f}"
@@ -563,9 +478,10 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
         fit = "alice_clean_audiobook_style_natural"
     filter_complex = (
         f"[0:a]{voice_prep},"
-        f"highpass=f=80,{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
+        f"highpass=f=145,equalizer=f=94:width_type=h:width=60:g=-24,{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
         f"{AUDIOBOOK_STYLE_NORMALIZATION_FILTER},"
-        f"volume=0.82,alimiter=limit=0.78,apad,atrim=0:{total_duration:.3f}[a]"
+        "highpass=f=145,equalizer=f=94:width_type=h:width=60:g=-18,"
+        f"volume=0.78,alimiter=limit=0.68:level=false,apad,atrim=0:{total_duration:.3f}[a]"
     )
     run(
         "ffmpeg",
@@ -867,10 +783,9 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     provider_meta: dict[str, Any] = {"provider": "first_party_audio_bed", "voice_id_redacted": ""}
     narration_path: Path | None = None
     if group.narration:
-        if LEGACY.unmixr_config() and group.key != ALICE_CLEAN_AUDIO_GROUP and not prefer_edge_tts():
-            narration_path, provider_meta = render_unmixr_narration(group.key, group.narration, work, force_tts=force_tts)
-        else:
-            narration_path, provider_meta = render_edge_narration(group.key, group.narration, work, force_tts=force_tts)
+        if not LEGACY.unmixr_config():
+            raise RuntimeError("unmixr_tts_required_for_public_video_audio")
+        narration_path, provider_meta = render_unmixr_narration(group.key, group.narration, work, force_tts=force_tts)
     file_receipts: list[dict[str, Any]] = []
     for video in group.files:
         total_duration = duration(video)
@@ -903,7 +818,7 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     for receipt in file_receipts:
         if receipt["audio_streams"] != 1 or receipt["video_streams"] != 1 or receipt["quality"].get("status") != "pass":
             status = "fail"
-    if group.key == ALICE_CLEAN_AUDIO_GROUP and str(provider_meta.get("voice_policy") or "") != "female_only":
+    if group.key == ALICE_CLEAN_AUDIO_GROUP and str(provider_meta.get("provider") or "") != UNMIXR_PROVIDER:
         status = "fail"
     return {
         "group_key": group.key,
@@ -978,12 +893,12 @@ def main() -> int:
             "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
-            "alice_voice_policy": "female_only",
+            "alice_voice_policy": "unmixr_required_no_edge_fallback",
             "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed except Alice, which uses clean audiobook-style speech-only narration; noise-bed-only output is rejected by review policy",
         },
         "provider_posture": {
-            "narration_provider": "edge-tts-premium-news; optional Unmixr when configured except Alice female-only override",
-            "unmixr_required": False,
+            "narration_provider": "unmixr-short-tts",
+            "unmixr_required": True,
             "non_narrated_mode": "clean first-party cinematic ambient bed only when no narration source exists",
             "artifact_filters": {
                 "notch_hz": 11730,
@@ -995,8 +910,6 @@ def main() -> int:
             "voice_selection": {
                 "default_voice_env_order": list(DEFAULT_VOICE_ENV_KEYS),
                 "alice_voice_env_order": list(VOICE_ENV_BY_GROUP[ALICE_CLEAN_AUDIO_GROUP]),
-                "default_edge_voice": PREMIUM_NEWS_VOICE,
-                "alice_edge_voice": ALICE_PREMIUM_NEWS_VOICE,
             },
         },
         "groups": receipts,

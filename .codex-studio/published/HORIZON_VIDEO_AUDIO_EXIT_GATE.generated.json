@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.horizon_video_audio_exit_gate.v1",
-  "generated_at_utc": "2026-06-21T03:13:27Z",
+  "generated_at_utc": "2026-06-21T03:30:33Z",
   "status": "pass",
   "manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/horizon-video-manifest.json",
   "rebuild_receipt": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",
@@ -13,7 +13,7 @@
     "max_silence_seconds": 0.7,
     "max_start_silence_seconds": 0.3,
     "max_tail_silence_seconds": 0.3,
-    "alice_voice_policy": "female news-anchor voice only",
+    "alice_voice_policy": "Unmixr required; Edge TTS fallback is not allowed",
     "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration, except Alice which must use clean audiobook-style speech-only narration with no synthetic bed or noise floor"
   },
   "asset_count": 14,
@@ -80,7 +80,7 @@
       }
     },
     {
-      "public_mp4": "/media/horizons/alice-90s-deepdive.mp4?v=20260621-alice-clean-audio",
+      "public_mp4": "/media/horizons/alice-90s-deepdive.mp4?v=20260621-alice-unmixr-clean-audio",
       "title": "ALICE 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -90,23 +90,23 @@
       "quality": {
         "status": "pass",
         "reasons": [],
-        "rms_dbfs": -17.61,
-        "peak_dbfs": -0.98,
-        "high_band_power_ratio": 0.000189,
-        "tone_peak_hz": 10500.0,
-        "tone_peak_prominence_db": 36.2,
-        "sub_bass_power_ratio": 9e-06,
-        "low_bass_power_ratio": 0.000496,
-        "voice_to_low_db": 32.51,
-        "low_tone_peak_hz": 140.6,
-        "low_tone_peak_prominence_db": 15.98,
-        "mid_tone_peak_hz": 515.6,
-        "mid_tone_peak_prominence_db": 6.25,
-        "mid_tone_power_ratio": 0.642179,
+        "rms_dbfs": -20.83,
+        "peak_dbfs": -3.33,
+        "high_band_power_ratio": 7e-06,
+        "tone_peak_hz": 10640.6,
+        "tone_peak_prominence_db": 10.08,
+        "sub_bass_power_ratio": 1e-06,
+        "low_bass_power_ratio": 0.001952,
+        "voice_to_low_db": 26.78,
+        "low_tone_peak_hz": 269.5,
+        "low_tone_peak_prominence_db": 12.62,
+        "mid_tone_peak_hz": 398.4,
+        "mid_tone_peak_prominence_db": 5.46,
+        "mid_tone_power_ratio": 0.509021,
         "silence_gate_dbfs": -42.0,
-        "max_silence_seconds": 1.25,
+        "max_silence_seconds": 1.0,
         "first_audible_seconds": 0.0,
-        "tail_silence_seconds": 0.015
+        "tail_silence_seconds": 0.0
       }
     },
     {

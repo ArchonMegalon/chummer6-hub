@@ -85,7 +85,7 @@ def test_narration_mix_covers_internal_pauses(tmp_path: Path) -> None:
     assert quality["tail_silence_seconds"] <= audio.MAX_EDGE_SILENCE_SECONDS
 
 
-def test_gate_requires_alice_female_voice_receipt(monkeypatch, tmp_path: Path) -> None:
+def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -> None:
     gate = _load(GATE_SCRIPT, "verify_horizon_video_audio_exit_gate_for_test")
     manifest = tmp_path / "manifest.json"
     manifest.write_text(
@@ -124,4 +124,5 @@ def test_gate_requires_alice_female_voice_receipt(monkeypatch, tmp_path: Path) -
     result = gate.verify_manifest(manifest)
 
     assert result["status"] == "fail"
-    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_female_news_anchor_receipt" in result["issues"]
+    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_unmixr_receipt" in result["issues"]
+    assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_no_edge_fallback_receipt" in result["issues"]

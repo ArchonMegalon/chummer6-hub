@@ -95,8 +95,10 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         if alice_clean_audio:
             alice_receipt = group_receipts.get("alice-90s-deepdive") or {}
             provider = alice_receipt.get("provider") if isinstance(alice_receipt.get("provider"), dict) else {}
-            if str(provider.get("voice_policy") or "") != "female_only":
-                row_issues.append("alice_voice_policy_requires_female_news_anchor_receipt")
+            if str(provider.get("provider") or "") != getattr(audio, "UNMIXR_PROVIDER", "unmixr-short-tts"):
+                row_issues.append("alice_voice_policy_requires_unmixr_receipt")
+            if str(provider.get("voice_policy") or "") != "unmixr_required_no_edge_fallback":
+                row_issues.append("alice_voice_policy_requires_no_edge_fallback_receipt")
             alice_files = alice_receipt.get("files") if isinstance(alice_receipt.get("files"), list) else []
             alice_styles = {str(item.get("audio_style") or "") for item in alice_files if isinstance(item, dict)}
             alice_clean_audio_style = getattr(audio, "ALICE_CLEAN_AUDIO_STYLE", "clean_audiobook_style_no_bed_no_noise_floor")
@@ -129,7 +131,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "max_silence_seconds": audio.MAX_SILENCE_SECONDS,
             "max_start_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
-            "alice_voice_policy": "female news-anchor voice only",
+            "alice_voice_policy": "Unmixr required; Edge TTS fallback is not allowed",
             "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration, except Alice which must use clean audiobook-style speech-only narration with no synthetic bed or noise floor",
         },
         "asset_count": len(rows),
