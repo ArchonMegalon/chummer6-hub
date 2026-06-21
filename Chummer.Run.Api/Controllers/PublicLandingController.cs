@@ -7673,8 +7673,8 @@ Boundary:
         if ((installLinking.ClaimedInstallations?.Count ?? 0) > 0 && hasNoCampaignWork)
         {
             return new HomePrimaryActionViewModel(
-                "Starter lane",
-                "Open work and seed your first playable session",
+                "First session",
+                "Open work and start your first playable session",
                 "Your install is linked. Open your workspace to move from setup into the next safe session before returning to optional tasks.",
                 "Open work",
                 "/home/work",

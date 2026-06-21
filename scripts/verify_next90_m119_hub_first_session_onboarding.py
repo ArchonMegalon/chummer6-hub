@@ -14,7 +14,7 @@ WORK_TASK_ID = "119.1"
 FRONTIER_ID = 1130567614
 MILESTONE_ID = 119
 PACKAGE_TITLE = "Orchestrate guided first-playable-session onboarding"
-PACKAGE_TASK = "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
+PACKAGE_TASK = "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session path."
 PACKAGE_REPO = "chummer6-hub"
 PACKAGE_WAVE = "W14"
 PACKAGE_STATUS = "complete"
@@ -22,7 +22,7 @@ PACKAGE_LANDED_COMMIT = "TO_BE_FILLED_M119_COMMIT"
 PACKAGE_COMPLETION_ACTION = "verify_closed_package_only"
 PACKAGE_DO_NOT_REOPEN_REASON = (
     "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify "
-    "the starter-lane proof receipts, local release proof package, canonical registry row, Fleet queue row, and design "
+    "the first-session records, local release package, canonical registry row, Fleet queue row, and design "
     "queue row instead of reopening the install-to-first-session onboarding slice."
 )
 OWNED_SURFACES = {
@@ -91,14 +91,14 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
             "install_claim_restore_continue",
         ],
         "summary_markers": [
-            "starter-workspace seeding",
-            "campaign-primer-backed first-session proof",
+            "first-session workspace seeding",
+            "campaign-primer-backed first-session detail",
             "support-safe recovery",
         ],
         "evidence_markers": [
-            "CampaignSpineController.cs exposes the bounded starter-workspace seeding route",
+            "CampaignSpineController.cs exposes the starter-workspace seeding route",
             "CampaignSpineService.cs projects first-playable-session summaries",
-            "RunServicesSmoke/Program.cs proves landing, home, account, and starter-workspace API surfaces",
+            "RunServicesSmoke/Program.cs checks landing, home, account, and starter-workspace API surfaces",
         ],
     },
     "starter_lane:hub": {
@@ -118,13 +118,13 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         ],
         "summary_markers": [
             "linked install",
-            "first-session proof",
+            "first-session detail",
             "install support",
         ],
         "evidence_markers": [
-            "Views/PublicLanding/Home.cshtml wires starter-workspace seeding",
+            "Views/PublicLanding/Home.cshtml wires first-session workspace seeding",
             "Views/Accounts/Account.cshtml keeps the selected first-session drawer",
-            "PublicLandingController.cs promotes the starter lane as the primary signed-in action",
+            "PublicLandingController.cs promotes first-session work as the primary signed-in action",
         ],
     },
 }
@@ -135,8 +135,8 @@ SOURCE_MARKERS = {
         "CampaignWorkspaceProjection? starter = _campaignSpine.GetStarterWorkspace(user, installLinking);",
     ],
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
-        '"Starter lane",',
-        '"Open work and seed your first playable session"',
+        '"First session",',
+        '"Open work and start your first playable session"',
         '"/home/work",',
     ],
     "Chummer.Run.Api/Services/Community/CampaignSpineService.cs": [
@@ -149,7 +149,7 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml": [
         "starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession",
-        "Open starter lane on Home",
+        "Open Home",
         "Open first playable session",
         "Open install support",
     ],
@@ -159,17 +159,17 @@ SOURCE_MARKERS = {
         "Open first playable session",
         "Legal runner: @leadFirstPlayableSession.RuleReadySummary",
         "Understandable return: @leadFirstPlayableSession.ReturnLaneSummary",
-        "Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary",
+        "Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary",
         "Open build path for @handoff.Title",
     ],
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": [
         'id="selected-first-playable-session"',
         "Start first playable session",
-        "Open starter lane on Home",
+        "Open Home",
         "Open install support",
         "<p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>",
         "<p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>",
-        "<p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>",
+        "<p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>",
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'Assert(landingSource.Contains("Open first playable session", StringComparison.Ordinal), "landing should keep a direct route from the front door into the first-session detail.");',
@@ -350,7 +350,7 @@ def verify_successor_registry(errors: list[str]) -> None:
         errors.append(f"successor registry missing milestone {MILESTONE_ID}")
         return
 
-    if milestone.get("title") != "Guided onboarding and starter lane to first playable session":
+    if milestone.get("title") != "Guided onboarding to first playable session":
         errors.append("successor registry milestone 119 title drifted")
 
     work_tasks = milestone.get("work_tasks")

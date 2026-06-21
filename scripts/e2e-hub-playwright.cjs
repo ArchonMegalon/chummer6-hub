@@ -724,7 +724,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       await expectBodyText(page, 'Playable kickoff', '/home/work -> first playable');
       await expectBodyText(page, 'Legal runner', '/home/work -> first playable');
       await expectBodyText(page, 'Understandable return', '/home/work -> first playable');
-      await expectBodyText(page, 'Campaign-ready lane', '/home/work -> first playable');
+      await expectBodyText(page, 'Campaign readiness', '/home/work -> first playable');
     });
   }
 

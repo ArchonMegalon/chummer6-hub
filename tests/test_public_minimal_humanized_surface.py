@@ -126,6 +126,7 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
 def test_connected_table_pulse_sources_do_not_keep_legacy_marker_comments() -> None:
     sources = [
         read("Chummer.Run.Api/Views/Accounts/Account.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml"),
@@ -140,6 +141,9 @@ def test_connected_table_pulse_sources_do_not_keep_legacy_marker_comments() -> N
         "governed workspace",
         "Connected lane",
         "Release proof",
+        "Open starter lane on Home",
+        "Starter lane",
+        "Campaign-ready lane",
     ):
         assert forbidden not in combined
 

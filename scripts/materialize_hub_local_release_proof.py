@@ -614,11 +614,11 @@ def main() -> int:
             "repo": "chummer6-hub",
             "status": "complete",
             "wave": "W14",
-            "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+            "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session path.",
             "title": "Orchestrate guided first-playable-session onboarding",
             "landed_commit": "TO_BE_FILLED_M119_COMMIT",
             "completion_action": "verify_closed_package_only",
-            "do_not_reopen_reason": "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify the starter-lane proof receipts, local release proof package, canonical registry row, Fleet queue row, and design queue row instead of reopening the install-to-first-session onboarding slice.",
+            "do_not_reopen_reason": "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify the first-session records, local release package, canonical registry row, Fleet queue row, and design queue row instead of reopening the install-to-first-session onboarding slice.",
             "allowed_paths": [
                 "Chummer.Run.Api",
                 "scripts",
@@ -643,7 +643,7 @@ def main() -> int:
                 "first_playable_session:onboarding",
                 "starter_lane:hub",
             ],
-            "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+            "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session path.",
         },
         {
             "package_id": "next90-m120-hub-public-launch-health",
@@ -1330,7 +1330,7 @@ def main() -> int:
                 "package_id": "next90-m119-hub-first-session-onboarding",
                 "milestone_id": 119,
                 "frontier_id": 1130567614,
-                "summary": "Hub now keeps signed-in install return, starter-workspace seeding, campaign-primer-backed first-session proof, and support-safe recovery on one bounded first-playable-session onboarding lane instead of a separate onboarding ritual.",
+                "summary": "Hub now keeps signed-in install return, first-session workspace seeding, campaign-primer-backed first-session detail, and support-safe recovery in one first-session onboarding path instead of a separate onboarding ritual.",
                 "routes": [
                     "/home",
                     "/home/work",
@@ -1344,9 +1344,9 @@ def main() -> int:
                     "install_claim_restore_continue",
                 ],
                 "evidence": [
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the bounded starter-workspace seeding route so the signed-in starter lane reuses campaign-spine truth instead of inventing a second onboarding API.",
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner proof, understandable-return proof, and primer-safe publication titles on the same campaign return lane.",
-                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves landing, home, account, and starter-workspace API surfaces keep the first-session lane grounded on the shared campaign projection.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the starter-workspace seeding route so the signed-in first-session path reuses campaign data instead of inventing a second onboarding API.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner detail, understandable-return detail, and primer-safe publication titles on the same campaign return path.",
+                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs checks landing, home, account, and starter-workspace API surfaces keep the first-session path on the shared campaign projection.",
                 ],
             },
             {
@@ -1354,7 +1354,7 @@ def main() -> int:
                 "package_id": "next90-m119-hub-first-session-onboarding",
                 "milestone_id": 119,
                 "frontier_id": 1130567614,
-                "summary": "The hub-owned starter lane now gives signed-in users one calmer route from linked install into first-session proof, build follow-through, campaign-primer follow-through, and install support without hiding the next safe action behind deeper admin-only pages.",
+                "summary": "The hub-owned first-session path gives signed-in users one calmer route from linked install into first-session detail, build next steps, campaign-primer return, and install support without hiding the next safe action behind deeper admin-only pages.",
                 "routes": [
                     "/home/work",
                     "/account/work",
@@ -1367,9 +1367,9 @@ def main() -> int:
                     "starter_build:follow_through",
                 ],
                 "evidence": [
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires starter-workspace seeding to the campaign-spine starter endpoint and keeps first-session proof, build-path follow-through, and claimed-device return on the signed-in Home rail.",
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return proof, and install-support follow-through on the shared account work route.",
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes the starter lane as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires first-session workspace seeding to the campaign-spine starter endpoint and keeps first-session detail, build-path next steps, and claimed-device return on the signed-in Home view.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return detail, and install support on the shared account work route.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes first-session work as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet.",
                 ],
             },
             *_m141_direct_import_route_receipts(),
