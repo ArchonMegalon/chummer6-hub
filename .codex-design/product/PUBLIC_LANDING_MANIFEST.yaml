@@ -35,8 +35,8 @@ product_proof_secondary_label: See status
 product_proof_secondary_href: /status
 product_proof_topline_label: Current release
 product_proof_scope_line: Public pages focus on the builds, platforms, and workflows
-  a player can actually try today; downloads remain the primary route for trying Chummer.
-product_flagship_boundary_line: Experimental surfaces stay behind lab routes until
+  a player can actually try today; downloads stay the simplest way to try Chummer.
+product_flagship_boundary_line: Experimental surfaces stay off the main path until
   their visuals, behavior, and tests are ready for normal users.
 product_proof_result_title: Final pool 9
 product_proof_result_summary: Same inputs, same answer, with a clear explanation

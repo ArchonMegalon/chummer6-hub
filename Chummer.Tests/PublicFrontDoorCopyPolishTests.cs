@@ -41,9 +41,13 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("Black Ledger", firstImpression, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Real product proof", firstImpression, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Projection compiled", firstImpression, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("primary route", firstImpression, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("lab routes", firstImpression, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("horizon_summary", manifest, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("public horizon set", manifest, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Download Chummer", firstImpression, StringComparison.Ordinal);
+        Assert.Contains("downloads stay the simplest way to try Chummer", firstImpression, StringComparison.Ordinal);
+        Assert.Contains("Experimental surfaces stay off the main path", firstImpression, StringComparison.Ordinal);
     }
 
     [Fact]
