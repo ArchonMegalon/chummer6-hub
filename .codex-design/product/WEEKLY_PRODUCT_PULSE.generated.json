@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-20T22:48:11Z",
+  "generated_at": "2026-06-21T07:34:28Z",
   "as_of": "2026-06-21",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
@@ -16,11 +16,10 @@
   },
   "flagship_readiness": {
     "state": "watch",
-    "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client, horizons_and_public_surface. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
+    "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
     "proof_status": "fail",
     "coverage_gap_keys": [
-      "desktop_client",
-      "horizons_and_public_surface"
+      "desktop_client"
     ],
     "readiness_plane_gap_keys": [
       "structural_ready",
@@ -121,11 +120,10 @@
     },
     "flagship_readiness": {
       "state": "watch",
-      "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client, horizons_and_public_surface. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
+      "reason": "Published flagship readiness proof is fail. Coverage gaps remain: desktop_client. Readiness-plane gaps remain: structural_ready, flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
       "proof_status": "fail",
       "coverage_gap_keys": [
-        "desktop_client",
-        "horizons_and_public_surface"
+        "desktop_client"
       ],
       "readiness_plane_gap_keys": [
         "structural_ready",
