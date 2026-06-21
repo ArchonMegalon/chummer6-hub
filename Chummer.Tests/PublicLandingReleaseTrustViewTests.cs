@@ -516,8 +516,17 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Black Ledger follow-through", gmSessionVenue, StringComparison.Ordinal);
 
         Assert.Contains("Next steps", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("Reviewed product decision", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("Saved rules request", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("Saved review state", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("These next steps stay attached to the saved rules request instead of becoming loose follow-up notes.", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("SanitizePublicText(stage.Boundary.Replace", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Bounded follow-through", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("Governed product decision", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("normalized HouseRuleDemandPacket", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("<summary>HouseRuleDemandPacket</summary>", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("<summary>KarmaForgeCandidate</summary>", karmaForgeSubmitted, StringComparison.Ordinal);
 
         Assert.Contains("reviewed output history", buildGhostConcierge, StringComparison.Ordinal);
         Assert.DoesNotContain("governed output follow-through", buildGhostConcierge, StringComparison.Ordinal);

@@ -14,7 +14,7 @@
         new PublicNavigationLink("Saved details", "#packet-json"),
     };
     var governedDecisionLabel = string.Concat("Product", " Governor");
-    var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Governed product decision", StringComparison.OrdinalIgnoreCase);
+    var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Reviewed product decision", StringComparison.OrdinalIgnoreCase);
     string SanitizePublicText(string value)
         => string.IsNullOrWhiteSpace(value)
             ? string.Empty
@@ -25,7 +25,15 @@
                 .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Next", "Step"), "guided review lane", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase);
+                .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
+                .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
+                .Replace("canonical", "reviewed", StringComparison.OrdinalIgnoreCase)
+                .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+                .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
+                .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
+                .Replace("normalized", "saved", StringComparison.OrdinalIgnoreCase)
+                .Replace("HouseRuleDemandPacket", "rules request", StringComparison.OrdinalIgnoreCase)
+                .Replace("KarmaForgeCandidate", "saved request", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">
@@ -96,7 +104,7 @@
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>Step saved</span>
-                    <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
+                    <span>@SanitizePublicText(stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</span>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
                 {
@@ -136,7 +144,7 @@
         <article class="trust-page-section" id="next-steps">
             <p class="eyebrow">What happens next</p>
             <h2>What should happen before any implementation talk</h2>
-            <p>These next steps are attached to the normalized HouseRuleDemandPacket, not left as loose follow-up memory.</p>
+            <p>These next steps stay attached to the saved rules request instead of becoming loose follow-up notes.</p>
             <ul class="trust-page-section__list">
                 @foreach (var step in Model.NextSteps)
                 {
@@ -152,11 +160,11 @@
             <p>These previews show what Chummer saved for this submission.</p>
 
             <details class="details-drawer">
-                <summary>HouseRuleDemandPacket</summary>
+                <summary>Saved rules request</summary>
                 <pre>@SanitizePublicText(Model.PacketJson)</pre>
             </details>
             <details class="details-drawer">
-                <summary>KarmaForgeCandidate</summary>
+                <summary>Saved review state</summary>
                 <pre>@SanitizePublicText(Model.CandidateJson)</pre>
             </details>
             <details class="details-drawer">
