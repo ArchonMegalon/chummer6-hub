@@ -1,24 +1,27 @@
 @model PrivacyBoundaryPanelViewModel
+@{
+    static string PublicPrivacyText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+}
 
 <section class="release-shelf" aria-label="Privacy boundaries">
     <article class="app-action-card">
-        <span class="tag">@Model.Eyebrow</span>
-        <h2>@Model.Heading</h2>
-        <p>@Model.Summary</p>
+        <span class="tag">@PublicPrivacyText(Model.Eyebrow)</span>
+        <h2>@PublicPrivacyText(Model.Heading)</h2>
+        <p>@PublicPrivacyText(Model.Summary)</p>
         @if (Model.MicroProof.Count > 0)
         {
             <div class="trust-claim__details">
                 @foreach (var item in Model.MicroProof)
                 {
-                    <span>@item</span>
+                    <span>@PublicPrivacyText(item)</span>
                 }
             </div>
         }
         <div class="stacked-actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicPrivacyText(Model.PrimaryAction.Label)</a>
             @if (Model.SecondaryAction is not null)
             {
-                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicPrivacyText(Model.SecondaryAction.Label)</a>
             }
         </div>
     </article>
@@ -28,12 +31,12 @@
         {
             <article class="workflow-card">
                 <div class="workflow-card__copy">
-                    <span class="tag">@domain.Owner</span>
-                    <h3>@domain.Label</h3>
-                    <p><strong>Retention window:</strong> @domain.RetentionSummary</p>
-                    <p><strong>Redaction:</strong> @domain.RedactionSummary</p>
-                    <p><strong>Public page:</strong> @domain.PublicProjection</p>
-                    <p><strong>Signed-in page:</strong> @domain.SignedInProjection</p>
+                    <span class="tag">@PublicPrivacyText(domain.Owner)</span>
+                    <h3>@PublicPrivacyText(domain.Label)</h3>
+                    <p><strong>Retention window:</strong> @PublicPrivacyText(domain.RetentionSummary)</p>
+                    <p><strong>Redaction:</strong> @PublicPrivacyText(domain.RedactionSummary)</p>
+                    <p><strong>Public page:</strong> @PublicPrivacyText(domain.PublicProjection)</p>
+                    <p><strong>Signed-in page:</strong> @PublicPrivacyText(domain.SignedInProjection)</p>
                 </div>
             </article>
         }
@@ -46,9 +49,9 @@
             {
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>@rule.Label</h3>
-                        <p>@rule.Summary</p>
-                        <p class="muted-copy"><strong>Never:</strong> @rule.BlockedSummary</p>
+                        <h3>@PublicPrivacyText(rule.Label)</h3>
+                        <p>@PublicPrivacyText(rule.Summary)</p>
+                        <p class="muted-copy"><strong>Never:</strong> @PublicPrivacyText(rule.BlockedSummary)</p>
                     </div>
                 </article>
             }

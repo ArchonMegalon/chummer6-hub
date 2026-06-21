@@ -1,15 +1,18 @@
 @model PublicTrustPulsePanelViewModel
+@{
+    static string PublicTrustPulseText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+}
 
 <section class="release-shelf" aria-label="Weekly trust pulse">
     <article class="app-action-card">
-        <span class="tag">@Model.Eyebrow</span>
-        <h2>@Model.Heading</h2>
+        <span class="tag">@PublicTrustPulseText(Model.Eyebrow)</span>
+        <h2>@PublicTrustPulseText(Model.Heading)</h2>
         @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model)
         <div class="stacked-actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicTrustPulseText(Model.PrimaryAction.Label)</a>
             @if (Model.SecondaryAction is not null)
             {
-                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicTrustPulseText(Model.SecondaryAction.Label)</a>
             }
         </div>
     </article>

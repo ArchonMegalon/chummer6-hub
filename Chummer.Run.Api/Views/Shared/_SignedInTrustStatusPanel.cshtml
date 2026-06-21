@@ -1,24 +1,27 @@
 @model SignedInTrustStatusPanelViewModel
+@{
+    static string PublicSignedInTrustText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+}
 
 <section id="signed-in-trust-status" class="release-shelf">
     <article class="app-action-card app-action-card--primary">
-        <span class="tag">@Model.Eyebrow</span>
-        <h2>@Model.Heading</h2>
-        <p>@Model.Summary</p>
+        <span class="tag">@PublicSignedInTrustText(Model.Eyebrow)</span>
+        <h2>@PublicSignedInTrustText(Model.Heading)</h2>
+        <p>@PublicSignedInTrustText(Model.Summary)</p>
         <div class="settings-summary-list">
             @foreach (var row in Model.Rows)
             {
                 <div class="settings-summary-row">
-                    <span>@row.Label</span>
+                    <span>@PublicSignedInTrustText(row.Label)</span>
                     <strong>@row.Value</strong>
                 </div>
             }
         </div>
         <div class="stacked-actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicSignedInTrustText(Model.PrimaryAction.Label)</a>
             @if (Model.SecondaryAction is not null)
             {
-                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicSignedInTrustText(Model.SecondaryAction.Label)</a>
             }
         </div>
     </article>

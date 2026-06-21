@@ -831,6 +831,48 @@ def test_now_page_cleans_dynamic_public_copy_before_rendering() -> None:
         assert forbidden not in now
 
 
+def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
+    privacy = read("Chummer.Run.Api/Views/Shared/_PrivacyBoundaryPanel.cshtml")
+    signed_in = read("Chummer.Run.Api/Views/Shared/_SignedInTrustStatusPanel.cshtml")
+    pulse_panel = read("Chummer.Run.Api/Views/Shared/_PublicTrustPulsePanel.cshtml")
+    pulse_body = read("Chummer.Run.Api/Views/Shared/_PublicTrustPulseBody.cshtml")
+    combined = "\n".join((privacy, signed_in, pulse_panel, pulse_body))
+
+    for expected in (
+        "static string PublicPrivacyText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicSignedInTrustText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicTrustPulseText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicPrivacyText(Model.Heading)",
+        "@PublicPrivacyText(Model.Summary)",
+        "@PublicPrivacyText(Model.PrimaryAction.Label)",
+        "@PublicPrivacyText(domain.RetentionSummary)",
+        "@PublicPrivacyText(rule.BlockedSummary)",
+        "@PublicSignedInTrustText(Model.Heading)",
+        "@PublicSignedInTrustText(Model.PrimaryAction.Label)",
+        "@PublicSignedInTrustText(row.Label)",
+        "@PublicTrustPulseText(Model.Heading)",
+        "@PublicTrustPulseText(Model.PrimaryAction.Label)",
+        "@PublicTrustPulseText(Model.Summary)",
+        "@PublicTrustPulseText(row.Label)",
+    ):
+        assert expected in combined
+
+    for forbidden in (
+        "<h2>@Model.Heading</h2>",
+        "<p>@Model.Summary</p>",
+        ">@Model.PrimaryAction.Label</a>",
+        ">@Model.SecondaryAction.Label</a>",
+        "<span>@item</span>",
+        "<span>@row.Label</span>",
+        "<span class=\"tag\">@domain.Owner</span>",
+        "<h3>@domain.Label</h3>",
+        "@domain.RetentionSummary",
+        "@domain.RedactionSummary",
+        "@rule.BlockedSummary",
+    ):
+        assert forbidden not in combined
+
+
 def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy() -> None:
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
 

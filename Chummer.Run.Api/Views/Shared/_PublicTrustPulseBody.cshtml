@@ -1,12 +1,15 @@
 @model PublicTrustPulsePanelViewModel
+@{
+    static string PublicTrustPulseText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+}
 
-<p>@Model.Summary</p>
+<p>@PublicTrustPulseText(Model.Summary)</p>
 @if (Model.MicroProof.Count > 0)
 {
     <div class="trust-claim__details">
         @foreach (var item in Model.MicroProof)
         {
-            <span>@item</span>
+            <span>@PublicTrustPulseText(item)</span>
         }
     </div>
 }
@@ -31,7 +34,7 @@
     @foreach (var row in Model.Rows)
     {
         <div class="settings-summary-row">
-            <span>@row.Label</span>
+            <span>@PublicTrustPulseText(row.Label)</span>
             <strong>@row.Value</strong>
         </div>
     }
