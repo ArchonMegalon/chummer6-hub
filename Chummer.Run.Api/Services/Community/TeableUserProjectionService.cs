@@ -19,7 +19,13 @@ public sealed record TeableUserProjectionRow(
     IReadOnlyList<string> GroupIds,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
-    string WorkspacePrepLibrarySearchHistory);
+    string WorkspacePrepLibrarySearchHistory,
+    string WhatsappAiSupportPhone,
+    string WhatsappAiSupportPhoneLast4,
+    bool WhatsappAiSupportEnabled,
+    bool WhatsappNotificationsEnabled,
+    string WhatsappAiSupportPurpose,
+    string WhatsappAiSupportOpeningPrompt);
 
 public sealed record TeableUserProjectionDashboard(
     bool Enabled,
@@ -56,6 +62,11 @@ public sealed class TeableUserProjectionService
     private const string StateReady = "ready";
     private const string StateFailed = "failed";
     private const string StatePassed = "passed";
+    private const int RecordPageSize = 1000;
+    private const int CreateRecordBatchSize = 20;
+    private const int PatchConcurrency = 8;
+    private const string WhatsappAiSupportPurpose = "ai_support_only";
+    private const string WhatsappAiSupportOpeningPrompt = "Ask what questions the user has before giving product guidance.";
 
     private static readonly TeableFieldDefinition[] RequiredFields =
     [
@@ -70,6 +81,12 @@ public sealed class TeableUserProjectionService
         new("Linked Principals", "longText", Description: "All linked principal ids, one per line."),
         new("Group Ids", "longText", Description: "All joined group ids, one per line."),
         new("Workspace Prep Library Search History", "longText", Description: "Recent workspace prep search queries with last-used timestamps."),
+        new("WhatsApp AI Support Phone", "singleLineText", Description: "Normalized WhatsApp support handle for routing only."),
+        new("WhatsApp AI Support Phone Last4", "singleLineText", Description: "Masked support handle suffix for audits."),
+        new("WhatsApp AI Support Enabled", "checkbox", Description: "True when a WhatsApp AI support handle is linked."),
+        new("WhatsApp Notifications Enabled", "checkbox", Description: "True when the user opted into WhatsApp notices."),
+        new("WhatsApp AI Support Purpose", "singleLineText", Description: "Support-only routing purpose."),
+        new("WhatsApp AI Support Opening Prompt", "longText", Description: "First-turn guidance for WhatsApp AI support."),
         new("Created At UTC", "singleLineText", Description: "Initial account creation timestamp."),
         new("Updated At UTC", "singleLineText", Description: "Most recent hub-side account update timestamp."),
         new("Last Synced At UTC", "singleLineText", Description: "Most recent Teable projection timestamp.")
@@ -198,19 +215,48 @@ public sealed class TeableUserProjectionService
             TeableDestination destination = await EnsureDestinationAsync(options, cancellationToken);
             int synced = 0;
             List<string> errors = new();
+            Dictionary<string, ExistingTeableRecord> existingRecords = await FetchExistingRecordsAsync(destination.TableId, options, cancellationToken);
+            List<TeableUserProjectionRow> usersToCreate = new();
+            List<PendingTeableUserUpdate> usersToUpdate = new();
             foreach (TeableUserProjectionRow user in users)
+            {
+                JsonObject fields = BuildFields(user);
+                if (!existingRecords.TryGetValue(user.UserId, out ExistingTeableRecord? existing))
+                {
+                    usersToCreate.Add(user);
+                    continue;
+                }
+
+                if (FieldsNeedUpdate(fields, existing.Fields))
+                {
+                    usersToUpdate.Add(new PendingTeableUserUpdate(user, existing.RecordId));
+                    continue;
+                }
+
+                synced++;
+            }
+
+            foreach (List<TeableUserProjectionRow> chunk in Chunk(usersToCreate, CreateRecordBatchSize))
             {
                 try
                 {
-                    await UpsertUserRecordAsync(destination, user, options, cancellationToken);
-                    synced++;
+                    await CreateUserRecordsAsync(destination, chunk, options, cancellationToken);
+                    synced += chunk.Count;
                 }
                 catch (Exception ex)
                 {
-                    string error = $"{user.UserId}:{ShortMessage(ex)}";
-                    errors.Add(error);
-                    _logger.LogWarning(ex, "could not project hub user {UserId} into Teable table {TableId}", user.UserId, destination.TableId);
+                    foreach (TeableUserProjectionRow user in chunk)
+                    {
+                        errors.Add($"{user.UserId}:{ShortMessage(ex)}");
+                    }
+                    _logger.LogWarning(ex, "could not batch-create {Count} hub users into Teable table {TableId}", chunk.Count, destination.TableId);
                 }
+            }
+
+            if (usersToUpdate.Count > 0)
+            {
+                int patched = await PatchChangedUserRecordsAsync(destination, usersToUpdate, options, errors, cancellationToken);
+                synced += patched;
             }
 
             if (errors.Count == 0)
@@ -350,46 +396,31 @@ public sealed class TeableUserProjectionService
         }
     }
 
-    private async Task UpsertUserRecordAsync(
+    private async Task CreateUserRecordsAsync(
         TeableDestination destination,
-        TeableUserProjectionRow user,
+        IReadOnlyList<TeableUserProjectionRow> users,
         TeableOptions options,
         CancellationToken cancellationToken)
     {
-        string? recordId = await FindExistingRecordIdAsync(destination.TableId, user.UserId, options, cancellationToken);
-        JsonObject fields = BuildFields(user);
-        if (!string.IsNullOrWhiteSpace(recordId))
+        if (users.Count == 0)
         {
-            JsonObject payload = new()
-            {
-                ["fieldKeyType"] = "name",
-                ["typecast"] = true,
-                ["record"] = new JsonObject
-                {
-                    ["fields"] = fields
-                }
-            };
-            JsonDocument ignored = await SendAsync(
-                HttpMethod.Patch,
-                $"{options.ApiBaseUrl}/table/{Uri.EscapeDataString(destination.TableId)}/record/{Uri.EscapeDataString(recordId)}",
-                payload,
-                options.ApiKey,
-                cancellationToken);
-            ignored.Dispose();
             return;
+        }
+
+        JsonArray records = new();
+        foreach (TeableUserProjectionRow user in users)
+        {
+            records.Add(new JsonObject
+            {
+                ["fields"] = BuildFields(user)
+            });
         }
 
         JsonObject createPayload = new()
         {
             ["fieldKeyType"] = "name",
             ["typecast"] = true,
-            ["records"] = new JsonArray
-            {
-                new JsonObject
-                {
-                    ["fields"] = fields
-                }
-            }
+            ["records"] = records
         };
         JsonDocument created = await SendAsync(
             HttpMethod.Post,
@@ -400,32 +431,114 @@ public sealed class TeableUserProjectionService
         created.Dispose();
     }
 
-    private async Task<string?> FindExistingRecordIdAsync(
-        string tableId,
-        string userId,
+    private async Task<int> PatchChangedUserRecordsAsync(
+        TeableDestination destination,
+        IReadOnlyList<PendingTeableUserUpdate> users,
+        TeableOptions options,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        int patched = 0;
+        using SemaphoreSlim gate = new(PatchConcurrency, PatchConcurrency);
+        object errorsGate = new();
+        List<Task> tasks = new();
+        foreach (PendingTeableUserUpdate pending in users)
+        {
+            await gate.WaitAsync(cancellationToken);
+            tasks.Add(Task.Run(
+                async () =>
+                {
+                    try
+                    {
+                        await PatchUserRecordAsync(destination, pending, options, cancellationToken);
+                        Interlocked.Increment(ref patched);
+                    }
+                    catch (Exception ex)
+                    {
+                        lock (errorsGate)
+                        {
+                            errors.Add($"{pending.User.UserId}:{ShortMessage(ex)}");
+                        }
+                        _logger.LogWarning(ex, "could not patch hub user {UserId} in Teable table {TableId}", pending.User.UserId, destination.TableId);
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+                },
+                cancellationToken));
+        }
+
+        await Task.WhenAll(tasks);
+        return patched;
+    }
+
+    private async Task PatchUserRecordAsync(
+        TeableDestination destination,
+        PendingTeableUserUpdate pending,
         TeableOptions options,
         CancellationToken cancellationToken)
     {
-        string filter = Uri.EscapeDataString($"{{User Id}} = '{userId}'");
-        string path = $"{options.ApiBaseUrl}/table/{Uri.EscapeDataString(tableId)}/record?fieldKeyType=name&take=1&filterByTql={filter}";
-        JsonDocument response = await SendAsync(HttpMethod.Get, path, null, options.ApiKey, cancellationToken);
-        using (response)
+        JsonObject payload = new()
         {
-            if (!response.RootElement.TryGetProperty("records", out JsonElement records)
-                || records.ValueKind != JsonValueKind.Array)
+            ["fieldKeyType"] = "name",
+            ["typecast"] = true,
+            ["record"] = new JsonObject
             {
-                return null;
+                ["fields"] = BuildFields(pending.User)
             }
+        };
+        JsonDocument ignored = await SendAsync(
+            HttpMethod.Patch,
+            $"{options.ApiBaseUrl}/table/{Uri.EscapeDataString(destination.TableId)}/record/{Uri.EscapeDataString(pending.RecordId)}",
+            payload,
+            options.ApiKey,
+            cancellationToken);
+        ignored.Dispose();
+    }
 
-            foreach (JsonElement record in records.EnumerateArray())
+    private async Task<Dictionary<string, ExistingTeableRecord>> FetchExistingRecordsAsync(
+        string tableId,
+        TeableOptions options,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, ExistingTeableRecord> rows = new(StringComparer.OrdinalIgnoreCase);
+        int skip = 0;
+        while (true)
+        {
+            string query = $"fieldKeyType=name&cellFormat=json&take={RecordPageSize}&skip={skip}";
+            string path = $"{options.ApiBaseUrl}/table/{Uri.EscapeDataString(tableId)}/record?{query}";
+            JsonDocument response = await SendAsync(HttpMethod.Get, path, null, options.ApiKey, cancellationToken);
+            using (response)
             {
-                if (TryGetString(record, "id", out string? recordId))
+                if (!response.RootElement.TryGetProperty("records", out JsonElement records)
+                    || records.ValueKind != JsonValueKind.Array)
                 {
-                    return recordId;
+                    return rows;
                 }
-            }
 
-            return null;
+                int count = 0;
+                foreach (JsonElement record in records.EnumerateArray())
+                {
+                    count++;
+                    if (!TryGetString(record, "id", out string? recordId)
+                        || !record.TryGetProperty("fields", out JsonElement fields)
+                        || fields.ValueKind != JsonValueKind.Object
+                        || !TryGetString(fields, "User Id", out string? userId))
+                    {
+                        continue;
+                    }
+
+                    rows[userId!] = new ExistingTeableRecord(recordId!, ReadComparableFields(fields));
+                }
+
+                if (count < RecordPageSize)
+                {
+                    return rows;
+                }
+
+                skip += RecordPageSize;
+            }
         }
     }
 
@@ -443,6 +556,12 @@ public sealed class TeableUserProjectionService
             ["Linked Principals"] = string.Join('\n', user.LinkedPrincipals ?? Array.Empty<string>()),
             ["Group Ids"] = string.Join('\n', user.GroupIds ?? Array.Empty<string>()),
             ["Workspace Prep Library Search History"] = user.WorkspacePrepLibrarySearchHistory,
+            ["WhatsApp AI Support Phone"] = user.WhatsappAiSupportPhone,
+            ["WhatsApp AI Support Phone Last4"] = user.WhatsappAiSupportPhoneLast4,
+            ["WhatsApp AI Support Enabled"] = user.WhatsappAiSupportEnabled,
+            ["WhatsApp Notifications Enabled"] = user.WhatsappNotificationsEnabled,
+            ["WhatsApp AI Support Purpose"] = user.WhatsappAiSupportPurpose,
+            ["WhatsApp AI Support Opening Prompt"] = user.WhatsappAiSupportOpeningPrompt,
             ["Created At UTC"] = user.CreatedAtUtc.ToString("O"),
             ["Updated At UTC"] = user.UpdatedAtUtc.ToString("O"),
             ["Last Synced At UTC"] = DateTimeOffset.UtcNow.ToString("O"),
@@ -455,23 +574,39 @@ public sealed class TeableUserProjectionService
             return _store.UsersById.Values
                 .OrderBy(static item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
-                .Select(item => new TeableUserProjectionRow(
-                    UserId: item.UserId,
-                    SubjectId: item.SubjectId,
-                    Email: Normalize(item.Email) ?? string.Empty,
-                    DisplayName: item.DisplayName,
-                    Handle: item.Handle,
-                    Visibility: item.Visibility,
-                    Timezone: item.Timezone,
-                    CountryCode: item.CountryCode,
-                    LinkedPrincipals: item.LinkedPrincipals,
-                    GroupIds: item.GroupIds,
-                    CreatedAtUtc: item.CreatedAtUtc,
-                    UpdatedAtUtc: item.UpdatedAtUtc,
-                    WorkspacePrepLibrarySearchHistory: BuildWorkspacePrepHistory(
-                        _store.UserExperienceByUserId.TryGetValue(item.UserId, out var experience)
-                            ? experience.WorkspacePrepLibrarySearchHistory
-                            : Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())))
+                .Select(item =>
+                {
+                    ChannelLinkDto? whatsapp = _store.ChannelLinks.FirstOrDefault(link =>
+                        string.Equals(link.UserId, item.UserId, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(link.ChannelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(link.Status, "revoked", StringComparison.OrdinalIgnoreCase));
+                    var phone = Normalize(whatsapp?.DisplayLabel) ?? string.Empty;
+                    var digits = DigitsOnly(phone);
+                    var hasWhatsappSupportPhone = !string.IsNullOrWhiteSpace(phone);
+                    return new TeableUserProjectionRow(
+                        UserId: item.UserId,
+                        SubjectId: item.SubjectId,
+                        Email: Normalize(item.Email) ?? string.Empty,
+                        DisplayName: item.DisplayName,
+                        Handle: item.Handle,
+                        Visibility: item.Visibility,
+                        Timezone: item.Timezone,
+                        CountryCode: item.CountryCode,
+                        LinkedPrincipals: item.LinkedPrincipals,
+                        GroupIds: item.GroupIds,
+                        CreatedAtUtc: item.CreatedAtUtc,
+                        UpdatedAtUtc: item.UpdatedAtUtc,
+                        WorkspacePrepLibrarySearchHistory: BuildWorkspacePrepHistory(
+                            _store.UserExperienceByUserId.TryGetValue(item.UserId, out var experience)
+                                ? experience.WorkspacePrepLibrarySearchHistory
+                                : Array.Empty<WorkspacePrepLibrarySearchHistoryItem>()),
+                        WhatsappAiSupportPhone: phone,
+                        WhatsappAiSupportPhoneLast4: digits.Length >= 4 ? digits[^4..] : digits,
+                        WhatsappAiSupportEnabled: hasWhatsappSupportPhone,
+                        WhatsappNotificationsEnabled: whatsapp?.NotificationsEnabled ?? false,
+                        WhatsappAiSupportPurpose: hasWhatsappSupportPhone ? Normalize(whatsapp?.Purpose) ?? WhatsappAiSupportPurpose : string.Empty,
+                        WhatsappAiSupportOpeningPrompt: hasWhatsappSupportPhone ? Normalize(whatsapp?.AiSupportOpeningPrompt) ?? WhatsappAiSupportOpeningPrompt : string.Empty);
+                })
                 .ToArray();
         }
     }
@@ -619,6 +754,100 @@ public sealed class TeableUserProjectionService
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static List<List<T>> Chunk<T>(IReadOnlyList<T> values, int chunkSize)
+    {
+        List<List<T>> chunks = new();
+        for (int start = 0; start < values.Count; start += chunkSize)
+        {
+            chunks.Add(values.Skip(start).Take(chunkSize).ToList());
+        }
+
+        return chunks;
+    }
+
+    private static Dictionary<string, string> ReadComparableFields(JsonElement fields)
+    {
+        Dictionary<string, string> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonProperty field in fields.EnumerateObject())
+        {
+            result[field.Name] = ComparableValue(field.Value);
+        }
+
+        return result;
+    }
+
+    private static bool FieldsNeedUpdate(JsonObject desired, IReadOnlyDictionary<string, string> current)
+    {
+        foreach (KeyValuePair<string, JsonNode?> field in desired)
+        {
+            if (string.Equals(field.Key, "Last Synced At UTC", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string desiredValue = ComparableValue(field.Value);
+            if (!current.TryGetValue(field.Key, out string? currentValue))
+            {
+                if (MissingCellMatchesDesiredValue(field.Key, desiredValue))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            if (!string.Equals(currentValue, desiredValue, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MissingCellMatchesDesiredValue(string fieldName, string desiredValue)
+        => string.IsNullOrEmpty(desiredValue)
+            || (string.Equals(desiredValue, "false", StringComparison.Ordinal)
+                && RequiredFields.Any(field =>
+                    string.Equals(field.Name, fieldName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(field.Type, "checkbox", StringComparison.OrdinalIgnoreCase)));
+
+    private static string ComparableValue(JsonNode? value)
+    {
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
+        if (value is JsonValue jsonValue)
+        {
+            if (jsonValue.TryGetValue(out string? stringValue))
+            {
+                return Normalize(stringValue) ?? string.Empty;
+            }
+
+            if (jsonValue.TryGetValue(out bool boolValue))
+            {
+                return boolValue ? "true" : "false";
+            }
+        }
+
+        return value.ToJsonString();
+    }
+
+    private static string ComparableValue(JsonElement value)
+        => value.ValueKind switch
+        {
+            JsonValueKind.String => Normalize(value.GetString()) ?? string.Empty,
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
+            _ => value.GetRawText(),
+        };
+
+    private static string DigitsOnly(string? value)
+        => new((value ?? string.Empty).Where(char.IsDigit).ToArray());
+
     private static bool ParseBool(string? value, bool defaultValue)
     {
         string? normalized = Normalize(value);
@@ -647,6 +876,10 @@ public sealed class TeableUserProjectionService
 
     private sealed record TeableDestination(string? BaseId, string TableId, string TableName);
 
+    private sealed record ExistingTeableRecord(string RecordId, IReadOnlyDictionary<string, string> Fields);
+
+    private sealed record PendingTeableUserUpdate(TeableUserProjectionRow User, string RecordId);
+
     private sealed record TeableFieldDefinition(
         string Name,
         string Type,
@@ -661,16 +894,6 @@ public sealed class TeableUserProjectionService
                 ["type"] = Type,
                 ["name"] = Name,
             };
-            if (Unique)
-            {
-                node["unique"] = true;
-            }
-
-            if (NotNull)
-            {
-                node["notNull"] = true;
-            }
-
             if (!string.IsNullOrWhiteSpace(Description))
             {
                 node["description"] = Description;

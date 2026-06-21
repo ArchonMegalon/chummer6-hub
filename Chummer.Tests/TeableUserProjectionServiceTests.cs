@@ -41,7 +41,11 @@ public sealed class TeableUserProjectionServiceTests
         Assert.Equal(1, result.SyncedCount);
         Assert.Equal(0, result.FailedCount);
         Assert.Equal("tbl_users", result.TableId);
-        Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        LoggedRequest createTable = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        Assert.DoesNotContain("\"unique\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"notNull\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
         Assert.Contains(fixture.Handler.Requests, static item => item.Body.Contains("\"Email\":\"demo@example.com\"", StringComparison.Ordinal));
 
@@ -50,6 +54,156 @@ public sealed class TeableUserProjectionServiceTests
         Assert.Equal("tbl_users", dashboard.TableId);
         Assert.Single(dashboard.Users);
         Assert.Equal("demo@example.com", dashboard.Users[0].Email);
+    }
+
+    [Fact]
+    public async Task SyncAllProjectsWhatsappAiSupportChannelForRouteImport()
+    {
+        using Fixture fixture = new();
+        HubUserDto user = new(
+            UserId: "usr-demo",
+            SubjectId: "subject.demo",
+            DisplayName: "Demo Runner",
+            Handle: "demo-runner",
+            Visibility: "private",
+            Timezone: "Europe/Vienna",
+            CountryCode: "AT",
+            LinkedPrincipals: ["subject.demo"],
+            GroupIds: ["grp-alpha"],
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:15:00Z"))
+        {
+            Email = "demo@example.com",
+        };
+        SeedUser(fixture.Store, user);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.ChannelLinks.Add(new ChannelLinkDto(
+                ChannelLinkId: "chn-whatsapp-demo",
+                UserId: user.UserId,
+                ChannelKind: "whatsapp_official_business",
+                DisplayLabel: "+436647916419",
+                Status: "ea_linked",
+                OfficialChannel: true,
+                NotificationsEnabled: true,
+                CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:20:00Z"),
+                UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:21:00Z"),
+                Note: "WhatsApp AI support")
+            {
+                Purpose = "ai_support_only",
+                AiSupportOpeningPrompt = "Ask what questions the user has before giving product guidance."
+            });
+            fixture.Store.PersistLocked();
+        }
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        LoggedRequest create = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+        using JsonDocument created = JsonDocument.Parse(create.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.Equal("+436647916419", fields.GetProperty("WhatsApp AI Support Phone").GetString());
+        Assert.Equal("6419", fields.GetProperty("WhatsApp AI Support Phone Last4").GetString());
+        Assert.True(fields.GetProperty("WhatsApp AI Support Enabled").GetBoolean());
+        Assert.True(fields.GetProperty("WhatsApp Notifications Enabled").GetBoolean());
+        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp AI Support Purpose").GetString());
+        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp AI Support Opening Prompt").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SyncAllDefaultsLegacyWhatsappSupportChannelPurposeForRouteImport()
+    {
+        using Fixture fixture = new();
+        HubUserDto user = new(
+            UserId: "usr-demo",
+            SubjectId: "subject.demo",
+            DisplayName: "Demo Runner",
+            Handle: "demo-runner",
+            Visibility: "private",
+            Timezone: "Europe/Vienna",
+            CountryCode: "AT",
+            LinkedPrincipals: ["subject.demo"],
+            GroupIds: Array.Empty<string>(),
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:15:00Z"));
+        SeedUser(fixture.Store, user);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.ChannelLinks.Add(new ChannelLinkDto(
+                ChannelLinkId: "chn-whatsapp-demo",
+                UserId: user.UserId,
+                ChannelKind: "whatsapp_official_business",
+                DisplayLabel: "+436647916419",
+                Status: "linked",
+                OfficialChannel: true,
+                NotificationsEnabled: false,
+                CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:20:00Z"),
+                UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:21:00Z"),
+                Note: "Legacy WhatsApp support link"));
+            fixture.Store.PersistLocked();
+        }
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        LoggedRequest create = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+        using JsonDocument created = JsonDocument.Parse(create.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.True(fields.GetProperty("WhatsApp AI Support Enabled").GetBoolean());
+        Assert.False(fields.GetProperty("WhatsApp Notifications Enabled").GetBoolean());
+        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp AI Support Purpose").GetString());
+        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp AI Support Opening Prompt").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SyncAllBatchCreatesMissingUsersAfterSingleExistingRecordScan()
+    {
+        using Fixture fixture = new();
+        SeedUser(fixture.Store, new HubUserDto(
+            UserId: "usr-demo-1",
+            SubjectId: "subject.demo.1",
+            DisplayName: "Demo Runner 1",
+            Handle: "demo-runner-1",
+            Visibility: "private",
+            Timezone: "UTC",
+            CountryCode: "",
+            LinkedPrincipals: ["subject.demo.1"],
+            GroupIds: Array.Empty<string>(),
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            UpdatedAtUtc: DateTimeOffset.UtcNow)
+        {
+            Email = "demo1@example.com",
+        });
+        SeedUser(fixture.Store, new HubUserDto(
+            UserId: "usr-demo-2",
+            SubjectId: "subject.demo.2",
+            DisplayName: "Demo Runner 2",
+            Handle: "demo-runner-2",
+            Visibility: "private",
+            Timezone: "UTC",
+            CountryCode: "",
+            LinkedPrincipals: ["subject.demo.2"],
+            GroupIds: Array.Empty<string>(),
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            UpdatedAtUtc: DateTimeOffset.UtcNow)
+        {
+            Email = "demo2@example.com",
+        });
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        Assert.Equal(2, result.SyncedCount);
+        Assert.Single(fixture.Handler.Requests, static item => item.Method == HttpMethod.Get && item.Path.StartsWith("/api/table/tbl_users/record?", StringComparison.Ordinal));
+        LoggedRequest create = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+        using JsonDocument created = JsonDocument.Parse(create.Body);
+        Assert.Equal(2, created.RootElement.GetProperty("records").GetArrayLength());
     }
 
     [Fact]
@@ -187,6 +341,46 @@ public sealed class TeableUserProjectionServiceTests
     }
 
     [Fact]
+    public async Task SyncAllDoesNotPatchWhenTeableOmitsEmptyOptionalCells()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset createdAt = DateTimeOffset.Parse("2026-04-12T10:00:00Z");
+        DateTimeOffset updatedAt = DateTimeOffset.Parse("2026-04-12T10:15:00Z");
+        fixture.Handler.ExistingRecordIdByUserId["usr-demo"] = "rec_existing";
+        fixture.Handler.ExistingFieldsByUserId["usr-demo"] = new Dictionary<string, object>
+        {
+            ["Display Name"] = "Demo Runner",
+            ["User Id"] = "usr-demo",
+            ["Subject Id"] = "subject.demo",
+            ["Handle"] = "demo-runner",
+            ["Visibility"] = "private",
+            ["Timezone"] = "UTC",
+            ["Linked Principals"] = "subject.demo",
+            ["Created At UTC"] = createdAt.ToString("O"),
+            ["Updated At UTC"] = updatedAt.ToString("O"),
+        };
+        SeedUser(fixture.Store, new HubUserDto(
+            UserId: "usr-demo",
+            SubjectId: "subject.demo",
+            DisplayName: "Demo Runner",
+            Handle: "demo-runner",
+            Visibility: "private",
+            Timezone: "UTC",
+            CountryCode: "",
+            LinkedPrincipals: ["subject.demo"],
+            GroupIds: Array.Empty<string>(),
+            CreatedAtUtc: createdAt,
+            UpdatedAtUtc: updatedAt));
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        Assert.Equal(1, result.SyncedCount);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Method == HttpMethod.Patch);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+    }
+
+    [Fact]
     public async Task BackgroundWorkerReconcilesStoredUsersWithoutManualTrigger()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
@@ -318,6 +512,7 @@ public sealed class TeableUserProjectionServiceTests
 
         public List<LoggedRequest> Requests { get; } = [];
         public Dictionary<string, string> ExistingRecordIdByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Dictionary<string, object>> ExistingFieldsByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -364,38 +559,52 @@ public sealed class TeableUserProjectionServiceTests
 
             if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_users/record?", StringComparison.Ordinal))
             {
-                string userId = ExtractUserId(path) ?? string.Empty;
-                if (ExistingRecordIdByUserId.TryGetValue(userId, out string? recordId))
+                if (path.Contains("filterByTql=", StringComparison.Ordinal))
                 {
-                    return Json(HttpStatusCode.OK, $$"""
-                        {
-                          "records": [
+                    string userId = ExtractUserId(path) ?? string.Empty;
+                    if (ExistingRecordIdByUserId.TryGetValue(userId, out string? recordId))
+                    {
+                        Dictionary<string, object> fields = BuildExistingRecordFields(userId);
+                        return Json(HttpStatusCode.OK, $$"""
                             {
-                              "id": {{JsonSerializer.Serialize(recordId)}}
+                              "records": [
+                                {
+                                  "id": {{JsonSerializer.Serialize(recordId)}},
+                                  "fields": {{JsonSerializer.Serialize(fields)}}
+                                }
+                              ]
                             }
-                          ]
-                        }
-                        """);
+                            """);
+                    }
+
+                    return Json(HttpStatusCode.OK, """
+                            {
+                              "records": []
+                            }
+                            """);
                 }
 
-                return Json(HttpStatusCode.OK, """
-                        {
-                          "records": []
-                        }
-                        """);
+                object[] records = ExistingRecordIdByUserId
+                    .Select(item => new
+                    {
+                        id = item.Value,
+                        fields = BuildExistingRecordFields(item.Key),
+                    })
+                    .ToArray();
+                return Json(HttpStatusCode.OK, JsonSerializer.Serialize(new { records }));
             }
 
             if (request.Method == HttpMethod.Post && path == "/api/table/tbl_users/record")
             {
                 return Json(HttpStatusCode.Created, """
+                {
+                  "records": [
                     {
-                      "records": [
-                        {
-                          "id": "rec_demo"
-                        }
-                      ]
+                      "id": "rec_demo"
                     }
-                    """);
+                  ]
+                }
+                """);
             }
 
             if (request.Method == HttpMethod.Patch && path.StartsWith("/api/table/tbl_users/record/", StringComparison.Ordinal))
@@ -412,6 +621,19 @@ public sealed class TeableUserProjectionServiceTests
                   "path": {{JsonSerializer.Serialize(path)}}
                 }
                 """);
+        }
+
+        private Dictionary<string, object> BuildExistingRecordFields(string userId)
+        {
+            if (ExistingFieldsByUserId.TryGetValue(userId, out Dictionary<string, object>? fields))
+            {
+                return fields;
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["User Id"] = userId,
+            };
         }
 
         private static HttpResponseMessage Json(HttpStatusCode statusCode, string payload)
