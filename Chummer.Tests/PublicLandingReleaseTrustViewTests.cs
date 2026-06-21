@@ -541,6 +541,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("SanitizePublicText(stage.Boundary.Replace", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Bounded follow-through", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("bounded-followthrough", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("guided synthesis lane", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("guided review lane", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Governed product decision", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("normalized HouseRuleDemandPacket", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("<summary>HouseRuleDemandPacket</summary>", karmaForgeSubmitted, StringComparison.Ordinal);
@@ -564,7 +567,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("support history", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", packageCatalogService, StringComparison.Ordinal);
-        Assert.Contains("Publication trust, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("Publication status, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("Publication trust, history, and visibility stay attached.", packageCatalogService, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", packageCatalogService, StringComparison.Ordinal);
 
         string ledgerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml");

@@ -8,7 +8,6 @@
     ViewData["ContextSidebarSummary"] = "Keep next steps, next questions, and saved details in the shared side panel.";
     ViewData["ContextSidebarLinks"] = new[]
     {
-        new PublicNavigationLink("Next steps", "#bounded-followthrough"),
         new PublicNavigationLink("Next questions", "#next-questions"),
         new PublicNavigationLink("Next steps", "#next-steps"),
         new PublicNavigationLink("Saved details", "#packet-json"),
@@ -22,9 +21,9 @@
                 .Replace(string.Concat("Product", " Governor"), "product decision", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Next", "Step"), "guided review lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
                 .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
                 .Replace("canonical", "reviewed", StringComparison.OrdinalIgnoreCase)
@@ -89,7 +88,7 @@
     }
 </section>
 
-<section class="editorial-block" id="bounded-followthrough">
+<section class="editorial-block" id="review-next-steps">
     <div class="editorial-block__lead">
         <p class="eyebrow">Next steps</p>
         <h2 class="editorial-title">The next steps stay clear from follow-up through closeout.</h2>

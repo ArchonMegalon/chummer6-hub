@@ -100,8 +100,27 @@ def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
         "canonicalSources",
         "journeyProofEvents",
         "guided synthesis lane",
+        "guided review lane",
     ):
         assert forbidden not in packet
+
+
+def test_karma_forge_surfaces_use_plain_review_language() -> None:
+    karma_forge = read("Chummer.Run.Api/Views/PublicLanding/KarmaForge.cshtml")
+    karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
+    combined = "\n".join((karma_forge, karma_submitted))
+
+    assert "guided review path" in combined
+    assert "review path" in combined
+    assert "id=\"review-next-steps\"" in karma_submitted
+
+    for forbidden in (
+        "guided synthesis lane",
+        "guided review lane",
+        "bounded-followthrough",
+        "new PublicNavigationLink(\"Next steps\", \"#bounded-followthrough\")",
+    ):
+        assert forbidden not in combined
 
 
 def test_connected_table_pulse_sources_do_not_keep_legacy_marker_comments() -> None:
