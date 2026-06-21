@@ -26,6 +26,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
     assert 'Pick one path' in trust_page
+    assert 'other options below' in trust_page
+    assert 'other routes below' not in trust_page
 
 
 def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
@@ -514,6 +516,11 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
     for forbidden in (
         "follow-up record",
         "posted follow-up record",
+        "private-support crossover",
+        "private-support item",
+        "Category routing",
+        "Public feedback stays easy to route.",
+        "Public signal routing stays transparent",
     ):
         assert forbidden not in signal_operations
 
@@ -530,6 +537,10 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
     assert "Message updates" in feedback_operations
     assert "Message attempt" in feedback_operations
     assert "Follow-up sent" in feedback_operations
+    assert "likely private support handoff" in signal_operations
+    assert "Feedback sorting" in signal_operations
+    assert "Public feedback stays easy to sort." in signal_operations
+    assert "Public feedback stays visible; private follow-up goes through Help." in signal_operations
 
 
 def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> None:

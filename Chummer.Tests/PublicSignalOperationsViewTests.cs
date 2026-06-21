@@ -16,7 +16,7 @@ public sealed class PublicSignalOperationsViewTests
     }
 
     [Fact]
-    public void SharedOperationsPartialSurfacesHostedReadinessWebhookAndRoutingBoard()
+    public void SharedOperationsPartialSurfacesHostedReadinessWebhookAndSortingBoard()
     {
         string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml");
         string partial = File.ReadAllText(partialPath);
@@ -24,8 +24,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("@model PublicSignalOperationsPacketViewModel", partial, StringComparison.Ordinal);
         Assert.Contains("Public loop status", partial, StringComparison.Ordinal);
         Assert.Contains("Keep signal, planning, shipped updates, and private help on separate pages.", partial, StringComparison.Ordinal);
-        Assert.Contains("Category routing", partial, StringComparison.Ordinal);
-        Assert.Contains("Public feedback stays easy to route.", partial, StringComparison.Ordinal);
+        Assert.Contains("Feedback sorting", partial, StringComparison.Ordinal);
+        Assert.Contains("Public feedback stays easy to sort.", partial, StringComparison.Ordinal);
         Assert.Contains("Open roadmap", partial, StringComparison.Ordinal);
         Assert.Contains("Open changelog", partial, StringComparison.Ordinal);
         Assert.Contains("Open private support", partial, StringComparison.Ordinal);

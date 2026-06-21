@@ -37,7 +37,7 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "release-backed closeout" not in feedback
     assert "First-party follow-up is not posted here yet." in operations
     assert "account-backed follow-up waits until the shipped path is available on this host" in operations
-    assert "Public feedback stays easy to route." in operations
+    assert "Public feedback stays easy to sort." in operations
     assert "Decision context" in projection
     assert "Decision sources" not in projection
     assert "Open the Chummer page" in projection
