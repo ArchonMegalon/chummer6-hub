@@ -83,8 +83,8 @@
         @foreach (var receipt in Model.Receipts)
         {
             <article class="route-choice-card">
-                <span class="tag">@receipt.Status</span>
-                <h3>@receipt.Topic</h3>
+                <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
+                <h3>@PublicFacingCopyHumanizer.Clean(receipt.Topic)</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>@PublicFacingCopyHumanizer.Clean(receipt.Route)</span>

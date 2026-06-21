@@ -360,6 +360,35 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Helper_page_receipt_bindings_clean_dynamic_public_copy()
+    {
+        string knowledgeFabric = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KnowledgeFabric.cshtml"));
+        string nexusPan = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "NexusPanContinuity.cshtml"));
+
+        foreach (string cleanedBinding in new[]
+                 {
+                     "PublicFacingCopyHumanizer.Clean(receipt.Status)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Provenance)"
+                 })
+        {
+            Assert.Contains(cleanedBinding, knowledgeFabric, StringComparison.Ordinal);
+        }
+
+        foreach (string cleanedBinding in new[]
+                 {
+                     "PublicFacingCopyHumanizer.Clean(receipt.Status)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
+                     "PublicFacingCopyHumanizer.Clean(receipt.Route)"
+                 })
+        {
+            Assert.Contains(cleanedBinding, nexusPan, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Public_api_sources_do_not_reintroduce_old_human_copy_markers()
     {
         string apiRoot = RepoPaths.FromRoot("Chummer.Run.Api");
