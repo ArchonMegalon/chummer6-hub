@@ -871,6 +871,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string accountHome = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAccountHome.cshtml"));
         string advisory = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml"));
         string notifications = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml"));
+        string validation = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerWorldTickValidation.cshtml"));
 
         foreach (string required in new[]
         {
@@ -917,10 +918,46 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "PublicFacingCopyHumanizer.Clean(label)",
             "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
             "PublicFacingCopyHumanizer.Clean(receipt.RecipientLabel)",
-            "PublicFacingCopyHumanizer.Clean(receipt.FailureReason)"
+            "PublicFacingCopyHumanizer.Clean(receipt.FailureReason)",
+            "PublicFacingCopyHumanizer.Clean(option.Kind)",
+            "PublicFacingCopyHumanizer.Clean(option.Label)",
+            "PublicFacingCopyHumanizer.Clean(option.Summary)",
+            "PublicFacingCopyHumanizer.Clean(option.ActionLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
+            "PublicFacingCopyHumanizer.Clean(beat)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AnchorName)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
+            "PublicFacingCopyHumanizer.Clean(beat.ActorKind)",
+            "PublicFacingCopyHumanizer.Clean(beat.BeatLabel)",
+            "PublicFacingCopyHumanizer.Clean(beat.ActorLabel)",
+            "PublicFacingCopyHumanizer.Clean(message.Eyebrow)",
+            "PublicFacingCopyHumanizer.Clean(message.Heading)",
+            "PublicFacingCopyHumanizer.Clean(message.Summary)",
+            "PublicFacingCopyHumanizer.Clean(message.StatusLabel)",
+            "PublicFacingCopyHumanizer.Clean(message.CtaLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)"
         })
         {
             Assert.Contains(required, notifications, StringComparison.Ordinal);
+        }
+
+        foreach (string required in new[]
+        {
+            "ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);",
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+            "PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
+            "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName)",
+            "PublicFacingCopyHumanizer.Clean(item)"
+        })
+        {
+            Assert.Contains(required, validation, StringComparison.Ordinal);
         }
 
         foreach (string forbidden in new[]
@@ -938,6 +975,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.DoesNotContain(forbidden, accountHome, StringComparison.Ordinal);
             Assert.DoesNotContain(forbidden, advisory, StringComparison.Ordinal);
             Assert.DoesNotContain(forbidden, notifications, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, validation, StringComparison.Ordinal);
         }
 
         foreach (string forbidden in new[]
@@ -953,11 +991,36 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "@option.Label · @option.VoteShareLabel",
             "<span>@option.Label: @option.VoteCount vote(s)</span>",
             "<h3>@summary.Heading</h3>",
-            "<span>@item</span>"
+            "<span>@item</span>",
+            "<h3>@option.Label</h3>",
+            "<p>@option.Summary</p>",
+            ">@option.ActionLabel</button>",
+            "<p class=\"eyebrow\">@Model.WorldTurnBriefing.TransitionLabel</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.InboxHeadline</h2>",
+            "<p class=\"editorial-copy\">@Model.WorldTurnBriefing.NewsreelLead</p>",
+            "<p>@beat</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.Broadcast.PackageLabel</h2>",
+            "<span>Anchor: @Model.WorldTurnBriefing.Broadcast.AnchorName</span>",
+            "<span>Desk: @Model.WorldTurnBriefing.Broadcast.DeskLabel</span>",
+            "<span class=\"tag\">@beat.ActorKind</span>",
+            "<h4>@beat.BeatLabel</h4>",
+            "<p class=\"ledger-newsreel-broadcast__action-actor\">@beat.ActorLabel</p>",
+            "<span class=\"tag\">@message.Eyebrow</span>",
+            "<h3>@message.Heading</h3>",
+            "<p>@message.Summary</p>",
+            "<span>Status: @message.StatusLabel</span>",
+            ">@message.CtaLabel</a>",
+            "<h2 class=\"editorial-title\">@Model.Status.StatusLabel</h2>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<p class=\"page-copy\">@Model.Intro</p>",
+            "<span>World: @Model.Packet.WorldName</span>",
+            "<h2 class=\"editorial-title\">@Model.LeaderDigest.PublicName leader digest</h2>"
         })
         {
             Assert.DoesNotContain(forbidden, accountHome, StringComparison.Ordinal);
             Assert.DoesNotContain(forbidden, advisory, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, notifications, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, validation, StringComparison.Ordinal);
         }
     }
 

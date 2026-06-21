@@ -1,6 +1,6 @@
 @model BlackLedgerWorldTickValidationPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
@@ -8,10 +8,10 @@
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">World turn</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>World: @Model.Packet.WorldName</span>
+            <span>World: @PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)</span>
             <span>Turn: @Model.Packet.ToTurn</span>
             <span>Status: current</span>
         </div>
@@ -44,9 +44,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@Model.WorldTurnBriefing.TransitionLabel</p>
-            <h2 class="editorial-title">@Model.WorldTurnBriefing.InboxHeadline</h2>
-            <p class="editorial-copy">@Model.WorldTurnBriefing.NewsreelLead</p>
+            <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
     </section>
 }
@@ -56,14 +56,14 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Leader view</p>
-            <h2 class="editorial-title">@Model.LeaderDigest.PublicName leader digest</h2>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName) leader digest</h2>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Match</span>
-                    <p>@item</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
                 </article>
             }
         </div>

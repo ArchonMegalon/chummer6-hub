@@ -565,6 +565,8 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     ledger_create = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionCreate.cshtml")
     ledger_promo = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml")
     ledger_leader = read("Chummer.Run.Api/Views/PublicLanding/LedgerLeaderBriefing.cshtml")
+    ledger_notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
+    ledger_validation = read("Chummer.Run.Api/Views/PublicLanding/LedgerWorldTickValidation.cshtml")
     sources = [
         read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
         ledger_account,
@@ -572,8 +574,9 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         ledger_onboarding,
         ledger_promo,
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml"),
+        ledger_notifications,
         ledger_leader,
+        ledger_validation,
     ]
     combined = "\n".join(sources)
 
@@ -721,6 +724,71 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
             "<p>@scene.VisualDirection</p>",
             "<p>@scene.NarratorLine</p>",
             "<p>@format</p>",
+        ):
+            assert forbidden not in source
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(option.Kind)",
+        "PublicFacingCopyHumanizer.Clean(option.Label)",
+        "PublicFacingCopyHumanizer.Clean(option.Summary)",
+        "PublicFacingCopyHumanizer.Clean(option.ActionLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
+        "PublicFacingCopyHumanizer.Clean(beat)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AnchorName)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
+        "PublicFacingCopyHumanizer.Clean(beat.ActorKind)",
+        "PublicFacingCopyHumanizer.Clean(beat.BeatLabel)",
+        "PublicFacingCopyHumanizer.Clean(beat.ActorLabel)",
+        "PublicFacingCopyHumanizer.Clean(message.Eyebrow)",
+        "PublicFacingCopyHumanizer.Clean(message.Heading)",
+        "PublicFacingCopyHumanizer.Clean(message.Summary)",
+        "PublicFacingCopyHumanizer.Clean(message.StatusLabel)",
+        "PublicFacingCopyHumanizer.Clean(message.CtaLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)",
+    ):
+        assert required in ledger_notifications
+
+    for required in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+        "PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
+        "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(item)",
+    ):
+        assert required in ledger_validation
+
+    for source in (ledger_notifications, ledger_validation):
+        for forbidden in (
+            "<h3>@option.Label</h3>",
+            "<p>@option.Summary</p>",
+            ">@option.ActionLabel</button>",
+            "<p class=\"eyebrow\">@Model.WorldTurnBriefing.TransitionLabel</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.InboxHeadline</h2>",
+            "<p class=\"editorial-copy\">@Model.WorldTurnBriefing.NewsreelLead</p>",
+            "<p>@beat</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.Broadcast.PackageLabel</h2>",
+            "<span>Anchor: @Model.WorldTurnBriefing.Broadcast.AnchorName</span>",
+            "<span>Desk: @Model.WorldTurnBriefing.Broadcast.DeskLabel</span>",
+            "<span class=\"tag\">@beat.ActorKind</span>",
+            "<h4>@beat.BeatLabel</h4>",
+            "<p class=\"ledger-newsreel-broadcast__action-actor\">@beat.ActorLabel</p>",
+            "<span class=\"tag\">@message.Eyebrow</span>",
+            "<h3>@message.Heading</h3>",
+            "<p>@message.Summary</p>",
+            "<span>Status: @message.StatusLabel</span>",
+            ">@message.CtaLabel</a>",
+            "<h2 class=\"editorial-title\">@Model.Status.StatusLabel</h2>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<p class=\"page-copy\">@Model.Intro</p>",
+            "<span>World: @Model.Packet.WorldName</span>",
+            "<h2 class=\"editorial-title\">@Model.LeaderDigest.PublicName leader digest</h2>",
         ):
             assert forbidden not in source
 
