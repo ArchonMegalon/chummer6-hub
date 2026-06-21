@@ -27,7 +27,9 @@ public sealed class BuildGhostConciergeServiceTests
         Assert.Equal("Limited explainer fail-closed", projection.AnswerlyStatus);
         Assert.Equal("First-party compare/apply only", projection.EngineStatus);
         Assert.Contains("A short intake can", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(projection.Actions, item => string.Equals(item.Href, "/participate/karma-forge?track=player_trust_track", StringComparison.Ordinal));
+        Assert.Contains(projection.Actions, item =>
+            string.Equals(item.Label, "Open public concierge", StringComparison.Ordinal)
+            && string.Equals(item.Href, "/facepop/build-ghosts", StringComparison.Ordinal));
     }
 
     [Fact]
