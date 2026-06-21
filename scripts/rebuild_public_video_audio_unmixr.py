@@ -36,7 +36,7 @@ NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 0.70
 MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
-MIN_ALICE_TTS_COVERAGE_RATIO = 0.95
+MIN_CLEAN_TTS_COVERAGE_RATIO = 0.90
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 RUNSITE_CLEAN_AUDIO_GROUP = "runsite-90s-deepdive"
 CLEAN_SPEECH_AUDIO_GROUPS = {
@@ -848,18 +848,18 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     source = trimmed if trimmed.is_file() and trimmed.stat().st_size > 0 else narration
     source_duration = duration(source)
     target_voice = max(total_duration, 1.0)
-    if source_duration < target_voice * MIN_ALICE_TTS_COVERAGE_RATIO:
+    if source_duration < target_voice * MIN_CLEAN_TTS_COVERAGE_RATIO:
         raise RuntimeError(
             f"{group_key}_unmixr_narration_too_short_for_natural_pacing:"
             f"{source_duration:.3f}s_for_{target_voice:.3f}s"
         )
-    tempo = min(max(source_duration / target_voice, 1.0), 1.16)
-    if tempo > 1.015:
+    tempo = min(max(source_duration / target_voice, 0.90), 1.16)
+    if tempo > 1.015 or tempo < 0.985:
         voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
-        fit = f"alice_clean_audiobook_style_{tempo:.3f}"
+        fit = f"clean_speech_style_{tempo:.3f}"
     else:
         voice_prep = f"atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
-        fit = "alice_clean_audiobook_style_natural"
+        fit = "clean_speech_style_natural"
     filter_complex = (
         f"[0:a]{voice_prep},"
         f"highpass=f=145,equalizer=f=94:width_type=h:width=60:g=-24,{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
