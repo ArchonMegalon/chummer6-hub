@@ -63,6 +63,14 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("detail.FilterLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("savedPivots", detailView, StringComparison.Ordinal);
         Assert.Contains("Search another item", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(sourceReceipt.StatusLabel)", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(receipt.RouteKind)", detailView, StringComparison.Ordinal);
+        Assert.Contains("Resolution @PublicFeedbackText(receipt.DeliveryState)", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(receipt.QueueLane)", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(receipt.ProviderState)", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(receipt.IdentityMatchMode)", detailView, StringComparison.Ordinal);
+        Assert.Contains("PublicFeedbackText(thread.QueueStatusLabel)", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>Closeout", detailView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("support boundary", detailView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("closeout eligibility", detailView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("closeout status", detailView, StringComparison.OrdinalIgnoreCase);
