@@ -261,6 +261,32 @@ def test_participation_surface_uses_plain_character_helper_copy() -> None:
         assert forbidden not in participate
 
 
+def test_participation_surface_uses_plain_decision_and_account_language() -> None:
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+
+    for expected in (
+        "Account-only programs stay below the fold",
+        "account options visible",
+        "Keep the public loop simple and keep final decisions in Chummer.",
+        "Chummer makes the final call",
+        "Account participation",
+        "Use the account path when public signal is not enough",
+        "optional account paths",
+    ):
+        assert expected in participate
+
+    for forbidden in (
+        "signed-in programs stay below the fold",
+        "signed-in options visible",
+        "Keep the public loop visible, but keep authority inside Chummer.",
+        "Chummer keeps the authority",
+        "Signed-in participation",
+        "Use the signed-in path when public signal is not enough",
+        "optional signed-in paths",
+    ):
+        assert forbidden not in participate
+
+
 def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
     packet = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
 

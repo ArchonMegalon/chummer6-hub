@@ -140,7 +140,7 @@
         <a class="button-like button-like--secondary" href="/contact#support-intake">Report a problem</a>
         <a class="button-like button-like--ghost" href="@betaHref">Join beta waitlist</a>
     </div>
-    <p class="muted-copy">Follow an item to hear when it changes. Votes show demand; Chummer decides what ships. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
+    <p class="muted-copy">Follow an item to hear when it changes. Votes show demand; Chummer decides what ships. Account-only programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Participation overview">
@@ -173,7 +173,7 @@
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed an older feedback link</h3>
-                <p>The public feedback page now lives at <code class="mono-receipt">/feedback</code>. This page keeps broader participation and signed-in options visible without turning them into the default path.</p>
+                <p>The public feedback page now lives at <code class="mono-receipt">/feedback</code>. This page keeps broader participation and account options visible without turning them into the default path.</p>
                 <div class="route-callout__details">
                     <span>Public by default</span>
                     <span>No private logs</span>
@@ -259,7 +259,7 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Public loop</p>
-        <h2 class="editorial-title">Keep the public loop visible, but keep authority inside Chummer.</h2>
+        <h2 class="editorial-title">Keep the public loop simple and keep final decisions in Chummer.</h2>
         <p class="editorial-copy">The public path should feel simple: one place to post signal, one place to follow movement, and one honest shipped update path when the feature is actually available.</p>
     </div>
     <div class="workflow-grid">
@@ -314,7 +314,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Chummer decides</span>
-                <h3>Chummer keeps the authority</h3>
+                <h3>Chummer makes the final call</h3>
                 <div class="route-choice-card__details">
                     @foreach (var truthDomain in beHuman.ForbiddenTruthDomains)
                     {
@@ -428,8 +428,8 @@
         <article class="lane-strip">
             <div class="lane-strip__copy">
                 <span class="tag tag--amber">Account required</span>
-                <h2>Signed-in participation</h2>
-                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or guided contribution tools tied to your account.</p>
+                <h2>Account participation</h2>
+                <p>Use the account path when public signal is not enough and you want tracked beta follow-up, account-linked return, or guided contribution tools tied to your account.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {
@@ -453,7 +453,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Current page</p>
     <h2 class="editorial-title">Broader participation stays separate from the dedicated public-signal loop.</h2>
-    <p class="editorial-copy">The current Chummer loop is explicit now: public feedback lives on <code class="mono-receipt">/feedback</code>, planned movement lives on <code class="mono-receipt">/roadmap</code>, and shipped updates live on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional signed-in paths while hosted mirroring remains downstream of Chummer review.</p>
+    <p class="editorial-copy">The current Chummer loop is explicit now: public feedback lives on <code class="mono-receipt">/feedback</code>, planned movement lives on <code class="mono-receipt">/roadmap</code>, and shipped updates live on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional account paths while hosted mirroring remains downstream of Chummer review.</p>
     <p class="muted-copy">
         Need public signal? <a class="inline-link" href="/feedback">Open feedback</a>.
         Need current release status? <a class="inline-link" href="/changelog">Open shipped updates</a>.
