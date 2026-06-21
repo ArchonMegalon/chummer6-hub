@@ -643,3 +643,48 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Details</span>" in publication
     assert "supporting detail" in publication
+
+
+def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -> None:
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+    changelog = read("Chummer.Run.Api/Views/PublicLanding/Changelog.cshtml")
+    support_submitted = read("Chummer.Run.Api/Views/PublicLanding/SupportSubmitted.cshtml")
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+    nexus_pan = read("Chummer.Run.Api/Views/PublicLanding/NexusPanContinuity.cshtml")
+    ledger_notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
+    ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
+    ledger_onboarding = read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml")
+    combined = "\n".join((
+        shelf,
+        changelog,
+        support_submitted,
+        publication,
+        nexus_pan,
+        ledger_notifications,
+        ledger,
+        ledger_onboarding,
+    ))
+
+    for forbidden in (
+        "first-party help",
+        "First-party help",
+        "first-party page",
+        "first-party route",
+        "first-party storage",
+        "first-party email",
+        "first-party motion",
+        "product claims",
+    ):
+        assert forbidden not in combined
+
+    assert "Chummer help" in shelf
+    assert "Chummer help" in changelog
+    assert "Chummer help" in support_submitted
+    assert "Use Chummer help" in publication
+    assert "tracked by Chummer" in nexus_pan
+    assert "one Chummer route" in ledger_notifications
+    assert "Delivery: Chummer email" in ledger
+    assert "Chummer motion intros" in ledger
+    assert "Video: Chummer motion" in ledger
+    assert "Video: Chummer motion" in ledger_onboarding
+    assert "product improvements" in changelog
