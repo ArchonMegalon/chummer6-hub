@@ -21,6 +21,10 @@ public sealed class PublicFlagshipCoverageServiceTests
         var strip = service.LoadStrip();
 
         Assert.Equal("Whole-product frontier", strip.Eyebrow);
+        Assert.Equal("Install, mobile return, and workbench polish belong together.", strip.Heading);
+        Assert.DoesNotContain("truth", strip.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rail", strip.Intro, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("lanes", strip.Intro, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(3, strip.Cards.Count);
 
         Assert.Collection(
@@ -32,6 +36,7 @@ public sealed class PublicFlagshipCoverageServiceTests
                 Assert.Contains("public entry, publishing, registry", hub.Summary, StringComparison.Ordinal);
                 Assert.Equal("Completion wave", hub.CurrentTitle);
                 Assert.Equal("/downloads", hub.Href);
+                Assert.Equal("Open install and account", hub.ActionLabel);
             },
             mobile =>
             {

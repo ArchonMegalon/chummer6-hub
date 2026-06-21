@@ -14,7 +14,7 @@ public sealed class PublicFlagshipCoverageService
 
     private static readonly IReadOnlyList<(string PartId, string CardId, string Href, string ActionLabel)> CoverageOrder =
     [
-        ("community-cloud", "hub_and_registry", "/downloads", "Open install and account truth"),
+        ("community-cloud", "hub_and_registry", "/downloads", "Open install and account"),
         ("live-play", "mobile_play_shell", "/now#real-mobile-prep", "See continuity in preview"),
         ("workbench-ui", "ui_kit_and_flagship_polish", "/what-is-chummer", "See workbench and shared UI")
     ];
@@ -66,8 +66,8 @@ public sealed class PublicFlagshipCoverageService
 
         return new FlagshipCoverageStripViewModel(
             Eyebrow: "Whole-product frontier",
-            Heading: "Hub truth, mobile continuity, and shared flagship polish stay visible together.",
-            Intro: "The public install path is only one rail. These three lanes keep the front door honest about the hosted account stack, weak-network session return, and the shared UI quality bar behind the real workbench.",
+            Heading: "Install, mobile return, and workbench polish belong together.",
+            Intro: "The front door should stay simple while still showing the account stack, weak-network session return, and shared UI quality bar behind the real workbench.",
             Cards: cards);
     }
 
