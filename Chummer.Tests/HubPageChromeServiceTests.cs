@@ -79,11 +79,23 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "Get Chummer", "Help"],
+            ["Home", "Get Chummer", "Participate", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
         Assert.Equal("/downloads", chrome.PrimaryNavigation[1].Href);
-        Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
+        Assert.Equal("/participate/karma-forge", chrome.PrimaryNavigation[2].Href);
+        Assert.Equal("/help", chrome.PrimaryNavigation[3].Href);
+    }
+
+    [Fact]
+    public void PublicLayoutSuppressesLandingDownloadHeaderAction()
+    {
+        string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+
+        Assert.Contains("var visibleHeaderActions = nonBuildHeaderActions", layout, StringComparison.Ordinal);
+        Assert.Contains("routeKey is not \"landing\"", layout, StringComparison.Ordinal);
+        Assert.Contains("!normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
+        Assert.Contains("@foreach (var action in visibleHeaderActions)", layout, StringComparison.Ordinal);
     }
 
     [Fact]

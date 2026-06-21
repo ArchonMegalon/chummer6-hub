@@ -76,6 +76,9 @@
 
     var buildAction = chrome.HeaderActions.FirstOrDefault(action => isBuildAction(action.Href));
     var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
+    var visibleHeaderActions = nonBuildHeaderActions
+        .Where(action => routeKey is not "landing" || !normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
     var defaultNavOpen = false;
@@ -92,12 +95,7 @@
     var supplementalSignalLinks = publicSignalLinks
         .Where(link => !string.Equals(link.Href, "/roadmap", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var primaryDrawerLinks = new[]
-    {
-        new PublicNavigationLink("Home", "/"),
-        new PublicNavigationLink("Get Chummer", "/downloads"),
-        new PublicNavigationLink("Help", "/help")
-    };
+    var primaryDrawerLinks = chrome.PrimaryNavigation;
     var compactDrawerLinks = chrome.PrimaryNavigation
         .Concat(supplementalSignalLinks)
         .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
@@ -377,7 +375,7 @@
                     {
                         <span class="site-actions__label">@chrome.SignedInLabel</span>
                     }
-                    @foreach (var action in nonBuildHeaderActions)
+                    @foreach (var action in visibleHeaderActions)
                     {
                         var renderedActionLabel = routeKey is "landing"
                             && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)

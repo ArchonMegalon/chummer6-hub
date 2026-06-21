@@ -6,6 +6,8 @@ primary_nav:
     href: /
   - label: Get Chummer
     href: /downloads
+  - label: Participate
+    href: /participate/karma-forge
   - label: Help
     href: /help
 public_signal_nav:
