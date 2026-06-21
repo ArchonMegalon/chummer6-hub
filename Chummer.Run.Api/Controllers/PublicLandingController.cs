@@ -2654,7 +2654,7 @@ public sealed class PublicLandingController : Controller
         TrustPageViewModel model = await BuildHorizonPreviewPageModel(
             pageId: "community-run-venue",
             title: "Open-run venue",
-            description: "Public-safe venue status for an open run without leaking private room details.",
+            description: "Public venue status for an open run without leaking private room details.",
             currentPath: $"/community/runs/{normalizedRunId}/venue",
             eyebrow: "Community venue",
             heading: "Open-run venue status",
@@ -2663,13 +2663,13 @@ public sealed class PublicLandingController : Controller
             [
                 new TrustPageSectionViewModel(
                     "community_run_venue_public_surface",
-                    "Public-safe venue",
+                    "Public venue",
                     "What this page can show",
                     "This route can acknowledge a venue without leaking the room itself.",
                     [
-                        "Public-safe session title or run label.",
+                        "Public session title or run label.",
                         "Scheduled start time when the organizer has published it.",
-                        "Whether the live room is not configured, private, or ready for signed-in participants."
+                        "Whether the live room is not configured, private, or ready for account participants."
                     ]),
                 new TrustPageSectionViewModel(
                     "community_run_venue_private_boundary",
@@ -2700,7 +2700,7 @@ public sealed class PublicLandingController : Controller
             cancellationToken: cancellationToken,
             summaryPoints:
             [
-                "Public-safe venue status only",
+                "Public venue status only",
                 "No private room disclosure",
                 "Manual fallback stays available"
             ]);
@@ -2961,13 +2961,13 @@ public sealed class PublicLandingController : Controller
                 ScheduleApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/schedule",
                 MeetingHandoffApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/meeting-handoff",
                 CloseoutApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/closeout",
-                Summary = "Signed-in Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on first-party campaign-spine rails."
+                Summary = "Account Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on Chummer campaign pages."
             },
             Boundary = new
             {
                 MeetingTools = "Projection only",
-                RuleTruth = "Chummer-owned",
-                WorldTruth = "Chummer-owned",
+                RulesOwner = "Chummer",
+                WorldOwner = "Chummer",
                 Surveillance = "Not claimed"
             }
         });
@@ -5387,8 +5387,8 @@ public sealed class PublicLandingController : Controller
             description: "Open-run board, organizer closeout status, and moderation-safe public paths.",
             eyebrow: "Community",
             heading: "Community Hub",
-            intro: "Community Hub now ships a real open-run network: public board status and safety boundaries stay readable, while signed-in listing, join review, scheduling, meeting handoff, and closeout stay on the same reviewed campaign path.",
-            boundaryLine: "Public route shows board status and safety boundaries. Private roster notes, meeting access, and case handling stay signed-in and Chummer-owned.",
+            intro: "Community Hub now ships a real open-run network: public board status and safety limits stay readable, while account listing, join review, scheduling, meeting handoff, and closeout stay on the same campaign path.",
+            boundaryLine: "Public pages show board status and safety limits. Private roster notes, meeting access, and case handling stay in Chummer account pages.",
             summaryPoints:
             [
                 $"{summary.OpenRuns.Count} open runs visible",
@@ -5680,26 +5680,26 @@ public sealed class PublicLandingController : Controller
             BlackLedgerFollowThroughCueViewModel[] guestCues =
             [
                 new(
-                    Label: "Signed-in board",
-                    Summary: "Sign in to open the Community Hub board where open-run listing, join review, scheduling, and closeout stay on one Chummer path.",
+                    Label: "Account board",
+                    Summary: "Sign in to open the Community Hub board where open-run listing, join review, scheduling, and closeout stay together.",
                     Href: "/login?next=%2Faccount%2Fcommunity",
                     StatusLabel: "Sign-in"),
                 new(
-                    Label: "Public board packet",
+                    Label: "Public board",
                     Summary: $"{publicSummary.OpenRuns.Count} public open run(s), {publicSummary.PendingJoinCount} pending join request(s), and {publicSummary.CloseoutCount} closeout record(s) are already visible without leaking private roster state.",
                     Href: "/community/open-runs/open_run_board.json",
-                    StatusLabel: "Public-safe"),
+                    StatusLabel: "Public"),
                 new(
                     Label: "Network details",
-                    Summary: "Inspect the named signed-in and API paths before treating Community Hub as just another forum or meeting-tool shell.",
+                    Summary: "Read the account and public paths before treating Community Hub as just another forum or meeting-tool shell.",
                     Href: "/community/receipts/open-run-network.json",
                     StatusLabel: "Current")
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
                 Heading: "Community Hub operations",
-                Summary: "Public board status is readable without an account, but the reviewed open-run board, join review, scheduling, and closeout loop stay on the signed-in Community Hub path.",
-                BoundaryLine: "Meeting tools and public venues are handoff paths only. Chummer owns run, roster, scheduling, and closeout truth.",
+                Summary: "Public board status is readable without an account, but open-run listing, join review, scheduling, and closeout stay on the account Community Hub path.",
+                BoundaryLine: "Meeting tools and public venues are handoff paths only. Chummer keeps run, roster, scheduling, and closeout records.",
                 Cues: guestCues);
         }
 
@@ -5721,32 +5721,32 @@ public sealed class PublicLandingController : Controller
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
-                    Label: "Signed-in board",
+                    Label: "Account board",
                     Summary: openRuns.Count == 0
-                    ? "No reviewed open run is attached to this account yet. Community Hub is ready to open the named board as soon as a workspace publishes one."
-                    : $"{openRuns.Count} open run(s) are already visible on your reviewed board, with listing, join review, scheduling, and closeout attached to the same account path.",
+                    ? "No reviewed open run is attached to this account yet. Community Hub is ready to open the account board as soon as a workspace publishes one."
+                    : $"{openRuns.Count} open run(s) are already visible on your board, with listing, join review, scheduling, and closeout attached to the same account path.",
                 Href: "/account/community",
                 StatusLabel: openRuns.Count == 0 ? "Ready" : "Signed-in"),
                 new(
-                    Label: "Lead open run contract",
+                    Label: "Lead open run",
                     Summary: leadDetail is null
-                    ? "Use the typed API index when you want the open-run contract before a public packet becomes a real table."
+                    ? "Use the open-run list when you want current table status before a public listing becomes a real table."
                     : $"{leadDetail.JoinRequests.Count} join request(s), {leadDetail.Roster.Count} roster seat(s), and {(leadDetail.Schedule is null ? "no" : "a")} schedule are attached to {leadDetail.Listing.ListingTitle}.",
                 Href: detailApiHref,
                 StatusLabel: leadDetail is null ? "API" : "Typed"),
             new(
-                    Label: "Venue and handoff boundary",
+                    Label: "Venue and meeting link",
                     Summary: leadDetail?.MeetingHandoff is null
-                    ? "Public venue status can be shown without leaking private room details, and meeting-service automation still remains projection-only."
-                    : $"{leadDetail.MeetingHandoff.ProviderLabel} handoff exists for the lead open run, but Chummer still owns accepted roster and run truth.",
+                    ? "Public venue status can be shown without leaking private room details, and meeting-service automation stays optional."
+                    : $"{leadDetail.MeetingHandoff.ProviderLabel} handoff exists for the lead open run, but Chummer still keeps accepted roster and run status.",
                 Href: venueHref,
                 StatusLabel: leadDetail?.MeetingHandoff is null ? "Boundary" : "Handoff")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
             Heading: "Community Hub operations",
-            Summary: "The named Community Hub path now carries reviewed open-run board status, join review, scheduling, meeting handoff, and closeout on one Chummer campaign path.",
-            BoundaryLine: "Community Hub can project venue status and service handoff, but it does not hand run truth, roster truth, or consequence truth to chat tools, meeting tools, or public boards.",
+            Summary: "The Community Hub path now carries open-run board status, join review, scheduling, meeting handoff, and closeout on one Chummer campaign path.",
+            BoundaryLine: "Community Hub can show venue status and service handoff, but it does not hand run, roster, or closeout records to chat tools, meeting tools, or public boards.",
             Cues: cues);
     }
 

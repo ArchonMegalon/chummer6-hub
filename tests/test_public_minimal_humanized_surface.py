@@ -2071,3 +2071,57 @@ def test_foundry_export_copy_uses_limited_handoff_language() -> None:
         "Export stays clear",
     ):
         assert expected in controller
+
+
+def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+
+    for forbidden in (
+        "Public-safe venue status for an open run without leaking private room details.",
+        "Public-safe venue",
+        "Public-safe session title or run label.",
+        "ready for signed-in participants",
+        "Public-safe venue status only",
+        "Signed-in Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on first-party campaign-spine rails.",
+        "RuleTruth = \"Chummer-owned\"",
+        "WorldTruth = \"Chummer-owned\"",
+        "public board status and safety boundaries stay readable, while signed-in listing",
+        "Private roster notes, meeting access, and case handling stay signed-in and Chummer-owned.",
+        "Signed-in board",
+        "Public board packet",
+        "Inspect the named signed-in and API paths before treating Community Hub as just another forum or meeting-tool shell.",
+        "the signed-in Community Hub path",
+        "Chummer owns run, roster, scheduling, and closeout truth.",
+        "Lead open run contract",
+        "Use the typed API index when you want the open-run contract before a public packet becomes a real table.",
+        "Venue and handoff boundary",
+        "meeting-service automation still remains projection-only",
+        "Chummer still owns accepted roster and run truth.",
+        "run truth, roster truth, or consequence truth",
+    ):
+        assert forbidden not in controller
+
+    for expected in (
+        "Public venue status for an open run without leaking private room details.",
+        "Public venue",
+        "Public session title or run label.",
+        "ready for account participants",
+        "Public venue status only",
+        "Account Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on Chummer campaign pages.",
+        "RulesOwner = \"Chummer\"",
+        "WorldOwner = \"Chummer\"",
+        "public board status and safety limits stay readable, while account listing",
+        "Private roster notes, meeting access, and case handling stay in Chummer account pages.",
+        "Account board",
+        "Public board",
+        "Read the account and public paths before treating Community Hub as just another forum or meeting-tool shell.",
+        "account Community Hub path",
+        "Chummer keeps run, roster, scheduling, and closeout records.",
+        "Lead open run",
+        "Use the open-run list when you want current table status before a public listing becomes a real table.",
+        "Venue and meeting link",
+        "meeting-service automation stays optional",
+        "Chummer still keeps accepted roster and run status.",
+        "does not hand run, roster, or closeout records to chat tools, meeting tools, or public boards.",
+    ):
+        assert expected in controller
