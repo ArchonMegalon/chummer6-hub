@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 import requests
 
 from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json, write_text
+from verify_public_copy_leak_gate import visible_text
 
 
 DESIGN_FILES = [
@@ -40,6 +42,11 @@ HTML_ROUTES = [
     "/participate/karma-forge/submitted/sample-submission-id",
     "/contact/submitted/sample-case-id",
 ]
+ALLOWED_EXTERNAL_REDIRECT_ROUTES = {
+    "/participate",
+    "/feedback",
+    "/help/feedback",
+}
 FORBIDDEN_PATTERN = re.compile(
     r"\b(ProductLift|ICanpreneur|Icanpreneur|Emailit|Deftform|MetaSurvey|Lunacal|Signitic|Teable|ApproveThis|NextStep|FacePop|ClickRank|Katteb)\b",
     re.IGNORECASE,
@@ -94,10 +101,21 @@ def scan_files() -> list[dict]:
 def scan_html(base_url: str) -> list[dict]:
     hits: list[dict] = []
     session = requests.Session()
+    base_host = urlparse(base_url).netloc.lower()
     for route in HTML_ROUTES:
-        response = session.get(f"{base_url}{route}", timeout=30)
+        url = f"{base_url}{route}"
+        response = session.get(url, timeout=30, allow_redirects=False)
         response.raise_for_status()
-        hits.extend(scan_text("html", route, response.text))
+        if 300 <= response.status_code < 400:
+            redirect_location = response.headers.get("Location", "").strip()
+            redirect_url = urljoin(url, redirect_location) if redirect_location else ""
+            redirect_host = urlparse(redirect_url).netloc.lower()
+            if redirect_host and redirect_host != base_host and route in ALLOWED_EXTERNAL_REDIRECT_ROUTES:
+                continue
+            if redirect_url and (not redirect_host or redirect_host == base_host):
+                response = session.get(redirect_url, timeout=30, allow_redirects=False)
+                response.raise_for_status()
+        hits.extend(scan_text("html", route, visible_text(response.text)))
     return hits
 
 

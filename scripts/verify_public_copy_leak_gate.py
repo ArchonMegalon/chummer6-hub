@@ -45,6 +45,11 @@ MINIMAL_PUBLIC_ROUTES = {
     "/what-is-chummer",
     "/login",
 }
+ALLOWED_EXTERNAL_REDIRECT_ROUTES = {
+    "/participate",
+    "/feedback",
+    "/help/feedback",
+}
 FORBIDDEN_PATTERNS = [
     r"\bchummer-api\b",
     r"\bchummer6-hub\b",
@@ -219,6 +224,8 @@ class RouteResult:
     minimal_route: bool
     minimal_forbidden_hits: list[str]
     detail: str | None = None
+    redirect_url: str | None = None
+    redirect_external: bool = False
 
 
 def now_iso() -> str:
@@ -269,9 +276,50 @@ def normalize_base_url(base_url: str) -> str:
 def verify_route(session: requests.Session, base_url: str, route: str) -> RouteResult:
     url = urljoin(f"{base_url}/", route.lstrip("/"))
     try:
-        response = session.get(url, timeout=10)
+        response = session.get(url, timeout=10, allow_redirects=False)
     except Exception as exc:
         return RouteResult(route, url, None, False, [], is_minimal_public_route(route), [], str(exc))
+
+    base_host = urlparse(base_url).netloc.lower()
+    if 300 <= response.status_code < 400:
+        redirect_location = response.headers.get("Location", "").strip()
+        redirect_url = urljoin(url, redirect_location) if redirect_location else None
+        redirect_host = urlparse(redirect_url or "").netloc.lower()
+        redirect_external = bool(redirect_host and redirect_host != base_host)
+        normalized_route = normalized_route_path(route)
+
+        if redirect_external:
+            success = normalized_route in ALLOWED_EXTERNAL_REDIRECT_ROUTES
+            detail = None if success else "route redirects outside Chummer from an unapproved public path"
+            return RouteResult(
+                route,
+                url,
+                response.status_code,
+                success,
+                [],
+                is_minimal_public_route(route),
+                [],
+                detail,
+                redirect_url,
+                redirect_external=True,
+            )
+
+        if redirect_url:
+            try:
+                response = session.get(redirect_url, timeout=10, allow_redirects=False)
+            except Exception as exc:
+                return RouteResult(route, url, None, False, [], is_minimal_public_route(route), [], str(exc), redirect_url)
+        else:
+            return RouteResult(
+                route,
+                url,
+                response.status_code,
+                False,
+                [],
+                is_minimal_public_route(route),
+                [],
+                "route returned a redirect without a Location header",
+            )
 
     text = visible_text(response.text)
     hits = forbidden_hits(text)

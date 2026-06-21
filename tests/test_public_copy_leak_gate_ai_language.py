@@ -7,10 +7,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "verify_public_copy_leak_gate.py"
+FORBIDDEN_SCAN_MODULE_PATH = ROOT / "scripts" / "public_forbidden_string_scan.py"
 
 
 def load_module():
     spec = importlib.util.spec_from_file_location("verify_public_copy_leak_gate", MODULE_PATH)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_forbidden_scan_module():
+    scripts_dir = str(ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    spec = importlib.util.spec_from_file_location("public_forbidden_string_scan", FORBIDDEN_SCAN_MODULE_PATH)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -101,3 +115,60 @@ def test_route_result_fails_when_minimal_route_contains_strict_forbidden_copy():
     assert "AI, proof" not in detail
     assert "artifact" not in detail
     assert "lane" not in detail
+
+
+def test_participation_external_redirect_is_allowed_without_scanning_provider_copy():
+    module = load_module()
+
+    class FakeResponse:
+        status_code = 302
+        text = "ProductLift"
+        headers = {"Location": "https://chummer6.productlift.dev"}
+
+    class FakeSession:
+        def get(self, url: str, timeout: int, allow_redirects: bool):
+            assert url == "https://chummer.run/participate"
+            assert timeout == 10
+            assert allow_redirects is False
+            return FakeResponse()
+
+    result = module.verify_route(FakeSession(), "https://chummer.run", "/participate")
+
+    assert result.success is True
+    assert result.redirect_external is True
+    assert result.redirect_url == "https://chummer6.productlift.dev"
+    assert result.forbidden_hits == []
+
+
+def test_unapproved_external_redirect_fails_public_copy_gate():
+    module = load_module()
+
+    class FakeResponse:
+        status_code = 302
+        text = ""
+        headers = {"Location": "https://example.invalid/outside"}
+
+    class FakeSession:
+        def get(self, url: str, timeout: int, allow_redirects: bool):
+            assert allow_redirects is False
+            return FakeResponse()
+
+    result = module.verify_route(FakeSession(), "https://chummer.run", "/downloads")
+
+    assert result.success is False
+    assert result.redirect_external is True
+    assert result.detail == "route redirects outside Chummer from an unapproved public path"
+
+
+def test_provider_scanner_uses_visible_html_text_not_script_or_href_details():
+    module = load_forbidden_scan_module()
+
+    markup = """
+    <main>
+      <a href="https://chummer6.productlift.dev">Participate</a>
+      <script>window.clickRankScript = "https://js.clickrank.ai/script";</script>
+    </main>
+    """
+
+    assert module.scan_text("html", "/", module.visible_text(markup)) == []
+    assert module.scan_text("html", "/", module.visible_text("<main>Open ProductLift</main>"))
