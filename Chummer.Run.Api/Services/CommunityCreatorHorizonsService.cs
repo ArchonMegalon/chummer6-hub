@@ -14,24 +14,24 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "open_run_board",
             "Open run board",
-            "Public-safe board view over Chummer-owned open run truth, seat posture, and scheduling stance.",
+            "A simple public board for open runs, seats, and scheduling.",
             "/community/open-runs/open_run_board.md",
             "/community/open-runs/open_run_board.json",
-            ["Open-run board", "Seat posture", "Scheduling truth"]),
+            ["Open-run board", "Seats", "Scheduling"]),
         new(
             "organizer_closeout_posture",
-            "Organizer closeout posture",
-            "How organizer-owned scheduling, handoff, and closeout rails stay visible without pretending public chat tools own the workflow.",
+            "Organizer closeout",
+            "How scheduling, handoff, and closeout stay clear without exposing private table details.",
             "/community/open-runs/organizer_closeout_posture.md",
             "/community/open-runs/organizer_closeout_posture.json",
             ["Organizer path", "Meeting handoff", "Closeout status"]),
         new(
             "moderation_boundary",
-            "Moderation boundary",
-            "Names the public moderation and appeals boundary so community trust never turns into hidden private scoring.",
+            "Moderation rules",
+            "What can be shown publicly, what stays private, and why there is no hidden score.",
             "/community/open-runs/moderation_boundary.md",
             "/community/open-runs/moderation_boundary.json",
-            ["Moderation boundary", "Appeals posture", "No hidden scoring"])
+            ["Moderation", "Appeals", "No hidden scoring"])
     ];
 
     private static readonly IReadOnlyList<CommunityCreatorDocument> CreatorDocuments =
@@ -39,17 +39,17 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "publication_board",
             "Publication board",
-            "Governed publication discovery backed by Chummer-owned publication truth instead of loose external shelves.",
+            "Shared work people can browse from Chummer instead of chasing links across outside services.",
             "/creator/packets/publication_board.md",
             "/creator/packets/publication_board.json",
-            ["Governed discovery", "Publication truth", "Public-safe gallery"]),
+            ["Shared work", "Publication history", "Gallery"]),
         new(
             "publication_trust_boundary",
-            "Publication trust boundary",
-            "Visible trust posture and moderation limits for discoverable creator publications.",
+            "Publication safety",
+            "Clear status and moderation notes for discoverable creator publications.",
             "/creator/packets/publication_trust_boundary.md",
             "/creator/packets/publication_trust_boundary.json",
-            ["Trust posture", "Moderation limits", "No provider-owned truth"]),
+            ["Status", "Moderation", "No hidden scoring"]),
         new(
             "campaign_return_loop",
             "Campaign return loop",
@@ -63,14 +63,14 @@ public sealed class CommunityCreatorHorizonsService
     [
         new(
             "runner_return_posture",
-            "Runner return posture",
-            "Public-safe identity posture for runner return, account return, and open-run readiness.",
+            "Runner return",
+            "How Chummer shows return, account access, and open-run readiness without exposing private account details.",
             "/passport/receipts/runner_return_posture.md",
             "/passport/receipts/runner_return_posture.json",
-            ["Runner return", "Install continuity", "Participation posture"]),
+            ["Runner return", "Linked installs", "Participation"]),
         new(
             "cross_table_identity_boundary",
-            "Cross-table identity boundary",
+            "Cross-table identity",
             "Explains what Runner Passport can signal publicly without leaking private account state or moderation internals.",
             "/passport/receipts/cross_table_identity_boundary.md",
             "/passport/receipts/cross_table_identity_boundary.json",
@@ -78,60 +78,60 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "privacy_safe_participation_proof",
             "Privacy-safe participation",
-            "Aggregate status that participation identity remains first-party, bounded, and non-surveillant.",
+            "Aggregate participation status without private identity links or surveillance-style scoring.",
             "/passport/receipts/privacy_safe_participation_proof.md",
             "/passport/receipts/privacy_safe_participation_proof.json",
-            ["Aggregate status", "Public-safe counts", "Bounded identity"])
+            ["Aggregate status", "Public counts", "Private identity"])
     ];
 
     private static readonly IReadOnlyList<CommunityCreatorDocument> SignalDeckDocuments =
     [
         new(
             "pressure_posture",
-            "Signal Deck pressure posture",
-            "Public-safe command-deck posture for governed consequence cues, inbox continuity, and next-step pressure.",
+            "Signal Deck pressure",
+            "Consequence cues, inbox follow-up, and next steps without turning the campaign into a public scoreboard.",
             "/signal-deck/receipts/pressure_posture.md",
             "/signal-deck/receipts/pressure_posture.json",
-            ["Command pressure", "Governed cues", "Inbox continuity"]),
+            ["Command pressure", "Cues", "Inbox"]),
         new(
             "command_boundary",
-            "Signal Deck command boundary",
-            "Explains how Signal Deck stays first-party, bounded, and consequence-backed without turning into private world authority.",
+            "Signal Deck limits",
+            "What Signal Deck can show without revealing private session notes or inventing authority.",
             "/signal-deck/receipts/command_boundary.md",
             "/signal-deck/receipts/command_boundary.json",
-            ["Command boundary", "No hidden authority", "First-party only"]),
+            ["Command limits", "No hidden authority", "Private stays private"]),
         new(
             "aftermath_return_loop",
             "Signal Deck aftermath return loop",
             "Shows how command pressure survives through aftermath, Living Newsroom framing, and Runner Passport continuity.",
             "/signal-deck/receipts/aftermath_return_loop.md",
             "/signal-deck/receipts/aftermath_return_loop.json",
-            ["Aftermath rail", "Living Newsroom", "Runner continuity"])
+            ["Aftermath", "Living Newsroom", "Runner continuity"])
     ];
 
     private static readonly IReadOnlyList<CommunityCreatorDocument> LivingWorldDocuments =
     [
         new(
             "watch_package_posture",
-            "Living World watch package posture",
-            "Public-safe between-session posture showing how Living Newsroom framing, faction command, and governed continuity stay attached to the same turn.",
+            "Living World watchlist",
+            "Between-session updates from the newsroom, factions, and the current turn.",
             "/living-world/receipts/watch_package_posture.md",
             "/living-world/receipts/watch_package_posture.json",
-            ["Watch package", "Between-session loop", "First-party framing"]),
+            ["Watchlist", "Between-session loop", "Current turn"]),
         new(
             "command_followthrough_boundary",
-            "Living World command continuity boundary",
-            "Explains how living-world engagement stays governed, opt-in, and bounded instead of becoming autonomous world simulation.",
+            "Living World command continuity",
+            "Explains how living-world engagement stays opt-in and reviewable instead of becoming an automatic simulation.",
             "/living-world/receipts/command_followthrough_boundary.md",
             "/living-world/receipts/command_followthrough_boundary.json",
-            ["Governed continuity", "No autonomous simulation", "Bounded engagement"]),
+            ["Reviewed continuity", "No autonomous simulation", "Opt-in"]),
         new(
             "newsroom_aftermath_loop",
             "Living World newsroom and aftermath loop",
-            "Shows how the public-safe bulletin, aftermath rail, and runner continuity stay stitched together across the same turn.",
+            "Shows how the bulletin, aftermath, and runner continuity stay connected across the same turn.",
             "/living-world/receipts/newsroom_aftermath_loop.md",
             "/living-world/receipts/newsroom_aftermath_loop.json",
-            ["Living Newsroom", "Aftermath rail", "Runner continuity"])
+            ["Living Newsroom", "Aftermath", "Runner continuity"])
     ];
 
     private readonly CommunityStore _communityStore;
@@ -256,7 +256,7 @@ public sealed class CommunityCreatorHorizonsService
             string.Empty,
             document.Summary,
             string.Empty,
-            "## Current public-safe posture",
+            "## What is visible now",
             string.Empty,
             $"- Active open runs on the board: {summary.OpenRuns.Count}",
             $"- Quickstart-friendly runs: {summary.QuickstartCount}",
@@ -264,7 +264,7 @@ public sealed class CommunityCreatorHorizonsService
             $"- Scheduled runs: {summary.ScheduledCount}",
             $"- Closeouts on record: {summary.CloseoutCount}",
             string.Empty,
-            "## Boundary",
+            "## Privacy and limits",
             string.Empty,
             BuildCommunityBoundary(id),
             string.Empty
@@ -278,7 +278,6 @@ public sealed class CommunityCreatorHorizonsService
             lines.Add(string.Empty);
         }
 
-        lines.Add($"JSON route: {document.JsonRoute}");
         return string.Join('\n', lines) + "\n";
     }
 
@@ -318,9 +317,9 @@ public sealed class CommunityCreatorHorizonsService
                 counts = BuildCommunityCounts(summary),
                 organizer_factors = new[]
                 {
-                    "open_run_schedule_receipts",
-                    "meeting_handoff_receipts",
-                    "closeout_receipts"
+                    "open_run_schedules",
+                    "meeting_handoffs",
+                    "closeouts"
                 },
                 boundary = BuildCommunityBoundary(id),
                 generated_at_utc = DateTimeOffset.UtcNow
@@ -333,9 +332,9 @@ public sealed class CommunityCreatorHorizonsService
                 status = "live",
                 moderation_boundary = new[]
                 {
-                    "Public route explains moderation and appeals posture without exposing private case detail.",
+                    "The public page explains moderation and appeals without exposing private cases.",
                     "Community trust does not become a hidden reputation engine.",
-                    "Signed-in operator rails keep enforcement detail off the public lane."
+                    "Signed-in pages keep enforcement detail private."
                 },
                 counts = BuildCommunityCounts(summary),
                 generated_at_utc = DateTimeOffset.UtcNow
@@ -355,14 +354,14 @@ public sealed class CommunityCreatorHorizonsService
             string.Empty,
             document.Summary,
             string.Empty,
-            "## Current governed publication posture",
+            "## What is visible now",
             string.Empty,
             $"- Discoverable publications: {summary.Publications.Count}",
             $"- Curated live: {summary.CuratedLiveCount}",
             $"- Approval-backed: {summary.ApprovalBackedCount}",
             $"- Publications with campaign return summaries: {summary.ReturnLoopCount}",
             string.Empty,
-            "## Boundary",
+            "## Privacy and limits",
             string.Empty,
             BuildCreatorBoundary(id),
             string.Empty
@@ -376,7 +375,6 @@ public sealed class CommunityCreatorHorizonsService
             lines.Add(string.Empty);
         }
 
-        lines.Add($"JSON route: {document.JsonRoute}");
         return string.Join('\n', lines) + "\n";
     }
 
@@ -464,19 +462,17 @@ public sealed class CommunityCreatorHorizonsService
             string.Empty,
             document.Summary,
             string.Empty,
-            "## Current public-safe posture",
+            "## What is visible now",
             string.Empty,
-            $"- Active claimed installs: {summary.ActiveInstallationCount}",
-            $"- Open runs visible to the public lane: {summary.OpenRunCount}",
+            $"- Linked installs: {summary.ActiveInstallationCount}",
+            $"- Open runs visible publicly: {summary.OpenRunCount}",
             $"- Pending join requests: {summary.PendingJoinCount}",
-            $"- Participation receipts on the community spine: {summary.ParticipationNotificationCount}",
-            $"- Platforms in claimed-install posture: {(summary.PlatformLabels.Count == 0 ? "none yet" : string.Join(", ", summary.PlatformLabels))}",
+            $"- Participation events: {summary.ParticipationNotificationCount}",
+            $"- Linked platforms: {(summary.PlatformLabels.Count == 0 ? "none yet" : string.Join(", ", summary.PlatformLabels))}",
             string.Empty,
-            "## Boundary",
+            "## Privacy and limits",
             string.Empty,
-            BuildPassportBoundary(id),
-            string.Empty,
-            $"JSON route: {document.JsonRoute}"
+            BuildPassportBoundary(id)
         ];
         return string.Join('\n', lines) + "\n";
     }
@@ -517,18 +513,16 @@ public sealed class CommunityCreatorHorizonsService
             string.Empty,
             document.Summary,
             string.Empty,
-            "## Current first-party posture",
+            "## What is visible now",
             string.Empty,
-            $"- Active claimed installs on the continuity rail: {summary.ActiveInstallationCount}",
-            $"- Open runs visible to the shared command rail: {summary.OpenRunCount}",
-            $"- Pending join requests waiting on follow-through: {summary.PendingJoinCount}",
-            $"- Participation receipts on the first-party spine: {summary.ParticipationNotificationCount}",
+            $"- Linked installs: {summary.ActiveInstallationCount}",
+            $"- Open runs visible publicly: {summary.OpenRunCount}",
+            $"- Pending join requests: {summary.PendingJoinCount}",
+            $"- Participation events: {summary.ParticipationNotificationCount}",
             string.Empty,
-            "## Boundary",
+            "## Privacy and limits",
             string.Empty,
-            BuildSignalDeckBoundary(id),
-            string.Empty,
-            $"JSON route: {document.JsonRoute}"
+            BuildSignalDeckBoundary(id)
         ];
         return string.Join('\n', lines) + "\n";
     }
@@ -568,18 +562,16 @@ public sealed class CommunityCreatorHorizonsService
             string.Empty,
             document.Summary,
             string.Empty,
-            "## Current first-party posture",
+            "## What is visible now",
             string.Empty,
-            $"- Active claimed installs on the continuity rail: {summary.ActiveInstallationCount}",
-            $"- Open runs on the shared turn rail: {summary.OpenRunCount}",
-            $"- Participation receipts on the first-party spine: {summary.ParticipationNotificationCount}",
+            $"- Linked installs: {summary.ActiveInstallationCount}",
+            $"- Open runs visible publicly: {summary.OpenRunCount}",
+            $"- Participation events: {summary.ParticipationNotificationCount}",
             $"- Creator publications with return-loop summaries: {summary.ReturnLoopPublicationCount}",
             string.Empty,
-            "## Boundary",
+            "## Privacy and limits",
             string.Empty,
-            BuildLivingWorldBoundary(id),
-            string.Empty,
-            $"JSON route: {document.JsonRoute}"
+            BuildLivingWorldBoundary(id)
         ];
         return string.Join('\n', lines) + "\n";
     }
@@ -626,40 +618,40 @@ public sealed class CommunityCreatorHorizonsService
     private static string BuildCommunityBoundary(string id)
         => id switch
         {
-            "open_run_board" => "The public board can show title, seat posture, summary, and scheduling stance. Private roster notes, meeting links, and applicant detail stay signed-in.",
-            "organizer_closeout_posture" => "Organizer scheduling, handoff, and closeout truth stays first-party, but account-linked mutations and private meeting access stay off the guest rail.",
-            _ => "Moderation posture stays explicit, appeals remain bounded, and no public reputation score is invented from private case handling."
+            "open_run_board" => "The public board can show title, seats, summary, and scheduling. Private roster notes, meeting links, and applicant detail stay signed-in.",
+            "organizer_closeout_posture" => "Scheduling, handoff, and closeout status stay in Chummer, but private meeting access stays signed-in.",
+            _ => "Moderation rules and appeals stay visible. Private case handling never becomes a public reputation score."
         };
 
     private static string BuildCreatorBoundary(string id)
         => id switch
         {
-            "publication_board" => "Discoverable creator publication truth comes from Chummer-owned publication history, not external service dashboards.",
-            "campaign_return_loop" => "Public publication can point at return posture and next safe action without exposing private workspace review detail.",
-            _ => "Trust bands and moderation posture stay visible. External service analytics and hidden scoring do not become creator truth."
+            "publication_board" => "Discoverable creator publications use Chummer publication history, not outside dashboards.",
+            "campaign_return_loop" => "Publications can show the next useful action without exposing private workspace review detail.",
+            _ => "Status and moderation notes stay visible. External analytics and hidden scoring do not drive creator discovery."
         };
 
     private static string BuildPassportBoundary(string id)
         => id switch
         {
-            "runner_return_posture" => "Runner Passport can expose aggregate readiness posture and continuity rails without showing private device history or account internals.",
-            "cross_table_identity_boundary" => "Cross-table trust stays bounded, explainable, and non-surveillant. It is not a secret ranking engine.",
-            _ => "Participation status remains aggregate and first-party. Private moderation, private identity links, and account recovery detail stay signed-in."
+            "runner_return_posture" => "Runner Passport can show aggregate readiness and return paths without showing private device history or account internals.",
+            "cross_table_identity_boundary" => "Cross-table trust stays explainable and non-surveillant. It is not a secret ranking engine.",
+            _ => "Participation status is shown only as totals. Private moderation, identity links, and account recovery detail stay signed-in."
         };
 
     private static string BuildSignalDeckBoundary(string id)
         => id switch
         {
-            "pressure_posture" => "Signal Deck can expose governed command pressure and consequence posture on first-party rails, but it does not become automatic world authority or a hidden moderation score.",
-            "command_boundary" => "Signal Deck stays bounded to first-party command and continuity. It does not reveal private session transcript detail, moderation internals, or off-platform operator state.",
-            _ => "Aftermath return loops can stay attached to Signal Deck posture, Living Newsroom framing, and Runner Passport continuity without leaking private campaign detail."
+            "pressure_posture" => "Signal Deck can show command pressure and consequences, but it does not become an automatic world engine or a hidden moderation score.",
+            "command_boundary" => "Signal Deck does not reveal private session transcripts, moderation details, or off-platform state.",
+            _ => "Aftermath can stay connected to Signal Deck, Living Newsroom, and Runner Passport without leaking private campaign detail."
         };
 
     private static string BuildLivingWorldBoundary(string id)
         => id switch
         {
-            "watch_package_posture" => "Living World can expose the current public-safe watch package and first-party follow-through posture, but it does not claim an autonomous always-on simulation.",
-            "command_followthrough_boundary" => "Living World engagement stays reviewed, opt-in, and bounded to Chummer-owned command, aftermath, and continuity paths. It does not mutate world truth outside that loop.",
+            "watch_package_posture" => "Living World can show the current public watchlist, but it does not promise an autonomous always-on simulation.",
+            "command_followthrough_boundary" => "Living World engagement stays reviewed and opt-in. It does not change the campaign outside that loop.",
             _ => "Living Newsroom framing, aftermath, and runner continuity can stay on the same turn loop without exposing private campaign detail or pretending off-table fiction is authoritative by itself."
         };
 }

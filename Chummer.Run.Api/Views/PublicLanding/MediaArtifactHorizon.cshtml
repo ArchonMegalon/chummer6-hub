@@ -59,7 +59,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Files</p>
         <h2 class="editorial-title">Open the files when you need detail.</h2>
-        <p class="editorial-copy">Each card has readable notes and raw data for tools.</p>
+        <p class="editorial-copy">Each card opens to the readable notes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var document in Model.Documents)
@@ -76,7 +76,6 @@
                 </div>
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@document.MarkdownRoute">Open notes</a>
-                    <a class="button-like button-like--ghost" href="@document.JsonRoute">Open data</a>
                 </div>
             </article>
         }
