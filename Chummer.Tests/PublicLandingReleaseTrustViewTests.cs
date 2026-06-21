@@ -463,8 +463,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Use this page", liveProof, StringComparison.Ordinal);
         Assert.Contains("Useful cues", liveProof, StringComparison.Ordinal);
-        Assert.Contains("Use your signed-in detail view", liveProof, StringComparison.Ordinal);
-        Assert.Contains("signed-in detail view", liveProof, StringComparison.Ordinal);
+        Assert.Contains("Use your account detail view", liveProof, StringComparison.Ordinal);
+        Assert.Contains("account detail view", liveProof, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Pain)", liveProof, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Payoff)", liveProof, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", liveProof, StringComparison.Ordinal);
@@ -476,7 +476,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Verification markers", liveProof, StringComparison.Ordinal);
 
         Assert.Contains("detail view", previewConcept, StringComparison.Ordinal);
-        Assert.Contains("signed-in detail view", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("account detail view", previewConcept, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Pain)", previewConcept, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Payoff)", previewConcept, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", previewConcept, StringComparison.Ordinal);
@@ -487,7 +487,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("follow-through", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("artifact is already live", previewConcept, StringComparison.Ordinal);
 
-        Assert.Contains("signed-in detail view", roadmap, StringComparison.Ordinal);
+        Assert.Contains("account detail view", roadmap, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", roadmap, StringComparison.Ordinal);
         Assert.DoesNotContain("dead external handoff", roadmap, StringComparison.OrdinalIgnoreCase);
     }

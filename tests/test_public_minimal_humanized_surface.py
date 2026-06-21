@@ -1680,6 +1680,32 @@ def test_public_publication_page_uses_account_return_language() -> None:
         assert forbidden not in publication
 
 
+def test_feature_detail_partials_use_account_detail_language() -> None:
+    live = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailLiveProof.cshtml")
+    preview = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml")
+    roadmap = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml")
+    combined = "\n".join((live, preview, roadmap))
+
+    for expected in (
+        "Use your account detail view",
+        "Open the account detail view",
+        "Open account detail",
+        "Compare against your account detail view",
+        "Open account detail view",
+    ):
+        assert expected in combined
+
+    for forbidden in (
+        "Use your signed-in detail view",
+        "Open the signed-in detail view",
+        "Open signed-in detail",
+        "Compare against your signed-in detail view",
+        "Open signed-in detail view",
+        "signed-in detail view",
+    ):
+        assert forbidden not in combined
+
+
 def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> None:
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")
