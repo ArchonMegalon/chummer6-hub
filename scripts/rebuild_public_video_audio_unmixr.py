@@ -36,6 +36,8 @@ LOW_TONE_CLEANUP_FILTER = "equalizer=f=188:width_type=h:width=90:g=-18,equalizer
 NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 1.00
 MAX_EDGE_SILENCE_SECONDS = 0.30
+MIN_AUDIO_COVERAGE_RATIO = 0.98
+MAX_UNCOVERED_TAIL_SECONDS = 0.75
 SILENCE_GATE_DBFS = -42.0
 MIN_CLEAN_TTS_COVERAGE_RATIO = 0.68
 MIN_CLEAN_TTS_TEMPO = 0.68
@@ -646,6 +648,8 @@ EXTRA_SCRIPT_BY_GROUP = {
     ),
     "rust-market-syndicate-promo": (
         "Rust Market Syndicate makes every favor visible enough to become dangerous. Debt heat, favor load, and black-market opportunity all share the same table. "
+        "A bargain can look friendly when the stall lights are warm, but every shortcut leaves a mark. "
+        "Chummer keeps the cost legible: who owes what, which pressure is climbing, and when a small deal becomes the problem the crew must solve next. "
         "Everything is available. Nothing is free. The trick is seeing the cost before the deal starts collecting interest."
     ),
     "turn-1-newsreel": (
@@ -1272,6 +1276,7 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
         first_audible_seconds = samples.size / TARGET_SR
         last_audible_end_seconds = 0.0
     total_seconds = samples.size / TARGET_SR
+    media_duration_seconds = duration(path)
     max_silence_seconds = max_silent_frames * frame_samples / TARGET_SR
     tail_silence_seconds = max(0.0, total_seconds - last_audible_end_seconds)
     status = "pass"
@@ -1314,6 +1319,12 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
     if tail_silence_seconds > MAX_EDGE_SILENCE_SECONDS:
         status = "fail"
         reasons.append("audio_ends_early")
+    if media_duration_seconds > 1.0 and total_seconds > 0:
+        uncovered_tail_seconds = media_duration_seconds - total_seconds
+        coverage_ratio = total_seconds / media_duration_seconds if media_duration_seconds else 0.0
+        if uncovered_tail_seconds > MAX_UNCOVERED_TAIL_SECONDS and coverage_ratio < MIN_AUDIO_COVERAGE_RATIO:
+            status = "fail"
+            reasons.append("audio_undercovered")
     return {
         "status": status,
         "reasons": reasons,
@@ -1334,6 +1345,8 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
         "max_silence_seconds": round(max_silence_seconds, 3),
         "first_audible_seconds": round(first_audible_seconds, 3),
         "tail_silence_seconds": round(tail_silence_seconds, 3),
+        "audio_duration_seconds": round(total_seconds, 3),
+        "media_duration_seconds": round(media_duration_seconds, 3),
     }
 
 
@@ -1480,6 +1493,8 @@ def main() -> int:
             "max_silence_seconds_at_gate_dbfs": MAX_SILENCE_SECONDS,
             "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
+            "max_uncovered_tail_seconds": MAX_UNCOVERED_TAIL_SECONDS,
+            "min_audio_coverage_ratio": MIN_AUDIO_COVERAGE_RATIO,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
             "max_low_tone_resonance_db": MAX_LOW_TONE_RESONANCE_DB,
             "min_low_tone_resonance_ratio": MIN_LOW_TONE_RESONANCE_RATIO,

@@ -58,6 +58,45 @@ class PublicVideoAudioUnmixrTests(unittest.TestCase):
         self.assertEqual(quality["status"], "pass")
         self.assertNotIn("low_frequency_tonal_artifact", quality["reasons"])
 
+    def test_video_with_short_audio_stream_fails_coverage_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "undercovered.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=black:size=320x180:duration=3:rate=24",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"sine=frequency=1000:duration=1:sample_rate={MODULE.TARGET_SR}",
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    str(path),
+                ],
+                check=True,
+            )
+
+            quality = MODULE.audio_quality(path)
+
+        self.assertEqual(quality["status"], "fail")
+        self.assertIn("audio_undercovered", quality["reasons"])
+        self.assertLess(quality["audio_duration_seconds"], quality["media_duration_seconds"])
+
     def test_alice_prefers_dedicated_female_voice_env_before_default_voice(self) -> None:
         original = MODULE.LEGACY.env_or_file
 

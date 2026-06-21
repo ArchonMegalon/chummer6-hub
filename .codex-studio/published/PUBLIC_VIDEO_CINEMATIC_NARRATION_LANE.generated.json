@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_video_cinematic_narration_lane.v1",
-  "generated_at_utc": "2026-06-21T21:32:23Z",
+  "generated_at_utc": "2026-06-21T21:52:25Z",
   "status": "pass",
   "media_root": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media",
   "policy": {
@@ -711,8 +711,8 @@
       "caption_segments": 0,
       "receipt": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.receipt.json",
       "tour_manifest": "",
-      "narration_provider": "unmixr-short-tts",
-      "voice": "en-US-AndrewNeural",
+      "narration_provider": "edge-tts-live-repair-because-unmixr-unavailable",
+      "voice": "en-US-GuyNeural",
       "voice_direction": "short faction teaser narration; noir energy, no rules authority",
       "variants": [
         {
@@ -744,7 +744,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 26.383,
+          "duration_seconds": 26.354,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [

@@ -4,8 +4,8 @@
   "provider": "MagicFit",
   "provider_status": "VERIFIED_PROVIDER",
   "render_mode": "magicfit_cinematic_faction_promo_with_narration",
-  "narration_provider": "unmixr-short-tts",
-  "voice": "en-US-AndrewNeural",
+  "narration_provider": "edge-tts-live-repair-because-unmixr-unavailable",
+  "voice": "en-US-GuyNeural",
   "slug": "rust-market-syndicate",
   "title": "Rust Market Syndicate",
   "captions": [
@@ -96,5 +96,14 @@
     "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-poster.png",
     "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-audio.m4a"
   },
-  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/rust-market-syndicate/video_manifest.generated.json"
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/rust-market-syndicate/video_manifest.generated.json",
+  "audio_live_repair": {
+    "generated_at_utc": "2026-06-21T21:48:01Z",
+    "status": "pass",
+    "reason": "mp4 variants had a stale truncated audio stream; Unmixr was unavailable during live repair",
+    "fallback_scope": "rust-market-syndicate-promo only",
+    "fallback_provider": "edge-tts-live-repair",
+    "voice": "en-US-GuyNeural",
+    "receipt": ".codex-studio/published/RUST_MARKET_AUDIO_LIVE_REPAIR.generated.json"
+  }
 }
