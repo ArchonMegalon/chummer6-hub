@@ -571,10 +571,24 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("export path", combined, StringComparison.Ordinal);
         Assert.Contains("Download starter file", view, StringComparison.Ordinal);
         Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.TertiaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(verdict.RoleLabel)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(verdict.StatusLabel)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Label)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.RoleLane)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.Label)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.RoleId)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.Label)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.PrimaryAction.Label", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.TertiaryAction.Label", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">@verdict.RoleLabel</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>@verdict.StatusLabel</h3>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@action.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@kit.RoleLane</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>@kit.Label</h3>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@packet.RoleId</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<h3>@packet.Label</h3>", view, StringComparison.Ordinal);
 

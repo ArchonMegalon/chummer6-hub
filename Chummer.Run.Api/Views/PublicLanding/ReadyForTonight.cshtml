@@ -18,9 +18,9 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.TertiaryAction.Label)</a>
     </div>
 </section>
 
@@ -41,8 +41,8 @@
         @foreach (var verdict in Model.Verdicts)
         {
             <article class="route-choice-card">
-                <span class="tag">@verdict.RoleLabel</span>
-                <h3>@verdict.StatusLabel</h3>
+                <span class="tag">@PublicFacingCopyHumanizer.Clean(verdict.RoleLabel)</span>
+                <h3>@PublicFacingCopyHumanizer.Clean(verdict.StatusLabel)</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(verdict.Summary)</p>
                 <p><strong>Blocking reasons</strong></p>
                 <ul>
@@ -61,7 +61,7 @@
                 <div class="stacked-actions">
                     @foreach (var action in verdict.Actions)
                     {
-                        <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+                        <a class="button-like button-like--@action.Tone" href="@action.Href">@PublicFacingCopyHumanizer.Clean(action.Label)</a>
                     }
                 </div>
             </article>
@@ -80,7 +80,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@PublicFacingCopyHumanizer.Clean(kit.RoleLane)</span>
-                <h3>@kit.Label</h3>
+                <h3>@PublicFacingCopyHumanizer.Clean(kit.Label)</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(kit.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in kit.Highlights)
