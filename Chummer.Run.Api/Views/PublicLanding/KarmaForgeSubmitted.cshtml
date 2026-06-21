@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model KarmaForgeSubmittedPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE submission";
@@ -40,9 +40,9 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@SanitizePublicText(Model.Eyebrow)</p>
+        <h1 class="page-title">@SanitizePublicText(Model.Heading)</h1>
+        <p class="page-copy">@SanitizePublicText(Model.Intro)</p>
         <div class="trust-claim__details">
             <span>Submission saved</span>
             <span>@SanitizePublicText(Model.TrackTitle)</span>
@@ -52,7 +52,7 @@
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@SanitizePublicText(action.Label)</a>
         }
     </div>
 </section>
@@ -102,7 +102,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
-                <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
+                <h3>@SanitizePublicText(stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>Step saved</span>
@@ -110,7 +110,7 @@
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
                 {
-                    <a class="editorial-strip__action" href="@stage.ActionHref">@stage.ActionLabel</a>
+                    <a class="editorial-strip__action" href="@stage.ActionHref">@SanitizePublicText(stage.ActionLabel)</a>
                 }
             </article>
         }
@@ -122,7 +122,7 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>@journeyRef.EventKey</h3>
+                <h3>@SanitizePublicText(journeyRef.EventKey)</h3>
                 <p>@SanitizePublicText(journeyRef.Summary)</p>
             </div>
         </article>

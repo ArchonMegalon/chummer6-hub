@@ -771,6 +771,75 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Hint: @PublicText(sourceHintLine)" in home
 
 
+def test_submitted_pages_clean_dynamic_public_copy_before_rendering() -> None:
+    support_submitted = read("Chummer.Run.Api/Views/PublicLanding/SupportSubmitted.cshtml")
+    karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
+
+    for expected in (
+        "static string PublicSupportSubmittedText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicSupportSubmittedText(Model.Eyebrow)",
+        "@PublicSupportSubmittedText(Model.Heading)",
+        "@PublicSupportSubmittedText(Model.Intro)",
+        "@PublicSupportSubmittedText(Model.StatusLabel.Replace('_', ' '))",
+        "@PublicSupportSubmittedText(action.Label)",
+        "@PublicSupportSubmittedText(Model.ResponseExpectation)",
+        "@PublicSupportSubmittedText(item)",
+        "@PublicSupportSubmittedText(route.Badge)",
+        "@PublicSupportSubmittedText(route.Title)",
+        "@PublicSupportSubmittedText(route.Summary)",
+        "@PublicSupportSubmittedText(detail)",
+        "@PublicSupportSubmittedText(route.Label)",
+        "@PublicSupportSubmittedText(fact.Heading)",
+        "@PublicSupportSubmittedText(fact.Summary)",
+        "@PublicSupportSubmittedText(eventItem.Label)",
+        "@PublicSupportSubmittedText(eventItem.Summary)",
+    ):
+        assert expected in support_submitted
+
+    for expected in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "@SanitizePublicText(Model.Eyebrow)",
+        "@SanitizePublicText(Model.Heading)",
+        "@SanitizePublicText(Model.Intro)",
+        "@SanitizePublicText(action.Label)",
+        "@SanitizePublicText(stage.Status.Replace",
+        "@SanitizePublicText(stage.ActionLabel)",
+        "@SanitizePublicText(journeyRef.EventKey)",
+    ):
+        assert expected in karma_submitted
+
+    for source in (support_submitted, karma_submitted):
+        for forbidden in (
+            'ViewData["Title"] = Model.Heading;',
+            "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<p class=\"page-copy\">@Model.Intro</p>",
+            ">@action.Label</a>",
+        ):
+            assert forbidden not in source
+
+    for forbidden in (
+        "<span>@Model.StatusLabel.Replace('_', ' ')</span>",
+        "<strong>@item</strong>",
+        "<span class=\"tag\">@route.Badge</span>",
+        "<h3>@route.Title</h3>",
+        "<p>@route.Summary</p>",
+        "<span>@detail</span>",
+        ">@route.Label</a>",
+        "<h3>@fact.Heading</h3>",
+        "@eventItem.Label</span>",
+        "<strong>@eventItem.Summary</strong>",
+    ):
+        assert forbidden not in support_submitted
+
+    for forbidden in (
+        "<h3>@stage.Status.Replace",
+        ">@stage.ActionLabel</a>",
+        "<h3>@journeyRef.EventKey</h3>",
+    ):
+        assert forbidden not in karma_submitted
+
+
 def test_home_page_cleans_primary_and_coverage_dynamic_copy() -> None:
     home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
 

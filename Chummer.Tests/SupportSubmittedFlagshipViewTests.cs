@@ -16,7 +16,9 @@ public sealed class SupportSubmittedFlagshipViewTests
         Assert.Contains("This page keeps the current case state", view, StringComparison.Ordinal);
         Assert.Contains("Open what works today", view, StringComparison.Ordinal);
         Assert.Contains("Same recovery path", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(fact.Summary)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicSupportSubmittedText(fact.Summary)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicSupportSubmittedText(Model.Heading)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicSupportSubmittedText(route.Label)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Follow-up status", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Fix status", view, StringComparison.Ordinal);
         Assert.DoesNotContain("This pack", view, StringComparison.Ordinal);

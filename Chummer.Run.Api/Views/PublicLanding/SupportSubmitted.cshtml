@@ -1,6 +1,6 @@
 @model SupportSubmittedPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-support-submitted";
     var primaryAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
@@ -15,6 +15,8 @@
         string label,
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
+
+    static string PublicSupportSubmittedText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 
     if (primaryAction is not null)
     {
@@ -93,18 +95,18 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicSupportSubmittedText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicSupportSubmittedText(Model.Heading)</h1>
+        <p class="page-copy">@PublicSupportSubmittedText(Model.Intro)</p>
         <div class="trust-claim__details">
             <span>Report saved</span>
-            <span>@Model.StatusLabel.Replace('_', ' ')</span>
+            <span>@PublicSupportSubmittedText(Model.StatusLabel.Replace('_', ' '))</span>
         </div>
     </div>
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@PublicSupportSubmittedText(action.Label)</a>
         }
     </div>
 </section>
@@ -113,14 +115,14 @@
     <div class="continuity-band__copy">
         <p class="eyebrow">What happens next</p>
         <h2 class="editorial-title">The report is in Chummer now, with a clear next page attached.</h2>
-        <p class="editorial-copy">@Model.ResponseExpectation</p>
+        <p class="editorial-copy">@PublicSupportSubmittedText(Model.ResponseExpectation)</p>
     </div>
     <div class="continuity-band__panel">
         @foreach (var item in Model.Highlights)
         {
             <article class="continuity-band__fact">
                 <span>Support</span>
-                <strong>@item</strong>
+                <strong>@PublicSupportSubmittedText(item)</strong>
             </article>
         }
     </div>
@@ -136,16 +138,16 @@
         @foreach (var route in responseRoutes)
         {
             <article class="route-choice-card">
-                <span class="tag">@route.Badge</span>
-                <h3>@route.Title</h3>
-                <p>@route.Summary</p>
+                <span class="tag">@PublicSupportSubmittedText(route.Badge)</span>
+                <h3>@PublicSupportSubmittedText(route.Title)</h3>
+                <p>@PublicSupportSubmittedText(route.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var detail in route.Details)
                     {
-                        <span>@detail</span>
+                        <span>@PublicSupportSubmittedText(detail)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@route.Href">@route.Label</a>
+                <a class="editorial-strip__action" href="@route.Href">@PublicSupportSubmittedText(route.Label)</a>
             </article>
         }
     </div>
@@ -166,8 +168,8 @@
         {
             <article class="compact-rail__item">
                 <div class="compact-rail__copy">
-                    <h3>@fact.Heading</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(fact.Summary)</p>
+                    <h3>@PublicSupportSubmittedText(fact.Heading)</h3>
+                    <p>@PublicSupportSubmittedText(fact.Summary)</p>
                 </div>
             </article>
         }
@@ -177,7 +179,7 @@
 @if (Model.SignedInStatus is not null)
 {
     <section class="release-footnote">
-        <p class="muted-copy">Who can get it now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</p>
+        <p class="muted-copy">Who can get it now: @PublicSupportSubmittedText(TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access."))</p>
     </section>
 }
 
@@ -190,8 +192,8 @@
                 @foreach (var eventItem in Model.TrackedCaseSummary.TimelineHighlights)
                 {
                     <div class="settings-summary-row">
-                        <span>@eventItem.OccurredLabel · @eventItem.Label</span>
-                        <strong>@eventItem.Summary</strong>
+                        <span>@eventItem.OccurredLabel · @PublicSupportSubmittedText(eventItem.Label)</span>
+                        <strong>@PublicSupportSubmittedText(eventItem.Summary)</strong>
                     </div>
                 }
             </div>
