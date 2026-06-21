@@ -284,7 +284,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                      "MobileProjection.cshtml",
                      "KarmaForgeSubmitted.cshtml",
                      "FeedbackOperationsDetail.cshtml",
-                     "GmSessionVenue.cshtml"
+                     "GmSessionVenue.cshtml",
+                     "PublicCreatorPublication.cshtml",
+                     "KnowledgeFabric.cshtml",
+                     "NexusPanContinuity.cshtml"
                  })
         {
             string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", viewName));
@@ -340,7 +343,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                          "packet stays high-signal",
                          "canonical prompts",
                          "Named bounded roles",
-                         "Still bounded"
+                         "Still bounded",
+                         "creator concierge",
+                         "testimonial wrapper",
+                         "lineage, provenance",
+                         "Governed product decision",
+                         "HouseRuleDemandPacket",
+                         "KarmaForgeCandidate",
+                         "Linked update",
+                         "required detail"
                      })
             {
                 Assert.DoesNotContain(marker, visibleText, StringComparison.OrdinalIgnoreCase);
