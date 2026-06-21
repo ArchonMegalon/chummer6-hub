@@ -62,6 +62,8 @@ public sealed class BlackLedgerFactionTests
         Assert.Contains("-promo.receipt.json", service, StringComparison.Ordinal);
         Assert.Contains("How the reel is structured", promoView, StringComparison.Ordinal);
         Assert.Contains("Storyboard mode", promoView, StringComparison.Ordinal);
+        Assert.Contains("Every faction video page includes video files", promoView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Every faction video route", promoView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("faction-storyboard-frame__payoff", promoView, StringComparison.Ordinal);
         Assert.DoesNotContain("Fallback mode:", promoView, StringComparison.Ordinal);
         Assert.DoesNotContain("faction-storyboard-frame__proof", promoView, StringComparison.Ordinal);

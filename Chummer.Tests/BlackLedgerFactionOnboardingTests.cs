@@ -123,7 +123,10 @@ public sealed class FactionCharterBuilderTests
         Assert.Contains("[HttpPost(\"/account/ledger/factions/create\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/api/v1/account/ledger/factions\")]", ledgerController, StringComparison.Ordinal);
         Assert.Contains("Found a Challenger Faction", view, StringComparison.Ordinal);
-        Assert.Contains("starts weaker", view, StringComparison.Ordinal);
+        Assert.Contains("start weaker", view, StringComparison.Ordinal);
+        Assert.Contains("riskier start", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("riskier route", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("route-backed", view, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

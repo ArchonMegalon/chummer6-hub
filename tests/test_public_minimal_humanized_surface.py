@@ -845,6 +845,22 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
     assert "Major and challenger paths" in onboarding
 
 
+def test_faction_builder_and_promo_use_page_language_instead_of_route_language() -> None:
+    faction_create = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionCreate.cshtml")
+    faction_promo = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml")
+    combined = "\n".join((faction_create, faction_promo))
+
+    for forbidden in (
+        "riskier route",
+        "route-backed",
+        "Every faction video route",
+    ):
+        assert forbidden not in combined
+
+    assert "riskier start" in faction_create
+    assert "Every faction video page includes video files" in faction_promo
+
+
 def test_package_pages_use_page_language_instead_of_route_language() -> None:
     package_detail = read("Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml")
     package_receipt = read("Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml")
