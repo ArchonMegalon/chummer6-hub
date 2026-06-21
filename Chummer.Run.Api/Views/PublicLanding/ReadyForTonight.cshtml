@@ -1,14 +1,14 @@
 @model ReadyForTonightPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
+        <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)

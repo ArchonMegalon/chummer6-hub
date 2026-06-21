@@ -571,6 +571,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("export path", combined, StringComparison.Ordinal);
         Assert.Contains("Download starter file", view, StringComparison.Ordinal);
         Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Eyebrow)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Heading)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.TertiaryAction.Label)", view, StringComparison.Ordinal);
@@ -584,6 +587,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("@Model.PrimaryAction.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.TertiaryAction.Label", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"eyebrow\">@Model.Eyebrow</p>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h1 class=\"page-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@verdict.RoleLabel</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<h3>@verdict.StatusLabel</h3>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@action.Label", view, StringComparison.Ordinal);

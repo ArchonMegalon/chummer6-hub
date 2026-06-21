@@ -1011,6 +1011,28 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
     ):
         assert forbidden not in release_upload
 
+    assert "static string PublicGmVenueText(string? value) => PublicFacingCopyHumanizer.Clean(value);" in gm_session
+    assert "@PublicGmVenueText(Model.FallbackMessage)" in gm_session
+    assert "@PublicGmVenueText(Model.VenueStatus)" in gm_session
+    assert "@PublicGmVenueText(Model.ScheduledTimeSummary)" in gm_session
+    assert "@PublicGmVenueText(Model.PrivacyStatus)" in gm_session
+    assert "@PublicGmVenueText(Model.ConsentStatus)" in gm_session
+    assert "@PublicGmVenueText(Model.AttendeeSyncStatus)" in gm_session
+    assert "@PublicGmVenueText(Model.ProviderCreateDisabledReason)" in gm_session
+    assert "<h1 class=\"page-title\">@Model.SessionTitle</h1>" in gm_session
+    assert "<h3>@Model.CampaignName</h3>" in gm_session
+
+    for forbidden in (
+        "<p class=\"muted-copy\">@Model.FallbackMessage</p>",
+        "<h2>@Model.VenueStatus</h2>",
+        "<h2>@Model.ScheduledTimeSummary</h2>",
+        "<h2>@Model.PrivacyStatus / @Model.ConsentStatus</h2>",
+        "Attendance sync: @Model.AttendeeSyncStatus",
+        "<p>@PublicFacingCopyHumanizer.Clean(Model.ProviderCreateDisabledReason)</p>",
+        "<h3>@Model.AttendeeSyncStatus</h3>",
+    ):
+        assert forbidden not in gm_session
+
     assert "participation history" in codex
     assert "keeps the history" in codex
     assert "desktop app" in release_upload
@@ -1021,6 +1043,21 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
     assert "campaign history" in gm_session
     assert "Details</a>" in ledger
     assert "publication history" in roadmap_detail
+
+
+def test_ready_for_tonight_cleans_primary_page_copy() -> None:
+    ready = read("Chummer.Run.Api/Views/PublicLanding/ReadyForTonight.cshtml")
+
+    assert 'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);' in ready
+    assert "@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)" in ready
+    assert "@PublicFacingCopyHumanizer.Clean(Model.Heading)" in ready
+
+    for forbidden in (
+        'ViewData["Title"] = Model.Heading;',
+        "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+        "<h1 class=\"page-title\">@Model.Heading</h1>",
+    ):
+        assert forbidden not in ready
 
 
 def test_package_and_publication_pages_use_activity_and_details_language() -> None:

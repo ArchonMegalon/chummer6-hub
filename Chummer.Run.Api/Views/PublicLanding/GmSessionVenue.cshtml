@@ -5,6 +5,7 @@
     ViewData["SurfaceClass"] = "surface-session-venue";
     var isManage = string.Equals(Model.Section, "manage", StringComparison.OrdinalIgnoreCase);
     var isCloseout = string.Equals(Model.Section, "closeout", StringComparison.OrdinalIgnoreCase);
+    static string PublicGmVenueText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="release-footnote">
@@ -23,24 +24,24 @@
         <a class="button-like button-like--secondary" href="@Model.InvitePageUrl">Copy invite link</a>
         <a class="button-like button-like--ghost" href="/account/campaigns/@Model.CampaignId/sessions/@Model.SessionId/venue/closeout">Closeout</a>
     </div>
-    <p class="muted-copy">@Model.FallbackMessage</p>
+    <p class="muted-copy">@PublicGmVenueText(Model.FallbackMessage)</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Session venue status">
     <article class="status-decision-strip__card">
         <span class="tag">Venue status</span>
-        <h2>@Model.VenueStatus</h2>
-        <p>Room: @PublicFacingCopyHumanizer.Clean(Model.Provider). Visibility: @PublicFacingCopyHumanizer.Clean(Model.Visibility).</p>
+        <h2>@PublicGmVenueText(Model.VenueStatus)</h2>
+        <p>Room: @PublicGmVenueText(Model.Provider). Visibility: @PublicGmVenueText(Model.Visibility).</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Scheduled time</span>
-        <h2>@Model.ScheduledTimeSummary</h2>
+        <h2>@PublicGmVenueText(Model.ScheduledTimeSummary)</h2>
         <p>Keep scheduling visible here without moving campaign or roster data into the room tool.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Privacy and consent</span>
-        <h2>@Model.PrivacyStatus / @Model.ConsentStatus</h2>
-        <p>Attendance sync: @Model.AttendeeSyncStatus.</p>
+        <h2>@PublicGmVenueText(Model.PrivacyStatus) / @PublicGmVenueText(Model.ConsentStatus)</h2>
+        <p>Attendance sync: @PublicGmVenueText(Model.AttendeeSyncStatus).</p>
     </article>
 </section>
 
@@ -64,7 +65,7 @@
         <article class="route-choice-card">
             <span class="tag">Room link</span>
             <h3>@(string.IsNullOrWhiteSpace(Model.ProviderRoomUrl) ? "Manual room link not configured yet" : "Room available to signed-in participants")</h3>
-            <p>@Model.FallbackMessage</p>
+            <p>@PublicGmVenueText(Model.FallbackMessage)</p>
             <div class="route-choice-card__details">
                 <span>Private reply</span>
                 <span>No public room disclosure</span>
@@ -76,8 +77,8 @@
             <h3>@(Model.LatestRecapStatus ?? "No closeout recap yet")</h3>
             <p>Attendance sync remains consent-gated and optional.</p>
             <div class="route-choice-card__details">
-                <span>Attendee sync status: @Model.AttendeeSyncStatus</span>
-                <span>Consent status: @Model.ConsentStatus</span>
+                <span>Attendee sync status: @PublicGmVenueText(Model.AttendeeSyncStatus)</span>
+                <span>Consent status: @PublicGmVenueText(Model.ConsentStatus)</span>
                 <span>Campaign continuity stays in Chummer</span>
             </div>
         </article>
@@ -101,7 +102,7 @@
             <article class="route-choice-card">
                 <span class="tag">Create mode</span>
                 <h3>@(Model.ProviderCreateAvailable ? "Room creation available" : "Room creation unavailable")</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.ProviderCreateDisabledReason)</p>
+                <p>@PublicGmVenueText(Model.ProviderCreateDisabledReason)</p>
             </article>
         </div>
     </section>
@@ -118,7 +119,7 @@
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">Attendance</span>
-                <h3>@Model.AttendeeSyncStatus</h3>
+                <h3>@PublicGmVenueText(Model.AttendeeSyncStatus)</h3>
                 <p>Sync requires consent before attendance can come back into Chummer.</p>
             </article>
             <article class="route-choice-card">

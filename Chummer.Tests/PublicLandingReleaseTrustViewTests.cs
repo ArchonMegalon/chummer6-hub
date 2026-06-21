@@ -540,7 +540,14 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("command follow-through", ledgerNotifications, StringComparison.Ordinal);
 
         Assert.Contains("Campaign continuity", gmSessionVenue, StringComparison.Ordinal);
+        Assert.Contains("PublicGmVenueText(Model.FallbackMessage)", gmSessionVenue, StringComparison.Ordinal);
+        Assert.Contains("PublicGmVenueText(Model.VenueStatus)", gmSessionVenue, StringComparison.Ordinal);
+        Assert.Contains("PublicGmVenueText(Model.ScheduledTimeSummary)", gmSessionVenue, StringComparison.Ordinal);
+        Assert.Contains("PublicGmVenueText(Model.AttendeeSyncStatus)", gmSessionVenue, StringComparison.Ordinal);
         Assert.DoesNotContain("Black Ledger follow-through", gmSessionVenue, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"muted-copy\">@Model.FallbackMessage</p>", gmSessionVenue, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>@Model.VenueStatus</h2>", gmSessionVenue, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>@Model.ScheduledTimeSummary</h2>", gmSessionVenue, StringComparison.Ordinal);
 
         Assert.Contains("Next steps", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.Contains("Reviewed product decision", karmaForgeSubmitted, StringComparison.Ordinal);
