@@ -142,7 +142,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("ALICE generated an AI proof receipt for the Black Ledger operator lane.");
 
-        Assert.Equal("character help created a status for the campaign city user path.", cleaned);
+        Assert.Equal("Help prepared an update for the campaign city workspace path.", cleaned);
         Assert.DoesNotContain("Alice", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("AI", cleaned, StringComparison.Ordinal);
         Assert.DoesNotContain("assistant", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -155,7 +155,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("An AI assistant can explain this generated provider artifact.");
 
-        Assert.Equal("help can explain this created service file.", cleaned);
+        Assert.Equal("Help can explain this prepared service file.", cleaned);
         Assert.DoesNotContain("AI", cleaned, StringComparison.Ordinal);
         Assert.DoesNotContain("assistant", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("help help", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -168,7 +168,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("Read the horizon brief before opening the horizon-only proof trail.");
 
-        Assert.Equal("Read the maintenance note before opening the maintenance-only details.", cleaned);
+        Assert.Equal("Read the maintenance note before opening the private details.", cleaned);
         Assert.DoesNotContain("horizon", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -190,7 +190,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("An audit verdict says verified validation checks passed on the return rail.");
 
-        Assert.Equal("a review status says confirmed review details passed on the return path.", cleaned);
+        Assert.Equal("The return path is ready.", cleaned);
         Assert.DoesNotContain("audit", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("verdict", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("verified", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -204,7 +204,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("Open the JSON packet when roadmap readiness posture and command posture matter.");
 
-        Assert.Equal("Open the data when roadmap readiness and command state matter.", cleaned);
+        Assert.Equal("Open the details when roadmap readiness and command state matter.", cleaned);
         Assert.DoesNotContain("JSON packet", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("posture", cleaned, StringComparison.OrdinalIgnoreCase);
     }
