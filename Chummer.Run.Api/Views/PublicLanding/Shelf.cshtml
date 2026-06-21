@@ -1,7 +1,7 @@
 @using Chummer.Campaign.Contracts
 @model ShelfPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-artifacts";
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
@@ -171,8 +171,8 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
+        <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicText(Model.Heading)</h1>
         <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and background, then go back to downloads when you actually want the build.</p>
         <div class="trust-claim__details">
             <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
@@ -204,16 +204,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicText(choice.Badge)</span>
+                <h3>@PublicText(choice.Title)</h3>
+                <p>@PublicText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
             </article>
         }
     </div>

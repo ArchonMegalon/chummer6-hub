@@ -146,16 +146,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicPublicationText(choice.Badge)</span>
+                <h3>@PublicPublicationText(choice.Title)</h3>
+                <p>@PublicPublicationText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicPublicationText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicPublicationText(choice.Label)</a>
             </article>
         }
     </div>

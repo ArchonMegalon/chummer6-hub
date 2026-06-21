@@ -1040,6 +1040,47 @@ def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy()
     assert "Broader comparisons return when they are useful and current." in shelf
 
 
+def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> None:
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+    feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+
+    for expected in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "@PublicText(Model.Eyebrow)",
+        "@PublicText(Model.Heading)",
+        "@PublicText(choice.Badge)",
+        "@PublicText(choice.Title)",
+        "@PublicText(choice.Summary)",
+        "@PublicText(item)",
+        "@PublicText(choice.Label)",
+    ):
+        assert expected in shelf
+        assert expected in feature
+
+    for expected in (
+        "@PublicPublicationText(choice.Badge)",
+        "@PublicPublicationText(choice.Title)",
+        "@PublicPublicationText(choice.Summary)",
+        "@PublicPublicationText(item)",
+        "@PublicPublicationText(choice.Label)",
+    ):
+        assert expected in publication
+
+    for source in (shelf, feature, publication):
+        for forbidden in (
+            'ViewData["Title"] = Model.Heading;',
+            "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<span class=\"tag\">@choice.Badge</span>",
+            "<h3>@choice.Title</h3>",
+            "<p>@choice.Summary</p>",
+            "<span>@item</span>",
+            ">@choice.Label</a>",
+        ):
+            assert forbidden not in source
+
+
 def test_publication_detail_page_uses_plain_labels() -> None:
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
 

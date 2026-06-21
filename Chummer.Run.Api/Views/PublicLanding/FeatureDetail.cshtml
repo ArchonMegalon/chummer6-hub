@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model FeatureDetailPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail";
     static string NormalizeDetailRoute(string href)
@@ -172,16 +172,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicText(choice.Badge)</span>
+                <h3>@PublicText(choice.Title)</h3>
+                <p>@PublicText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
             </article>
         }
     </div>
