@@ -11956,7 +11956,7 @@ def main() -> int:
                 "What it does",
                 "Create",
                 "Update",
-                "Check",
+                "Review",
                 "Get the app",
                 "Help"),
             forbidden_texts=(
@@ -11986,7 +11986,7 @@ def main() -> int:
                 "Current release",
                 "Known issues and install help",
                 "Update path",
-                "Three quick checks beyond the landing page"),
+                "Three useful details beyond the landing page"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
@@ -12010,8 +12010,8 @@ def main() -> int:
                 "Build run-",
                 "Stable",
                 "Released",
-                "Last checked",
-                "Checks",
+                "Last updated",
+                "Available",
                 "Open downloads",
                 "Open support",
                 "Help",
@@ -12024,7 +12024,8 @@ def main() -> int:
             "/horizons",
             "Not the front door",
             required_texts=(
-                "Early campaign work stays behind the main app.",
+                "Future work stays behind the main app.",
+                "Start with Downloads, Help, or Status.",
                 "Use the app first",
                 "install Chummer, build a character",
                 "Roadmap",
@@ -12045,7 +12046,7 @@ def main() -> int:
         AuditRoute(
             "/help",
             "Get help without guessing",
-            required_texts=("Choose the right path.", "Open support intake", "Start with Downloads"),
+            required_texts=("Choose the right path", "Open support intake", "Start with Downloads"),
             expects_header_count=1),
         AuditRoute(
             "/faq",
