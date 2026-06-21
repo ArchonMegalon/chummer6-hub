@@ -706,3 +706,26 @@ def test_public_pages_use_plain_promises_and_summaries_instead_of_claim_jargon()
     assert "What this path covers" in anarchy
     assert "planned or shipped public update" in participate
     assert "no public summary beyond the saved state" in feedback_lookup
+
+
+def test_public_release_copy_uses_install_notes_instead_of_issue_checking_language() -> None:
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+    now = read("Chummer.Run.Api/Views/PublicLanding/Now.cshtml")
+    faq = read("Chummer.Run.Api/Views/PublicLanding/Faq.cshtml")
+    feature_live = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailLiveProof.cshtml")
+    combined = "\n".join((shelf, now, faq, feature_live))
+
+    for forbidden in (
+        "check known issues",
+        "Downloads shows the current package, known issues, and setup help",
+        "Read download help and known issues",
+        "Known issues and install help",
+        "easier to trust",
+    ):
+        assert forbidden not in combined
+
+    assert "see install notes" in shelf
+    assert "current package, setup help" in now
+    assert "Install notes and help" in now
+    assert "current package and setup help" in faq
+    assert "easier to use" in feature_live
