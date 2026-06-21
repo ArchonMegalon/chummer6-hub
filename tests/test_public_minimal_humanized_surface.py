@@ -830,3 +830,20 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
     assert "Open watch page" in ledger
     assert "signed-in page that mails and inbox items point back to" in advisory
     assert "Major and challenger paths" in onboarding
+
+
+def test_package_pages_use_page_language_instead_of_route_language() -> None:
+    package_detail = read("Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml")
+    package_receipt = read("Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml")
+    combined = "\n".join((package_detail, package_receipt))
+
+    for forbidden in (
+        "Next route",
+        "Return to the package route",
+        "package route.",
+    ):
+        assert forbidden not in combined
+
+    assert "Next step" in package_receipt
+    assert "Return to the package page" in package_receipt
+    assert "Package history stays attached to this package page." in package_detail
