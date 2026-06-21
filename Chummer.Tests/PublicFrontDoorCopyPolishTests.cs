@@ -511,7 +511,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "Package operator summary",
             "Private summary of package classes, compatibility posture",
             "main recommended shelf",
-            "same install rail"
+            "same install rail",
+            "Artifacts never become the system of record for rules or account truth",
+            "Proposal posture must stay honest",
+            "bounded consult handoff"
         ];
 
         foreach (string file in sourceFiles)

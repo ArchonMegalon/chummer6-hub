@@ -475,7 +475,7 @@ public sealed class PublicConciergeService
                 "Creator discovery"),
             ("creator-publication", "book_consult") => new ConciergeBranchPresentation(
                 "Book a creator consult",
-                "Route into a bounded consult handoff without making booking the owner of publication status.",
+                "Request a short consult without making booking the source for publication status.",
                 "Request creator consult",
                 "secondary",
                 "Creator consult"),

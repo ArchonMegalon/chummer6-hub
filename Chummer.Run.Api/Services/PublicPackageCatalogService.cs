@@ -70,8 +70,8 @@ public sealed class PublicPackageCatalogService
             "File and media package",
             "Briefings, primers, recaps, and media files that travel with a clear history.",
             [
-                "Artifacts never become the system of record for rules or account truth.",
-                "Publication trust, history, and visibility stay attached.",
+                "Files never become the source for rules or account records.",
+                "Publication status, history, and visibility stay attached.",
                 "Preview media can support a page, but cannot outrank the working product routes."
             ]),
         new(
@@ -81,7 +81,7 @@ public sealed class PublicPackageCatalogService
             [
                 "Votes and follows stay inside Chummer-owned routes.",
                 "Moderation, duplicate handling, and compatibility review block fast-publish folklore.",
-                "Proposal posture must stay honest about research versus release readiness."
+                "Proposal status must stay honest about research versus release readiness."
             ])
     ];
 
