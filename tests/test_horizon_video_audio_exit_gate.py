@@ -32,7 +32,16 @@ def _write_wav(path: Path, seconds: float, *, silent_tail_seconds: float = 0.0) 
         wav.setframerate(sample_rate)
         payload = bytearray()
         for index in range(audible_frames):
-            value = int(0.16 * 32767 * math.sin(2 * math.pi * 440 * index / sample_rate))
+            seconds = index / sample_rate
+            sample = (
+                0.050 * math.sin(2 * math.pi * 180 * seconds)
+                + 0.045 * math.sin(2 * math.pi * 310 * seconds)
+                + 0.035 * math.sin(2 * math.pi * 760 * seconds)
+                + 0.020 * math.sin(2 * math.pi * 1420 * seconds)
+                + 0.010 * math.sin(2 * math.pi * 2600 * seconds)
+            )
+            envelope = 0.65 + 0.35 * math.sin(2 * math.pi * 5.5 * seconds) ** 2
+            value = int(sample * envelope * 32767)
             payload.extend(struct.pack("<h", value))
         payload.extend(b"\x00\x00" * silent_tail_frames)
         wav.writeframes(bytes(payload))
