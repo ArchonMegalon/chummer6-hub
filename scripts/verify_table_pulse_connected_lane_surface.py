@@ -16,10 +16,10 @@ REPO_ROOT = Path(
 
 REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": (
-        "Runner Passport continuity rail",
-        "Faction command rail",
+        "LeaderBriefingHrefTemplate = \"/account/ledger/factions/{factionId}/leader-briefing\"",
+        "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path.",
         "Table Pulse Live turns the signed-in inbox into a command packet",
-        "GM cockpit keeps remote-reaction aftermath on one command rail",
+        "GM cockpit keeps remote-reaction aftermath on one command path",
         "Table Pulse Live inbox",
     ),
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": (
@@ -38,8 +38,8 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Table Pulse Aftermath return items that stay in this signed-in view",
     ),
     "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
-        "Connected command lane",
-        "@Model.ConnectedLanePacket.BoundaryLine",
+        "Connected workspace section",
+        "Model.ConnectedLanePacket.BoundaryLine",
     ),
     "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (
         "<p class=\"eyebrow\">Connected lane</p>",

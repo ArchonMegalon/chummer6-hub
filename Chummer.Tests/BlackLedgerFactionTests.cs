@@ -27,7 +27,12 @@ public sealed class BlackLedgerFactionTests
         Assert.DoesNotContain("world.LastTick?.ReceiptId", ledgerView, StringComparison.Ordinal);
         Assert.DoesNotContain("Package pressure visible", ledgerView, StringComparison.Ordinal);
         Assert.DoesNotContain("Public faction lanes", ledgerView, StringComparison.Ordinal);
-        Assert.Contains("Private labels stay private.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml")), StringComparison.Ordinal);
+        string workspaceView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
+        Assert.Contains("Private labels stay private.", workspaceView, StringComparison.Ordinal);
+        Assert.Contains("Connected workspace section", workspaceView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Connected command lane", workspaceView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Connected command path", workspaceView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Faction workspace lanes", workspaceView, StringComparison.Ordinal);
     }
 
     [Fact]

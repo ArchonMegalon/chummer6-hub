@@ -3,8 +3,6 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
-    // .Replace( legacy source marker: Connected command lane )
-    // .Replace( legacy source marker: @Model.ConnectedLanePacket.BoundaryLine )
 }
 
 <section class="ledger-flagship ledger-flagship--workspace">
@@ -12,7 +10,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the exact command path.</p>
+        <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
         <div class="trust-claim__details">
             <span>Authenticated route</span>
             <span>Faction: @Model.Faction.PublicName</span>
@@ -39,7 +37,7 @@
                 data-secondary-label="Open manage"
                 data-secondary-href="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')?section=manage"></div>
         </div>
-        <div class="ledger-flagship__nav" aria-label="Faction workspace lanes">
+        <div class="ledger-flagship__nav" aria-label="Faction workspace sections">
             @foreach (var tab in Model.Tabs)
             {
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
@@ -70,7 +68,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Connected command path</p>
+            <p class="eyebrow">Connected workspace section</p>
             <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Heading)</h2>
             <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)</p>
         </div>

@@ -198,6 +198,7 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml"),
@@ -220,6 +221,10 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         "management posture",
         "Cross-district posture",
         "Verdict:",
+        "Connected command lane",
+        "Connected command path",
+        "Faction workspace lanes",
+        "Onboarding command lanes",
     ):
         assert forbidden not in combined
 

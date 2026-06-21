@@ -102,15 +102,15 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             result.stderr,
         )
 
-    def test_verifier_fails_when_controller_drops_runner_passport_lane(self) -> None:
+    def test_verifier_fails_when_controller_drops_runner_passport_leader_briefing_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-controller-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
             controller_path.write_text(
                 controller_path.read_text(encoding="utf-8").replace(
-                    'Heading: "Runner Passport continuity rail"',
-                    'Heading: "Runner Passport"',
+                    'LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing"',
+                    'LeaderBriefingHrefTemplate = ""',
                     1,
                 ),
                 encoding="utf-8",
@@ -120,7 +120,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Controllers/PublicLandingController.cs missing marker: Runner Passport continuity rail",
+            "Chummer.Run.Api/Controllers/PublicLandingController.cs missing marker: LeaderBriefingHrefTemplate = \"/account/ledger/factions/{factionId}/leader-briefing\"",
             result.stderr,
         )
 
@@ -146,14 +146,14 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             result.stderr,
         )
 
-    def test_verifier_fails_when_workspace_drops_connected_lane(self) -> None:
+    def test_verifier_fails_when_workspace_drops_connected_section(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-workspace-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             workspace_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"
             workspace_path.write_text(
                 workspace_path.read_text(encoding="utf-8").replace(
-                    "Connected command lane",
+                    "Connected workspace section",
                     "Workspace tabs",
                     1,
                 ),
@@ -164,7 +164,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected command lane",
+            "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected workspace section",
             result.stderr,
         )
     def test_verifier_accepts_live_public_routes(self) -> None:
