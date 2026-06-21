@@ -735,6 +735,57 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Detail_shelf_dynamic_cards_clean_public_copy_before_rendering()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
+
+        foreach (string required in new[]
+        {
+            "static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+            "@PublicText(publication.Title)",
+            "@PublicText(publication.Summary)",
+            "@PublicText(publication.DiscoverySummary)",
+            "@PublicText(publication.TrustSummary)",
+            "@PublicText(publication.LineageSummary)",
+            "@PublicText(publication.NextSafeAction)",
+            "@PublicText(item.Label)",
+            "@PublicText(item.Summary)",
+            "@PublicText(item.OwnershipSummary)",
+            "@PublicText(linkedPublication.Title)",
+            "@PublicText(linkedPublication.TrustSummary)",
+            "@PublicText(card.Card.Title)",
+            "@PublicText(card.Card.Summary)",
+            "@PublicText(card.Card.Payoff)",
+            "@PublicText(card.Action.Label)"
+        })
+        {
+            Assert.Contains(required, view, StringComparison.Ordinal);
+        }
+
+        foreach (string forbidden in new[]
+        {
+            "@publication.Title",
+            "@publication.Summary",
+            "@publication.DiscoverySummary",
+            "@publication.TrustSummary",
+            "@publication.LineageSummary",
+            "@publication.NextSafeAction",
+            "@item.Label",
+            "@item.Summary",
+            "@item.OwnershipSummary",
+            "@linkedPublication.Title",
+            "@linkedPublication.TrustSummary",
+            "@card.Card.Title",
+            "@card.Card.Summary",
+            "@card.Card.Payoff",
+            "@card.Action.Label"
+        })
+        {
+            Assert.DoesNotContain(forbidden, view, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Signed_in_ledger_pages_clean_dynamic_status_and_notification_copy()
     {
         string accountHome = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAccountHome.cshtml"));

@@ -132,6 +132,7 @@
             ? "Open public publication"
             : "Open publication status";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
+    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
             ? "/artifacts#signed-in-detail-view"
@@ -246,38 +247,38 @@
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
                         <span class="tag">Shared publication</span>
-                        <h3>@publication.Title</h3>
-                        <p>@publication.Summary</p>
+                        <h3>@PublicText(publication.Title)</h3>
+                        <p>@PublicText(publication.Summary)</p>
                         <div class="trust-claim__details">
                             <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
                         <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
-                        <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                        <p><strong>Discovery:</strong> @PublicText(publication.DiscoverySummary)</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
-                            <p><strong>Confidence:</strong> @publication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @PublicText(publication.TrustSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                         {
-                            <p><strong>Compare by:</strong> @publication.ComparisonSummary</p>
+                            <p><strong>Compare by:</strong> @PublicText(publication.ComparisonSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                         {
-                            <p><strong>History:</strong> @publication.LineageSummary</p>
+                            <p><strong>History:</strong> @PublicText(publication.LineageSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                         {
-                            <p><strong>Moderation:</strong> @publication.ModerationSummary</p>
+                            <p><strong>Moderation:</strong> @PublicText(publication.ModerationSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                         {
-                            <p><strong>Return:</strong> @publication.CampaignReturnSummary</p>
+                            <p><strong>Return:</strong> @PublicText(publication.CampaignReturnSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                         {
-                            <p><strong>Next:</strong> @publication.NextSafeAction</p>
+                            <p><strong>Next:</strong> @PublicText(publication.NextSafeAction)</p>
                         }
                         <a class="editorial-strip__action" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
                     </div>
@@ -336,8 +337,8 @@
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
                         <span class="tag">Signed-in history</span>
-                        <h3>@item.Label</h3>
-                        <p>@item.Summary</p>
+                        <h3>@PublicText(item.Label)</h3>
+                        <p>@PublicText(item.Summary)</p>
                         <div class="trust-claim__details">
                             <span>@PublicSurfaceStatus.AudienceLabel(item.Audience)</span>
                             @if (!string.IsNullOrWhiteSpace(item.PublicationState))
@@ -352,7 +353,7 @@
                         </div>
                         @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
                         {
-                            <p><strong>Ownership:</strong> @item.OwnershipSummary</p>
+                            <p><strong>Ownership:</strong> @PublicText(item.OwnershipSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                         {
@@ -364,27 +365,27 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                         {
-                            <p><strong>Publication:</strong> @item.PublicationSummary</p>
+                            <p><strong>Publication:</strong> @PublicText(item.PublicationSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
                         {
-                            <p><strong>Confidence:</strong> @linkedPublication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @PublicText(linkedPublication.TrustSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                         {
-                            <p><strong>History:</strong> @linkedPublication.LineageSummary</p>
+                            <p><strong>History:</strong> @PublicText(linkedPublication.LineageSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
                         {
-                            <p><strong>Return:</strong> @linkedPublication.CampaignReturnSummary</p>
+                            <p><strong>Return:</strong> @PublicText(linkedPublication.CampaignReturnSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                         {
-                            <p><strong>Next:</strong> @item.NextSafeAction</p>
+                            <p><strong>Next:</strong> @PublicText(item.NextSafeAction)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
                         {
-                            <a class="quiet-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
+                            <a class="quiet-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @PublicText(linkedPublication.Title)</a>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                         {
@@ -398,46 +399,46 @@
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
                         <span class="tag">Creator-linked publication</span>
-                        <h3>@publication.Title</h3>
-                        <p>@publication.Summary</p>
+                        <h3>@PublicText(publication.Title)</h3>
+                        <p>@PublicText(publication.Summary)</p>
                         <div class="trust-claim__details">
                             <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
                         <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
-                        <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                        <p><strong>Discovery:</strong> @PublicText(publication.DiscoverySummary)</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
-                            <p><strong>Confidence:</strong> @publication.TrustSummary</p>
+                            <p><strong>Confidence:</strong> @PublicText(publication.TrustSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                         {
-                            <p><strong>Compare by:</strong> @publication.ComparisonSummary</p>
+                            <p><strong>Compare by:</strong> @PublicText(publication.ComparisonSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                         {
-                            <p><strong>History:</strong> @publication.LineageSummary</p>
+                            <p><strong>History:</strong> @PublicText(publication.LineageSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                         {
-                            <p><strong>Return:</strong> @publication.CampaignReturnSummary</p>
+                            <p><strong>Return:</strong> @PublicText(publication.CampaignReturnSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
                         {
-                            <p><strong>Support:</strong> @publication.SupportClosureSummary</p>
+                            <p><strong>Support:</strong> @PublicText(publication.SupportClosureSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                         {
-                            <p><strong>Moderation:</strong> @publication.ModerationSummary</p>
+                            <p><strong>Moderation:</strong> @PublicText(publication.ModerationSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                         {
-                            <p><strong>Next:</strong> @publication.NextSafeAction</p>
+                            <p><strong>Next:</strong> @PublicText(publication.NextSafeAction)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                         {
-                            <a class="quiet-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                            <a class="quiet-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @PublicText(publication.Title)</a>
                         }
                         <a class="editorial-strip__action" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                     </div>
@@ -467,11 +468,11 @@
                     }
                     <div class="artifact-card__copy">
                         <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                        <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
+                        <h3>@PublicText(card.Card.Title)</h3>
+                        <p>@PublicText(card.Card.Summary)</p>
                         <div class="trust-claim__details">
                             <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
-                            <span>@card.Action.Label</span>
+                            <span>@PublicText(card.Action.Label)</span>
                             @if (!string.IsNullOrWhiteSpace(card.Card.MicroProof))
                             {
                                 <span>@PublicFacingCopyHumanizer.Clean(card.Card.MicroProof)</span>
@@ -479,13 +480,13 @@
                         </div>
                         @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                         {
-                            <p><strong>What this shows:</strong> @card.Card.Payoff</p>
+                            <p><strong>What this shows:</strong> @PublicText(card.Card.Payoff)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
                             <p><strong>Note:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                         }
-                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                     </div>
                 </article>
             }
@@ -507,18 +508,18 @@
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
                         <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                        <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
+                        <h3>@PublicText(card.Card.Title)</h3>
+                        <p>@PublicText(card.Card.Summary)</p>
                         @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                         {
-                            <p><strong>Expected unlock:</strong> @card.Card.Payoff</p>
+                            <p><strong>Expected unlock:</strong> @PublicText(card.Card.Payoff)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
                             <p><strong>Next:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                         }
                     </div>
-                    <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                    <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                 </article>
             }
         </div>
