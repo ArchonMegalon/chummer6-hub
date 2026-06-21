@@ -25,7 +25,7 @@
     {
         "participation" => "Return to followed work, guided contribution history, and privacy-safe recognition from one calmer account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
-        "access" => "Keep linked installs, access rights, and claim handoff in one calmer place.",
+        "access" => "Keep linked installs, access rights, and claimed copies in one calmer place.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
         "advanced" => "Account identifiers and deeper account details stay behind the advanced page.",
@@ -797,18 +797,18 @@
             @if (showSettingsSection && showChannelsSection)
             {
                 <details class="details-drawer">
-                    <summary>AI support channels</summary>
+                    <summary>Messaging</summary>
                     <section id="channels" class="settings-section" data-account-panel>
                         <div class="settings-section__header">
-                            <h2>AI support channels</h2>
-                            <p>These contacts are for AI support only. They stay separate from account access, recovery, marketing, and public profile fields.</p>
+                            <h2>Messaging</h2>
+                            <p>These contacts are only used when you ask Chummer to contact you. They stay separate from sign-in, recovery, marketing, and public profile fields.</p>
                         </div>
                             <div class="settings-summary-row">
                                 <span>Telegram companion</span>
                                 <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>WhatsApp AI support</span>
+                                <span>WhatsApp support</span>
                                 <strong>@(whatsappChannel is null ? "Not connected" : $"{whatsappChannel.DisplayLabel} ({HumanizeStatus(whatsappChannel.Status, "Ready")})")</strong>
                             </div>
                         <form id="telegramForm" class="settings-form">
@@ -821,9 +821,9 @@
                         </form>
                         <form id="whatsappForm" class="settings-form">
                             <div class="field">
-                                <label for="whatsappHandle">WhatsApp number for AI support only</label>
+                                <label for="whatsappHandle">WhatsApp number</label>
                                 <input id="whatsappHandle" type="tel" inputmode="tel" autocomplete="tel" aria-describedby="whatsappSupportOnlyCopy" placeholder="+436647916419" value="@(whatsappChannel?.DisplayLabel ?? string.Empty)" />
-                                <p id="whatsappSupportOnlyCopy" class="muted-copy">Used only so Chummer.run AI support can reach out and ask what questions you have. It is not used for sign-in, recovery, marketing, or public profile display.</p>
+                                <p id="whatsappSupportOnlyCopy" class="muted-copy">Used only when you ask Chummer support to contact you. It is not used for sign-in, recovery, marketing, or public profile display.</p>
                                 <label class="check-row">
                                     <input id="whatsappNotificationsEnabled" type="checkbox" @(whatsappChannel is not null && whatsappChannel.NotificationsEnabled ? "checked" : null) />
                                     <span>Also allow WhatsApp notifications when I opt into Table Pulse updates, Black Ledger involvement, or support follow-up notices.</span>
@@ -839,8 +839,8 @@
                                 <button class="button-like button-like--secondary" type="button" id="whatsappDeepLinkButton">Generate WhatsApp link</button>
                             </div>
                             <div class="settings-summary-row">
-                                <button class="button-like button-like--secondary" type="button" id="telegramToEaButton">Link Telegram to Executive Assistant</button>
-                                <button class="button-like button-like--secondary" type="button" id="whatsappToEaButton">Link WhatsApp to AI support</button>
+                                <button class="button-like button-like--secondary" type="button" id="telegramToEaButton">Link Telegram</button>
+                                <button class="button-like button-like--secondary" type="button" id="whatsappToEaButton">Link WhatsApp</button>
                             </div>
                             <p id="telegramToEaNotice" class="muted-copy" hidden></p>
                             <p id="whatsappToEaNotice" class="muted-copy" hidden></p>
@@ -981,7 +981,7 @@
                     <summary>Need routing help first?</summary>
                     <form id="supportAssistantForm" class="settings-form">
                         <div class="field">
-                            <label for="supportAssistantQuery">Ask the grounded support assistant</label>
+                            <label for="supportAssistantQuery">Ask for guidance</label>
                             <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what still hurts, or what do you need help understanding?"></textarea>
                         </div>
                         <div class="field">
@@ -2121,7 +2121,7 @@
                                 </ul>
                             </details>
                             <details class="details-drawer">
-                                <summary>Restore provenance and conflict receipts</summary>
+                                <summary>Restore history and conflicts</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
                                         <span>Restore status</span>
@@ -2164,7 +2164,7 @@
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Lead receipt</span>
+                                        <span>Lead update</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2277,8 +2277,8 @@
                                                 }
                                                 @if (recovery is not null)
                                                 {
-                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current receipt")</span>
-                                                    <span>Recovery: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</span>
+                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current")</span>
+                                                    <span>Recovery: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable")</span>
                                                     @* Recovery route: @recovery.RecoveryRoute *@
                                                     <span>Next: @DescribeRecoveryRouteAction(recovery.RecoveryRoute)</span>
                                                     @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
@@ -2286,7 +2286,7 @@
                                                         <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
                                                     }
                                                     <span>@recovery.RecoverySummary</span>
-                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue with receipt")</span>
+                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue")</span>
                                                 }
                                             </li>
                                         }
@@ -3746,7 +3746,7 @@
                 @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Build handoffs</summary>
+                        <summary>Build plans</summary>
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
@@ -4284,8 +4284,8 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Member downloads</span>
                                         <div class="app-rail__copy">
-                                            <h3>Install and update handoff</h3>
-                                            <p>Use the real downloads page when members need the current installer, update handoff, or claim path instead of passing around stale links.</p>
+                                            <h3>Install and update</h3>
+                                            <p>Use the real downloads page when members need the current installer, update path, or claim path instead of passing around stale links.</p>
                                         </div>
                                         <a class="inline-link" href="/downloads">Open downloads</a>
                                     </article>
@@ -4805,7 +4805,7 @@
       case "downtime_brief":
         return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return path.`;
       case "runboard_state":
-        return `${scopeLabel} keeps the GM runboard and turn-ledger handoff reviewable in the same handoff.`;
+        return `${scopeLabel} keeps the GM runboard and turn review in the same place.`;
       case "resolution_report_draft":
         return `${scopeLabel} keeps the ResolutionReport draft continuous without turning hub into the engine-math owner.`;
       default:
@@ -5053,9 +5053,9 @@
           aiSupportOpeningPrompt: "Ask what questions the user has before giving product guidance."
         }
       });
-      ui.setNotice(notice, "WhatsApp AI support number saved. Outreach starts by asking what questions you have.");
+      ui.setNotice(notice, "WhatsApp support number saved. Outreach starts by asking what questions you have.");
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "WhatsApp AI support number could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "WhatsApp support number could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }
@@ -5086,7 +5086,7 @@
       : "";
 
     ui.clearNotice(noticeNode);
-    ui.setButtonBusy(button, true, "Linking to EA...");
+    ui.setButtonBusy(button, true, "Linking...");
     try {
       const supportMetadata = channelKind === "whatsapp_official_business"
         ? {
@@ -5106,12 +5106,12 @@
       setChannelToEaNotice(
         noticeNode,
         channelKind === "whatsapp_official_business"
-          ? "WhatsApp AI support linked. Outreach starts by asking what questions you have."
-          : "Executive Assistant linked to channel.");
+          ? "WhatsApp support linked. Outreach starts by asking what questions you have."
+          : "Channel linked.");
     } catch (error) {
-      setChannelToEaNotice(noticeNode, ui.describeError(error, `Could not link ${channelKind} to Executive Assistant.`), true);
+      setChannelToEaNotice(noticeNode, ui.describeError(error, `Could not link ${channelKind}.`), true);
     } finally {
-      ui.setButtonBusy(button, false, channelKind === "whatsapp_official_business" ? "Link WhatsApp to AI support" : "Link to Executive Assistant");
+      ui.setButtonBusy(button, false, channelKind === "whatsapp_official_business" ? "Link WhatsApp" : "Link Telegram");
     }
   };
 

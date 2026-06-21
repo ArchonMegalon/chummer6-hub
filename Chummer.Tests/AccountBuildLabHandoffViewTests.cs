@@ -91,16 +91,20 @@ public sealed class AccountBuildLabHandoffViewTests
     }
 
     [Fact]
-    public void AccountSettingsRendersWhatsappAiSupportOnlyControls()
+    public void AccountSettingsRendersNeutralWhatsappSupportControls()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("WhatsApp number for AI support only", view, StringComparison.Ordinal);
-        Assert.Contains("ask what questions you have", view, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WhatsApp number", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("WhatsApp number for AI support only", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("AI support channels", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ask the grounded support assistant", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Executive Assistant linked to channel", view, StringComparison.Ordinal);
+        Assert.Contains("asking what questions you have", view, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("purpose: \"ai_support_only\"", view, StringComparison.Ordinal);
         Assert.Contains("aiSupportOpeningPrompt", view, StringComparison.Ordinal);
-        Assert.Contains("Link WhatsApp to AI support", view, StringComparison.Ordinal);
+        Assert.Contains("Link WhatsApp", view, StringComparison.Ordinal);
         Assert.Contains("Table Pulse updates", view, StringComparison.Ordinal);
         Assert.Contains("Black Ledger involvement", view, StringComparison.Ordinal);
         Assert.Contains("whatsappNotificationsEnabled", view, StringComparison.Ordinal);

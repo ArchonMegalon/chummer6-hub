@@ -88,7 +88,7 @@ public sealed class TeableUserProjectionServiceTests
                 NotificationsEnabled: true,
                 CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:20:00Z"),
                 UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:21:00Z"),
-                Note: "WhatsApp AI support")
+                Note: "WhatsApp support")
             {
                 Purpose = "ai_support_only",
                 AiSupportOpeningPrompt = "Ask what questions the user has before giving product guidance."
@@ -104,12 +104,12 @@ public sealed class TeableUserProjectionServiceTests
             static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
         using JsonDocument created = JsonDocument.Parse(create.Body);
         JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
-        Assert.Equal("+436647916419", fields.GetProperty("WhatsApp AI Support Phone").GetString());
-        Assert.Equal("6419", fields.GetProperty("WhatsApp AI Support Phone Last4").GetString());
-        Assert.True(fields.GetProperty("WhatsApp AI Support Enabled").GetBoolean());
+        Assert.Equal("+436647916419", fields.GetProperty("WhatsApp Support Phone").GetString());
+        Assert.Equal("6419", fields.GetProperty("WhatsApp Support Phone Last4").GetString());
+        Assert.True(fields.GetProperty("WhatsApp Support Enabled").GetBoolean());
         Assert.True(fields.GetProperty("WhatsApp Notifications Enabled").GetBoolean());
-        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp AI Support Purpose").GetString());
-        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp AI Support Opening Prompt").GetString(), StringComparison.Ordinal);
+        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp Support Purpose").GetString());
+        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp Support Opening Prompt").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -153,10 +153,10 @@ public sealed class TeableUserProjectionServiceTests
             static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
         using JsonDocument created = JsonDocument.Parse(create.Body);
         JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
-        Assert.True(fields.GetProperty("WhatsApp AI Support Enabled").GetBoolean());
+        Assert.True(fields.GetProperty("WhatsApp Support Enabled").GetBoolean());
         Assert.False(fields.GetProperty("WhatsApp Notifications Enabled").GetBoolean());
-        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp AI Support Purpose").GetString());
-        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp AI Support Opening Prompt").GetString(), StringComparison.Ordinal);
+        Assert.Equal("ai_support_only", fields.GetProperty("WhatsApp Support Purpose").GetString());
+        Assert.Contains("what questions the user has", fields.GetProperty("WhatsApp Support Opening Prompt").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ public sealed class IdentityLinkService
     private const string WhatsappAiSupportOpeningPrompt =
         "Ask what questions the user has before giving product guidance.";
     private const string WhatsappAiSupportNote =
-        "WhatsApp is stored only for AI support outreach. When support reaches out, it asks what questions the user has before helping. It is not used for account access, recovery, marketing, or public profile display.";
+        "WhatsApp is stored only for support outreach. When support reaches out, it asks what questions the user has before helping. It is not used for account access, recovery, marketing, or public profile display.";
 
     private static readonly string[] SupportedIdentityProviders =
     {
@@ -373,7 +373,7 @@ public sealed class IdentityLinkService
         var aiSupportOpeningPrompt = ResolveAiSupportOpeningPrompt(normalizedChannelKind, request.AiSupportOpeningPrompt);
         var note = normalizedChannelKind == "whatsapp_official_business"
             ? WhatsappAiSupportNote
-            : "Executive Assistant is now linked to this channel.";
+            : "Channel is now linked.";
 
         lock (_store.Gate)
         {

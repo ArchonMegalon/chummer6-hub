@@ -28,7 +28,8 @@ public sealed class IdentityLinkServiceTests
             Assert.Contains("WhatsApp", link.Note ?? string.Empty);
             Assert.Equal("ai_support_only", link.Purpose);
             Assert.Contains("what questions", link.AiSupportOpeningPrompt, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("AI support", store.ChannelLinks[0].Note ?? string.Empty);
+            Assert.DoesNotContain("AI support", store.ChannelLinks[0].Note ?? string.Empty);
+            Assert.Contains("support outreach", store.ChannelLinks[0].Note ?? string.Empty);
         }
         finally
         {
