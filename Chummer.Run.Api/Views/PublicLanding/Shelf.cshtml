@@ -7,8 +7,6 @@
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     // Public comparison language stays limited until current direct route records are green.
-    // .Replace( legacy source marker: The signed-in view is the return rail for Table Pulse Aftermath )
-    // .Replace( legacy source marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together )
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
     var selectedSignedInArtifactView = Model.SignedInArtifactView;

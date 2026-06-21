@@ -36,9 +36,6 @@
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
     ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account area.";
-    // .Replace( legacy source marker: <strong>Table Pulse Live command-to-fallout lane</strong> )
-    // .Replace( legacy source marker: <strong>Table Pulse Aftermath return lane</strong> )
-    // .Replace( legacy source marker: Open aftermath rail )
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
@@ -4268,7 +4265,7 @@
                                             <p>What is fixed, who can get it now, and what still needs care stays on this same signed-in account surface before you guide the rest of the table.</p>
                                             <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open what works today for the latest availability.")</p>
                                             <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open what works today for the current install path.")</p>
-                                            <p class="muted-copy"><strong>Release checks:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release checks", "Open what works today for the latest status.")</p> @* .Replace( legacy source marker: TrustRowValue(Model.SignedInTrustStatus, "Release proof" ) *@
+                                            <p class="muted-copy"><strong>Release checks:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release checks", "Open what works today for the latest status.")</p>
                                             <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
                                         </div>
                                         <a class="inline-link" href="#signed-in-trust-status">Open current status</a>

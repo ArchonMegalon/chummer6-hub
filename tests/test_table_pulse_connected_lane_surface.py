@@ -37,15 +37,15 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("table_pulse_connected_lane_surface:ok", result.stdout)
 
-    def test_verifier_fails_when_account_workspace_lane_drifts(self) -> None:
+    def test_verifier_fails_when_account_workspace_summary_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-account-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             account_path = temp_root / "Chummer.Run.Api/Views/Accounts/Account.cshtml"
             account_path.write_text(
                 account_path.read_text(encoding="utf-8").replace(
-                    "<strong>Table Pulse Live command-to-fallout lane</strong>",
-                    "<strong>Workspace recap</strong>",
+                    "Table Pulse Live is armed on this workspace",
+                    "Workspace return is armed",
                     1,
                 ),
                 encoding="utf-8",
@@ -55,19 +55,19 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: <strong>Table Pulse Live command-to-fallout lane</strong>",
+            "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: Table Pulse Live is armed on this workspace",
             result.stderr,
         )
 
-    def test_verifier_fails_when_home_drops_return_rail_language(self) -> None:
+    def test_verifier_fails_when_home_drops_reviewed_workspace_language(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-home-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             home_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
             home_path.write_text(
                 home_path.read_text(encoding="utf-8").replace(
-                    "Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
-                    "Signed-in reaction fallout stays on the same governed workspace",
+                    "Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
+                    "Table Pulse aftermath: signed-in reaction fallout stays available",
                     1,
                 ),
                 encoding="utf-8",
@@ -77,7 +77,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
+            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
             result.stderr,
         )
 
@@ -88,8 +88,9 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_path.write_text(
                 shelf_path.read_text(encoding="utf-8").replace(
-                    "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
-                    "the artifact shelf keeps your live aftermath, replay, and linked creator-publication history together",
+                    "Same return view",
+                    "Return view",
+                    1,
                 ),
                 encoding="utf-8",
             )
@@ -98,7 +99,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
+            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: Same return view",
             result.stderr,
         )
 
@@ -124,15 +125,15 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             result.stderr,
         )
 
-    def test_verifier_fails_when_media_horizon_drops_connected_lane(self) -> None:
+    def test_verifier_fails_when_media_horizon_drops_connected_page(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-media-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             media_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml"
             media_path.write_text(
                 media_path.read_text(encoding="utf-8").replace(
-                    "<p class=\"eyebrow\">Connected lane</p>",
-                    "<p class=\"eyebrow\">Artifact lane</p>",
+                    "<p class=\"eyebrow\">Connected page</p>",
+                    "<p class=\"eyebrow\">Artifact page</p>",
                     1,
                 ),
                 encoding="utf-8",
@@ -142,7 +143,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml missing marker: <p class=\"eyebrow\">Connected lane</p>",
+            "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml missing marker: <p class=\"eyebrow\">Connected page</p>",
             result.stderr,
         )
 
@@ -176,9 +177,9 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
                 return None
 
         route_bodies = {
-            "http://example.test/living-world": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/living-world": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
         }
 
         def fake_get(url: str, timeout: int) -> FakeResponse:
@@ -196,7 +197,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         ):
             self.assertEqual(verifier.main(), 0)
 
-    def test_verifier_fails_when_live_public_route_drops_connected_lane(self) -> None:
+    def test_verifier_fails_when_live_public_route_drops_connected_page(self) -> None:
         class FakeResponse:
             def __init__(self, text: str) -> None:
                 self.text = text
@@ -206,8 +207,8 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         route_bodies = {
             "http://example.test/living-world": "<section><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
         }
 
         def fake_get(url: str, timeout: int) -> FakeResponse:
@@ -234,9 +235,9 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
                 return None
 
         route_bodies = {
-            "http://example.test/living-world": "<section><p class='eyebrow'>Connected lane</p><p>Living World receipts only</p></section>",
-            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/living-world": "<section><p class='eyebrow'>Connected page</p><p>Living World receipts only</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
         }
 
         def fake_get(url: str, timeout: int) -> FakeResponse:
@@ -263,9 +264,9 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
                 return None
 
         route_bodies = {
-            "http://example.test/living-world": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
-            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/living-world": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected page</p><p>Table Pulse Live inbox</p></section>",
         }
         attempts = {"http://example.test/living-world": 0}
 

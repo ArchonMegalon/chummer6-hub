@@ -104,6 +104,27 @@ def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
         assert forbidden not in packet
 
 
+def test_connected_table_pulse_sources_do_not_keep_legacy_marker_comments() -> None:
+    sources = [
+        read("Chummer.Run.Api/Views/Accounts/Account.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"),
+        read("Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml"),
+    ]
+    combined = "\n".join(sources)
+
+    for forbidden in (
+        "legacy source marker",
+        "command-to-fallout lane",
+        "Aftermath return lane",
+        "Open aftermath rail",
+        "governed workspace",
+        "Connected lane",
+        "Release proof",
+    ):
+        assert forbidden not in combined
+
+
 def test_public_humanizer_cleans_plural_internal_terms() -> None:
     humanizer = read("Chummer.Run.Api/Services/PublicFacingCopyHumanizer.cs")
 

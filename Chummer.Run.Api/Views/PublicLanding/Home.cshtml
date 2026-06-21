@@ -13,8 +13,6 @@
     ViewData["SurfaceClass"] = "surface-home";
     ViewData["ContextSidebarHeading"] = "Home sections";
     ViewData["ContextSidebarSummary"] = "Keep signed-in access and work sections in the shared side panel.";
-    // .Replace( legacy source marker: Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace )
-    // .Replace( legacy source marker: This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop )
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -28,7 +26,6 @@
     var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
-    // .Replace( legacy source marker: Open first playable session )
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
     var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();

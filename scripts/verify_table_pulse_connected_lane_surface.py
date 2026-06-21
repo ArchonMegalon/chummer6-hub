@@ -23,17 +23,17 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Table Pulse Live inbox",
     ),
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": (
-        "<strong>Table Pulse Live command-to-fallout lane</strong>",
+        "Table Pulse Live command to fallout",
+        "Table Pulse Live is armed on this workspace",
         "Open campaign memory",
-        "<strong>Table Pulse Aftermath return lane</strong>",
-        "Open aftermath rail",
+        "Open aftermath",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": (
-        "Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
-        "This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop",
+        "Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
+        "Open aftermath and return",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
-        "The signed-in view is the return rail for Table Pulse Aftermath",
+        "Same return view",
         "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
         "Table Pulse Aftermath return items that stay in this signed-in view",
     ),
@@ -42,22 +42,22 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Model.ConnectedLanePacket.BoundaryLine",
     ),
     "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (
-        "<p class=\"eyebrow\">Connected lane</p>",
+        "<p class=\"eyebrow\">Connected page</p>",
         "@Model.ConnectedLanePacket.BoundaryLine",
     ),
 }
 
 LIVE_ROUTE_MARKERS: dict[str, tuple[str, ...]] = {
     "/living-world": (
-        "Connected lane",
+        "Connected page",
         "Table Pulse Live inbox",
     ),
     "/signal-deck": (
-        "Connected lane",
+        "Connected page",
         "Table Pulse Live inbox",
     ),
     "/passport": (
-        "Connected lane",
+        "Connected page",
         "Table Pulse Live inbox",
     ),
 }
