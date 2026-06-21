@@ -54,6 +54,8 @@ public sealed class FaqFlagshipViewTests
         Assert.Contains(".route-help .field input", css, StringComparison.Ordinal);
         Assert.Contains(".surface-faq .field select option", css, StringComparison.Ordinal);
         Assert.Contains(".route-help .field select option", css, StringComparison.Ordinal);
+        Assert.Contains(".surface-faq .field select option:checked", css, StringComparison.Ordinal);
+        Assert.Contains(".route-help .field select option:checked", css, StringComparison.Ordinal);
         Assert.Contains("color-scheme: light;", css, StringComparison.Ordinal);
         Assert.Contains("background: #ffffff;", css, StringComparison.Ordinal);
         Assert.Contains("color: #151515;", css, StringComparison.Ordinal);

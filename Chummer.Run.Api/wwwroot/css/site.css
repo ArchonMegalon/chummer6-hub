@@ -105,6 +105,11 @@ select optgroup {
   color: var(--ink-strong);
 }
 
+select option:checked {
+  background: var(--ink-strong);
+  color: #ffffff;
+}
+
 .skip-link {
   position: absolute;
   left: 1rem;
@@ -8126,6 +8131,11 @@ body {
   color: var(--minimal-ink);
 }
 
+.surface-minimal .field select option:checked {
+  background: var(--minimal-ink);
+  color: var(--minimal-surface);
+}
+
 .surface-minimal .site-header {
   padding-top: 1rem;
 }
@@ -8584,6 +8594,12 @@ body {
 .route-help .field select optgroup {
   background: #ffffff;
   color: #151515;
+}
+
+.surface-faq .field select option:checked,
+.route-help .field select option:checked {
+  background: #151515;
+  color: #ffffff;
 }
 
 .surface-faq .field input::placeholder,
