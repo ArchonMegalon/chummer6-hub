@@ -18,6 +18,15 @@ public sealed class BlackLedgerFactionTests
         Assert.Contains("[HttpGet(\"/ledger/factions\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("Open faction file", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("<a href=\"@newsreelBroadcast.ReceiptsHref\">Details</a>", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("<span>Turn: @selectedTurn</span>", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("<p>Latest turn: Turn @selectedTurn</p>", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("Faction pages show pressure, not private people.", ledgerView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Episode details", ledgerView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Latest turn: @ledger.SourceReceipt", ledgerView, StringComparison.Ordinal);
+        Assert.DoesNotContain("world.LastTick?.ReceiptId", ledgerView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Package pressure visible", ledgerView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public faction lanes", ledgerView, StringComparison.Ordinal);
         Assert.Contains("Private labels stay private.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml")), StringComparison.Ordinal);
     }
 

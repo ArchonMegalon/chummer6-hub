@@ -352,7 +352,6 @@
                             <div class="route-choice-card__details">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
-                                <a href="@newsreelBroadcast.ReceiptsHref">Episode details</a>
                                 <a href="@newsreelBroadcast.ReceiptsHref">Details</a>
                                 <a href="@newsreelBroadcast.FeedbackHref">Feedback</a>
                             </div>
@@ -422,7 +421,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction files</p>
             <h2 class="editorial-title">Logos, backdrops, score ledgers, and first-party motion intros.</h2>
-            <p class="editorial-copy">Public faction lanes show pressure, not people.</p>
+            <p class="editorial-copy">Faction pages show pressure, not private people.</p>
         </div>
         <div class="faction-profile-grid">
             @foreach (var faction in world.Factions)
@@ -451,7 +450,7 @@
                     <div class="trust-claim__details">
                         <span>Safety: public</span>
                         <span>Video: first-party motion</span>
-                        <span>Turn: @(world.LastTick?.ReceiptId ?? "turn-1")</span>
+                        <span>Turn: @selectedTurn</span>
                     </div>
                     <a class="editorial-strip__action" href="/ledger/factions/@slug" data-faction-file-link="@slug">Open faction file</a>
                 </article>
@@ -475,7 +474,7 @@
                     <div class="trust-claim__details">
                         <span>Safety: public</span>
                         <span>Video: first-party motion</span>
-                        <span>Package pressure visible</span>
+                        <span>Pressure visible</span>
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--primary" href="@accountCtaHref">@accountCtaLabel</a>
@@ -492,7 +491,7 @@
                         <h3>@ledger.CurrentValue</h3>
                         <p>Delta since last turn: @ledger.Delta</p>
                         <p>Trend: @ledger.Trend</p>
-                        <p>Latest turn: @ledger.SourceReceipt</p>
+                        <p>Latest turn: Turn @selectedTurn</p>
                         <p>What changes it: @ledger.WhatChangesIt</p>
                         <p>Latest action: @ledger.LatestAction</p>
                     </article>
