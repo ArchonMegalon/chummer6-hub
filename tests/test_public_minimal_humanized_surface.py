@@ -1325,8 +1325,11 @@ def test_package_pages_use_page_language_instead_of_route_language() -> None:
 def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     mobile = read("Chummer.Run.Api/Views/PublicLanding/MobileProjection.cshtml")
     knowledge = read("Chummer.Run.Api/Views/PublicLanding/KnowledgeFabric.cshtml")
+    nexus = read("Chummer.Run.Api/Views/PublicLanding/NexusPanContinuity.cshtml")
     anarchy = read("Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml")
-    combined = "\n".join((mobile, knowledge, anarchy))
+    concierge = read("Chummer.Run.Api/Views/PublicLanding/Concierge.cshtml")
+    join = read("Chummer.Run.Api/Views/PublicLanding/JoinPrimer.cshtml")
+    combined = "\n".join((mobile, knowledge, nexus, anarchy, concierge, join))
 
     for forbidden in (
         "app route",
@@ -1349,3 +1352,43 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     assert "This page reads Chummer dispatches" in anarchy
     assert "Chummer owns the portable export" in anarchy
     assert "Portable runner export" in anarchy
+
+    for expected in (
+        "PublicKnowledgeText(Model.Heading)",
+        "PublicKnowledgeText(Model.PrimaryAction.Label)",
+        "PublicNexusText(Model.Heading)",
+        "PublicNexusText(Model.PlatformSummary)",
+        "PublicMobileText(Model.Heading)",
+        "PublicMobileText(Model.InstallabilitySummary)",
+        "PublicMobileText(role.Label)",
+        "PublicAnarchyText(Model.Heading)",
+        "PublicAnarchyText(Model.ScopeLabel)",
+        "PublicAnarchyText(Model.FeaturedProfile.Notes)",
+        "PublicAnarchyText(dispatch.Summary)",
+        "PublicConciergeText(Model.Heading)",
+        "PublicConciergeText(branch.ActionLabel)",
+        "PublicJoinText(Model.Heading)",
+        "PublicJoinText(panel.PrimaryAction.Label)",
+    ):
+        assert expected in combined
+
+    for forbidden_binding in (
+        "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+        "<h1 class=\"page-title\">@Model.Heading</h1>",
+        "<p class=\"page-copy\">@Model.Intro</p>",
+        ">@Model.PrimaryAction.Label</a>",
+        ">@Model.SecondaryAction.Label</a>",
+        ">@Model.TertiaryAction.Label</a>",
+        "<span>@Model.CurrentRoleLabel</span>",
+        "<p class=\"editorial-copy\">@Model.InstallabilitySummary</p>",
+        "<p class=\"editorial-copy\">@Model.PlatformSummary</p>",
+        "<span>@Model.ScopeLabel</span>",
+        "<p>@Model.FeaturedProfile.Notes</p>",
+        "<span class=\"tag\">@Model.ExplainReceipt.Status</span>",
+        "<a class=\"button-like button-like--@action.Tone\" href=\"@action.Href\">@action.Label</a>",
+        "<span class=\"tag\">@branch.DestinationLabel</span>",
+        "<a class=\"editorial-strip__action\" href=\"@branch.ActionHref\">@branch.ActionLabel</a>",
+        "<a class=\"@ToneClass(action.Tone)\" href=\"@action.Href\">@action.Label</a>",
+        "<a class=\"@ToneClass(panel.PrimaryAction.Tone)\" href=\"@panel.PrimaryAction.Href\">@panel.PrimaryAction.Label</a>",
+    ):
+        assert forbidden_binding not in combined

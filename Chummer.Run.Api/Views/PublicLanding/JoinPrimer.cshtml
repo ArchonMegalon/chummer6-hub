@@ -3,6 +3,8 @@
     ViewData["Title"] = Model.InviteCodePresent ? "Campaign invite primer" : "Campaign primer";
     ViewData["Chrome"] = Model.Chrome;
 
+    static string PublicJoinText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
     static string ToneClass(string tone) => tone switch
     {
         "primary" => "button-like button-like--primary",
@@ -14,18 +16,18 @@
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Invite primer</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="page-title">@PublicJoinText(Model.Heading)</h1>
+        <p class="page-copy">@PublicJoinText(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var detail in Model.ProofPoints)
             {
-                <span>@PublicFacingCopyHumanizer.Clean(detail)</span>
+                <span>@PublicJoinText(detail)</span>
             }
         </div>
         <div class="stacked-actions">
             @foreach (var action in Model.Actions)
             {
-                <a class="@ToneClass(action.Tone)" href="@action.Href">@action.Label</a>
+                <a class="@ToneClass(action.Tone)" href="@action.Href">@PublicJoinText(action.Label)</a>
             }
         </div>
     </div>
@@ -41,20 +43,20 @@
         @foreach (var panel in Model.Sections)
         {
             <article class="route-choice-card" id="@panel.Id">
-                <span class="tag">@panel.Eyebrow</span>
-                <h3>@panel.Heading</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(panel.Summary)</p>
+                <span class="tag">@PublicJoinText(panel.Eyebrow)</span>
+                <h3>@PublicJoinText(panel.Heading)</h3>
+                <p>@PublicJoinText(panel.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var bullet in panel.Bullets)
                     {
-                        <span>@PublicFacingCopyHumanizer.Clean(bullet)</span>
+                        <span>@PublicJoinText(bullet)</span>
                     }
                 </div>
                 <div class="stacked-actions">
-                    <a class="@ToneClass(panel.PrimaryAction.Tone)" href="@panel.PrimaryAction.Href">@panel.PrimaryAction.Label</a>
+                    <a class="@ToneClass(panel.PrimaryAction.Tone)" href="@panel.PrimaryAction.Href">@PublicJoinText(panel.PrimaryAction.Label)</a>
                     @if (panel.SecondaryAction is not null)
                     {
-                        <a class="@ToneClass(panel.SecondaryAction.Tone)" href="@panel.SecondaryAction.Href">@panel.SecondaryAction.Label</a>
+                        <a class="@ToneClass(panel.SecondaryAction.Tone)" href="@panel.SecondaryAction.Href">@PublicJoinText(panel.SecondaryAction.Label)</a>
                     }
                 </div>
             </article>

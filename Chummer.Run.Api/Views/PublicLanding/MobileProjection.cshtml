@@ -1,23 +1,25 @@
 @model MobileProjectionPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    static string PublicMobileText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    ViewData["Title"] = PublicMobileText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-mobile-projection";
 }
 
 <section class="trust-page-hero trust-page-hero--compact">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicMobileText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicMobileText(Model.Heading)</h1>
+        <p class="page-copy">@PublicMobileText(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>@Model.CurrentRoleLabel</span>
+            <span>@PublicMobileText(Model.CurrentRoleLabel)</span>
             <span>Installable app shell live</span>
             <span>Offline and reconnect path cached</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicMobileText(Model.PrimaryAction.Label)</a>
         <button class="button-like button-like--secondary" type="button" data-install-prompt-button aria-disabled="true">Install this app</button>
         <a class="button-like button-like--ghost" href="/play/continuity">Open continuity</a>
     </div>
@@ -27,7 +29,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Installability state</p>
         <h2 class="editorial-title">Install like an app. Re-enter like a session shell.</h2>
-        <p class="editorial-copy">@Model.InstallabilitySummary</p>
+        <p class="editorial-copy">@PublicMobileText(Model.InstallabilitySummary)</p>
     </div>
     <div class="flagship-gateway-grid flagship-gateway-grid--compact">
         <article class="gateway-card">
@@ -77,9 +79,9 @@
             <article class="gateway-card">
                 <div class="gateway-card__header">
                     <span class="tag">Included</span>
-                    <h3>@capability.Label</h3>
+                    <h3>@PublicMobileText(capability.Label)</h3>
                 </div>
-                <p>@capability.Summary</p>
+                <p>@PublicMobileText(capability.Summary)</p>
             </article>
         }
     </div>
@@ -96,9 +98,9 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@(role.Current ? "Current role" : "Role alias")</span>
-                <h3>@role.Label</h3>
-                <p>@role.Summary</p>
-                <a class="editorial-strip__action" href="@role.Href">Open @role.Label</a>
+                <h3>@PublicMobileText(role.Label)</h3>
+                <p>@PublicMobileText(role.Summary)</p>
+                <a class="editorial-strip__action" href="@role.Href">Open @PublicMobileText(role.Label)</a>
             </article>
         }
     </div>

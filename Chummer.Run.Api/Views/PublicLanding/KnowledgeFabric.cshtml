@@ -1,26 +1,28 @@
 @model KnowledgeFabricPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    static string PublicKnowledgeText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    ViewData["Title"] = PublicKnowledgeText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicKnowledgeText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicKnowledgeText(Model.Heading)</h1>
+        <p class="page-copy">@PublicKnowledgeText(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
             {
-                <span>@point</span>
+                <span>@PublicKnowledgeText(point)</span>
             }
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicKnowledgeText(Model.PrimaryAction.Label)</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicKnowledgeText(Model.SecondaryAction.Label)</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@PublicKnowledgeText(Model.TertiaryAction.Label)</a>
     </div>
 </section>
 

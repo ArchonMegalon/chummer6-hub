@@ -1,26 +1,28 @@
 @model NexusPanContinuityPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    static string PublicNexusText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    ViewData["Title"] = PublicNexusText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicNexusText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicNexusText(Model.Heading)</h1>
+        <p class="page-copy">@PublicNexusText(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
             {
-                <span>@point</span>
+                <span>@PublicNexusText(point)</span>
             }
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicNexusText(Model.PrimaryAction.Label)</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicNexusText(Model.SecondaryAction.Label)</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@PublicNexusText(Model.TertiaryAction.Label)</a>
     </div>
 </section>
 
@@ -60,7 +62,7 @@
     <div class="continuity-band__copy">
         <p class="eyebrow">Platform spread</p>
         <h2 class="editorial-title">Continuity stays cross-device, while the public page only shows safe aggregate status.</h2>
-        <p class="editorial-copy">@Model.PlatformSummary</p>
+        <p class="editorial-copy">@PublicNexusText(Model.PlatformSummary)</p>
     </div>
     <div class="continuity-band__panel">
         @foreach (var platform in Model.PlatformLabels)

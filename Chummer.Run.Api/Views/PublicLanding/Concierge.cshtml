@@ -1,20 +1,22 @@
 @model PublicConciergePageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    static string PublicConciergeText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    ViewData["Title"] = PublicConciergeText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-public-concierge";
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicConciergeText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicConciergeText(Model.Heading)</h1>
+        <p class="page-copy">@PublicConciergeText(Model.Intro)</p>
     </div>
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@PublicConciergeText(action.Label)</a>
         }
     </div>
 </section>
@@ -53,7 +55,7 @@
                 <p class="muted-copy">If this panel does not load, use the choices below.</p>
                 <iframe
                     src="@Model.Widget.IframeHref"
-                    title="@Model.Heading"
+                    title="@PublicConciergeText(Model.Heading)"
                     loading="lazy"
                     referrerpolicy="strict-origin-when-cross-origin"
                     style="width:100%;min-height:480px;border:1px solid rgba(255,255,255,.12);border-radius:1rem;background:rgba(9,14,19,.72);"></iframe>
@@ -72,10 +74,10 @@
         @foreach (var branch in Model.Branches)
         {
             <article class="route-choice-card">
-                <span class="tag">@branch.DestinationLabel</span>
-                <h3>@branch.Title</h3>
-                <p>@branch.Summary</p>
-                <a class="editorial-strip__action" href="@branch.ActionHref">@branch.ActionLabel</a>
+                <span class="tag">@PublicConciergeText(branch.DestinationLabel)</span>
+                <h3>@PublicConciergeText(branch.Title)</h3>
+                <p>@PublicConciergeText(branch.Summary)</p>
+                <a class="editorial-strip__action" href="@branch.ActionHref">@PublicConciergeText(branch.ActionLabel)</a>
             </article>
         }
     </div>

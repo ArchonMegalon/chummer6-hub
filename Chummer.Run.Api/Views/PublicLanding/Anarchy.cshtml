@@ -1,24 +1,26 @@
 @model AnarchyPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    static string PublicAnarchyText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    ViewData["Title"] = PublicAnarchyText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicAnarchyText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicAnarchyText(Model.Heading)</h1>
+        <p class="page-copy">@PublicAnarchyText(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>@Model.ScopeLabel</span>
-            <span>@PublicFacingCopyHumanizer.Clean(Model.VerdictLabel)</span>
+            <span>@PublicAnarchyText(Model.ScopeLabel)</span>
+            <span>@PublicAnarchyText(Model.VerdictLabel)</span>
             <span>Chummer export, not book text</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicAnarchyText(Model.PrimaryAction.Label)</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicAnarchyText(Model.SecondaryAction.Label)</a>
     </div>
 </section>
 
@@ -33,7 +35,7 @@
             <span class="tag">@Model.RulesetId</span>
             <h3>@Model.FeaturedProfile.Handle</h3>
             <p>@Model.FeaturedProfile.Concept</p>
-            <p class="muted-copy">@PublicFacingCopyHumanizer.Clean(Model.FeaturedProfile.PostureLabel)</p>
+            <p class="muted-copy">@PublicAnarchyText(Model.FeaturedProfile.PostureLabel)</p>
         </article>
         <article class="route-choice-card">
             <span class="tag">@PublicFacingCopyHumanizer.Clean(Model.FeaturedProfile.VerdictLabel)</span>
@@ -51,13 +53,13 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">@Model.FeaturedProfile.MetatypeOrIdentityTag</span>
-            <h3>@Model.FeaturedProfile.Handle</h3>
-            <p>@Model.FeaturedProfile.Notes</p>
+            <span class="tag">@PublicAnarchyText(Model.FeaturedProfile.MetatypeOrIdentityTag)</span>
+            <h3>@PublicAnarchyText(Model.FeaturedProfile.Handle)</h3>
+            <p>@PublicAnarchyText(Model.FeaturedProfile.Notes)</p>
             <div class="route-choice-card__details">
                 @foreach (var tag in Model.FeaturedProfile.ArchetypeTags)
                 {
-                    <span>@tag</span>
+                    <span>@PublicAnarchyText(tag)</span>
                 }
             </div>
         </article>
@@ -113,9 +115,9 @@
             @foreach (var dispatch in Model.Dispatches)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@dispatch.Type</span>
-                    <h3>@dispatch.Title</h3>
-                    <p>@dispatch.Summary</p>
+            <span class="tag">@PublicAnarchyText(dispatch.Type)</span>
+            <h3>@PublicAnarchyText(dispatch.Title)</h3>
+            <p>@PublicAnarchyText(dispatch.Summary)</p>
                     <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                 </article>
             }
@@ -131,13 +133,13 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">@Model.ExplainReceipt.Status</span>
+            <span class="tag">@PublicAnarchyText(Model.ExplainReceipt.Status)</span>
             <h3>Portable runner explanation</h3>
             <p>The export keeps enough context for Chummer to explain the sheet without showing sourcebook text.</p>
             <div class="route-choice-card__details">
                 @foreach (var note in Model.ExplainReceipt.ProvenanceNotes)
                 {
-                    <span>@note</span>
+                    <span>@PublicAnarchyText(note)</span>
                 }
             </div>
         </article>

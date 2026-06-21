@@ -1011,9 +1011,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string knowledgeFabric = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KnowledgeFabric.cshtml"));
         string nexusPan = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "NexusPanContinuity.cshtml"));
+        string mobile = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "MobileProjection.cshtml"));
+        string anarchy = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Anarchy.cshtml"));
+        string concierge = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Concierge.cshtml"));
+        string joinPrimer = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "JoinPrimer.cshtml"));
 
         foreach (string cleanedBinding in new[]
                  {
+                     "PublicKnowledgeText(Model.Heading)",
+                     "PublicKnowledgeText(Model.PrimaryAction.Label)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Status)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
@@ -1025,6 +1031,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string cleanedBinding in new[]
                  {
+                     "PublicNexusText(Model.Heading)",
+                     "PublicNexusText(Model.PlatformSummary)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Status)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
                      "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
@@ -1032,6 +1040,29 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                  })
         {
             Assert.Contains(cleanedBinding, nexusPan, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("PublicMobileText(Model.Heading)", mobile, StringComparison.Ordinal);
+        Assert.Contains("PublicMobileText(Model.PrimaryAction.Label)", mobile, StringComparison.Ordinal);
+        Assert.Contains("PublicMobileText(Model.InstallabilitySummary)", mobile, StringComparison.Ordinal);
+        Assert.Contains("PublicMobileText(role.Label)", mobile, StringComparison.Ordinal);
+        Assert.Contains("PublicAnarchyText(Model.Heading)", anarchy, StringComparison.Ordinal);
+        Assert.Contains("PublicAnarchyText(Model.ScopeLabel)", anarchy, StringComparison.Ordinal);
+        Assert.Contains("PublicAnarchyText(Model.FeaturedProfile.Notes)", anarchy, StringComparison.Ordinal);
+        Assert.Contains("PublicAnarchyText(dispatch.Summary)", anarchy, StringComparison.Ordinal);
+        Assert.Contains("PublicConciergeText(Model.Heading)", concierge, StringComparison.Ordinal);
+        Assert.Contains("PublicConciergeText(action.Label)", concierge, StringComparison.Ordinal);
+        Assert.Contains("PublicConciergeText(branch.ActionLabel)", concierge, StringComparison.Ordinal);
+        Assert.Contains("PublicJoinText(Model.Heading)", joinPrimer, StringComparison.Ordinal);
+        Assert.Contains("PublicJoinText(action.Label)", joinPrimer, StringComparison.Ordinal);
+        Assert.Contains("PublicJoinText(panel.PrimaryAction.Label)", joinPrimer, StringComparison.Ordinal);
+
+        foreach (string source in new[] { knowledgeFabric, nexusPan, mobile, anarchy, concierge, joinPrimer })
+        {
+            Assert.DoesNotContain("<h1 class=\"page-title\">@Model.Heading</h1>", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("<p class=\"page-copy\">@Model.Intro</p>", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("@Model.PrimaryAction.Label</a>", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("@action.Label</a>", source, StringComparison.Ordinal);
         }
     }
 
