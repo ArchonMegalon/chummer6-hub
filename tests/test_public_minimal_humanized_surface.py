@@ -804,7 +804,10 @@ def test_faction_workspace_uses_page_language_instead_of_route_language() -> Non
 def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
     account_home = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
     notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
-    combined = "\n".join((account_home, notifications))
+    ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
+    advisory = read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml")
+    onboarding = read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml")
+    combined = "\n".join((account_home, notifications, ledger, advisory, onboarding))
 
     for forbidden in (
         "signed-in route",
@@ -812,6 +815,9 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
         "route-backed world state",
         "one Chummer route",
         "inbox route",
+        "public globe route",
+        "Open watch route",
+        "Major and challenger routes",
     ):
         assert forbidden not in combined
 
@@ -820,3 +826,7 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
     assert "current world state" in notifications
     assert "one Chummer path" in notifications
     assert "Use the inbox as the Table Pulse Live entry point" in notifications
+    assert "public globe page" in ledger
+    assert "Open watch page" in ledger
+    assert "signed-in page that mails and inbox items point back to" in advisory
+    assert "Major and challenger paths" in onboarding

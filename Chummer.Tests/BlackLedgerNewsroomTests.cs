@@ -20,9 +20,9 @@ public sealed class BlackLedgerNewsroomTests
         Assert.Contains("TryParseNewsroomEpisodeTurn", controller, StringComparison.Ordinal);
 
         Assert.Contains("Black Ledger Newsroom", ledgerView, StringComparison.Ordinal);
-        Assert.Contains("Open watch route", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("Open watch page", ledgerView, StringComparison.Ordinal);
         Assert.Contains("Transcript", ledgerView, StringComparison.Ordinal);
-        Assert.Contains("Episode details", ledgerView, StringComparison.Ordinal);
+        Assert.Contains(">Details</a>", ledgerView, StringComparison.Ordinal);
         Assert.Contains("Feedback", ledgerView, StringComparison.Ordinal);
 
         Assert.Contains("TranscriptHref", siteViewModels, StringComparison.Ordinal);
