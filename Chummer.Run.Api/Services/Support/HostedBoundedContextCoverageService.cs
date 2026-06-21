@@ -77,7 +77,7 @@ public sealed class HostedBoundedContextCoverageService
                 "/, /downloads, /now, and /horizons remain openly readable public pages.",
                 feedbackPacket is null
                     ? "Public signal still enters through /participate before any account-linked followthrough is attached."
-                    : $"{feedbackPacket.Route} keeps reviewed public feedback separate from signed-in support and account pages.",
+                    : $"{feedbackPacket.Route} keeps reviewed public feedback separate from account support and account pages.",
                 "Public routes compare against the published release status rather than worker-local helper state."
             ],
             Actions:
@@ -99,8 +99,8 @@ public sealed class HostedBoundedContextCoverageService
         string locale)
     {
         string summary = user is null
-            ? "Account context stays closed until a signed-in identity exists, keeping profile, access, rewards, and entitlements off guest routes."
-            : $"{user.DisplayName} keeps profile, access, rewards, and entitlements on the signed-in account page with {groups.Count.ToString(CultureInfo.InvariantCulture)} reviewed group attachment(s).";
+            ? "Account context stays closed until an account identity exists, keeping profile, access, rewards, and entitlements off guest routes."
+            : $"{user.DisplayName} keeps profile, access, rewards, and entitlements on the account page with {groups.Count.ToString(CultureInfo.InvariantCulture)} reviewed group attachment(s).";
 
         return new HostedBoundedContextCoverageProjection(
             ProjectionId: StableId("hosted-bounded-context-account", user?.UserId ?? manifest.Version),
@@ -117,14 +117,14 @@ public sealed class HostedBoundedContextCoverageService
             EvidenceLines:
             [
                 user is null
-                    ? "No signed-in account is active, so /account remains protected."
-                    : $"Account {user.UserId} keeps {user.LinkedPrincipals.Count.ToString(CultureInfo.InvariantCulture)} linked sign-in method(s) on the signed-in account page.",
+                    ? "No account is active, so /account remains protected."
+                    : $"Account {user.UserId} keeps {user.LinkedPrincipals.Count.ToString(CultureInfo.InvariantCulture)} linked sign-in method(s) on the account page.",
                 "/account/access is the comparison route for claimed-install and recovery posture.",
                 "Account routes may summarize support, community, or campaign posture, but those details stay owned by their home contexts."
             ],
             Actions:
             [
-                new HostedBoundedContextCoverageActionProjection("open_account", "Open account", "/account", "Inspect the signed-in account page."),
+                new HostedBoundedContextCoverageActionProjection("open_account", "Open account", "/account", "Inspect the account page."),
                 new HostedBoundedContextCoverageActionProjection("open_account_access", "Open devices & access", "/account/access", "Inspect claimed-install and access continuity."),
                 new HostedBoundedContextCoverageActionProjection("open_rewards", "Open rewards", "/rewards", "Compare account status with reusable reward followthrough.")
             ],
@@ -162,17 +162,17 @@ public sealed class HostedBoundedContextCoverageService
             Summary: summary,
             EvidenceLines:
             [
-                $"{communityHubRoute} is the signed-in community operations anchor.",
+                $"{communityHubRoute} is the account community operations anchor.",
                 primaryGroup is null
                     ? "No reviewed group is active yet, so /groups remains the safe comparison route."
                     : $"Group {primaryGroup.GroupId} keeps {primaryGroup.Memberships.Count.ToString(CultureInfo.InvariantCulture)} member link(s) on the reviewed group page.",
                 openRun is null
-                    ? "No open-run listing is active yet, but community operations still stay on the same signed-in page."
-                    : $"Open run {openRun.Listing.OpenRunId} still routes through the same signed-in community page."
+                    ? "No open-run listing is active yet, but community operations still stay on the same account page."
+                    : $"Open run {openRun.Listing.OpenRunId} still routes through the same account community page."
             ],
             Actions:
             [
-                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Open community hub", communityHubRoute, "Inspect the signed-in community operations page."),
+                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Open community hub", communityHubRoute, "Inspect the account community operations page."),
                 new HostedBoundedContextCoverageActionProjection("open_groups", "Open groups", groupRoute, "Compare community operations against the reviewed group page."),
                 new HostedBoundedContextCoverageActionProjection("open_open_runs", "Open open runs", "/account/work#community-ops", "Return to the community page that owns discovery and join status.")
             ],
@@ -222,7 +222,7 @@ public sealed class HostedBoundedContextCoverageService
             [
                 new HostedBoundedContextCoverageActionProjection("open_campaign_workspace", "Open campaign workspace", route, "Inspect the signed-in campaign continuity page."),
                 new HostedBoundedContextCoverageActionProjection("open_campaign_open_run", "Open open-run details", comparisonRoute, "Compare the campaign workspace with reviewed open-run details."),
-                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Return to community hub", communityHubRoute, "Return to the signed-in community page without leaving the campaign workspace.")
+                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Return to community hub", communityHubRoute, "Return to the account community page without leaving the campaign workspace.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -346,7 +346,7 @@ public sealed class HostedBoundedContextCoverageService
             Actions:
             [
                 new HostedBoundedContextCoverageActionProjection("open_progress", "Open progress", "/progress", "Inspect the public summary that compares the product areas."),
-                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Open community hub", communityHubRoute, "Compare the public summary against the signed-in community page."),
+                new HostedBoundedContextCoverageActionProjection("open_community_hub", "Open community hub", communityHubRoute, "Compare the public summary against the account community page."),
                 new HostedBoundedContextCoverageActionProjection("open_account", "Open account", "/account", "Return to the signed-in customer spine when a boundary question needs deeper followthrough.")
             ],
             EmittedAtUtc: now,

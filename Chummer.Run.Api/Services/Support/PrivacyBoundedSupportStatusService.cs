@@ -252,7 +252,7 @@ public sealed class PrivacyBoundedSupportStatusService
             ReleaseVersion: manifest.Version,
             ProofStatus: ResolveProofStatus(manifest),
             SupportabilityState: ResolveSupportabilityState(manifest),
-            Summary: "Retention clocks stay explicit: public routes expose bounded status and help, while signed-in routes carry the user-safe slice of support and crash followthrough on a controlled clock.",
+            Summary: "Retention clocks stay explicit: public routes expose bounded status and help, while account routes carry the user-safe slice of support and crash followthrough on a controlled clock.",
             EvidenceLines:
             [
                 "Public surfaces may not expose private case notes, raw crash envelopes, provider traces, or account-internal survey payloads.",

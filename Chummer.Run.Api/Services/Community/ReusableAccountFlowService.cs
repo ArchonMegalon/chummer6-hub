@@ -57,7 +57,7 @@ public sealed class ReusableAccountFlowService
         DateTimeOffset now,
         string locale)
     {
-        string summary = $"{user.DisplayName} keeps reusable account-profile truth on the signed-in account rail with {groups.Count.ToString(CultureInfo.InvariantCulture)} governed group lane(s).";
+        string summary = $"{user.DisplayName} keeps reusable account-profile truth on the account page with {groups.Count.ToString(CultureInfo.InvariantCulture)} governed group lane(s).";
         return new ReusableAccountFlowProjection(
             ProjectionId: StableId("account-profile", user.UserId),
             SurfaceId: "account_profile",
@@ -78,7 +78,7 @@ public sealed class ReusableAccountFlowService
             ],
             Actions:
             [
-                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Review the signed-in account profile and linked rails."),
+                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Review the account profile and linked paths."),
                 new ReusableAccountFlowActionProjection("open_groups", "Open groups", "/groups", "Pivot from the account surface into governed groups."),
                 new ReusableAccountFlowActionProjection("open_rewards", "Open rewards", "/rewards", "Review the reward and entitlement followthrough anchored to this account.")
             ],
@@ -122,14 +122,14 @@ public sealed class ReusableAccountFlowService
                 primaryGroup is null
                     ? "No member list is attached yet."
                     : string.Equals(primaryGroup.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
-                        ? "This signed-in account currently owns the group."
-                        : $"This signed-in account currently participates in owner group {primaryGroup.OwnerUserId}."
+                        ? "This account currently owns the group."
+                        : $"This account currently participates in owner group {primaryGroup.OwnerUserId}."
             ],
             Actions:
             [
                 new ReusableAccountFlowActionProjection("open_group", "Open group", route, "Inspect the governed group page for member and code posture."),
                 new ReusableAccountFlowActionProjection("open_group_list", "Open groups", "/groups", "Review every governed group rail attached to the account."),
-                new ReusableAccountFlowActionProjection("open_account", "Return to account", "/account", "Return to the signed-in account spine.")
+                new ReusableAccountFlowActionProjection("open_account", "Return to account", "/account", "Return to the account page.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -176,7 +176,7 @@ public sealed class ReusableAccountFlowService
             [
                 new ReusableAccountFlowActionProjection("open_membership_group", "Open membership rail", route, "Inspect the governed group membership details."),
                 new ReusableAccountFlowActionProjection("open_groups_api", "Open groups api", $"/api/v1/groups?subjectId={Uri.EscapeDataString(user.SubjectId)}", "Load the reusable group membership payload."),
-                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the signed-in account rail.")
+                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the account page.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -224,7 +224,7 @@ public sealed class ReusableAccountFlowService
             [
                 new ReusableAccountFlowActionProjection("open_join_code_issue", "Open join codes", route, "Issue or inspect group join codes."),
                 new ReusableAccountFlowActionProjection("open_groups", "Open groups", "/groups", "Return to the governed group rail that owns the join code."),
-                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the signed-in account rail.")
+                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the account page.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -313,7 +313,7 @@ public sealed class ReusableAccountFlowService
             Actions:
             [
                 new ReusableAccountFlowActionProjection("open_rewards", "Open rewards", "/rewards", "Review the reusable reward journal rail."),
-                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the signed-in account profile."),
+                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the account profile."),
                 new ReusableAccountFlowActionProjection("open_entitlements", "Open entitlements", $"/api/v1/entitlements/me?subjectId={Uri.EscapeDataString(user.SubjectId)}", "Compare reward followthrough with granted entitlements.")
             ],
             EmittedAtUtc: now,
@@ -336,7 +336,7 @@ public sealed class ReusableAccountFlowService
         string route = $"/api/v1/entitlements/me?subjectId={Uri.EscapeDataString(user.SubjectId)}";
         string summary = entitlements.Count == 0
             ? "Entitlement-journal flow stays reusable, but no governed entitlement has been granted to this account yet."
-            : $"{entitlements.Count.ToString(CultureInfo.InvariantCulture)} entitlement(s) stay reusable on the signed-in account rail, with {badges.Count.ToString(CultureInfo.InvariantCulture)} badge posture marker(s) alongside them.";
+            : $"{entitlements.Count.ToString(CultureInfo.InvariantCulture)} entitlement(s) stay reusable on the account page, with {badges.Count.ToString(CultureInfo.InvariantCulture)} badge posture marker(s) alongside them.";
 
         return new ReusableAccountFlowProjection(
             ProjectionId: StableId("entitlement-journal", latestEntitlement?.EntitlementId ?? user.UserId),
@@ -364,7 +364,7 @@ public sealed class ReusableAccountFlowService
             [
                 new ReusableAccountFlowActionProjection("open_entitlements", "Open entitlements", route, "Review the reusable entitlement journal payload."),
                 new ReusableAccountFlowActionProjection("open_rewards", "Open rewards", "/rewards", "Review the reward rail that can promote new entitlements."),
-                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the signed-in account rail.")
+                new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the account page.")
             ],
             EmittedAtUtc: now,
             Locale: locale,

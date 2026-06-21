@@ -206,9 +206,9 @@ public sealed class AccountsController : Controller
         {
             _logger.LogWarning(ex, "Account page could not confirm the signed-in identity.");
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the signed-in account surface right now.", currentPath),
+                Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the account page right now.", currentPath),
                 Heading: "Account is unavailable right now",
-                SupportLine: "Chummer could not open the signed-in account surface right now. Your account details were not changed.",
+                SupportLine: "Chummer could not open the account page right now. Your account details were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
                 PrimaryHref: currentPath,

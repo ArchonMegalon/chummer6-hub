@@ -435,7 +435,7 @@ public sealed class PublicPackageCatalogService
                 "The public participate and feedback pages already separate safe public signal from private support and install work.",
                 "Open feedback",
                 "/feedback",
-                "Account package tracking keeps your follows and votes on the same signed-in page as support and continuity.",
+                "Account package tracking keeps your follows and votes on the same account page as support and continuity.",
                 "Treat this package as a reviewed proposal surface with clear moderation and compatibility status.")
         ];
 }

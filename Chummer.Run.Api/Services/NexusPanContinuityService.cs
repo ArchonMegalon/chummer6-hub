@@ -124,7 +124,7 @@ public sealed class NexusPanContinuityService
                     item.Status
                 }).ToArray(),
                 summary = BuildSummaryPayload(summary),
-                boundary = "Public continuity stays aggregate and preview-safe. Private device history, account detail, and workspace continuity stay on signed-in rails.",
+                boundary = "Public continuity stays aggregate and preview-safe. Private device history, account detail, and workspace continuity stay on account paths.",
                 generated_at_utc = DateTimeOffset.UtcNow
             },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });

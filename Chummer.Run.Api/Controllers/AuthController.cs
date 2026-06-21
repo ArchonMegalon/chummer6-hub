@@ -264,7 +264,7 @@ public sealed class AuthController : Controller
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Recovery email confirmation expired", "The recovery-email confirmation token was missing, expired, or invalid.", "/account"),
                 Heading: "Recovery email confirmation expired",
-                SupportLine: "Start the recovery-email step again from your signed-in account settings.",
+                SupportLine: "Start the recovery-email step again from your account settings.",
                 Notice: null,
                 PrimaryLabel: "Open account",
                 PrimaryHref: "/account",

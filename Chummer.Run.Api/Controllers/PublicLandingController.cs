@@ -4632,7 +4632,7 @@ public sealed class PublicLandingController : Controller
                 ? "This sample page keeps the support confirmation page reachable without opening a real support case."
                 : trackedCase is null
                     ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
-                    : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
+                    : "Chummer accepted the report and linked it to the account path so the next routed update stays visible.",
             CaseId: caseId,
             StatusLabel: sampleReceipt ? "sample" : trackedCase?.Status ?? SupportCaseStatuses.New,
             ResponseExpectation: sampleReceipt
@@ -5178,7 +5178,7 @@ public sealed class PublicLandingController : Controller
             description: "Player-safe dossier cards, mission briefs, and first-party publication history.",
             eyebrow: "Briefings",
             heading: "JACKPOINT",
-            intro: "JACKPOINT now ships a real briefing network: public-safe dossiers and mission briefs stay readable, while signed-in publication review and campaign-return history stay on named account pages.",
+            intro: "JACKPOINT now ships a real briefing network: public-safe dossiers and mission briefs stay readable, while account publication review and campaign-return history stay on named account pages.",
             boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
             summaryPoints: ["Dossier cards", "Mission briefs", "Account publication workspace"],
             documents: briefings,
@@ -5413,7 +5413,7 @@ public sealed class PublicLandingController : Controller
             description: "Reviewed publication discovery, trust status, and campaign return loops.",
             eyebrow: "Creator",
             heading: "Creator OS",
-            intro: "Creator OS now ships a real publication network: reviewed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return history stay on named account paths.",
+            intro: "Creator OS now ships a real publication network: reviewed discovery stays public-safe, while account draft review, publication state, and campaign-return history stay on named account paths.",
             boundaryLine: "Creator status comes from Chummer publication history and signed-in review state. External dashboards, shelves, and asset hosts do not decide what is published.",
             summaryPoints:
             [
@@ -5803,7 +5803,7 @@ public sealed class PublicLandingController : Controller
                     Label: "Account publication workspace",
                     Summary: publications.Count == 0
                     ? "No reviewed publication is attached to this account yet. Creator OS is ready to open the account workspace as soon as a workspace publishes one."
-                    : $"{publications.Count} publication(s) are already visible in your signed-in area, with review, publish state, and campaign-return history on one account path.",
+                    : $"{publications.Count} publication(s) are already visible in your account area, with review, publish state, and campaign-return history on one account path.",
                 Href: "/account/creator",
                 StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
             new(
@@ -7755,7 +7755,7 @@ Boundary:
                     ArtifactId: dossier.DossierId,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
                     Audience: "personal,campaign",
-                    OwnershipSummary: $"{campaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.",
+                    OwnershipSummary: $"{campaignName} reuses the same governed dossier artifact on the account path instead of forking a shadow copy.",
                     PublicationState: "personal_ready",
                     TrustBand: null,
                     Discoverable: false,

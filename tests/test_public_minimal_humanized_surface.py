@@ -2332,3 +2332,66 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "Room available to account participants",
     ):
         assert expected in combined
+
+
+def test_account_context_services_use_account_language_instead_of_signed_in_rails() -> None:
+    sources = "\n".join(
+        (
+            read("Chummer.Run.Api/Controllers/AccountsController.cs"),
+            read("Chummer.Run.Api/Controllers/AuthController.cs"),
+            read("Chummer.Run.Api/Controllers/PublicLandingController.cs"),
+            read("Chummer.Run.Api/Services/Community/CampaignSpineService.cs"),
+            read("Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs"),
+            read("Chummer.Run.Api/Services/Community/ReusableAccountFlowService.cs"),
+            read("Chummer.Run.Api/Services/NexusPanContinuityService.cs"),
+            read("Chummer.Run.Api/Services/PublicPackageCatalogService.cs"),
+            read("Chummer.Run.Api/Services/Support/HostedBoundedContextCoverageService.cs"),
+            read("Chummer.Run.Api/Services/Support/PrivacyBoundedSupportStatusService.cs"),
+        )
+    )
+
+    for forbidden in (
+        "reusable account-profile truth on the signed-in account rail",
+        "Review the signed-in account profile",
+        "Return to the signed-in account",
+        "This signed-in account",
+        "entitlement(s) stay reusable on the signed-in account rail",
+        "signed-in account page",
+        "Inspect the signed-in account page",
+        "same signed-in page",
+        "signed-in community operations anchor",
+        "signed-in community page",
+        "signed-in account settings",
+        "signed-in account surface",
+        "signed-in account path",
+        "signed-in routes carry",
+        "signed-in rails",
+        "signed-in support and account pages",
+        "signed-in publication review",
+        "signed-in draft review",
+        "signed-in area",
+    ):
+        assert forbidden not in sources
+
+    for expected in (
+        "reusable account-profile truth on the account page",
+        "Review the account profile and linked paths",
+        "Return to the account page",
+        "This account currently owns the group.",
+        "entitlement(s) stay reusable on the account page",
+        "keeps profile, access, rewards, and entitlements on the account page",
+        "Inspect the account page",
+        "same account page",
+        "account community operations anchor",
+        "account community page",
+        "account settings",
+        "account page right now",
+        "account path instead of forking a shadow copy",
+        "account routes carry the user-safe slice",
+        "account paths",
+        "account support and account pages",
+        "account publication review",
+        "account draft review",
+        "account area",
+    ):
+        assert expected in sources

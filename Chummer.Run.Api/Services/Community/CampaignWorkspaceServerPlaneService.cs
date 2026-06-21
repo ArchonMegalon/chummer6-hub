@@ -2935,7 +2935,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         if (IsDossierPublicationKind(normalizedKind))
         {
-            return $"{workspace.CampaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.";
+            return $"{workspace.CampaignName} reuses the same governed dossier artifact on the account path instead of forking a shadow copy.";
         }
 
         if (IsRunboardOrModulePublicationKind(normalizedKind))
