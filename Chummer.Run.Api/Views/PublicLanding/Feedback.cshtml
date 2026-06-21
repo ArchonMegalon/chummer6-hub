@@ -127,7 +127,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Public-safe boundary</p>
+        <p class="eyebrow">Keep private details out</p>
         <h2 class="editorial-title">This page stays public-facing on purpose.</h2>
         <p class="editorial-copy">Use the public board for safe ideas and safe bugs. This page stays public and lightweight on purpose. If the issue needs logs, account history, recovery, or private support follow-up, leave this page and use Help.</p>
     </div>
@@ -136,14 +136,14 @@
 <section class="status-decision-strip" aria-label="Feedback overview">
     <article class="status-decision-strip__card">
         <span class="tag">Roadmap</span>
-        <h2>@signalLoop.OpenMilestoneCount named slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") are visible on the public roadmap.</h2>
-        <p>@signalLoop.ClaimedMilestoneCount active now. @signalLoop.HighDifficultyMilestoneCount larger slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need more work before they become present-tense promises.</p>
+        <h2>@signalLoop.OpenMilestoneCount roadmap item@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") are visible.</h2>
+        <p>@signalLoop.ClaimedMilestoneCount active now. @signalLoop.HighDifficultyMilestoneCount larger item@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need more work before they are ready to use.</p>
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open roadmap</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Shipped today</span>
-        <h2>@signalLoop.ShippedFollowUpCount live example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what people can use now.</h2>
-        <p>When the question is what works today, switch to the changelog and current release notes instead of staying on the feedback page.</p>
+        <h2>@signalLoop.ShippedFollowUpCount available update@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what people can use now.</h2>
+        <p>When the question is what works today, use the changelog instead of staying on the feedback page.</p>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </article>
     <article class="status-decision-strip__card">
@@ -204,8 +204,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">After something ships</p>
-        <h2 class="editorial-title">Shipped updates stay upstream of public celebration.</h2>
-        <p class="editorial-copy">The public board can show demand now, but shipped updates only land after the update path is ready.</p>
+        <h2 class="editorial-title">Announce the update after people can use it.</h2>
+        <p class="editorial-copy">The public board can show demand. The changelog is for what is actually available.</p>
     </div>
 </section>
 
@@ -284,13 +284,13 @@
 </section>
 
 <section class="release-footnote">
-    <p class="eyebrow">Account-aware follow-up</p>
-    <h2 class="editorial-title">Create the account when you want feedback, installs, support, and roadmap follow-up to return to one place.</h2>
-    <p class="editorial-copy">The public board still works without an account. The account becomes useful once you want device return, support return, roadmap follows, and future install linking attached to one calmer place.</p>
+    <p class="eyebrow">Account</p>
+    <h2 class="editorial-title">Use an account when you want installs, support, and roadmap follows in one place.</h2>
+    <p class="editorial-copy">The public board still works without an account. An account becomes useful when you want a device, support history, and followed items to stay together.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@followSettingsHref">@followSettingsLabel</a>
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
         <a class="cta-link cta-link--ghost" href="/help">Open help</a>
     </div>
-    <p class="muted-copy">The paths stay split on purpose: <a class="inline-link" href="/feedback">public feedback</a>, <a class="inline-link" href="/roadmap">planned movement</a>, <a class="inline-link" href="/changelog">shipped updates</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
+    <p class="muted-copy">The paths stay split on purpose: <a class="inline-link" href="/feedback">public feedback</a>, <a class="inline-link" href="/roadmap">planned work</a>, <a class="inline-link" href="/changelog">available updates</a>, and <a class="inline-link" href="/help">private help</a>.</p>
 </section>
