@@ -573,8 +573,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.RoleLane)", view, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.RoleId)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.Label)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@kit.RoleLane</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@packet.RoleId</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>@packet.Label</h3>", view, StringComparison.Ordinal);
 
         foreach (string forbidden in new[]
         {
@@ -674,8 +676,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(signal)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.PrivacyNote</p>", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<span>@signal</span>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">@receipt.ActionLabel</span>", factionWorkspace, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -689,10 +693,16 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "@PublicText(supportCase.Case.Title)",
             "@PublicText(receipt.ArtifactLabel)",
             "@PublicText(workspace.ChangePackets[0].Summary)",
+            "PublicText(leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary)",
+            "PublicText(recentReceipts[0].ArtifactLabel)",
             "@PublicText(leadWorkspaceServerPlane.PrepLibrary.Summary)",
+            "@PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)",
+            "@PublicText(leadWorkspaceServerPlane.NextSafeAction.Summary)",
             "@PublicText(handoff.Summary)",
             "@string.Join(\", \", handoff.Outputs.Take(8).Select(item => PublicText(item.Label)))",
             "@PublicText(answer.ShortAnswer)",
+            "@PublicText(leadCommunityOperation.ArtifactPublicationSummary)",
+            "@PublicText(leadAftermathCreatorPublication.Title)",
             "@PublicText(publication.Summary)",
             "@PublicText(device.RestoreSummary)"
         })
@@ -705,12 +715,17 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "@supportCase.Case.Title",
             "@receipt.ArtifactLabel",
             "@workspace.ChangePackets[0].Summary",
+            "@leadWorkspaceServerPlane.ChangePackets[0].Summary",
             "@leadWorkspaceServerPlane.PrepLibrary.Summary",
             "@handoff.Summary",
             "handoff.Outputs.Take(8).Select(item => item.Label)",
             "@answer.ShortAnswer",
+            "@leadCommunityOperation.ArtifactPublicationSummary",
+            "@leadAftermathCreatorPublication.Title",
             "@publication.Summary",
             "@device.RestoreSummary",
+            "browser ritual",
+            "pending claim ticket(s)",
             "packet(s)",
             "package(s)"
         })

@@ -105,7 +105,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@PublicFacingCopyHumanizer.Clean(packet.RoleId)</span>
-                <h3>@packet.Label</h3>
+                <h3>@PublicFacingCopyHumanizer.Clean(packet.Label)</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(packet.Summary)</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@packet.MarkdownHref">Download notes</a>

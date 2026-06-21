@@ -290,21 +290,21 @@
         ?? (pendingClaims > 0
             ? "Finish the claim on the device that already has the build, then use Devices & access only for relink, reclaim, or recovery."
             : claimedInstallations > 0
-                ? "Downloads, support, and campaign return stay attached to the same account instead of splitting into a browser ritual."
+                ? "Downloads, support, and campaign return stay attached to the same account."
                 : "Use this account to keep install return, support, and campaign return attached from the first successful launch.");
     var homeRoleSummary = !string.IsNullOrWhiteSpace(leadWorkspaceServerPlane?.Workspace.DeviceRoleSummary)
-        ? leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary
+        ? PublicText(leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary)
         : leadTravelDevice is not null
-            ? $"{leadTravelDevice.DeviceRole} · {leadTravelDevice.Platform} / {leadTravelDevice.HeadId} / {leadTravelDevice.Channel}"
+            ? $"{PublicText(leadTravelDevice.DeviceRole)} · {PublicText(leadTravelDevice.Platform)} / {PublicText(leadTravelDevice.HeadId)} / {PublicText(leadTravelDevice.Channel)}"
             : claimedInstallations > 0
                 ? $"{claimedInstallations} linked install(s) are already attached to this account."
                 : pendingClaims > 0
-                    ? $"{pendingClaims} pending claim ticket(s) are waiting on their original device."
+                    ? $"{pendingClaims} pending claim(s) are waiting on their original device."
                     : "No claimed install or workspace role is attached yet.";
     var homeWhatChangedSummary = leadWorkspaceServerPlane?.ChangePackets.FirstOrDefault()?.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.ClosureSummary
         ?? (recentReceipts.Length > 0
-            ? $"{recentReceipts[0].ArtifactLabel} on {recentReceipts[0].Channel} is still attached to this account."
+            ? $"{PublicText(recentReceipts[0].ArtifactLabel)} on {PublicText(recentReceipts[0].Channel)} is still attached to this account."
             : restoreConflicts > 0
                 ? Model.CampaignSpine.Restore.ConflictSummaries[0]
                 : "Nothing urgent changed. This account is ready for the next install, campaign return, or support follow-up.");
@@ -736,23 +736,23 @@ else
                                                     <div class="app-rail__copy">
                                                         <h3>What changed for me</h3>
                                                         <p>
-                                                            @(leadWorkspaceState?.Label): @(leadWorkspaceState?.Summary)
+                                                            @PublicText(leadWorkspaceState?.Label): @PublicText(leadWorkspaceState?.Summary)
                                                             @if (leadNextSessionCarryForward is not null)
                                                             {
-                                                                <span> Carry-forward: @leadNextSessionCarryForward.Summary</span>
+                                                                <span> Carry-forward: @PublicText(leadNextSessionCarryForward.Summary)</span>
                                                             }
                                                             @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                             {
-                                                                <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                                <span> Change: @PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)</span>
                                                             }
-                                                            <span> Next: @leadWorkspaceServerPlane.NextSafeAction.Summary</span>
+                                                            <span> Next: @PublicText(leadWorkspaceServerPlane.NextSafeAction.Summary)</span>
                                                             @if (!string.IsNullOrWhiteSpace(leadPortableExchangeSummary))
                                                             {
-                                                                <span> Portable exchange: @leadPortableExchangeSummary</span>
+                                                                <span> Portable exchange: @PublicText(leadPortableExchangeSummary)</span>
                                                             }
                                                             else if (!string.IsNullOrWhiteSpace(leadWorkspaceDecisionNoticeSummary))
                                                             {
-                                                                <span> Workspace review: @leadWorkspaceDecisionNoticeSummary</span>
+                                                                <span> Workspace review: @PublicText(leadWorkspaceDecisionNoticeSummary)</span>
                                                             }
                                                         </p>
                                                     </div>
@@ -894,7 +894,7 @@ else
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">@leadAftermathRouteLabel</a>
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.BuildHandoffId))
                                                         {
-                                                            <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(leadAftermathCreatorPublication.BuildHandoffId)}")">Open build path for @leadAftermathCreatorPublication.Title</a>
+                                                            <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(leadAftermathCreatorPublication.BuildHandoffId)}")">Open build path for @PublicText(leadAftermathCreatorPublication.Title)</a>
                                                         }
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry?.CreatorPublicationId))
                                                         {
@@ -988,19 +988,19 @@ else
                                                     <article class="app-rail__item">
                                                         <span class="tag">Community role</span>
                                                         <div class="app-rail__copy">
-                                                            <h3>@leadCommunityOperation.GroupName</h3>
+                                                            <h3>@PublicText(leadCommunityOperation.GroupName)</h3>
                                                             <p>
-                                                                @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @leadCommunityOperation.CampaignVisibilitySummary
+                                                                @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @PublicText(leadCommunityOperation.CampaignVisibilitySummary)
                                                                 <span> Roster: @leadCommunityOperation.MemberCount members · @leadCommunityOperation.ActiveCampaignCount campaigns.</span>
-                                                                <span> Pulse: @leadCommunityOperation.OperationsSummary</span>
-                                                                <span> Return: @leadCommunityOperation.CampaignReturnSummary</span>
-                                                                <span> Season / event pulse: @leadCommunityOperation.SeasonEventSummary</span>
-                                                                <span> Publication: @leadCommunityOperation.ArtifactPublicationSummary</span>
-                                                                <span> Support: @leadCommunityOperation.SupportEscalationSummary</span>
+                                                                <span> Pulse: @PublicText(leadCommunityOperation.OperationsSummary)</span>
+                                                                <span> Return: @PublicText(leadCommunityOperation.CampaignReturnSummary)</span>
+                                                                <span> Season / event pulse: @PublicText(leadCommunityOperation.SeasonEventSummary)</span>
+                                                                <span> Publication: @PublicText(leadCommunityOperation.ArtifactPublicationSummary)</span>
+                                                                <span> Support: @PublicText(leadCommunityOperation.SupportEscalationSummary)</span>
                                                                 <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadCommunityEvent))
                                                                 {
-                                                                    <span> Latest event: @leadCommunityEvent</span>
+                                                                    <span> Latest event: @PublicText(leadCommunityEvent)</span>
                                                                 }
                                                                 @if (leadCommunityBoard is not null)
                                                                 {
