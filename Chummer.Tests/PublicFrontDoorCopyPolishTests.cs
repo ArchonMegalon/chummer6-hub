@@ -680,6 +680,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string factionCreate = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionCreate.cshtml"));
         string factionPromo = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"));
         string leaderBriefing = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerLeaderBriefing.cshtml"));
+        string ledger = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
         string factionWorkspace = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
 
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Intro)", media, StringComparison.Ordinal);
@@ -754,12 +755,85 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         }
 
         Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Label)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Effect)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Type)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Title)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Summary)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(signal)", factionWorkspace, StringComparison.Ordinal);
         Assert.Contains("PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.PrivacyNote</p>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Faction: @Model.Faction.PublicName</span>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2 class=\"editorial-title\">@Model.Faction.PublicName</h2>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>@action.Label</h3>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@action.Effect</p>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">@dispatch.Type</span>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h3>@dispatch.Title</h3>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@dispatch.Summary</p>", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<span>@signal</span>", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">@receipt.ActionLabel</span>", factionWorkspace, StringComparison.Ordinal);
+
+        foreach (string required in new[]
+                 {
+                     "PublicFacingCopyHumanizer.Clean(Model.Eyebrow)",
+                     "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+                     "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+                     "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
+                     "PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)",
+                     "PublicFacingCopyHumanizer.Clean(Model.World.PublicName)",
+                     "PublicFacingCopyHumanizer.Clean(Model.World.TurnHeadline)",
+                     "PublicFacingCopyHumanizer.Clean(Model.World.MapNote)",
+                     "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
+                     "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
+                     "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
+                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
+                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)",
+                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.ScopeLabel)",
+                     "PublicFacingCopyHumanizer.Clean(faction.Type)",
+                     "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
+                     "PublicFacingCopyHumanizer.Clean(ledger.Label)",
+                     "PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName)",
+                     "PublicFacingCopyHumanizer.Clean(accountCtaLabel)",
+                     "PublicFacingCopyHumanizer.Clean(selectedFaction.FactionLeader)",
+                     "PublicFacingCopyHumanizer.Clean(selectedFaction.FieldGm)",
+                     "PublicFacingCopyHumanizer.Clean(selectedFaction.IntelProvider)"
+                 })
+        {
+            Assert.Contains(required, ledger, StringComparison.Ordinal);
+        }
+
+        foreach (string forbidden in new[]
+                 {
+                     "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+                     "<h1 class=\"page-title\">@Model.Heading</h1>",
+                     "<p class=\"page-copy\">@Model.Intro</p>",
+                     "data-primary-label=\"@Model.PrimaryAction.Label\"",
+                     "data-secondary-label=\"@Model.SecondaryAction.Label\"",
+                     "data-analytics-label=\"@Model.PrimaryAction.Label\"",
+                     "data-analytics-label=\"@Model.SecondaryAction.Label\"",
+                     ">@Model.PrimaryAction.Label</a>",
+                     ">@Model.SecondaryAction.Label</a>",
+                     "<h2 class=\"editorial-title\">@Model.World.PublicName</h2>",
+                     "<p class=\"editorial-copy\">@Model.World.TurnHeadline</p>",
+                     "<p class=\"muted-copy\">@Model.World.MapNote</p>",
+                     "<span class=\"tag\">@dispatch.Type</span>",
+                     "<h3>@dispatch.Title</h3>",
+                     "<p>@dispatch.Summary</p>",
+                     "<h2 class=\"editorial-title\">@Model.NewsreelStatus.StatusLabel</h2>",
+                     "<p class=\"editorial-copy\">@Model.NewsreelStatus.Summary</p>",
+                     "<span>Scope: @Model.NewsreelStatus.ScopeLabel</span>",
+                     "<span class=\"tag\">@faction.Type</span>",
+                     "<h3>@faction.PublicName</h3>",
+                     "<span class=\"score-ledger__label\">@ledger.Label</span>",
+                     "<h2 class=\"editorial-title\">@selectedFaction.PublicName</h2>",
+                     ">@accountCtaLabel</a>"
+                 })
+        {
+            Assert.DoesNotContain(forbidden, ledger, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

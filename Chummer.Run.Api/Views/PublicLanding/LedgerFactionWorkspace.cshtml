@@ -1,6 +1,6 @@
 @model BlackLedgerFactionWorkspacePageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
@@ -13,7 +13,7 @@
         <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
         <div class="trust-claim__details">
             <span>Signed-in page</span>
-            <span>Faction: @Model.Faction.PublicName</span>
+            <span>Faction: @PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</span>
             <span>Public page stays separate</span>
         </div>
         <div class="stacked-actions">
@@ -90,7 +90,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Faction state</p>
-        <h2 class="editorial-title">@Model.Faction.PublicName</h2>
+        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</h2>
         <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Faction.Type) with signed-in management kept off the public Ledger pages.</p>
     </div>
     <div class="route-choice-grid">
@@ -203,8 +203,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 {
                     <article class="route-choice-card">
                         <span class="tag">@action.Cost AP</span>
-                        <h3>@action.Label</h3>
-                        <p>@action.Effect</p>
+                        <h3>@PublicFacingCopyHumanizer.Clean(action.Label)</h3>
+                        <p>@PublicFacingCopyHumanizer.Clean(action.Effect)</p>
                         <form method="post" action="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')/actions">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="actionId" value="@action.ActionId" />
@@ -246,9 +246,9 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
             @foreach (var dispatch in Model.Dispatches.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">@dispatch.Type</span>
-                    <h3>@dispatch.Title</h3>
-                    <p>@dispatch.Summary</p>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(dispatch.Type)</span>
+                    <h3>@PublicFacingCopyHumanizer.Clean(dispatch.Title)</h3>
+                    <p>@PublicFacingCopyHumanizer.Clean(dispatch.Summary)</p>
                     <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                 </article>
             }

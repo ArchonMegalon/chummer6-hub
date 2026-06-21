@@ -153,16 +153,16 @@
                 data-signal-secondary="faction motion tracked"
                 data-signal-tertiary="dispatch board armed"
                 data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
-                data-primary-label="@Model.PrimaryAction.Label"
+                data-primary-label="@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)"
                 data-primary-href="@Model.PrimaryAction.Href"
-                data-secondary-label="@Model.SecondaryAction.Label"
+                data-secondary-label="@PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)"
                 data-secondary-href="@Model.SecondaryAction.Href"></div>
         </div>
     }
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">Watch the city breathe, see which bloc is leaning on which district, and lift a hook straight into the next scene.</p>
         <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
             <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
@@ -173,18 +173,18 @@
         <section class="ledger-flagship__briefing" aria-label="Command briefing">
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Lead dispatch</span>
-                <strong>@(leadDispatch?.Title ?? "Dispatch queue open")</strong>
-                <p>@(leadDispatch?.Summary ?? "Public board hooks are staged and ready for the next turn.")</p>
+                <strong>@(leadDispatch is null ? "Dispatch queue open" : PublicFacingCopyHumanizer.Clean(leadDispatch.Title))</strong>
+                <p>@(leadDispatch is null ? "Public board hooks are staged and ready for the next turn." : PublicFacingCopyHumanizer.Clean(leadDispatch.Summary))</p>
             </article>
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Focus faction</span>
-                <strong>@(selectedFaction?.PublicName ?? "Ashline Circle")</strong>
+                <strong>@(selectedFaction is null ? "Ashline Circle" : PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName))</strong>
                 <p>@(selectedFaction is null ? "Start on the board, then drop into the faction file that is actually moving the city." : introLine(selectedFaction.Id))</p>
             </article>
         </section>
         <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@Model.PrimaryAction.Label">@Model.PrimaryAction.Label</a>
-            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@Model.SecondaryAction.Label">@Model.SecondaryAction.Label</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
+            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)">@PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)</a>
             <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
         <div class="trust-claim__details ledger-flagship__boundary">
@@ -209,9 +209,9 @@
             <strong>Open newsroom</strong>
             <p>Latest dispatches, table hooks, and the current bulletin.</p>
         </a>
-        <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@accountCtaLabel">
+        <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@PublicFacingCopyHumanizer.Clean(accountCtaLabel)">
             <span class="tag">Faction workspace</span>
-            <strong>@accountCtaLabel</strong>
+            <strong>@PublicFacingCopyHumanizer.Clean(accountCtaLabel)</strong>
             <p>Step from the public board into the account-side faction workspace.</p>
         </a>
     </nav>
@@ -223,12 +223,12 @@
     <section class="editorial-block editorial-block--focused" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
             <p class="eyebrow">Command map</p>
-            <h2 class="editorial-title">@Model.World.PublicName</h2>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.World.PublicName)</h2>
             @if (!string.IsNullOrWhiteSpace(Model.World.TurnHeadline))
             {
-                <p class="editorial-copy">@Model.World.TurnHeadline</p>
+                <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.World.TurnHeadline)</p>
             }
-            <p class="muted-copy">@Model.World.MapNote</p>
+            <p class="muted-copy">@PublicFacingCopyHumanizer.Clean(Model.World.MapNote)</p>
         </div>
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
@@ -237,7 +237,7 @@
                     <span>@(selectedTurn >= 2 ? "Turn 2 board" : "Turn 1 board")</span>
                     <span>@worldDistricts.Length districts</span>
                     <span>@liveConfidence confidence</span>
-                    <span>@(leadDispatch is null ? "Dispatch queue open" : leadDispatch.Title)</span>
+                    <span>@(leadDispatch is null ? "Dispatch queue open" : PublicFacingCopyHumanizer.Clean(leadDispatch.Title))</span>
                 </div>
                 <div class="ledger-command-map__globe">
                     <div
@@ -393,9 +393,9 @@
                     @foreach (var dispatch in latestDispatches)
                     {
                         <article class="ledger-dispatch-strip__item">
-                            <span class="tag">@dispatch.Type</span>
-                            <h3>@dispatch.Title</h3>
-                            <p>@dispatch.Summary</p>
+                            <span class="tag">@PublicFacingCopyHumanizer.Clean(dispatch.Type)</span>
+                            <h3>@PublicFacingCopyHumanizer.Clean(dispatch.Title)</h3>
+                            <p>@PublicFacingCopyHumanizer.Clean(dispatch.Summary)</p>
                             <a class="editorial-strip__action" href="@dispatch.Href">Dispatch detail</a>
                         </article>
                     }
@@ -406,11 +406,11 @@
         <section class="workflow-band workflow-band--compact">
             <div class="workflow-band__lead">
                 <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
-                <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
-                <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
+                <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)</h2>
+                <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)</p>
             </div>
             <div class="trust-claim__details">
-                <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
+                <span>Scope: @PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.ScopeLabel)</span>
                 <span>Delivery: Chummer email</span>
                             <span>Clips: @Model.NewsreelStatus.ReceiptCount</span>
             </div>
@@ -432,8 +432,8 @@
                     <div class="faction-profile-card__hero" style="background-image:url('@backgroundHref(faction.Id)')">
                         <img class="faction-profile-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
                         <div class="faction-profile-card__hero-copy">
-                            <span class="tag">@faction.Type</span>
-                            <h3>@faction.PublicName</h3>
+                            <span class="tag">@PublicFacingCopyHumanizer.Clean(faction.Type)</span>
+                            <h3>@PublicFacingCopyHumanizer.Clean(faction.PublicName)</h3>
                             <p>@introLine(faction.Id)</p>
                         </div>
                     </div>
@@ -441,7 +441,7 @@
                         @foreach (var ledger in ledgers)
                         {
                             <article class="score-ledger">
-                                <span class="score-ledger__label">@ledger.Label</span>
+                                <span class="score-ledger__label">@PublicFacingCopyHumanizer.Clean(ledger.Label)</span>
                                 <strong>@ledger.CurrentValue</strong>
                                 <small>@ledger.Delta · @ledger.Trend</small>
                             </article>
@@ -468,7 +468,7 @@
                 <img class="faction-detail-hero__logo" src="@logoHref(selectedFaction.Id)" alt="@($"{selectedFaction.PublicName} logo")" loading="lazy" />
                 <div class="faction-detail-hero__copy">
                     <p class="eyebrow">Faction profile</p>
-                    <h2 class="editorial-title">@selectedFaction.PublicName</h2>
+                    <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName)</h2>
                     <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
                     <p class="muted-copy">This page explains pressure, not people.</p>
                     <div class="trust-claim__details">
@@ -477,7 +477,7 @@
                         <span>Pressure visible</span>
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--primary" href="@accountCtaHref">@accountCtaLabel</a>
+                        <a class="button-like button-like--primary" href="@accountCtaHref">@PublicFacingCopyHumanizer.Clean(accountCtaLabel)</a>
                         <a class="button-like button-like--secondary" href="/ledger/factions/@slug/promo">Open faction video</a>
                     </div>
                 </div>
@@ -487,7 +487,7 @@
                 @foreach (var ledger in ledgers)
                 {
                     <article class="route-choice-card">
-                        <span class="tag">@ledger.Label</span>
+                        <span class="tag">@PublicFacingCopyHumanizer.Clean(ledger.Label)</span>
                         <h3>@ledger.CurrentValue</h3>
                         <p>Delta since last turn: @ledger.Delta</p>
                         <p>Trend: @ledger.Trend</p>
@@ -502,7 +502,7 @@
                 <article class="route-choice-card">
                     <span class="tag">Named roles</span>
                     <h3>Named roles</h3>
-                    <p>Leader: @selectedFaction.FactionLeader · GM: @selectedFaction.FieldGm · Intel: @selectedFaction.IntelProvider</p>
+                    <p>Leader: @PublicFacingCopyHumanizer.Clean(selectedFaction.FactionLeader) · GM: @PublicFacingCopyHumanizer.Clean(selectedFaction.FieldGm) · Intel: @PublicFacingCopyHumanizer.Clean(selectedFaction.IntelProvider)</p>
                 </article>
                 <article class="route-choice-card">
                     <span class="tag">District pressure</span>
@@ -526,9 +526,9 @@
                     @foreach (var dispatch in Model.Dispatches.Take(3))
                     {
                         <article class="route-choice-card">
-                            <span class="tag">@dispatch.Type</span>
-                            <h3>@dispatch.Title</h3>
-                            <p>@dispatch.Summary</p>
+                            <span class="tag">@PublicFacingCopyHumanizer.Clean(dispatch.Type)</span>
+                            <h3>@PublicFacingCopyHumanizer.Clean(dispatch.Title)</h3>
+                            <p>@PublicFacingCopyHumanizer.Clean(dispatch.Summary)</p>
                             <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                         </article>
                     }

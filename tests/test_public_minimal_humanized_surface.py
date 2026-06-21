@@ -562,18 +562,20 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     ledger_account = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
     ledger_advisory = read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml")
     ledger_onboarding = read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml")
+    ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
     ledger_create = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionCreate.cshtml")
     ledger_promo = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml")
+    ledger_workspace = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml")
     ledger_leader = read("Chummer.Run.Api/Views/PublicLanding/LedgerLeaderBriefing.cshtml")
     ledger_notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
     ledger_validation = read("Chummer.Run.Api/Views/PublicLanding/LedgerWorldTickValidation.cshtml")
     sources = [
-        read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
+        ledger,
         ledger_account,
         ledger_advisory,
         ledger_onboarding,
         ledger_promo,
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
+        ledger_workspace,
         ledger_notifications,
         ledger_leader,
         ledger_validation,
@@ -607,6 +609,81 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     assert "PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)" in combined
     assert "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)" in combined
     assert "Your browser cannot play this video here." in combined
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Eyebrow)",
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
+        "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
+        "PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)",
+        "PublicFacingCopyHumanizer.Clean(Model.World.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(Model.World.TurnHeadline)",
+        "PublicFacingCopyHumanizer.Clean(Model.World.MapNote)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
+        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)",
+        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.ScopeLabel)",
+        "PublicFacingCopyHumanizer.Clean(faction.Type)",
+        "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(ledger.Label)",
+        "PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(accountCtaLabel)",
+        "PublicFacingCopyHumanizer.Clean(selectedFaction.FactionLeader)",
+        "PublicFacingCopyHumanizer.Clean(selectedFaction.FieldGm)",
+        "PublicFacingCopyHumanizer.Clean(selectedFaction.IntelProvider)",
+    ):
+        assert required in ledger
+
+    for forbidden in (
+        '<p class="eyebrow">@Model.Eyebrow</p>',
+        '<h1 class="page-title">@Model.Heading</h1>',
+        '<p class="page-copy">@Model.Intro</p>',
+        'data-primary-label="@Model.PrimaryAction.Label"',
+        'data-secondary-label="@Model.SecondaryAction.Label"',
+        'data-analytics-label="@Model.PrimaryAction.Label"',
+        'data-analytics-label="@Model.SecondaryAction.Label"',
+        ">@Model.PrimaryAction.Label</a>",
+        ">@Model.SecondaryAction.Label</a>",
+        '<h2 class="editorial-title">@Model.World.PublicName</h2>',
+        '<p class="editorial-copy">@Model.World.TurnHeadline</p>',
+        '<p class="muted-copy">@Model.World.MapNote</p>',
+        '<span class="tag">@dispatch.Type</span>',
+        "<h3>@dispatch.Title</h3>",
+        "<p>@dispatch.Summary</p>",
+        '<h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>',
+        '<p class="editorial-copy">@Model.NewsreelStatus.Summary</p>',
+        "<span>Scope: @Model.NewsreelStatus.ScopeLabel</span>",
+        '<span class="tag">@faction.Type</span>',
+        "<h3>@faction.PublicName</h3>",
+        '<span class="score-ledger__label">@ledger.Label</span>',
+        '<h2 class="editorial-title">@selectedFaction.PublicName</h2>',
+        ">@accountCtaLabel</a>",
+    ):
+        assert forbidden not in ledger
+
+    for required in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(action.Label)",
+        "PublicFacingCopyHumanizer.Clean(action.Effect)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
+        "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
+    ):
+        assert required in ledger_workspace
+
+    for forbidden in (
+        "<span>Faction: @Model.Faction.PublicName</span>",
+        '<h2 class="editorial-title">@Model.Faction.PublicName</h2>',
+        "<h3>@action.Label</h3>",
+        "<p>@action.Effect</p>",
+        '<span class="tag">@dispatch.Type</span>',
+        "<h3>@dispatch.Title</h3>",
+        "<p>@dispatch.Summary</p>",
+    ):
+        assert forbidden not in ledger_workspace
 
     for required in (
         "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
