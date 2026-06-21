@@ -135,7 +135,7 @@
     var signedInBench = Model.SignedInBench;
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Signed-in helper</p>
+            <p class="eyebrow">Account helper</p>
             <h2 class="editorial-title">The real compare bench is now a named account path.</h2>
             <p class="editorial-copy">@SanitizePublicCopy(signedInBench.Summary)</p>
             <div class="stacked-actions">
@@ -150,7 +150,7 @@
             <article class="route-choice-card">
                 <span class="tag">@SanitizePublicCopy(signedInBench.StatusLabel)</span>
                 <h3>@SanitizePublicCopy(signedInBench.LeadHandoffTitle ?? "Character helper workbench")</h3>
-                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The signed-in helper keeps tradeoffs, rule differences, and reviewed output history on the account page.")</p>
+                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The account helper keeps tradeoffs, rule differences, and reviewed output history on the account page.")</p>
                 @if (signedInBench.ProofPoints is { Count: > 0 })
                 {
                     <div class="route-choice-card__details">

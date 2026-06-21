@@ -261,6 +261,19 @@ def test_participation_surface_uses_plain_character_helper_copy() -> None:
         assert forbidden not in participate
 
 
+def test_character_helper_page_uses_account_helper_language() -> None:
+    helper = read("Chummer.Run.Api/Views/PublicLanding/BuildGhostConcierge.cshtml")
+
+    assert "Account helper" in helper
+    assert "The account helper keeps tradeoffs" in helper
+
+    for forbidden in (
+        "Signed-in helper",
+        "The signed-in helper keeps tradeoffs",
+    ):
+        assert forbidden not in helper
+
+
 def test_participation_surface_uses_plain_decision_and_account_language() -> None:
     participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
 

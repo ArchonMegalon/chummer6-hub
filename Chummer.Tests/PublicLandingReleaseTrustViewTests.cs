@@ -644,7 +644,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("The helper should leave clear changes.", view, StringComparison.Ordinal);
         Assert.Contains("Use the helper to get oriented, then let Chummer do the work.", view, StringComparison.Ordinal);
-        Assert.Contains("Signed-in helper", view, StringComparison.Ordinal);
+        Assert.Contains("Account helper", view, StringComparison.Ordinal);
         Assert.Contains("The real compare bench is now a named account path.", view, StringComparison.Ordinal);
         Assert.Contains("@SanitizePublicCopy(signedInBench.EntryLabel)", view, StringComparison.Ordinal);
         Assert.Contains("Open lead build setup", view, StringComparison.Ordinal);
