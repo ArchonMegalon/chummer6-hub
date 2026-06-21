@@ -49,7 +49,7 @@ sections:
         answer: They are thank-yous, not power. They should celebrate useful help without replacing review or the rules themselves.
       - question: Would I need a Windows PC to join a run?
         required: true
-        answer: No. The intended direction is that browsing runs, applying with a quickstart or approved runner, acknowledging table expectations, and receiving scheduling and handoff details should work without assuming a Windows-only setup.
+        answer: No. The intended direction is that browsing runs, applying with a quickstart or approved runner, acknowledging table expectations, and receiving schedule and session details should work without assuming a Windows-only setup.
       - question: Is Chummer trying to replace Discord or VTTs?
         required: true
         answer: No. Chummer should handle rules, applications, scheduling records, and campaign consequences while Discord, Teams, and VTTs stay useful places to talk and play.

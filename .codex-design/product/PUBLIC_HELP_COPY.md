@@ -1,20 +1,20 @@
 # Public help copy
 
-## Public feedback lane
+## Public feedback
 
 If you want to help, start with the public front door:
 
 * file a public bug
 * send lightweight product feedback
 * flag confusing public copy
-* suggest a future product lane
+* suggest a future product direction
 * suggest or vote on a public ProductLift idea when it is not support, account, install, crash, private campaign, or copyrighted rules text
 
 That keeps feedback public and legible.
 
 ProductLift feedback is public. Do not post private logs, account data, campaign spoilers, copyrighted source text, crash dumps, or support requests there. Use Chummer Help for support.
 
-ProductLift roadmap and changelog pages are projections from Chummer-owned truth. They are not implementation priority, release authority, or support-case state.
+ProductLift roadmap and changelog pages are public planning views from Chummer. They are not implementation priority, release authority, or support-case state.
 
 ## Chummer Instant Help
 
@@ -26,9 +26,9 @@ Most support should start inside Chummer or on the help page:
 * send a private report if the issue is still unresolved
 
 No normal Chummer help path should require a call, calendar slot, or vendor account.
-The user should not need to know which provider, model, or support adapter helped.
+The user should not need to know which outside tool helped.
 
-## Private crash lane
+## Private crash reports
 
 If Chummer closes unexpectedly, the first safe path is a private in-product crash report:
 
@@ -51,17 +51,17 @@ That is a relationship choice, not a special per-user build.
 
 When a public concierge widget appears on `/downloads`, `/now`, `/help`, or another public low-risk page:
 
-* the first-party help or release article remains the fixed truth
+* the first-party help or release article remains the main answer
 * the widget is a preview overlay that helps the user choose a safe next step
-* fallback routes stay visible and must still work when the widget is disabled
+* normal routes stay visible and must still work when the widget is disabled
 * recovery language must point at the real help, relinking, or escalation path instead of claiming the widget fixed anything itself
 * no claim codes, auth secrets, or private case identifiers belong in the widget
 
 ## Public content optimization bounds
 
-Katteb-assisted articles and guide improvements must be reviewed against approved Chummer source packets.
+Article and guide improvements must be reviewed against approved Chummer source packets.
 
-Accepted content changes flow upstream into `chummer6-design` or public-guide source registries before generated guide output changes. Katteb must not invent rules, support answers, unshipped availability, or campaign/world truth.
+Accepted content changes flow upstream into `chummer6-design` or public-guide source registries before generated guide output changes. Content tools must not invent rules, support answers, unshipped availability, or campaign/world state.
 
 ## Closure rule
 
@@ -104,7 +104,7 @@ Public participation copy must say all of this plainly:
 Some expensive future features may begin as narrow previews while approvals, compatibility, editorial work, provenance, or support cost remain unusually heavy.
 
 That is not the same thing as a permanent paywall.
-When those lanes become cheaper and safer to operate broadly, the long-run intent is wider access rather than keeping the interesting parts locked forever.
+When those areas become cheaper and safer to operate broadly, the long-run intent is wider access rather than keeping the interesting parts locked forever.
 
 ## Primary CTAs
 

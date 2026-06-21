@@ -47,6 +47,37 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_help_and_faq_source_copy_uses_plain_user_language()
+    {
+        string publicFaq = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FAQ_REGISTRY.yaml"));
+        string publicHelp = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_HELP_COPY.md"));
+        string combined = string.Join(Environment.NewLine, publicFaq, publicHelp);
+
+        Assert.Contains("schedule and session details", publicFaq, StringComparison.Ordinal);
+        Assert.Contains("## Public feedback", publicHelp, StringComparison.Ordinal);
+        Assert.Contains("## Private crash reports", publicHelp, StringComparison.Ordinal);
+        Assert.Contains("which outside tool helped", publicHelp, StringComparison.Ordinal);
+
+        foreach (string forbidden in new[]
+        {
+            "handoff details",
+            "Public feedback lane",
+            "future product lane",
+            "Chummer-owned truth",
+            "which provider, model, or support adapter",
+            "Private crash lane",
+            "fixed truth",
+            "fallback routes",
+            "Katteb-assisted",
+            "campaign/world truth",
+            "When those lanes"
+        })
+        {
+            Assert.DoesNotContain(forbidden, combined, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void Shared_layout_does_not_depend_on_client_side_copy_rewrites()
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
