@@ -682,7 +682,7 @@ def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -
     assert "Chummer help" in support_submitted
     assert "Use Chummer help" in publication
     assert "tracked by Chummer" in nexus_pan
-    assert "one Chummer route" in ledger_notifications
+    assert "one Chummer path" in ledger_notifications
     assert "Delivery: Chummer email" in ledger
     assert "Chummer motion intros" in ledger
     assert "Video: Chummer motion" in ledger
@@ -799,3 +799,24 @@ def test_faction_workspace_uses_page_language_instead_of_route_language() -> Non
     assert "Public Ledger pages" in workspace
     assert "signed-in faction pages" in workspace
     assert "private lore overlay" in workspace
+
+
+def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
+    account_home = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
+    notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
+    combined = "\n".join((account_home, notifications))
+
+    for forbidden in (
+        "signed-in route",
+        "Open mail-backed route",
+        "route-backed world state",
+        "one Chummer route",
+        "inbox route",
+    ):
+        assert forbidden not in combined
+
+    assert "signed-in page" in account_home
+    assert "Open mail-backed page" in account_home
+    assert "current world state" in notifications
+    assert "one Chummer path" in notifications
+    assert "Use the inbox as the Table Pulse Live entry point" in notifications
