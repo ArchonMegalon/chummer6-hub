@@ -609,6 +609,39 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Hint: @PublicText(sourceHintLine)" in home
 
 
+def test_home_page_cleans_primary_and_coverage_dynamic_copy() -> None:
+    home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
+
+    for expected in (
+        "@PublicText(Model.PrimaryAction.Eyebrow)",
+        "@PublicText(Model.PrimaryAction.Title)",
+        "@PublicText(Model.PrimaryAction.Summary)",
+        "@PublicText(Model.PrimaryAction.Label)",
+        "@PublicText(Model.FlagshipCoverage.Eyebrow)",
+        "@PublicText(card.Label)",
+        "@PublicText(card.CurrentTitle)",
+        "@PublicText(card.CurrentBody)",
+        "@PublicText(card.TargetBody)",
+        "@PublicText(card.ActionLabel)",
+    ):
+        assert expected in home
+
+    for forbidden in (
+        ">@Model.PrimaryAction.Label</button>",
+        ">@Model.PrimaryAction.Label</a>",
+        "<span class=\"tag\">@Model.PrimaryAction.Eyebrow</span>",
+        "<h2 id=\"setupCardTitle\">@Model.PrimaryAction.Title</h2>",
+        "<p id=\"setupCardCopy\">@Model.PrimaryAction.Summary</p>",
+        "<p class=\"eyebrow\">@Model.FlagshipCoverage.Eyebrow</p>",
+        "<span class=\"tag\">@card.Label</span>",
+        "<h3>@card.CurrentTitle</h3>",
+        "<p>@card.CurrentBody</p>",
+        "<strong>Target:</strong> @card.TargetBody",
+        ">@card.ActionLabel</a>",
+    ):
+        assert forbidden not in home
+
+
 def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
     lookup = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsLookup.cshtml")
     leaderboards = read("Chummer.Run.Api/Views/Leaderboards/Index.cshtml")

@@ -330,11 +330,11 @@
         <div class="stacked-actions">
             @if (primaryActionTargetsSetup && showSetupSection)
             {
-                <button class="button-like button-like--primary" type="button" data-open-onboarding>@Model.PrimaryAction.Label</button>
+                <button class="button-like button-like--primary" type="button" data-open-onboarding>@PublicText(Model.PrimaryAction.Label)</button>
             }
             else
             {
-                <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@Model.PrimaryAction.Label</a>
+                <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
             }
             <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
             <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
@@ -368,7 +368,7 @@
 {
     <section class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
         <div class="flagship-coverage__lead">
-            <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+            <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
             <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
             <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
         </div>
@@ -376,11 +376,11 @@
             @foreach (var card in Model.FlagshipCoverage.Cards)
             {
                 <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
-                    <span class="tag">@card.Label</span>
-                    <h3>@card.CurrentTitle</h3>
-                    <p>@card.CurrentBody</p>
-                    <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
-                    <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+                    <span class="tag">@PublicText(card.Label)</span>
+                    <h3>@PublicText(card.CurrentTitle)</h3>
+                    <p>@PublicText(card.CurrentBody)</p>
+                    <p class="flagship-coverage__phase"><strong>Target:</strong> @PublicText(card.TargetBody)</p>
+                    <a class="inline-link" href="@card.Href">@PublicText(card.ActionLabel)</a>
                 </article>
             }
         </div>
@@ -397,7 +397,7 @@ else
             }
             <div class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
                 <div class="flagship-coverage__lead">
-                    <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+                    <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
                     <h2 class="editorial-title">Everything you need in one place.</h2>
                     <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
                 </div>
@@ -405,11 +405,11 @@ else
                     @foreach (var card in Model.FlagshipCoverage.Cards)
                     {
                         <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
-                            <span class="tag">@card.Label</span>
-                            <h3>@card.CurrentTitle</h3>
-                            <p>@card.CurrentBody</p>
-                            <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
-                            <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+                            <span class="tag">@PublicText(card.Label)</span>
+                            <h3>@PublicText(card.CurrentTitle)</h3>
+                            <p>@PublicText(card.CurrentBody)</p>
+                            <p class="flagship-coverage__phase"><strong>Target:</strong> @PublicText(card.TargetBody)</p>
+                            <a class="inline-link" href="@card.Href">@PublicText(card.ActionLabel)</a>
                         </article>
                     }
                 </div>
@@ -429,16 +429,16 @@ else
         {
             <div class="home-action-grid">
                 <article class="app-action-card app-action-card--primary">
-                    <span class="tag">@Model.PrimaryAction.Eyebrow</span>
-                    <h2 id="setupCardTitle">@Model.PrimaryAction.Title</h2>
-                    <p id="setupCardCopy">@Model.PrimaryAction.Summary</p>
+                    <span class="tag">@PublicText(Model.PrimaryAction.Eyebrow)</span>
+                    <h2 id="setupCardTitle">@PublicText(Model.PrimaryAction.Title)</h2>
+                    <p id="setupCardCopy">@PublicText(Model.PrimaryAction.Summary)</p>
                     @if (primaryActionTargetsSetup && showSetupSection)
                     {
-                        <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@Model.PrimaryAction.Label</button>
+                        <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@PublicText(Model.PrimaryAction.Label)</button>
                     }
                     else
                     {
-                        <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)" id="openSetupButton">@Model.PrimaryAction.Label</a>
+                        <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)" id="openSetupButton">@PublicText(Model.PrimaryAction.Label)</a>
                     }
                 </article>
                 <article class="app-action-card">
