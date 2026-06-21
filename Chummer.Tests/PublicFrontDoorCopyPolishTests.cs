@@ -720,6 +720,61 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Signed_in_ledger_pages_clean_dynamic_status_and_notification_copy()
+    {
+        string accountHome = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAccountHome.cshtml"));
+        string notifications = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml"));
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Allegiance.MembershipType)",
+            "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Heading)",
+            "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.PublicName)",
+            "PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)"
+        })
+        {
+            Assert.Contains(required, accountHome, StringComparison.Ordinal);
+        }
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.BoundaryLine)",
+            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)",
+            "PublicFacingCopyHumanizer.Clean(label)",
+            "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
+            "PublicFacingCopyHumanizer.Clean(receipt.RecipientLabel)",
+            "PublicFacingCopyHumanizer.Clean(receipt.FailureReason)"
+        })
+        {
+            Assert.Contains(required, notifications, StringComparison.Ordinal);
+        }
+
+        foreach (string forbidden in new[]
+        {
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<h2 class=\"editorial-title\">@Model.TablePulsePacket.Heading</h2>",
+            "<p>@Model.TablePulsePacket.BoundaryLine</p>",
+            "<span>@label</span>",
+            "<h3>@cue.StatusLabel</h3>",
+            "between-session watch package",
+            "Recipient: @receipt.RecipientLabel",
+            "Reason: @receipt.FailureReason"
+        })
+        {
+            Assert.DoesNotContain(forbidden, accountHome, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, notifications, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));

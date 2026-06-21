@@ -8,7 +8,7 @@
 <section class="ledger-flagship ledger-flagship--notifications">
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Signed-in notifications</p>
-        <h1 class="page-title">@Model.Heading</h1>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
         <div class="trust-claim__details">
@@ -73,7 +73,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Table Pulse Live</p>
-            <h2 class="editorial-title">@Model.TablePulsePacket.Heading</h2>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Heading)</h2>
             <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Summary)</p>
         </div>
         <div class="trust-claim__details">
@@ -83,21 +83,21 @@
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Boundary</span>
-                <p>@Model.TablePulsePacket.BoundaryLine</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.BoundaryLine)</p>
             </article>
         </div>
         <div class="trust-claim__details">
             @foreach (var label in Model.TablePulsePacket.Labels)
             {
-                <span>@label</span>
+                <span>@PublicFacingCopyHumanizer.Clean(label)</span>
             }
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var cue in Model.TablePulsePacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@cue.Label</span>
-                    <h3>@cue.StatusLabel</h3>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.Label)</span>
+                    <h3>@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
@@ -141,7 +141,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living World</span>
-                <p>Keep the between-session watch package, command carry-forward, and aftermath on one Chummer path.</p>
+                <p>Keep the between-session notes, command carry-forward, and aftermath on one Chummer path.</p>
                 <div class="route-choice-card__details">
                     <a href="/living-world">Open Living World</a>
                 </div>
@@ -185,8 +185,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Advisory signal</p>
-            <h2 class="editorial-title">@Model.AdvisorySummary.Heading</h2>
-            <p class="editorial-copy">@Model.AdvisorySummary.NoDemocracyNote</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -340,11 +340,11 @@
                     <h3>Delivery attempt</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
                     <div class="route-choice-card__details">
-                        <span>Recipient: @receipt.RecipientLabel</span>
+                        <span>Recipient: @PublicFacingCopyHumanizer.Clean(receipt.RecipientLabel)</span>
                         <span>Attempted: @receipt.AttemptedAtUtc</span>
                         @if (!string.IsNullOrWhiteSpace(receipt.FailureReason))
                         {
-                            <span>Reason: @receipt.FailureReason</span>
+                            <span>Reason: @PublicFacingCopyHumanizer.Clean(receipt.FailureReason)</span>
                         }
                     </div>
                 </article>
