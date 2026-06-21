@@ -1698,7 +1698,7 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Supplemental Windows installer",
             Heading: $"{headLabel} Windows setup",
             Summary: "This direct Windows installer stays available for support when this specific build is not on the main recommended downloads page.",
-            DispatchNote: "Use this route only when support points to this installer.",
+            DispatchNote: "Use this page only when support points to this installer.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
             ArtifactSupportLine: "Direct Windows installer for support.",
             DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/proof",
@@ -4629,14 +4629,14 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Support",
             Heading: "Support case received",
             Intro: sampleReceipt
-                ? "This sample route keeps the support confirmation page reachable without opening a real support case."
+                ? "This sample page keeps the support confirmation page reachable without opening a real support case."
                 : trackedCase is null
                     ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
                     : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
             CaseId: caseId,
             StatusLabel: sampleReceipt ? "sample" : trackedCase?.Status ?? SupportCaseStatuses.New,
             ResponseExpectation: sampleReceipt
-                ? "This sample route only confirms that the support confirmation page resolves. Real follow-up still starts from a submitted support case or the account support path."
+                ? "This sample page only confirms that the support confirmation page resolves. Real follow-up still starts from a submitted support case or the account support path."
                 : BuildSupportResponseExpectation(
                     authenticated,
                     BuildPublicTrustPulsePanel(manifest, releaseExperience)),

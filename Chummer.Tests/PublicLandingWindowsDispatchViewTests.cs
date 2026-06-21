@@ -30,6 +30,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("Supplemental Windows installer", controller, StringComparison.Ordinal);
         Assert.Contains("Download installer", controller, StringComparison.Ordinal);
         Assert.Contains("Direct file mirror", controller, StringComparison.Ordinal);
+        Assert.Contains("Use this page only when support points to this installer.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use this route only when support points to this installer.", controller, StringComparison.Ordinal);
 
         Assert.DoesNotContain("<summary>Guided Windows setup assistant</summary>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("The guided setup assistant below remains the linked-install default.", view, StringComparison.Ordinal);
