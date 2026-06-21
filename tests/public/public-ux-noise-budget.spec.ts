@@ -12,7 +12,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   const navLabels = await page.locator('.site-nav a, .site-nav__current').evaluateAll((items) =>
     items.map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
   );
-  expect(navLabels).toEqual(['Home', 'Get Chummer', 'Help']);
+  expect(navLabels).toEqual(['Home', 'Get Chummer', 'Participate', 'Help']);
 
   const hero = page.locator('[data-homepage-section="hero"]');
   const heroText = (await hero.textContent()) || '';
@@ -28,7 +28,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
       '# Final public UX redesign verdict',
       '',
       '- Homepage sections: `4`',
-      '- Primary nav: `Home, Get Chummer, Help`',
+      '- Primary nav: `Home, Get Chummer, Participate, Help`',
       '- First-screen proof noise: `0`',
       '- Verdict: `READY`',
     ].join('\n'),
