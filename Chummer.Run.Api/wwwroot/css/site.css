@@ -3134,7 +3134,7 @@ td {
   color: var(--ink-strong);
 }
 
-.workflow-card__proof {
+.workflow-card__note {
   font-family: var(--font-family-mono);
   font-size: 0.78rem;
   letter-spacing: 0.06em;
@@ -5587,7 +5587,7 @@ body.nav-sheet-open {
 .surface-now .workflow-card__copy p,
 .surface-now .route-callout p,
 .surface-now .evidence-header__label,
-.surface-now .workflow-card__proof {
+.surface-now .workflow-card__note {
   color: #43566f;
 }
 

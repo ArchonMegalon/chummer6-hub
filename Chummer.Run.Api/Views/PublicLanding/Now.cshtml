@@ -197,7 +197,7 @@
                     <p>@card.Card.Summary</p>
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                     {
-                        <p class="workflow-card__proof">@PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
+                        <p class="workflow-card__note">@PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
                     }
                     <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </div>

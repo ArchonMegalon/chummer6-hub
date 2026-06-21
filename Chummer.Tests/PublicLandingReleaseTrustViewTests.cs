@@ -334,6 +334,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use this when you want the newest Windows or Linux release.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
+        Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Filters", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes and install requirements stay on this page.", downloadsView, StringComparison.Ordinal);
