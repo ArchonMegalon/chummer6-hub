@@ -39,8 +39,8 @@ public sealed class PublicConciergeController : Controller
     public async Task<IActionResult> DownloadsConcierge(CancellationToken cancellationToken)
         => await RenderSurfaceAsync(
             surfaceKey: "downloads",
-            title: "Downloads concierge",
-            description: "Humanized setup routing on a bounded first-party wrapper.",
+            title: "Downloads help",
+            description: "Guided setup without extra noise.",
             currentPath: "/downloads/concierge",
             cancellationToken);
 
@@ -49,8 +49,8 @@ public sealed class PublicConciergeController : Controller
     public async Task<IActionResult> NowConcierge(CancellationToken cancellationToken)
         => await RenderSurfaceAsync(
             surfaceKey: "now",
-            title: "Release concierge",
-            description: "Short guided release routing without surrendering first-party truth.",
+            title: "Release help",
+            description: "Short answers about the current release and what changed.",
             currentPath: "/now/concierge",
             cancellationToken);
 
@@ -59,8 +59,8 @@ public sealed class PublicConciergeController : Controller
     public async Task<IActionResult> ContactConcierge(CancellationToken cancellationToken)
         => await RenderSurfaceAsync(
             surfaceKey: "contact",
-            title: "Support routing concierge",
-            description: "Choose the safe support lane before the issue gets louder.",
+            title: "Support help",
+            description: "Choose the right support path before the issue gets louder.",
             currentPath: "/contact/concierge",
             cancellationToken);
 
@@ -70,8 +70,8 @@ public sealed class PublicConciergeController : Controller
     {
         string? inviteCode = NormalizeInviteCode(code);
         SiteChromeViewModel chrome = await BuildChromeAsync(
-            "Campaign invite concierge",
-            "Continue the invite, review the primer, or ask for onboarding help without losing the first-party lane.",
+            "Campaign invite help",
+            "Continue the invite, review the primer, or ask for onboarding help without losing your place.",
             "/join/concierge",
             cancellationToken);
         PublicConciergePageViewModel model = _concierge.BuildPage(
@@ -97,7 +97,7 @@ public sealed class PublicConciergeController : Controller
         bool packetMode = string.Equals(mode, "packet", StringComparison.OrdinalIgnoreCase);
         SiteChromeViewModel chrome = await BuildChromeAsync(
             packetMode ? "Campaign primer packet" : "Campaign primer",
-            "First-session orientation, expectations, and the next safe invite step on one first-party page.",
+            "First-session orientation, expectations, and the next invite step on one Chummer page.",
             "/join/primer",
             cancellationToken);
         string continueInviteHref = ResolveInviteContinuationRoute(inviteCode, chrome.Authenticated);
@@ -117,22 +117,22 @@ public sealed class PublicConciergeController : Controller
             ProofPoints:
             [
                 inviteCode is null ? "No invite code is attached yet" : $"Invite code attached: {inviteCode}",
-                "Primer and join remain first-party",
+                "Primer and join stay in Chummer",
                 "Session-zero help stays separate from support and installs"
             ],
             Sections:
             [
                 new CampaignInvitePrimerSectionViewModel(
                     Id: "continue",
-                    Eyebrow: "Join rail",
-                    Heading: "Continue the governed invite on purpose.",
+                    Eyebrow: "Join",
+                    Heading: "Continue the invite when you are ready.",
                     Summary: chrome.Authenticated
-                        ? "You already have a signed-in return lane, so the safest next step is the invite-capable community work rail."
-                        : "Create the account only when you are ready to continue the governed invite and keep the return lane attached.",
+                        ? "You are already signed in, so the next step is the invite page in your account."
+                        : "Create the account only when you are ready to continue the invite and keep your return path attached.",
                     Bullets:
                     [
-                        "Invite continuation stays on first-party account rails.",
-                        "Join-code continuity should not hide behind a booking or support provider.",
+                        "Invite continuation stays on Chummer account pages.",
+                        "Join-code return should not hide behind a booking or outside support tool.",
                         "The wrapper can be replayed safely if the first pass is interrupted."
                     ],
                     PrimaryAction: new TrustPageActionViewModel(
@@ -145,16 +145,16 @@ public sealed class PublicConciergeController : Controller
                     Eyebrow: "Primer",
                     Heading: packetMode ? "Packet-first orientation" : "Video-first orientation",
                     Summary: packetMode
-                        ? "Use the packet posture when the player or GM needs expectations, prep, and table etiquette in one calmer read."
-                        : "Use the video posture when the quickest win is a short orientation before anyone reads a longer packet.",
+                        ? "Use the written primer when the player or GM needs expectations, prep, and table etiquette in one calmer read."
+                        : "Use the video view when the quickest win is a short orientation before anyone reads a longer primer.",
                     Bullets:
                     [
                         "Prep the install path before the session rather than during it.",
-                        "Confirm table expectations, spoiler boundaries, and recovery posture up front.",
-                        "Route unresolved questions into the invite help lane instead of guessing in chat."
+                        "Confirm table expectations, spoiler limits, and the recovery plan up front.",
+                        "Send unresolved questions to invite help instead of guessing in chat."
                     ],
                     PrimaryAction: new TrustPageActionViewModel(
-                        packetMode ? "Open video posture" : "Open packet posture",
+                        packetMode ? "Open video view" : "Open written view",
                         QueryHelpers.AddQueryString("/join/primer", new Dictionary<string, string?> { ["mode"] = packetMode ? "video" : "packet", ["code"] = inviteCode }),
                         "secondary"),
                     SecondaryAction: new TrustPageActionViewModel(
@@ -165,12 +165,12 @@ public sealed class PublicConciergeController : Controller
                     Id: "session-zero",
                     Eyebrow: "Session zero",
                     Heading: "Escalate to a session-zero handoff only when the primer is not enough.",
-                    Summary: "The session-zero lane exists for questions that need a human checkpoint. It should not become the hidden owner of the invite, account, or install truth.",
+                    Summary: "Session-zero help is for questions that need a human checkpoint. It should not replace the invite, account, or install pages.",
                     Bullets:
                     [
                         "Use help when the blocker is understanding, not a broken install.",
-                        "Keep private support on the private support rail.",
-                        "Keep campaign orientation separate from release and download truth."
+                        "Keep private support on the private support page.",
+                        "Keep campaign orientation separate from release and download status."
                     ],
                     PrimaryAction: new TrustPageActionViewModel(
                         "Request session-zero help",
@@ -198,8 +198,8 @@ public sealed class PublicConciergeController : Controller
 
         string currentPath = $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}/concierge";
         SiteChromeViewModel chrome = await BuildChromeAsync(
-            "Creator concierge",
-            "Bounded creator consult and publication follow-up routing.",
+            "Creator help",
+            "Creator help and publication follow-up routing.",
             currentPath,
             cancellationToken);
         PublicConciergePageViewModel model = _concierge.BuildPage(

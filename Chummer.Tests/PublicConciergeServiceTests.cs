@@ -11,6 +11,39 @@ namespace Chummer.Tests;
 public sealed class PublicConciergeServiceTests
 {
     [Fact]
+    public void PublicConciergeController_UsesPlainPublicCopy()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicConciergeController.cs"));
+
+        Assert.Contains("Guided setup without extra noise.", controller, StringComparison.Ordinal);
+        Assert.Contains("Short answers about the current release and what changed.", controller, StringComparison.Ordinal);
+        Assert.Contains("Continue the invite, review the primer, or ask for onboarding help without losing your place.", controller, StringComparison.Ordinal);
+        Assert.Contains("Primer and join stay in Chummer", controller, StringComparison.Ordinal);
+        Assert.Contains("Open written view", controller, StringComparison.Ordinal);
+        Assert.Contains("Open video view", controller, StringComparison.Ordinal);
+
+        foreach (string forbidden in new[]
+                 {
+                     "bounded first-party wrapper",
+                     "first-party truth",
+                     "first-party lane",
+                     "first-party page",
+                     "governed invite",
+                     "first-party account rails",
+                     "Join rail",
+                     "packet posture",
+                     "video posture",
+                     "recovery posture",
+                     "install truth",
+                     "download truth",
+                     "creator consult"
+                 })
+        {
+            Assert.DoesNotContain(forbidden, controller, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void BuildPage_UsesConfiguredWidgetAndKeepsFirstPartyFallbackVisible()
     {
         using TempRoot temp = new("public-concierge-widget");
