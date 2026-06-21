@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.horizon_video_audio_exit_gate.v1",
-  "generated_at_utc": "2026-06-21T20:30:34Z",
+  "generated_at_utc": "2026-06-21T20:42:25Z",
   "status": "pass",
   "manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/horizon-video-manifest.json",
   "rebuild_receipt": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",
@@ -10,7 +10,7 @@
     "audio_streams_required": 1,
     "video_streams_required": 1,
     "silence_gate_dbfs": -42.0,
-    "max_silence_seconds": 0.7,
+    "max_silence_seconds": 1.0,
     "max_start_silence_seconds": 0.3,
     "max_tail_silence_seconds": 0.3,
     "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
