@@ -187,6 +187,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_copy_humanizer_replaces_handoff_language_with_plain_next_steps()
+    {
+        string cleaned = PublicFacingCopyHumanizer.Clean("The signed-in handoff code keeps follow-up handoffs attached.");
+
+        Assert.Equal("The signed-in access code keeps follow-up next steps attached.", cleaned);
+        Assert.DoesNotContain("handoff", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Public_copy_humanizer_removes_review_and_validation_jargon()
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("An audit verdict says verified validation checks passed on the return rail.");

@@ -1,6 +1,6 @@
 @model ReleaseUploadPageViewModel
 @{
-    ViewData["Title"] = "Release upload handoff";
+    ViewData["Title"] = "Release upload";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
     var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
@@ -11,15 +11,15 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac release one-liner</span>
             <h2>Run this in your Mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload handoff code so non-interactive runners do not stop after the integrity step.</p>
+            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload access code so unattended runs do not stop after the integrity step.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
                 <div class="stacked-actions">
                     <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadCommandButton">Copy command</button>
-                    <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open bootstrap script</a>
+                    <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open setup script</a>
                 </div>
-                <p class="status-copy">This signed-in command contains a short-lived handoff code. Use it in the release shell that will run the bootstrap, and do not paste it into logs or shared chat.</p>
+                <p class="status-copy">This signed-in command contains a short-lived access code. Use it in the release shell that will run the setup script, and do not paste it into logs or shared chat.</p>
                 <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging files again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
@@ -30,16 +30,16 @@
 <section class="recommended-download" id="release-upload-handoff">
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
-            <span class="tag">Short-lived handoff code</span>
-            <h2>Backup handoff code</h2>
-            <p>The command above already includes this value. Keep it available only for recovery or for a manually downloaded bootstrap script that still prompts for upload authorization.</p>
+            <span class="tag">Short-lived access code</span>
+            <h2>Backup access code</h2>
+            <p>The command above already includes this value. Keep it available only for recovery or for a manually downloaded setup script that still prompts for upload authorization.</p>
             <div class="code-panel">
-                <div class="code-panel__label">Handoff code</div>
+                <div class="code-panel__label">Access code</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadHandoffCode">@Model.HandoffCode</pre>
                 <div class="stacked-actions">
-                    <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton">Copy handoff code</button>
+                    <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton">Copy access code</button>
                 </div>
-                <p class="status-copy">Treat the handoff code as sensitive until it expires. Never export it in shell startup files.</p>
+                <p class="status-copy">Treat the access code as sensitive until it expires. Never export it in shell startup files.</p>
                 <p class="status-copy" id="releaseUploadHandoffCodeNotice" hidden></p>
             </div>
         </div>
@@ -52,7 +52,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Summary</p>
         <p class="release-stage__note">
-            This page handles release upload in Chummer: one authenticated handoff, one bootstrap command, and one recovery-aware status path.
+            This page handles release upload in Chummer: one authenticated access code, one setup command, and one recovery-aware status path.
         </p>
     </div>
 </section>
@@ -81,8 +81,8 @@
         <h2>Automatic publication and recovery-aware status</h2>
         <ul class="trust-page-section__list">
             <li>The upload response accepts the bundle and publishes only the target platform file to the live downloads shelf.</li>
-            <li>The response returns the install handoff URL and keeps any recovery-only code on the same handoff if setup explicitly enters recovery mode during setup.</li>
-            <li>The promoted file appears in the canonical public manifest at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>, while <code>/downloads/releases.json</code> remains the compatibility view.</li>
+            <li>The response returns the install setup URL and keeps any recovery-only code with the same release run if setup explicitly enters recovery mode.</li>
+            <li>The promoted file appears in the current public release file at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>, while <code>/downloads/releases.json</code> remains the compatibility view.</li>
         </ul>
     </article>
     <article class="release-guidance__item">
@@ -121,9 +121,9 @@
     copyHandoffCodeButton.addEventListener("click", async () => {
       try {
         await ui.copyToClipboard(handoffCodeValue.textContent || "", copyHandoffCodeButton, "Copied");
-        ui.setNotice(handoffCodeNotice, "Release upload handoff code copied.");
+        ui.setNotice(handoffCodeNotice, "Release upload access code copied.");
       } catch (error) {
-        ui.setNotice(handoffCodeNotice, ui.describeError(error, "Release upload handoff code copy failed. Copy it manually from the code panel."), true);
+        ui.setNotice(handoffCodeNotice, ui.describeError(error, "Release upload access code copy failed. Copy it manually from the code panel."), true);
       }
     });
   }
