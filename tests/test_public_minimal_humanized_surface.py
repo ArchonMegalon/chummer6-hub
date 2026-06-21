@@ -1262,8 +1262,11 @@ def test_submitted_pages_clean_dynamic_public_copy_before_rendering() -> None:
         "<h3>@fact.Heading</h3>",
         "@eventItem.Label</span>",
         "<strong>@eventItem.Summary</strong>",
+        "later signed-in return path",
     ):
         assert forbidden not in support_submitted
+
+    assert "later account return path" in support_submitted
 
     for forbidden in (
         "<h3>@stage.Status.Replace",
@@ -1885,11 +1888,13 @@ def test_package_pages_use_page_language_instead_of_route_language() -> None:
         "Next route",
         "Return to the package route",
         "package route.",
+        "signed-in package page",
     ):
         assert forbidden not in combined
 
     assert "Next step" in package_receipt
     assert "Return to the package page" in package_receipt
+    assert "account package page" in package_receipt
     assert "Package history stays attached to this package page." in package_detail
 
 
