@@ -248,6 +248,7 @@ static bool RequiresNoStoreHeaders(PathString path)
 {
     return path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || IsLegacyMacReleaseBootstrapArtifactPath(path)
+        || IsPublicVideoMediaPath(path)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/aur-packages.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/ledger/newsroom", StringComparison.OrdinalIgnoreCase)
@@ -260,6 +261,30 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/ai.txt", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
+}
+
+static bool IsPublicVideoMediaPath(PathString path)
+{
+    string rawPath = path.Value ?? string.Empty;
+    if (!rawPath.StartsWith("/media/", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    string extension = Path.GetExtension(rawPath);
+    if (!extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+        && !extension.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+        && !extension.Equals(".vtt", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    return path.StartsWithSegments("/media/horizons", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/media/promo", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/media/ledger/factions", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/media/ledger/globe", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/media/ledger/newsreels", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/media/ledger/tours", StringComparison.OrdinalIgnoreCase);
 }
 
 static string ResolveRobotsPolicy(PathString path)

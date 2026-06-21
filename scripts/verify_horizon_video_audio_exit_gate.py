@@ -126,7 +126,10 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         clean_speech_audio = True
         alice_clean_audio = group_key == "alice-90s-deepdive"
         rebuild_receipt = group_receipts.get(group_key) or {}
-        relative_file = str(path.relative_to(REPO))
+        try:
+            relative_file = str(path.relative_to(REPO))
+        except ValueError:
+            relative_file = path.name
         cleanup_receipt = (
             cleanup_file_receipts.get(relative_file)
             or cleanup_file_receipts.get(path.name)
@@ -137,6 +140,8 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             quality = audio.audio_quality(path, allow_clean_speech_pauses=False)
         except TypeError:
             quality = audio.audio_quality(path)
+        clean_speech_groups = set(getattr(audio, "CLEAN_SPEECH_AUDIO_GROUPS", set()))
+        requires_clean_speech_receipt = group_key in clean_speech_groups
         if not MIN_VIDEO_DURATION_SECONDS <= duration_seconds <= MAX_VIDEO_DURATION_SECONDS:
             row_issues.append("duration_not_90s")
         if audio_streams != 1:
@@ -170,7 +175,18 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             )
             existing_audio_cleanup_is_current = bool(cleanup_receipt) or str(quality.get("status") or "") == "pass"
 
-            if not unmixr_rebuild_is_current and not existing_audio_cleanup_is_current:
+            if requires_clean_speech_receipt and not unmixr_rebuild_is_current:
+                if not rebuild_receipt:
+                    row_issues.append("clean_speech_unmixr_rebuild_receipt_missing")
+                elif str(rebuild_receipt.get("status") or "") != "pass":
+                    row_issues.append("clean_speech_unmixr_rebuild_receipt_not_pass")
+                elif str(provider.get("provider") or "") != getattr(audio, "UNMIXR_PROVIDER", "unmixr-short-tts"):
+                    row_issues.append("clean_speech_requires_unmixr_rebuild_receipt")
+                elif not matching_file:
+                    row_issues.append("clean_speech_rebuild_file_receipt_missing")
+                elif not rebuild_style_is_current:
+                    row_issues.append("clean_speech_rebuild_uses_legacy_bed_or_noise_style")
+            elif not unmixr_rebuild_is_current and not existing_audio_cleanup_is_current:
                 if not rebuild_receipt:
                     row_issues.append("public_video_audio_rebuild_receipt_missing")
                 elif str(rebuild_receipt.get("status") or "") != "pass":
@@ -231,6 +247,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "max_start_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
+            "clean_speech_receipt_policy": "ALICE, Runsite, Runbook Press, and Table Pulse require a current Unmixr clean-speech receipt; waveform pass metrics or legacy cleanup evidence alone cannot release them",
             "premium_mix_policy": "every public horizon video requires passing measured audio quality plus either a current Unmixr rebuild receipt or current existing-audio cleanup evidence when the asset needed repair; legacy bed/noise styles and dead-air waivers are rejected",
         },
         "asset_count": len(rows),

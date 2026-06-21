@@ -1,15 +1,19 @@
 {
   "contract_name": "chummer.public_video_all_media_audio_gate.v1",
-  "generated_at_utc": "2026-06-21T20:41:04Z",
+  "generated_at_utc": "2026-06-21T21:24:28Z",
   "status": "pass",
-  "scope": "all public MP4/WebM files under Chummer.Run.Api/wwwroot/media",
+  "scope": "all public MP4/WebM files under Chummer.Run.Api/wwwroot/media; grouped by canonical asset stem; desktop, mobile, and WebM variants included",
+  "group_count": 27,
   "file_count": 48,
   "max_natural_pause_seconds": 1.0,
+  "clean_speech_mix_contract": "ea.public_video_clean_speech_no_noise_floor.v2",
+  "audio_normalization_contract": "ea.public_video_unmixr_beat_trim.v2",
+  "issues": [],
   "files": [
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.mp4",
       "group_key": "alice-90s-deepdive",
-      "duration_seconds": 89.5,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -35,7 +39,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-90s-deepdive.mp4",
       "group_key": "black-ledger-90s-deepdive",
-      "duration_seconds": 89.542,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -61,7 +65,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/black-ledger-epic-90s.mp4",
       "group_key": "black-ledger-epic-90s",
-      "duration_seconds": 89.75,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -87,7 +91,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/community-hub-90s-deepdive.mp4",
       "group_key": "community-hub-90s-deepdive",
-      "duration_seconds": 89.5,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -113,7 +117,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/jackpoint-90s-deepdive.mp4",
       "group_key": "jackpoint-90s-deepdive",
-      "duration_seconds": 89.458,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -139,7 +143,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/karma-forge-90s-deepdive.mp4",
       "group_key": "karma-forge-90s-deepdive",
-      "duration_seconds": 89.458,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -165,7 +169,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-90s-deepdive.mp4",
       "group_key": "nexus-pan-90s-deepdive",
-      "duration_seconds": 89.458,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -191,7 +195,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/nexus-pan-epic-90s.mp4",
       "group_key": "nexus-pan-epic-90s",
-      "duration_seconds": 89.667,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -217,7 +221,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.mp4",
       "group_key": "origin-dossier-90s-deepdive",
-      "duration_seconds": 90.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -243,7 +247,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-90s-deepdive.webm",
       "group_key": "origin-dossier-90s-deepdive",
-      "duration_seconds": 90.095,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -269,7 +273,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
       "group_key": "origin-dossier-the-name-she-chose-20260619",
-      "duration_seconds": 90.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -295,7 +299,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.webm",
       "group_key": "origin-dossier-the-name-she-chose-20260619",
-      "duration_seconds": 90.071,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -321,7 +325,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.mp4",
       "group_key": "origin-dossier-the-name-she-chose",
-      "duration_seconds": 90.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -347,7 +351,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.webm",
       "group_key": "origin-dossier-the-name-she-chose",
-      "duration_seconds": 90.071,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -373,7 +377,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.mp4",
       "group_key": "runbook-press-90s-deepdive",
-      "duration_seconds": 89.667,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -399,7 +403,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.mp4",
       "group_key": "runsite-90s-deepdive",
-      "duration_seconds": 89.625,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -425,33 +429,33 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/horizons/table-pulse-90s-deepdive.mp4",
       "group_key": "table-pulse-90s-deepdive",
-      "duration_seconds": 89.458,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
-        "rms_dbfs": -21.03,
-        "peak_dbfs": -3.3,
-        "high_band_power_ratio": 1.1e-05,
-        "tone_peak_hz": 10500.0,
-        "tone_peak_prominence_db": 10.55,
-        "sub_bass_power_ratio": 0.0,
-        "low_bass_power_ratio": 1e-06,
-        "voice_to_low_db": 60.97,
+        "rms_dbfs": -20.9,
+        "peak_dbfs": -3.34,
+        "high_band_power_ratio": 1e-05,
+        "tone_peak_hz": 10652.3,
+        "tone_peak_prominence_db": 5.33,
+        "sub_bass_power_ratio": 1e-06,
+        "low_bass_power_ratio": 0.001485,
+        "voice_to_low_db": 27.91,
         "low_tone_peak_hz": 269.5,
-        "low_tone_peak_prominence_db": 2.75,
-        "mid_tone_peak_hz": 1160.2,
-        "mid_tone_peak_prominence_db": 3.0,
-        "mid_tone_power_ratio": 0.224213,
+        "low_tone_peak_prominence_db": 9.96,
+        "mid_tone_peak_hz": 585.9,
+        "mid_tone_peak_prominence_db": 4.83,
+        "mid_tone_power_ratio": 0.508118,
         "silence_gate_dbfs": -42.0,
-        "max_silence_seconds": 0.0,
+        "max_silence_seconds": 0.5,
         "first_audible_seconds": 0.0,
-        "tail_silence_seconds": 0.0
+        "tail_silence_seconds": 0.158
       }
     },
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo-mobile.mp4",
       "group_key": "ashline-circle-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -477,7 +481,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.mp4",
       "group_key": "ashline-circle-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -503,7 +507,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.webm",
       "group_key": "ashline-circle-promo",
-      "duration_seconds": 26.403,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -529,7 +533,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo-mobile.mp4",
       "group_key": "barrens-free-wardens-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -555,7 +559,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.mp4",
       "group_key": "barrens-free-wardens-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -581,7 +585,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.webm",
       "group_key": "barrens-free-wardens-promo",
-      "duration_seconds": 26.383,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -607,7 +611,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo-mobile.mp4",
       "group_key": "ghostline-network-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -633,7 +637,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.mp4",
       "group_key": "ghostline-network-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -659,7 +663,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.webm",
       "group_key": "ghostline-network-promo",
-      "duration_seconds": 26.383,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -685,7 +689,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo-mobile.mp4",
       "group_key": "glass-tower-compact-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -711,7 +715,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.mp4",
       "group_key": "glass-tower-compact-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -737,7 +741,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.webm",
       "group_key": "glass-tower-compact-promo",
-      "duration_seconds": 26.382,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -763,7 +767,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo-mobile.mp4",
       "group_key": "neon-docks-union-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -789,7 +793,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.mp4",
       "group_key": "neon-docks-union-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -815,7 +819,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.webm",
       "group_key": "neon-docks-union-promo",
-      "duration_seconds": 26.382,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -841,7 +845,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-mobile.mp4",
       "group_key": "rust-market-syndicate-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -867,7 +871,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.mp4",
       "group_key": "rust-market-syndicate-promo",
-      "duration_seconds": 26.333,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -893,7 +897,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo.webm",
       "group_key": "rust-market-syndicate-promo",
-      "duration_seconds": 26.383,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -919,7 +923,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.mp4",
       "group_key": "black-ledger-video-globe-idle",
-      "duration_seconds": 14.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -945,7 +949,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/globe/black-ledger-video-globe-idle.webm",
       "group_key": "black-ledger-video-globe-idle",
-      "duration_seconds": 14.049,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -971,7 +975,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.mp4",
       "group_key": "turn-1-newsreel",
-      "duration_seconds": 20.167,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -997,7 +1001,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-1-newsreel.webm",
       "group_key": "turn-1-newsreel",
-      "duration_seconds": 20.216,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1023,7 +1027,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.mp4",
       "group_key": "turn-2-newsreel",
-      "duration_seconds": 24.133,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1049,7 +1053,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/newsreels/turn-2-newsreel.webm",
       "group_key": "turn-2-newsreel",
-      "duration_seconds": 24.183,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1075,7 +1079,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
       "group_key": "black-ledger-3dvista-flythrough",
-      "duration_seconds": 60.233,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1101,7 +1105,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.mp4",
       "group_key": "all-horizons-90s-magicfit-promo",
-      "duration_seconds": 90.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1127,7 +1131,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.webm",
       "group_key": "all-horizons-90s-magicfit-promo",
-      "duration_seconds": 90.104,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1153,7 +1157,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
       "group_key": "chummer6-flagship-promo",
-      "duration_seconds": 90.0,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1179,7 +1183,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
       "group_key": "chummer6-flagship-promo",
-      "duration_seconds": 90.112,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1205,7 +1209,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.mp4",
       "group_key": "every-wonder-horizon-promo",
-      "duration_seconds": 89.542,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],
@@ -1231,7 +1235,7 @@
     {
       "file": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.webm",
       "group_key": "every-wonder-horizon-promo",
-      "duration_seconds": 89.642,
+      "duration_seconds": 0,
       "after_quality": {
         "status": "pass",
         "reasons": [],

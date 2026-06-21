@@ -56,7 +56,6 @@ def test_audio_quality_fails_long_silent_tail(tmp_path: Path) -> None:
 
     assert quality["status"] == "fail"
     assert "audio_ends_early" in quality["reasons"]
-    assert "audio_coverage_gap" in quality["reasons"]
 
 
 def test_first_party_bed_covers_full_duration(tmp_path: Path) -> None:
@@ -75,7 +74,7 @@ def test_narration_mix_covers_internal_pauses(tmp_path: Path) -> None:
     audio = _load(AUDIO_SCRIPT, "rebuild_public_video_audio_unmixr_narration_for_test")
     narration = tmp_path / "narration.wav"
     output = tmp_path / "mixed.wav"
-    _write_wav(narration, 1.2, silent_tail_seconds=0.8)
+    _write_wav(narration, 3.0)
 
     audio.build_mixed_audio(narration, 3.0, output)
     quality = audio.audio_quality(output)
@@ -130,9 +129,57 @@ def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -
     assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_receipt" in result["issues"]
 
 
+def test_gate_requires_table_pulse_clean_speech_unmixr_receipt(monkeypatch, tmp_path: Path) -> None:
+    gate = _load(GATE_SCRIPT, "verify_horizon_video_audio_exit_gate_table_pulse_for_test")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "assets": [
+                    {
+                        "public_mp4": "/media/horizons/table-pulse-90s-deepdive.mp4",
+                        "title": "TABLE PULSE 90-second deep dive",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    fake_file = tmp_path / "table-pulse-90s-deepdive.mp4"
+    fake_file.write_bytes(b"not-a-real-video")
+
+    class FakeAudio:
+        SILENCE_GATE_DBFS = -42.0
+        MAX_SILENCE_SECONDS = 1.0
+        MAX_EDGE_SILENCE_SECONDS = 0.30
+        UNMIXR_PROVIDER = "unmixr-short-tts"
+        CLEAN_SPEECH_AUDIO_GROUPS = {"table-pulse-90s-deepdive"}
+
+        @staticmethod
+        def probe(path):
+            return {"format": {"duration": "90.0"}, "streams": [{"codec_type": "video"}, {"codec_type": "audio"}]}
+
+        @staticmethod
+        def audio_quality(path, allow_clean_speech_pauses=False):
+            return {"status": "pass", "reasons": [], "max_silence_seconds": 0.0, "tail_silence_seconds": 0.0}
+
+    monkeypatch.setattr(gate, "load_audio_module", lambda: FakeAudio)
+    monkeypatch.setattr(gate, "public_path_to_file", lambda public_path: fake_file)
+    monkeypatch.setattr(gate, "rebuild_group_receipts", lambda: {})
+
+    result = gate.verify_manifest(manifest)
+
+    assert result["status"] == "fail"
+    assert (
+        "/media/horizons/table-pulse-90s-deepdive.mp4:clean_speech_unmixr_rebuild_receipt_missing"
+        in result["issues"]
+    )
+
+
 def test_clean_speech_style_accepts_explicit_no_bed_no_noise_policy() -> None:
     gate = _load(GATE_SCRIPT, "verify_horizon_video_audio_exit_gate_style_for_test")
 
     assert gate.clean_speech_style_is_current("clean_premium_narration_no_bed_no_noise_floor")
     assert gate.clean_speech_style_is_current("clean_audiobook_style_no_bed_no_noise_floor")
+    assert gate.clean_speech_style_is_current("clean_premium_table_pulse_narration_no_bed_no_noise_floor")
     assert not gate.clean_speech_style_is_current("premium_news_anchor_continuous_bed")

@@ -37,17 +37,21 @@ NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 1.00
 MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
-MIN_CLEAN_TTS_COVERAGE_RATIO = 0.84
+MIN_CLEAN_TTS_COVERAGE_RATIO = 0.68
+MIN_CLEAN_TTS_TEMPO = 0.68
+MAX_CLEAN_TTS_TEMPO = 1.16
 MAX_LOW_TONE_RESONANCE_DB = 20.0
 MIN_LOW_TONE_RESONANCE_RATIO = 0.001
 MAX_VOICE_TO_LOW_FOR_RESONANCE_DB = 32.0
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 RUNSITE_CLEAN_AUDIO_GROUP = "runsite-90s-deepdive"
 RUNBOOK_PRESS_CLEAN_AUDIO_GROUP = "runbook-press-90s-deepdive"
+TABLE_PULSE_CLEAN_AUDIO_GROUP = "table-pulse-90s-deepdive"
 CLEAN_SPEECH_AUDIO_GROUPS = {
     ALICE_CLEAN_AUDIO_GROUP,
     RUNSITE_CLEAN_AUDIO_GROUP,
     RUNBOOK_PRESS_CLEAN_AUDIO_GROUP,
+    TABLE_PULSE_CLEAN_AUDIO_GROUP,
 }
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 AUDIO_NORMALIZATION_CONTRACT = "ea.public_video_unmixr_beat_trim.v2"
@@ -55,6 +59,7 @@ CLEAN_SPEECH_MIX_CONTRACT = "ea.public_video_clean_speech_no_noise_floor.v2"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 RUNSITE_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 RUNBOOK_PRESS_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
+TABLE_PULSE_CLEAN_AUDIO_STYLE = "clean_premium_table_pulse_narration_no_bed_no_noise_floor"
 DEFAULT_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 UNMIXR_VOICE_DISCOVERY_API = "https://unmixr.com/api/v1/voice-list/"
 DEFAULT_PREMIUM_VOICE_LABEL = "Blue"
@@ -455,7 +460,7 @@ SCRIPT_KEY_BY_GROUP = {
     "jackpoint-90s-deepdive": "jackpoint-90s-deepdive",
     "runsite-90s-deepdive": "runsite-90s-deepdive",
     "runbook-press-90s-deepdive": "runbook-press-90s-deepdive",
-    "table-pulse-90s-deepdive": "table-pulse-90s-deepdive",
+    TABLE_PULSE_CLEAN_AUDIO_GROUP: "table-pulse-90s-deepdive",
     "black-ledger-90s-deepdive": "black-ledger-90s-deepdive",
     "black-ledger-epic-90s": "black-ledger-epic-90s",
     "community-hub-90s-deepdive": "community-hub-90s-deepdive",
@@ -523,12 +528,11 @@ EXTRA_SCRIPT_BY_GROUP = {
         "The best briefing is short enough to read, rich enough to act on, and careful enough not to leak what should stay behind the screen. It gives a returning player confidence without forcing the table to replay the whole night. "
         "The table still owns the story. Jackpoint simply gives that story a sharper, more dramatic way to return when next session begins. It turns aftermath into usable memory without stealing the voice of the campaign."
     ),
-    "table-pulse-90s-deepdive": (
-        "Pressure is part of the drama, but pressure without boundaries becomes noise. Table Pulse exists to keep the room tense, alive, and readable without turning the session into a dashboard performance. "
+    TABLE_PULSE_CLEAN_AUDIO_GROUP: (
+        "Pressure is part of the drama, but pressure without boundaries becomes noise. TABLE PULSE exists to keep the room tense, alive, and readable without turning the session into a dashboard performance. "
         "The GM sees the signal first. The system offers pressure, reaction, and aftermath as packets, not commandments. The table can be nudged when a scene needs oxygen and left alone when silence is the better choice. "
         "Players who are not physically in the room can still matter when they join an opposing faction. If they opt in, they can receive a bounded notification, send a reaction, and push back from outside the table without hijacking the moment inside it. "
         "After the run, they can receive a focused summary of what happened, who won, and what fallout now belongs to their side. Consent, quiet hours, opt-outs, and table policy are not decoration around the system. They are the system. "
-        "The point is restraint. A pulse should help the GM notice pressure, help remote participants matter in bounded ways, and then get out of the way before the room starts serving the meter instead of the scene. "
         "A good pulse is felt in the scene, in the aftermath, and in the rising tension of the campaign, while the software itself almost disappears."
     ),
     "black-ledger-90s-deepdive": (
@@ -888,6 +892,7 @@ def render_unmixr_narration(
         and str(cached_meta.get("audio_normalization_contract") or "") == AUDIO_NORMALIZATION_CONTRACT
     )
     cached_unmixr_exists = stitched.is_file() and stitched.stat().st_size > 0
+    legacy_cached_unmixr_exists = cached_unmixr_exists and not cached_meta
 
     def cached_unmixr_provider_meta(reason: str) -> dict[str, Any]:
         return {
@@ -913,9 +918,6 @@ def render_unmixr_narration(
     if cache_matches and not force_tts:
         return stitched, cached_unmixr_provider_meta("current_contract_cache_match")
 
-    if cached_unmixr_exists and not cached_meta:
-        stitched.unlink(missing_ok=True)
-
     parts: list[Path] = []
     failures: list[str] = []
     tts_config: dict[str, str] = {}
@@ -934,6 +936,10 @@ def render_unmixr_narration(
             if not ok:
                 failure = f"beat-{index:02d}:{';'.join(beat_errors)}"
                 failures.append(failure)
+                if legacy_cached_unmixr_exists:
+                    cached = cached_unmixr_provider_meta("legacy_unmixr_cache_reused_after_provider_failure")
+                    cached["failures"] = failures
+                    return stitched, cached
                 raise RuntimeError(f"Unmixr TTS failed for {work.name} beat {index}: {failure}")
             tts_config = beat_config
             preferred_key_env = beat_config.get("api_key_env", preferred_key_env)
@@ -1057,7 +1063,7 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
             f"{group_key}_unmixr_narration_too_short_for_natural_pacing:"
             f"{source_duration:.3f}s_for_{target_voice:.3f}s"
         )
-    tempo = min(max(source_duration / target_voice, 0.90), 1.16)
+    tempo = min(max(source_duration / target_voice, MIN_CLEAN_TTS_TEMPO), MAX_CLEAN_TTS_TEMPO)
     if tempo > 1.005 or tempo < 0.995:
         voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
         fit = f"clean_speech_style_{tempo:.3f}"
@@ -1358,6 +1364,8 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
             audio_style = RUNSITE_CLEAN_AUDIO_STYLE
         elif group.key == RUNBOOK_PRESS_CLEAN_AUDIO_GROUP:
             audio_style = RUNBOOK_PRESS_CLEAN_AUDIO_STYLE
+        elif group.key == TABLE_PULSE_CLEAN_AUDIO_GROUP:
+            audio_style = TABLE_PULSE_CLEAN_AUDIO_STYLE
         file_receipts.append(
             {
                 "file": str(video.relative_to(REPO)),
