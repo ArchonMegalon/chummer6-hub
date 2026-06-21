@@ -250,11 +250,14 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReadyForTonightService.cs"));
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReadyForTonight.cshtml"));
         string combined = string.Join(Environment.NewLine, controller, service);
 
         Assert.Contains("role status, starter loadouts, session files, and mobile setup", combined, StringComparison.Ordinal);
         Assert.Contains("table role", combined, StringComparison.Ordinal);
         Assert.Contains("export path", combined, StringComparison.Ordinal);
+        Assert.Contains("Download starter file", view, StringComparison.Ordinal);
+        Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
 
         foreach (string forbidden in new[]
         {
@@ -274,6 +277,18 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         })
         {
             Assert.DoesNotContain(forbidden, combined, StringComparison.OrdinalIgnoreCase);
+        }
+
+        foreach (string forbiddenViewDetail in new[]
+        {
+            "verdict.ProofReceipts",
+            "verdict.NextBestScreen",
+            "Status: @verdict.Status",
+            "Download starter loadout JSON",
+            "machine-readable copy"
+        })
+        {
+            Assert.DoesNotContain(forbiddenViewDetail, view, StringComparison.OrdinalIgnoreCase);
         }
     }
 

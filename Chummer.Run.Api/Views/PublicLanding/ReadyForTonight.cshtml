@@ -44,10 +44,6 @@
                 <span class="tag">@verdict.RoleLabel</span>
                 <h3>@verdict.StatusLabel</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(verdict.Summary)</p>
-                <div class="route-choice-card__details">
-                    <span>Status: @verdict.Status</span>
-                    <span>Next: @verdict.NextBestScreen</span>
-                </div>
                 <p><strong>Blocking reasons</strong></p>
                 <ul>
                     @foreach (var item in verdict.BlockingReasons)
@@ -66,12 +62,6 @@
                     @foreach (var action in verdict.Actions)
                     {
                         <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
-                    }
-                </div>
-                <div class="trust-claim__details">
-                    @foreach (var detail in verdict.ProofReceipts)
-                    {
-                        <span>@PublicFacingCopyHumanizer.Clean(detail)</span>
                     }
                 </div>
             </article>
@@ -98,7 +88,7 @@
                         <span>@PublicFacingCopyHumanizer.Clean(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@kit.DownloadHref">Download starter loadout JSON</a>
+                <a class="editorial-strip__action" href="@kit.DownloadHref">Download starter file</a>
             </article>
         }
     </div>
@@ -108,7 +98,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Files and mobile setup</p>
         <h2 class="editorial-title">Carry the session notes into print, export, or mobile.</h2>
-        <p class="editorial-copy">The file routes below stay first-party. They keep the session-start notes, machine-readable copy, and mobile return path together.</p>
+        <p class="editorial-copy">The files below keep the session-start notes, downloadable setup, and mobile return path together.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var packet in Model.Packets)
