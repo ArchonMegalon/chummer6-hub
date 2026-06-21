@@ -493,16 +493,16 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", status, StringComparison.Ordinal);
 
-        Assert.Contains("Shipped updates stay upstream of public celebration.", feedback, StringComparison.Ordinal);
+        Assert.Contains("Announce the update after people can use it.", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
 
         Assert.Contains("Character tools for Shadowrun.", productStory, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", productStory, StringComparison.OrdinalIgnoreCase);
 
-        Assert.Contains("Your recent package records", packages, StringComparison.Ordinal);
+        Assert.Contains("Your recent package activity", packages, StringComparison.Ordinal);
         Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
 
-        Assert.Contains("support follow-up separate", trustPage, StringComparison.Ordinal);
+        Assert.Contains("support history in one place", trustPage, StringComparison.Ordinal);
         Assert.DoesNotContain("human escalation", trustPage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Browser handoff", trustPage, StringComparison.Ordinal);
 
@@ -586,9 +586,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("ALICE build ghosts", view, StringComparison.Ordinal);
-        Assert.Contains("Open Build Ghost concierge", view, StringComparison.Ordinal);
-        Assert.Contains("The actual Build Ghost compare and apply decision still stays inside Chummer.", view, StringComparison.Ordinal);
+        Assert.Contains("Character help preview", view, StringComparison.Ordinal);
+        Assert.Contains("Open character helper", view, StringComparison.Ordinal);
+        Assert.Contains("The compare and apply decision still stays inside Chummer.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1046,7 +1046,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string shelfView = File.ReadAllText(shelfViewPath);
 
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Review-required state", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Limited public state", publicationView, StringComparison.Ordinal);
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", shelfView, StringComparison.Ordinal);
         Assert.Contains("Limited public wording", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("review-required", shelfView, StringComparison.Ordinal);
@@ -1080,11 +1080,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("downloadReceiptId = dispatch.Receipt.ReceiptId", controller, StringComparison.Ordinal);
         Assert.Contains("claimTicketId = dispatch.ClaimTicket.TicketId", controller, StringComparison.Ordinal);
         Assert.Contains("BuildRouteReceiptPayload(routeLookup.ReceiptMatch)", controller, StringComparison.Ordinal);
-        Assert.Contains("No current release status is attached to this install recovery route for the requested installer.", controller, StringComparison.Ordinal);
-        Assert.Contains("No current release status is attached to this release-bundle route or format.", controller, StringComparison.Ordinal);
-        Assert.Contains("No current release status is attached to the public creator-publication detail route.", controller, StringComparison.Ordinal);
+        Assert.Contains("No current release record is attached to this install recovery route for the requested artifact.", controller, StringComparison.Ordinal);
+        Assert.Contains("No current release record is attached to this release-bundle route or format.", controller, StringComparison.Ordinal);
+        Assert.Contains("No current release record is attached to the public creator-publication detail route.", controller, StringComparison.Ordinal);
         Assert.Contains("ResolvePublicRouteClaimStatus(", controller, StringComparison.Ordinal);
-        Assert.Contains("Current direct route record is attached, but parity claims stay review-required because", controller, StringComparison.Ordinal);
+        Assert.Contains("Current direct route record is attached, but public comparison stays limited because", controller, StringComparison.Ordinal);
         Assert.Contains("public-shelf:/artifacts/publications/{publicationId}", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE", localProofService, StringComparison.Ordinal);
         Assert.Contains(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json", localProofService, StringComparison.Ordinal);
@@ -1149,7 +1149,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("You followed an old link", nowView, StringComparison.Ordinal);
         Assert.Contains("Release notes now live on <code class=\"mono-receipt\">/changelog</code>", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?source=feedback#public-feedback", nowView, StringComparison.Ordinal);
-        Assert.Contains("Create the account when you want feedback, installs, support, and roadmap follow-up to return to one place.", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("Use an account when you want installs, support, and roadmap follows in one place.", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Private logs and account issues belong in Help, not public feedback.", feedbackView, StringComparison.Ordinal);
     }
 

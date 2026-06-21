@@ -10629,7 +10629,7 @@ Boundary:
         {
             return new RouteClaimStatus(
                 "bounded_failure",
-                $"Parity claims stay review-required because {routeLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')}.");
+                $"Public comparison stays limited because {routeLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')}.");
         }
 
         LocalProofReceiptMatch? routeReceipt = routeLookup.ReceiptMatch;
@@ -10644,7 +10644,7 @@ Boundary:
             string reviewRequiredReason = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
             return new RouteClaimStatus(
                 "bounded_failure",
-                $"Current direct route record is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+                $"Current direct route record is attached, but public comparison stays limited because {reviewRequiredReason}.");
         }
 
         ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
@@ -10652,7 +10652,7 @@ Boundary:
         {
             return new RouteClaimStatus(
                 "bounded_failure",
-                $"Current direct route record is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+                $"Current direct route record is attached, but public comparison stays limited because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
         }
 
         return new RouteClaimStatus(passingState, null);

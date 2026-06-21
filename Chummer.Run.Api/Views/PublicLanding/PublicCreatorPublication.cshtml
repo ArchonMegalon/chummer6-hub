@@ -4,7 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
-    // Current direct parity proof receipts still keep the public parity claim under review.
+    // Current direct route records still keep public comparison language limited.
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -34,7 +34,7 @@
 
     string PublicationAvailabilityLabel(bool discoverable)
         => publicationRouteReviewRequired && discoverable
-            ? "Review-required state"
+            ? "Limited public state"
             : discoverable
                 ? "Ready now"
                 : "Limited release";

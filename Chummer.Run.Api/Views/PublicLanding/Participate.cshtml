@@ -143,11 +143,11 @@
     <p class="muted-copy">Follow an item to hear when it changes. Votes show demand; Chummer decides what ships. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
-<section class="status-decision-strip" aria-label="Participation loop snapshot">
+<section class="status-decision-strip" aria-label="Participation overview">
     <article class="status-decision-strip__card">
-        <span class="tag">Live pressure</span>
-        <h2>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") keep the public loop grounded in real delivery pressure.</h2>
-        <p>@signalLoop.ClaimedMilestoneCount already show visible movement. Public participation stays more credible when it points at live work instead of generic enthusiasm.</p>
+        <span class="tag">Roadmap</span>
+        <h2>@signalLoop.OpenMilestoneCount roadmap item@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") are open.</h2>
+        <p>@signalLoop.ClaimedMilestoneCount already show visible movement. Public participation is clearer when it points at real work instead of generic enthusiasm.</p>
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestones</a>
     </article>
     <article class="status-decision-strip__card">
@@ -157,8 +157,8 @@
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-horizons">Browse campaign tools</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Shipped path exists</span>
-        <h2>@signalLoop.ShippedFollowUpCount reviewed shipped example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show the loop can finish clearly.</h2>
+        <span class="tag">Available now</span>
+        <h2>@signalLoop.ShippedFollowUpCount available update@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") show what people can use.</h2>
         <p>The public board is not just intake. It already has a separate shipped updates page where finished outcomes can land.</p>
         <a class="button-like button-like--ghost" href="/changelog">Open shipped updates</a>
     </article>
@@ -166,7 +166,7 @@
 
 <section class="trust-claims route-anchor-target" id="public-feedback">
     <div class="trust-claims__lead">
-        <p class="eyebrow">Public loop</p>
+        <p class="eyebrow">Public pages</p>
         <h2 class="editorial-title">Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.</h2>
         <p class="editorial-copy">This page keeps the broader participation story visible while the dedicated pages stay honest about what they can promise today and how they connect back to help, shipped updates, and what works now.</p>
         @if (fromFeedbackAlias)

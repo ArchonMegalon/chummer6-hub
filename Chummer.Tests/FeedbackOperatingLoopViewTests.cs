@@ -35,11 +35,13 @@ public sealed class FeedbackOperatingLoopViewTests
 
         Assert.Contains("Participation works best when it points at live milestones, planned work, and shipped updates.", view, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
-        Assert.Contains("Participation loop snapshot", view, StringComparison.Ordinal);
+        Assert.Contains("Participation overview", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
-        Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
+        Assert.Contains("Open milestones", view, StringComparison.Ordinal);
         Assert.Contains("Browse campaign tools", view, StringComparison.Ordinal);
         Assert.Contains("Open shipped updates", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("open milestone slice", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("real delivery pressure", view, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
