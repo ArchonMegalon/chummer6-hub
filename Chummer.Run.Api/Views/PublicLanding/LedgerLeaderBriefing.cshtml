@@ -8,14 +8,14 @@
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Faction leader briefing</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
             <span>Leader: @Model.Digest.LeaderHandle</span>
             <span>Faction: @Model.Digest.PublicName</span>
             @if (Model.WorldTurnBriefing is not null)
             {
-                <span>@Model.WorldTurnBriefing.TransitionLabel</span>
+                <span>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</span>
             }
         </div>
     </div>
@@ -30,14 +30,14 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Pressure calls</p>
         <h2 class="editorial-title">@Model.Digest.PublicName right now</h2>
-        <p class="editorial-copy">@Model.Digest.Summary</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Digest.Summary)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var item in Model.Digest.PressureCalls)
         {
             <article class="route-choice-card">
                 <span class="tag">Pressure</span>
-                <p>@item</p>
+                <p>@PublicFacingCopyHumanizer.Clean(item)</p>
             </article>
         }
     </div>
@@ -53,7 +53,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">Next move</span>
-                <p>@item</p>
+                <p>@PublicFacingCopyHumanizer.Clean(item)</p>
             </article>
         }
     </div>
@@ -64,8 +64,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">GM cockpit</p>
-            <h2 class="editorial-title">@Model.GmCockpitPacket.Heading</h2>
-            <p class="editorial-copy">@Model.GmCockpitPacket.Summary</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.Heading)</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -74,7 +74,7 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living Newsroom</span>
-                <p>@Model.GmCockpitPacket.LivingNewsroomSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.LivingNewsroomSummary)</p>
                 <div class="route-choice-card__details">
                     <a href="@Model.GmCockpitPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
@@ -82,23 +82,23 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
-                <p>@Model.GmCockpitPacket.AftermathSummary</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.AftermathSummary)</p>
                 <div class="route-choice-card__details">
                     <a href="@Model.GmCockpitPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Boundary</span>
-                <p>@Model.GmCockpitPacket.BoundaryLine</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.BoundaryLine)</p>
             </article>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var cue in Model.GmCockpitPacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@cue.Label</span>
-                    <h3>@cue.StatusLabel</h3>
-                    <p>@cue.Summary</p>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.Label)</span>
+                    <h3>@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</h3>
+                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
                     </div>

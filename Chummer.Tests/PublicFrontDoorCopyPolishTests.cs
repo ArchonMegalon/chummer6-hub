@@ -652,6 +652,33 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Media_and_ledger_dynamic_templates_clean_public_copy_before_rendering()
+    {
+        string media = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "MediaArtifactHorizon.cshtml"));
+        string leaderBriefing = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerLeaderBriefing.cshtml"));
+        string factionWorkspace = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
+
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Intro)", media, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)", media, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(document.Summary)", media, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"page-copy\">@Model.Intro</p>", media, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.ConnectedLanePacket.Summary</p>", media, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@document.Summary</p>", media, StringComparison.Ordinal);
+
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.Summary)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.BoundaryLine)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.Summary)", leaderBriefing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.GmCockpitPacket.Summary</p>", leaderBriefing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@Model.GmCockpitPacket.BoundaryLine</p>", leaderBriefing, StringComparison.Ordinal);
+
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(signal)", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.PrivacyNote</p>", factionWorkspace, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>@signal</span>", factionWorkspace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));

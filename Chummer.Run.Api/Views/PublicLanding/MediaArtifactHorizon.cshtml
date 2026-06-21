@@ -7,20 +7,20 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
             {
-                <span>@point</span>
+                <span>@PublicFacingCopyHumanizer.Clean(point)</span>
             }
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.TertiaryAction.Label)</a>
     </div>
 </section>
 
@@ -28,7 +28,7 @@
     <div class="continuity-band__copy">
         <p class="eyebrow">Limits</p>
         <h2 class="editorial-title">Files, with the limits clearly stated.</h2>
-        <p class="editorial-copy">@Model.BoundaryLine</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.BoundaryLine)</p>
     </div>
 </section>
 
@@ -37,21 +37,21 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Connected page</p>
-            <h2 class="editorial-title">@Model.ConnectedLanePacket.Heading</h2>
-            <p class="editorial-copy">@Model.ConnectedLanePacket.Summary</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Heading)</h2>
+            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var cue in Model.ConnectedLanePacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@cue.StatusLabel</span>
-                    <h3>@cue.Label</h3>
-                    <p>@cue.Summary</p>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</span>
+                    <h3>@PublicFacingCopyHumanizer.Clean(cue.Label)</h3>
+                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <a class="editorial-strip__action" href="@cue.Href">Open page</a>
                 </article>
             }
         </div>
-        <p class="editorial-copy">@Model.ConnectedLanePacket.BoundaryLine</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.BoundaryLine)</p>
     </section>
 }
 
@@ -66,12 +66,12 @@
         {
             <article class="route-choice-card">
                 <span class="tag">Live</span>
-                <h3>@document.Label</h3>
-                <p>@document.Summary</p>
+                <h3>@PublicFacingCopyHumanizer.Clean(document.Label)</h3>
+                <p>@PublicFacingCopyHumanizer.Clean(document.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var highlight in document.Highlights)
                     {
-                        <span>@highlight</span>
+                        <span>@PublicFacingCopyHumanizer.Clean(highlight)</span>
                     }
                 </div>
                 <div class="stacked-actions">

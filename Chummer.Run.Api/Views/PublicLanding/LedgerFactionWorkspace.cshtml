@@ -7,9 +7,9 @@
 
 <section class="ledger-flagship ledger-flagship--workspace">
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
+        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
         <div class="trust-claim__details">
             <span>Signed-in page</span>
@@ -42,7 +42,7 @@
             {
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
                     <span class="tag">Tab</span>
-                    <strong>@tab.Label</strong>
+                    <strong>@PublicFacingCopyHumanizer.Clean(tab.Label)</strong>
                 <p>@(tab.Current ? "Current workspace." : "Open this faction workspace section.")</p>
                 </a>
             }
@@ -54,12 +54,12 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Workspace tabs</p>
         <h2 class="editorial-title">Faction management stays signed in.</h2>
-        <p class="editorial-copy">@Model.PrivacyNote</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)</p>
     </div>
     <div class="trust-claim__details" aria-label="Faction workspace tabs">
         @foreach (var tab in Model.Tabs)
         {
-            <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{tab.Label} (current)" : tab.Label)</a>
+            <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{PublicFacingCopyHumanizer.Clean(tab.Label)} (current)" : PublicFacingCopyHumanizer.Clean(tab.Label))</a>
         }
     </div>
 </section>
@@ -76,8 +76,8 @@
             @foreach (var cue in Model.ConnectedLanePacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@cue.StatusLabel</span>
-                    <h3>@cue.Label</h3>
+                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</span>
+                    <h3>@PublicFacingCopyHumanizer.Clean(cue.Label)</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
                     <a class="editorial-strip__action" href="@cue.Href">Open</a>
                 </article>
@@ -100,7 +100,7 @@
             <div class="route-choice-card__details">
                 @foreach (var signal in Model.Faction.PublicSignals)
                 {
-                    <span>@signal</span>
+                    <span>@PublicFacingCopyHumanizer.Clean(signal)</span>
                 }
             </div>
         </article>
