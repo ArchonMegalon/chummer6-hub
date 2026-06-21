@@ -91,6 +91,7 @@ MATERIALIZERS = [
     ["python3", "scripts/materialize_external_distribution_mirror_proof.py", "--base-url", os.environ.get("CHUMMER_PUBLIC_BASE_URL", "http://127.0.0.1:8091")],
     ["python3", "scripts/verify_public_copy_leak_gate.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/ui_layout_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
+    ["python3", "scripts/verify_minimal_experience_gate.py", "--base-url", DEFAULT_BASE_URL, "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/materialize_design_quality_gate.py"],
     ["python3", "scripts/verify_windows_installer_visual_audit.py"],
     ["python3", "scripts/materialize_operator_release_dashboard.py"],

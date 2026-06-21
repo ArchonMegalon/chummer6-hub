@@ -141,14 +141,34 @@ def build_payload() -> dict[str, Any]:
 
     ltd_optimization_stack = load_json(LTD_OPTIMIZATION_STACK_PATH)
     ltd_optimization_stack_pass = status_pass(ltd_optimization_stack) and not ltd_optimization_stack.get("failures")
+    ltd_checks = ltd_optimization_stack.get("checks") if isinstance(ltd_optimization_stack.get("checks"), dict) else {}
+    icanpreneur_check = ltd_checks.get("icanpreneur_discovery_interview") if isinstance(ltd_checks.get("icanpreneur_discovery_interview"), dict) else {}
+    icanpreneur_design_lane_pass = (
+        ltd_optimization_stack_pass
+        and bool(icanpreneur_check.get("pass"))
+        and str(icanpreneur_check.get("status") or "").strip().lower() == "tracked"
+        and str(icanpreneur_check.get("lane_status") or "").strip().lower() == "pass"
+        and icanpreneur_check.get("license_tier") == "Tier 3"
+        and icanpreneur_check.get("runtime_ready") is False
+    )
     if not ltd_optimization_stack_pass:
         failures.append("LTD optimization stack is missing or failing")
+    if not icanpreneur_design_lane_pass:
+        failures.append("Icanpreneur discovery lane is missing from the design-quality LTD stack")
     checks["ltd_optimization_stack"] = {
         "path": str(LTD_OPTIMIZATION_STACK_PATH),
         "status": ltd_optimization_stack.get("status", "missing"),
         "verdict": ltd_optimization_stack.get("verdict"),
         "failure_count": len(ltd_optimization_stack.get("failures") or []),
         "pass": ltd_optimization_stack_pass,
+    }
+    checks["icanpreneur_design_lane"] = {
+        "path": str(LTD_OPTIMIZATION_STACK_PATH),
+        "status": icanpreneur_check.get("status", "missing"),
+        "lane_status": icanpreneur_check.get("lane_status", "missing"),
+        "license_tier": icanpreneur_check.get("license_tier"),
+        "runtime_ready": icanpreneur_check.get("runtime_ready"),
+        "pass": icanpreneur_design_lane_pass,
     }
 
     ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"

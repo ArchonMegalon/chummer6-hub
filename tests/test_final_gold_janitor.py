@@ -34,6 +34,15 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("icanpreneur_discovery_lane", module.REQUIRED_RECEIPTS)
         self.assertIn("icanpreneur_discovery_lane", module.FRESHNESS_REQUIRED_GATES)
 
+    def test_materializers_build_minimal_experience_before_design_gate(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        minimal_index = next(index for index, command in enumerate(commands) if "scripts/verify_minimal_experience_gate.py" in command)
+        design_index = commands.index("python3 scripts/materialize_design_quality_gate.py")
+
+        self.assertLess(minimal_index, design_index)
+
     def test_payload_uses_current_v20_root(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             module = load_module()
