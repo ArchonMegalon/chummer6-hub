@@ -876,3 +876,32 @@ def test_package_pages_use_page_language_instead_of_route_language() -> None:
     assert "Next step" in package_receipt
     assert "Return to the package page" in package_receipt
     assert "Package history stays attached to this package page." in package_detail
+
+
+def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
+    mobile = read("Chummer.Run.Api/Views/PublicLanding/MobileProjection.cshtml")
+    knowledge = read("Chummer.Run.Api/Views/PublicLanding/KnowledgeFabric.cshtml")
+    anarchy = read("Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml")
+    combined = "\n".join((mobile, knowledge, anarchy))
+
+    for forbidden in (
+        "app route",
+        "continuity route",
+        "routes converge",
+        "This route keeps rule answers",
+        "Chummer packet, not book text",
+        "This route reads Chummer dispatches",
+        "portable packet",
+        "Portable runner packet",
+        "provenance attached",
+    ):
+        assert forbidden not in combined
+
+    assert "app page, manifest, and service worker" in mobile
+    assert "continuity page" in mobile
+    assert "entry points meet in one shell" in mobile
+    assert "This page keeps rule answers short" in knowledge
+    assert "Chummer export, not book text" in anarchy
+    assert "This page reads Chummer dispatches" in anarchy
+    assert "Chummer owns the portable export" in anarchy
+    assert "Portable runner export" in anarchy

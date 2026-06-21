@@ -13,7 +13,7 @@
         <div class="trust-claim__details">
             <span>@Model.ScopeLabel</span>
             <span>@PublicFacingCopyHumanizer.Clean(Model.VerdictLabel)</span>
-            <span>Chummer packet, not book text</span>
+            <span>Chummer export, not book text</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -107,7 +107,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Dispatch-compatible path</p>
             <h2 class="editorial-title">The same public-safe dispatches can power Anarchy play.</h2>
-            <p class="editorial-copy">This route reads Chummer dispatches and applies an Anarchy lens. It does not invent separate unsupported fiction.</p>
+            <p class="editorial-copy">This page reads Chummer dispatches and applies an Anarchy lens. It does not invent separate unsupported fiction.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var dispatch in Model.Dispatches)
@@ -126,8 +126,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Explain and export</p>
-        <h2 class="editorial-title">Chummer owns the portable packet.</h2>
-        <p class="editorial-copy">The preview export stays Chummer-owned JSON with provenance attached. Adapters may draft around it later, but they do not become publication authority.</p>
+        <h2 class="editorial-title">Chummer owns the portable export.</h2>
+        <p class="editorial-copy">The preview export stays Chummer-owned JSON with context attached. Adapters may draft around it later, but they do not become publication authority.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -143,7 +143,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">JSON export</span>
-            <h3>Portable runner packet</h3>
+            <h3>Portable runner export</h3>
             <pre class="code-panel__value mono-receipt">@Model.ExportJson</pre>
         </article>
     </div>
