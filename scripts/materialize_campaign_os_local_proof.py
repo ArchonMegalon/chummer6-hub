@@ -150,7 +150,7 @@ REQUIRED_MARKERS = {
         'homeSource.Contains("@workspace.ActiveSceneSummary"',
         'homeSource.Contains("@workspace.NextSafeAction"',
         'workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1',
-        'accountSource.Contains("Authority: @HumanizeStatus(receipt.Authority, \\"hub\\")"',
+        'accountSource.Contains("From @HumanizeStatus(receipt.Authority, \\"Chummer\\")"',
         'accountSource.Contains("@receipt.RecoveryHint"',
         'accountSource.Contains("Continue is blocked until this receipt is resolved."',
         'consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, "heat", StringComparison.Ordinal)',
