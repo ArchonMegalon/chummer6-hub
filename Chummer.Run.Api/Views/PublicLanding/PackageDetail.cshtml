@@ -43,10 +43,10 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicPackageText(Model.PrimaryAction.Label)</a>
         @if (Model.SecondaryAction is not null)
         {
-            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@PublicPackageText(Model.SecondaryAction.Label)</a>
         }
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
@@ -106,13 +106,13 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Vote</span>
-            <h3>@Model.VoteActionLabel</h3>
+            <h3>@PublicPackageText(Model.VoteActionLabel)</h3>
             <p>Package votes stay in Chummer and stay tied to compatibility.</p>
             @if (Model.CanInteract)
             {
                 <form method="post" action="@Model.VoteActionHref">
                     @Html.AntiForgeryToken()
-                    <button class="button-like button-like--primary" type="submit">@Model.VoteActionLabel</button>
+                    <button class="button-like button-like--primary" type="submit">@PublicPackageText(Model.VoteActionLabel)</button>
                 </form>
                 @if (Model.CanRevokeVote && !string.IsNullOrWhiteSpace(Model.RevokeVoteActionHref))
                 {
@@ -124,7 +124,7 @@
             }
             else
             {
-                <a class="button-like button-like--primary" href="@Model.VoteActionHref">@Model.VoteActionLabel</a>
+                <a class="button-like button-like--primary" href="@Model.VoteActionHref">@PublicPackageText(Model.VoteActionLabel)</a>
             }
             @if (Model.LatestVoteReceipt is not null)
             {
@@ -133,13 +133,13 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Follow</span>
-            <h3>@Model.FollowActionLabel</h3>
+            <h3>@PublicPackageText(Model.FollowActionLabel)</h3>
             <p>Package follows stay on the same Chummer page as later compatibility or release updates.</p>
             @if (Model.CanInteract)
             {
                 <form method="post" action="@Model.FollowActionHref">
                     @Html.AntiForgeryToken()
-                    <button class="button-like button-like--secondary" type="submit">@Model.FollowActionLabel</button>
+                    <button class="button-like button-like--secondary" type="submit">@PublicPackageText(Model.FollowActionLabel)</button>
                 </form>
                 @if (Model.CanRevokeFollow && !string.IsNullOrWhiteSpace(Model.RevokeFollowActionHref))
                 {
@@ -151,7 +151,7 @@
             }
             else
             {
-                <a class="button-like button-like--secondary" href="@Model.FollowActionHref">@Model.FollowActionLabel</a>
+                <a class="button-like button-like--secondary" href="@Model.FollowActionHref">@PublicPackageText(Model.FollowActionLabel)</a>
             }
             @if (Model.LatestFollowReceipt is not null)
             {
@@ -182,7 +182,7 @@
             {
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>@PublicPackageText(receipt.ActionLabel) · @receipt.ActorLabel</h3>
+                        <h3>@PublicPackageText(receipt.ActionLabel) · @PublicPackageText(receipt.ActorLabel)</h3>
                         <p>@PublicPackageText(receipt.RouteSummary)</p>
                         <p>@receipt.RecordedAtLabel</p>
                     </div>

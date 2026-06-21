@@ -664,6 +664,18 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "Your recent package activity" in packages
     assert "Recent activity" in package_detail
     assert "Open activity" in package_detail
+    assert "@PublicPackageText(receipt.ActorLabel)" in packages
+    assert "@PublicPackageText(Model.PrimaryAction.Label)" in package_detail
+    assert "@PublicPackageText(Model.SecondaryAction.Label)" in package_detail
+    assert "@PublicPackageText(Model.VoteActionLabel)" in package_detail
+    assert "@PublicPackageText(Model.FollowActionLabel)" in package_detail
+    assert "@PublicPackageText(receipt.ActorLabel)" in package_detail
+    assert "@receipt.ActorLabel" not in packages
+    assert "@receipt.ActorLabel" not in package_detail
+    assert "@Model.PrimaryAction.Label" not in package_detail
+    assert "@Model.SecondaryAction.Label" not in package_detail
+    assert "@Model.VoteActionLabel" not in package_detail
+    assert "@Model.FollowActionLabel" not in package_detail
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Details</span>" in publication
     assert "related detail" in publication
