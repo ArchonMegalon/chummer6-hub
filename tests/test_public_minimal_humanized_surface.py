@@ -1657,6 +1657,29 @@ def test_public_detail_page_uses_account_language_instead_of_signed_in_labels() 
         assert forbidden not in shelf
 
 
+def test_public_publication_page_uses_account_return_language() -> None:
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+
+    for expected in (
+        "Open account return view",
+        "Create account for account return",
+        "Use the account return view",
+        "Account return keeps public and private returns together",
+        "Choose gallery, downloads, account return, or help on purpose.",
+    ):
+        assert expected in publication
+
+    for forbidden in (
+        "Open signed-in account return view",
+        "Create account for signed-in account return",
+        "Use the signed-in detail view",
+        "Signed-in account return keeps public and private returns together",
+        "signed-in account-return view",
+        "Choose gallery, downloads, signed-in account return, or help on purpose.",
+    ):
+        assert forbidden not in publication
+
+
 def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> None:
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")

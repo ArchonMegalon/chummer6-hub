@@ -67,9 +67,9 @@
         ?? Model.BoundedFailureReason
         ?? "No visible publication history is attached to this public page yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in account return view" : "Create account for signed-in account return";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open account return view" : "Create account for account return";
     var signedInShelfSummary = Model.Chrome.Authenticated
-        ? "Use the signed-in detail view when you want personal, campaign, creator, and public returns to stay in one calmer place."
+        ? "Use the account return view when you want personal, campaign, creator, and public returns to stay in one calmer place."
         : "Public discovery works without an account. Sign in only when you want private account return, campaign return, and creator next steps in one place.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
@@ -104,10 +104,10 @@
         },
         new
         {
-            Badge = "Signed-in account return",
+            Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Signed-in account return keeps public and private returns together"
-                : "Create the account only when you want the signed-in account-return view too",
+                ? "Account return keeps public and private returns together"
+                : "Create the account only when you want the account-return view too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
@@ -139,7 +139,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Choose gallery, downloads, signed-in account return, or help on purpose.</h2>
+        <h2 class="editorial-title">Choose gallery, downloads, account return, or help on purpose.</h2>
         <p class="editorial-copy">A publication detail page should make origin, comparison, and the next step clear. It should not pretend to be the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">

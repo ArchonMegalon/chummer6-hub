@@ -396,7 +396,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("detail view", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", shelfView, StringComparison.Ordinal);
 
-        Assert.Contains("Use the signed-in detail view", creatorView, StringComparison.Ordinal);
+        Assert.Contains("Use the account return view", creatorView, StringComparison.Ordinal);
         Assert.Contains("creator next steps", creatorView, StringComparison.Ordinal);
         Assert.DoesNotContain("artifacts shelf", creatorView, StringComparison.Ordinal);
     }
@@ -1128,7 +1128,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string publicationViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml");
         string publicationView = File.ReadAllText(publicationViewPath);
 
-        Assert.Contains("Choose gallery, downloads, signed-in account return, or help on purpose.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Choose gallery, downloads, account return, or help on purpose.", publicationView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", publicationView, StringComparison.Ordinal);
         Assert.Contains("Stay in the gallery when you want history, origin, or comparison", publicationView, StringComparison.Ordinal);
         Assert.Contains("Leave this page when the next job is installing the product", publicationView, StringComparison.Ordinal);
