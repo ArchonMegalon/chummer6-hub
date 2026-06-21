@@ -1309,6 +1309,30 @@ def test_home_page_cleans_primary_and_coverage_dynamic_copy() -> None:
         assert forbidden not in home
 
 
+def test_home_page_uses_account_language_for_return_surface_copy() -> None:
+    home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
+
+    for expected in (
+        "Keep account access and work sections in the shared side panel.",
+        "Account continuity cockpit",
+        "The account cockpit answers this first",
+        "Account flagship coverage",
+        "account home view",
+        "account reaction fallout",
+    ):
+        assert expected in home
+
+    for forbidden in (
+        "Keep signed-in access and work sections in the shared side panel.",
+        "Signed-in continuity cockpit",
+        "The signed-in cockpit answers",
+        "Signed-in flagship coverage",
+        "signed-in home view",
+        "signed-in reaction fallout",
+    ):
+        assert forbidden not in home
+
+
 def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
     lookup = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsLookup.cshtml")
     leaderboards = read("Chummer.Run.Api/Views/Leaderboards/Index.cshtml")

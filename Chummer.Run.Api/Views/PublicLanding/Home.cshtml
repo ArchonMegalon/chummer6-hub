@@ -12,7 +12,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-home";
     ViewData["ContextSidebarHeading"] = "Home sections";
-    ViewData["ContextSidebarSummary"] = "Keep signed-in access and work sections in the shared side panel.";
+    ViewData["ContextSidebarSummary"] = "Keep account access and work sections in the shared side panel.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -322,7 +322,7 @@
     @Html.AntiForgeryToken()
 </div>
 
-<section class="home-cockpit-strip" aria-label="Signed-in continuity cockpit">
+<section class="home-cockpit-strip" aria-label="Account continuity cockpit">
     <div class="home-cockpit-strip__lead">
         <p class="eyebrow">Continuity cockpit</p>
         <h2>@homeContinuityHeadline</h2>
@@ -349,7 +349,7 @@
         <article class="home-cockpit-strip__fact">
             <span>What changed for me</span>
             <strong>@homeWhatChangedSummary</strong>
-            <p>The signed-in cockpit answers this first so you know whether to continue, recover, or wait.</p>
+            <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
         </article>
         <article class="home-cockpit-strip__fact">
             <span>Support and return</span>
@@ -366,7 +366,7 @@
 
 @if (showAccessSection)
 {
-    <section class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
+    <section class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
         <div class="flagship-coverage__lead">
             <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
             <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
@@ -395,7 +395,7 @@ else
             {
                 @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
             }
-            <div class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
+            <div class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
                 <div class="flagship-coverage__lead">
                     <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
                     <h2 class="editorial-title">Everything you need in one place.</h2>
@@ -570,7 +570,7 @@ else
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
                                         @* Campaign workspace. GM readiness cues. *@
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, Rule environments, and GM readiness cues so the signed-in home view points to the next safe page without turning Home into a deeper work page.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, Rule environments, and GM readiness cues so the account home view points to the next safe page without turning Home into a deeper work page.</p>
                                         <p class="muted-copy">Campaign workspace return, rules answers, Device roles, Rule environments, and GM readiness cues stay visible here before you open the deeper account work page.</p>
                                     </div>
                                     <div class="app-rail">
@@ -810,7 +810,7 @@ else
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
                                                                 @leadAftermathPackage.Summary
-                                                                <span> Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace, not in a disconnected recap.</span>
+                                                                <span> Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace, not in a disconnected recap.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
                                                                 {
                                                                     <span> Note: @leadAftermathEvidence</span>

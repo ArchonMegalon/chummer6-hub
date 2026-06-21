@@ -66,8 +66,8 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             home_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
             home_path.write_text(
                 home_path.read_text(encoding="utf-8").replace(
-                    "Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
-                    "Table Pulse aftermath: signed-in reaction fallout stays available",
+                    "Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
+                    "Table Pulse aftermath: account reaction fallout stays available",
                     1,
                 ),
                 encoding="utf-8",
@@ -77,7 +77,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
+            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
             result.stderr,
         )
 

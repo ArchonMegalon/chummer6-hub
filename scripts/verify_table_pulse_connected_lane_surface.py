@@ -29,13 +29,13 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Open aftermath",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": (
-        "Table Pulse aftermath: signed-in reaction fallout stays on the same reviewed workspace",
+        "Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
         "Open aftermath and return",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
         "Same return view",
         "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
-        "Table Pulse Aftermath return items that stay in this signed-in view",
+        "Table Pulse Aftermath return items that stay in this account view",
     ),
     "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
         "Connected workspace section",
@@ -43,7 +43,7 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (
         "<p class=\"eyebrow\">Connected page</p>",
-        "@Model.ConnectedLanePacket.BoundaryLine",
+        "@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.BoundaryLine)",
     ),
 }
 
