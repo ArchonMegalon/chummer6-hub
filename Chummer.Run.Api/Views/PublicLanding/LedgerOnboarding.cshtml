@@ -34,7 +34,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <p class="ledger-flagship__support">Choose on the globe first. The faction should feel like a country with pressure, territory, and visible consequence before you ever hit a form.</p>
-        <div class="trust-claim__microproof" aria-label="Onboarding steps">
+        <div class="trust-claim__details" aria-label="Onboarding steps">
             @foreach (var step in Model.Steps)
             {
                 <a class="inline-link" href="@step.Href">@(step.Current ? $"{step.Label} (current)" : step.Complete ? $"{step.Label} (complete)" : step.Label)</a>
@@ -124,7 +124,7 @@
                         }
                     </div>
                     <p class="muted-copy">@faction.Summary</p>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <span>Safety: no private table data</span>
                         <span>Video: first-party motion</span>
                         <span>Join path: account-wide</span>

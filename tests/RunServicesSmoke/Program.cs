@@ -2092,7 +2092,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
     Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter path from the first playable session truth already attached to the campaign spine.");
     Assert(landingSource.Contains("Open first session on Home", StringComparison.Ordinal), "landing should keep a direct signed-in first-session route instead of forcing repo knowledge.");
-    Assert(landingSource.Contains("Open first playable session proof", StringComparison.Ordinal), "landing should keep a direct route from the front door into the bounded first-session proof drawer.");
+    Assert(landingSource.Contains("Open first playable session", StringComparison.Ordinal), "landing should keep a direct route from the front door into the first-session detail.");
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter path should reuse signed-in fix-availability truth instead of tutorial prose.");
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter path should reuse signed-in caution truth instead of tutorial prose.");
     Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter path should keep install-support follow-through on the same front-door rail.");
@@ -2203,7 +2203,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
     Assert(homeSource.Contains("var leadPortableExchangeNotice =", StringComparison.Ordinal), "home work should derive a dedicated portable-exchange notice from the bounded workspace server plane.");
     Assert(homeSource.Contains("Portable exchange:", StringComparison.Ordinal), "home work should surface portable exchange explicitly instead of hiding it inside a generic notice lane.");
-    Assert(homeSource.Contains("Open first playable session proof", StringComparison.Ordinal), "home work should keep a direct route into the bounded first-session proof detail.");
+    Assert(homeSource.Contains("Open first playable session", StringComparison.Ordinal), "home work should keep a direct route into the first-session detail.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface the first-session campaign-start summary directly from the server plane.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly from the bounded first-session projection.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly from the bounded first-session projection.");
@@ -2401,7 +2401,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Recent aftermath and replay packages", StringComparison.Ordinal), "account work should keep generated aftermath and replay packages visible on the selected campaign card.");
     Assert(accountSource.Contains("<option value=\"replay_timeline\">Replay timeline</option>", StringComparison.Ordinal), "account work should let operators generate replay timelines from the same governed package rail.");
     Assert(shelfSource.Contains("aftermath or replay follow-through", StringComparison.Ordinal), "signed-in artifact shelf should describe the campaign lane with replay-safe follow-through instead of recap-only wording.");
-    Assert(shelfSource.Contains("live aftermath, replay, and linked creator-publication record", StringComparison.Ordinal), "signed-in artifact shelf should describe the all-views lane with replay-safe outputs instead of recap-only wording.");
+    Assert(shelfSource.Contains("live aftermath, replay, and linked creator-publication history", StringComparison.Ordinal), "signed-in artifact shelf should describe the all-views lane with replay-safe outputs instead of recap-only wording.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -2435,7 +2435,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account work should render the restore receipt recovery summary instead of leaving recoverability implicit.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account work should expose a direct recovery-route action for the lead restore receipt instead of leaving the route as inert text.");
     Assert(accountSource.Contains("Restore provenance and conflict receipts", StringComparison.Ordinal), "account work should expose a dedicated restore provenance/conflict receipt drawer on the selected workspace card.");
-    Assert(accountSource.Contains("Authority: @HumanizeStatus(receipt.Authority, \"hub\")", StringComparison.Ordinal), "account work should render restore receipt authority instead of hiding which plane issued the continuity proof.");
+    Assert(accountSource.Contains("From @HumanizeStatus(receipt.Authority, \"Chummer\")", StringComparison.Ordinal), "account work should render restore receipt source instead of hiding which Chummer area issued the continuity note.");
     Assert(accountSource.Contains("@receipt.RecoveryHint", StringComparison.Ordinal), "account work should render the concrete restore recovery hint on provenance receipts.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(recovery.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each provenance recovery receipt.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(receipt.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each conflict receipt.");
@@ -2514,7 +2514,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@op.CampaignReturnSummary", StringComparison.Ordinal), "account teams and permissions should surface the campaign-return pulse directly from the shared projection.");
     Assert(accountSource.Contains("Season / event pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class season and event pulse instead of treating larger organizer work as implicit.");
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
-    Assert(accountSource.Contains("Artifact publication", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer artifact-publication posture on the operator rail.");
+    Assert(accountSource.Contains("Publication status", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer publication posture on the operator rail.");
     Assert(accountSource.Contains("@op.ArtifactPublicationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer artifact-publication posture directly from the shared projection.");
     Assert(accountSource.Contains("Support escalation", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer support-escalation posture on the operator rail.");
     Assert(accountSource.Contains("@op.SupportEscalationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer support-escalation posture directly from the shared projection.");

@@ -42,7 +42,7 @@
             Summary = "Use Chummer help when the problem needs logs, recovery, support history, or any private account or campaign detail that should not sit on a public board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
-            Details = new[] { "Setup help", "Account help", "Private by default" }
+            Details = new[] { "Setup help", "Account help", "Private reply" }
         }
     };
     var feedbackStages = new[]
@@ -97,7 +97,7 @@
         new
         {
             Badge = "Account value",
-            Title = "Create the account only when tracked follow-up becomes useful",
+            Title = "Create the account only when support history becomes useful",
             Summary = "Roadmap follows, support history, device return, and future install return all get calmer once they can come back to one account place.",
             Href = followSettingsHref,
             Label = Model.Chrome.Authenticated ? "Open account settings" : "Create account for follow-up"
@@ -167,7 +167,7 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
                         <span>@item</span>

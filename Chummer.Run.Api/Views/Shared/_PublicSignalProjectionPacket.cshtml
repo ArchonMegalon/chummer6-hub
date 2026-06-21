@@ -93,7 +93,7 @@
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
             <h3>Open first-party fallback</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>Role: @Model.Role</span>
                 <span>Public page: @Model.PublicPath</span>
                 <span>Chummer path: @Model.FallbackPath</span>
@@ -126,7 +126,7 @@
             <p>Public signal can move into review tracks, but it cannot become support, roadmap, or release status by itself.</p>
             @if (decisionRoutes.Length > 0)
             {
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var route in decisionRoutes)
                     {
                         <span>@SanitizeProjectionText(route)</span>
@@ -159,7 +159,7 @@
             <p>These links keep feedback connected to product review without turning public comments into promises.</p>
             @if (sourceReceipts.Length > 0)
             {
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var receipt in sourceReceipts)
                     {
                         <span>@receipt</span>

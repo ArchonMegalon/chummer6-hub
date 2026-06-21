@@ -55,7 +55,7 @@
             <span class="tag">Campaign</span>
             <h3>@Model.CampaignName</h3>
             <p>Session id: <code class="mono-receipt">@Model.SessionId</code></p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>Campaign data stays in Chummer</span>
                 <span>Runner sheets stay out of room links</span>
                 <span>GM secrets stay private</span>
@@ -65,8 +65,8 @@
             <span class="tag">Room link</span>
             <h3>@(string.IsNullOrWhiteSpace(Model.ProviderRoomUrl) ? "Manual room link not configured yet" : "Room available to signed-in participants")</h3>
             <p>@Model.FallbackMessage</p>
-            <div class="route-choice-card__proof">
-                <span>Private by default</span>
+            <div class="route-choice-card__details">
+                <span>Private reply</span>
                 <span>No public room disclosure</span>
                 <span>Manual fallback required</span>
             </div>
@@ -75,7 +75,7 @@
             <span class="tag">Closeout</span>
             <h3>@(Model.LatestRecapStatus ?? "No closeout recap yet")</h3>
             <p>Attendance sync remains consent-gated and optional.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>Attendee sync status: @Model.AttendeeSyncStatus</span>
                 <span>Consent status: @Model.ConsentStatus</span>
                 <span>Campaign continuity stays in Chummer</span>

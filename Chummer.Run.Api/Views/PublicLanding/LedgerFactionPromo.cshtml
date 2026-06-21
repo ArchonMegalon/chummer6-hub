@@ -14,7 +14,7 @@
         <p class="eyebrow">Faction war bulletin</p>
         <h1 class="editorial-title">@Model.Heading</h1>
         <p class="editorial-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)</span>
             <span>Format: @PublicFacingCopyHumanizer.Clean(Model.Promo.RenderMode)</span>
             <span>Fallback: @PublicFacingCopyHumanizer.Clean(Model.Promo.FallbackRenderMode)</span>
@@ -36,7 +36,7 @@
         <p class="editorial-copy">@Model.Promo.StorylineSummary</p>
     </div>
     <div id="promo-player" class="route-choice-card" data-storyboard-player>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Mode: @Model.Promo.PlaybackLabel</span>
             <span>Captions: included</span>
             <span>Narration: @PublicFacingCopyHumanizer.Clean(Model.Promo.NarratorPosture)</span>
@@ -52,7 +52,7 @@
             <track kind="captions" src="@Model.Promo.CaptionsHref" srclang="en" label="English" default />
             Your browser cannot play this video here.
         </video>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Fallback mode: storyboard bulletin</span>
             <span>Captions: included</span>
         </div>
@@ -74,7 +74,7 @@
                 </article>
             }
         </div>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @for (int index = 0; index < Model.Promo.CaptionLines.Count; index += 1)
             {
                 <span>Caption @(index + 1): @Model.Promo.CaptionLines[index]</span>

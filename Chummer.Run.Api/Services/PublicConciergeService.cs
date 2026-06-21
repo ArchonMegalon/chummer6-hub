@@ -417,7 +417,7 @@ public sealed class PublicConciergeService
                 "Public feedback"),
             ("contact", "private_support") => new ConciergeBranchPresentation(
                 "This needs private support",
-                "Keep logs, account detail, and tracked follow-up on the private support path.",
+                "Keep logs, account detail, and support history on the private support path.",
                 "Open private support",
                 "secondary",
                 "Private support"),

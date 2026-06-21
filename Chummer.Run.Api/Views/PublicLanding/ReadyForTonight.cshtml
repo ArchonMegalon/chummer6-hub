@@ -10,7 +10,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
             {
                 <span>@PublicFacingCopyHumanizer.Clean(point)</span>
@@ -44,7 +44,7 @@
                 <span class="tag">@verdict.RoleLabel</span>
                 <h3>@verdict.StatusLabel</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(verdict.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>Status: @verdict.Status</span>
                     <span>Next: @verdict.NextBestScreen</span>
                 </div>
@@ -68,7 +68,7 @@
                         <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
                     }
                 </div>
-                <div class="trust-claim__microproof">
+                <div class="trust-claim__details">
                     @foreach (var detail in verdict.ProofReceipts)
                     {
                         <span>@PublicFacingCopyHumanizer.Clean(detail)</span>
@@ -92,7 +92,7 @@
                 <span class="tag">@kit.RoleLane</span>
                 <h3>@kit.Label</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(kit.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in kit.Highlights)
                     {
                         <span>@PublicFacingCopyHumanizer.Clean(item)</span>

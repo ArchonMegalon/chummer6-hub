@@ -33,7 +33,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Submission saved</span>
             <span>@Model.TrackTitle</span>
             <span>@queueStatusLabel</span>
@@ -94,7 +94,7 @@
                 <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
                 <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>Step saved</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
                 </div>

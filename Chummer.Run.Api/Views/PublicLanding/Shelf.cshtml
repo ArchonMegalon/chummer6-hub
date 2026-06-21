@@ -8,7 +8,7 @@
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     // Public parity claims remain review-required until current direct parity proof receipts are green.
     // .Replace( legacy source marker: The signed-in view is the return rail for Table Pulse Aftermath )
-    // .Replace( legacy source marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together )
+    // .Replace( legacy source marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together )
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
     var selectedSignedInArtifactView = Model.SignedInArtifactView;
@@ -175,7 +175,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and background, then go back to downloads when you actually want the build.</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
             <span>@previewItems.Length opening next</span>
             @if (publicationRouteReviewRequired)
@@ -208,7 +208,7 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
@@ -234,7 +234,7 @@
                     <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
                     <p>You can inspect the publication and background today. The remaining limit is about how broadly the public page should compare it, not whether the publication exists.</p>
                     <p>Public comparison language stays limited until the current review is finished.</p>
-                    <div class="route-callout__proof">
+                    <div class="route-callout__details">
                         <span>Discoverable now</span>
                         <span>Comparison still reviewed</span>
                         <span>No fake closure</span>
@@ -250,7 +250,7 @@
                         <span class="tag">Shared publication</span>
                         <h3>@publication.Title</h3>
                         <p>@publication.Summary</p>
-                        <div class="trust-claim__microproof">
+                        <div class="trust-claim__details">
                             <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
@@ -340,7 +340,7 @@
                         <span class="tag">Signed-in history</span>
                         <h3>@item.Label</h3>
                         <p>@item.Summary</p>
-                        <div class="trust-claim__microproof">
+                        <div class="trust-claim__details">
                             <span>@PublicSurfaceStatus.AudienceLabel(item.Audience)</span>
                             @if (!string.IsNullOrWhiteSpace(item.PublicationState))
                             {
@@ -402,7 +402,7 @@
                         <span class="tag">Creator-linked publication</span>
                         <h3>@publication.Title</h3>
                         <p>@publication.Summary</p>
-                        <div class="trust-claim__microproof">
+                        <div class="trust-claim__details">
                             <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
@@ -471,7 +471,7 @@
                         <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
-                        <div class="trust-claim__microproof">
+                        <div class="trust-claim__details">
                             <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
                             <span>@card.Action.Label</span>
                             @if (!string.IsNullOrWhiteSpace(card.Card.MicroProof))

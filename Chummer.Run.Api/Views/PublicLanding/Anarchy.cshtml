@@ -10,7 +10,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>@Model.ScopeLabel</span>
             <span>@PublicFacingCopyHumanizer.Clean(Model.VerdictLabel)</span>
             <span>Chummer packet, not book text</span>
@@ -54,7 +54,7 @@
             <span class="tag">@Model.FeaturedProfile.MetatypeOrIdentityTag</span>
             <h3>@Model.FeaturedProfile.Handle</h3>
             <p>@Model.FeaturedProfile.Notes</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var tag in Model.FeaturedProfile.ArchetypeTags)
                 {
                     <span>@tag</span>
@@ -134,7 +134,7 @@
             <span class="tag">@Model.ExplainReceipt.Status</span>
             <h3>Portable runner explanation</h3>
             <p>The export keeps enough context for Chummer to explain the sheet without showing sourcebook text.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var note in Model.ExplainReceipt.ProvenanceNotes)
                 {
                     <span>@note</span>

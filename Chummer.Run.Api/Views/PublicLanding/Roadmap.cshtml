@@ -96,7 +96,7 @@
             Summary = "Crashes, install recovery, account access, and private campaign details should move to Chummer help instead of sitting on the public roadmap or feedback board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
-            Notes = new[] { "Support-owned", "Tracked return", "Private by default" }
+            Notes = new[] { "Support owned", "Saved return", "Private reply" }
         }
     };
 }
@@ -157,7 +157,7 @@
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed the public roadmap alias</h3>
                 <p><code class="mono-receipt">/roadmap</code> is the Chummer planning page for direction and milestone pressure. It is not the changelog and it is not the support queue.</p>
-                <div class="route-callout__proof">
+                <div class="route-callout__details">
                     <span>Planning view</span>
                     <span>Feedback lives elsewhere</span>
                     <span>Shipped updates live elsewhere</span>
@@ -172,7 +172,7 @@
                 <span class="tag">@lane.Badge</span>
                 <h3>@lane.Title</h3>
                 <p>@lane.Summary</p>
-                <div class="route-choice-card__proof" aria-label="Route notes">
+                <div class="route-choice-card__details" aria-label="Route notes">
                     @foreach (var item in lane.Notes)
                     {
                         <span>@item</span>
@@ -237,7 +237,7 @@
             <span class="tag">Tracked follow-up</span>
             <h3>Follow the loop from one calmer account place when you want return paths, not just public reading.</h3>
             <p>Account-aware follow-up keeps roadmap follows, account return, and support history attached to the same shell without turning account creation into the default public ask.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>Roadmap follows</span>
                 <span>Account return</span>
                 <span>Support return</span>

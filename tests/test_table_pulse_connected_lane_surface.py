@@ -88,9 +88,8 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_path.write_text(
                 shelf_path.read_text(encoding="utf-8").replace(
-                    "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
-                    "the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together",
-                    1,
+                    "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
+                    "the artifact shelf keeps your live aftermath, replay, and linked creator-publication history together",
                 ),
                 encoding="utf-8",
             )
@@ -99,7 +98,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together",
             result.stderr,
         )
 

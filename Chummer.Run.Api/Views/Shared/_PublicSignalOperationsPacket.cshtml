@@ -24,7 +24,7 @@
             <span class="tag">Public board</span>
             <h3>@(publicSignalLive ? "Public signal is live on Chummer pages." : "Public signal is still warming up on this host.")</h3>
             <p>@Model.CategoryCount category@(Model.CategoryCount == 1 ? string.Empty : "ies") keep ideas, safe public bugs, and likely private issues separated before they blur into support or roadmap copy.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>@Model.CategoryCount public category@(Model.CategoryCount == 1 ? string.Empty : "ies")</span>
                 <span>@Model.MisrouteLikelyCount likely private-support crossover@(Model.MisrouteLikelyCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.PrivacySensitiveCount private-support item@(Model.PrivacySensitiveCount == 1 ? string.Empty : "s")</span>
@@ -35,7 +35,7 @@
             <span class="tag">Follow-up</span>
             <h3>@followThroughHeading</h3>
             <p>@followThroughSummary</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>@Model.CloseoutDispatchSentCount posted follow-up update@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.CloseoutQueueReadyCount ready follow-up candidate@(Model.CloseoutQueueReadyCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.JourneyReceiptCount follow-up signals</span>
@@ -46,7 +46,7 @@
             <span class="tag">Private help</span>
             <h3>Private help still leaves this page immediately.</h3>
             <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public board noise.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 <span>Help for private follow-up</span>
                 <span>Roadmap for planned movement</span>
                 <span>Changelog for shipped updates</span>

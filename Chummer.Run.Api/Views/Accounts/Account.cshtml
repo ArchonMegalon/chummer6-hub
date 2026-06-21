@@ -2260,7 +2260,7 @@
                                             <li>
                                                 <strong>Restore update:</strong>
                                                 @PublicText(receipt.Summary)
-                                                <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
+                                                <span>From @HumanizeStatus(receipt.Authority, "Chummer")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Proof))
                                                 {
                                                     <span>Note: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
@@ -2634,7 +2634,7 @@
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
-                                        <summary>Recap and artifact shelf</summary>
+                                        <summary>Recap files</summary>
                                         <ul class="muted-copy">
                                             @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
                                             {
@@ -3587,7 +3587,7 @@
                             @if (workspace.RecapShelf.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Recap and artifact shelf</summary>
+                                    <summary>Recap files</summary>
                                     <ul class="muted-copy">
                                         @foreach (var item in workspace.RecapShelf)
                                         {
@@ -3988,7 +3988,7 @@
                                     <strong>@op.SeasonEventSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Artifact publication</span>
+                                    <span>Publication status</span>
                                     <strong>@op.ArtifactPublicationSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -4059,7 +4059,7 @@
                                 <summary>Season &amp; event activity</summary>
                                 <ul class="muted-copy">
                                     <li>@op.SeasonEventSummary</li>
-                                    <li>Artifact publication: @op.ArtifactPublicationSummary</li>
+                                    <li>Publication status: @op.ArtifactPublicationSummary</li>
                                     <li>Support escalation: @op.SupportEscalationSummary</li>
                                     @if (op.RecentEventSummaries.Count == 0)
                                     {
@@ -4410,7 +4410,7 @@
                 </div>
                 @if (participationBadges.Length > 0)
                 {
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         @foreach (var badge in participationBadges)
                         {
                             <span>@badge.Label</span>

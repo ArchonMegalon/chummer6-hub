@@ -35,7 +35,7 @@
         <p class="eyebrow">@PublicPackageText(Model.Eyebrow)</p>
         <h1 class="page-title">@PublicPackageText(Model.Heading)</h1>
         <p class="page-copy">@PublicPackageText(Model.Intro)</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>@Model.Packages.Count package(s)</span>
             <span>@Model.Classes.Count package class(es)</span>
             <span>@PublicPackageText(Model.ScopeLabel)</span>
@@ -64,7 +64,7 @@
                 <span class="tag">Type</span>
                 <h3>@PublicPackageText(packageClass.Label)</h3>
                 <p>@PublicPackageText(packageClass.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var rule in packageClass.Rules)
                     {
                         <span>@PublicPackageText(rule)</span>
@@ -88,7 +88,7 @@
                 <span class="tag">@PublicPackageText(package.ClassLabel)</span>
                 <h3>@PublicPackageText(package.Title)</h3>
                 <p>@PublicPackageText(package.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>@PublicPackageText(package.StatusLabel)</span>
                     <span>@package.VoteCount vote(s)</span>
                     <span>@package.FollowCount follow(s)</span>

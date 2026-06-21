@@ -9352,7 +9352,7 @@ Boundary:
             Heading: "Open a first-party support case",
             Intro: authenticated
                 ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
-                : "Use the first-party intake here when you want help without another account. Create an account later if you want tracked follow-up inside Chummer.",
+                : "Use this form when you want help without another account. Create an account later if you want support history inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
@@ -9364,7 +9364,7 @@ Boundary:
             Options:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs and tracked follow-up."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
             DefaultKind: overrides.Kind,

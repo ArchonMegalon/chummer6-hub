@@ -10,7 +10,7 @@
         <p class="eyebrow">Faction leader briefing</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Leader: @Model.Digest.LeaderHandle</span>
             <span>Faction: @Model.Digest.PublicName</span>
             @if (Model.WorldTurnBriefing is not null)
@@ -75,7 +75,7 @@
             <article class="route-choice-card">
                 <span class="tag">Living Newsroom</span>
                 <p>@Model.GmCockpitPacket.LivingNewsroomSummary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <a href="@Model.GmCockpitPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
                 </div>
@@ -83,7 +83,7 @@
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
                 <p>@Model.GmCockpitPacket.AftermathSummary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <a href="@Model.GmCockpitPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
@@ -99,7 +99,7 @@
                     <span class="tag">@cue.Label</span>
                     <h3>@cue.StatusLabel</h3>
                     <p>@cue.Summary</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
                     </div>
                 </article>

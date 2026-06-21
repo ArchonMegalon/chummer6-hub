@@ -32,7 +32,7 @@ REQUIRED_SOURCE_MARKERS: dict[str, tuple[str, ...]] = {
         "Black Ledger Newsroom",
         "Open watch route",
         "Transcript",
-        "Source receipts",
+        "Details",
         "Feedback",
         "Published:",
     ),
@@ -79,7 +79,7 @@ WATCH_ROUTE_ASSET_PATTERNS: dict[str, tuple[str, str]] = {
 WATCH_ROUTE_TEXT_MARKERS: tuple[str, ...] = (
     "Black Ledger Newsroom",
     "Transcript",
-    "Source receipts",
+    "Details",
     "Feedback",
     "Published:",
 )
@@ -231,7 +231,7 @@ def main() -> int:
                 )
 
         transcript_match = re.search(r'href="([^"]+/transcript)"[^>]*>Transcript', watch_body)
-        receipts_match = re.search(r'href="([^"]+/receipts)"[^>]*>Source receipts', watch_body)
+        receipts_match = re.search(r'href="([^"]+/receipts)"[^>]*>Details', watch_body)
         transcript_route = transcript_match.group(1) if transcript_match else f"{current_watch_route}/transcript"
         receipts_route = receipts_match.group(1) if receipts_match else f"{current_watch_route}/receipts"
 

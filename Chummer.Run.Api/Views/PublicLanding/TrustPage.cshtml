@@ -22,8 +22,8 @@
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
     var policyFacts = new List<(string Tag, string Heading, string Summary, string Href)>();
-    var helpRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
-    var contactRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var helpRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
+    var contactRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
 
     string ContextualPreviewHref(string? href)
     {
@@ -83,7 +83,7 @@
                 Summary: pageSection.Body,
                 Href: ContextualPreviewHref(routeAction.Href),
                 Label: routeAction.Label,
-                Proof: Array.Empty<string>()));
+                Details: Array.Empty<string>()));
         }
     }
 
@@ -106,23 +106,23 @@
             Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public feedback page. Install failures, account issues, logs, and private campaign detail do not.",
             Href: "/feedback",
             Label: "Open feedback",
-            Proof: new[] { "Public by default", "Votes show demand", "No private logs" }));
+            Details: new[] { "Public page", "Votes show demand", "No private logs" }));
         contactRouteChoices.Add((
             Id: "right-lane",
             Badge: "Private support",
-            Title: "Use the support form when the issue needs private or account-linked follow-up",
-            Summary: "First-party support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs, support history, or a quieter follow-up loop.",
+            Title: "Use the support form when the issue needs logs or account detail",
+            Summary: "Support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs or support history.",
             Href: "#support-intake",
             Label: "Open support intake",
-            Proof: new[] { "Private reply", "Follow-up stays here", "Private by default" }));
+            Details: new[] { "Private reply", "Saved case", "Account optional" }));
         contactRouteChoices.Add((
             Id: "tracked-support",
-            Badge: "Tracked return",
+            Badge: "Saved history",
             Title: "Create an account when you want support history in one place",
-            Summary: "Guest submissions are allowed, but account-backed follow-up keeps the case, recovery state, and later replies attached to the same Chummer return path.",
+            Summary: "Guest submissions are allowed. An account keeps the case, recovery state, and later replies in one place.",
             Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
             Label: Model.SupportIntake.AccountSupportLabel,
-            Proof: new[] { "Guest allowed", "History in Account", "No outside account needed" }));
+            Details: new[] { "Guest allowed", "History in Account", "No outside account" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
             Badge: "Account return",
@@ -130,20 +130,20 @@
             Summary: installSummary,
             Href: installHref,
             Label: installRouteLabel,
-            Proof: new[]
+            Details: new[]
             {
                 Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install path",
                 "Devices & access stays simple",
-                "Account return, not claim ritual"
+                "Account return"
             }));
         contactRouteChoices.Add((
             Id: "guided-routing",
             Badge: "Guided routing",
-            Title: "Open one bounded wrapper when you want the next safe help branch first",
-            Summary: "The routing concierge keeps public feedback, private support, install return, and support follow-up separate without replacing any first-party truth lane.",
+            Title: "Open one guided page when you are not sure where to start",
+            Summary: "The guide keeps feedback, support, install return, and account help separate without making you choose from a long list.",
             Href: "/contact/concierge",
             Label: "Open concierge",
-            Proof: new[] { "Optional", "Simple fallback", "Help stays visible" }));
+            Details: new[] { "Optional", "Simple fallback", "Help stays visible" }));
     }
 }
 
@@ -154,7 +154,7 @@
         <p class="@(helpPage ? string.Empty : "page-copy")">@Model.Intro</p>
         @if (!helpPage && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
         {
-            <div class="trust-claim__microproof">
+            <div class="trust-claim__details">
                 @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate))
                 {
                     <span>Effective @Model.EffectiveDate</span>
@@ -167,7 +167,7 @@
         }
         @if (!policyPage && !helpPage && Model.SummaryPoints is { Count: > 0 })
         {
-            <div class="trust-claim__microproof">
+            <div class="trust-claim__details">
                 @foreach (var point in Model.SummaryPoints)
                 {
                     <span>@point</span>
@@ -447,8 +447,8 @@ else if (!contactPage)
                         <span class="tag">@choice.Badge</span>
                         <h3>@choice.Title</h3>
                         <p>@choice.Summary</p>
-                        <div class="route-choice-card__proof">
-                            @foreach (var item in choice.Proof)
+                        <div class="route-choice-card__details">
+                            @foreach (var item in choice.Details)
                             {
                                 <span>@item</span>
                             }

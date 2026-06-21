@@ -11,7 +11,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)</span>
             <span>Policy: @PublicFacingCopyHumanizer.Clean(Model.Status.Policy)</span>
             <span>Messages: @Model.Status.ReceiptCount</span>
@@ -76,7 +76,7 @@
             <h2 class="editorial-title">@Model.TablePulsePacket.Heading</h2>
             <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Summary)</p>
         </div>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Status: @PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.VerdictLabel)</span>
             <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.ConsentPosture)</span>
         </div>
@@ -86,7 +86,7 @@
                 <p>@Model.TablePulsePacket.BoundaryLine</p>
             </article>
         </div>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @foreach (var label in Model.TablePulsePacket.Labels)
             {
                 <span>@label</span>
@@ -99,7 +99,7 @@
                     <span class="tag">@cue.Label</span>
                     <h3>@cue.StatusLabel</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
                     </div>
                 </article>
@@ -107,7 +107,7 @@
         </div>
         @if (!string.IsNullOrWhiteSpace(Model.TablePulsePacket.AdjudicationSummary))
         {
-            <div class="trust-claim__microproof">
+            <div class="trust-claim__details">
                 <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AdjudicationSummary)</span>
             </div>
         }
@@ -135,21 +135,21 @@
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
                 <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AftermathPosture)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living World</span>
                 <p>Keep the between-session watch package, command carry-forward, and aftermath on one first-party route.</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <a href="/living-world">Open Living World</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Entry</span>
                 <p>Use the inbox route as the Table Pulse Live entry point, not a static notification list.</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <a href="@Model.TablePulsePacket.EntryHref">Open Table Pulse Live</a>
                 </div>
             </article>
@@ -244,7 +244,7 @@
                         <track kind="captions" src="@Model.WorldTurnBriefing.Broadcast.CaptionsHref" srclang="en" label="English" default />
                         Your browser cannot play this video here.
                     </video>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <span>Anchor: @Model.WorldTurnBriefing.Broadcast.AnchorName</span>
                         <span>Desk: @Model.WorldTurnBriefing.Broadcast.DeskLabel</span>
                         <span>Duration: @Model.WorldTurnBriefing.Broadcast.DurationLabel</span>
@@ -264,7 +264,7 @@
                                         <h4>@beat.BeatLabel</h4>
                                         <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
                                         <p>@PublicFacingCopyHumanizer.Clean(beat.ActionSummary)</p>
-                                        <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
+                                        <p class="ledger-newsreel-broadcast__action-detail">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
                                     </article>
                                 }
                             </div>
@@ -275,7 +275,7 @@
                         <h3>Broadcast mix</h3>
                         <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AudioPosture)</p>
                         <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.MusicPosture)</p>
-                        <div class="route-choice-card__proof">
+                        <div class="route-choice-card__details">
                             <a href="@Model.WorldTurnBriefing.Broadcast.WatchHref">Watch</a>
                         </div>
                     </article>
@@ -298,7 +298,7 @@
                 <span class="tag">@message.Eyebrow</span>
                 <h3>@message.Heading</h3>
                 <p>@message.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>Status: @message.StatusLabel</span>
                     <a href="@message.Href">@message.CtaLabel</a>
                 </div>
@@ -339,7 +339,7 @@
                     <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
                     <h3>Delivery attempt</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>Recipient: @receipt.RecipientLabel</span>
                         <span>Attempted: @receipt.AttemptedAtUtc</span>
                         @if (!string.IsNullOrWhiteSpace(receipt.FailureReason))

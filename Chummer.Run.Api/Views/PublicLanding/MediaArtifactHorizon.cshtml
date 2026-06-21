@@ -11,7 +11,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
             {
                 <span>@point</span>
@@ -69,7 +69,7 @@
                 <span class="tag">Live</span>
                 <h3>@document.Label</h3>
                 <p>@document.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var highlight in document.Highlights)
                     {
                         <span>@highlight</span>

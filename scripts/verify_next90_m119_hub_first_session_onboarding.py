@@ -150,13 +150,13 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml": [
         "starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession",
         "Open starter lane on Home",
-        "Open first playable session proof",
+        "Open first playable session",
         "Open install support",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": [
         'id="seedStarterWorkspace"',
         "/api/v1/campaign-spine/me/workspaces/starter",
-        "Open first playable session proof",
+        "Open first playable session",
         "Legal runner: @leadFirstPlayableSession.RuleReadySummary",
         "Understandable return: @leadFirstPlayableSession.ReturnLaneSummary",
         "Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary",
@@ -172,7 +172,7 @@ SOURCE_MARKERS = {
         "<p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>",
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'Assert(landingSource.Contains("Open first playable session proof", StringComparison.Ordinal), "landing should keep a direct route from the front door into the bounded first-session proof drawer.");',
+        'Assert(landingSource.Contains("Open first playable session", StringComparison.Ordinal), "landing should keep a direct route from the front door into the first-session detail.");',
         'Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-lane seeding on the empty workspace first-run path.");',
         'Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");',
         'Assert(accountModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.Kind, "primer", StringComparison.Ordinal) && item.Title.Contains("campaign primer", StringComparison.OrdinalIgnoreCase)), "account page should surface a first-class primer publication alongside the existing shared publication lanes.");',

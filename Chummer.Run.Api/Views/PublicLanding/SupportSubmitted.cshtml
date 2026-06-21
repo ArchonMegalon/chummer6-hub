@@ -19,17 +19,17 @@
     if (primaryAction is not null)
     {
         responseRoutes.Add((
-            Badge: Model.Chrome.Authenticated ? "Tracked return" : "Tracked follow-up",
+            Badge: Model.Chrome.Authenticated ? "Saved history" : "Saved follow-up",
             Title: Model.Chrome.Authenticated
                 ? "Keep this report on the account support page"
-                : "Create an account if you want tracked support history here",
+                : "Create an account if you want support history here",
             Summary: Model.Chrome.Authenticated
                 ? "The next tracked update should stay inside Chummer instead of vanishing into side channels."
                 : "Guest follow-up still works on reply email, but an account keeps later support history, linked installs, and recovery on one calmer return path.",
             Href: primaryAction.Href,
             Label: primaryAction.Label,
             Details: Model.Chrome.Authenticated
-                ? new[] { "Same report", "Tracked updates", "Private by default" }
+                ? new[] { "Same report", "Saved updates", "Private reply" }
                 : new[] { "Guest still works", "History in Account", "No personalized binary" }));
     }
 
@@ -47,7 +47,7 @@
         Summary: "Use help when the question turns back into direction: install trouble, account recovery, product questions, or figuring out which first-party page should own the next move.",
         Href: helpAction.Href,
         Label: helpAction.Label,
-        Details: new[] { "First-party help", "Safe next step", "No outside account required" }));
+        Details: new[] { "First-party help", "Safe next step", "Account optional" }));
 
     if (installAction is not null)
     {
@@ -96,7 +96,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Report saved</span>
             <span>@Model.StatusLabel.Replace('_', ' ')</span>
         </div>
@@ -130,7 +130,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Next steps</p>
         <h2 class="editorial-title">Pick the next page without losing the case.</h2>
-        <p class="editorial-copy">Use the page that matches the next job: tracked follow-up, release status, help, or the same install path.</p>
+        <p class="editorial-copy">Use the page that matches the next job: saved support history, release status, help, or the same install path.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var route in responseRoutes)
@@ -139,7 +139,7 @@
                 <span class="tag">@route.Badge</span>
                 <h3>@route.Title</h3>
                 <p>@route.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var detail in route.Details)
                     {
                         <span>@detail</span>

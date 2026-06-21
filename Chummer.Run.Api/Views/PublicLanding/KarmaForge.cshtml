@@ -97,7 +97,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">Send one concrete table problem to Chummer.</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>@Model.CanonicalLane</span>
             <span>@Model.EntryLane</span>
             <span>@Model.Dashboard.TotalPackets request(s) received so far</span>
@@ -123,7 +123,7 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
@@ -174,7 +174,7 @@
                 <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
                 <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>Request status</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
                 </div>

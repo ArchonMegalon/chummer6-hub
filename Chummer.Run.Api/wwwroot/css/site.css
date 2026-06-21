@@ -3530,13 +3530,13 @@ td {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.trust-claim__microproof {
+.trust-claim__details {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.trust-claim__microproof span {
+.trust-claim__details span {
   display: inline-flex;
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
@@ -3567,8 +3567,7 @@ td {
   color: var(--ink-muted);
 }
 
-.route-callout__proof,
-.route-choice-card__proof,
+.route-callout__details,
 .route-choice-card__details,
 .route-choice-card__highlights {
   display: flex;
@@ -3576,8 +3575,7 @@ td {
   gap: 0.5rem;
 }
 
-.route-callout__proof span,
-.route-choice-card__proof span,
+.route-callout__details span,
 .route-choice-card__details span,
 .route-choice-card__highlights span {
   display: inline-flex;
@@ -3600,7 +3598,7 @@ td {
   box-shadow: none;
 }
 
-.trust-claims .route-callout__proof span {
+.trust-claims .route-callout__details span {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(237, 244, 255, 0.86);
 }
@@ -7137,7 +7135,7 @@ body {
   color: var(--ink-muted);
 }
 
-.faction-profile-card .trust-claim__microproof,
+.faction-profile-card .trust-claim__details,
 .faction-profile-card .stacked-actions,
 .faction-profile-card .muted-copy {
   padding-inline: 1rem;

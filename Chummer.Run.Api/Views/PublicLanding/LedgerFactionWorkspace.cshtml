@@ -13,7 +13,7 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
         <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the exact command path.</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>Authenticated route</span>
             <span>Faction: @Model.Faction.PublicName</span>
             <span>Public route stays separate</span>
@@ -58,7 +58,7 @@
         <h2 class="editorial-title">Faction management stays signed in.</h2>
         <p class="editorial-copy">@Model.PrivacyNote</p>
     </div>
-    <div class="trust-claim__microproof" aria-label="Faction workspace tabs">
+    <div class="trust-claim__details" aria-label="Faction workspace tabs">
         @foreach (var tab in Model.Tabs)
         {
             <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{tab.Label} (current)" : tab.Label)</a>
@@ -99,7 +99,7 @@
         <article class="route-choice-card">
             <span class="tag">Signals</span>
             <h3>Current pressure markers</h3>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var signal in Model.Faction.PublicSignals)
                 {
                     <span>@signal</span>

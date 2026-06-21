@@ -187,7 +187,7 @@
             <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@Model.SecondaryAction.Label">@Model.SecondaryAction.Label</a>
             <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
-        <div class="trust-claim__microproof ledger-flagship__boundary">
+        <div class="trust-claim__details ledger-flagship__boundary">
             <span>Fictional city</span>
             <span>Opt-in aggregate only</span>
             <span>Ready to run</span>
@@ -280,7 +280,7 @@
                     <span class="tag">@district.DominantFaction</span>
                     <h3>@district.Name</h3>
                     <p>@district.Summary</p>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <span>Heat: @district.Heat</span>
                         <span>Influence: @district.Influence</span>
                         <span>Confidence: @district.Confidence</span>
@@ -312,7 +312,7 @@
                             <track kind="captions" src="@newsreelBroadcast.CaptionsHref" srclang="en" label="English" default />
                             Your browser cannot play this video here.
                         </video>
-                        <div class="trust-claim__microproof">
+                        <div class="trust-claim__details">
                             <span>Anchor: @newsreelBroadcast.AnchorName</span>
                             <span>Desk: @newsreelBroadcast.DeskLabel</span>
                             <span>Duration: @newsreelBroadcast.DurationLabel</span>
@@ -332,11 +332,11 @@
                                             <span class="tag">@beat.ActorKind</span>
                                             <h4>@beat.BeatLabel</h4>
                                             <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.VisualHook)</p>
+                                            <p class="ledger-newsreel-broadcast__action-detail">@PublicFacingCopyHumanizer.Clean(beat.VisualHook)</p>
                                             <p>@PublicFacingCopyHumanizer.Clean(beat.ActionSummary)</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@PublicFacingCopyHumanizer.Clean(beat.Stakes)</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@PublicFacingCopyHumanizer.Clean(beat.ConsequenceLine)</p>
-                                            <p class="ledger-newsreel-broadcast__action-proof">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
+                                            <p class="ledger-newsreel-broadcast__action-detail">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
                                         </article>
                                     }
                                 </div>
@@ -349,11 +349,11 @@
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.MusicPosture)</p>
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.PublicSafetyNote)</p>
                             <p>@PublicFacingCopyHumanizer.Clean(newsreelBroadcast.ReconstructionNote)</p>
-                            <div class="route-choice-card__proof">
+                            <div class="route-choice-card__details">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
                                 <a href="@newsreelBroadcast.ReceiptsHref">Episode details</a>
-                                <a href="@newsreelBroadcast.ReceiptsHref">Source receipts</a>
+                                <a href="@newsreelBroadcast.ReceiptsHref">Details</a>
                                 <a href="@newsreelBroadcast.FeedbackHref">Feedback</a>
                             </div>
                         </article>
@@ -410,7 +410,7 @@
                 <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
                 <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
             </div>
-            <div class="trust-claim__microproof">
+            <div class="trust-claim__details">
                 <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
                 <span>Delivery: first-party email</span>
                             <span>Clips: @Model.NewsreelStatus.ReceiptCount</span>
@@ -448,7 +448,7 @@
                             </article>
                         }
                     </div>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <span>Safety: public</span>
                         <span>Video: first-party motion</span>
                         <span>Turn: @(world.LastTick?.ReceiptId ?? "turn-1")</span>
@@ -472,7 +472,7 @@
                     <h2 class="editorial-title">@selectedFaction.PublicName</h2>
                     <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
                     <p class="muted-copy">This page explains pressure, not people.</p>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <span>Safety: public</span>
                         <span>Video: first-party motion</span>
                         <span>Package pressure visible</span>
@@ -514,7 +514,7 @@
                     <span class="tag">Storyboard</span>
                     <h3>Faction intro video</h3>
                     <p>Video playback status is still pending, so this page stays on a simple fallback.</p>
-                    <div class="trust-claim__microproof">
+                    <div class="trust-claim__details">
                         <a class="inline-link" href="/ledger/factions/@slug/promo">Promo page</a>
                         <a class="inline-link" href="/ledger/factions/@slug/promo.json">JSON brief</a>
                     </div>

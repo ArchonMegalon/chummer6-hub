@@ -186,11 +186,11 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "SupportCaseStatuses.UserNotified",
     ],
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": [
-        "<span>Artifact publication</span>",
+        "<span>Publication status</span>",
         "<strong>@op.ArtifactPublicationSummary</strong>",
         "<span>Support escalation</span>",
         "<strong>@op.SupportEscalationSummary</strong>",
-        "<li>Artifact publication: @op.ArtifactPublicationSummary</li>",
+        "<li>Publication status: @op.ArtifactPublicationSummary</li>",
         "<li>Support escalation: @op.SupportEscalationSummary</li>",
         '<p class="muted-copy">@op.SupportEscalationSummary</p>',
     ],

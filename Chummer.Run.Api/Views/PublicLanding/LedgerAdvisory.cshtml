@@ -96,7 +96,7 @@
                             }
                         </form>
                     }
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         @foreach (var option in ballot.Options)
                         {
                             <span>@option.Label: @option.VoteCount vote(s)</span>
@@ -138,7 +138,7 @@
                             }
                         </form>
                     }
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         @foreach (var option in ballot.Options)
                         {
                             <span>@option.Label: @option.VoteCount vote(s)</span>
@@ -166,7 +166,7 @@
                     <h3>@summary.Heading</h3>
                     <p>@PublicFacingCopyHumanizer.Clean(summary.Summary)</p>
                     <p><strong>Leader state:</strong> @PublicFacingCopyHumanizer.Clean(summary.ExecutivePosture)</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         @foreach (var item in summary.Highlights)
                         {
                             <span>@item</span>

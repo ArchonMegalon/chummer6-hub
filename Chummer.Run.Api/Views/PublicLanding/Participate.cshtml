@@ -174,7 +174,7 @@
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed an older feedback link</h3>
                 <p>The public feedback page now lives at <code class="mono-receipt">/feedback</code>. This page keeps broader participation and signed-in options visible without turning them into the default path.</p>
-                <div class="route-callout__proof">
+                <div class="route-callout__details">
                     <span>Public by default</span>
                     <span>No private logs</span>
                     <span>Support stays in Chummer</span>
@@ -194,7 +194,7 @@
                 <span class="tag">@PublicText(route.Eyebrow)</span>
                 <h3>@PublicText(route.Title)</h3>
                 <p>@PublicText(route.Summary)</p>
-                <div class="trust-claim__microproof">
+                <div class="trust-claim__details">
                     @foreach (var item in route.Details)
                     {
                         <span>@PublicText(item)</span>
@@ -219,7 +219,7 @@
                 <span class="tag">@PublicText(choice.Badge)</span>
                 <h3>@PublicText(choice.Title)</h3>
                 <p>@PublicText(choice.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
                         <span>@PublicText(item)</span>
@@ -244,7 +244,7 @@
                 <span class="tag">@PublicText(buildGhost.StatusLabel)</span>
                 <h3>Public helper can open the path</h3>
                 <p>The compare and apply decision still stays inside Chummer.</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in buildGhost.ProofPoints)
                     {
                         <span>@PublicText(item)</span>
@@ -305,7 +305,7 @@
             <article class="route-choice-card">
                 <span class="tag">Allowed event types</span>
                 <h3>Community-only use</h3>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var eventFamily in beHuman.AllowedEventFamilies)
                     {
                         <span>@PublicText(eventFamily)</span>
@@ -315,7 +315,7 @@
             <article class="route-choice-card">
                 <span class="tag">Chummer decides</span>
                 <h3>Chummer keeps the authority</h3>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var truthDomain in beHuman.ForbiddenTruthDomains)
                     {
                         <span>@PublicText(truthDomain)</span>

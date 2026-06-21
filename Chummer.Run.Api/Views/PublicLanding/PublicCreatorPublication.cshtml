@@ -132,7 +132,7 @@
                 <span class="tag">@choice.Badge</span>
                 <h3>@choice.Title</h3>
                 <p>@choice.Summary</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
                         <span>@item</span>
@@ -149,7 +149,7 @@
         <p class="eyebrow">Public shared publication</p>
         <h1 class="page-title">@Model.Publication.Title</h1>
         <p class="page-copy">@Model.Publication.Summary</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
             <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
             <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>

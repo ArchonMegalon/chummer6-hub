@@ -28,7 +28,7 @@
     var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
-    // .Replace( legacy source marker: Open first playable session proof )
+    // .Replace( legacy source marker: Open first playable session )
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
     var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();

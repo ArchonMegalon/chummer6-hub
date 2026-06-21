@@ -80,7 +80,7 @@
             <span class="tag">Concierge can</span>
             <h3>Open the conversation</h3>
             <p>Capture the comparison question and route the builder into the right next step.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var item in projection.FacePopResponsibilities)
                 {
                     <span>@SanitizePublicCopy(item)</span>
@@ -91,7 +91,7 @@
             <span class="tag">Explainer can</span>
             <h3>Explain the boundary</h3>
             <p>Clarify what the draft comparison means without computing mechanics or choosing the final character.</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var item in projection.AnswerlyResponsibilities)
                 {
                     <span>@SanitizePublicCopy(item)</span>
@@ -102,7 +102,7 @@
             <span class="tag">Chummer must</span>
             <h3>Own the real compare bench</h3>
             <p>@SanitizePublicCopy(projection.RuntimeBoundary)</p>
-            <div class="route-choice-card__proof">
+            <div class="route-choice-card__details">
                 @foreach (var item in projection.ChummerResponsibilities)
                 {
                     <span>@SanitizePublicCopy(item)</span>
@@ -153,7 +153,7 @@
                 <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The signed-in helper keeps tradeoffs, rule differences, and reviewed output history on the account page.")</p>
                 @if (signedInBench.ProofPoints is { Count: > 0 })
                 {
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         @foreach (var point in signedInBench.ProofPoints)
                         {
                             <span>@SanitizePublicCopy(point)</span>

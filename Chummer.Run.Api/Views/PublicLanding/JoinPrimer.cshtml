@@ -16,7 +16,7 @@
         <p class="eyebrow">Invite primer</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @foreach (var detail in Model.ProofPoints)
             {
                 <span>@PublicFacingCopyHumanizer.Clean(detail)</span>
@@ -44,7 +44,7 @@
                 <span class="tag">@panel.Eyebrow</span>
                 <h3>@panel.Heading</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(panel.Summary)</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     @foreach (var bullet in panel.Bullets)
                     {
                         <span>@PublicFacingCopyHumanizer.Clean(bullet)</span>

@@ -43,13 +43,13 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("black_ledger_newsroom_surface:ok", result.stdout)
 
-    def test_verifier_fails_when_view_drops_receipts_link(self) -> None:
+    def test_verifier_fails_when_view_drops_details_link(self) -> None:
         with tempfile.TemporaryDirectory(prefix="black-ledger-newsroom-view-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             view_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"
             view_path.write_text(
-                view_path.read_text(encoding="utf-8").replace("Source receipts", "Source archive", 1),
+                view_path.read_text(encoding="utf-8").replace("Details", "Source archive", 1),
                 encoding="utf-8",
             )
 
@@ -57,7 +57,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml missing marker: Source receipts",
+            "Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml missing marker: Details",
             result.stderr,
         )
 
@@ -80,7 +80,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
                 return self._payload
 
         route_bodies = {
-            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Ledger Bulletin</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span></section>",
+            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Ledger Bulletin</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
             "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
@@ -143,7 +143,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
                 return self._payload
 
         route_bodies = {
-            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span></section>",
+            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
             "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
@@ -206,7 +206,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
                 return self._payload
 
         route_bodies = {
-            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span></section>",
+            "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
             "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
@@ -275,7 +275,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
     <source src="/media/ledger/newsreels/turn-2-newsreel.webm?v=1" type="video/webm" />
     <track kind="captions" src="/media/ledger/newsreels/turn-2-newsreel.vtt?v=1" />
   </video>
-  <a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span>
+  <a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span>
 </section>
 """
         receipts_payload = {
@@ -346,7 +346,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
     <source src="/media/ledger/newsreels/turn-2-newsreel.webm?v=1" type="video/webm" />
     <track kind="captions" src="/media/ledger/newsreels/turn-2-newsreel.vtt?v=1" />
   </video>
-  <a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span>
+  <a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span>
 </section>
 """
         receipts_payload = {

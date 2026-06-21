@@ -63,7 +63,7 @@
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed an old link</h3>
                 <p>Release notes now live on <code class="mono-receipt">/changelog</code>. This page gives you the quick answer: install now, wait, or get help first.</p>
-                <div class="route-callout__proof">
+                <div class="route-callout__details">
                     <span>Available now</span>
                     <span>Current build</span>
                     <span>Setup help</span>
@@ -236,7 +236,7 @@
     <p class="editorial-copy">Use an account when you want installs, support updates, and follow-up history attached to you.</p>
     @if (signedInBenefits.Length > 0)
     {
-        <div class="trust-claim__microproof">
+        <div class="trust-claim__details">
             @foreach (var overlay in signedInBenefits)
             {
                 <span>@overlay.Title</span>

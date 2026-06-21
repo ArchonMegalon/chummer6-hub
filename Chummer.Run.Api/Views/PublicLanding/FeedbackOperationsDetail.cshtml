@@ -126,7 +126,7 @@
                 <span class="tag">@sourceReceipt.StatusLabel</span>
                 <h3>@sourceReceipt.CategoryLabel · @sourceReceipt.ItemReference</h3>
                 <p>@sourceReceipt.ActionLabel</p>
-                <div class="route-choice-card__proof">
+                <div class="route-choice-card__details">
                     <span>@sourceReceipt.BoardLabel</span>
                     <span>@sourceReceipt.EventType</span>
                     <span>@sourceReceipt.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
@@ -180,7 +180,7 @@
                     <span class="tag">@receipt.StatusLabel</span>
                     <h3>@receipt.RouteKind</h3>
                     <p>@receipt.Summary</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                     </div>
@@ -200,7 +200,7 @@
                     <span class="tag">@receipt.StatusLabel</span>
                     <h3>Closeout @receipt.DeliveryState</h3>
                     <p>@receipt.Summary</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
@@ -226,7 +226,7 @@
                     <h3>@receipt.QueueLane</h3>
                     <p>@receipt.Summary</p>
                     <p class="muted-copy">@receipt.QueueReason</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.QueueState</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
@@ -279,7 +279,7 @@
                     <span class="tag">@thread.CurrentStageLabel</span>
                     <h3>Recipient thread</h3>
                     <p>@thread.Summary</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@PublicFeedbackText(thread.SourceLabel)</span>
                         <span>@thread.QueueStatusLabel</span>
                         <span>@thread.DispatchStatusLabel</span>
@@ -326,7 +326,7 @@
                     {
                         <p class="muted-copy">@receipt.Error</p>
                     }
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         @if (receipt.AcceptedAtUtc is { } acceptedAtUtc)
                         {
@@ -374,7 +374,7 @@
                     {
                         <p class="muted-copy">@receipt.Reason</p>
                     }
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.IdentityMatchMode</span>
                         <span>@receipt.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
@@ -412,7 +412,7 @@
                     <span class="tag">@receipt.StatusLabel</span>
                     <h3>Follow-up sent</h3>
                     <p>@receipt.Summary</p>
-                    <div class="route-choice-card__proof">
+                    <div class="route-choice-card__details">
                         <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@PublicFeedbackText(receipt.SourceHotFilterLabel) · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>

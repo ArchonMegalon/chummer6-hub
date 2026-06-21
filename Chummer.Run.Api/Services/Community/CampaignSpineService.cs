@@ -4831,7 +4831,7 @@ public sealed class CampaignSpineService
             $"Permissions: {(operation.Capabilities.Count == 0 ? "none" : string.Join(", ", operation.Capabilities))}.",
             $"Roster: {(operation.RecentRosterTransfers?.Count ?? 0)} recent transfer(s) across {operation.ActiveCampaignCount} active campaign(s).",
             $"Events: {operation.SeasonBoardEntries.Count} season lane(s) and {operation.RecentEventSummaries.Count} recent event summary line(s).",
-            $"Artifact publication: {publicationReceipts.Count} bounded receipt(s) on the operator rail.",
+            $"Publication status: {publicationReceipts.Count} publication note(s) on the operator rail.",
             $"Support escalation: {supportCases.Count} tracked case(s) remain attached to the same account-bound closure lane."
         ];
         return lines;
