@@ -406,9 +406,14 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         ];
         string firstVisitSource = string.Join(Environment.NewLine, firstVisitNavigation);
 
-        Assert.Contains("new PublicNavigationLink(\"Home\", \"/\")", layout, StringComparison.Ordinal);
-        Assert.Contains("new PublicNavigationLink(\"Get Chummer\", \"/downloads\")", layout, StringComparison.Ordinal);
-        Assert.Contains("new PublicNavigationLink(\"Help\", \"/help\")", layout, StringComparison.Ordinal);
+        Assert.Contains("label: Home", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /", navigation, StringComparison.Ordinal);
+        Assert.Contains("label: Get Chummer", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /downloads", navigation, StringComparison.Ordinal);
+        Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /participate/karma-forge", navigation, StringComparison.Ordinal);
+        Assert.Contains("label: Help", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /help", navigation, StringComparison.Ordinal);
         Assert.Contains("@foreach (var link in primaryDrawerLinks)", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@foreach (var link in compactDrawerLinks)", layout, StringComparison.Ordinal);
 
