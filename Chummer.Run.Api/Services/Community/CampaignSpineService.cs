@@ -1270,7 +1270,7 @@ public sealed class CampaignSpineService
                     NextSafeAction: nextSafeAction,
                     EvidenceLines: resolutionEvidenceLines,
                     UpdatedAtUtc: now),
-                Summary: $"{storedRun.Title} keeps a persisted turn-ledger handoff, runboard state, and ResolutionReport draft on the governed hub lane.",
+                Summary: $"{storedRun.Title} keeps a persisted turn-ledger handoff, runboard state, and ResolutionReport draft on the reviewed hub path.",
                 EvidenceLines: FinalizeLines(
                 [
                     $"Turn ledger handoff: {normalizedTurnLedgerSummary}",
@@ -1337,7 +1337,7 @@ public sealed class CampaignSpineService
             string nextSafeAction = normalizedNextSafeAction
                 ?? recommendedNextActions.FirstOrDefault()
                 ?? (request.SafeToPlay
-                    ? "Open the governed workspace return on /account/work."
+                    ? "Open the reviewed workspace return on /account/work."
                     : "Resolve the adoption unknowns before reopening the shared campaign return on /account/work.");
 
             var adoption = new CampaignAdoptionProjection(
@@ -1604,13 +1604,13 @@ public sealed class CampaignSpineService
                 Summary: normalizedNewsSummary,
                 Url: normalizedNewsUrl,
                 SpoilerPolicy: "player_safe_preview_only",
-                PublicationSummary: "Player-safe news stays previewable for runners without becoming world truth.",
+                PublicationSummary: "Player-safe news stays previewable for runners without becoming world state.",
                 EvidenceLines: FinalizeLines(
                 [
                     $"{normalizedNewsTitle}: {normalizedNewsSummary}",
                     $"Source kind: {PlayerSafeNewsSourceKind}.",
                     $"Origin: {normalizedNewsSource}.",
-                    "Spoiler policy: player-safe preview only; rendered news is not world truth.",
+                    "Spoiler policy: player-safe preview only; rendered news is not world state.",
                     $"WorldTick anchor: {worldTickId}.",
                     $"Shadowfeed bulletin: {shadowfeedBulletin.BulletinId}.",
                     $"Shadowfeed receipt: {shadowfeedBulletin.ReceiptRef}.",
@@ -1679,14 +1679,14 @@ public sealed class CampaignSpineService
                             ])),
                         UpdatedAtUtc = now
                     },
-                    Summary = $"{storedRun.Title} keeps an approved ResolutionReport, first WorldTick, and player-safe news item on the governed hub lane.",
+                    Summary = $"{storedRun.Title} keeps an approved ResolutionReport, first WorldTick, and player-safe news item on the reviewed hub path.",
                     EvidenceLines = FinalizeLines(
                         storedRun.RunboardContinuity.EvidenceLines.Concat(
                         [
                             $"ResolutionReport approval: {normalizedSummary}",
                             $"WorldTick: {normalizedWorldTickSummary}",
                             $"Player-safe news: {normalizedNewsTitle}",
-                            "Boundary: player-safe news previews stay separate from world truth.",
+                            "Boundary: player-safe news previews stay separate from world state.",
                             $"Next safe action: {nextSafeAction}"
                         ])),
                     UpdatedByUserId = user.UserId,
@@ -4284,7 +4284,7 @@ public sealed class CampaignSpineService
                 CueId: StableId("cue", $"{campaign.CampaignId}:world-tick"),
                 Severity: "ready",
                 Title: "BLACK LEDGER follow-through is attached",
-                Summary: "ResolutionReport approval, first WorldTick, and player-safe news stay on one governed hub lane without turning preview copy into world truth."));
+                Summary: "ResolutionReport approval, first WorldTick, and player-safe news stay on one reviewed hub path without turning preview copy into world state."));
         }
 
         var recapShelf = workspaceAftermathPackages
@@ -4487,7 +4487,7 @@ public sealed class CampaignSpineService
             .ToArray();
         if (shelfEntries.Length == 0)
         {
-            return "No governed artifact publication receipt is attached to this operator rail yet.";
+            return "No governed artifact publication receipt is attached to this maintainer path yet.";
         }
 
         int readyCount = shelfEntries.Count(static item =>
@@ -4498,7 +4498,7 @@ public sealed class CampaignSpineService
         string latestSummary = string.IsNullOrWhiteSpace(latest.PublicationSummary)
             ? latest.Summary
             : latest.PublicationSummary!;
-        return $"{shelfEntries.Length} governed artifact receipt(s) stay on the same operator rail; {readyCount} ready or published, {discoverableCount} discoverable, latest is {latest.Label}: {latestSummary}";
+        return $"{shelfEntries.Length} governed artifact receipt(s) stay on the same maintainer path; {readyCount} ready or published, {discoverableCount} discoverable, latest is {latest.Label}: {latestSummary}";
     }
 
     private string ResolveGroupSupportEscalationSummary(HubUserDto user)
@@ -4513,11 +4513,11 @@ public sealed class CampaignSpineService
                 .ToArray();
             if (cases.Length == 0)
             {
-                return "No tracked support escalation is blocking this operator rail right now.";
+                return "No tracked support escalation is blocking this maintainer path right now.";
             }
 
             SupportCaseProjection latest = cases[0];
-            return $"{cases.Length} tracked support case(s) stay on the same operator rail; latest is {HumanizeSupportValue(latest.Kind)} ({HumanizeSupportValue(latest.Status)}).";
+            return $"{cases.Length} tracked support case(s) stay on the same maintainer path; latest is {HumanizeSupportValue(latest.Kind)} ({HumanizeSupportValue(latest.Status)}).";
         }
     }
 
@@ -4784,7 +4784,7 @@ public sealed class CampaignSpineService
                     "can_issue_boost_codes" => "Issue sponsorship codes that stay attached to the governed community lane.",
                     "can_hold_shared_entitlements" => "Carry community-scale entitlements without collapsing them into personal install state.",
                     "campaign_workspace" => "Open shared campaign workspaces and multi-campaign season boards from the same operator contract.",
-                    "creator_publication" => "Track artifact-publication posture and public-safe publication follow-through on the operator rail.",
+                    "creator_publication" => "Track artifact-publication posture and public-safe publication follow-through on the maintainer path.",
                     "support_closure" => "Keep human escalation and tracked support closure visible on the same operator contract.",
                     _ => "Keep this governed operator permission explicit instead of burying it in ad hoc admin folklore."
                 }))
@@ -4831,7 +4831,7 @@ public sealed class CampaignSpineService
             $"Permissions: {(operation.Capabilities.Count == 0 ? "none" : string.Join(", ", operation.Capabilities))}.",
             $"Roster: {(operation.RecentRosterTransfers?.Count ?? 0)} recent transfer(s) across {operation.ActiveCampaignCount} active campaign(s).",
             $"Events: {operation.SeasonBoardEntries.Count} season lane(s) and {operation.RecentEventSummaries.Count} recent event summary line(s).",
-            $"Publication status: {publicationReceipts.Count} publication note(s) on the operator rail.",
+            $"Publication status: {publicationReceipts.Count} publication note(s) on the maintainer path.",
             $"Support escalation: {supportCases.Count} tracked case(s) remain attached to the same account-bound closure lane."
         ];
         return lines;
@@ -5165,8 +5165,8 @@ public sealed class CampaignSpineService
                 var runtimeCompatibilitySummary = DescribeBuildLabRuntimeCompatibility(runtimeFingerprint, workspace, restore);
                 var attachedOutputSummary = outputs.Count switch
                 {
-                    1 => "1 dossier or campaign-safe output is already attached to this handoff.",
-                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already attached to this handoff.",
+                    1 => "1 dossier or campaign-safe output is already attached to this build.",
+                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already attached to this build.",
                     _ => null
                 };
                 var readyOutputSummary = outputs.Count switch
@@ -5203,16 +5203,16 @@ public sealed class CampaignSpineService
                     ExplainEntryId: explainReceiptId,
                     TradeoffLines:
                     [
-                        attachedOutputSummary ?? "Role overlap stays explicit before the handoff leaves build comparison.",
+                        attachedOutputSummary ?? "Role overlap stays explicit before the build leaves build comparison.",
                         workspace is null
-                            ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
+                            ? "No campaign workspace is attached yet, so the build seeds the dossier first."
                             : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible and the same upgrade path attached.",
                         ruleEnvironmentDiff.Summary
                     ],
                     ProgressionOutcomes:
                     [
                         workspace is null
-                            ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
+                            ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first reviewed campaign workspace exists."
                             : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
                         readyOutputSummary,
                         $"Explain receipt {explainReceiptId} stays attached across character-template, JSON exchange, Foundry-class exchange, sheet-viewer checks, print-ready PDF export, replay timeline, session recap, and run-module artifact follow-through."
@@ -5502,7 +5502,7 @@ public sealed class CampaignSpineService
 
         if (workspace is null)
         {
-            return "Attach this dossier to a governed campaign workspace before you trust the handoff as the table-safe return path.";
+            return "Attach this dossier to a reviewed campaign workspace before you trust the build as the table-safe return path.";
         }
 
         if (outputs.Count == 0)
@@ -5520,12 +5520,12 @@ public sealed class CampaignSpineService
     {
         if (restore.ConflictSummaries.Count > 0)
         {
-            return $"{runtimeFingerprint} is the active compatibility fingerprint, but restore still needs review before the handoff is campaign-safe.";
+            return $"{runtimeFingerprint} is the active compatibility fingerprint, but restore still needs review before the build is campaign-safe.";
         }
 
         return workspace is null
             ? $"{runtimeFingerprint} is pinned on the living dossier, but the first campaign workspace still needs to confirm the same rule posture."
-            : $"{runtimeFingerprint} is pinned across the dossier, workspace, and return rail for this handoff.";
+            : $"{runtimeFingerprint} is pinned across the dossier, workspace, and return path for this build.";
     }
 
     private static string DescribeBuildLabSupportClosure(
@@ -5558,7 +5558,7 @@ public sealed class CampaignSpineService
     {
         if (workspace is null)
         {
-            return "Crew-fit is pending: attach this build path to a governed campaign workspace before role-overlap and roster-fit checks can be grounded.";
+            return "Crew-fit is pending: attach this build path to a reviewed campaign workspace before role-overlap and roster-fit checks can be grounded.";
         }
 
         int crewCount = workspace.Crews.Count;
@@ -5642,8 +5642,8 @@ public sealed class CampaignSpineService
             return
             [
                 workspace is null
-                    ? "Conditional state lane: campaign workspace is not attached yet, so state checks are still dossier-first."
-                    : "Conditional state lane: campaign workspace is attached, but explicit conditional toggles are not active yet.",
+                    ? "Current conditions: campaign workspace is not attached yet, so state checks are still dossier-first."
+                    : "Current conditions: campaign workspace is attached, but explicit conditional toggles are not active yet.",
                 "Conditional checks pending: drugs and temporary chemistry modifiers.",
                 "Conditional checks pending: foci bonding and sustained effects.",
                 "Conditional checks pending: acquisition timing and reputation spends."
@@ -5653,8 +5653,8 @@ public sealed class CampaignSpineService
         List<string> lines =
         [
             workspace is null
-                ? "Conditional state lane: living dossier conditions are active before campaign return handoff."
-                : $"Conditional state lane: {workspace.CampaignName} is carrying conditional checks on the governed return lane."
+                ? "Current conditions: living dossier conditions are active before campaign return handoff."
+                : $"Current conditions: {workspace.CampaignName} is carrying conditional checks on the reviewed return path."
         ];
 
         lines.AddRange(signals.Select(static signal => signal.line));
@@ -5678,7 +5678,7 @@ public sealed class CampaignSpineService
         List<(string key, string label, string line)> signals = [];
         if (toggles.Any(static token => token.Contains("drug", StringComparison.OrdinalIgnoreCase) || token.Contains("chem", StringComparison.OrdinalIgnoreCase)))
         {
-            signals.Add(("drugs", "drug modifiers", "Conditional check: drug and chemistry modifiers stay explicit on this handoff."));
+            signals.Add(("drugs", "drug modifiers", "Conditional check: drug and chemistry modifiers stay explicit on this build."));
         }
 
         if (toggles.Any(static token => token.Contains("focus", StringComparison.OrdinalIgnoreCase) || token.Contains("foci", StringComparison.OrdinalIgnoreCase)))
@@ -5799,20 +5799,20 @@ public sealed class CampaignSpineService
         List<string> lines =
         [
             workspace is null
-                ? "Campaign continuity: no governed campaign workspace is attached yet, so the handoff still lands on the living dossier first."
-                : $"Campaign continuity: {workspace.CampaignName} is already attached as the governed return lane for this handoff.",
+                ? "Campaign continuity: no reviewed campaign workspace is attached yet, so the build still lands on the living dossier first."
+                : $"Campaign continuity: {workspace.CampaignName} is already attached as the reviewed return path for this build.",
             outputs.Count switch
             {
-                1 => "Outputs: 1 dossier or campaign-safe output is already attached to the handoff.",
-                > 1 => $"Outputs: {outputs.Count} dossier or campaign-safe outputs are already attached to the handoff.",
-                _ => "Outputs: no dossier or campaign-safe output is attached yet, so export, exchange, replay, and recap proof are still pending."
+                1 => "Outputs: 1 dossier or campaign-safe output is already attached to the build.",
+                > 1 => $"Outputs: {outputs.Count} dossier or campaign-safe outputs are already attached to the build.",
+                _ => "Outputs: no dossier or campaign-safe output is attached yet, so export, exchange, replay, and recap review is still pending."
             },
             BuildBuildLabOutputLaneCoverageLine(outputs),
             restore.ConflictSummaries.Count switch
             {
                 0 => "Restore posture: no restore conflicts are currently blocking replay-safe handoff follow-through.",
-                1 => "Restore posture: 1 restore conflict still needs review before the handoff is replay-safe.",
-                _ => $"Restore posture: {restore.ConflictSummaries.Count} restore conflicts still need review before the handoff is replay-safe."
+                1 => "Restore posture: 1 restore conflict still needs review before the build is replay-safe.",
+                _ => $"Restore posture: {restore.ConflictSummaries.Count} restore conflicts still need review before the build is replay-safe."
             },
             restore.ClaimedDevices.Count switch
             {
@@ -5933,7 +5933,7 @@ public sealed class CampaignSpineService
             var output = outputs.FirstOrDefault(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
             if (output is null)
             {
-                return (label, false, "Lane artifact is missing from this handoff.");
+                return (label, false, "Required file is missing from this build.");
             }
 
             bool ready = string.Equals(output.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
@@ -5972,7 +5972,7 @@ public sealed class CampaignSpineService
             var output = outputs.FirstOrDefault(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
             if (output is null)
             {
-                return (label, false, "Lane artifact is missing from this handoff.");
+                return (label, false, "Required file is missing from this build.");
             }
 
             bool ready = string.Equals(output.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
@@ -6395,11 +6395,11 @@ public sealed class CampaignSpineService
         string nextSafeAction = approval?.NextSafeAction
             ?? orderedGoals.FirstOrDefault()?.NextSafeAction
             ?? adoption?.NextSafeAction
-            ?? "Open the governed workspace return on /account/work.";
+            ?? "Open the reviewed workspace return on /account/work.";
         string summary = approval is not null
-            ? $"{campaign.Name} keeps campaign adoption, runner-goal pins, ResolutionReport closeout, and the first BLACK LEDGER WorldTick on one governed return lane."
+            ? $"{campaign.Name} keeps campaign adoption, runner-goal pins, ResolutionReport closeout, and the first BLACK LEDGER WorldTick on one reviewed return path."
             : adoption is not null && orderedGoals.Length > 0
-                ? $"{campaign.Name} keeps campaign adoption and {orderedGoals.Length} runner-goal pin(s) on one governed return lane."
+                ? $"{campaign.Name} keeps campaign adoption and {orderedGoals.Length} runner-goal pin(s) on one reviewed return path."
                 : adoption?.Summary
                     ?? $"{campaign.Name} keeps the adoption loop attached to the shared workspace.";
 
@@ -7049,7 +7049,7 @@ public sealed class CampaignSpineService
             Summary: item.Summary,
             ArtifactId: item.NewsId,
             Audience: "campaign, creator",
-            OwnershipSummary: "Player-safe news preview stays attached to the shared campaign return without becoming world truth.",
+            OwnershipSummary: "Player-safe news preview stays attached to the shared campaign return without becoming world state.",
             PublicationState: "preview_ready",
             TrustBand: "player-safe-preview",
             Discoverable: false,
@@ -7057,7 +7057,7 @@ public sealed class CampaignSpineService
             NextSafeAction: "Review the player-safe preview before you reopen the shared runboard.",
             ProvenanceSummary: $"{item.Source} preview stays anchored to WorldTick {item.WorldTickId}.",
             AuditSummary: item.SpoilerPolicy,
-            CompatibilitySummary: "Player-safe preview only; rendered news remains separate from world truth.",
+            CompatibilitySummary: "Player-safe preview only; rendered news remains separate from world state.",
             LineageSummary: $"WorldTick lineage: {item.WorldTickId}.");
 
     private static IReadOnlyList<PublicationSafeProjection> EnrichWorkspaceRecapShelf(
@@ -7169,7 +7169,7 @@ public sealed class CampaignSpineService
                 ? "Run scope: campaign-wide aftermath."
                 : $"Run scope: {package.RunTitle}.");
         string continuity = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Continuity:", StringComparison.OrdinalIgnoreCase))
-            ?? "Continuity: governed return lane remains attached to the same campaign spine.";
+            ?? "Continuity: reviewed return path remains attached to the same campaign spine.";
         string artifactDescriptor = BuildAftermathArtifactDescriptor(package);
         return $"{runScope} {continuity} {artifactDescriptor} stays attached to package {ResolveAftermathPackageIdentity(package)}.";
     }
@@ -7848,7 +7848,7 @@ public sealed class CampaignSpineService
 
         if (workspace is null)
         {
-            watchouts.Add("No governed campaign workspace is attached yet, so the handoff is still dossier-first rather than table-return first.");
+            watchouts.Add("No reviewed campaign workspace is attached yet, so the build is still dossier-first rather than table-return first.");
         }
 
         if (outputs.Count == 0)
@@ -7986,7 +7986,7 @@ public sealed class CampaignSpineService
                 DiffId: StableId("rules-diff", $"{operation.GroupId}:rule-environment"),
                 Label: "Group rule environment",
                 BeforeSummary: "Before the group rule environment is explicit, campaign operator decisions can drift into one-off interpretation.",
-                AfterSummary: $"After campaign approval, {operation.RuleEnvironment.CompatibilityFingerprint} anchors {operation.ActiveCampaignCount} active campaign(s) on the same operator rail.",
+                AfterSummary: $"After campaign approval, {operation.RuleEnvironment.CompatibilityFingerprint} anchors {operation.ActiveCampaignCount} active campaign(s) on the same maintainer path.",
                 ReasonSummary: returnReason,
                 ExplainEntryId: $"{explainRoot}:rule-environment")
         ];
@@ -8046,7 +8046,7 @@ public sealed class CampaignSpineService
             BuildRuleEnvironmentLifecycleStep(
                 RuleEnvironmentLifecycleStages.CampaignApproved,
                 "Campaign-approved",
-                $"{scopeLabel} binds {environment.CompatibilityFingerprint} to build, play, support, and return on one governed rail.",
+                $"{scopeLabel} binds {environment.CompatibilityFingerprint} to build, play, support, and return on one reviewed path.",
                 currentStage,
                 promotionTargetStage),
             BuildRuleEnvironmentLifecycleStep(

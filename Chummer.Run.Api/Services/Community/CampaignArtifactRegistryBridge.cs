@@ -121,7 +121,7 @@ public sealed class CampaignArtifactRegistryBridge
         string workspaceId = NormalizeToken(request.WorkspaceId, "workspace");
         string packageKind = HumanizePackageKind(request.PackageKind);
         string continuity = request.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Continuity:", StringComparison.OrdinalIgnoreCase))
-            ?? "Continuity: governed return lane remains attached to the same campaign spine.";
+            ?? "Continuity: reviewed return path remains attached to the same campaign spine.";
         return $"{packageKind} artifact for {campaignName} on {workspaceId}. {continuity}";
     }
 

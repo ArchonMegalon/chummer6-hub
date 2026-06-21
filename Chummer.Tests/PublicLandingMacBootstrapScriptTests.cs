@@ -254,7 +254,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
         Assert.Contains("shasum -a 256", command, StringComparison.Ordinal);
         Assert.Contains("'abc123'", command, StringComparison.Ordinal);
-        Assert.Contains("Bootstrap digest mismatch; re-open the signed-in downloads handoff and copy a fresh install command.", command, StringComparison.Ordinal);
+        Assert.Contains("Setup script check failed; open the signed-in Downloads page and copy a fresh install command.", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("downloads handoff", command, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -84,8 +84,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         return Ok(new
         {
-            status = "proof_only",
-            message = "These Windows installers stay on a verification and support rail. Use the main downloads shelf for the recommended Windows setup when available, and use these direct copies only when a proof or support flow points to them.",
+            status = "support_only",
+            message = "These Windows installers are supplemental support downloads. Use the main Downloads page for the recommended Windows setup, and use these direct copies only when support asks you to.",
             downloads = installers.Select(static installer => new
             {
                 installer.FileName,
@@ -236,7 +236,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Unauthorized(new
             {
                 error = "invalid_or_expired_install_ticket",
-                message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
             });
         }
 
@@ -257,7 +257,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Unauthorized(new
             {
                 error = "invalid_or_expired_claim_code",
-                message = "The claim code in this download handoff is no longer valid. Re-download the Mac setup script from the signed-in downloads page."
+                message = "The claim code for this download is no longer valid. Re-download the Mac setup script from the signed-in Downloads page."
             });
         }
 
@@ -313,7 +313,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Unauthorized(new
             {
                 error = "invalid_or_expired_install_ticket",
-                message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
             });
         }
 
@@ -330,7 +330,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Unauthorized(new
             {
                 error = "invalid_or_expired_claim_code",
-                message = "The claim code in this download handoff is no longer valid. Re-download the Mac setup script from the signed-in downloads page."
+                message = "The claim code for this download is no longer valid. Re-download the Mac setup script from the signed-in Downloads page."
             });
         }
 

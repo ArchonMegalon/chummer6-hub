@@ -820,7 +820,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             CampaignId: workspace.CampaignId,
             Summary: packages.Length == 0
                 ? $"{workspace.CampaignName} has no governed downtime or aftermath packages yet."
-                : $"{packages.Length} governed downtime and aftermath package(s) stay attached to the shared return rail.",
+                : $"{packages.Length} governed downtime and aftermath package(s) stay attached to the shared return path.",
             ReturnLoopRoute: "/account/work#aftermath-packages",
             ReturnLoopActions: returnLoopActions,
             Packages: packages,
@@ -4124,7 +4124,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         int relationshipSignalCount = relationshipConsequences.Length
             + uniqueReturnChangeSignals.Count(static packet => IsCampaignRelationshipSignal(packet))
             + (carryForwardRelationshipSignal ? 1 : 0);
-        string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
+        string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one reviewed return path for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
             ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
             : $"{leadRun.Title} and campaign return cues share the same diary/contact/heat continuity lane.";

@@ -282,11 +282,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "prep:live-audit-diary-return",
             Kind: "continuity_packet",
             Title: "Continuity Probe preview season diary, contacts, and heat return packet",
-            Summary: "7 diary/continuity signal(s) and 1 relationship signal(s) stay on one governed return lane for downtime and next-session reopen.",
+            Summary: "7 diary/continuity signal(s) and 1 relationship signal(s) stay on one reviewed return path for downtime and next-session reopen.",
             BindingSummary: "Bound to campaign return and continuity receipts.",
             Reusable: true,
             SearchTerms: ["diary", "journal", "sessionlog", "contact", "contacts", "connection", "heat", "aftermath", "recap", "return", "connections", "faction"],
-            EvidenceLines: ["Continuity signals remain attached to the governed return lane."],
+            EvidenceLines: ["Continuity signals remain attached to the reviewed return path."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-05-07T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnloop")));
@@ -445,7 +445,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "prep:workspace-v4-compact-packets",
             Kind: "campaign_return_packet",
             Title: "Neon Cradle campaign return diary contacts heat aftermath downtime event control operation packet",
-            Summary: "Compact continuity and GM packet forms stay on one governed workspace v4 lane.",
+            Summary: "Compact continuity and GM packet forms stay on one reviewed workspace v4 lane.",
             BindingSummary: "Bound to travel/offline return continuity and GM operations receipts.",
             Reusable: true,
             SearchTerms: ["campaign", "return", "loop", "diary", "connection", "heat", "aftermath", "downtime", "travel", "offline", "safehouse", "eventcontrol", "season", "operation", "packet"],
@@ -1169,11 +1169,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "campaign-return:mutations",
             Kind: "campaign_return_packet",
             Title: "Neon Cradle diary, contacts, and heat return packet",
-            Summary: "Diary, contacts, and heat continuity remain on one governed return lane.",
+            Summary: "Diary, contacts, and heat continuity remain on one reviewed return path.",
             BindingSummary: "Bound to the shared campaign return lane for downtime and next-session reopen.",
             Reusable: true,
             SearchTerms: ["diary", "contact", "connection", "heat", "return", "session", "loop"],
-            EvidenceLines: ["Relationship continuity stays attached to the governed return lane."],
+            EvidenceLines: ["Relationship continuity stays attached to the reviewed return path."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contact updates")));
@@ -5323,7 +5323,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("return lane label", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(packet.EvidenceLines, line => line.Contains("reopen from governed return lane", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("reopen from reviewed return path", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -7825,7 +7825,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
                 TurnLedgerHandoff: new TurnLedgerHandoffProjection(
                     HandoffId: "turn-ledger:test",
                     Summary: "Minor actions stay committed before the next opponent pass.",
-                    EvidenceLines: ["Hub keeps the handoff receipt without replaying engine math."],
+                    EvidenceLines: ["Hub keeps the build receipt without replaying engine math."],
                     UpdatedAtUtc: DateTimeOffset.UtcNow),
                 RunboardState: new RunboardStateProjection(
                     StateId: "runboard-state:test",
@@ -7833,7 +7833,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
                     ObjectiveLines: ["Secure the courier", "Keep Knight Errant off the comms"],
                     Blockers: ["Suppress the west stairwell", "Resolve matrix overwatch before extraction"],
                     NextSafeAction: "Open ResolutionReport and confirm the same return lane.",
-                    EvidenceLines: ["Same workspace rail, same governed runboard state."],
+                    EvidenceLines: ["Same workspace path, same governed runboard state."],
                     UpdatedAtUtc: DateTimeOffset.UtcNow),
                 ResolutionReportDraft: new ResolutionReportDraftProjection(
                     DraftId: "resolution:test",
@@ -9503,7 +9503,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             MemoryId: "memory-1",
             Label: "Long-lived memory ledger",
             Summary: "Long-lived campaign memory keeps season outcomes and contact fallout reviewable.",
-            ReturnSummary: "Memory return lane stays attached to the same governed workspace.",
+            ReturnSummary: "Memory return lane stays attached to the same reviewed workspace.",
             NextSafeAction: "Review memory ledger before next session prep.",
             EvidenceLines: ["Long-lived memory evidence remains attached to recap and consequence receipts."],
             UpdatedAtUtc: now.AddMinutes(4));
@@ -10498,7 +10498,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "packet-2",
             Kind: "contact_obligation_lane",
             Label: "Fixer obligation lane",
-            Summary: "Fixer obligation remains attached to the same governed return lane.",
+            Summary: "Fixer obligation remains attached to the same reviewed return path.",
             UpdatedAtUtc: now.AddMinutes(4));
 
         return new CampaignWorkspaceProjection(
@@ -10957,7 +10957,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Label: "Return lane label",
             Summary: "",
             ReturnSummary: "",
-            NextSafeAction: "Reopen from governed return lane.",
+            NextSafeAction: "Reopen from reviewed return path.",
             EvidenceLines: [],
             UpdatedAtUtc: now.AddMinutes(2));
 
@@ -11321,7 +11321,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Label: "Return lane priority",
             Summary: "Carry-forward summary keeps reopen actions staged.",
             ReturnSummary: "Return summary keeps the session handoff governed.",
-            NextSafeAction: "Reopen the campaign from the governed return lane.",
+            NextSafeAction: "Reopen the campaign from the reviewed return path.",
             EvidenceLines: [],
             UpdatedAtUtc: now.AddMinutes(3));
 
@@ -13991,7 +13991,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             CarryForwardId: "carry-out-brief-1",
             Label: "Out brief carry-forward",
             Summary: "",
-            ReturnSummary: "Out-briefings stay attached to the governed return lane.",
+            ReturnSummary: "Out-briefings stay attached to the reviewed return path.",
             NextSafeAction: "Review recap board before table return.",
             EvidenceLines: [],
             UpdatedAtUtc: now.AddMinutes(2));
@@ -14071,7 +14071,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             CarryForwardId: "carry-post-mortem-1",
             Label: "Post mortem carry-forward",
             Summary: "",
-            ReturnSummary: "Post-mortems stay attached to the governed return lane.",
+            ReturnSummary: "Post-mortems stay attached to the reviewed return path.",
             NextSafeAction: "Review recap board before table return.",
             EvidenceLines: [],
             UpdatedAtUtc: now.AddMinutes(2));

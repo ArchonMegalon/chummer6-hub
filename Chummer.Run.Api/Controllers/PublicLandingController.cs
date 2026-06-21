@@ -1818,7 +1818,7 @@ public sealed class PublicLandingController : Controller
                         PersonalizedInstallScriptConsumeStatus.Revoked => "install_command_revoked",
                         _ => "install_command_unavailable",
                     },
-                    message = "The install command expired or is no longer available. Re-open the signed-in downloads handoff and copy a fresh install command."
+                    message = "The install command expired or is no longer available. Open the signed-in Downloads page and copy a fresh install command."
                 });
         }
 
@@ -1855,7 +1855,7 @@ public sealed class PublicLandingController : Controller
             Response.Headers["Cache-Control"] = "private, no-store";
             return Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                detail: "no macOS bootstrap artifacts are available for this personalized handoff.");
+                detail: "No macOS setup files are available for this personalized install.");
         }
 
         MacInstallBootstrapArtifact[] scriptArtifacts = BuildMacInstallBootstrapArtifacts(
@@ -1929,7 +1929,7 @@ public sealed class PublicLandingController : Controller
                 return Unauthorized(new
                 {
                     error = "invalid_or_expired_install_ticket",
-                    message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                    message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
                 });
             }
 
@@ -2898,7 +2898,7 @@ public sealed class PublicLandingController : Controller
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
                 AftermathHref = "/account/work#aftermath-packages",
-                Summary = "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return rail."
+                Summary = "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
             },
             Boundary = new
             {
@@ -5592,7 +5592,7 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "World",
             Heading: "Living World",
             Intro: "Living World is now a real route for between-session command continuity: the watch package, faction command, Runner Passport, and aftermath path stay attached to the same reviewed turn instead of scattering into concept-only copy.",
-            BoundaryLine: "Living World engagement is reviewed, opt-in, and Chummer-owned. It does not claim autonomous simulation, automatic world truth, or unbounded off-table authorship.",
+            BoundaryLine: "Living World engagement is reviewed, opt-in, and Chummer-owned. It does not claim autonomous simulation, automatic world state, or unbounded off-table authorship.",
             SummaryPoints:
             [
                 worldTurnBriefing?.Broadcast is not null ? "Watch package live" : "Watch framing armed",
@@ -6824,7 +6824,7 @@ ONRAMP now ships a first-party guided starter packet.
 ## Lead starter workspace
 
 {{(receipt.LeadStarter is null
-    ? "No lead starter workspace is attached yet. Use the signed-in desk to move into the first playable session lane when the first governed workspace returns."
+    ? "No lead starter workspace is attached yet. Use the signed-in desk to move into the first playable session lane when the first reviewed workspace returns."
     : $"{receipt.LeadStarter.CampaignName} is the lead starter workspace. Ruleset: {receipt.LeadStarter.RuleEnvironment}. Next safe action: {receipt.LeadStarter.NextSafeAction}")}}
 """;
     }
@@ -9363,7 +9363,7 @@ Boundary:
             AttachmentHelp: "Add screenshots, logs, or a small diagnostic bundle when they make the bug or install problem easier to route.",
             Options:
             [
-                new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download link is the problem."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
@@ -11239,7 +11239,7 @@ Boundary:
             builder.Append("ACTUAL_BOOTSTRAP_SHA256=\"$(shasum -a 256 \"$TMP_BOOTSTRAP_SCRIPT\" | awk '{print $1}')\"; ");
             builder.Append("[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == ")
                 .Append(SingleQuoteShellValue(bootstrapSha256))
-                .Append(" ]] || { echo 'Bootstrap digest mismatch; re-open the signed-in downloads handoff and copy a fresh install command.' >&2; exit 1; }; ");
+                .Append(" ]] || { echo 'Setup script check failed; open the signed-in Downloads page and copy a fresh install command.' >&2; exit 1; }; ");
         }
 
         builder.Append("/bin/bash \"$TMP_BOOTSTRAP_SCRIPT\"");
@@ -12034,7 +12034,7 @@ Boundary:
         builder.AppendLine("  advance_progress \"Linking $artifact_title to this account\"");
         builder.AppendLine("  echo \"Linking $artifact_title to this account...\"");
         builder.AppendLine("  if [[ -z \"$claim_code\" ]]; then");
-        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title could not find the embedded short-lived install claim for this handoff. Re-open the current Mac install command from $DOWNLOADS_URL and run it again.\")");
+        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title could not find the embedded short-lived install claim for this build. Re-open the current Mac install command from $DOWNLOADS_URL and run it again.\")");
         builder.AppendLine("    return 0");
         builder.AppendLine("  fi");
         builder.AppendLine("  launch_pid=\"$(launch_bundle_binary_with_claim \"$target_app\" \"$claim_code\")\" || {");
@@ -12151,7 +12151,7 @@ Boundary:
                 return (null, Unauthorized(new
                 {
                     error = "invalid_or_expired_install_ticket",
-                    message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                    message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
                 }));
             }
 
@@ -12168,7 +12168,7 @@ Boundary:
                 return (null, Unauthorized(new
                 {
                     error = "invalid_or_expired_claim_code",
-                    message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                    message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
                 }));
             }
 
@@ -12199,7 +12199,7 @@ Boundary:
 
         if (guidedArtifacts.Count == 0)
         {
-            return (null, Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: $"no {requiredPlatform} bootstrap artifacts are available for this handoff."));
+            return (null, Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: $"No {requiredPlatform} setup files are available for this install."));
         }
 
         string effectiveBootstrapTicket = !string.IsNullOrWhiteSpace(bootstrapTicket)
@@ -13569,7 +13569,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return loop",
                 Summary: aftermathCount > 0
-                    ? $"{aftermathCount} aftermath package(s) are on the governed return rail, so Passport continuity can survive the off-table handoff."
+                    ? $"{aftermathCount} aftermath package(s) are on the reviewed return path, so Passport continuity can survive the off-table return."
                     : "Aftermath return loops stay armed even when the queue is empty, so trust does not vanish when a session moves off-table.",
                 Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Return-loop" : "Armed")
@@ -13621,8 +13621,8 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath rail",
                 Summary: aftermathCount > 0
-                    ? $"{aftermathCount} aftermath package(s) are already queued on the governed return rail, so Signal Deck pressure survives the off-table handoff."
-                    : "Aftermath return rail is attached even when no package is queued yet, so command pressure does not disappear after adjudication.",
+                    ? $"{aftermathCount} aftermath package(s) are already queued on the reviewed return path, so Signal Deck pressure survives the off-table return."
+                    : "Aftermath return path is attached even when no package is queued yet, so command pressure does not disappear after adjudication.",
                 Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed"),
             new(
@@ -13683,7 +13683,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath rail",
                 Summary: aftermathCount > 0
-                    ? $"{aftermathCount} aftermath package(s) are already queued, so Living World fallout survives the off-table handoff."
+                    ? $"{aftermathCount} aftermath package(s) are already queued, so Living World fallout survives the off-table return."
                     : "Aftermath rail is attached even before the next package is written, so the between-session lane stays governed and real.",
                 Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
@@ -13705,7 +13705,7 @@ echo "Help: ${HELP_URL}"
         int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
         int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
         string summary = "Faction workspace is part of the same governed command rail as Table Pulse Live, Signal Deck, Runner Passport, Living Newsroom, and Table Pulse Aftermath. Command does not end at action points; it carries through to fallout.";
-        string boundaryLine = "Workspace command stays authenticated and attached to Chummer state. It can route pressure, command, and reviewed fallout, but it does not publish private lore or invent public world truth outside Chummer-owned paths.";
+        string boundaryLine = "Workspace command stays authenticated and attached to Chummer state. It can route pressure, command, and reviewed fallout, but it does not publish private lore or invent public world state outside Chummer-owned paths.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
@@ -13735,7 +13735,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath rail",
                 Summary: aftermathCount > 0
-                    ? $"{aftermathCount} aftermath package(s) are on the governed return rail, so this workspace can review fallout instead of losing the thread after adjudication."
+                    ? $"{aftermathCount} aftermath package(s) are on the reviewed return path, so this workspace can review fallout instead of losing the thread after adjudication."
                     : "Aftermath rail is attached even when the queue is empty, so the workspace stays connected to return-loop posture.",
                 Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
@@ -13902,8 +13902,8 @@ echo "Help: ${HELP_URL}"
             ? "Consent-gated preview"
             : "Governed signed-in lane";
         string boundaryLine = workspaceServerPlane is null
-            ? "No governed workspace means no live reaction write path. Table Pulse Live stays read-only instead of inventing detached minigame truth, and Table Pulse Aftermath stays parked."
-            : "Table Pulse Live can write only governed consequence posture on the signed-in workspace rail. It does not publish world truth, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return rail.";
+            ? "No reviewed workspace means no live reaction write path. Table Pulse Live stays read-only instead of inventing detached minigame truth, and Table Pulse Aftermath stays parked."
+            : "Table Pulse Live can write only governed consequence posture on the signed-in workspace path. It does not publish world state, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return path.";
         string consentPosture = "Table Pulse Live is opt-in, consent-gated, and review-based. Remote reactions are mini-games and packets, not direct table mutation or automatic world-state authority. Table Pulse Aftermath remains private and GM-controlled.";
 
         List<BlackLedgerTablePulseCueViewModel> cues =
@@ -13957,10 +13957,10 @@ echo "Help: ${HELP_URL}"
         string? adjudicationSummary = workspaceServerPlane?.Consequences.Count > 0
             ? $"Current governed consequence posture: {string.Join(", ", workspaceServerPlane.Consequences.Take(3).Select(static item => $"{item.Label} {item.State}"))}."
             : workspaceServerPlane is null
-                ? "Adjudication is parked until a governed workspace is available for this signed-in account."
+                ? "Adjudication is parked until a reviewed workspace is available for this signed-in account."
                 : null;
 
-        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same governed rail. Table Pulse Aftermath is the separate private return lane.";
+        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same reviewed path. Table Pulse Aftermath is the separate private return lane.";
         string[] labels =
         [
             "Table Pulse Live",
@@ -14100,7 +14100,7 @@ echo "Help: ${HELP_URL}"
             : "Aftermath queue is empty right now, so this cockpit is reading posture rather than shepherding live fallout packages.";
         string aftermathHref = "/account/work#aftermath-packages";
         string summary = "GM cockpit keeps remote-reaction aftermath on one command rail: review consequences, escalate to leader intent, preserve Signal Deck continuity, and keep Runner Passport trust bounded.";
-        string boundaryLine = "This cockpit can interpret and escalate governed consequence posture only. It does not create public scores, mutate world truth directly, or reveal private session transcript detail.";
+        string boundaryLine = "This cockpit can interpret and escalate governed consequence posture only. It does not create public scores, mutate world state directly, or reveal private session transcript detail.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
@@ -14255,9 +14255,9 @@ echo "Help: ${HELP_URL}"
         return "set -euo pipefail; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
             "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
-            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the release page and retry.' >&2; exit 1; }; " +
+            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch setup script; refresh the release page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
-            "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the release page and retry.' >&2; exit 1; }; " +
+            "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Setup script check failed; refresh the release page and retry.' >&2; exit 1; }; " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
             "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1' " +

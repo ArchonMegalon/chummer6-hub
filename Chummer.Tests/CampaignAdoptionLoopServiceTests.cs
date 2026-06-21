@@ -84,7 +84,7 @@ public sealed class CampaignAdoptionLoopServiceTests
                 ],
                 RecommendedNextActions:
                 [
-                    "Keep future changes only and preserve legacy notes on the governed return lane."
+                    "Keep future changes only and preserve legacy notes on the reviewed return path."
                 ],
                 Summary: "Campaign adoption wizard says this workspace is safe to play while unknown provenance stays explicit.",
                 NextSafeAction: "Review the adoption wizard on /account/work#adoption before you reopen the next campaign return.",
@@ -105,7 +105,7 @@ public sealed class CampaignAdoptionLoopServiceTests
 
             ResolutionReportApprovalProjection approval = campaignSpine.ApproveResolutionReport(user, workspace, new ResolutionReportApprovalRequest(
                 RunId: run.RunId,
-                Summary: "ResolutionReport approval closes the courier extraction on the governed hub lane.",
+                Summary: "ResolutionReport approval closes the courier extraction on the reviewed hub path.",
                 WorldTickSummary: "Dockside courier fallout becomes the first BLACK LEDGER WorldTick for Tacoma.",
                 ConsequenceSummary: "Heat escalates across Tacoma after the courier extraction closes out.",
                 NewsTitle: "Tacoma grid rumor points to a vanished courier",

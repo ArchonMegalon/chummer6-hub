@@ -20,13 +20,13 @@ internal static class CommunityApiProblemMapper
                 => controller.NotFound(new ProblemDetails
                 {
                     Title = "Join code is not active",
-                    Detail = "That join code is not active anymore. Ask the organizer for a fresh join code and reuse the member guidance rail for downloads, help, and closure."
+                    Detail = "That join code is not active anymore. Ask the organizer for a fresh join code and reuse the member guidance page for downloads, help, and closure."
                 }),
             var message when message.Contains("Unknown boost code:", StringComparison.OrdinalIgnoreCase)
                 => controller.NotFound(new ProblemDetails
                 {
                     Title = "Boost code is not active",
-                    Detail = "That boost code is not active anymore. Ask the organizer for a fresh sponsorship code on the same governed operator rail."
+                    Detail = "That boost code is not active anymore. Ask the organizer for a fresh sponsorship code on the same organizer page."
                 }),
             _ => controller.NotFound()
         };
@@ -38,7 +38,7 @@ internal static class CommunityApiProblemMapper
                 => controller.BadRequest(new ProblemDetails
                 {
                     Title = "Join code expired",
-                    Detail = "That join code expired. Ask the organizer for a fresh join code and resend the same member guidance rail so recovery stays grounded."
+                    Detail = "That join code expired. Ask the organizer for a fresh join code and resend the same member guidance page so recovery stays clear."
                 }),
             _ => controller.BadRequest(ex.Message)
         };

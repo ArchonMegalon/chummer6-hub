@@ -265,8 +265,9 @@ public sealed class DownloadsCompatibilityControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         string payload = JsonSerializer.Serialize(ok.Value);
-        Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
-        Assert.Contains("verification and support rail", payload, StringComparison.Ordinal);
+        Assert.Contains("\"status\":\"support_only\"", payload, StringComparison.Ordinal);
+        Assert.Contains("supplemental support downloads", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("verification and support rail", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
@@ -383,7 +384,7 @@ public sealed class DownloadsCompatibilityControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         string payload = JsonSerializer.Serialize(ok.Value);
-        Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
+        Assert.Contains("\"status\":\"support_only\"", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
 
