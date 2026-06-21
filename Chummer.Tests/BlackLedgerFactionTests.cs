@@ -47,7 +47,7 @@ public sealed class BlackLedgerFactionTests
         Assert.Contains("TryLoadPublicMagicFitFactionReceipt", service, StringComparison.Ordinal);
         Assert.Contains("-promo.receipt.json", service, StringComparison.Ordinal);
         Assert.Contains("How the reel is structured", promoView, StringComparison.Ordinal);
-        Assert.Contains("@Model.Promo.RenderPipelineLabel", promoView, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Promo.RenderPipelineLabel)", promoView, StringComparison.Ordinal);
         Assert.Contains("@foreach (var scene in Model.Promo.ScreenplayScenes)", promoView, StringComparison.Ordinal);
     }
 }
