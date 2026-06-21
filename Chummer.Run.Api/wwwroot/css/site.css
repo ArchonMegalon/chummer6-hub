@@ -7043,7 +7043,7 @@ body {
 
 .faction-storyboard-frame__visual,
 .faction-storyboard-frame__action,
-.faction-storyboard-frame__proof {
+.faction-storyboard-frame__payoff {
   margin: 0;
 }
 
@@ -7056,7 +7056,7 @@ body {
   color: var(--ink-strong);
 }
 
-.faction-storyboard-frame__proof {
+.faction-storyboard-frame__payoff {
   color: var(--ink-muted);
   font-size: 0.92rem;
 }

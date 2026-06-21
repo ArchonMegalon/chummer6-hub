@@ -245,6 +245,8 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         "Connected command path",
         "Faction workspace lanes",
         "Onboarding command lanes",
+        "Fallback mode:",
+        "faction-storyboard-frame__proof",
     ):
         assert forbidden not in combined
 
