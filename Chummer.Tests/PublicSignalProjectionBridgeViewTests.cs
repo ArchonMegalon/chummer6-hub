@@ -15,9 +15,9 @@ public sealed class PublicSignalProjectionBridgeViewTests
         Assert.Contains("@Model.CoreRule", partial, StringComparison.Ordinal);
         Assert.Contains("Boundary conditions", partial, StringComparison.Ordinal);
         Assert.Contains("Required public warning", partial, StringComparison.Ordinal);
-        Assert.Contains("First board set", partial, StringComparison.Ordinal);
-        Assert.Contains("Canonical sources", partial, StringComparison.Ordinal);
-        Assert.Contains("Shipped closeout gate", partial, StringComparison.Ordinal);
+        Assert.Contains("Product review", partial, StringComparison.Ordinal);
+        Assert.Contains("Decision context", partial, StringComparison.Ordinal);
+        Assert.Contains("Planning and shipped updates stay separate from the public board.", partial, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -31,10 +31,10 @@ public sealed class PublicSignalProjectionBridgeViewTests
         string roadmapView = File.ReadAllText(roadmapViewPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
-        Assert.Contains("var signalProjection = Model.SignalProjection;", feedbackView, StringComparison.Ordinal);
+        Assert.DoesNotContain("var signalProjection = Model.SignalProjection;", feedbackView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", changelogView, StringComparison.Ordinal);
-        Assert.Contains("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", feedbackView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicSignalProjectionPacket", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Model.SignalLoop", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", changelogView, StringComparison.Ordinal);
