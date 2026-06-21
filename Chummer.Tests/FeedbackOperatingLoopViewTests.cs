@@ -45,7 +45,7 @@ public sealed class FeedbackOperatingLoopViewTests
     }
 
     [Fact]
-    public void RoadmapAndChangelogRoutesReuseTheSharedSignalLoopSnapshotForCrossRailHandoff()
+    public void RoadmapAndChangelogRoutesReuseTheSharedSignalLoopSnapshotForRelatedPages()
     {
         string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string changelogViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml");
@@ -54,7 +54,7 @@ public sealed class FeedbackOperatingLoopViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("var signalLoop = Model.SignalLoop;", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Page handoff", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Related pages", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Open changelog", roadmapView, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.FollowSettingsHref", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);

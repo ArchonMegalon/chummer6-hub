@@ -474,7 +474,7 @@ else
                                                     <span class="tag">Calm</span>
                                                 <div class="app-rail__copy">
                                                     <h3>No urgent follow-up</h3>
-                                                    <p>This view does not see a fresh support closure, install handoff, or restore conflict right now.</p>
+                                                    <p>There is no urgent support update, setup step, or restore conflict right now.</p>
                                                 </div>
                                                 <a class="inline-link" href="/now">See what works today</a>
                                             </article>
@@ -1078,9 +1078,9 @@ else
                                             @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Build handoff</span>
+                                                    <span class="tag">Build setup</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>Continuity is ready for the first build handoff</h3>
+                                                        <h3>Continuity is ready for the first build setup</h3>
                                                         <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
                                                     </div>
                                                     <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Start from downloads</a>
@@ -1092,7 +1092,7 @@ else
                                                 {
                                                     var handoff = buildHandoffs[0];
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Build handoff</span>
+                                                        <span class="tag">Build setup</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@handoff.Title</h3>
                                                             <p>
@@ -1325,7 +1325,7 @@ else
                                                             {
                                                                 <span> Lineage: @publication.LineageSummary</span>
                                                             }
-                                                            <span>Available now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                            <span>Available now: @(publication.Discoverable ? "Eligible now" : "Limited").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                                             {

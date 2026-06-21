@@ -515,7 +515,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Campaign continuity", gmSessionVenue, StringComparison.Ordinal);
         Assert.DoesNotContain("Black Ledger follow-through", gmSessionVenue, StringComparison.Ordinal);
 
-        Assert.Contains("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.Contains("Next steps", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("Bounded follow-through", karmaForgeSubmitted, StringComparison.Ordinal);
 
         Assert.Contains("reviewed output history", buildGhostConcierge, StringComparison.Ordinal);
@@ -577,7 +578,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Signed-in helper", view, StringComparison.Ordinal);
         Assert.Contains("The real compare bench is now a named account path.", view, StringComparison.Ordinal);
         Assert.Contains("@SanitizePublicCopy(signedInBench.EntryLabel)", view, StringComparison.Ordinal);
-        Assert.Contains("Open lead build handoff", view, StringComparison.Ordinal);
+        Assert.Contains("Open lead build setup", view, StringComparison.Ordinal);
     }
 
     [Fact]

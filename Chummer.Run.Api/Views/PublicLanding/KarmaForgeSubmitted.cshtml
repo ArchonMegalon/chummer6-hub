@@ -5,13 +5,13 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE submission";
-    ViewData["ContextSidebarSummary"] = "Keep next steps, next questions, and saved packet data in the shared side panel.";
+    ViewData["ContextSidebarSummary"] = "Keep next steps, next questions, and saved details in the shared side panel.";
     ViewData["ContextSidebarLinks"] = new[]
     {
-        new PublicNavigationLink("Bounded next steps", "#bounded-followthrough"),
+        new PublicNavigationLink("Next steps", "#bounded-followthrough"),
         new PublicNavigationLink("Next questions", "#next-questions"),
         new PublicNavigationLink("Next steps", "#next-steps"),
-        new PublicNavigationLink("Saved packet data", "#packet-json"),
+        new PublicNavigationLink("Saved details", "#packet-json"),
     };
     var governedDecisionLabel = string.Concat("Product", " Governor");
     var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Governed product decision", StringComparison.OrdinalIgnoreCase);
@@ -19,7 +19,7 @@
         => string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value
-                .Replace(string.Concat("Product", " Governor"), "governed product decision", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Product", " Governor"), "product decision", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
                 .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
@@ -74,7 +74,7 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Packet detail</h3>
+                <h3>Saved detail</h3>
                 <p>@highlight</p>
             </div>
         </article>
@@ -83,9 +83,9 @@
 
 <section class="editorial-block" id="bounded-followthrough">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Bounded next steps</p>
+        <p class="eyebrow">Next steps</p>
         <h2 class="editorial-title">The next steps stay clear from follow-up through closeout.</h2>
-        <p class="editorial-copy">These steps can sharpen, schedule, review, decide, or close out the packet. None of them become product decisions on their own unless the Chummer decision step says so.</p>
+        <p class="editorial-copy">These steps can sharpen, schedule, review, decide, or close out the request. Chummer still makes the final product decision.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var stage in Model.ExternalStages)
@@ -124,7 +124,7 @@
         <article class="trust-page-section" id="next-questions">
             <p class="eyebrow">Next questions queue</p>
             <h2>Questions that should sharpen the next pass</h2>
-            <p>@(Model.FollowUpAllowed ? "Follow-up is allowed, so these are the most likely questions Chummer will ask next if this packet stays high-signal." : "Follow-up is off, but these are still the canonical prompts that would sharpen the packet if you return later.")</p>
+            <p>@(Model.FollowUpAllowed ? "Follow-up is allowed, so these are the most likely questions Chummer will ask next." : "Follow-up is off, but these questions can still sharpen the request if you return later.")</p>
             <ul class="trust-page-section__list">
                 @foreach (var question in Model.NextQuestions)
                 {
@@ -147,9 +147,9 @@
         </article>
 
         <article class="trust-page-section" id="packet-json">
-            <p class="eyebrow">Saved packet data</p>
+            <p class="eyebrow">Saved details</p>
             <h2>The normalized outputs are visible here</h2>
-            <p>These JSON previews are Chummer-owned packet shapes. They are the durable intake truth for this submission, not raw interview notes.</p>
+            <p>These previews show what Chummer saved for this submission.</p>
 
             <details class="details-drawer">
                 <summary>HouseRuleDemandPacket</summary>

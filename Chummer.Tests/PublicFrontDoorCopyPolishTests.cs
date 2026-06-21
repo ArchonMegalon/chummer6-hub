@@ -329,7 +329,18 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                          "provider setup",
                          "operating posture",
                          "send posture",
-                         "release-facing trail"
+                         "release-facing trail",
+                         "Download handoff",
+                         "Page handoff",
+                         "Build handoff",
+                         "Open lead build handoff",
+                         "handoff JSON",
+                         "packet data",
+                         "Packet detail",
+                         "packet stays high-signal",
+                         "canonical prompts",
+                         "Named bounded roles",
+                         "Still bounded"
                      })
             {
                 Assert.DoesNotContain(marker, visibleText, StringComparison.OrdinalIgnoreCase);

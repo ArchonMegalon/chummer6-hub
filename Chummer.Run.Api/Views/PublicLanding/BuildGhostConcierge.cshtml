@@ -124,7 +124,7 @@
             <article class="trust-claim">
                 <span class="tag">Detail</span>
                 <h3>@SanitizePublicCopy(artifact)</h3>
-                <p>Chummer output only. No helper is allowed to publish this as truth on its own.</p>
+                <p>Chummer keeps the final result. The helper only prepares a draft.</p>
             </article>
         }
     </div>
@@ -142,7 +142,7 @@
                 <a class="button-like button-like--primary" href="@signedInBench.EntryHref">@SanitizePublicCopy(signedInBench.EntryLabel)</a>
                 @if (!string.IsNullOrWhiteSpace(signedInBench.LeadHandoffHref))
                 {
-                    <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open lead build handoff</a>
+                    <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open lead build setup</a>
                 }
             </div>
         </div>

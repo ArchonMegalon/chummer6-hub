@@ -156,7 +156,7 @@
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed the public roadmap alias</h3>
-                <p><code class="mono-receipt">/roadmap</code> is the Chummer planning page for direction and milestone pressure. It is not the changelog and it is not the support queue.</p>
+                <p><code class="mono-receipt">/roadmap</code> is the Chummer planning page. It is not the changelog and it is not the support queue.</p>
                 <div class="route-callout__details">
                     <span>Planning view</span>
                     <span>Feedback lives elsewhere</span>
@@ -186,15 +186,15 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Page handoff</p>
+        <p class="eyebrow">Related pages</p>
         <h2 class="editorial-title">Roadmap works best when it stays connected to feedback and shipped updates.</h2>
-        <p class="editorial-copy">This page should sit in the middle of the loop: it shows visible demand, real milestone pressure, and a direct comparison with shipped updates before promise language tightens.</p>
+        <p class="editorial-copy">This page shows what is being considered, what has already shipped, and where public feedback belongs.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Active pressure</span>
-            <h3>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") still define the real planning load.</h3>
-            <p>@signalLoop.ClaimedMilestoneCount already show claimed movement. @signalLoop.HighDifficultyMilestoneCount still need broader coordination before public promise language should narrow.</p>
+            <span class="tag">In planning</span>
+            <h3>@signalLoop.OpenMilestoneCount open milestone@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") still need attention.</h3>
+            <p>@signalLoop.ClaimedMilestoneCount already show movement. @signalLoop.HighDifficultyMilestoneCount need broader coordination before they can be described more narrowly.</p>
             @if (milestoneFollowUp.Length > 0)
             {
                 <div class="compact-rail">
