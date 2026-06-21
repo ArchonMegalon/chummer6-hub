@@ -88,6 +88,39 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         assert forbidden not in trust_page
 
 
+def test_faq_page_cleans_dynamic_public_copy_before_rendering() -> None:
+    faq = read("Chummer.Run.Api/Views/PublicLanding/Faq.cshtml")
+
+    for expected in (
+        "@PublicText(Model.Eyebrow)",
+        "@PublicText(Model.Heading)",
+        "@PublicText(Model.Intro)",
+        "@PublicText(action.Label)",
+        "@PublicText(choice.Badge)",
+        "@PublicText(choice.Title)",
+        "@PublicText(choice.Summary)",
+        "@PublicText(choice.Label)",
+        "@PublicText(faqSection.Title)",
+        "@PublicText(entry.Question)",
+        "@PublicText(entry.Answer)",
+    ):
+        assert expected in faq
+
+    for forbidden in (
+        ">@Model.Eyebrow</p>",
+        ">@Model.Heading</h1>",
+        ">@Model.Intro</p>",
+        ">@action.Label</a>",
+        "<span class=\"tag\">@choice.Badge</span>",
+        "<h3>@choice.Title</h3>",
+        "<p>@choice.Summary</p>",
+        ">@choice.Label</a>",
+        "<summary>@entry.Question</summary>",
+        "<p>@entry.Answer</p>",
+    ):
+        assert forbidden not in faq
+
+
 def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     horizons = read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml")

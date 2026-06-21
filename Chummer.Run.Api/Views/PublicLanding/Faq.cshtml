@@ -102,9 +102,9 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicText(Model.Heading)</h1>
+        <p class="page-copy">@PublicText(Model.Intro)</p>
     </div>
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
@@ -124,7 +124,7 @@
         @foreach (var choice in faqRouteChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
+                <span class="tag">@PublicText(choice.Badge)</span>
                 <h3>@PublicText(choice.Title)</h3>
                 <p>@PublicText(choice.Summary)</p>
                 <div class="route-choice-card__highlights">
