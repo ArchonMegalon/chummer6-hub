@@ -1,5 +1,22 @@
 @model FeatureDetailPageViewModel
 @{
+    static string RoadmapText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return PublicFacingCopyHumanizer.Clean(value)
+            .Replace("Black Ledger", "campaign city", StringComparison.OrdinalIgnoreCase)
+            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
+            .Replace("Alice", "character helper", StringComparison.OrdinalIgnoreCase)
+            .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("horizon", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("implementation tranche", "implementation slice", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 <section class="role-matrix">
@@ -13,14 +30,14 @@
         {
             <article class="role-matrix__cell">
                 <span class="tag">Why now</span>
-                <p>@Model.Pain</p>
+                <p>@RoadmapText(Model.Pain)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Payoff))
         {
             <article class="role-matrix__cell">
                 <span class="tag">Expected unlock</span>
-                <p>@Model.Payoff</p>
+                <p>@RoadmapText(Model.Payoff)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
@@ -60,9 +77,9 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Next honest page</h3>
-            <p>@Model.PrimaryAction.Label is the in-product next step. The deeper brief stays secondary so roadmap pages stay useful without pulling you away from the product.</p>
+            <p>@RoadmapText(Model.PrimaryAction.Label) is the in-product next step. The deeper brief stays secondary so roadmap pages stay useful without pulling you away from the product.</p>
         </div>
-        <a class="inline-link" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="inline-link" href="@Model.PrimaryAction.Href">@RoadmapText(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">

@@ -272,6 +272,40 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
     assert "planned work" in combined
 
 
+def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
+    roadmap = read("Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml")
+    roadmap_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml")
+
+    for required in (
+        "@CalmRoadmapText(milestone.StatusLabel)",
+        "@CalmRoadmapText(dependency.StatusLabel)",
+        "@CalmRoadmapText(signalLoop.FollowSettingsLabel)",
+    ):
+        assert required in roadmap
+
+    for required in (
+        "static string RoadmapText(string? value)",
+        "@RoadmapText(Model.Pain)",
+        "@RoadmapText(Model.Payoff)",
+        "@RoadmapText(Model.PrimaryAction.Label)",
+    ):
+        assert required in roadmap_detail
+
+    for forbidden in (
+        "@milestone.StatusLabel",
+        "@dependency.StatusLabel",
+        "@signalLoop.FollowSettingsLabel",
+    ):
+        assert forbidden not in roadmap
+
+    for forbidden in (
+        "@Model.Pain",
+        "@Model.Payoff",
+        "@Model.PrimaryAction.Label",
+    ):
+        assert forbidden not in roadmap_detail
+
+
 def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     sources = [
         read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),

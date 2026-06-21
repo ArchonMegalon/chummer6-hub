@@ -205,7 +205,7 @@
                                 <h3>@($"Milestone {milestone.Id}") · @CalmRoadmapText(milestone.Title)</h3>
                                 <p>@CalmRoadmapText(milestone.CasualSummary)</p>
                             </div>
-                            <span class="tag">@milestone.StatusLabel</span>
+                            <span class="tag">@CalmRoadmapText(milestone.StatusLabel)</span>
                         </article>
                     }
                 </div>
@@ -242,7 +242,7 @@
                 <span>Account return</span>
                 <span>Support return</span>
             </div>
-            <a class="editorial-strip__action" href="@signalLoop.FollowSettingsHref">@signalLoop.FollowSettingsLabel</a>
+            <a class="editorial-strip__action" href="@signalLoop.FollowSettingsHref">@CalmRoadmapText(signalLoop.FollowSettingsLabel)</a>
         </article>
     </div>
 </section>
@@ -276,7 +276,7 @@
                                 <span class="milestone-drawer__tease">@CalmRoadmapText(milestone.CasualSummary)</span>
                             </span>
                             <span class="milestone-pills" aria-hidden="true">
-                                <span class="milestone-pill milestone-pill--status">@milestone.StatusLabel</span>
+                                <span class="milestone-pill milestone-pill--status">@CalmRoadmapText(milestone.StatusLabel)</span>
                                 <span class="milestone-pill">@milestone.DifficultyLabel</span>
                                 <span class="milestone-pill">@(milestone.Claimed ? "Claimed" : "Open")</span>
                             </span>
@@ -296,7 +296,7 @@
                                     <li>
                                         <strong>@($"Milestone {dependency.Id}")</strong>
                                         <span>@CalmRoadmapText(dependency.Title)</span>
-                                        <span class="muted-copy">(@dependency.StatusLabel)</span>
+                                        <span class="muted-copy">(@CalmRoadmapText(dependency.StatusLabel))</span>
                                     </li>
                                 }
                             </ul>
