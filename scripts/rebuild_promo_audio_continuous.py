@@ -88,11 +88,12 @@ SCRIPTS: dict[str, str] = {
         "The returning player should receive the humane version of continuity: where you were, what changed, and what move is waiting. That is the fantasy here. Less ceremony. Less panic. More run."
     ),
     "alice-90s-deepdive": (
-        "A flashy runner is easy to imagine and much harder to keep alive. ALICE begins where style collides with table reality, in that narrow space where a character concept either becomes a professional or folds under the first real job. "
-        "The question is never just which build looks coolest. It is which build can carry the weight, absorb the tradeoffs, and still feel like the runner the player wanted to bring into the shadows. "
-        "The numbers should tell a story. What became sharper. What became fragile. What was quietly sacrificed to buy the trick. Gear is not a shopping list. Chrome is not flavor. Magic is not free. Every choice leaves a shape on the sheet and a consequence in play. "
-        "ALICE should not sound like a lecture from above. It should feel like a sharp-eyed coach standing beside the player, pointing at the weak seam before the first bad roll tears it open. "
-        "By the end, the runner still belongs completely to the player. They are simply clearer, stronger, and more ready for the table to test them."
+        "ALICE starts where a stylish runner concept meets the cold math of a real table. The fantasy matters. The look, the attitude, the role in the crew all need to survive contact with initiative, recoil, drain, money, availability, and the kind of mission that punishes vague confidence. "
+        "First, she reads the sheet like a professional looking for pressure points. What is the runner actually good at. Where does the build fold. Which weakness is deliberate, and which one only appeared because the numbers were hard to see. "
+        "Then she turns tradeoffs into plain language. Chrome buys speed and costs Essence. Magic opens doors and demands discipline. Gear solves problems until legality, concealment, noise, and cash start pushing back. A clever trick is not useful if the table cannot understand when it works. "
+        "When the video moves from portrait to choices to warnings, the voice keeps one continuous line of thought: not scene labels, but momentum. We are watching a concept become table-ready, a first draft becoming something the whole crew can trust when the run starts moving. "
+        "ALICE does not take authorship away from the player. She keeps the concept intact while making consequences visible early enough to choose them on purpose. The GM gets clearer risk. The player gets a runner who can enter the scene with fewer surprises and better reasons. "
+        "The point is not optimization for its own sake. It is confidence. A character who still feels like the person you imagined, but now has a structure strong enough for the shadows to test."
     ),
     "karma-forge-90s-deepdive": (
         "Every table invents house rules. Very few tables remember exactly when they did it, who agreed, what broke, or why everyone still argues about it three sessions later. "

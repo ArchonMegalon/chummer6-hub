@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import contextmanager
@@ -35,6 +36,7 @@ NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 0.70
 MAX_EDGE_SILENCE_SECONDS = 0.30
 SILENCE_GATE_DBFS = -42.0
+MIN_ALICE_TTS_COVERAGE_RATIO = 0.95
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
@@ -44,6 +46,11 @@ ALICE_PREMIUM_FEMALE_VOICE_LABEL = "Ava"
 UNMIXR_VOICE_POLICY = "unmixr_premium_required_no_edge_fallback"
 ALICE_VOICE_POLICY = "unmixr_premium_female_required_no_edge_fallback"
 VOICE_DISCOVERY_FIELDS = "uuid,character,gender,language,quality,use_cases,is_available"
+UNMIXR_API_KEY_ENV_KEYS = (
+    "UNMIXR_API_KEY",
+    "UNMIXR_API_KEY_FALLBACK_1",
+    "UNMIXR_API_KEY_FALLBACK_2",
+)
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -119,6 +126,117 @@ LEGACY = load_legacy_audio_module()
 
 def _voice_id_sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest() if value else ""
+
+
+def _unmixr_api_keys(preferred_env: str = "") -> list[tuple[str, str]]:
+    keys: list[tuple[str, str]] = []
+    seen_values: set[str] = set()
+    env_keys = list(UNMIXR_API_KEY_ENV_KEYS)
+    if preferred_env in env_keys:
+        env_keys.remove(preferred_env)
+        env_keys.insert(0, preferred_env)
+    for env_key in env_keys:
+        value = LEGACY.env_or_file(env_key)
+        if not value or value in seen_values:
+            continue
+        keys.append((env_key, value))
+        seen_values.add(value)
+    return keys
+
+
+def _unmixr_tts_config(voice_id: str, api_key_env: str = "") -> dict[str, str]:
+    return {
+        "api_key_env": api_key_env,
+        "voice_id": voice_id,
+        "language": LEGACY.env_or_file("UNMIXR_LANGUAGE") or "en-US",
+        "speaking_rate": LEGACY.env_or_file("UNMIXR_PROMO_SPEAKING_RATE") or LEGACY.env_or_file("UNMIXR_SPEAKING_RATE") or "slow",
+        "speaking_pitch": LEGACY.env_or_file("UNMIXR_SPEAKING_PITCH") or "low",
+        "speaking_volume": LEGACY.env_or_file("UNMIXR_SPEAKING_VOLUME") or "medium",
+    }
+
+
+def _unmixr_failure_summary(status: int | None, body: bytes | str) -> str:
+    text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+    try:
+        payload = json.loads(text) if text else {}
+    except json.JSONDecodeError:
+        payload = {}
+    if isinstance(payload, dict):
+        code = str(payload.get("code") or status or "").strip()
+        message = str(payload.get("message") or payload.get("detail") or payload.get("error") or "").strip()
+        if "balance" in message.lower():
+            return f"provider_{code or 'error'}_insufficient_api_balance"
+        if code or message:
+            reason = re.sub(r"[^A-Za-z0-9_.:-]+", "_", message).strip("_").lower()[:80] or "request_failed"
+            return f"provider_{code or 'error'}_{reason}"
+    if status is not None:
+        return f"http_{status}"
+    return "request_failed"
+
+
+def render_unmixr_tts_with_fallback_keys(
+    text: str,
+    voice_id: str,
+    output: Path,
+    *,
+    preferred_key_env: str = "",
+) -> tuple[bool, dict[str, str], list[str]]:
+    errors: list[str] = []
+    output.unlink(missing_ok=True)
+    api_keys = _unmixr_api_keys(preferred_key_env)
+    if not api_keys:
+        return False, _unmixr_tts_config(voice_id), ["unmixr_api_key_missing"]
+    for api_key_env, api_key in api_keys:
+        config = _unmixr_tts_config(voice_id, api_key_env)
+        payload = json.dumps(
+            {
+                "text": text,
+                "voice_id": config["voice_id"],
+                "language": config["language"],
+                "speaking_rate": config["speaking_rate"],
+                "speaking_pitch": config["speaking_pitch"],
+                "speaking_volume": config["speaking_volume"],
+                "output_type": output.suffix.lstrip(".") or "mp3",
+                "response_type": "url",
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            LEGACY.UNMIXR_API_URL,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                response_body = response.read()
+            body = json.loads(response_body.decode("utf-8"))
+            if isinstance(body, dict) and body.get("success") is False:
+                errors.append(f"{api_key_env}:{_unmixr_failure_summary(None, response_body)}")
+                continue
+            audio_url = str(body.get("audio_url") or "").strip() if isinstance(body, dict) else ""
+            if not audio_url:
+                errors.append(f"{api_key_env}:audio_url_missing")
+                continue
+            with urllib.request.urlopen(audio_url, timeout=120) as audio_response:
+                output.write_bytes(audio_response.read())
+        except urllib.error.HTTPError as exc:
+            try:
+                error_body = exc.read()
+            except OSError:
+                error_body = b""
+            errors.append(f"{api_key_env}:{_unmixr_failure_summary(exc.code, error_body)}")
+            continue
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            errors.append(f"{api_key_env}:{type(exc).__name__}")
+            continue
+        if output.exists() and output.stat().st_size > 0:
+            return True, config, errors
+        errors.append(f"{api_key_env}:empty_audio")
+    return False, _unmixr_tts_config(voice_id), errors
 
 
 def _unmixr_voice_policy_for_group(group_key: str) -> str:
@@ -508,6 +626,7 @@ def render_unmixr_narration(
             "voice_quality": str(resolved.get("voice_quality") or cached_meta.get("voice_quality") or ""),
             "voice_language": str(resolved.get("voice_language") or cached_meta.get("voice_language") or ""),
             "voice_reused_from_cache": True,
+            "api_key_env": str(cached_meta.get("api_key_env") or ""),
             "language": str(cached_meta.get("language") or ""),
             "speaking_rate": str(cached_meta.get("speaking_rate") or ""),
             "speaking_pitch": str(cached_meta.get("speaking_pitch") or ""),
@@ -518,15 +637,25 @@ def render_unmixr_narration(
 
     parts: list[Path] = []
     failures: list[str] = []
+    tts_config: dict[str, str] = {}
+    preferred_key_env = ""
     with unmixr_voice_override(group_key) as resolved:
         voice_id = str(resolved.get("voice_id") or "")
         source_env = str(resolved.get("voice_source_env") or "")
         for index, beat in enumerate(beats, start=1):
             raw = beat_dir / f"beat-{index:02d}.mp3"
-            ok = LEGACY.render_unmixr_tts(beat, raw)
+            ok, beat_config, beat_errors = render_unmixr_tts_with_fallback_keys(
+                beat,
+                voice_id,
+                raw,
+                preferred_key_env=preferred_key_env,
+            )
             if not ok:
-                failures.append(f"beat-{index:02d}")
-                raise RuntimeError(f"Unmixr TTS failed for {work.name} beat {index}")
+                failure = f"beat-{index:02d}:{';'.join(beat_errors)}"
+                failures.append(failure)
+                raise RuntimeError(f"Unmixr TTS failed for {work.name} beat {index}: {failure}")
+            tts_config = beat_config
+            preferred_key_env = beat_config.get("api_key_env", preferred_key_env)
             normalized = beat_dir / f"beat-{index:02d}.wav"
             normalize_voice(raw, normalized)
             parts.append(normalized)
@@ -536,7 +665,6 @@ def render_unmixr_narration(
                 render_pause(pause, pause_seconds)
                 parts.append(pause)
     concat_wavs(parts, stitched)
-    config = LEGACY.unmixr_config() or {}
     meta = {
         "script_sha256": script_sha,
         "voice_id_sha256": voice_sha,
@@ -546,16 +674,17 @@ def render_unmixr_narration(
         "voice_gender": str(resolved.get("voice_gender") or ""),
         "voice_quality": str(resolved.get("voice_quality") or ""),
         "voice_language": str(resolved.get("voice_language") or ""),
-        "language": config.get("language", ""),
-        "speaking_rate": config.get("speaking_rate", ""),
-        "speaking_pitch": config.get("speaking_pitch", ""),
-        "speaking_volume": config.get("speaking_volume", ""),
+        "api_key_env": tts_config.get("api_key_env", ""),
+        "language": tts_config.get("language", ""),
+        "speaking_rate": tts_config.get("speaking_rate", ""),
+        "speaking_pitch": tts_config.get("speaking_pitch", ""),
+        "speaking_volume": tts_config.get("speaking_volume", ""),
         "beat_count": len(beats),
     }
     meta_file.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     return stitched, {
         "provider": UNMIXR_PROVIDER,
-        "voice_id_redacted": redact(voice_id or config.get("voice_id", "")),
+        "voice_id_redacted": redact(voice_id or tts_config.get("voice_id", "")),
         "voice_source_env": source_env,
         "voice_policy": voice_policy,
         "voice_label": meta["voice_label"],
@@ -563,10 +692,11 @@ def render_unmixr_narration(
         "voice_quality": meta["voice_quality"],
         "voice_language": meta["voice_language"],
         "voice_reused_from_cache": False,
-        "language": config.get("language", ""),
-        "speaking_rate": config.get("speaking_rate", ""),
-        "speaking_pitch": config.get("speaking_pitch", ""),
-        "speaking_volume": config.get("speaking_volume", ""),
+        "api_key_env": tts_config.get("api_key_env", ""),
+        "language": tts_config.get("language", ""),
+        "speaking_rate": tts_config.get("speaking_rate", ""),
+        "speaking_pitch": tts_config.get("speaking_pitch", ""),
+        "speaking_volume": tts_config.get("speaking_volume", ""),
         "beat_count": len(beats),
         "failures": failures,
     }
@@ -622,8 +752,13 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     source = trimmed if trimmed.is_file() and trimmed.stat().st_size > 0 else narration
     source_duration = duration(source)
     target_voice = max(total_duration, 1.0)
-    tempo = min(max(source_duration / target_voice, 0.60), 1.16)
-    if abs(tempo - 1.0) > 0.015:
+    if source_duration < target_voice * MIN_ALICE_TTS_COVERAGE_RATIO:
+        raise RuntimeError(
+            f"alice_unmixr_narration_too_short_for_natural_pacing:"
+            f"{source_duration:.3f}s_for_{target_voice:.3f}s"
+        )
+    tempo = min(max(source_duration / target_voice, 1.0), 1.16)
+    if tempo > 1.015:
         voice_prep = f"atempo={tempo:.5f},atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
         fit = f"alice_clean_audiobook_style_{tempo:.3f}"
     else:
@@ -936,7 +1071,7 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
     provider_meta: dict[str, Any] = {"provider": "first_party_audio_bed", "voice_id_redacted": ""}
     narration_path: Path | None = None
     if group.narration:
-        if not LEGACY.unmixr_config():
+        if not _unmixr_api_keys():
             raise RuntimeError("unmixr_tts_required_for_public_video_audio")
         narration_path, provider_meta = render_unmixr_narration(group.key, group.narration, work, force_tts=force_tts)
     file_receipts: list[dict[str, Any]] = []
