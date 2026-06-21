@@ -79,17 +79,24 @@
     };
 
     string SanitizePublicText(string value)
-        => string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : value
-                .Replace(string.Concat("Product", " Governor"), "product review", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("oper", "ator projections"), "review projections", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("oper", "ator projection"), "review projection", StringComparison.OrdinalIgnoreCase);
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string cleaned = value
+            .Replace(string.Concat("Product", " Governor"), "product review", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("oper", "ator projections"), "review projections", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("oper", "ator projection"), "review projection", StringComparison.OrdinalIgnoreCase);
+
+        return PublicFacingCopyHumanizer.Clean(cleaned);
+    }
 }
 
 <section class="trust-page-hero">
@@ -98,8 +105,8 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">Send one concrete table problem to Chummer.</p>
         <div class="trust-claim__details">
-            <span>@Model.CanonicalLane</span>
-            <span>@Model.EntryLane</span>
+            <span>@SanitizePublicText(Model.CanonicalLane)</span>
+            <span>@SanitizePublicText(Model.EntryLane)</span>
             <span>@Model.Dashboard.TotalPackets request(s) received so far</span>
         </div>
     </div>
@@ -326,13 +333,13 @@
                     <div class="field">
                         <label>
                             <input name="QuoteAllowed" type="checkbox" value="true" checked="@Model.Form.DefaultQuoteAllowed" />
-                            Chummer may use an anonymous quote or paraphrase in discovery closeout materials.
+                            Chummer may use an anonymous quote or paraphrase when summarizing common problems.
                         </label>
                     </div>
                     <div class="field">
                         <label>
                             <input name="ConsentAccepted" type="checkbox" value="true" checked="@Model.Form.DefaultConsentAccepted" required />
-                            I understand this may inform Chummer design, but it does not become a feature commitment or backlog ownership by itself.
+                            I understand this may inform Chummer design, but it does not promise a feature by itself.
                         </label>
                     </div>
                 </details>
@@ -345,12 +352,12 @@
 
         <article class="trust-page-section" id="track-questions">
             <p class="eyebrow">Follow-up prompts</p>
-            <h2>@Model.SelectedTrack.Title</h2>
+            <h2>@SanitizePublicText(Model.SelectedTrack.Title)</h2>
             <p>These prompts sharpen the need without becoming decisions by themselves.</p>
             <ul class="trust-page-section__list">
                 @foreach (var question in Model.SelectedTrack.Questions)
                 {
-                    <li>@question</li>
+                    <li>@SanitizePublicText(question)</li>
                 }
             </ul>
         </article>
@@ -364,8 +371,8 @@
                 @foreach (var decision in Model.CandidateDecisions)
                 {
                     <div class="settings-summary-row">
-                        <span>@decision.Key</span>
-                        <strong>@decision.Meaning</strong>
+                        <span>@SanitizePublicText(decision.Key)</span>
+                        <strong>@SanitizePublicText(decision.Meaning)</strong>
                     </div>
                 }
             </div>
@@ -374,7 +381,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>@output</h3>
+                            <h3>@SanitizePublicText(output)</h3>
                             <p>Chummer uses saved decisions here. Raw interview notes and vendor summaries stay out of the public result.</p>
                         </div>
                     </article>
@@ -396,8 +403,8 @@
                     @foreach (var packet in Model.RecentSubmissions)
                     {
                         <div class="settings-summary-row">
-                            <span><a class="inline-link" href="/participate/karma-forge/submitted/@packet.SubmissionId">@packet.Title</a></span>
-                            <strong>@packet.SubmittedLabel · @packet.CandidateDecision · @packet.QueueStatus</strong>
+                            <span><a class="inline-link" href="/participate/karma-forge/submitted/@packet.SubmissionId">@SanitizePublicText(packet.Title)</a></span>
+                            <strong>@SanitizePublicText(packet.SubmittedLabel) · @SanitizePublicText(packet.CandidateDecision) · @SanitizePublicText(packet.QueueStatus)</strong>
                         </div>
                     }
                 </div>

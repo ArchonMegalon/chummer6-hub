@@ -711,6 +711,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                      "Ledger.cshtml",
                      "Changelog.cshtml",
                      "MobileProjection.cshtml",
+                     "KarmaForge.cshtml",
                      "KarmaForgeSubmitted.cshtml",
                      "FeedbackOperationsDetail.cshtml",
                      "GmSessionVenue.cshtml",
@@ -782,7 +783,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                          "HouseRuleDemandPacket",
                          "KarmaForgeCandidate",
                          "Linked update",
-                         "required detail"
+                         "required detail",
+                         "The normalized outputs",
+                         "RuleEnvironmentImpactHypothesis"
                      })
             {
                 Assert.DoesNotContain(marker, visibleText, StringComparison.OrdinalIgnoreCase);

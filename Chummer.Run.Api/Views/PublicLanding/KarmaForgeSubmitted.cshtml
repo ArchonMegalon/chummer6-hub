@@ -15,24 +15,27 @@
     var governedDecisionLabel = string.Concat("Product", " Governor");
     var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Reviewed product decision", StringComparison.OrdinalIgnoreCase);
     string SanitizePublicText(string value)
-        => string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : value
-                .Replace(string.Concat("Product", " Governor"), "product decision", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
-                .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
-                .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
-                .Replace("canonical", "reviewed", StringComparison.OrdinalIgnoreCase)
-                .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
-                .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
-                .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
-                .Replace("normalized", "saved", StringComparison.OrdinalIgnoreCase)
-                .Replace("HouseRuleDemandPacket", "rules request", StringComparison.OrdinalIgnoreCase)
-                .Replace("KarmaForgeCandidate", "saved request", StringComparison.OrdinalIgnoreCase);
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string cleaned = value
+            .Replace(string.Concat("Product", " Governor"), "product decision", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
+            .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
+            .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
+            .Replace("normalized", "saved", StringComparison.OrdinalIgnoreCase)
+            .Replace("HouseRuleDemandPacket", "rules request", StringComparison.OrdinalIgnoreCase)
+            .Replace("KarmaForgeCandidate", "saved request", StringComparison.OrdinalIgnoreCase);
+
+        return PublicFacingCopyHumanizer.Clean(cleaned);
+    }
 }
 
 <section class="trust-page-hero">
@@ -42,8 +45,8 @@
         <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__details">
             <span>Submission saved</span>
-            <span>@Model.TrackTitle</span>
-            <span>@queueStatusLabel</span>
+            <span>@SanitizePublicText(Model.TrackTitle)</span>
+            <span>@SanitizePublicText(queueStatusLabel)</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -57,21 +60,21 @@
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">What happened</p>
-        <h2 class="editorial-title">@Model.PacketTitle</h2>
-        <p class="editorial-copy">@Model.QueueSummary</p>
+        <h2 class="editorial-title">@SanitizePublicText(Model.PacketTitle)</h2>
+        <p class="editorial-copy">@SanitizePublicText(Model.QueueSummary)</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
             <span class="tag">Decision</span>
-            <p><strong>@Model.CandidateDecision</strong> · @Model.CandidateDecisionMeaning</p>
+            <p><strong>@SanitizePublicText(Model.CandidateDecision)</strong> · @SanitizePublicText(Model.CandidateDecisionMeaning)</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Next action</span>
-            <p>@Model.ReporterNextAction</p>
+            <p>@SanitizePublicText(Model.ReporterNextAction)</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Consent</span>
-            <p>@Model.ConsentSummary</p>
+            <p>@SanitizePublicText(Model.ConsentSummary)</p>
         </article>
     </div>
 </section>
@@ -82,7 +85,7 @@
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
                 <h3>Saved detail</h3>
-                <p>@highlight</p>
+                <p>@SanitizePublicText(highlight)</p>
             </div>
         </article>
     }
@@ -135,7 +138,7 @@
             <ul class="trust-page-section__list">
                 @foreach (var question in Model.NextQuestions)
                 {
-                    <li>@question</li>
+                    <li>@SanitizePublicText(question)</li>
                 }
             </ul>
         </article>
@@ -147,7 +150,7 @@
             <ul class="trust-page-section__list">
                 @foreach (var step in Model.NextSteps)
                 {
-                    <li>@step</li>
+                    <li>@SanitizePublicText(step)</li>
                 }
             </ul>
             <p class="muted-copy">Anonymous quote permission is @(Model.QuoteAllowed ? "enabled" : "disabled").</p>
@@ -155,7 +158,7 @@
 
         <article class="trust-page-section" id="packet-json">
             <p class="eyebrow">Saved details</p>
-            <h2>The normalized outputs are visible here</h2>
+            <h2>The saved details are visible here</h2>
             <p>These previews show what Chummer saved for this submission.</p>
 
             <details class="details-drawer">
@@ -167,7 +170,7 @@
                 <pre>@SanitizePublicText(Model.CandidateJson)</pre>
             </details>
             <details class="details-drawer">
-                <summary>RuleEnvironmentImpactHypothesis</summary>
+                <summary>Rules impact</summary>
                 <pre>@SanitizePublicText(Model.ImpactHypothesisJson)</pre>
             </details>
         </article>
