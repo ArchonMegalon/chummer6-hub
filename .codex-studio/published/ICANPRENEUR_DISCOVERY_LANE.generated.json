@@ -1,0 +1,61 @@
+{
+  "contract_name": "chummer.icanpreneur_discovery_lane",
+  "generated_at_utc": "2026-06-21T17:07:46Z",
+  "status": "pass",
+  "lane": "bounded adaptive discovery interview",
+  "runtime_ready": false,
+  "claim_boundary": "Icanpreneur may sharpen discovery interviews and demand synthesis only. Chummer-owned packets, Product Governor decisions, rules truth, release truth, entitlements, private campaign data, and publication approval remain outside the provider lane.",
+  "checks": {
+    "inventory_lane": {
+      "path": "/docker/chummercomplete/chummer.run-services/ltds.md",
+      "status": "pass",
+      "missing": []
+    },
+    "env_example": {
+      "path": "/docker/chummercomplete/chummer.run-services/.env.example",
+      "status": "pass",
+      "missing": []
+    },
+    "public_edge_env_passthrough": {
+      "path": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+      "status": "pass",
+      "missing": []
+    },
+    "credential_catalog": {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ExecutiveAssistantCredentialCatalogService.cs",
+      "status": "pass",
+      "missing": []
+    },
+    "karma_forge_handoff": {
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/KarmaForge/KarmaForgeDiscoveryService.cs",
+      "status": "pass",
+      "missing": []
+    },
+    "design_policy": {
+      "path": "/docker/chummercomplete/chummer-design/products/chummer/ICANPRENEUR_DISCOVERY_AND_VALIDATION_LANE.md",
+      "status": "pass",
+      "missing": []
+    },
+    "provider_discoverability_tracking": {
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/verify_provider_proof_discoverability.py",
+      "status": "pass",
+      "missing": []
+    },
+    "public_leak_gates": {
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/verify_public_copy_leak_gate.py",
+      "status": "pass",
+      "missing": []
+    },
+    "public_provider_scan": {
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/scan_public_forbidden_provider_ltd_names.py",
+      "status": "pass",
+      "missing": []
+    },
+    "public_copy_quiet": {
+      "status": "pass",
+      "scanned_file_count": 11,
+      "hits": []
+    }
+  },
+  "failures": []
+}

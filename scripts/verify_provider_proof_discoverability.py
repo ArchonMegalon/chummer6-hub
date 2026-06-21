@@ -50,6 +50,14 @@ def required_artifacts() -> dict[str, list[Path]]:
 
 
 TRACKED_PROVIDER_RECEIPTS: dict[str, dict[str, Any]] = {
+    "icanpreneur": {
+        "status": "tracked",
+        "provider": "Icanpreneur",
+        "license_tier": "Tier 3",
+        "lane": "bounded adaptive discovery interview",
+        "runtime_ready": False,
+        "boundary": "Discovery interviews and demand synthesis only; Chummer-owned packets and Product Governor decisions remain canonical.",
+    },
     "dadan": {
         "status": "tracked",
         "provider": "Dadan",

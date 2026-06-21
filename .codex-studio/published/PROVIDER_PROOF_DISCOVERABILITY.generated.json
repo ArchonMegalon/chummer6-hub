@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.provider_proof_discoverability",
-  "generated_at_utc": "2026-06-20T18:37:22Z",
+  "generated_at_utc": "2026-06-21T17:07:46Z",
   "status": "pass",
   "providers": {
     "payfunnels": {
@@ -94,6 +94,15 @@
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "icanpreneur": {
+      "status": "pass",
+      "tracked_inventory_only": true,
+      "runtime_ready": false,
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/icanpreneur/ICANPRENEUR_TRACKED_PROVIDER_RECEIPT.generated.json"
       ],
       "missing_paths": []
     },

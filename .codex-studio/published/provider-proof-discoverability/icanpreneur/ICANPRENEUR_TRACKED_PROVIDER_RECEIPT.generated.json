@@ -1,0 +1,11 @@
+{
+  "contract_name": "chummer.provider.tracked_inventory_receipt",
+  "generated_at_utc": "2026-06-21T17:07:46Z",
+  "status": "tracked",
+  "provider": "Icanpreneur",
+  "license_tier": "Tier 3",
+  "lane": "bounded adaptive discovery interview",
+  "runtime_ready": false,
+  "boundary": "Discovery interviews and demand synthesis only; Chummer-owned packets and Product Governor decisions remain canonical.",
+  "claim_boundary": "Discovery interviews and demand synthesis only; Chummer-owned packets and Product Governor decisions remain canonical."
+}
