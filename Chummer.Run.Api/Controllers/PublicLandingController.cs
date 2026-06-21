@@ -6940,8 +6940,8 @@ LOCAL CO-PROCESSOR keeps local acceleration optional and fail-open.
 
 ## Public board
 
-* Capability matrix packet: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
-* Policy boundary packet: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
+* Capability details: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
+* Policy notes: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
 
 ## Account workspace
 
@@ -6964,12 +6964,12 @@ LOCAL CO-PROCESSOR does not turn desktop compute into a requirement, does not mo
         return $$"""
 # LOCAL CO-PROCESSOR capability matrix
 
-LOCAL CO-PROCESSOR now ships a bounded optional-acceleration lane.
+LOCAL CO-PROCESSOR now ships optional local acceleration.
 
 ## Public board
 
-* Capability matrix packet: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
-* Policy boundary packet: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
+* Capability details: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
+* Policy notes: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
 
 ## Account workspace
 

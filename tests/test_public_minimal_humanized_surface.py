@@ -1813,9 +1813,13 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
         "This route keeps rule answers",
         "Chummer packet, not book text",
         "This route reads Chummer dispatches",
+        "public-safe dispatches",
         "portable packet",
         "Portable runner packet",
         "provenance attached",
+        "Chummer-owned JSON",
+        "publication authority",
+        "<span class=\"tag\">JSON export</span>",
     ):
         assert forbidden not in combined
 
@@ -1825,8 +1829,11 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     assert "This page keeps rule answers short" in knowledge
     assert "Chummer export, not book text" in anarchy
     assert "This page reads Chummer dispatches" in anarchy
-    assert "Chummer owns the portable export" in anarchy
+    assert "The same Chummer dispatches can power Anarchy play." in anarchy
+    assert "Chummer keeps the portable export readable" in anarchy
+    assert "The export stays with Chummer" in anarchy
     assert "Portable runner export" in anarchy
+    assert "File export" in anarchy
 
     for expected in (
         "PublicKnowledgeText(Model.Heading)",

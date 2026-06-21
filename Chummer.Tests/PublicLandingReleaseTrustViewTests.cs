@@ -139,7 +139,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string consoleView = File.ReadAllText(consoleViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Signed-in participation", view, StringComparison.Ordinal);
+        Assert.Contains("Account participation", view, StringComparison.Ordinal);
         Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
         Assert.Contains("guided contribution tools tied to your account", view, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
@@ -928,7 +928,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/ghostwire\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/roadmap/ghostwire\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ghostwire/receipts/replay-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("GHOSTWIRE now ships after-action packets", controller, StringComparison.Ordinal);
+        Assert.Contains("GHOSTWIRE now ships after-action notes", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1329,7 +1329,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/local-co-processor/receipts/optional-acceleration.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("LOCAL CO-PROCESSOR now ships a bounded optional-acceleration path", controller, StringComparison.Ordinal);
+        Assert.Contains("LOCAL CO-PROCESSOR now ships a controlled optional-acceleration path", controller, StringComparison.Ordinal);
+        Assert.Contains("LOCAL CO-PROCESSOR now ships optional local acceleration.", controller, StringComparison.Ordinal);
         Assert.Contains("IsKnownLocalCoProcessorPacketId", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/local-co-processor\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/local-co-processor/open\")]", accountsController, StringComparison.Ordinal);
