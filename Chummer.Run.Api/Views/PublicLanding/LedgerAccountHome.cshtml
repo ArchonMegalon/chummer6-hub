@@ -12,7 +12,7 @@
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">This is the signed-in campaign city view: one globe, one board state, one faction state, and one professional world-turn briefing.</p>
         <div class="trust-claim__details">
-            <span>Faction: @Model.Faction.PublicName</span>
+            <span>Faction: @PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</span>
             <span>Membership: @PublicFacingCopyHumanizer.Clean(Model.Allegiance.MembershipType)</span>
             <span>Lock until: @Model.Allegiance.LockUntilUtc?.ToString("yyyy-MM-dd")</span>
         </div>
@@ -123,8 +123,8 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@Model.WorldTurnBriefing.TransitionLabel</p>
-            <h2 class="editorial-title">@Model.WorldTurnBriefing.InboxHeadline</h2>
+            <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</p>
+            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)</h2>
             <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
@@ -136,7 +136,7 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">Newsreel beat</span>
-                    <p>@item</p>
+                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
                 </article>
             }
         </div>

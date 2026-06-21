@@ -808,14 +808,19 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     public void Signed_in_ledger_pages_clean_dynamic_status_and_notification_copy()
     {
         string accountHome = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAccountHome.cshtml"));
+        string advisory = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml"));
         string notifications = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml"));
 
         foreach (string required in new[]
         {
             "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
             "PublicFacingCopyHumanizer.Clean(Model.Allegiance.MembershipType)",
             "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
             "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+            "PublicFacingCopyHumanizer.Clean(item)",
             "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Heading)",
             "PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Heading)",
             "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
@@ -824,6 +829,21 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         })
         {
             Assert.Contains(required, accountHome, StringComparison.Ordinal);
+        }
+
+        foreach (string required in new[]
+        {
+            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)",
+            "PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)",
+            "PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)",
+            "PublicFacingCopyHumanizer.Clean(ballot.Heading)",
+            "PublicFacingCopyHumanizer.Clean(option.Label)",
+            "PublicFacingCopyHumanizer.Clean(summary.Heading)",
+            "PublicFacingCopyHumanizer.Clean(item)"
+        })
+        {
+            Assert.Contains(required, advisory, StringComparison.Ordinal);
         }
 
         foreach (string required in new[]
@@ -855,7 +875,28 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         })
         {
             Assert.DoesNotContain(forbidden, accountHome, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, advisory, StringComparison.Ordinal);
             Assert.DoesNotContain(forbidden, notifications, StringComparison.Ordinal);
+        }
+
+        foreach (string forbidden in new[]
+        {
+            "<span>Faction: @Model.Faction.PublicName</span>",
+            "<p class=\"eyebrow\">@Model.WorldTurnBriefing.TransitionLabel</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.InboxHeadline</h2>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<h2 class=\"editorial-title\">@Model.Summary.Heading</h2>",
+            "<p class=\"editorial-copy\">@Model.Summary.Intro</p>",
+            "<span class=\"tag\">@ballot.AudienceLabel</span>",
+            "<h3>@ballot.Heading</h3>",
+            "@option.Label · @option.VoteShareLabel",
+            "<span>@option.Label: @option.VoteCount vote(s)</span>",
+            "<h3>@summary.Heading</h3>",
+            "<span>@item</span>"
+        })
+        {
+            Assert.DoesNotContain(forbidden, accountHome, StringComparison.Ordinal);
+            Assert.DoesNotContain(forbidden, advisory, StringComparison.Ordinal);
         }
     }
 

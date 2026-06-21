@@ -559,10 +559,12 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
 
 
 def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
+    ledger_account = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
+    ledger_advisory = read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml")
     sources = [
         read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml"),
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml"),
-        read("Chummer.Run.Api/Views/PublicLanding/LedgerAdvisory.cshtml"),
+        ledger_account,
+        ledger_advisory,
         read("Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionPromo.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"),
@@ -598,6 +600,43 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     assert "PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)" in combined
     assert "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)" in combined
     assert "Your browser cannot play this video here." in combined
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
+        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
+        "PublicFacingCopyHumanizer.Clean(item)",
+    ):
+        assert required in ledger_account
+
+    for required in (
+        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)",
+        "PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)",
+        "PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)",
+        "PublicFacingCopyHumanizer.Clean(ballot.Heading)",
+        "PublicFacingCopyHumanizer.Clean(option.Label)",
+        "PublicFacingCopyHumanizer.Clean(summary.Heading)",
+        "PublicFacingCopyHumanizer.Clean(item)",
+    ):
+        assert required in ledger_advisory
+
+    for source in (ledger_account, ledger_advisory):
+        for forbidden in (
+            "<span>Faction: @Model.Faction.PublicName</span>",
+            "<p class=\"eyebrow\">@Model.WorldTurnBriefing.TransitionLabel</p>",
+            "<h2 class=\"editorial-title\">@Model.WorldTurnBriefing.InboxHeadline</h2>",
+            "<h1 class=\"page-title\">@Model.Heading</h1>",
+            "<h2 class=\"editorial-title\">@Model.Summary.Heading</h2>",
+            "<p class=\"editorial-copy\">@Model.Summary.Intro</p>",
+            "<span class=\"tag\">@ballot.AudienceLabel</span>",
+            "<h3>@ballot.Heading</h3>",
+            "@option.Label · @option.VoteShareLabel",
+            "<span>@option.Label: @option.VoteCount vote(s)</span>",
+            "<h3>@summary.Heading</h3>",
+            "<span>@item</span>",
+        ):
+            assert forbidden not in source
 
 
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
