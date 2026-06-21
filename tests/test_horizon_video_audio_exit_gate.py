@@ -128,3 +128,11 @@ def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -
     assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_female_no_edge_receipt" in result["issues"]
     assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_female_receipt" in result["issues"]
     assert "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_receipt" in result["issues"]
+
+
+def test_clean_speech_style_accepts_explicit_no_bed_no_noise_policy() -> None:
+    gate = _load(GATE_SCRIPT, "verify_horizon_video_audio_exit_gate_style_for_test")
+
+    assert gate.clean_speech_style_is_current("clean_premium_narration_no_bed_no_noise_floor")
+    assert gate.clean_speech_style_is_current("clean_audiobook_style_no_bed_no_noise_floor")
+    assert not gate.clean_speech_style_is_current("premium_news_anchor_continuous_bed")

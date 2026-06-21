@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_video_cinematic_narration_lane.v1",
-  "generated_at_utc": "2026-06-20T18:14:48Z",
+  "generated_at_utc": "2026-06-21T17:36:04Z",
   "status": "pass",
   "media_root": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media",
   "policy": {
@@ -20,7 +20,7 @@
       "issues": [],
       "source_mode": "captions",
       "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.vtt",
-      "caption_segments": 10,
+      "caption_segments": 14,
       "receipt": "",
       "tour_manifest": "",
       "narration_provider": "",
@@ -32,7 +32,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.5,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -60,7 +60,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.542,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -116,7 +116,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.5,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -144,7 +144,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.458,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -172,7 +172,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.458,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -200,7 +200,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.458,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -268,7 +268,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 90.027,
+          "duration_seconds": 90.087,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -284,7 +284,7 @@
       "issues": [],
       "source_mode": "captions",
       "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose.vtt",
-      "caption_segments": 11,
+      "caption_segments": 7,
       "receipt": "",
       "tour_manifest": "",
       "narration_provider": "",
@@ -308,7 +308,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 90.027,
+          "duration_seconds": 90.071,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -324,7 +324,7 @@
       "issues": [],
       "source_mode": "captions",
       "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/origin-dossier-the-name-she-chose-20260619.vtt",
-      "caption_segments": 11,
+      "caption_segments": 7,
       "receipt": "",
       "tour_manifest": "",
       "narration_provider": "",
@@ -348,7 +348,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 90.027,
+          "duration_seconds": 90.071,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -364,7 +364,7 @@
       "issues": [],
       "source_mode": "captions",
       "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.vtt",
-      "caption_segments": 9,
+      "caption_segments": 11,
       "receipt": "",
       "tour_manifest": "",
       "narration_provider": "",
@@ -392,7 +392,7 @@
       "issues": [],
       "source_mode": "captions",
       "caption": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.vtt",
-      "caption_segments": 9,
+      "caption_segments": 10,
       "receipt": "",
       "tour_manifest": "",
       "narration_provider": "",
@@ -432,7 +432,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.458,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -932,7 +932,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 90.027,
+          "duration_seconds": 90.05,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -972,7 +972,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 90.062,
+          "duration_seconds": 90.085,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -1000,7 +1000,7 @@
           "kind": "mp4",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.542,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [
@@ -1012,7 +1012,7 @@
           "kind": "webm",
           "status": "pass",
           "issues": [],
-          "duration_seconds": 89.611,
+          "duration_seconds": 89.634,
           "video_streams": 1,
           "audio_streams": 1,
           "audio_codecs": [

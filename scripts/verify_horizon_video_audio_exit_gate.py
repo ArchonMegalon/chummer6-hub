@@ -15,6 +15,7 @@ MANIFEST = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons" / "horizo
 AUDIO_REBUILD = REPO / "scripts" / "rebuild_public_video_audio_unmixr.py"
 OUTPUT = REPO / ".codex-studio" / "published" / "HORIZON_VIDEO_AUDIO_EXIT_GATE.generated.json"
 REBUILD_RECEIPT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json")
+PUBLISHED_REBUILD_RECEIPT = REPO / ".codex-studio" / "published" / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
 MIN_VIDEO_DURATION_SECONDS = 89.4
 MAX_VIDEO_DURATION_SECONDS = 90.5
 
@@ -40,11 +41,11 @@ def public_path_to_file(public_path: str) -> Path:
     return REPO / "Chummer.Run.Api" / "wwwroot" / normalized.lstrip("/")
 
 
-def rebuild_group_receipts() -> dict[str, dict[str, Any]]:
-    if not REBUILD_RECEIPT.is_file():
+def load_group_receipts(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.is_file():
         return {}
     try:
-        payload = json.loads(REBUILD_RECEIPT.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
     return {
@@ -52,6 +53,17 @@ def rebuild_group_receipts() -> dict[str, dict[str, Any]]:
         for group in payload.get("groups", [])
         if isinstance(group, dict) and str(group.get("group_key") or "")
     }
+
+
+def rebuild_group_receipts() -> dict[str, dict[str, Any]]:
+    receipts = load_group_receipts(PUBLISHED_REBUILD_RECEIPT)
+    receipts.update(load_group_receipts(REBUILD_RECEIPT))
+    return receipts
+
+
+def clean_speech_style_is_current(style: str) -> bool:
+    normalized = style.strip().lower()
+    return normalized.startswith("clean_") and "no_bed" in normalized and "no_noise" in normalized
 
 
 def verify_manifest(manifest_path: Path) -> dict[str, Any]:
@@ -68,6 +80,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             continue
         seen.add(public_mp4)
         path = public_path_to_file(public_mp4)
+        group_key = path.stem
         row_issues: list[str] = []
         if not path.is_file():
             row_issues.append("mp4_missing")
@@ -79,9 +92,12 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         duration_seconds = float((probe.get("format") or {}).get("duration") or 0.0)
         audio_streams = sum(1 for stream in streams if stream.get("codec_type") == "audio")
         video_streams = sum(1 for stream in streams if stream.get("codec_type") == "video")
-        alice_clean_audio = path.name == "alice-90s-deepdive.mp4"
+        clean_speech_groups = set(getattr(audio, "CLEAN_SPEECH_AUDIO_GROUPS", set()))
+        clean_speech_audio = group_key in clean_speech_groups
+        alice_clean_audio = group_key == "alice-90s-deepdive"
+        rebuild_receipt = group_receipts.get(group_key) or {}
         try:
-            quality = audio.audio_quality(path, allow_clean_speech_pauses=alice_clean_audio)
+            quality = audio.audio_quality(path, allow_clean_speech_pauses=clean_speech_audio)
         except TypeError:
             quality = audio.audio_quality(path)
         if not MIN_VIDEO_DURATION_SECONDS <= duration_seconds <= MAX_VIDEO_DURATION_SECONDS:
@@ -92,8 +108,33 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             row_issues.append("video_stream_count_invalid")
         if quality.get("status") != "pass":
             row_issues.extend(str(item) for item in quality.get("reasons") or ["audio_quality_failed"])
+        if clean_speech_audio and not rebuild_receipt:
+            row_issues.append("public_video_audio_rebuild_receipt_missing")
+        elif clean_speech_audio and str(rebuild_receipt.get("status") or "") != "pass":
+            row_issues.append("public_video_audio_rebuild_receipt_not_pass")
+        elif clean_speech_audio:
+            provider = rebuild_receipt.get("provider") if isinstance(rebuild_receipt.get("provider"), dict) else {}
+            if str(provider.get("provider") or "") != getattr(audio, "UNMIXR_PROVIDER", "unmixr-short-tts"):
+                row_issues.append("public_video_audio_requires_unmixr_rebuild_receipt")
+            receipt_files = rebuild_receipt.get("files") if isinstance(rebuild_receipt.get("files"), list) else []
+            matching_file = next(
+                (
+                    item
+                    for item in receipt_files
+                    if isinstance(item, dict)
+                    and str(item.get("file") or "").endswith(f"/{path.name}")
+                    and str(item.get("quality", {}).get("status") if isinstance(item.get("quality"), dict) else "") == "pass"
+                ),
+                None,
+            )
+            if not matching_file:
+                row_issues.append("public_video_audio_rebuild_file_receipt_missing")
+            else:
+                style = str(matching_file.get("audio_style") or "").strip().lower()
+                if not clean_speech_style_is_current(style):
+                    row_issues.append("public_video_audio_rebuild_uses_legacy_bed_or_noise_style")
         if alice_clean_audio:
-            alice_receipt = group_receipts.get("alice-90s-deepdive") or {}
+            alice_receipt = rebuild_receipt
             provider = alice_receipt.get("provider") if isinstance(alice_receipt.get("provider"), dict) else {}
             if str(provider.get("provider") or "") != getattr(audio, "UNMIXR_PROVIDER", "unmixr-short-tts"):
                 row_issues.append("alice_voice_policy_requires_unmixr_receipt")
@@ -114,6 +155,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
                 row_issues.append("alice_clean_audiobook_style_receipt_missing")
         row = {
             "public_mp4": public_mp4,
+            "group_key": group_key,
             "title": str(asset.get("title") or ""),
             "status": "fail" if row_issues else "pass",
             "issues": row_issues,
@@ -121,6 +163,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "audio_streams": audio_streams,
             "video_streams": video_streams,
             "quality": quality,
+            "rebuild_receipt_status": str(rebuild_receipt.get("status") or "") if rebuild_receipt else "",
         }
         rows.append(row)
         issues.extend(f"{public_mp4}:{issue}" for issue in row_issues)
@@ -140,7 +183,7 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "max_start_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "max_tail_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
             "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
-            "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration, except Alice which must use clean audiobook-style speech-only narration with no synthetic bed or noise floor",
+            "premium_mix_policy": "clean-speech horizon videos require passing Unmixr rebuild receipts with no synthetic bed or noise floor; legacy bed/noise styles are rejected for those groups while older full-mix videos keep audio QA coverage until they are rebuilt",
         },
         "asset_count": len(rows),
         "issues": issues,

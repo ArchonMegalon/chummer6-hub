@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_video_audio_rebuild.v1",
-  "generated_at_utc": "2026-06-20T18:14:27Z",
+  "generated_at_utc": "2026-06-21T17:34:02Z",
   "status": "pass",
   "scope": {
     "definition": "all public MP4/WebM files under Chummer.Run.Api/wwwroot/media, grouped by canonical asset stem; desktop, mobile and WebM variants included",
@@ -56,23 +56,35 @@
     {
       "group_key": "alice-90s-deepdive",
       "status": "pass",
-      "mode": "legacy_longform_script_humanized",
-      "narration_word_count": 179,
+      "mode": "legacy_longform_script_humanized_alice_full_length_clean_audio",
+      "narration_word_count": 257,
       "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.vtt",
       "receipt_file": "",
       "provider": {
-        "provider": "edge-tts-premium-news",
-        "voice": "en-US-JennyNeural",
-        "voice_policy": "female_only",
+        "provider": "unmixr-short-tts",
+        "voice_id_redacted": "34de...0901",
+        "voice_source_env": "discovery:unmixr:documentary-voices:Ava",
+        "voice_policy": "unmixr_premium_female_required_no_edge_fallback",
+        "voice_label": "Ava",
+        "voice_gender": "Female",
+        "voice_quality": "Premium",
+        "voice_language": "en-US",
         "voice_reused_from_cache": true,
-        "beat_count": 10
+        "api_key_env": "UNMIXR_API_KEY_FALLBACK_2",
+        "language": "en-US",
+        "speaking_rate": "medium",
+        "speaking_pitch": "low",
+        "speaking_volume": "medium",
+        "beat_count": 13,
+        "failures": []
       },
       "files": [
         {
           "file": "Chummer.Run.Api/wwwroot/media/horizons/alice-90s-deepdive.mp4",
-          "duration_seconds": 89.583,
+          "duration_seconds": 89.5,
           "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/alice-90s-deepdive/alice-90s-deepdive.mp4.before-unmixr-audio",
-          "fit_mode": "stretched_0.860",
+          "fit_mode": "clean_speech_style_1.092",
+          "audio_style": "clean_audiobook_style_no_bed_no_noise_floor",
           "probe": {
             "programs": [],
             "streams": [
@@ -81,19 +93,19 @@
                 "codec_type": "video",
                 "width": 1280,
                 "height": 720,
-                "bit_rate": "2401506"
+                "bit_rate": "2402025"
               },
               {
                 "codec_name": "aac",
                 "codec_type": "audio",
-                "sample_rate": "96000",
+                "sample_rate": "48000",
                 "channels": 1,
-                "bit_rate": "196989"
+                "bit_rate": "180595"
               }
             ],
             "format": {
-              "duration": "89.583333",
-              "size": "29105503"
+              "duration": "89.500000",
+              "size": "28957064"
             }
           },
           "audio_streams": 1,
@@ -101,20 +113,23 @@
           "quality": {
             "status": "pass",
             "reasons": [],
-            "rms_dbfs": -22.77,
-            "peak_dbfs": -5.59,
-            "high_band_power_ratio": 4.6e-05,
-            "tone_peak_hz": 10500.0,
-            "tone_peak_prominence_db": 23.64,
-            "sub_bass_power_ratio": 1.8e-05,
-            "low_bass_power_ratio": 0.000177,
-            "voice_to_low_db": 36.84,
-            "low_tone_peak_hz": 140.6,
-            "low_tone_peak_prominence_db": 12.14,
+            "rms_dbfs": -20.44,
+            "peak_dbfs": -3.34,
+            "high_band_power_ratio": 1.5e-05,
+            "tone_peak_hz": 10593.8,
+            "tone_peak_prominence_db": 11.04,
+            "sub_bass_power_ratio": 0.0,
+            "low_bass_power_ratio": 1.2e-05,
+            "voice_to_low_db": 48.92,
+            "low_tone_peak_hz": 269.5,
+            "low_tone_peak_prominence_db": 13.35,
+            "mid_tone_peak_hz": 503.9,
+            "mid_tone_peak_prominence_db": 4.71,
+            "mid_tone_power_ratio": 0.570564,
             "silence_gate_dbfs": -42.0,
-            "max_silence_seconds": 0.25,
+            "max_silence_seconds": 0.75,
             "first_audible_seconds": 0.0,
-            "tail_silence_seconds": 0.103
+            "tail_silence_seconds": 0.015
           }
         }
       ]
@@ -2251,23 +2266,35 @@
     {
       "group_key": "runbook-press-90s-deepdive",
       "status": "pass",
-      "mode": "legacy_longform_script_humanized",
-      "narration_word_count": 151,
+      "mode": "authored_repair_script",
+      "narration_word_count": 187,
       "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.vtt",
       "receipt_file": "",
       "provider": {
-        "provider": "edge-tts-premium-news",
-        "voice": "en-US-GuyNeural",
-        "voice_policy": "premium_news_anchor",
-        "voice_reused_from_cache": true,
-        "beat_count": 6
+        "provider": "unmixr-short-tts",
+        "voice_id_redacted": "83eb...ff41",
+        "voice_source_env": "discovery:unmixr:documentary-voices:Blue",
+        "voice_policy": "unmixr_premium_required_no_edge_fallback",
+        "voice_label": "Blue",
+        "voice_gender": "Neutral",
+        "voice_quality": "Premium",
+        "voice_language": "en-US",
+        "voice_reused_from_cache": false,
+        "api_key_env": "UNMIXR_API_KEY_FALLBACK_2",
+        "language": "en-US",
+        "speaking_rate": "medium",
+        "speaking_pitch": "low",
+        "speaking_volume": "medium",
+        "beat_count": 11,
+        "failures": []
       },
       "files": [
         {
           "file": "Chummer.Run.Api/wwwroot/media/horizons/runbook-press-90s-deepdive.mp4",
           "duration_seconds": 89.667,
           "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/runbook-press-90s-deepdive/runbook-press-90s-deepdive.mp4.before-unmixr-audio",
-          "fit_mode": "stretched_0.860",
+          "fit_mode": "clean_speech_style_0.925",
+          "audio_style": "clean_premium_narration_no_bed_no_noise_floor",
           "probe": {
             "programs": [],
             "streams": [
@@ -2281,14 +2308,14 @@
               {
                 "codec_name": "aac",
                 "codec_type": "audio",
-                "sample_rate": "96000",
+                "sample_rate": "48000",
                 "channels": 1,
-                "bit_rate": "196367"
+                "bit_rate": "173716"
               }
             ],
             "format": {
               "duration": "89.666667",
-              "size": "34682005"
+              "size": "34482731"
             }
           },
           "audio_streams": 1,
@@ -2296,20 +2323,23 @@
           "quality": {
             "status": "pass",
             "reasons": [],
-            "rms_dbfs": -23.44,
-            "peak_dbfs": -5.41,
-            "high_band_power_ratio": 5e-06,
-            "tone_peak_hz": 10500.0,
-            "tone_peak_prominence_db": 13.49,
-            "sub_bass_power_ratio": 0.000228,
-            "low_bass_power_ratio": 0.001891,
-            "voice_to_low_db": 26.72,
-            "low_tone_peak_hz": 117.2,
-            "low_tone_peak_prominence_db": 20.47,
+            "rms_dbfs": -21.1,
+            "peak_dbfs": -3.33,
+            "high_band_power_ratio": 0.000127,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 7.63,
+            "sub_bass_power_ratio": 0.0,
+            "low_bass_power_ratio": 3.8e-05,
+            "voice_to_low_db": 43.85,
+            "low_tone_peak_hz": 269.5,
+            "low_tone_peak_prominence_db": 13.15,
+            "mid_tone_peak_hz": 503.9,
+            "mid_tone_peak_prominence_db": 4.87,
+            "mid_tone_power_ratio": 0.66822,
             "silence_gate_dbfs": -42.0,
-            "max_silence_seconds": 0.0,
+            "max_silence_seconds": 1.5,
             "first_audible_seconds": 0.0,
-            "tail_silence_seconds": 0.0
+            "tail_silence_seconds": 0.121
           }
         }
       ]
@@ -2317,23 +2347,35 @@
     {
       "group_key": "runsite-90s-deepdive",
       "status": "pass",
-      "mode": "legacy_longform_script_humanized",
-      "narration_word_count": 147,
+      "mode": "authored_repair_script",
+      "narration_word_count": 199,
       "caption_file": "Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.vtt",
       "receipt_file": "",
       "provider": {
-        "provider": "edge-tts-premium-news",
-        "voice": "en-US-GuyNeural",
-        "voice_policy": "premium_news_anchor",
+        "provider": "unmixr-short-tts",
+        "voice_id_redacted": "83eb...ff41",
+        "voice_source_env": "discovery:unmixr:documentary-voices:Blue",
+        "voice_policy": "unmixr_premium_required_no_edge_fallback",
+        "voice_label": "Blue",
+        "voice_gender": "Neutral",
+        "voice_quality": "Premium",
+        "voice_language": "en-US",
         "voice_reused_from_cache": true,
-        "beat_count": 9
+        "api_key_env": "UNMIXR_API_KEY_FALLBACK_2",
+        "language": "en-US",
+        "speaking_rate": "medium",
+        "speaking_pitch": "low",
+        "speaking_volume": "medium",
+        "beat_count": 12,
+        "failures": []
       },
       "files": [
         {
           "file": "Chummer.Run.Api/wwwroot/media/horizons/runsite-90s-deepdive.mp4",
           "duration_seconds": 89.625,
           "backup": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/runsite-90s-deepdive/runsite-90s-deepdive.mp4.before-unmixr-audio",
-          "fit_mode": "stretched_0.860",
+          "fit_mode": "clean_speech_style_0.929",
+          "audio_style": "clean_premium_narration_no_bed_no_noise_floor",
           "probe": {
             "programs": [],
             "streams": [
@@ -2347,14 +2389,14 @@
               {
                 "codec_name": "aac",
                 "codec_type": "audio",
-                "sample_rate": "96000",
+                "sample_rate": "48000",
                 "channels": 1,
-                "bit_rate": "196497"
+                "bit_rate": "176779"
               }
             ],
             "format": {
               "duration": "89.625000",
-              "size": "28957557"
+              "size": "28788785"
             }
           },
           "audio_streams": 1,
@@ -2362,18 +2404,21 @@
           "quality": {
             "status": "pass",
             "reasons": [],
-            "rms_dbfs": -23.47,
-            "peak_dbfs": -5.65,
-            "high_band_power_ratio": 6e-06,
-            "tone_peak_hz": 10500.0,
-            "tone_peak_prominence_db": 15.14,
-            "sub_bass_power_ratio": 0.000283,
-            "low_bass_power_ratio": 0.001673,
-            "voice_to_low_db": 27.26,
-            "low_tone_peak_hz": 105.5,
-            "low_tone_peak_prominence_db": 19.15,
+            "rms_dbfs": -20.81,
+            "peak_dbfs": -3.31,
+            "high_band_power_ratio": 0.000144,
+            "tone_peak_hz": 10511.7,
+            "tone_peak_prominence_db": 8.64,
+            "sub_bass_power_ratio": 0.0,
+            "low_bass_power_ratio": 3.4e-05,
+            "voice_to_low_db": 44.27,
+            "low_tone_peak_hz": 269.5,
+            "low_tone_peak_prominence_db": 12.56,
+            "mid_tone_peak_hz": 515.6,
+            "mid_tone_peak_prominence_db": 4.07,
+            "mid_tone_power_ratio": 0.670947,
             "silence_gate_dbfs": -42.0,
-            "max_silence_seconds": 0.0,
+            "max_silence_seconds": 1.25,
             "first_audible_seconds": 0.0,
             "tail_silence_seconds": 0.0
           }

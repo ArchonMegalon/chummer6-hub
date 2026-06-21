@@ -26,6 +26,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 MEDIA_ROOT = REPO / "Chummer.Run.Api" / "wwwroot" / "media"
 OUT_ROOT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619")
+PUBLISHED_REBUILD_RECEIPT = REPO / ".codex-studio" / "published" / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
 LEGACY_PROMO_AUDIO = REPO / "scripts" / "rebuild_promo_audio_continuous.py"
 UNMIXR_PROVIDER = "unmixr-short-tts"
 TARGET_SR = 48000
@@ -39,13 +40,16 @@ SILENCE_GATE_DBFS = -42.0
 MIN_CLEAN_TTS_COVERAGE_RATIO = 0.90
 ALICE_CLEAN_AUDIO_GROUP = "alice-90s-deepdive"
 RUNSITE_CLEAN_AUDIO_GROUP = "runsite-90s-deepdive"
+RUNBOOK_PRESS_CLEAN_AUDIO_GROUP = "runbook-press-90s-deepdive"
 CLEAN_SPEECH_AUDIO_GROUPS = {
     ALICE_CLEAN_AUDIO_GROUP,
     RUNSITE_CLEAN_AUDIO_GROUP,
+    RUNBOOK_PRESS_CLEAN_AUDIO_GROUP,
 }
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 RUNSITE_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
+RUNBOOK_PRESS_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 UNMIXR_VOICE_DISCOVERY_API = "https://unmixr.com/api/v1/voice-list/"
 DEFAULT_PREMIUM_VOICE_LABEL = "Blue"
 ALICE_PREMIUM_FEMALE_VOICE_LABEL = "Ava"
@@ -453,6 +457,18 @@ SCRIPT_KEY_BY_GROUP = {
 
 
 EXTRA_SCRIPT_BY_GROUP = {
+    RUNBOOK_PRESS_CLEAN_AUDIO_GROUP: (
+        "Runbook Press begins with a familiar mess: maps in one folder, session notes in another, "
+        "NPC motives in chat, rulings in memory, and a campaign that deserves more than another scattered handoff. "
+        "The point is not to make a generic book. The point is to turn approved source material into a useful artifact. "
+        "A player primer that welcomes someone new. A district guide that makes a place easy to run. "
+        "A mission packet that carries the right details without exposing the wrong ones. A season book that lets the table keep what it built. "
+        "Runbook Press keeps the split clear. Player-safe pages stay readable. GM-only material stays behind the curtain. "
+        "Credits, changes, source notes, and approval state remain attached, so a polished page does not become a loose claim. "
+        "The workflow should feel like a small editorial room inside Chummer: draft, arrange, review, format, export, and revise without losing provenance. "
+        "Layout matters because people use books under pressure. They need the map, the faction note, the timeline, or the handout fast enough that the table keeps moving. "
+        "Runbook Press is campaign publishing with memory, structure, and restraint."
+    ),
     RUNSITE_CLEAN_AUDIO_GROUP: (
         "Runsite begins with a simple truth: a location is not ready just because a map exists. "
         "A flat floor plan can tell the table where the walls are, but it cannot tell the crew where the pressure lives. "
@@ -589,6 +605,8 @@ def narration_from_receipt(receipt: Path) -> str | None:
 
 
 def narration_for_group(key: str, caption_file: Path | None, receipt_file: Path | None) -> tuple[str | None, str]:
+    if key in EXTRA_SCRIPT_BY_GROUP:
+        return humanize_public_narration(EXTRA_SCRIPT_BY_GROUP[key]), "authored_repair_script"
     script_key = SCRIPT_KEY_BY_GROUP.get(key, key)
     legacy_script = getattr(LEGACY, "SCRIPTS", {}).get(script_key)
     if legacy_script:
@@ -596,8 +614,6 @@ def narration_for_group(key: str, caption_file: Path | None, receipt_file: Path 
         if key == ALICE_CLEAN_AUDIO_GROUP:
             return text, "legacy_longform_script_humanized_alice_full_length_clean_audio"
         return text, "legacy_longform_script_humanized"
-    if key in EXTRA_SCRIPT_BY_GROUP:
-        return humanize_public_narration(EXTRA_SCRIPT_BY_GROUP[key]), "authored_repair_script"
     if receipt_file and receipt_file.exists():
         receipt_text = narration_from_receipt(receipt_file)
         if receipt_text:
@@ -1187,6 +1203,8 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
             audio_style = ALICE_CLEAN_AUDIO_STYLE
         elif group.key == RUNSITE_CLEAN_AUDIO_GROUP:
             audio_style = RUNSITE_CLEAN_AUDIO_STYLE
+        elif group.key == RUNBOOK_PRESS_CLEAN_AUDIO_GROUP:
+            audio_style = RUNBOOK_PRESS_CLEAN_AUDIO_STYLE
         file_receipts.append(
             {
                 "file": str(video.relative_to(REPO)),
@@ -1251,6 +1269,29 @@ def main() -> int:
             receipts.append({"group_key": group.key, "mode": group.mode, "files": files})
     else:
         receipts = [rebuild_group(group, force_tts=args.force_tts) for group in groups]
+        if selected:
+            previous_outputs = (
+                PUBLISHED_REBUILD_RECEIPT,
+                OUT_ROOT / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",
+            )
+            merged: dict[str, dict[str, Any]] = {}
+            for previous_output in previous_outputs:
+                if not previous_output.is_file():
+                    continue
+                try:
+                    previous = json.loads(previous_output.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    previous = {}
+                merged.update(
+                    {
+                        str(group.get("group_key") or ""): group
+                        for group in previous.get("groups", [])
+                        if isinstance(group, dict) and str(group.get("group_key") or "")
+                    }
+                )
+            for group in receipts:
+                merged[str(group.get("group_key") or "")] = group
+            receipts = [merged[key] for key in sorted(merged)]
 
     status = "pass"
     for group in receipts:
@@ -1283,7 +1324,7 @@ def main() -> int:
             "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
             "alice_voice_policy": ALICE_VOICE_POLICY,
-            "premium_mix_required": "news-anchor narration with continuous harmonic broadcast bed except clean speech groups such as Alice and Runsite, which use speech-only narration with no synthetic bed or white-noise floor; noise-bed-only output is rejected by review policy",
+            "premium_mix_required": "clean Unmixr narration with no synthetic noise floor; legacy bed/noise mixes are rejected. Alice, Runsite, and Runbook Press are explicit clean-speech groups, and additional public videos must carry a passing rebuild receipt before release.",
         },
         "provider_posture": {
             "narration_provider": "unmixr-short-tts",

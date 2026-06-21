@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.horizon_video_audio_exit_gate.v1",
-  "generated_at_utc": "2026-06-21T04:41:45Z",
+  "generated_at_utc": "2026-06-21T17:36:12Z",
   "status": "pass",
   "manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/horizon-video-manifest.json",
   "rebuild_receipt": "/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",
@@ -14,13 +14,14 @@
     "max_start_silence_seconds": 0.3,
     "max_tail_silence_seconds": 0.3,
     "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
-    "premium_mix_policy": "continuous harmonic bed plus normalized news-anchor narration, except Alice which must use clean audiobook-style speech-only narration with no synthetic bed or noise floor"
+    "premium_mix_policy": "clean-speech horizon videos require passing Unmixr rebuild receipts with no synthetic bed or noise floor; legacy bed/noise styles are rejected for those groups while older full-mix videos keep audio QA coverage until they are rebuilt"
   },
   "asset_count": 14,
   "issues": [],
   "assets": [
     {
-      "public_mp4": "/media/horizons/nexus-pan-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/nexus-pan-90s-deepdive.mp4",
+      "group_key": "nexus-pan-90s-deepdive",
       "title": "NEXUS-PAN 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -47,10 +48,12 @@
         "max_silence_seconds": 0.0,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/nexus-pan-epic-90s.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/nexus-pan-epic-90s.mp4",
+      "group_key": "nexus-pan-epic-90s",
       "title": "NEXUS-PAN epic 90-second reel",
       "status": "pass",
       "issues": [],
@@ -77,10 +80,12 @@
         "max_silence_seconds": 0.0,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/alice-90s-deepdive.mp4?v=20260621-alice-unmixr-clean-audio",
+      "public_mp4": "/media/horizons/alice-90s-deepdive.mp4",
+      "group_key": "alice-90s-deepdive",
       "title": "ALICE 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -107,10 +112,12 @@
         "max_silence_seconds": 0.75,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.015
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/karma-forge-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/karma-forge-90s-deepdive.mp4",
+      "group_key": "karma-forge-90s-deepdive",
       "title": "KARMA FORGE 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -137,10 +144,12 @@
         "max_silence_seconds": 0.0,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/jackpoint-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/jackpoint-90s-deepdive.mp4",
+      "group_key": "jackpoint-90s-deepdive",
       "title": "JACKPOINT 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -167,10 +176,12 @@
         "max_silence_seconds": 0.0,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/runsite-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/runsite-90s-deepdive.mp4",
+      "group_key": "runsite-90s-deepdive",
       "title": "RUNSITE 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -180,27 +191,29 @@
       "quality": {
         "status": "pass",
         "reasons": [],
-        "rms_dbfs": -18.15,
-        "peak_dbfs": -0.91,
-        "high_band_power_ratio": 4.5e-05,
-        "tone_peak_hz": 10500.0,
-        "tone_peak_prominence_db": 3.98,
-        "sub_bass_power_ratio": 0.000392,
-        "low_bass_power_ratio": 0.0021,
-        "voice_to_low_db": 26.23,
-        "low_tone_peak_hz": 105.5,
-        "low_tone_peak_prominence_db": 17.83,
-        "mid_tone_peak_hz": 457.0,
-        "mid_tone_peak_prominence_db": 1.71,
-        "mid_tone_power_ratio": 0.370046,
+        "rms_dbfs": -20.81,
+        "peak_dbfs": -3.31,
+        "high_band_power_ratio": 0.000144,
+        "tone_peak_hz": 10511.7,
+        "tone_peak_prominence_db": 8.64,
+        "sub_bass_power_ratio": 0.0,
+        "low_bass_power_ratio": 3.4e-05,
+        "voice_to_low_db": 44.27,
+        "low_tone_peak_hz": 269.5,
+        "low_tone_peak_prominence_db": 12.56,
+        "mid_tone_peak_hz": 515.6,
+        "mid_tone_peak_prominence_db": 4.07,
+        "mid_tone_power_ratio": 0.670947,
         "silence_gate_dbfs": -42.0,
-        "max_silence_seconds": 0.0,
+        "max_silence_seconds": 1.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/runbook-press-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/runbook-press-90s-deepdive.mp4",
+      "group_key": "runbook-press-90s-deepdive",
       "title": "RUNBOOK PRESS 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -210,27 +223,29 @@
       "quality": {
         "status": "pass",
         "reasons": [],
-        "rms_dbfs": -18.11,
-        "peak_dbfs": -0.69,
-        "high_band_power_ratio": 4.3e-05,
-        "tone_peak_hz": 10523.4,
-        "tone_peak_prominence_db": 3.44,
-        "sub_bass_power_ratio": 0.000303,
-        "low_bass_power_ratio": 0.002347,
-        "voice_to_low_db": 25.74,
-        "low_tone_peak_hz": 117.2,
-        "low_tone_peak_prominence_db": 19.52,
-        "mid_tone_peak_hz": 480.5,
-        "mid_tone_peak_prominence_db": 2.04,
-        "mid_tone_power_ratio": 0.333796,
+        "rms_dbfs": -21.1,
+        "peak_dbfs": -3.33,
+        "high_band_power_ratio": 0.000127,
+        "tone_peak_hz": 10511.7,
+        "tone_peak_prominence_db": 7.63,
+        "sub_bass_power_ratio": 0.0,
+        "low_bass_power_ratio": 3.8e-05,
+        "voice_to_low_db": 43.85,
+        "low_tone_peak_hz": 269.5,
+        "low_tone_peak_prominence_db": 13.15,
+        "mid_tone_peak_hz": 503.9,
+        "mid_tone_peak_prominence_db": 4.87,
+        "mid_tone_power_ratio": 0.66822,
         "silence_gate_dbfs": -42.0,
-        "max_silence_seconds": 0.0,
+        "max_silence_seconds": 1.5,
         "first_audible_seconds": 0.0,
-        "tail_silence_seconds": 0.0
-      }
+        "tail_silence_seconds": 0.121
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/table-pulse-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/table-pulse-90s-deepdive.mp4",
+      "group_key": "table-pulse-90s-deepdive",
       "title": "TABLE PULSE 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -257,10 +272,12 @@
         "max_silence_seconds": 0.0,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.0
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/black-ledger-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/black-ledger-90s-deepdive.mp4",
+      "group_key": "black-ledger-90s-deepdive",
       "title": "BLACK LEDGER 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -287,10 +304,12 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.047
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/black-ledger-epic-90s.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/black-ledger-epic-90s.mp4",
+      "group_key": "black-ledger-epic-90s",
       "title": "BLACK LEDGER epic 90-second reel",
       "status": "pass",
       "issues": [],
@@ -317,10 +336,12 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.01
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/community-hub-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/community-hub-90s-deepdive.mp4",
+      "group_key": "community-hub-90s-deepdive",
       "title": "COMMUNITY HUB 90-second deep dive",
       "status": "pass",
       "issues": [],
@@ -347,10 +368,12 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.004
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/origin-dossier-90s-deepdive.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/origin-dossier-90s-deepdive.mp4",
+      "group_key": "origin-dossier-90s-deepdive",
       "title": "Origin Dossier: The Name She Chose",
       "status": "pass",
       "issues": [],
@@ -377,10 +400,12 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.005
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose.mp4",
+      "group_key": "origin-dossier-the-name-she-chose",
       "title": "Origin Dossier: The Name She Chose",
       "status": "pass",
       "issues": [],
@@ -407,10 +432,12 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.005
-      }
+      },
+      "rebuild_receipt_status": "pass"
     },
     {
-      "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4?v=20260620-audio2",
+      "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
+      "group_key": "origin-dossier-the-name-she-chose-20260619",
       "title": "Origin Dossier: The Name She Chose",
       "status": "pass",
       "issues": [],
@@ -437,7 +464,8 @@
         "max_silence_seconds": 0.25,
         "first_audible_seconds": 0.0,
         "tail_silence_seconds": 0.005
-      }
+      },
+      "rebuild_receipt_status": "pass"
     }
   ]
 }
