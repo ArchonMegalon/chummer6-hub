@@ -470,7 +470,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
         Assert.Contains("carries the current short-lived upload handoff code", view, StringComparison.Ordinal);
         Assert.Contains("This signed-in command contains a short-lived handoff code", view, StringComparison.Ordinal);
-        Assert.Contains("delete the local release work root and temporary packaging artifacts again", view, StringComparison.Ordinal);
+        Assert.Contains("delete the local release work root and temporary packaging files again", view, StringComparison.Ordinal);
         Assert.Contains("Short-lived handoff code", view, StringComparison.Ordinal);
         Assert.Contains("Backup handoff code", view, StringComparison.Ordinal);
         Assert.Contains("releaseUploadHandoffCode", view, StringComparison.Ordinal);
@@ -3627,7 +3627,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PublicationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
-        Assert.Contains("Recent governed prep launches", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent prep launches", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent travel prefetch history", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent aftermath recap packages and replay outputs", accountView, StringComparison.Ordinal);
     }
