@@ -143,15 +143,15 @@ public sealed class PrivacyBoundedSupportStatusService
         DateTimeOffset now,
         string locale)
     {
-        string route = feedbackPacket?.DestinationRoute ?? "/participate?productlift=feedback#productlift-feedback";
+        string route = feedbackPacket?.DestinationRoute ?? "/feedback";
         if (string.Equals(route, "/participate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
             || string.Equals(route, "/participate?productlift=feedback#productlift-feedback", StringComparison.OrdinalIgnoreCase))
         {
-            route = "/participate?productlift=feedback#productlift-feedback";
+            route = "/feedback";
         }
         string summary = feedbackPacket is null
-            ? "Feedback stays privacy-bounded until it is classified on the Participate page and reviewed for product work."
-            : "Feedback stays bounded to the Participate page instead of becoming support folklore or telemetry surveillance.";
+            ? "Feedback stays privacy-bounded until it is classified on the public feedback page and reviewed for product work."
+            : "Feedback stays bounded to the public feedback page instead of becoming support folklore or telemetry surveillance.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-feedback-status", feedbackPacket?.PacketId ?? latestSupportCase?.CaseId ?? manifest.Version),

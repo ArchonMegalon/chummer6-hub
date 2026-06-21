@@ -67,7 +67,7 @@ public sealed class PublicSignalToCanonPacketServiceTests
                 UpdatedAtUtc: DateTimeOffset.UtcNow,
                 Source: "public_web"));
 
-            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?source=feedback#public-feedback", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/feedback", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?source=roadmap#public-roadmap-projection", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.CaseId, "case-public-001", StringComparison.Ordinal));

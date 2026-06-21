@@ -1,24 +1,24 @@
 {
   "contract_name": "chummer.windows_installer_visual_audit",
-  "generated_at_utc": "2026-06-20T20:03:48Z",
-  "status": "fail",
+  "generated_at_utc": "2026-06-21T18:13:26Z",
+  "status": "pass",
   "release": {
-    "version": "run-258",
-    "channel": "preview"
+    "version": "run-20260621-054902",
+    "channel": "public_stable"
   },
   "artifact": {
     "artifactId": "avalonia-win-x64-installer",
     "fileName": "chummer-avalonia-win-x64-installer.exe",
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe",
-    "sha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51",
-    "actualSha256": "c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51"
+    "sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+    "actualSha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b"
   },
   "startupReceipt": {
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
     "status": "pass",
     "verificationDisposition": null,
     "skipClass": null,
-    "artifactDigest": "sha256:c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51"
+    "artifactDigest": "sha256:c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b"
   },
   "visualAuditSource": {
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
@@ -26,7 +26,7 @@
     "status": "pass",
     "platform": "windows",
     "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
-    "artifactSha256": "1d6cc812dab45939d451026deeed627025d9e58f4247dd45bbb25b924158ad1d",
+    "artifactSha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
     "screenshotCount": 4,
     "defaultDpiScreenshotCount": 2,
     "scaledDpiScreenshotCount": 2,
@@ -37,9 +37,9 @@
   },
   "screenshots": [
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260620T174600Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260621T174405Z.png",
       "exists": true,
-      "sha256": "66935f2d86115b35f781d76a499af020a7a0fdea8f156506430641c10d6e7110",
+      "sha256": "363c87f78ec03bb66291a18b184839cdbc11fb19992ed7fe4d88372daf6ae5d7",
       "dpiScale": "1.0",
       "surface": "install-progress",
       "canonicalSurface": "install-progress",
@@ -48,38 +48,38 @@
       "hostClass": "native-windows",
       "captureMode": "window-bounds",
       "captureBounds": {
-        "left": 74,
-        "top": 130,
-        "width": 876,
-        "height": 459
+        "left": 64,
+        "top": 120,
+        "width": 896,
+        "height": 479
       },
       "reusedFrom": "",
       "windowTitle": "Chummer6 Avalonia Desktop Installer - Installing"
     },
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260620T174646Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260621T174405Z.png",
       "exists": true,
-      "sha256": "66935f2d86115b35f781d76a499af020a7a0fdea8f156506430641c10d6e7110",
+      "sha256": "8b0db98a2f7af32bf7cba5e91a24506538950f05467e7ec500511b22e0090b86",
       "dpiScale": "1.5",
       "surface": "install-progress",
       "canonicalSurface": "install-progress",
       "clippingStatus": "pass",
       "readabilityStatus": "pass",
       "hostClass": "native-windows",
-      "captureMode": "reused-same-surface",
+      "captureMode": "window-bounds",
       "captureBounds": {
-        "left": 74,
-        "top": 130,
-        "width": 876,
-        "height": 459
+        "left": 64,
+        "top": 120,
+        "width": 896,
+        "height": 479
       },
-      "reusedFrom": "windows-installer-install-progress-dpi-1.0-20260620T174600Z.png",
+      "reusedFrom": "",
       "windowTitle": "Chummer6 Avalonia Desktop Installer - Installing"
     },
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260620T174649Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260621T174411Z.png",
       "exists": true,
-      "sha256": "3702acdb23bffbfcee7c9d705687d66ae21ea3d7eaecb143ee62b41ba9e760c4",
+      "sha256": "e6c0c85978c9eb1c456a0ac938d27c993f2270eb9ad0aa3f43c7f3af2c255a3f",
       "dpiScale": "1.0",
       "surface": "completion",
       "canonicalSurface": "completion",
@@ -88,18 +88,18 @@
       "hostClass": "native-windows",
       "captureMode": "window-bounds",
       "captureBounds": {
-        "left": 74,
-        "top": 130,
-        "width": 876,
-        "height": 459
+        "left": 64,
+        "top": 120,
+        "width": 896,
+        "height": 479
       },
       "reusedFrom": "",
       "windowTitle": "Chummer6 Avalonia Desktop Installer - Install Complete"
     },
     {
-      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260620T174653Z.png",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260621T174415Z.png",
       "exists": true,
-      "sha256": "3702acdb23bffbfcee7c9d705687d66ae21ea3d7eaecb143ee62b41ba9e760c4",
+      "sha256": "e6c0c85978c9eb1c456a0ac938d27c993f2270eb9ad0aa3f43c7f3af2c255a3f",
       "dpiScale": "1.5",
       "surface": "completion",
       "canonicalSurface": "completion",
@@ -108,27 +108,15 @@
       "hostClass": "native-windows",
       "captureMode": "window-bounds",
       "captureBounds": {
-        "left": 74,
-        "top": 130,
-        "width": 876,
-        "height": 459
+        "left": 64,
+        "top": 120,
+        "width": 896,
+        "height": 479
       },
       "reusedFrom": "",
       "windowTitle": "Chummer6 Avalonia Desktop Installer - Install Complete"
     }
   ],
-  "failures": [
-    "Windows installer visual audit source digest does not match promoted installer"
-  ],
-  "nextActions": [
-    "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
-    "Preferred remote path: trigger GitHub Actions workflow 'Windows Installer Gold Proof' (.github/workflows/windows-installer-gold-proof.yml); it captures native Windows evidence only and does not publish downloads.",
-    "Use PowerShell: scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5",
-    "Use PowerShell: scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass",
-    "If you need manual capture, run scripts/capture_windows_installer_visual_audit.ps1 once per surface/DPI for install-progress and completion at default plus scaled DPI.",
-    "If progress and completion screenshots are byte-identical, rerun manual capture with the progress dialog visible before accepting the completion dialog.",
-    "If proof came from GitHub Actions, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
-    "Commit the generated source receipt and screenshots under /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer.",
-    "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest."
-  ]
+  "failures": [],
+  "nextActions": []
 }

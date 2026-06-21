@@ -81,7 +81,7 @@ public sealed class PublicPrivacyBoundaryServiceTests
 
 Owner: `chummer6-hub`
 
-Retention posture:
+Retention:
 
 * case timeline and user-visible status events: retain for 18 months after the last state change
 
@@ -93,7 +93,7 @@ Redaction baseline:
 
 Owner: `chummer6-hub` plus `chummer6-hub-registry`
 
-Retention posture:
+Retention:
 
 * claim tickets and install-link events: retain for 365 days after last install activity
 
@@ -105,7 +105,7 @@ Redaction baseline:
 
 Owner: `chummer6-hub`
 
-Retention posture:
+Retention:
 
 * post-fix follow-up invites and answer summaries: retain for 365 days
 * raw free-text survey payloads: summarize or redact within 180 days unless still tied to open product work
@@ -114,11 +114,11 @@ Redaction baseline:
 
 * keep survey conclusions out of public guide copy until they are reviewed
 
-### Help tool traces
+### Help and assistant service traces
 
 Owner: `chummer6-hub` plus the owning product surface
 
-Retention posture:
+Retention:
 
 * raw external-service request/response traces: retain for 30 days unless a narrower service contract says less
 * help summaries and review notes: retain for 180 days
@@ -139,7 +139,7 @@ Redaction baseline:
 * may expose case timeline, install status, claimed-device state, and the user-safe slice of crash/support data
 * may not expose unrelated reporter data, maintainer-only deliberation, or private moderation notes
 
-### Help tool surfaces
+### Help and assistant surfaces
 
 * must base answers on reviewed Chummer sources, release records, or support-case records
 * must not become the system of record for support or release state

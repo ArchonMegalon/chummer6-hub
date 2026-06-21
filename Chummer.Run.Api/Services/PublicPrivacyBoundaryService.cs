@@ -171,7 +171,7 @@ public sealed class PublicPrivacyBoundaryService
         BoundaryDomainSpec spec,
         IReadOnlyDictionary<string, RetentionDomainSection> sections)
     {
-        if (!sections.TryGetValue(spec.MarkdownHeading, out var section))
+        if (!TryGetSection(sections, spec.MarkdownHeading, out var section))
         {
             throw new InvalidOperationException($"privacy canon is missing retention domain '{spec.MarkdownHeading}'.");
         }
@@ -192,7 +192,7 @@ public sealed class PublicPrivacyBoundaryService
         BoundarySurfaceRuleSpec spec,
         IReadOnlyDictionary<string, IReadOnlyList<string>> sections)
     {
-        if (!sections.TryGetValue(spec.MarkdownHeading, out var bullets))
+        if (!TryGetSection(sections, spec.MarkdownHeading, out var bullets))
         {
             throw new InvalidOperationException($"privacy canon is missing surface rule '{spec.MarkdownHeading}'.");
         }
@@ -255,7 +255,7 @@ public sealed class PublicPrivacyBoundaryService
                 continue;
             }
 
-            if (string.Equals(line, "Retention posture:", StringComparison.Ordinal))
+            if (IsRetentionHeading(line))
             {
                 currentList = "retention";
                 continue;
@@ -364,6 +364,40 @@ public sealed class PublicPrivacyBoundaryService
 
         return string.Join(" ", bullets);
     }
+
+    private static bool IsRetentionHeading(string line)
+        => string.Equals(line, "Retention posture:", StringComparison.Ordinal)
+            || string.Equals(line, "Retention:", StringComparison.Ordinal);
+
+    private static bool TryGetSection<T>(
+        IReadOnlyDictionary<string, T> sections,
+        string heading,
+        out T section)
+    {
+        if (sections.TryGetValue(heading, out section!))
+        {
+            return true;
+        }
+
+        foreach (var alias in HeadingAliases(heading))
+        {
+            if (sections.TryGetValue(alias, out section!))
+            {
+                return true;
+            }
+        }
+
+        section = default!;
+        return false;
+    }
+
+    private static IReadOnlyList<string> HeadingAliases(string heading)
+        => heading switch
+        {
+            "Help tool traces" => ["Help and assistant service traces"],
+            "Help tool surfaces" => ["Help and assistant surfaces"],
+            _ => Array.Empty<string>()
+        };
 
     private static string RequireText(string? value, string description)
         => string.IsNullOrWhiteSpace(value)

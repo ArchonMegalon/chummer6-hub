@@ -411,7 +411,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("label: Get Chummer", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /downloads", navigation, StringComparison.Ordinal);
         Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);
-        Assert.Contains("href: /participate/karma-forge", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /feedback", navigation, StringComparison.Ordinal);
         Assert.Contains("label: Help", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /help", navigation, StringComparison.Ordinal);
         Assert.Contains("@foreach (var link in primaryDrawerLinks)", layout, StringComparison.Ordinal);
@@ -427,8 +427,6 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "/roadmap",
             "changelog",
             "/changelog",
-            "feedback",
-            "/feedback",
             "proof",
             "receipt",
             "provider"

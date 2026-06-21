@@ -172,7 +172,7 @@ public sealed class PrivacyBoundedSupportStatusServiceTests
 
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "crash_status", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/support/crashes/work-items", StringComparison.Ordinal));
-            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate?productlift=feedback#productlift-feedback", StringComparison.Ordinal));
+            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/feedback", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "telemetry_rollup", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));

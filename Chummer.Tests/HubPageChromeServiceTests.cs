@@ -83,7 +83,7 @@ public sealed class HubPageChromeServiceTests
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
         Assert.Equal("/downloads", chrome.PrimaryNavigation[1].Href);
-        Assert.Equal("/participate/karma-forge", chrome.PrimaryNavigation[2].Href);
+        Assert.Equal("/feedback", chrome.PrimaryNavigation[2].Href);
         Assert.Equal("/help", chrome.PrimaryNavigation[3].Href);
     }
 
