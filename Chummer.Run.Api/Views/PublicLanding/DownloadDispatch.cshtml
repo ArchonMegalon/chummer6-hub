@@ -8,6 +8,14 @@
             || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
             || Model.BootstrapFeatureCards.Count > 0
             || !string.IsNullOrWhiteSpace(Model.CurrentReleaseSummary));
+
+    static string PublicDispatchText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
+    static string PublicDispatchTextOr(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : PublicFacingCopyHumanizer.Clean(value);
+
     var routeChoices = new[]
     {
         new
@@ -60,12 +68,12 @@
 
 <section class="release-stage">
     <div class="release-stage__lead">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
+        <p class="eyebrow">@PublicDispatchText(Model.Eyebrow)</p>
+        <h1 class="page-title">@PublicDispatchText(Model.Heading)</h1>
         @if (Model.CompactDispatchLayout)
         {
             <div class="dispatch-compact-lead">
-                <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Summary)</p>
+                <p class="page-copy">@PublicDispatchText(Model.Summary)</p>
                 @if (showCompactDispatchInfo)
                 {
                     <details class="dispatch-inline-info" data-install-info>
@@ -76,19 +84,19 @@
                             <p class="dispatch-inline-info__eyebrow">Install details</p>
                             @if (!string.IsNullOrWhiteSpace(Model.DispatchNote))
                             {
-                                <p>@PublicFacingCopyHumanizer.Clean(Model.DispatchNote)</p>
+                                <p>@PublicDispatchText(Model.DispatchNote)</p>
                             }
                             @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                             {
-                                <p>@PublicFacingCopyHumanizer.Clean(Model.BootstrapCommandNote)</p>
+                                <p>@PublicDispatchText(Model.BootstrapCommandNote)</p>
                             }
-                            <p><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
+                            <p><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
                             @if (Model.BootstrapFeatureCards.Count > 0)
                             {
                                 <ul class="dispatch-inline-info__list">
                                     @foreach (var card in Model.BootstrapFeatureCards)
                                     {
-                                        <li><strong>@(PublicFacingCopyHumanizer.Clean(card.Heading)).</strong> @PublicFacingCopyHumanizer.Clean(card.Body)</li>
+                                        <li><strong>@(PublicDispatchText(card.Heading)).</strong> @PublicDispatchText(card.Body)</li>
                                     }
                                 </ul>
                             }
@@ -99,11 +107,11 @@
         }
         else
         {
-            <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Summary)</p>
-            <p class="release-stage__note">@PublicFacingCopyHumanizer.Clean(Model.DispatchNote)</p>
+            <p class="page-copy">@PublicDispatchText(Model.Summary)</p>
+            <p class="release-stage__note">@PublicDispatchText(Model.DispatchNote)</p>
             <p class="release-stage__note">Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
             <p class="release-stage__note">Support stays with this downloaded copy.</p>
-            <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
+            <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
         }
     </div>
 </section>
@@ -118,16 +126,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicDispatchText(choice.Badge)</span>
+                <h3>@PublicDispatchText(choice.Title)</h3>
+                <p>@PublicDispatchText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicDispatchText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicDispatchText(choice.Label)</a>
             </article>
         }
     </div>
@@ -143,23 +151,23 @@
             @if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand) && Model.PromoteSecondaryDownload && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadHref) && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadLabel))
             {
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
+                    <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@PublicDispatchText(Model.SecondaryDownloadLabel)</a>
                 </div>
                 <p class="muted-copy">Use this direct installer only when support asks for it. The guided setup below is the normal path.</p>
                 <details class="release-disclosure">
                 <summary>Guided setup</summary>
                     <div class="release-disclosure__body">
                         <div class="code-panel">
-                            <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
-                            <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
+                            <div class="code-panel__label">@PublicDispatchTextOr(Model.BootstrapCommandLabel, "Install command")</div>
+                            <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Paste this into your platform shell.")</strong></p>
                             <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
                             @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                             {
-                            <p class="handoff-command__note">@PublicFacingCopyHumanizer.Clean(Model.BootstrapCommandNote)</p>
+                            <p class="handoff-command__note">@PublicDispatchText(Model.BootstrapCommandNote)</p>
                             }
                             <div class="stacked-actions">
-                                <button class="button-like button-like--secondary" type="button" id="copyTerminalInstallCommandButton">@Model.CopyCommandLabel</button>
-                                <a class="button-like button-like--ghost" href="@Model.DownloadHref">@Model.DownloadLabel</a>
+                                <button class="button-like button-like--secondary" type="button" id="copyTerminalInstallCommandButton">@PublicDispatchText(Model.CopyCommandLabel)</button>
+                                <a class="button-like button-like--ghost" href="@Model.DownloadHref">@PublicDispatchText(Model.DownloadLabel)</a>
                             </div>
                             <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
                         </div>
@@ -169,8 +177,8 @@
                                 @foreach (var card in Model.BootstrapFeatureCards)
                                 {
                                     <article class="handoff-feature-card">
-                                        <h2>@PublicFacingCopyHumanizer.Clean(card.Heading)</h2>
-                                        <p>@PublicFacingCopyHumanizer.Clean(card.Body)</p>
+                                        <h2>@PublicDispatchText(card.Heading)</h2>
+                                        <p>@PublicDispatchText(card.Body)</p>
                                     </article>
                                 }
                             </div>
@@ -181,15 +189,15 @@
             else if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
             {
                 <div class="code-panel">
-                    <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
-                    <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
+                    <div class="code-panel__label">@PublicDispatchTextOr(Model.BootstrapCommandLabel, "Install command")</div>
+                    <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Paste this into your platform shell.")</strong></p>
                     <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
                     @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                     {
-                        <p class="handoff-command__note">@PublicFacingCopyHumanizer.Clean(Model.BootstrapCommandNote)</p>
+                        <p class="handoff-command__note">@PublicDispatchText(Model.BootstrapCommandNote)</p>
                     }
                     <div class="stacked-actions">
-                        <button class="button-like button-like--primary" type="button" id="copyTerminalInstallCommandButton">@Model.CopyCommandLabel</button>
+                        <button class="button-like button-like--primary" type="button" id="copyTerminalInstallCommandButton">@PublicDispatchText(Model.CopyCommandLabel)</button>
                     </div>
                     <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
                 </div>
@@ -199,8 +207,8 @@
                         @foreach (var card in Model.BootstrapFeatureCards)
                         {
                             <article class="handoff-feature-card">
-                                <h2>@PublicFacingCopyHumanizer.Clean(card.Heading)</h2>
-                                <p>@PublicFacingCopyHumanizer.Clean(card.Body)</p>
+                                <h2>@PublicDispatchText(card.Heading)</h2>
+                                <p>@PublicDispatchText(card.Body)</p>
                             </article>
                         }
                     </div>
@@ -209,36 +217,36 @@
             @if (string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
             {
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@Model.DownloadHref" id="startSignedInDownloadButton">@Model.DownloadLabel</a>
+                    <a class="button-like button-like--primary" href="@Model.DownloadHref" id="startSignedInDownloadButton">@PublicDispatchText(Model.DownloadLabel)</a>
                 </div>
             }
             <details class="release-disclosure">
                 <summary>Recovery options</summary>
                 <div class="release-disclosure__body">
                     <p class="muted-copy">Use these options if setup stalls or this install needs account recovery.</p>
-                    <p class="muted-copy">@PublicFacingCopyHumanizer.Clean(Model.ArtifactSupportLine)</p>
+                    <p class="muted-copy">@PublicDispatchText(Model.ArtifactSupportLine)</p>
                     @if (Model.Steps.Count > 0)
                     {
                         <ul class="trust-page-section__list">
                             @foreach (var step in Model.Steps)
                             {
-                                <li>@PublicFacingCopyHumanizer.Clean(step)</li>
+                                <li>@PublicDispatchText(step)</li>
                             }
                         </ul>
                     }
                     <div class="stacked-actions">
                         @if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
                         {
-                            <a class="button-like button-like--primary" href="@Model.DownloadHref">@Model.DownloadLabel</a>
+                            <a class="button-like button-like--primary" href="@Model.DownloadHref">@PublicDispatchText(Model.DownloadLabel)</a>
                         }
                         @if (!Model.PromoteSecondaryDownload && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadHref) && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadLabel))
                         {
-                            <a class="button-like button-like--ghost" href="@Model.SecondaryDownloadHref">@Model.SecondaryDownloadLabel</a>
+                            <a class="button-like button-like--ghost" href="@Model.SecondaryDownloadHref">@PublicDispatchText(Model.SecondaryDownloadLabel)</a>
                         }
-                        <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
-                        <a class="button-like button-like--secondary" href="@Model.SupportHref">@Model.SupportLabel</a>
+                        <a class="button-like button-like--secondary" href="@Model.AccountHref">@PublicDispatchText(Model.AccountLabel)</a>
+                        <a class="button-like button-like--secondary" href="@Model.SupportHref">@PublicDispatchText(Model.SupportLabel)</a>
                         <a class="button-like button-like--ghost" href="/now">What works today</a>
-                        <a class="button-like button-like--ghost" href="@Model.HelpHref">@Model.HelpLabel</a>
+                        <a class="button-like button-like--ghost" href="@Model.HelpHref">@PublicDispatchText(Model.HelpLabel)</a>
                         <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>
                     </div>
                 </div>
@@ -250,8 +258,8 @@
 <section class="release-footnote">
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/downloads">Back to downloads</a>
-        <a class="cta-link cta-link--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
-        <a class="cta-link cta-link--ghost" href="@Model.SupportHref">@Model.SupportLabel</a>
+        <a class="cta-link cta-link--secondary" href="@Model.AccountHref">@PublicDispatchText(Model.AccountLabel)</a>
+        <a class="cta-link cta-link--ghost" href="@Model.SupportHref">@PublicDispatchText(Model.SupportLabel)</a>
     </div>
 </section>
 

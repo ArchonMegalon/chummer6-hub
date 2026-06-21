@@ -35,8 +35,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
 
         Assert.DoesNotContain("<summary>Guided Windows setup assistant</summary>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("The guided setup assistant below remains the linked-install default.", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.CopyCommandLabel", view, StringComparison.Ordinal);
-        Assert.Contains("href=\"@Model.SecondaryDownloadHref\" id=\"startSignedInDownloadButton\">@Model.SecondaryDownloadLabel</a>", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicDispatchText(Model.CopyCommandLabel)", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"@Model.SecondaryDownloadHref\" id=\"startSignedInDownloadButton\">@PublicDispatchText(Model.SecondaryDownloadLabel)</a>", view, StringComparison.Ordinal);
         Assert.True(CountOccurrences(view, "id=\"startSignedInDownloadButton\"") >= 1);
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);

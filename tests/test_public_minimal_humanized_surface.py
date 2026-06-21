@@ -146,6 +146,52 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         assert forbidden not in combined
 
 
+def test_download_dispatch_cleans_dynamic_public_copy_before_rendering() -> None:
+    dispatch = read("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml")
+
+    for expected in (
+        "static string PublicDispatchText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicDispatchTextOr(string? value, string fallback)",
+        "@PublicDispatchText(Model.Eyebrow)",
+        "@PublicDispatchText(Model.Heading)",
+        "@PublicDispatchText(Model.Summary)",
+        "@PublicDispatchText(Model.DispatchNote)",
+        "@PublicDispatchText(Model.BootstrapCommandNote)",
+        "@PublicDispatchText(Model.CurrentReleaseSummary)",
+        "@PublicDispatchText(choice.Badge)",
+        "@PublicDispatchText(choice.Title)",
+        "@PublicDispatchText(choice.Summary)",
+        "@PublicDispatchText(item)",
+        "@PublicDispatchText(choice.Label)",
+        "@PublicDispatchText(Model.SecondaryDownloadLabel)",
+        "@PublicDispatchText(Model.CopyCommandLabel)",
+        "@PublicDispatchText(Model.DownloadLabel)",
+        "@PublicDispatchText(Model.AccountLabel)",
+        "@PublicDispatchText(Model.SupportLabel)",
+        "@PublicDispatchText(Model.HelpLabel)",
+        "@PublicDispatchText(Model.ArtifactSupportLine)",
+    ):
+        assert expected in dispatch
+
+    for forbidden in (
+        "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+        "<h1 class=\"page-title\">@Model.Heading</h1>",
+        "@Model.CurrentReleaseSummary.</p>",
+        "<span class=\"tag\">@choice.Badge</span>",
+        "<h3>@choice.Title</h3>",
+        "<p>@choice.Summary</p>",
+        "<span>@item</span>",
+        ">@choice.Label</a>",
+        ">@Model.SecondaryDownloadLabel</a>",
+        ">@Model.CopyCommandLabel</button>",
+        ">@Model.DownloadLabel</a>",
+        ">@Model.AccountLabel</a>",
+        ">@Model.SupportLabel</a>",
+        ">@Model.HelpLabel</a>",
+    ):
+        assert forbidden not in dispatch
+
+
 def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     horizons = read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml")

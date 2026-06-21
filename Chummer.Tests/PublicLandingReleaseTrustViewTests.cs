@@ -105,7 +105,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("href=\"/now\">What works today</a>", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.HelpLabel", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicDispatchText(Model.HelpLabel)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.", view, StringComparison.Ordinal);
     }
 
