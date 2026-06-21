@@ -679,6 +679,47 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Signed_in_home_dynamic_cards_clean_public_copy_before_rendering()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
+
+        foreach (string required in new[]
+        {
+            "static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+            "@PublicText(supportCase.Case.Title)",
+            "@PublicText(receipt.ArtifactLabel)",
+            "@PublicText(workspace.ChangePackets[0].Summary)",
+            "@PublicText(leadWorkspaceServerPlane.PrepLibrary.Summary)",
+            "@PublicText(handoff.Summary)",
+            "@string.Join(\", \", handoff.Outputs.Take(8).Select(item => PublicText(item.Label)))",
+            "@PublicText(answer.ShortAnswer)",
+            "@PublicText(publication.Summary)",
+            "@PublicText(device.RestoreSummary)"
+        })
+        {
+            Assert.Contains(required, view, StringComparison.Ordinal);
+        }
+
+        foreach (string forbidden in new[]
+        {
+            "@supportCase.Case.Title",
+            "@receipt.ArtifactLabel",
+            "@workspace.ChangePackets[0].Summary",
+            "@leadWorkspaceServerPlane.PrepLibrary.Summary",
+            "@handoff.Summary",
+            "handoff.Outputs.Take(8).Select(item => item.Label)",
+            "@answer.ShortAnswer",
+            "@publication.Summary",
+            "@device.RestoreSummary",
+            "packet(s)",
+            "package(s)"
+        })
+        {
+            Assert.DoesNotContain(forbidden, view, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Public_maintenance_feature_page_copy_avoids_internal_process_words()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));

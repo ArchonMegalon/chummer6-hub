@@ -572,7 +572,7 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
     assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
-    assert "Hint: @sourceHintLine" in home
+    assert "Hint: @PublicText(sourceHintLine)" in home
 
 
 def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:

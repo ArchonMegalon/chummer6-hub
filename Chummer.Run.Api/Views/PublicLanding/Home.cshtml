@@ -196,6 +196,8 @@
         return resolvedHref;
     }
 
+    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -481,17 +483,17 @@ else
                                             @foreach (var supportCase in releasedOrNotifiedCases)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">@supportCase.StageLabel</span>
+                                                    <span class="tag">@PublicText(supportCase.StageLabel)</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@supportCase.Case.Title</h3>
-                                                        <p>@supportCase.ClosureSummary <span>Next: @supportCase.NextSafeAction</span></p>
-                                                        <p class="muted-copy">@supportCase.ReleaseProgressSummary</p>
+                                                        <h3>@PublicText(supportCase.Case.Title)</h3>
+                                                        <p>@PublicText(supportCase.ClosureSummary) <span>Next: @PublicText(supportCase.NextSafeAction)</span></p>
+                                                        <p class="muted-copy">@PublicText(supportCase.ReleaseProgressSummary)</p>
                                                         @if (!string.IsNullOrWhiteSpace(supportCase.AffectedInstallSummary))
                                                         {
-                                                            <p class="muted-copy">@supportCase.AffectedInstallSummary</p>
+                                                            <p class="muted-copy">@PublicText(supportCase.AffectedInstallSummary)</p>
                                                         }
                                                     </div>
-                                                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@supportCase.PrimaryActionLabel</a>
+                                                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
                                                 </article>
                                             }
                                             @foreach (var receipt in recentReceipts)
@@ -499,8 +501,8 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Install</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@receipt.ArtifactLabel</h3>
-                                                        <p>@receipt.Version on @receipt.Channel is still attached to this account if you need to reconnect the copy later.</p>
+                                                        <h3>@PublicText(receipt.ArtifactLabel)</h3>
+                                                        <p>@PublicText(receipt.Version) on @PublicText(receipt.Channel) is still attached to this account if you need to reconnect the copy later.</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                                 </article>
@@ -511,7 +513,7 @@ else
                                                     <span class="tag">Return path</span>
                                                     <div class="app-rail__copy">
                                                         <h3>Campaign return needs confirmation</h3>
-                                                        <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
+                                                        <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Review campaign return</a>
                                                 </article>
@@ -658,55 +660,55 @@ else
                                                             }
                                                             else if (workspace.CampaignMemory is not null)
                                                             {
-                                                                <span> Memory: @workspace.CampaignMemory.Summary</span>
+                                                                <span> Memory: @PublicText(workspace.CampaignMemory.Summary)</span>
                                                             }
                                                             else if (workspace.Consequences is { Count: > 0 })
                                                             {
-                                                                <span> Consequence: @workspace.Consequences[0].Label is @workspace.Consequences[0].State.</span>
+                                                                <span> Consequence: @PublicText(workspace.Consequences[0].Label) is @PublicText(workspace.Consequences[0].State).</span>
                                                             }
                                                             else if (workspace.RosterTransfers is { Count: > 0 })
                                                             {
-                                                                <span> Transfer: @workspace.RosterTransfers[0].Summary</span>
+                                                                <span> Transfer: @PublicText(workspace.RosterTransfers[0].Summary)</span>
                                                             }
                                                             else if (workspace.ReadinessCues.Count > 0)
                                                             {
-                                                                <span> Readiness: @workspace.ReadinessCues[0].Summary</span>
+                                                                <span> Readiness: @PublicText(workspace.ReadinessCues[0].Summary)</span>
                                                             }
                                                             else if (workspace.ChangePackets is { Count: > 0 })
                                                             {
-                                                                <span> Change: @workspace.ChangePackets[0].Summary</span>
+                                                                <span> Change: @PublicText(workspace.ChangePackets[0].Summary)</span>
                                                             }
                                                             else if (workspace.RecapShelf.Count > 0)
                                                             {
-                                                                <span> Recent return: @workspace.RecapShelf[0].Summary</span>
+                                                                <span> Recent return: @PublicText(workspace.RecapShelf[0].Summary)</span>
                                                             }
                                                             @if (leadWorkspaceServerPlane is not null
                                                                 && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
                                                             {
-                                                                <span> State: @(leadWorkspaceState?.Label).</span>
+                                                                <span> State: @PublicText(leadWorkspaceState?.Label).</span>
                                                                 @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                                 {
-                                                                    <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                                    <span> Change: @PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)</span>
                                                                 }
                                                                 @if (leadNextSessionCarryForward is not null)
                                                                 {
-                                                                    <span> Carry-forward: @leadNextSessionCarryForward.Summary</span>
+                                                                    <span> Carry-forward: @PublicText(leadNextSessionCarryForward.Summary)</span>
                                                                 }
                                                                 @if (leadFirstPlayableSession is not null)
                                                                 {
-                                                                    <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
-                                                                <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
-                                                                <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
-                                                                <span> Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary</span>
+                                                                    <span> First session: @PublicText(leadFirstPlayableSession.CampaignStartSummary)</span>
+                                                                <span> Legal runner: @PublicText(leadFirstPlayableSession.RuleReadySummary)</span>
+                                                                <span> Understandable return: @PublicText(leadFirstPlayableSession.ReturnLaneSummary)</span>
+                                                                <span> Campaign readiness: @PublicText(leadFirstPlayableSession.CampaignReadySummary)</span>
                                                                 }
-                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
+                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count file(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
                                                                 {
-                                                                    <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count package(s).</span>
+                                                                    <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count file(s).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(leadPortableExchangeSummary))
                                                                 {
-                                                                    <span> Portable exchange: @leadPortableExchangeSummary</span>
+                                                                    <span> Portable exchange: @PublicText(leadPortableExchangeSummary)</span>
                                                                 }
                                                             }
                                                         </p>
@@ -1053,19 +1055,19 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">GM prep</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@leadWorkspaceServerPlane.PrepLibrary.Summary</h3>
+                                                        <h3>@PublicText(leadWorkspaceServerPlane.PrepLibrary.Summary)</h3>
                                                         <p>
-                                                            @leadWorkspaceServerPlane.TravelMode.Summary
+                                                            @PublicText(leadWorkspaceServerPlane.TravelMode.Summary)
                                                             @if (leadPrepLaunch is not null)
                                                             {
-                                                                <span> Latest launch: @leadPrepLaunch.PacketTitle@(string.IsNullOrWhiteSpace(leadPrepLaunch.TargetRunTitle) ? string.Empty : $" for {leadPrepLaunch.TargetRunTitle}").</span>
+                                                                <span> Latest launch: @PublicText(leadPrepLaunch.PacketTitle)@(string.IsNullOrWhiteSpace(leadPrepLaunch.TargetRunTitle) ? string.Empty : $" for {PublicText(leadPrepLaunch.TargetRunTitle)}").</span>
                                                             }
                                                             @if (leadTravelPrefetch is not null)
                                                             {
-                                                                <span> Latest travel setup: @leadTravelPrefetch.DeviceRole on @leadTravelPrefetch.Platform.</span>
+                                                                <span> Latest travel setup: @PublicText(leadTravelPrefetch.DeviceRole) on @PublicText(leadTravelPrefetch.Platform).</span>
                                                             }
-                                                            <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
-                                                            <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
+                                                            <span> Search: @PublicText(leadWorkspaceServerPlane.PrepLibrary.SearchSummary)</span>
+                                                            <span> Safehouse / travel mode: @PublicText(leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary).</span>
                                                         </p>
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
@@ -1091,94 +1093,94 @@ else
                                                     <article class="app-rail__item">
                                                         <span class="tag">Build setup</span>
                                                         <div class="app-rail__copy">
-                                                            <h3>@handoff.Title</h3>
+                                                            <h3>@PublicText(handoff.Title)</h3>
                                                             <p>
-                                                                @handoff.Summary
+                                                                @PublicText(handoff.Summary)
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.NextSafeAction))
                                                                 {
-                                                                    <span> Next: @handoff.NextSafeAction.</span>
+                                                                    <span> Next: @PublicText(handoff.NextSafeAction).</span>
                                                                 }
                                                                 else if (handoff.ProgressionOutcomes.Count > 0)
                                                                 {
-                                                                    <span> Next: @handoff.ProgressionOutcomes[0].</span>
+                                                                    <span> Next: @PublicText(handoff.ProgressionOutcomes[0]).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.CampaignReturnSummary))
                                                                 {
-                                                                    <span> Return: @handoff.CampaignReturnSummary.</span>
+                                                                    <span> Return: @PublicText(handoff.CampaignReturnSummary).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.PlannerCoverageSummary))
                                                                 {
-                                                                    <span> Coverage: @handoff.PlannerCoverageSummary.</span>
+                                                                    <span> Coverage: @PublicText(handoff.PlannerCoverageSummary).</span>
                                                                 }
                                                                 @if (handoff.PlannerCoverageLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var plannerLine in handoff.PlannerCoverageLines.Take(2))
                                                                     {
-                                                                        <span> Planner note: @plannerLine</span>
+                                                                        <span> Planner note: @PublicText(plannerLine)</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
                                                                 {
-                                                                    <span> Crew fit: @handoff.CrewFitSummary.</span>
+                                                                    <span> Crew fit: @PublicText(handoff.CrewFitSummary).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.ConditionalStateSummary))
                                                                 {
-                                                                    <span> Current conditions: @handoff.ConditionalStateSummary.</span>
+                                                                    <span> Current conditions: @PublicText(handoff.ConditionalStateSummary).</span>
                                                                 }
                                                                 @if (handoff.ConditionalStateLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var conditionalLine in handoff.ConditionalStateLines.Take(2))
                                                                     {
-                                                                        <span> Conditional note: @conditionalLine</span>
+                                                                        <span> Conditional note: @PublicText(conditionalLine)</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
                                                                 {
-                                                                    <span> Helpful notes: @handoff.SourceHintSummary.</span>
+                                                                    <span> Helpful notes: @PublicText(handoff.SourceHintSummary).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary))
                                                                 {
-                                                                    <span> Builder view: @handoff.BuildSurfaceSummary.</span>
+                                                                    <span> Builder view: @PublicText(handoff.BuildSurfaceSummary).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.ExchangeParitySummary))
                                                                 {
-                                                                    <span> Import/export fit: @handoff.ExchangeParitySummary.</span>
+                                                                    <span> Import/export fit: @PublicText(handoff.ExchangeParitySummary).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.PortabilityPillarSummary))
                                                                 {
-                                                                    <span> Portability: @handoff.PortabilityPillarSummary.</span>
+                                                                    <span> Portability: @PublicText(handoff.PortabilityPillarSummary).</span>
                                                                 }
                                                                 @if (handoff.SourceHintLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
                                                                     {
-                                                                        <span> Hint: @sourceHintLine</span>
+                                                                        <span> Hint: @PublicText(sourceHintLine)</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.BuildSurfaceLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var buildSurfaceLine in handoff.BuildSurfaceLines.Take(2))
                                                                     {
-                                                                        <span> Build note: @buildSurfaceLine</span>
+                                                                        <span> Build note: @PublicText(buildSurfaceLine)</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.ExchangeParityLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var parityLine in handoff.ExchangeParityLines.Take(2))
                                                                     {
-                                                                        <span> Parity note: @parityLine</span>
+                                                                        <span> Parity note: @PublicText(parityLine)</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.PortabilityPillarLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var portabilityLine in handoff.PortabilityPillarLines.Take(2))
                                                                     {
-                                                                        <span> Portability note: @portabilityLine</span>
+                                                                        <span> Portability note: @PublicText(portabilityLine)</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
                                                                 {
-                                                                    <span> Support: @handoff.SupportClosureSummary.</span>
+                                                                    <span> Support: @PublicText(handoff.SupportClosureSummary).</span>
                                                                 }
                                                                 @if (handoff.RuleEnvironmentDiff is not null)
                                                                 {
@@ -1187,7 +1189,7 @@ else
                                                                 }
                                                                 @if (handoff.Outputs.Count > 0)
                                                                 {
-                                                                    <span> Outputs: @string.Join(", ", handoff.Outputs.Take(8).Select(item => item.Label)).</span>
+                                                                    <span> Outputs: @string.Join(", ", handoff.Outputs.Take(8).Select(item => PublicText(item.Label))).</span>
                                                                     @if (handoff.Outputs.Count > 8)
                                                                     {
                                                                         <span> More next steps: +@(handoff.Outputs.Count - 8) additional guided items.</span>
@@ -1196,7 +1198,7 @@ else
                                                                     {
                                                                         @if (!string.IsNullOrWhiteSpace(output.NextSafeAction))
                                                                         {
-                                                                            <span> Output next: @output.NextSafeAction.</span>
+                                                                            <span> Output next: @PublicText(output.NextSafeAction).</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                                                         {
@@ -1205,7 +1207,7 @@ else
                                                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
                                                                         {
-                                                                            <span> Output publication: @output.PublicationSummary.</span>
+                                                                            <span> Output publication: @PublicText(output.PublicationSummary).</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                                                         {
@@ -1213,25 +1215,25 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
-                                                                            <span> Output note: @output.AuditSummary.</span>
+                                                                            <span> Output note: @PublicText(output.AuditSummary).</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
                                                                         {
-                                                                            <span> Output compatibility: @output.CompatibilitySummary.</span>
+                                                                            <span> Output compatibility: @PublicText(output.CompatibilitySummary).</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.LineageSummary))
                                                                         {
-                                                                            <span> Output lineage: @output.LineageSummary.</span>
+                                                                            <span> Output lineage: @PublicText(output.LineageSummary).</span>
                                                                         }
                                                                     }
                                                                 }
                                                                 @if (handoff.Watchouts is { Count: > 0 })
                                                                 {
-                                                                    <span> Needs attention: @handoff.Watchouts[0]</span>
+                                                                    <span> Needs attention: @PublicText(handoff.Watchouts[0])</span>
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(handoff.HandoffId)}")">Open build path for @handoff.Title</a>
+                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(handoff.HandoffId)}")">Open build path for @PublicText(handoff.Title)</a>
                                                     </article>
                                                 }
                                                 @if (rulesAnswers.Length > 0)
@@ -1240,26 +1242,26 @@ else
                                                     <article class="app-rail__item">
                                                         <span class="tag">Rule answer</span>
                                                         <div class="app-rail__copy">
-                                                            <h3>@answer.Question</h3>
+                                                            <h3>@PublicText(answer.Question)</h3>
                                                             <p>
-                                                                @answer.ShortAnswer
+                                                                @PublicText(answer.ShortAnswer)
                                                                 <span> Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel).</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
-                                                                    <span> Note: @answer.EvidenceLines[0]</span>
+                                                                    <span> Note: @PublicText(answer.EvidenceLines[0])</span>
                                                                 }
                                                                 @if (answer.Studio is not null)
                                                                 {
-                                                                    <span> Lifecycle: @answer.Studio.CurrentStageLabel -> @answer.Studio.PromotionTargetLabel.</span>
-                                                                    <span> Rollback: @answer.Studio.RollbackSummary.</span>
+                                                                    <span> Lifecycle: @PublicText(answer.Studio.CurrentStageLabel) -> @PublicText(answer.Studio.PromotionTargetLabel).</span>
+                                                                    <span> Rollback: @PublicText(answer.Studio.RollbackSummary).</span>
                                                                 }
                                                                 @if (answer.Diffs is { Count: > 0 })
                                                                 {
-                                                                    <span> Change: @answer.Diffs[0].Label -> @answer.Diffs[0].AfterSummary</span>
+                                                                    <span> Change: @PublicText(answer.Diffs[0].Label) -> @PublicText(answer.Diffs[0].AfterSummary)</span>
                                                                 }
                                                                 @if (answer.SupportReuseHints.Count > 0)
                                                                 {
-                                                                    <span> Support note: @answer.SupportReuseHints[0]</span>
+                                                                    <span> Support note: @PublicText(answer.SupportReuseHints[0])</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -1282,7 +1284,7 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Migration return</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@migration.Summary</h3>
+                                                        <h3>@PublicText(migration.Summary)</h3>
                                                         <p>
                                                             @if (leadField is null)
                                                             {
@@ -1290,7 +1292,7 @@ else
                                                             }
                                                             else
                                                             {
-                                                                <span>@leadField.Label: @leadField.Summary</span>
+                                                                <span>@PublicText(leadField.Label): @PublicText(leadField.Summary)</span>
                                                             }
                                                         </p>
                                                     </div>
@@ -1303,49 +1305,49 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Publication status</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@publication.Title</h3>
+                                                        <h3>@PublicText(publication.Title)</h3>
                                                         <p>
-                                                            @publication.Summary
+                                                            @PublicText(publication.Summary)
                                                             <span>Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary).</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
-                                                            <span>Discovery: @publication.DiscoverySummary</span>
+                                                            <span>Discovery: @PublicText(publication.DiscoverySummary)</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                                             {
-                                                                <span> Status: @publication.TrustSummary</span>
+                                                                <span> Status: @PublicText(publication.TrustSummary)</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                                                             {
-                                                                <span> Compare by: @publication.ComparisonSummary</span>
+                                                                <span> Compare by: @PublicText(publication.ComparisonSummary)</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                                                             {
-                                                                <span> Lineage: @publication.LineageSummary</span>
+                                                                <span> Lineage: @PublicText(publication.LineageSummary)</span>
                                                             }
                                                             <span>Available now: @(publication.Discoverable ? "Eligible now" : "Limited").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                                             {
-                                                                <span> Next: @publication.NextSafeAction.</span>
+                                                                <span> Next: @PublicText(publication.NextSafeAction).</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                                                             {
-                                                                <span> Return: @publication.CampaignReturnSummary.</span>
+                                                                <span> Return: @PublicText(publication.CampaignReturnSummary).</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
                                                             {
-                                                                <span> Support: @publication.SupportClosureSummary.</span>
+                                                                <span> Support: @PublicText(publication.SupportClosureSummary).</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                                                             {
-                                                                <span> Moderation: @publication.ModerationSummary</span>
+                                                                <span> Moderation: @PublicText(publication.ModerationSummary)</span>
                                                             }
                                                         </p>
                                                     </div>
                                                     <a class="inline-link" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                                                     @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                                                     {
-                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}")">Open build path for @publication.Title</a>
+                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}")">Open build path for @PublicText(publication.Title)</a>
                                                     }
                                                 </article>
                                             }
@@ -1355,8 +1357,8 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Device return</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@device.HostLabel</h3>
-                                                        <p>@device.RestoreSummary <span>Role: @device.DeviceRole on @device.Platform.</span></p>
+                                                        <h3>@PublicText(device.HostLabel)</h3>
+                                                        <p>@PublicText(device.RestoreSummary) <span>Role: @PublicText(device.DeviceRole) on @PublicText(device.Platform).</span></p>
                                                     </div>
                                                     <a class="inline-link" href="/account/access">Open device return</a>
                                                 </article>
