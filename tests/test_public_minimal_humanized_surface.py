@@ -300,6 +300,79 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
         assert forbidden not in combined
 
 
+def test_public_intake_pages_clean_dynamic_route_and_stage_copy() -> None:
+    karma_forge = read("Chummer.Run.Api/Views/PublicLanding/KarmaForge.cshtml")
+    feedback = read("Chummer.Run.Api/Views/PublicLanding/Feedback.cshtml")
+
+    for expected in (
+        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        "@SanitizePublicText(Model.Eyebrow)",
+        "@SanitizePublicText(Model.Heading)",
+        "@SanitizePublicText(choice.Badge)",
+        "@SanitizePublicText(choice.Title)",
+        "@SanitizePublicText(choice.Summary)",
+        "@SanitizePublicText(item)",
+        "@SanitizePublicText(choice.Label)",
+        "@SanitizePublicText(stage.Status.Replace",
+        "@SanitizePublicText(stage.ActionLabel)",
+        "@SanitizePublicText(option.Label)",
+        "@SanitizePublicText(Model.SelectedTrack.Family)",
+    ):
+        assert expected in karma_forge
+
+    for expected in (
+        "static string PublicFeedbackText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "@PublicFeedbackText(choice.Badge)",
+        "@PublicFeedbackText(choice.Title)",
+        "@PublicFeedbackText(choice.Summary)",
+        "@PublicFeedbackText(item)",
+        "@PublicFeedbackText(choice.Label)",
+        "@PublicFeedbackText(stage.Badge)",
+        "@PublicFeedbackText(stage.Title)",
+        "@PublicFeedbackText(stage.Summary)",
+        "@PublicFeedbackText(stage.Note)",
+        "@PublicFeedbackText(stage.Label)",
+        "@PublicFeedbackText(card.Badge)",
+        "@PublicFeedbackText(card.Title)",
+        "@PublicFeedbackText(card.Summary)",
+        "@PublicFeedbackText(card.Label)",
+    ):
+        assert expected in feedback
+
+    for source in (karma_forge, feedback):
+        for forbidden in (
+            "<span class=\"tag\">@choice.Badge</span>",
+            "<h3>@choice.Title</h3>",
+            "<p>@choice.Summary</p>",
+            "<span>@item</span>",
+            ">@choice.Label</a>",
+        ):
+            assert forbidden not in source
+
+    for forbidden in (
+        "<p class=\"eyebrow\">@Model.Eyebrow</p>",
+        "<h1 class=\"page-title\">@Model.Heading</h1>",
+        "<h3>@stage.Status.Replace",
+        ">@stage.ActionLabel</a>",
+        ">@option.Label</option>",
+        "@Model.SelectedTrack.Family prompts",
+    ):
+        assert forbidden not in karma_forge
+
+    for forbidden in (
+        "<span class=\"tag\">@stage.Badge</span>",
+        "<h3>@stage.Title</h3>",
+        "<p>@stage.Summary</p>",
+        "<p class=\"workflow-card__note\">@stage.Note</p>",
+        ">@stage.Label</a>",
+        "PublicFacingCopyHumanizer.Clean(card.Badge)",
+        "PublicFacingCopyHumanizer.Clean(card.Title)",
+        "PublicFacingCopyHumanizer.Clean(card.Summary)",
+        "PublicFacingCopyHumanizer.Clean(card.Label)",
+    ):
+        assert forbidden not in feedback
+
+
 def test_connected_table_pulse_sources_do_not_keep_legacy_marker_comments() -> None:
     sources = [
         read("Chummer.Run.Api/Views/Accounts/Account.cshtml"),

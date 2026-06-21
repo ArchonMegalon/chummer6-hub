@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model KarmaForgeIntakePageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE sections";
@@ -78,7 +78,7 @@
         }
     };
 
-    string SanitizePublicText(string value)
+    string SanitizePublicText(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -101,8 +101,8 @@
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1 class="page-title">@Model.Heading</h1>
+        <p class="eyebrow">@SanitizePublicText(Model.Eyebrow)</p>
+        <h1 class="page-title">@SanitizePublicText(Model.Heading)</h1>
         <p class="page-copy">Send one concrete table problem to Chummer.</p>
         <div class="trust-claim__details">
             <span>@SanitizePublicText(Model.CanonicalLane)</span>
@@ -127,16 +127,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@SanitizePublicText(choice.Badge)</span>
+                <h3>@SanitizePublicText(choice.Title)</h3>
+                <p>@SanitizePublicText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@SanitizePublicText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@SanitizePublicText(choice.Label)</a>
             </article>
         }
     </div>
@@ -179,7 +179,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
-                <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
+                <h3>@SanitizePublicText(stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>Request status</span>
@@ -187,7 +187,7 @@
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
                 {
-                    <a class="editorial-strip__action" href="@stage.ActionHref">@stage.ActionLabel</a>
+                    <a class="editorial-strip__action" href="@stage.ActionHref">@SanitizePublicText(stage.ActionLabel)</a>
                 }
             </article>
         }
@@ -237,17 +237,17 @@
                     <select id="trackKey" name="TrackKey" required>
                         @foreach (var option in Model.Form.TrackOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTrackKey, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTrackKey, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
-                    <p class="muted-copy">@Model.SelectedTrack.Family prompts are currently loaded below.</p>
+                    <p class="muted-copy">@SanitizePublicText(Model.SelectedTrack.Family) prompts are currently loaded below.</p>
                 </div>
                 <div class="field">
                     <label for="respondentRole">Respondent role</label>
                     <select id="respondentRole" name="RespondentRole" required>
                         @foreach (var option in Model.Form.RoleOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRespondentRole, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRespondentRole, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
                 </div>
@@ -256,7 +256,7 @@
                     <select id="edition" name="Edition" required>
                         @foreach (var option in Model.Form.EditionOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultEdition, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultEdition, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
                 </div>
@@ -265,7 +265,7 @@
                     <select id="tableType" name="TableType" required>
                         @foreach (var option in Model.Form.TableTypeOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTableType, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTableType, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
                 </div>
@@ -274,7 +274,7 @@
                     <select id="ruleCategory" name="RuleCategory" required>
                         @foreach (var option in Model.Form.RuleCategoryOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRuleCategory, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRuleCategory, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
                 </div>
@@ -283,7 +283,7 @@
                     <select id="severity" name="Severity" required>
                         @foreach (var option in Model.Form.SeverityOptions)
                         {
-                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultSeverity, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultSeverity, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
                 </div>

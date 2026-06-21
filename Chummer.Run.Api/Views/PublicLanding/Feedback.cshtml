@@ -111,6 +111,7 @@
             Label = "Open private support"
         }
     };
+    static string PublicFeedbackText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="release-footnote route-anchor-target" id="public-feedback">
@@ -164,16 +165,16 @@
         @foreach (var choice in routeChoices)
         {
             <article class="route-choice-card">
-                <span class="tag">@choice.Badge</span>
-                <h3>@choice.Title</h3>
-                <p>@choice.Summary</p>
+                <span class="tag">@PublicFeedbackText(choice.Badge)</span>
+                <h3>@PublicFeedbackText(choice.Title)</h3>
+                <p>@PublicFeedbackText(choice.Summary)</p>
                 <div class="route-choice-card__details">
                     @foreach (var item in choice.Details)
                     {
-                        <span>@item</span>
+                        <span>@PublicFeedbackText(item)</span>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                <a class="editorial-strip__action" href="@choice.Href">@PublicFeedbackText(choice.Label)</a>
             </article>
         }
     </div>
@@ -190,11 +191,11 @@
         {
             <article class="workflow-card">
                 <div class="workflow-card__copy">
-                    <span class="tag">@stage.Badge</span>
-                    <h3>@stage.Title</h3>
-                    <p>@stage.Summary</p>
-                    <p class="workflow-card__note">@stage.Note</p>
-                    <a class="inline-link" href="@stage.Href">@stage.Label</a>
+                    <span class="tag">@PublicFeedbackText(stage.Badge)</span>
+                    <h3>@PublicFeedbackText(stage.Title)</h3>
+                    <p>@PublicFeedbackText(stage.Summary)</p>
+                    <p class="workflow-card__note">@PublicFeedbackText(stage.Note)</p>
+                    <a class="inline-link" href="@stage.Href">@PublicFeedbackText(stage.Label)</a>
                 </div>
             </article>
         }
@@ -213,10 +214,10 @@
     @foreach (var card in operatingCards)
     {
         <article class="status-decision-strip__card">
-            <span class="tag">@PublicFacingCopyHumanizer.Clean(card.Badge)</span>
-            <h2>@PublicFacingCopyHumanizer.Clean(card.Title)</h2>
-            <p>@PublicFacingCopyHumanizer.Clean(card.Summary)</p>
-            <a class="button-like button-like--ghost" href="@card.Href">@PublicFacingCopyHumanizer.Clean(card.Label)</a>
+            <span class="tag">@PublicFeedbackText(card.Badge)</span>
+            <h2>@PublicFeedbackText(card.Title)</h2>
+            <p>@PublicFeedbackText(card.Summary)</p>
+            <a class="button-like button-like--ghost" href="@card.Href">@PublicFeedbackText(card.Label)</a>
         </article>
     }
 </section>
