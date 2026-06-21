@@ -2253,6 +2253,8 @@ def test_foundry_export_copy_uses_limited_handoff_language() -> None:
 
 def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    venue = read("Chummer.Run.Api/Views/PublicLanding/GmSessionVenue.cshtml")
+    combined = "\n".join((controller, venue))
 
     for forbidden in (
         "Public-safe venue status for an open run without leaking private room details.",
@@ -2277,7 +2279,7 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "Chummer still owns accepted roster and run truth.",
         "run truth, roster truth, or consequence truth",
     ):
-        assert forbidden not in controller
+        assert forbidden not in combined
 
     for expected in (
         "Public venue status for an open run without leaking private room details.",
@@ -2301,5 +2303,6 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "meeting-service automation stays optional",
         "Chummer still keeps accepted roster and run status.",
         "does not hand run, roster, or closeout records to chat tools, meeting tools, or public boards.",
+        "Room available to account participants",
     ):
-        assert expected in controller
+        assert expected in combined
