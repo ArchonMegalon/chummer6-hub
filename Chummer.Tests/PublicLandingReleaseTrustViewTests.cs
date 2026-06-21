@@ -465,12 +465,24 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Useful cues", liveProof, StringComparison.Ordinal);
         Assert.Contains("Use your signed-in detail view", liveProof, StringComparison.Ordinal);
         Assert.Contains("signed-in detail view", liveProof, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Pain)", liveProof, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Payoff)", liveProof, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@Model.Pain</p>", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@Model.Payoff</p>", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain(">@Model.PrimaryAction.Label</a>", liveProof, StringComparison.Ordinal);
         Assert.DoesNotContain("detail trail", liveProof, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof shelf", liveProof, StringComparison.Ordinal);
         Assert.DoesNotContain("Verification markers", liveProof, StringComparison.Ordinal);
 
         Assert.Contains("detail view", previewConcept, StringComparison.Ordinal);
         Assert.Contains("signed-in detail view", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Pain)", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Payoff)", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@Model.Pain</p>", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>@Model.Payoff</p>", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain(">@Model.PrimaryAction.Label</a>", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("artifact is already live", previewConcept, StringComparison.Ordinal);

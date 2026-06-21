@@ -15,14 +15,14 @@
         {
             <article class="role-matrix__cell">
                 <span class="tag">Why it matters</span>
-                <p>@Model.Pain</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.Pain)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Payoff))
         {
             <article class="role-matrix__cell">
                 <span class="tag">What it could unlock</span>
-                <p>@Model.Payoff</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.Payoff)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
@@ -62,9 +62,9 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Best next page</h3>
-            <p>@Model.PrimaryAction.Label is the cleanest place to follow the concept without treating it as already shipped.</p>
+            <p>@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label) is the cleanest place to follow the concept without treating it as already shipped.</p>
         </div>
-        <a class="inline-link" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="inline-link" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">

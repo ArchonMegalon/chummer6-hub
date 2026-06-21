@@ -510,6 +510,8 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
 def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     roadmap = read("Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml")
     roadmap_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml")
+    live_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailLiveProof.cshtml")
+    preview_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml")
 
     for required in (
         "@CalmRoadmapText(milestone.StatusLabel)",
@@ -539,6 +541,21 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         "@Model.PrimaryAction.Label",
     ):
         assert forbidden not in roadmap_detail
+
+    for source in (live_detail, preview_detail):
+        for required in (
+            "PublicFacingCopyHumanizer.Clean(Model.Pain)",
+            "PublicFacingCopyHumanizer.Clean(Model.Payoff)",
+            "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
+        ):
+            assert required in source
+
+        for forbidden in (
+            "<p>@Model.Pain</p>",
+            "<p>@Model.Payoff</p>",
+            ">@Model.PrimaryAction.Label</a>",
+        ):
+            assert forbidden not in source
 
 
 def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:

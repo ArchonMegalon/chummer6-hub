@@ -15,14 +15,14 @@
         {
             <article class="role-matrix__cell">
                 <span class="tag">Why it matters</span>
-                <p>@Model.Pain</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.Pain)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Payoff))
         {
             <article class="role-matrix__cell">
                 <span class="tag">What it unlocks</span>
-                <p>@Model.Payoff</p>
+                <p>@PublicFacingCopyHumanizer.Clean(Model.Payoff)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
@@ -57,7 +57,7 @@
             <h3>Start from the live surface</h3>
             <p>Use the product action first. The page should move you forward before it sends you to secondary reading.</p>
         </div>
-        <a class="inline-link" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="inline-link" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
