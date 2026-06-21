@@ -238,7 +238,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Choose the right path</h2>
-            <p>Start with the page that matches the problem. Each path has one primary next step and one fallback.</p>
+            <p>Start with the page that matches the problem. Each path has a clear next step and a second option if that does not fit.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -251,7 +251,7 @@
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
                     @if (fallbackAction is not null)
                     {
-                        <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
+                        <p class="muted-copy">If that does not fit: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
                     }
                 </article>
             }

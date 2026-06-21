@@ -11,11 +11,15 @@ public sealed class TrustPageFlagshipViewTests
         string trustView = File.ReadAllText(trustViewPath);
 
         Assert.Contains("Choose the right path", trustView, StringComparison.Ordinal);
+        Assert.Contains("Each path has a clear next step and a second option if that does not fit.", trustView, StringComparison.Ordinal);
+        Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);
         Assert.Contains("Public feedback, tracked return, and install recovery stay nearby.", trustView, StringComparison.Ordinal);
         Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the trust boundary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the rule boundary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("one fallback", trustView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Fallback:", trustView, StringComparison.Ordinal);
     }
 
     [Fact]
