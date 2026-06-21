@@ -1840,21 +1840,32 @@ def test_faction_workspace_uses_page_language_instead_of_route_language() -> Non
         "authenticated campaign routes",
         "Public Ledger routes",
         "signed-in faction routes",
+        "Signed-in page",
+        "signed-in campaign pages",
+        "signed-in faction pages",
+        "signed-in API",
         "faction overlay route",
+        "internal campaign city view",
+        "Overlay API",
+        "Private lore path exists",
     ):
         assert forbidden not in workspace
 
-    assert "Signed-in page" in workspace
+    assert "The campaign city view starts with the globe" in workspace
+    assert "Account page" in workspace
     assert "Public page stays separate" in workspace
     assert "Current workspace." in workspace
     assert "public Ledger pages" in workspace
-    assert "signed-in campaign pages" in workspace
+    assert "account campaign pages" in workspace
     assert "Public Ledger pages" in workspace
-    assert "signed-in faction pages" in workspace
+    assert "account faction pages" in workspace
+    assert "account workspace" in workspace
     assert "private lore overlay" in workspace
+    assert "Private layer" in workspace
+    assert "Private lore stays private" in workspace
 
 
-def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
+def test_account_ledger_pages_use_page_and_path_language() -> None:
     account_home = read("Chummer.Run.Api/Views/PublicLanding/LedgerAccountHome.cshtml")
     notifications = read("Chummer.Run.Api/Views/PublicLanding/LedgerNotifications.cshtml")
     ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
@@ -1872,18 +1883,27 @@ def test_signed_in_ledger_pages_use_page_and_path_language() -> None:
         "Open watch route",
         "Major and challenger routes",
         "Current world-turn packet",
+        "signed-in page",
+        "Signed-in notifications",
+        "signed-in inbox",
+        "signed-in path",
+        "signed-in campaign city view",
     ):
         assert forbidden not in combined
 
-    assert "signed-in page" in account_home
+    assert "account page" in account_home
     assert "Open mail-backed page" in account_home
+    assert "Account notifications" in notifications
+    assert "account inbox" in notifications
+    assert "account path" in notifications
     assert "current world state" in notifications
     assert "one Chummer path" in notifications
     assert "Use the inbox as the Table Pulse Live entry point" in notifications
     assert "public globe page" in ledger
     assert "Open watch page" in ledger
     assert "Current turn details" in account_home
-    assert "signed-in page that mails and inbox items point back to" in advisory
+    assert "account campaign city view" in account_home
+    assert "account page that mail and inbox items return to" in advisory
     assert "Major and challenger paths" in onboarding
 
 
