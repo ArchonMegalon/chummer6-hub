@@ -53,7 +53,7 @@ test('help page stays practical instead of exposing internal policy language', a
   expect(bodyText).not.toContain('mystery math');
 });
 
-test('public user pages do not expose AI or repo-process copy', async ({ page }) => {
+test('public user pages do not expose AI or repo-process copy', async ({ page, request }) => {
   const blockedTerms = [
     'AI',
     'ALICE',
@@ -83,7 +83,11 @@ test('public user pages do not expose AI or repo-process copy', async ({ page })
     'AI generated',
   ];
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/participate', '/what-is-chummer']) {
+  const participateResponse = await request.get(`${baseUrl}/participate`, { maxRedirects: 0 });
+  expect(participateResponse.status()).toBe(302);
+  expect(new URL(participateResponse.headers()['location']).origin).toBe('https://chummer6.productlift.dev');
+
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
     const pageSource = await page.content();
