@@ -29,7 +29,12 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("Open advisory voting", accountView, StringComparison.Ordinal);
         Assert.Contains("Open advisory", notificationsView, StringComparison.Ordinal);
         Assert.Contains("LedgerAdvisory.cshtml", controller, StringComparison.Ordinal);
-        Assert.Contains("World turn", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerWorldTickValidation.cshtml")), StringComparison.Ordinal);
+        string turnReviewView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerWorldTickValidation.cshtml"));
+        Assert.Contains("World turn", turnReviewView, StringComparison.Ordinal);
+        Assert.Contains("Download details", turnReviewView, StringComparison.Ordinal);
+        Assert.Contains("What changed this turn", turnReviewView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open data", turnReviewView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("What this packet says", turnReviewView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Faction leader briefing", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerLeaderBriefing.cshtml")), StringComparison.Ordinal);
         Assert.Contains("Controlled signal", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml")), StringComparison.Ordinal);
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);

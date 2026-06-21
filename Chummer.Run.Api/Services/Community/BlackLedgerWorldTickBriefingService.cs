@@ -163,17 +163,17 @@ public sealed class BlackLedgerWorldTickBriefingService
             ? null
             : BuildLeaderDigest(factionId, requestedTurn, accountBasePath);
         string summary = digest is null
-            ? $"{briefing.TransitionLabel} world-state packet for the inbox/newsreel path."
-            : $"{briefing.TransitionLabel} world-state packet plus leader-specific readout for {digest.PublicName}.";
+            ? $"{briefing.TransitionLabel} current turn details for the inbox/newsreel path."
+            : $"{briefing.TransitionLabel} current turn details plus leader-specific readout for {digest.PublicName}.";
         List<string> checks =
         [
             ..briefing.ValidationChecks,
-            $"World route: {ledgerBasePath.TrimEnd('/')}/turns/{briefing.ToTurn}",
-            $"Notification route: {accountBasePath.TrimEnd('/')}/notifications"
+            $"World page: {ledgerBasePath.TrimEnd('/')}/turns/{briefing.ToTurn}",
+            $"Inbox page: {accountBasePath.TrimEnd('/')}/notifications"
         ];
         if (digest is not null)
         {
-            checks.Add($"Leader digest route: {accountBasePath.TrimEnd('/')}/factions/{digest.FactionId}/leader-briefing");
+            checks.Add($"Leader page: {accountBasePath.TrimEnd('/')}/factions/{digest.FactionId}/leader-briefing");
         }
 
         List<string> links =

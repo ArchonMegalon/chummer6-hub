@@ -26,9 +26,9 @@ class BlackLedgerNewsroomRouteTests(unittest.TestCase):
     def test_watch_surface_exposes_required_newsroom_sections(self) -> None:
         ledger_view = VIEW.read_text(encoding="utf-8")
         self.assertIn("Black Ledger Newsroom", ledger_view)
-        self.assertIn("Open watch route", ledger_view)
+        self.assertIn("Open watch page", ledger_view)
         self.assertIn("Transcript", ledger_view)
-        self.assertIn("Episode details", ledger_view)
+        self.assertIn("Details", ledger_view)
         self.assertIn("Feedback", ledger_view)
         self.assertIn("Published:", ledger_view)
 

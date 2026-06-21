@@ -13,11 +13,11 @@
         <div class="trust-claim__details">
             <span>World: @Model.Packet.WorldName</span>
             <span>Turn: @Model.Packet.ToTurn</span>
-            <span>Data: current</span>
+            <span>Status: current</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Open data</a>
+        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Download details</a>
         <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open inbox</a>
         <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
     </div>
@@ -26,7 +26,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Turn summary</p>
-        <h2 class="editorial-title">What this packet says</h2>
+        <h2 class="editorial-title">What changed this turn</h2>
         <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Packet.Summary)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">

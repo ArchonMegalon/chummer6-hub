@@ -83,10 +83,10 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Ledger Bulletin</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
-            "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
+            "summary": "Turn 0 -> Turn 1 current turn details for the inbox/newsreel path.",
             "checks": [
                 "Public-safe effects carried: 6",
-                "Notification route: /account/ledger/notifications",
+                "Inbox page: /account/ledger/notifications",
             ],
         }
         redirect_bodies = {
@@ -146,10 +146,10 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
-            "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
+            "summary": "Turn 0 -> Turn 1 current turn details for the inbox/newsreel path.",
             "checks": [
                 "Public-safe effects carried: 6",
-                "Notification route: /account/ledger/notifications",
+                "Inbox page: /account/ledger/notifications",
             ],
         }
         redirect_bodies = {
@@ -209,10 +209,10 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "http://example.test/ledger/newsroom/turn-2-newsreel": "<section><h2>Black Ledger Newsroom</h2><video poster=\"/media/ledger/newsreels/turn-2-newsreel-poster.png?v=1\"><source src=\"/media/ledger/newsreels/turn-2-newsreel.mp4?v=1\" type=\"video/mp4\" /><source src=\"/media/ledger/newsreels/turn-2-newsreel.webm?v=1\" type=\"video/webm\" /><track kind=\"captions\" src=\"/media/ledger/newsreels/turn-2-newsreel.vtt?v=1\" /></video><a>Transcript</a><a>Details</a><a>Feedback</a><span>Published:</span></section>",
         }
         receipts_payload = {
-            "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
+            "summary": "Turn 0 -> Turn 1 current turn details for the inbox/newsreel path.",
             "checks": [
                 "Public-safe effects carried: 6",
-                "Notification route: /account/ledger/notifications",
+                "Inbox page: /account/ledger/notifications",
             ],
         }
         redirect_bodies = {
@@ -279,10 +279,10 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
 </section>
 """
         receipts_payload = {
-            "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
+            "summary": "Turn 0 -> Turn 1 current turn details for the inbox/newsreel path.",
             "checks": [
                 "Public-safe effects carried: 6",
-                "Notification route: /account/ledger/notifications",
+                "Inbox page: /account/ledger/notifications",
             ],
         }
         redirect_bodies = {
@@ -350,10 +350,10 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
 </section>
 """
         receipts_payload = {
-            "summary": "Turn 1 -> Turn 2 validation packet for the inbox/newsreel lane.",
+            "summary": "Turn 1 -> Turn 2 current turn details for the inbox/newsreel path.",
             "checks": [
                 "Public-safe effects carried: 3",
-                "Notification route: /account/ledger/notifications",
+                "Inbox page: /account/ledger/notifications",
             ],
         }
         redirect_bodies = {

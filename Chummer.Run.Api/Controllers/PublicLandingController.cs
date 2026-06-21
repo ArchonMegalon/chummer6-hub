@@ -13803,7 +13803,7 @@ echo "Help: ${HELP_URL}"
                     Kind: "validation",
                     Eyebrow: "World state",
                     Heading: "World turn",
-                    Summary: validationPacket?.Summary ?? "Review the inbox-safe world turn against the same world-state packet.",
+                    Summary: validationPacket?.Summary ?? "Review the inbox-safe world turn against the same current turn details.",
                     Href: "/account/ledger/worldtick/validation",
                     CtaLabel: "Open turn review",
                     StatusLabel: "Ready")
@@ -14152,12 +14152,12 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerWorldTickValidationPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
                 "Black Ledger world-turn review",
-                "Signed-in world-state packet for inbox newsreel, leader brief, and public world-turn posture.",
+                "Signed-in turn details for inbox newsreel, leader brief, and public world-turn status.",
                 "/account/ledger/worldtick/validation",
                 user.DisplayName,
                 user.Email),
             Heading: "World turn",
-            Intro: "Use this route to review the inbox newsreel, the public turn packet, and the faction-leader readout against the same world-state packet.",
+            Intro: "Use this page to review the inbox newsreel, the public turn update, and the faction-leader readout against the same current turn details.",
             Packet: packet,
             WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),
             LeaderDigest: string.IsNullOrWhiteSpace(factionId) ? null : _blackLedgerBriefings.BuildLeaderDigest(factionId, 1));

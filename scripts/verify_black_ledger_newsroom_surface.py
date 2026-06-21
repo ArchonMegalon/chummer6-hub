@@ -30,7 +30,7 @@ REQUIRED_SOURCE_MARKERS: dict[str, tuple[str, ...]] = {
     ),
     "Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml": (
         "Black Ledger Newsroom",
-        "Open watch route",
+        "Open watch page",
         "Transcript",
         "Details",
         "Feedback",
@@ -54,12 +54,12 @@ REQUIRED_SOURCE_MARKERS: dict[str, tuple[str, ...]] = {
 
 RECEIPTS_JSON_EXPECTATIONS: dict[str, tuple[str, ...]] = {
     "summary": (
-        "validation packet",
-        "newsreel lane",
+        "current turn details",
+        "newsreel path",
     ),
     "checks": (
         "Public-safe effects carried",
-        "Notification route: /account/ledger/notifications",
+        "Inbox page: /account/ledger/notifications",
     ),
 }
 
