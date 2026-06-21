@@ -26,6 +26,8 @@ DESKTOP_MAIN_WINDOW_PATH = Path("/docker/chummercomplete/chummer-presentation/Ch
 DESKTOP_ANALYTICS_CLIENT_PATH = Path("/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/DesktopAnalyticsClient.cs")
 DESKTOP_PREFERENCE_PATH = Path("/docker/chummercomplete/chummer-presentation/Chummer.Presentation/Overview/DesktopPreferenceState.cs")
 PROVIDER_DISCOVERABILITY_PATH = PUBLISHED_ROOT / "PROVIDER_PROOF_DISCOVERABILITY.generated.json"
+ICANPRENEUR_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "icanpreneur" / "ICANPRENEUR_TRACKED_PROVIDER_RECEIPT.generated.json"
+ICANPRENEUR_LANE_PATH = PUBLISHED_ROOT / "ICANPRENEUR_DISCOVERY_LANE.generated.json"
 RYBBIT_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "rybbit" / "RYBBIT_TRACKED_PROVIDER_RECEIPT.generated.json"
 NEURONWRITER_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "neuronwriter" / "NEURONWRITER_TRACKED_PROVIDER_RECEIPT.generated.json"
 SUBSCRIBR_RECEIPT_PATH = PUBLISHED_ROOT / "provider-proof-discoverability" / "subscribr" / "SUBSCRIBR_TRACKED_PROVIDER_RECEIPT.generated.json"
@@ -78,6 +80,43 @@ def build_payload() -> dict[str, Any]:
     desktop_main_window_source = read_text(DESKTOP_MAIN_WINDOW_PATH)
     desktop_analytics_source = read_text(DESKTOP_ANALYTICS_CLIENT_PATH)
     desktop_preference_source = read_text(DESKTOP_PREFERENCE_PATH)
+    growth_doc = read_text(PUBLIC_GROWTH_DOC_PATH)
+    ltd_registry = read_text(LTD_REGISTRY_PATH)
+    ltd_map = read_text(LTD_MAP_PATH)
+
+    icanpreneur_receipt = load_json(ICANPRENEUR_RECEIPT_PATH)
+    icanpreneur_lane = load_json(ICANPRENEUR_LANE_PATH)
+    icanpreneur_design = read_text(DESIGN_ROOT / "ICANPRENEUR_DISCOVERY_AND_VALIDATION_LANE.md")
+    karma_forge_source = read_text(RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Services" / "KarmaForge" / "KarmaForgeDiscoveryService.cs")
+    icanpreneur_pass = (
+        status_pass(icanpreneur_receipt)
+        and icanpreneur_receipt.get("license_tier") == "Tier 3"
+        and icanpreneur_receipt.get("runtime_ready") is False
+        and status_pass(icanpreneur_lane)
+        and icanpreneur_lane.get("runtime_ready") is False
+        and "rules truth" in str(icanpreneur_lane.get("claim_boundary") or "")
+        and "publication approval" in str(icanpreneur_lane.get("claim_boundary") or "")
+        and "`Icanpreneur` - bounded discovery interview and validation lane" in ltd_map
+        and "Icanpreneur" in ltd_registry
+        and "bounded adaptive discovery-interview and validation lane" in icanpreneur_design
+        and "direct backlog ownership" in icanpreneur_design
+        and "copyrighted-book-text capture" in icanpreneur_design
+        and "CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL" in env_example
+        and "CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL" in compose_source
+        and 'stageKey: "adaptive_interview"' in karma_forge_source
+        and 'boundary: "interview_signal_not_product_truth"' in karma_forge_source
+    )
+    if not icanpreneur_pass:
+        failures.append("icanpreneur discovery interview lane is not discoverable and bounded")
+    checks["icanpreneur_discovery_interview"] = {
+        "path": str(ICANPRENEUR_RECEIPT_PATH),
+        "lane_path": str(ICANPRENEUR_LANE_PATH),
+        "status": icanpreneur_receipt.get("status", "missing"),
+        "lane_status": icanpreneur_lane.get("status", "missing"),
+        "license_tier": icanpreneur_receipt.get("license_tier"),
+        "runtime_ready": icanpreneur_receipt.get("runtime_ready"),
+        "pass": icanpreneur_pass,
+    }
 
     rybbit_receipt = load_json(RYBBIT_RECEIPT_PATH)
     rybbit_pass = (
@@ -116,9 +155,6 @@ def build_payload() -> dict[str, Any]:
     }
 
     neuronwriter_receipt = load_json(NEURONWRITER_RECEIPT_PATH)
-    growth_doc = read_text(PUBLIC_GROWTH_DOC_PATH)
-    ltd_registry = read_text(LTD_REGISTRY_PATH)
-    ltd_map = read_text(LTD_MAP_PATH)
     neuronwriter_pass = (
         status_pass(neuronwriter_receipt)
         and "NeuronWriter may optimize approved source packets." in growth_doc
