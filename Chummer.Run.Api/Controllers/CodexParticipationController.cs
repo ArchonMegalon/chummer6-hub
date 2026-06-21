@@ -657,7 +657,7 @@ public sealed class CodexParticipationController : Controller
                 status = "ready_to_start",
                 phase = "start",
                 heading = "Start contributing",
-                support = "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.",
+                support = "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for the Chummer task you start here, and work is reviewed before it counts.",
                 statusLine = "You can stop or revoke this later from your account.",
                 auth = new
                 {
@@ -811,7 +811,7 @@ public sealed class CodexParticipationController : Controller
 
         string activationState = laneReady ? "complete" : terminalStop ? "stopped" : authDone ? "in_progress" : "pending";
         string activationSummary = laneReady
-            ? "This session is active and ready for bounded contribution work."
+            ? "This session is active and ready for the selected Chummer task."
             : terminalStop
                 ? "This session is no longer active. Start a fresh session when you want to contribute again."
                 : authDone
@@ -981,7 +981,7 @@ public sealed class CodexParticipationController : Controller
         {
             "complete" => "Your contribution session is linked. Chummer will only count accepted work after review.",
             "authorize" => "Open the authorization page, sign in to ChatGPT, enter the one-time code, and keep this page open while Chummer watches for confirmation. If the code expires, ask for a fresh one here.",
-            _ => "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
+            _ => "Authorize a temporary contribution session in ChatGPT. Chummer uses it only for the Chummer task you start here, and work is reviewed before it counts."
         };
     }
 

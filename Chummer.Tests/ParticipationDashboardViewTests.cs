@@ -54,6 +54,10 @@ public sealed class ParticipationDashboardViewTests
 
         Assert.Contains("Public contribution code", consoleView, StringComparison.Ordinal);
         Assert.Contains("Chummer attaches this code to your contribution session", consoleView, StringComparison.Ordinal);
+        Assert.Contains("specific Chummer tasks", consoleView, StringComparison.Ordinal);
+        Assert.DoesNotContain("bounded product work", consoleView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("blank check", consoleView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token-backed", consoleView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Contribution usage", leaderboardView, StringComparison.Ordinal);
         Assert.Contains("Contribution code", leaderboardView, StringComparison.Ordinal);
         Assert.Contains("Codex contribution code", workflowCanon, StringComparison.Ordinal);
