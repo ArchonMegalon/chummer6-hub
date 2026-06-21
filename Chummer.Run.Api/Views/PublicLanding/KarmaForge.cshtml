@@ -25,7 +25,7 @@
         ? "Open your recent requests"
         : "Create an account only if you want request history";
     var historySummary = Model.Form.Authenticated
-        ? "Signed-in history keeps recent requests and next steps together."
+        ? "Account history keeps recent requests and next steps together."
         : "The public intake works without an account. Sign in only if you want your request history saved.";
     var routeChoices = new[]
     {
@@ -390,12 +390,12 @@
         </article>
 
         <article class="trust-page-section" id="recent-packets">
-            <p class="eyebrow">Signed-in history</p>
+            <p class="eyebrow">Account history</p>
             <h2>Your recent KARMA FORGE requests</h2>
-            <p>@(Model.Form.Authenticated ? "Signed-in submissions stay visible here with current queue status." : "Sign in if you want request history beyond this page.")</p>
+            <p>@(Model.Form.Authenticated ? "Account submissions stay visible here with current queue status." : "Sign in if you want request history beyond this page.")</p>
             @if (Model.RecentSubmissions.Count == 0)
             {
-                <p class="muted-copy">No signed-in KARMA FORGE requests are visible on this account yet.</p>
+                <p class="muted-copy">No account KARMA FORGE requests are visible on this account yet.</p>
             }
             else
             {

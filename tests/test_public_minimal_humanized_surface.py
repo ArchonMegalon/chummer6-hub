@@ -322,11 +322,18 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
     assert "KARMA FORGE request saved" in controller
     assert "The request is saved. Chummer can now show the likely review route and the next questions." in controller
     assert "Consent must be accepted before Chummer can save the request." in controller
+    assert "Account history keeps recent requests and next steps together." in karma_forge
+    assert "Account submissions stay visible here with current queue status." in karma_forge
+    assert "No account KARMA FORGE requests are visible on this account yet." in karma_forge
     assert "new PublicNavigationLink(\"Saved details\", \"#saved-details\")" in karma_submitted
     assert "id=\"saved-details\"" in karma_submitted
     assert 'journeyRef.EventKey.Replace("_", " ", StringComparison.OrdinalIgnoreCase)' in karma_submitted
 
     for forbidden in (
+        "Signed-in history keeps recent requests and next steps together.",
+        "<p class=\"eyebrow\">Signed-in history</p>",
+        "Signed-in submissions stay visible here with current queue status.",
+        "No signed-in KARMA FORGE requests are visible on this account yet.",
         "guided synthesis lane",
         "guided review lane",
         "bounded-followthrough",
