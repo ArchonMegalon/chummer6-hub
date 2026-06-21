@@ -1,6 +1,6 @@
 @model PublicCreatorPublicationPageViewModel
 @{
-    ViewData["Title"] = Model.Publication.Title;
+    ViewData["Title"] = PublicPublicationText(Model.Publication.Title);
     ViewData["Chrome"] = Model.Chrome;
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
@@ -164,8 +164,8 @@
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Public shared publication</p>
-        <h1 class="page-title">@Model.Publication.Title</h1>
-        <p class="page-copy">@Model.Publication.Summary</p>
+        <h1 class="page-title">@PublicPublicationText(Model.Publication.Title)</h1>
+        <p class="page-copy">@PublicPublicationText(Model.Publication.Summary)</p>
         <div class="trust-claim__details">
             <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
             <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
@@ -174,7 +174,7 @@
         </div>
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
-            <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
+            <p class="muted-copy">@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)</p>
             <p class="muted-copy">Some desktop work is still open, so this public summary stays short.</p>
         }
         <div class="stacked-actions">

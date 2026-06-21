@@ -837,6 +837,14 @@ def test_publication_detail_page_uses_plain_labels() -> None:
 
     assert "Limited detail" in publication
     assert "Page: @routeStateLabel" in publication
+    assert "ViewData[\"Title\"] = PublicPublicationText(Model.Publication.Title)" in publication
+    assert "@PublicPublicationText(Model.Publication.Title)" in publication
+    assert "@PublicPublicationText(Model.Publication.Summary)" in publication
+    assert "@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)" in publication
+    assert "ViewData[\"Title\"] = Model.Publication.Title" not in publication
+    assert "@Model.Publication.Title" not in publication
+    assert "@Model.Publication.Summary" not in publication
+    assert "@Model.TrustPulse.RouteGuardSummary" not in publication
     assert "Install notes nearby" in publication
     assert "Clear install path" in publication
     assert "Public discovery stays open" in publication
