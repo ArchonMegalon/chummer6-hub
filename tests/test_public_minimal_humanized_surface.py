@@ -688,3 +688,21 @@ def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -
     assert "Video: Chummer motion" in ledger
     assert "Video: Chummer motion" in ledger_onboarding
     assert "product improvements" in changelog
+
+
+def test_public_pages_use_plain_promises_and_summaries_instead_of_claim_jargon() -> None:
+    anarchy = read("Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml")
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+    feedback_lookup = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsLookup.cshtml")
+    combined = "\n".join((anarchy, participate, feedback_lookup))
+
+    for forbidden in (
+        "Public claim ceiling",
+        "public claim",
+        "planned or shipped public claim",
+    ):
+        assert forbidden not in combined
+
+    assert "What this path covers" in anarchy
+    assert "planned or shipped public update" in participate
+    assert "no public summary beyond the saved state" in feedback_lookup
