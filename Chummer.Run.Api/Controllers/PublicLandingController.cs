@@ -2658,7 +2658,7 @@ public sealed class PublicLandingController : Controller
             currentPath: $"/community/runs/{normalizedRunId}/venue",
             eyebrow: "Community venue",
             heading: "Open-run venue status",
-            intro: "This page stays public-safe on purpose. Chummer can acknowledge that a run has a live-room handoff without publishing private room links, player emails, or campaign truth.",
+            intro: "This page can show that a run has a live room without exposing private room links, player emails, or campaign details.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -2669,7 +2669,7 @@ public sealed class PublicLandingController : Controller
                     [
                         "Public-safe session title or run label.",
                         "Scheduled start time when the organizer has published it.",
-                        "Whether the live-room handoff is not configured, private, or ready for authenticated participants."
+                        "Whether the live room is not configured, private, or ready for signed-in participants."
                     ]),
                 new TrustPageSectionViewModel(
                     "community_run_venue_private_boundary",
@@ -2679,16 +2679,16 @@ public sealed class PublicLandingController : Controller
                     [
                         "Private room links for closed tables.",
                         "Runner sheets, campaign spoilers, and GM-only notes.",
-                        "Player emails, attendance imports, and provider-secret state."
+                        "Player emails, attendance imports, and service secrets."
                     ]),
                 new TrustPageSectionViewModel(
                     "community_run_venue_fallback",
                     "Fallback",
                     "Fallback when the service is unavailable",
-                    "Manual venue handoff stays available when service automation is off.",
+                    "Manual room links stay available when room creation is off.",
                     [
                         "Live room integration unavailable. Paste your external room link manually or use another service.",
-                        "Chummer keeps the scheduling and closeout truth even when BeHuman create mode is off."
+                        "Chummer keeps the scheduling and closeout details even when room creation is off."
                     ])
             ],
             actions:
@@ -8642,7 +8642,7 @@ Boundary:
             HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             GmSessionVenueSurfaceProjection venue = _gmSessionVenues.DescribeVenue(user.UserId, campaignId, sessionId, requireManage: section != "overview");
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Session venue", "Manage the live-room handoff without surrendering campaign truth.", currentPath, cancellationToken);
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Session venue", "Manage the live room without exposing private campaign details.", currentPath, cancellationToken);
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
             GmSessionVenuePageViewModel model = new(
                 Chrome: chrome,

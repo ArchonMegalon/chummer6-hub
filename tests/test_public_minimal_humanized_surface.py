@@ -537,7 +537,7 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
     assert "Message updates" in feedback_operations
     assert "Message attempt" in feedback_operations
     assert "Follow-up sent" in feedback_operations
-    assert "likely private support handoff" in signal_operations
+    assert "likely private support follow-up" in signal_operations
     assert "Feedback sorting" in signal_operations
     assert "Public feedback stays easy to sort." in signal_operations
     assert "Public feedback stays visible; private follow-up goes through Help." in signal_operations

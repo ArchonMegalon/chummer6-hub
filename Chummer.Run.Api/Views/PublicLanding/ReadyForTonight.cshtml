@@ -79,7 +79,7 @@
         @foreach (var kit in Model.RoleKits)
         {
             <article class="route-choice-card">
-                <span class="tag">@kit.RoleLane</span>
+                <span class="tag">@PublicFacingCopyHumanizer.Clean(kit.RoleLane)</span>
                 <h3>@kit.Label</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(kit.Summary)</p>
                 <div class="route-choice-card__details">
@@ -104,7 +104,7 @@
         @foreach (var packet in Model.Packets)
         {
             <article class="route-choice-card">
-                <span class="tag">@packet.RoleId</span>
+                <span class="tag">@PublicFacingCopyHumanizer.Clean(packet.RoleId)</span>
                 <h3>@packet.Label</h3>
                 <p>@PublicFacingCopyHumanizer.Clean(packet.Summary)</p>
                 <div class="stacked-actions">

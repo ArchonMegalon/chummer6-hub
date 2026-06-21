@@ -571,6 +571,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("export path", combined, StringComparison.Ordinal);
         Assert.Contains("Download starter file", view, StringComparison.Ordinal);
         Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.RoleLane)", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.RoleId)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">@kit.RoleLane</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">@packet.RoleId</span>", view, StringComparison.Ordinal);
 
         foreach (string forbidden in new[]
         {
@@ -657,6 +661,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "public async Task<IActionResult> ParticipatePage",
             "public async Task<IActionResult> AlicePage",
             "public async Task<IActionResult> TablePulsePage",
+            "public async Task<IActionResult> CommunityRunVenuePage",
             "private async Task<KnowledgeFabricPageViewModel> BuildKnowledgeFabricPageModel",
             "private async Task<MobileProjectionPageViewModel> BuildMobileProjectionPageModel",
             "private async Task<NexusPanContinuityPageViewModel> BuildNexusPanContinuityPageModel",
@@ -756,6 +761,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                          "provider setup",
                          "operating posture",
                          "send posture",
+                         "browser callback handoffs",
+                         "live-room handoff",
                          "release-facing trail",
                          "Download handoff",
                          "Page handoff",
@@ -781,6 +788,16 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                 Assert.DoesNotContain(marker, visibleText, StringComparison.OrdinalIgnoreCase);
             }
         }
+    }
+
+    [Fact]
+    public void Shared_public_signal_operations_copy_uses_plain_follow_up_language()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml"));
+        string visibleText = ExtractVisibleText(view);
+
+        Assert.Contains("likely private support follow-up", visibleText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("likely private support handoff", visibleText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
