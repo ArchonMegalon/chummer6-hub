@@ -51,6 +51,54 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     }
 
     [Fact]
+    public void Public_feature_registry_start_and_release_cards_use_plain_copy()
+    {
+        string[] registryPaths =
+        [
+            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FEATURE_REGISTRY.yaml"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_FEATURE_REGISTRY.yaml")
+        ];
+
+        foreach (string registryPath in registryPaths)
+        {
+            string registry = File.ReadAllText(registryPath);
+
+            foreach (string forbidden in new[]
+            {
+                "A current build exists now, not just a story about one.",
+                "Receipt-backed continuity",
+                "provenance rules",
+                "compatibility, and receipts",
+                "cannot route, close, and explain",
+                "Deterministic rules truth",
+                "Clean audit trail",
+                "Records and provenance",
+                "Visible evidence",
+                "integrity trail",
+                "hard to verify",
+                "desktop artifact",
+                "live verification",
+                "truthful bootstrap",
+                "public-release lane",
+                "verify the release",
+                "Explanation receipt trail",
+                "The proof view",
+                "Inspect the receipt trail"
+            })
+            {
+                Assert.DoesNotContain(forbidden, registry, StringComparison.Ordinal);
+            }
+
+            Assert.Contains("Current builds are published and ready to download.", registry, StringComparison.Ordinal);
+            Assert.Contains("Recorded continuity keeps the table moving", registry, StringComparison.Ordinal);
+            Assert.Contains("Repeatable rules math", registry, StringComparison.Ordinal);
+            Assert.Contains("Readable records", registry, StringComparison.Ordinal);
+            Assert.Contains("download details are live right now", registry, StringComparison.Ordinal);
+            Assert.Contains("See the explanation trail", registry, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Public_help_and_faq_source_copy_uses_plain_user_language()
     {
         string publicFaq = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FAQ_REGISTRY.yaml"));

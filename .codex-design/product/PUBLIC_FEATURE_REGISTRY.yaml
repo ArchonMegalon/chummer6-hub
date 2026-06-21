@@ -12,7 +12,7 @@ cards:
     image_family: solo_operator
     asset_slot: capability_build_runner
     action_label: Open downloads
-    proof_note: "A current build exists now, not just a story about one."
+    proof_note: "Current builds are published and ready to download."
     pain: Clean dossiers, visible tradeoffs, and no hidden modifier stack.
     payoff: Deterministic totals stay readable before you ever take the character to the table.
   - id: see_whats_real
@@ -25,7 +25,7 @@ cards:
     image_family: simulation_bench
     asset_slot: capability_check_rules
     action_label: See a rules explanation
-    proof_note: "Modifier trail, source trace, and repeatable output stay visible together."
+    proof_note: "Modifiers, sources, and repeated results stay visible together."
     pain: Follow source traces and modifier trails instead of arguing from vibes.
     payoff: The answer stays inspectable when somebody asks where the number came from.
   - id: get_the_poc
@@ -39,20 +39,20 @@ cards:
     action_label: See continuity in preview
     proof_note: "Continuity survives device drift without hiding the current product limits."
     pain: Carry the same dossier, ledger, and session state across devices without losing trust.
-    payoff: Receipt-backed continuity keeps the table moving even when the network does not cooperate.
+    payoff: Recorded continuity keeps the table moving even when the network does not cooperate.
   - id: publish_grounded_artifacts
     bucket: start_here
     title: Exchange
-    summary: Move dossiers, recaps, packets, and support context across tools without losing where they came from.
+    summary: Move dossiers, recaps, files, and support context across tools without losing where they came from.
     href: /artifacts
     badge: Workflow
     audience: public
     image_family: prop_cluster
     asset_slot: lane_creator
     action_label: See portable outputs
-    proof_note: "Exchange and publication now use manifests, previews, and provenance rules instead of copy-paste folklore."
+    proof_note: "Exchange and publication now use manifests, previews, and source notes instead of copy-paste folklore."
     pain: Export, support, and creator handoff usually lose context right when you need trust the most.
-    payoff: Portable outputs stay tied to manifests, compatibility, and receipts.
+    payoff: Portable outputs stay tied to manifests, compatibility, and update history.
   - id: improve_the_product
     bucket: start_here
     title: Improve
@@ -63,30 +63,30 @@ cards:
     image_family: archive_stair
     action_label: Open support and feedback
     proof_note: "Support, feedback, and release notes should close the loop for users instead of disappearing into a private inbox."
-    pain: Reporting a problem is useless if the product cannot route, close, and explain the outcome honestly.
+    pain: Reporting a problem is useless if the product cannot sort it, follow up, and explain the outcome honestly.
     payoff: Improvement becomes a visible loop instead of a one-way complaint box.
   - id: deterministic_truth
     bucket: why_trust_it
-    title: Deterministic rules truth
+    title: Repeatable rules math
     summary: No fuzzy math. The explanation stays attached to the answer.
     href: /what-is-chummer
     badge: Trust
     audience: public
     image_family: simulation_bench
-    microproof: Deterministic engine|Repeatable totals|Clean audit trail
+    microproof: Deterministic engine|Repeatable totals|Readable history
     pain: Engine-backed modifiers
-    payoff: Repeatable totals and clean audits
+    payoff: Repeatable totals and readable checks
   - id: records_and_provenance
     bucket: why_trust_it
-    title: Records and provenance
-    summary: Every answer stays tied to visible records and provenance.
+    title: Readable records
+    summary: Every answer stays tied to visible records and source notes.
     href: /now
-    badge: Proof
+    badge: Details
     audience: public
     image_family: dossier_desk
-    microproof: Modifier trail|Source trace|Visible evidence
+    microproof: Modifier trail|Source trace|Visible steps
     pain: Modifier trail and source trace
-    payoff: Visible evidence instead of table arguments
+    payoff: Visible steps instead of table arguments
   - id: local_first_continuity
     bucket: why_trust_it
     title: Local-first session continuity
@@ -130,7 +130,7 @@ cards:
     action_label: Open Creator OS
   - id: real_rules_truth
     bucket: whats_real_now
-    title: Deterministic rules truth
+    title: Repeatable rules math
     summary: The explanation trail is already visible enough to inspect a real result instead of trusting a black box.
     href: /now#real-rules-truth
     badge: Live now
@@ -564,7 +564,7 @@ cards:
   - id: artifact_preview_build
     bucket: featured_artifacts
     title: Current release build
-    summary: The installer shelf, release channel, and integrity trail are live right now.
+    summary: The installer shelf, release channel, and download details are live right now.
     href: /downloads
     badge: Available today
     audience: public
@@ -574,14 +574,14 @@ cards:
     action_label: Inspect the release build
     detail_primary_href: /downloads
     detail_primary_label: Open downloads
-    pain: Early-access products stop feeling real when the current build is vague or hard to verify.
+    pain: Early-access products stop feeling real when the current build is vague or hard to check.
     payoff: One visible build, one truthful channel label, and one clean install path make the release feel dependable instead of improvised.
     proof_note: "Detail: the current release has a real installer path, clear platform status, and a first-party download path."
     microproof: Installer path|Release channel|Account-aware handoff
   - id: artifact_mac_release_pipeline
     bucket: featured_artifacts
     title: Mac release pipeline
-    summary: A Mac release session can clone the release repos, build the desktop artifact, sign and notarize it, publish it to chummer.run, and verify the live public release from one public runbook.
+    summary: A Mac release session can clone the release repos, build the desktop app, sign and notarize it, publish it to chummer.run, and check the live public release from one public runbook.
     href: /artifacts/mac-release-pipeline
     badge: Available today
     audience: public
@@ -593,21 +593,21 @@ cards:
     detail_primary_label: Open the Mac bootstrap script
     fallback_route: /artifacts/mac-release-pipeline
     fallback_label: Read the full runbook
-    pain: Mac release work falls apart when cloning, signing, notarization, publication, and live verification live in separate tribal steps.
-    payoff: One truthful bootstrap turns a Mac release session into a repeatable public-release lane instead of a manual operator ritual.
-    proof_note: "Paste `bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)` into the Mac shell, then let the bootstrap build, sign, notarize, publish, and verify the release with the current supported chummer.run topology."
-    microproof: Clone and pin refs|Codesign and notarize|Publish and verify live release
+    pain: Mac release work falls apart when cloning, signing, notarization, publication, and live checks live in separate tribal steps.
+    payoff: One bootstrap turns a Mac release session into a repeatable public release flow instead of a manual operator ritual.
+    proof_note: "Paste `bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)` into the Mac shell, then let the bootstrap build, sign, notarize, publish, and check the release with the current supported chummer.run topology."
+    microproof: Clone and pin refs|Codesign and notarize|Publish and check live release
   - id: artifact_rules_receipt
     bucket: featured_artifacts
-    title: Explanation receipt trail
-    summary: The proof view already shows how Chummer explains a result instead of hiding the path.
+    title: Explanation trail
+    summary: The explanation view shows how Chummer explains a result instead of hiding the path.
     href: /now#real-rules-truth
     badge: Available today
     audience: public
     image_family: simulation_bench
     asset_slot: capability_check_rules
     detail_route: /artifacts/explanation-receipt-trail
-    action_label: Inspect the receipt trail
+    action_label: See the explanation trail
     detail_primary_href: /now#real-rules-truth
     detail_primary_label: See the explanation
   - id: artifact_runsite_pack
