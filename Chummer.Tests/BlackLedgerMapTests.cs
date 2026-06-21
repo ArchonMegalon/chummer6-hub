@@ -102,7 +102,7 @@ public sealed class BlackLedgerMapTests
     {
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
 
-        Assert.Contains("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
+        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<strong>Read dispatches</strong>", view, StringComparison.Ordinal);
         Assert.Contains("<strong>Open newsroom</strong>", view, StringComparison.Ordinal);
         Assert.Contains("Optional viewer exports.", view, StringComparison.Ordinal);
@@ -129,6 +129,18 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("data-geoscape-overlay", script, StringComparison.Ordinal);
         Assert.Contains("data-geoscape-signal-rail", script, StringComparison.Ordinal);
         Assert.Contains("data-geoscape-panel", script, StringComparison.Ordinal);
+        Assert.Contains("Preparing faction view.", script, StringComparison.Ordinal);
+        Assert.Contains("Loading city map…", script, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Map views\"", script, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Accessible city list\"", script, StringComparison.Ordinal);
+        Assert.Contains("District borders, pressure arrows, and turn replay stay visible.", script, StringComparison.Ordinal);
+        Assert.Contains("} view`", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Preparing faction posture.", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Loading geoscape…", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Geoscape modes\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Accessible geoscape list\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Faction countries, pressure arrows, and turn replay stay visible.", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("} lane`", script, StringComparison.Ordinal);
         Assert.Contains("--ledger-geoscape-panel-width", css, StringComparison.Ordinal);
         Assert.Contains(".ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__signal-rail", css, StringComparison.Ordinal);
         Assert.Contains("this.overlayEyebrow = root.dataset.overlayEyebrow", script, StringComparison.Ordinal);

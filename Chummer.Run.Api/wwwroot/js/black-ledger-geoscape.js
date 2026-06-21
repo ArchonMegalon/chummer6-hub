@@ -285,24 +285,24 @@ class BlackLedgerGeoscapeRoot {
           <div class="black-ledger-geoscape__tooltip" aria-hidden="true">
             <span class="tag black-ledger-geoscape__tooltip-tag">Faction pressure</span>
             <strong class="black-ledger-geoscape__tooltip-title">Loading…</strong>
-            <p class="black-ledger-geoscape__tooltip-body">Preparing faction posture.</p>
+            <p class="black-ledger-geoscape__tooltip-body">Preparing faction view.</p>
           </div>
         </div>
         <aside class="black-ledger-geoscape__panel" data-geoscape-panel aria-live="polite">
           <span class="tag black-ledger-geoscape__panel-tag">Faction pressure</span>
-          <h3 class="black-ledger-geoscape__panel-title">Loading geoscape…</h3>
+          <h3 class="black-ledger-geoscape__panel-title">Loading city map…</h3>
           <p class="black-ledger-geoscape__panel-summary">Loading the city board.</p>
           <div class="black-ledger-geoscape__panel-metrics"></div>
           <div class="black-ledger-geoscape__panel-actions"></div>
         </aside>
       </div>
       <div class="black-ledger-geoscape__controls" data-geoscape-controls>
-        <div class="black-ledger-geoscape__modes" role="tablist" aria-label="Geoscape modes"></div>
+        <div class="black-ledger-geoscape__modes" role="tablist" aria-label="Map views"></div>
         <div class="black-ledger-geoscape__playback">
           <button type="button" class="black-ledger-geoscape__replay button-like button-like--secondary">Replay pressure</button>
         </div>
       </div>
-      <div class="black-ledger-geoscape__fallback-list" data-geoscape-fallback-list aria-label="Accessible geoscape list"></div>
+      <div class="black-ledger-geoscape__fallback-list" data-geoscape-fallback-list aria-label="Accessible city list"></div>
     `;
 
     this.videoPlate = this.root.querySelector('.black-ledger-geoscape__video-plate');
@@ -993,7 +993,7 @@ class BlackLedgerGeoscapeRoot {
     this.panelMetrics.innerHTML = metrics.map((metric) => `<span>${metric}</span>`).join('');
 
     this.panelActions.innerHTML = this.variant === 'teaser'
-      ? '<span class="muted-copy">Faction countries, pressure arrows, and turn replay stay visible.</span>'
+      ? '<span class="muted-copy">District borders, pressure arrows, and turn replay stay visible.</span>'
       : `
         <a class="button-like button-like--primary" href="${primaryHref}">${primaryLabel}</a>
         <a class="button-like button-like--secondary" href="${secondaryHref}">${secondaryLabel}</a>
@@ -1012,7 +1012,7 @@ class BlackLedgerGeoscapeRoot {
       this.root.dataset.signalTone = eventTone;
       this.signalPrimary.textContent = `${shortTitle.slice(0, 28)}${shortTitle.length > 28 ? '…' : ''}`;
       this.signalSecondary.textContent = `heat ${Math.max(0, activeFaction.heat)} · pressure ${activeFaction.pressureScore} · ${Math.max(1, relatedRegions.length)} districts`;
-      this.signalTertiary.textContent = `${(activeFaction.type || 'faction').toLowerCase()} · ${this.state.mode.replace('-', ' ')} lane`;
+      this.signalTertiary.textContent = `${(activeFaction.type || 'faction').toLowerCase()} · ${this.state.mode.replace('-', ' ')} view`;
     }
     this.root.dataset.renderSignature = `${this.state.mode}:${activeFaction.slug}:${this.root.dataset.replayState || 'idle'}`;
   }
