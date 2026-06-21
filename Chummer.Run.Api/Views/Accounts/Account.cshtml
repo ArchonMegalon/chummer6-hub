@@ -1556,7 +1556,7 @@
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Build handoffs</span>
+                        <span>Build plans</span>
                         <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1619,7 +1619,7 @@
                                 </div>
                             }
                             <div class="settings-summary-row">
-                                <span>Support follow-through</span>
+                                <span>Support status</span>
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign workspace.")</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1651,14 +1651,14 @@
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Summary))
                             {
-                                <p><strong>Follow-through:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
+                                <p><strong>Next step:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
                             }
                             @if (selectedWorkspaceFirstPlayableSession is not null)
                             {
                                 <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
                                 <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                 <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
-                                <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                <p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                             }
                             @if (selectedWorkspaceServerPlane is not null)
                             {
@@ -1798,7 +1798,7 @@
                                             <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                            <p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                                         </div>
                                     }
                                     <div class="settings-summary-row">
@@ -1888,7 +1888,7 @@
                                         <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
                                 </div>
                                 <div class="settings-summary-row">
-                                        <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                        <p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next step</span>
@@ -2870,15 +2870,15 @@
                             @if (selectedBuildLabHandoff.RuleEnvironmentDiff is not null)
                             {
                                 <div class="settings-summary-row">
-                                    <span>Rule diff status</span>
+                                    <span>Rules status</span>
                                     <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.Status</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Rule diff before</span>
+                                    <span>Rules before</span>
                                     <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.BeforeScope · @selectedBuildLabHandoff.RuleEnvironmentDiff.BeforeFingerprint</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Rule diff after</span>
+                                    <span>Rules after</span>
                                     <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.AfterScope · @selectedBuildLabHandoff.RuleEnvironmentDiff.AfterFingerprint</strong>
                                 </div>
                             }
@@ -2899,35 +2899,35 @@
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.ConditionalStateSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Conditional state</span>
+                                    <span>Current conditions</span>
                                     <strong>@selectedBuildLabHandoff.ConditionalStateSummary</strong>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.SourceHintSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Linked hints</span>
+                                    <span>Helpful notes</span>
                                     <strong>@selectedBuildLabHandoff.SourceHintSummary</strong>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.BuildSurfaceSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Build surface</span>
+                                    <span>Builder view</span>
                                     <strong>@selectedBuildLabHandoff.BuildSurfaceSummary</strong>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.ExchangeParitySummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Exchange parity</span>
+                                    <span>Import/export fit</span>
                                     <strong>@selectedBuildLabHandoff.ExchangeParitySummary</strong>
                                 </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.PortabilityPillarSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Portability pillar</span>
+                                    <span>Portability</span>
                                     <strong>@selectedBuildLabHandoff.PortabilityPillarSummary</strong>
                                 </div>
                             }
@@ -2938,7 +2938,7 @@
                         }
                         @if (selectedBuildLabHandoff.RuleEnvironmentDiff is not null)
                         {
-                            <p><strong>Rule diff:</strong> @selectedBuildLabHandoff.RuleEnvironmentDiff.Summary</p>
+                            <p><strong>Rules change:</strong> @selectedBuildLabHandoff.RuleEnvironmentDiff.Summary</p>
                         }
                         @if (selectedBuildLabHandoff.ProgressionOutcomes.Count > 0)
                         {
@@ -2950,23 +2950,23 @@
                         }
                         @if (selectedBuildLabHandoff.ConditionalStateLines is { Count: > 0 })
                         {
-                            <p><strong>Conditional state:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
+                            <p><strong>Current conditions:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.SourceHintLines is { Count: > 0 })
                         {
-                            <p><strong>Linked hints:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
+                            <p><strong>Helpful notes:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.BuildSurfaceLines is { Count: > 0 })
                         {
-                            <p><strong>Build surface:</strong> @string.Join(" ", selectedBuildLabHandoff.BuildSurfaceLines.Take(4))</p>
+                            <p><strong>Builder view:</strong> @string.Join(" ", selectedBuildLabHandoff.BuildSurfaceLines.Take(4))</p>
                         }
                         @if (selectedBuildLabHandoff.ExchangeParityLines is { Count: > 0 })
                         {
-                            <p><strong>Exchange parity:</strong> @string.Join(" ", selectedBuildLabHandoff.ExchangeParityLines.Take(5))</p>
+                            <p><strong>Import/export fit:</strong> @string.Join(" ", selectedBuildLabHandoff.ExchangeParityLines.Take(5))</p>
                         }
                         @if (selectedBuildLabHandoff.PortabilityPillarLines is { Count: > 0 })
                         {
-                            <p><strong>Portability pillar:</strong> @string.Join(" ", selectedBuildLabHandoff.PortabilityPillarLines.Take(5))</p>
+                            <p><strong>Portability:</strong> @string.Join(" ", selectedBuildLabHandoff.PortabilityPillarLines.Take(5))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
@@ -3009,13 +3009,13 @@
                                 }
                                 @if (selectedBuildLabHandoff.Outputs.Count > 3)
                                 {
-                                    <li>More outputs: +@(selectedBuildLabHandoff.Outputs.Count - 3) additional continuity items.</li>
+                                    <li>More next steps: +@(selectedBuildLabHandoff.Outputs.Count - 3) additional continuity items.</li>
                                 }
                             </ul>
                         }
                         @if (selectedBuildLabHandoff.Watchouts is { Count: > 0 })
                         {
-                            <p><strong>Watchouts:</strong> @string.Join(" ", selectedBuildLabHandoff.Watchouts)</p>
+                            <p><strong>Needs attention:</strong> @string.Join(" ", selectedBuildLabHandoff.Watchouts)</p>
                         }
                     </article>
                 }
@@ -3173,7 +3173,7 @@
                         </div>
                         @if (selectedCreatorPublication.Watchouts is { Count: > 0 })
                         {
-                            <p><strong>Watchouts:</strong> @string.Join(" ", selectedCreatorPublication.Watchouts.Take(3))</p>
+                            <p><strong>Needs attention:</strong> @string.Join(" ", selectedCreatorPublication.Watchouts.Take(3))</p>
                         }
                         @if (selectedCreatorPublicationDraftDetail is not null)
                         {
@@ -3778,7 +3778,7 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
                                     {
-                                        <span> Linked hints: @handoff.SourceHintSummary.</span>
+                                        <span> Helpful notes: @handoff.SourceHintSummary.</span>
                                     }
                                     @if (handoff.SourceHintLines is { Count: > 0 })
                                     {
@@ -3789,7 +3789,7 @@
                                     }
                                     @if (handoff.RuleEnvironmentDiff is not null)
                                     {
-                                        <span> Rule diff: @handoff.RuleEnvironmentDiff.Summary</span>
+                                        <span> Rules change: @handoff.RuleEnvironmentDiff.Summary</span>
                                     }
                                     @if (handoff.Outputs.Count > 0)
                                     {
@@ -3813,7 +3813,7 @@
                                     }
                                     @if (handoff.Watchouts is { Count: > 0 })
                                     {
-                                        <span> Watchouts: @string.Join(" ", handoff.Watchouts.Take(2)).</span>
+                                        <span> Needs attention: @string.Join(" ", handoff.Watchouts.Take(2)).</span>
                                     }
                                 </li>
                             }
@@ -4026,7 +4026,7 @@
                                     <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Watchouts</span>
+                                    <span>Needs attention</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
                             </div>
@@ -4039,7 +4039,7 @@
                                     }
                                     @foreach (var watchout in op.Watchouts)
                                     {
-                                        <li><strong>Watchout:</strong> @watchout</li>
+                                        <li><strong>Needs attention:</strong> @watchout</li>
                                     }
                                 </ul>
                             </details>
@@ -4111,7 +4111,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(entry.WatchoutSummary))
                                                 {
-                                                    <span> Watchout: @entry.WatchoutSummary</span>
+                                                    <span> Needs attention: @entry.WatchoutSummary</span>
                                                 }
                                                 <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign workspace</a>
                                             </li>

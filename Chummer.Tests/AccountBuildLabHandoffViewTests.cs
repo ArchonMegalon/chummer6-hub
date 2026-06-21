@@ -25,31 +25,40 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Lineage: @output.LineageSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ProgressionOutcomes.Take(3)", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
-        Assert.Contains("Rule diff before", view, StringComparison.Ordinal);
-        Assert.Contains("Rule diff after", view, StringComparison.Ordinal);
+        Assert.Contains("Rules before", view, StringComparison.Ordinal);
+        Assert.Contains("Rules after", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule diff before", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule diff after", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ConditionalStateSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ConditionalStateLines.Take(3)", view, StringComparison.Ordinal);
-        Assert.Contains("Conditional state", view, StringComparison.Ordinal);
+        Assert.Contains("Current conditions", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Conditional state", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.SourceHintSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.SourceHintLines.Take(3)", view, StringComparison.Ordinal);
-        Assert.Contains("Linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("Helpful notes:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Linked hints:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.BuildSurfaceSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.BuildSurfaceLines.Take(4)", view, StringComparison.Ordinal);
-        Assert.Contains("Build surface:", view, StringComparison.Ordinal);
+        Assert.Contains("Builder view:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build surface:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ExchangeParitySummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ExchangeParityLines.Take(5)", view, StringComparison.Ordinal);
-        Assert.Contains("Exchange parity:", view, StringComparison.Ordinal);
+        Assert.Contains("Import/export fit:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exchange parity:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PortabilityPillarSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PortabilityPillarLines.Take(5)", view, StringComparison.Ordinal);
-        Assert.Contains("Portability pillar:", view, StringComparison.Ordinal);
+        Assert.Contains("Portability:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Portability pillar:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner coverage", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.Summary", view, StringComparison.Ordinal);
+        Assert.Contains("More next steps:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("More outputs:", view, StringComparison.Ordinal);
     }
 
     [Fact]

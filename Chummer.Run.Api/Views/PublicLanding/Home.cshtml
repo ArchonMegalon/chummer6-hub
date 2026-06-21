@@ -605,7 +605,7 @@ else
                                                     <span class="tag">Dossier</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@dossier.DisplayName</h3>
-                                                        <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next handoff.")</p>
+                                                        <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next return.")</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Open dossiers</a>
                                                 </article>
@@ -700,7 +700,7 @@ else
                                                                     <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
                                                                 <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
-                                                                <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
+                                                                <span> Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
@@ -727,7 +727,7 @@ else
                                         <div class="home-stream__lead">
                                             <p class="eyebrow">Next</p>
                                             <h2 class="home-stream__title">Build, explain, and move forward without losing your place</h2>
-                                            <p class="home-stream__summary">Build handoffs and rules answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
+                                            <p class="home-stream__summary">Build plans and rules answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                         </div>
                                         <div class="app-rail">
                                             @if (leadWorkspaceServerPlane is not null)
@@ -773,7 +773,7 @@ else
                                                             </p>
                                                             <p class="muted-copy">Legal runner: @leadFirstPlayableSession.RuleReadySummary</p>
                                                             <p class="muted-copy">Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</p>
-                                                            <p class="muted-copy">Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</p>
+                                                            <p class="muted-copy">Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary</p>
                                                             @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
                                                             {
                                                                 <p class="muted-copy">Note: @leadFirstPlayableEvidence</p>
@@ -1039,7 +1039,7 @@ else
                                                                 }
                                                                 @if (leadCommunityOperation.Watchouts.Count > 0)
                                                                 {
-                                                                    <span> Watchout: @leadCommunityOperation.Watchouts[0]</span>
+                                                                    <span> Needs attention: @leadCommunityOperation.Watchouts[0]</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -1126,7 +1126,7 @@ else
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.ConditionalStateSummary))
                                                                 {
-                                                                    <span> Conditional state: @handoff.ConditionalStateSummary.</span>
+                                                                    <span> Current conditions: @handoff.ConditionalStateSummary.</span>
                                                                 }
                                                                 @if (handoff.ConditionalStateLines is { Count: > 0 })
                                                                 {
@@ -1137,19 +1137,19 @@ else
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
                                                                 {
-                                                                    <span> Linked hints: @handoff.SourceHintSummary.</span>
+                                                                    <span> Helpful notes: @handoff.SourceHintSummary.</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary))
                                                                 {
-                                                                    <span> Build surface: @handoff.BuildSurfaceSummary.</span>
+                                                                    <span> Builder view: @handoff.BuildSurfaceSummary.</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.ExchangeParitySummary))
                                                                 {
-                                                                    <span> Exchange parity: @handoff.ExchangeParitySummary.</span>
+                                                                    <span> Import/export fit: @handoff.ExchangeParitySummary.</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.PortabilityPillarSummary))
                                                                 {
-                                                                    <span> Portability pillar: @handoff.PortabilityPillarSummary.</span>
+                                                                    <span> Portability: @handoff.PortabilityPillarSummary.</span>
                                                                 }
                                                                 @if (handoff.SourceHintLines is { Count: > 0 })
                                                                 {
@@ -1185,15 +1185,15 @@ else
                                                                 }
                                                                 @if (handoff.RuleEnvironmentDiff is not null)
                                                                 {
-                                                                    <span> Rule diff: @handoff.RuleEnvironmentDiff.BeforeFingerprint -> @handoff.RuleEnvironmentDiff.AfterFingerprint (@handoff.RuleEnvironmentDiff.Status).</span>
-                                                                    <span> Rule diff scope: @handoff.RuleEnvironmentDiff.BeforeScope -> @handoff.RuleEnvironmentDiff.AfterScope.</span>
+                                                                    <span> Rules change: @handoff.RuleEnvironmentDiff.BeforeFingerprint -> @handoff.RuleEnvironmentDiff.AfterFingerprint (@handoff.RuleEnvironmentDiff.Status).</span>
+                                                                    <span> Rules scope: @handoff.RuleEnvironmentDiff.BeforeScope -> @handoff.RuleEnvironmentDiff.AfterScope.</span>
                                                                 }
                                                                 @if (handoff.Outputs.Count > 0)
                                                                 {
                                                                     <span> Outputs: @string.Join(", ", handoff.Outputs.Take(8).Select(item => item.Label)).</span>
                                                                     @if (handoff.Outputs.Count > 8)
                                                                     {
-                                                                        <span> More outputs: +@(handoff.Outputs.Count - 8) additional guided next-step items.</span>
+                                                                        <span> More next steps: +@(handoff.Outputs.Count - 8) additional guided items.</span>
                                                                     }
                                                                     foreach (var output in handoff.Outputs.Take(8))
                                                                     {
@@ -1230,7 +1230,7 @@ else
                                                                 }
                                                                 @if (handoff.Watchouts is { Count: > 0 })
                                                                 {
-                                                                    <span> Watchout: @handoff.Watchouts[0]</span>
+                                                                    <span> Needs attention: @handoff.Watchouts[0]</span>
                                                                 }
                                                             </p>
                                                         </div>

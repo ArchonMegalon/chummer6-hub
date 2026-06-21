@@ -22,8 +22,10 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
         Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
-        Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
-        Assert.Contains("Rule diff scope:", view, StringComparison.Ordinal);
+        Assert.Contains("Rules change:", view, StringComparison.Ordinal);
+        Assert.Contains("Rules scope:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule diff:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule diff scope:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.BeforeScope", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.AfterScope", view, StringComparison.Ordinal);
         Assert.Contains("handoff.CrewFitSummary", view, StringComparison.Ordinal);
@@ -33,19 +35,23 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Conditional note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("Helpful notes:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Linked hints:", view, StringComparison.Ordinal);
         Assert.Contains("Hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.BuildSurfaceSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.BuildSurfaceLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Build surface:", view, StringComparison.Ordinal);
+        Assert.Contains("Builder view:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build surface:", view, StringComparison.Ordinal);
         Assert.Contains("Build note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.ExchangeParitySummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.ExchangeParityLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Exchange parity:", view, StringComparison.Ordinal);
+        Assert.Contains("Import/export fit:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exchange parity:", view, StringComparison.Ordinal);
         Assert.Contains("Parity note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PortabilityPillarSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PortabilityPillarLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Portability pillar:", view, StringComparison.Ordinal);
+        Assert.Contains("Portability:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Portability pillar:", view, StringComparison.Ordinal);
         Assert.Contains("Portability note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner note:", view, StringComparison.Ordinal);
@@ -55,6 +61,8 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
         Assert.Contains("Output status:", view, StringComparison.Ordinal);
         Assert.Contains("Output note:", view, StringComparison.Ordinal);
+        Assert.Contains("More next steps:", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("More outputs:", view, StringComparison.Ordinal);
     }
 
     [Fact]

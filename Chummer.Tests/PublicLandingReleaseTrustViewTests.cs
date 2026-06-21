@@ -366,6 +366,21 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Governed output", homeView, StringComparison.Ordinal);
         Assert.DoesNotContain("first grounded handoff", homeView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Open grounded rule context", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build handoffs", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Campaign-ready lane", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule diff", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Linked hints", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build surface", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exchange parity", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Portability pillar", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Watchout:", homeView, StringComparison.Ordinal);
+        Assert.Contains("Build plans and rules answers", homeView, StringComparison.Ordinal);
+        Assert.Contains("Campaign readiness", homeView, StringComparison.Ordinal);
+        Assert.Contains("Rules change", homeView, StringComparison.Ordinal);
+        Assert.Contains("Helpful notes", homeView, StringComparison.Ordinal);
+        Assert.Contains("Builder view", homeView, StringComparison.Ordinal);
+        Assert.Contains("Import/export fit", homeView, StringComparison.Ordinal);
+        Assert.Contains("Needs attention", homeView, StringComparison.Ordinal);
 
         Assert.Contains("Open detail view", shelfView, StringComparison.Ordinal);
         Assert.Contains("signed-in view", shelfView, StringComparison.Ordinal);
