@@ -729,3 +729,21 @@ def test_public_release_copy_uses_install_notes_instead_of_issue_checking_langua
     assert "Install notes and help" in now
     assert "current package and setup help" in faq
     assert "easier to use" in feature_live
+
+
+def test_public_detail_page_uses_limited_detail_instead_of_review_process_copy() -> None:
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+
+    for forbidden in (
+        "Limited public wording",
+        "limited public wording",
+        "public comparison language",
+        "one more review pass",
+        "Public parity claims remain",
+        "review-required",
+    ):
+        assert forbidden not in shelf
+
+    assert "Shared publications with limited detail" in shelf
+    assert "shorter public summary" in shelf
+    assert "Broader comparisons return when they are useful and current." in shelf

@@ -6,7 +6,7 @@
     ViewData["SurfaceClass"] = "surface-artifacts";
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
-    // Public comparison language stays limited until current direct route records are green.
+    // Keep public comparisons narrow until the related route records are current.
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
     var selectedSignedInArtifactView = Model.SignedInArtifactView;
@@ -161,10 +161,10 @@
                 : "Limited release";
 
     var governedDiscoveryTitle = publicationRouteReviewRequired
-        ? "Shared publications with limited public wording"
+        ? "Shared publications with limited detail"
         : "Published shared publications";
     var governedDiscoveryCopy = publicationRouteReviewRequired
-        ? "These campaign, primer, dossier, recap, replay, and run-module outputs are visible, but some public comparison language stays narrow until the remaining review is finished."
+        ? "These campaign, primer, dossier, recap, replay, and run-module outputs are visible now. Some comparisons stay brief until they are useful and current."
         : "These campaign, primer, dossier, recap, replay, and run-module outputs are live after review and moderation.";
 }
 
@@ -178,7 +178,7 @@
             <span>@previewItems.Length opening next</span>
             @if (publicationRouteReviewRequired)
             {
-                <span>Limited public wording</span>
+                <span>Limited detail</span>
             }
             @if (Model.Chrome.Authenticated)
             {
@@ -228,14 +228,14 @@
             @if (publicationRouteReviewRequired)
             {
                 <article class="route-callout">
-                    <span class="tag">Limited public wording</span>
-                    <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
-                    <p>You can inspect the publication and background today. The remaining limit is about how broadly the public page should compare it, not whether the publication exists.</p>
-                    <p>Public comparison language stays limited until the current review is finished.</p>
+                    <span class="tag">Limited detail</span>
+                    <h3>These publications are visible now, with a shorter public summary for now.</h3>
+                    <p>You can inspect the publication and background today. The limit is only how broadly this page compares it to other work.</p>
+                    <p>Broader comparisons return when they are useful and current.</p>
                     <div class="route-callout__details">
                         <span>Discoverable now</span>
-                        <span>Comparison still reviewed</span>
-                        <span>No fake closure</span>
+                        <span>Short comparison</span>
+                        <span>No overstatement</span>
                     </div>
                 </article>
             }

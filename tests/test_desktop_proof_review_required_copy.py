@@ -16,30 +16,30 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         source = SIGNED_IN_STATUS_SERVICE.read_text(encoding="utf-8")
 
         self.assertIn("bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)", source)
-        self.assertIn("parity-sensitive desktop checks remain review-required until current proof receipts are green", source)
-        self.assertIn("Downloads, support, and recovery stay on the same claimed install rail", source)
+        self.assertIn("some desktop review work is still open", source)
+        self.assertIn("Downloads, support, and recovery stay with this linked copy", source)
 
     def test_publication_detail_view_switches_headline_when_route_is_review_required(self) -> None:
         source = PUBLICATION_VIEW.read_text(encoding="utf-8")
 
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
         self.assertIn("publicationRouteReviewRequired", source)
-        self.assertIn("Why this publication stays review-required", source)
-        self.assertIn("Current direct parity proof receipts still keep the public parity claim under review.", source)
+        self.assertIn("Why this publication is still limited", source)
+        self.assertIn("Current desktop coverage still keeps this public wording limited.", source)
 
     def test_publication_shelf_view_switches_discovery_copy_when_route_is_review_required(self) -> None:
         source = SHELF_VIEW.read_text(encoding="utf-8")
 
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
-        self.assertIn("Shared publications with limited public claims", source)
-        self.assertIn("These publications are visible now, but some public comparison language still needs one more review pass.", source)
-        self.assertIn("Public parity claims remain review-required until current direct parity proof receipts are green.", source)
+        self.assertIn("Shared publications with limited detail", source)
+        self.assertIn("These publications are visible now, with a shorter public summary for now.", source)
+        self.assertIn("Broader comparisons return when they are useful and current.", source)
 
     def test_support_response_expectation_inherits_review_required_route_guard(self) -> None:
         source = PUBLIC_LANDING_CONTROLLER.read_text(encoding="utf-8")
 
         self.assertIn("BuildSupportResponseExpectation(", source)
-        self.assertIn("Public parity claims stay review-required until the current desktop proof receipts are green again.", source)
+        self.assertIn("Public parity claims stay paused until the desktop experience is ready again.", source)
         self.assertIn("Tracked cases stay visible in Account.", source)
         self.assertIn("Guest cases should include a reply email.", source)
 
@@ -49,7 +49,7 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         self.assertIn("status = routeClaim.State", source)
         self.assertIn("routeState = routeClaim.State", source)
         self.assertIn("state = routeClaim.State", source)
-        self.assertIn("Current direct route receipt is attached, but parity claims stay review-required because", source)
+        self.assertIn("Current direct route record is attached, but public comparison stays limited because", source)
 
 
 if __name__ == "__main__":

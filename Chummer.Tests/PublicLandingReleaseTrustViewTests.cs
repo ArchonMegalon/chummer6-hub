@@ -1092,7 +1092,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", publicationView, StringComparison.Ordinal);
         Assert.Contains("Limited public state", publicationView, StringComparison.Ordinal);
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", shelfView, StringComparison.Ordinal);
-        Assert.Contains("Limited public wording", shelfView, StringComparison.Ordinal);
+        Assert.Contains("Limited detail", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("review-required", shelfView, StringComparison.Ordinal);
     }
 
