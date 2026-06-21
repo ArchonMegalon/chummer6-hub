@@ -540,8 +540,8 @@ public sealed class PublicSignalOperationsService
                 Scope: normalizedScope,
                 ScopeLabel: ResolveLookupScopeLabel(normalizedScope),
                 QueryProvided: queryProvided,
-                Eyebrow: "Bounded activity lookup",
-                Heading: queryProvided ? "Search bounded receipt and thread drilldowns" : "Recent bounded receipt and thread drilldowns",
+                Eyebrow: "Activity lookup",
+                Heading: queryProvided ? "Search source records and recipient threads" : "Recent source records and recipient threads",
                 Summary: BuildLookupSummary(normalizedQuery, normalizedScope, queryProvided, ordered.Length),
                 ResultCount: ordered.Length,
                 Results: ordered);
@@ -2211,7 +2211,7 @@ public sealed class PublicSignalOperationsService
     {
         if (tokens.Length == 0)
         {
-            return "Recent bounded drilldown";
+            return "Recent activity";
         }
 
         string combined = string.Join(' ', fields
@@ -2235,24 +2235,24 @@ public sealed class PublicSignalOperationsService
             }
         }
 
-        return "Composite bounded receipt match";
+        return "Combined match";
     }
 
     private static string BuildLookupSummary(string query, string scope, bool queryProvided, int resultCount)
     {
         string subject = scope switch
         {
-            "source" => "source receipt",
+            "source" => "source record",
             "thread" => "recipient thread",
-            _ => "bounded drilldown"
+            _ => "activity item"
         };
         if (!queryProvided)
         {
-            return $"Showing the most recent {subject}{(resultCount == 1 ? string.Empty : "s")} so people can jump into one bounded source or follow-up timeline without scanning the full feedback rail.";
+            return $"Showing the most recent {subject}{(resultCount == 1 ? string.Empty : "s")} so people can open the right source or follow-up timeline without scanning the full feedback list.";
         }
 
         return resultCount == 0
-            ? $"No {subject} matched '{query}'. Try a source receipt id, dispatch receipt id, recipient ref, delivery id, delivery message id, or item reference."
+            ? $"No {subject} matched '{query}'. Try a source record id, dispatch id, recipient, delivery id, delivery message id, or item reference."
             : $"Found {resultCount} matching {subject}{(resultCount == 1 ? string.Empty : "s")} for '{query}'.";
     }
 

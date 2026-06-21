@@ -514,7 +514,13 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "same install rail",
             "Artifacts never become the system of record for rules or account truth",
             "Proposal posture must stay honest",
-            "bounded consult handoff"
+            "bounded consult handoff",
+            "Search bounded receipt and thread drilldowns",
+            "Recent bounded receipt and thread drilldowns",
+            "Recent bounded drilldown",
+            "Composite bounded receipt match",
+            "full feedback rail",
+            "source receipt id, dispatch receipt id"
         ];
 
         foreach (string file in sourceFiles)

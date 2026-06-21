@@ -1240,7 +1240,7 @@ public sealed class PublicSignalOperationsServiceTests
     }
 
     [Fact]
-    public void LookupCanSearchBoundedSourceAndThreadDrilldowns()
+    public void LookupCanSearchSourceRecordsAndRecipientThreads()
     {
         using var fixture = new PublicSignalOperationsFixture(new Dictionary<string, string?>
         {
@@ -1311,6 +1311,12 @@ public sealed class PublicSignalOperationsServiceTests
         string lookupJson = service.LoadLookupJson(packet.RecentDispatchReceipts[0].DeliveryId, "thread");
 
         Assert.Equal("thread", threadLookup.Scope);
+        Assert.Equal("Activity lookup", threadLookup.Eyebrow);
+        Assert.Equal("Search source records and recipient threads", threadLookup.Heading);
+        Assert.DoesNotContain("bounded", threadLookup.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("drilldown", threadLookup.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bounded", threadLookup.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rail", threadLookup.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.True(threadLookup.QueryProvided);
         Assert.Single(threadLookup.Results);
         Assert.Equal("Recipient thread", threadLookup.Results[0].ResultKindLabel);
