@@ -774,3 +774,28 @@ def test_publication_detail_page_uses_plain_labels() -> None:
     assert "Status</span>" in publication
     assert "History</span>" in publication
     assert "related detail" in publication
+
+
+def test_faction_workspace_uses_page_language_instead_of_route_language() -> None:
+    workspace = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml")
+
+    for forbidden in (
+        "Authenticated route",
+        "Public route stays separate",
+        "Current signed-in workspace.",
+        "public Ledger routes",
+        "authenticated campaign routes",
+        "Public Ledger routes",
+        "signed-in faction routes",
+        "faction overlay route",
+    ):
+        assert forbidden not in workspace
+
+    assert "Signed-in page" in workspace
+    assert "Public page stays separate" in workspace
+    assert "Current workspace." in workspace
+    assert "public Ledger pages" in workspace
+    assert "signed-in campaign pages" in workspace
+    assert "Public Ledger pages" in workspace
+    assert "signed-in faction pages" in workspace
+    assert "private lore overlay" in workspace

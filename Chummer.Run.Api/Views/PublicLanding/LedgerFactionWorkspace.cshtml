@@ -12,9 +12,9 @@
         <p class="page-copy">@Model.Intro</p>
         <p class="ledger-flagship__support">The internal campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
         <div class="trust-claim__details">
-            <span>Authenticated route</span>
+            <span>Signed-in page</span>
             <span>Faction: @Model.Faction.PublicName</span>
-            <span>Public route stays separate</span>
+            <span>Public page stays separate</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.PublicProfileHref">Open public faction file</a>
@@ -43,7 +43,7 @@
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
                     <span class="tag">Tab</span>
                     <strong>@tab.Label</strong>
-                <p>@(tab.Current ? "Current signed-in workspace." : "Open this faction workspace section.")</p>
+                <p>@(tab.Current ? "Current workspace." : "Open this faction workspace section.")</p>
                 </a>
             }
         </div>
@@ -91,7 +91,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Faction state</p>
         <h2 class="editorial-title">@Model.Faction.PublicName</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Faction.Type) with signed-in management kept off the public Ledger routes.</p>
+        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Faction.Type) with signed-in management kept off the public Ledger pages.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -123,7 +123,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Private lore overlay</p>
             <h2 class="editorial-title">Private labels stay private.</h2>
-            <p class="editorial-copy">These labels and notes may exist on authenticated campaign routes. Public Ledger routes must never render them.</p>
+            <p class="editorial-copy">These labels and notes may exist on signed-in campaign pages. Public Ledger pages must never render them.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var label in Model.PrivateLabels)
@@ -131,7 +131,7 @@
                 <article class="route-choice-card">
                     <span class="tag">Private label</span>
                     <h3>@label</h3>
-                    <p>Available only on signed-in faction routes.</p>
+                    <p>Available only on signed-in faction pages.</p>
                 </article>
             }
             @foreach (var note in Model.PrivateLoreNotes)
@@ -193,7 +193,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
             <article class="route-choice-card">
                 <span class="tag">Overlay API</span>
                 <h3>Private lore path exists</h3>
-                <p>The faction overlay route is available through the signed-in API and stays off public pages.</p>
+                <p>The private lore overlay is available through the signed-in API and stays off public pages.</p>
             </article>
         </div>
         @if (Model.Allegiance is not null && Model.AvailableActions is not null)
