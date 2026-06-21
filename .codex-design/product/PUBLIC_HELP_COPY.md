@@ -53,15 +53,15 @@ When a public concierge widget appears on `/downloads`, `/now`, `/help`, or anot
 
 * the first-party help or release article remains the main answer
 * the widget is a preview overlay that helps the user choose a safe next step
-* normal routes stay visible and must still work when the widget is disabled
+* normal help choices stay visible and must still work when the widget is disabled
 * recovery language must point at the real help, relinking, or escalation path instead of claiming the widget fixed anything itself
 * no claim codes, auth secrets, or private case identifiers belong in the widget
 
 ## Public content optimization bounds
 
-Article and guide improvements must be reviewed against approved Chummer source packets.
+Article and guide improvements must be reviewed against approved Chummer copy, screenshots, and release notes.
 
-Accepted content changes flow upstream into `chummer6-design` or public-guide source registries before generated guide output changes. Content tools must not invent rules, support answers, unshipped availability, or campaign/world state.
+Accepted content changes flow upstream into Chummer's design notes or public guide copy before published guides change. Content tools must not invent rules, support answers, unshipped availability, or campaign/world state.
 
 ## Closure rule
 

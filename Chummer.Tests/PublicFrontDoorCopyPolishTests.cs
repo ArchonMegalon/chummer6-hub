@@ -68,6 +68,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "Private crash lane",
             "fixed truth",
             "fallback routes",
+            "normal routes stay visible",
+            "source packets",
+            "public-guide source registries",
+            "generated guide output",
             "Katteb-assisted",
             "campaign/world truth",
             "When those lanes"
