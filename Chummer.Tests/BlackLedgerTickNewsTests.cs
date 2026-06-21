@@ -479,7 +479,7 @@ public sealed class BlackLedgerTickNewsTests
             BlackLedgerNewsStatusViewModel status = service.BuildStatusViewModel(
                 "emerald-sprawl-prelude",
                 1,
-                "Signed-in account lane",
+                "Account lane",
                 "/account/ledger/notifications",
                 "/ledger/turns/1",
                 "/ledger/turns/1/dispatches",

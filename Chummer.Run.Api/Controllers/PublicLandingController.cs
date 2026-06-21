@@ -2898,7 +2898,7 @@ public sealed class PublicLandingController : Controller
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
                 AftermathHref = "/account/work#aftermath-packages",
-                Summary = "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
+                Summary = "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
             },
             Boundary = new
             {
@@ -13428,7 +13428,7 @@ echo "Help: ${HELP_URL}"
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
-        var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Signed-in Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
+        var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Account Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, user.SubjectId);
         CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
@@ -13443,7 +13443,7 @@ echo "Help: ${HELP_URL}"
             NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
                 worldId: "emerald-sprawl-prelude",
                 turn: 1,
-                scopeLabel: "Signed-in account lane",
+                scopeLabel: "Account lane",
                 notificationsHref: "/account/ledger/notifications",
                 turnHref: "/ledger/turns/1",
                 dispatchHref: "/ledger/turns/1/dispatches",
@@ -13468,13 +13468,13 @@ echo "Help: ${HELP_URL}"
     {
         string signalDeckSummary = workspaceServerPlane?.Consequences.Count > 0
             ? $"Signal Deck is carrying {workspaceServerPlane.Consequences.Count} reviewed consequence cue(s) forward from the latest inbox reaction and workspace state."
-            : "Signal Deck is armed, but no reviewed consequence cue has been written yet for this signed-in path.";
+            : "Signal Deck is armed, but no reviewed consequence cue has been written yet for this account path.";
         string runnerPassportSummaryText =
             $"Runner Passport is live with {runnerPassportSummary.ActiveInstallationCount} claimed install(s), {runnerPassportSummary.OpenRunCount} public open run(s), and {runnerPassportSummary.ParticipationNotificationCount} participation record(s) on the Chummer path.";
         int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
         string livingNewsroomSummary = worldTurnBriefing?.Broadcast is not null
             ? $"Living Newsroom is carrying {worldTurnBriefing.Broadcast.PackageLabel} as the public-safe bulletin for this turn, so the same anchor-led package can frame what Signal Deck and the inbox are reacting to."
-            : "Living Newsroom is armed for this turn, but the signed-in lane has not attached a watch package yet.";
+            : "Living Newsroom is armed for this turn, but the account lane has not attached a watch package yet.";
         string livingNewsroomHref = worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1";
         string aftermathSummary = aftermathCount > 0
             ? $"Reviewed aftermath currently holds {aftermathCount} package(s), so remote reactions can return as records and next steps instead of disappearing into flavor-only copy."
@@ -13536,8 +13536,8 @@ echo "Help: ${HELP_URL}"
         string leaderHref = string.IsNullOrWhiteSpace(factionId)
             ? "/account/ledger"
             : $"/account/ledger/factions/{factionId}/leader-briefing";
-        string summary = "Runner Passport is the continuity path for Table Pulse Live: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and Table Pulse Aftermath history on one reviewed path.";
-        string boundaryLine = "Runner Passport exposes aggregate trust and return status only. It can point to signed-in command paths, but it does not project private identity, moderation decisions, or transcript detail.";
+        string summary = "Runner Passport is the continuity path for Table Pulse Live: trust stays public-safe, but the account command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and Table Pulse Aftermath history on one reviewed path.";
+        string boundaryLine = "Runner Passport exposes aggregate trust and return status only. It can point to account command paths, but it does not project private identity, moderation decisions, or transcript detail.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
@@ -13548,10 +13548,10 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
-                    ? $"The signed-in inbox is already carrying {consequenceCount} reviewed consequence cue(s), so trust continuity is attached to real command fallout instead of free-floating copy."
+                    ? $"The account inbox is already carrying {consequenceCount} reviewed consequence cue(s), so trust continuity is attached to real command fallout instead of free-floating copy."
                     : "Table Pulse Live is armed for this account, so the next reviewed reaction can land on the same trust path instead of disappearing into a separate system.",
                 Href: "/account/ledger/notifications",
-                StatusLabel: workspaceServerPlane is null ? "Armed" : "Signed-in"),
+                StatusLabel: workspaceServerPlane is null ? "Armed" : "Account"),
             new(
                 Label: "Leader command",
                 Summary: string.IsNullOrWhiteSpace(factionId)
@@ -13665,7 +13665,7 @@ echo "Help: ${HELP_URL}"
                 Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
                     ? $"{consequenceCount} consequence cue(s) are already live, so between-session continuity is attached to reviewed command state."
-                    : "The signed-in inbox is armed so the next remote reaction can enter the same reviewed between-session loop.",
+                    : "The account inbox is armed so the next remote reaction can enter the same reviewed between-session loop.",
                 Href: "/account/ledger/notifications",
                 StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
             new(
@@ -13705,14 +13705,14 @@ echo "Help: ${HELP_URL}"
         int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
         int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
         string summary = "Faction workspace is part of the same reviewed command path as Table Pulse Live, Signal Deck, Runner Passport, Living Newsroom, and Table Pulse Aftermath. Command does not end at action points; it carries through to fallout.";
-        string boundaryLine = "Workspace command stays signed in and attached to Chummer state. It can route pressure, command, and reviewed fallout, but it does not publish private lore or invent public world state outside Chummer paths.";
+        string boundaryLine = "Workspace command stays in the account and attached to Chummer state. It can route pressure, command, and reviewed fallout, but it does not publish private lore or invent public world state outside Chummer paths.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
                 Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
                     ? $"{consequenceCount} consequence cue(s) are already live from the inbox, so this workspace can act on real reviewed pressure."
-                    : "Open the signed-in inbox to review or trigger the next remote reaction before spending command effort here.",
+                    : "Open the account inbox to review or trigger the next remote reaction before spending command effort here.",
                 Href: "/account/ledger/notifications",
                 StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
             new(
@@ -13753,7 +13753,7 @@ echo "Help: ${HELP_URL}"
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
-        var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Signed-in Black Ledger newsreel delivery status and history.", "/account/ledger/notifications", user.DisplayName, user.Email);
+        var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Account Black Ledger newsreel delivery status and history.", "/account/ledger/notifications", user.DisplayName, user.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, subjectId);
         CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
@@ -13763,7 +13763,7 @@ echo "Help: ${HELP_URL}"
         BlackLedgerNewsStatusViewModel status = _blackLedgerTickNews.BuildStatusViewModel(
             worldId: "emerald-sprawl-prelude",
             turn: 1,
-            scopeLabel: "Signed-in account",
+            scopeLabel: "Account",
             notificationsHref: "/account/ledger/notifications",
             turnHref: "/ledger/turns/1",
             dispatchHref: "/ledger/turns/1/dispatches",
@@ -13891,7 +13891,7 @@ echo "Help: ${HELP_URL}"
             : $"{leaderDigest.PublicName} can turn inbox beats into remote reactions, minigame prompts, and reviewed command intents before the next turn lands.";
         string signalDeckPosture = promoArtifact is null
             ? "Signal Deck stays attached to the same inbox packet so command visuals, pressure cues, and records do not split into a second status page."
-            : $"{promoArtifact.PublicName} promo previews are ready to amplify Signal Deck cues without leaving the signed-in command path.";
+            : $"{promoArtifact.PublicName} promo previews are ready to amplify Signal Deck cues without leaving the account command path.";
         string runnerPassportPosture = leaderDigest is null
             ? "Runner Passport stays ready to stamp return status, trust, and privacy-safe continuity after each remote reaction."
             : $"Runner Passport can stamp {leaderDigest.PublicName} response status, return trust, and public-safe cross-table continuity after the current inbox action.";
@@ -13900,10 +13900,10 @@ echo "Help: ${HELP_URL}"
             : "Table Pulse Aftermath stays private and ready even when no package is queued yet, so debrief and coaching remain separate from the live packet path.";
         string verdictLabel = workspaceServerPlane is null
             ? "Consent-gated preview"
-            : "Reviewed signed-in path";
+            : "Reviewed account path";
         string boundaryLine = workspaceServerPlane is null
             ? "No reviewed workspace means no live reaction write path. Table Pulse Live stays read-only instead of inventing detached minigame results, and Table Pulse Aftermath stays parked."
-            : "Table Pulse Live can write only reviewed consequence state on the signed-in workspace path. It does not publish world state, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return path.";
+            : "Table Pulse Live can write only reviewed consequence state on the account workspace path. It does not publish world state, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return path.";
         string consentPosture = "Table Pulse Live is opt-in, consent-gated, and review-based. Remote reactions are mini-games and packets, not direct table mutation or automatic world-state authority. Table Pulse Aftermath remains private and GM-controlled.";
 
         List<BlackLedgerTablePulseCueViewModel> cues =
@@ -13957,10 +13957,10 @@ echo "Help: ${HELP_URL}"
         string? adjudicationSummary = workspaceServerPlane?.Consequences.Count > 0
             ? $"Current reviewed consequence state: {string.Join(", ", workspaceServerPlane.Consequences.Take(3).Select(static item => $"{item.Label} {item.State}"))}."
             : workspaceServerPlane is null
-                ? "Adjudication is parked until a reviewed workspace is available for this signed-in account."
+                ? "Adjudication is parked until a reviewed workspace is available for this account."
                 : null;
 
-        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same reviewed path. Table Pulse Aftermath is the separate private return path.";
+        string summary = "Table Pulse Live turns the account inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same reviewed path. Table Pulse Aftermath is the separate private return path.";
         string[] labels =
         [
             "Table Pulse Live",

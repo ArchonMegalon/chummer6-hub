@@ -17,8 +17,8 @@ REPO_ROOT = Path(
 REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": (
         "LeaderBriefingHrefTemplate = \"/account/ledger/factions/{factionId}/leader-briefing\"",
-        "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path.",
-        "Table Pulse Live turns the signed-in inbox into a command packet",
+        "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path.",
+        "Table Pulse Live turns the account inbox into a command packet",
         "GM cockpit keeps remote-reaction aftermath on one command path",
         "Table Pulse Live inbox",
     ),

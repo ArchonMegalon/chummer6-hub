@@ -2194,6 +2194,19 @@ def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> Non
         "GM-private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path.",
         "no_automatic_world_authority",
         "no_public_surveillance_truth",
+        "Signed-in account lane",
+        "Signed-in Runner Passport keeps public-safe trust posture",
+        "Signal Deck is armed, but no reviewed consequence cue has been written yet for this signed-in path.",
+        "the signed-in command loop can still carry inbox reactions",
+        "signed-in command paths",
+        "The signed-in inbox is already carrying",
+        "The signed-in inbox is armed",
+        "Open the signed-in inbox",
+        "Signed-in Black Ledger newsreel delivery status and history.",
+        "Signed-in Black Ledger faction home",
+        "Reviewed signed-in path",
+        "signed-in workspace path",
+        "Table Pulse Live turns the signed-in inbox into a command packet",
     ):
         assert forbidden not in controller
 
@@ -2212,6 +2225,19 @@ def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> Non
         "Private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path.",
         "no_automatic_world_changes",
         "no_public_surveillance",
+        "Account lane",
+        "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox",
+        "Signal Deck is armed, but no reviewed consequence cue has been written yet for this account path.",
+        "the account command loop can still carry inbox reactions",
+        "account command paths",
+        "The account inbox is already carrying",
+        "The account inbox is armed",
+        "Open the account inbox",
+        "Account Black Ledger newsreel delivery status and history.",
+        "Account Black Ledger faction home",
+        "Reviewed account path",
+        "account workspace path",
+        "Table Pulse Live turns the account inbox into a command packet",
     ):
         assert expected in controller
 
