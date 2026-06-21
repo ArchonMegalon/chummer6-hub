@@ -142,8 +142,8 @@ public sealed class HostedBoundedContextCoverageServiceTests
                     ListingTitle: "Tacoma bridge extraction",
                     Visibility: "community",
                     Status: "scheduled",
-                    Summary: "Community open run that stays on the governed campaign spine.",
-                    TableContractSummary: "Table contract stays on the signed-in rail with spoiler-safe closeout.",
+                    Summary: "Community open run that stays in the campaign workspace.",
+                    TableContractSummary: "Table contract stays in the signed-in workspace with spoiler-safe closeout.",
                     JoinPolicy: new OpenRunJoinPolicyProjection(
                         AdmissionMode: "request_to_join",
                         SeatsTotal: 4,
@@ -159,12 +159,12 @@ public sealed class HostedBoundedContextCoverageServiceTests
                         CommunicationPlatform: "discord",
                         VoiceRequired: true,
                         ObserverMode: "manual_markers",
-                        Summary: "Community open-run policy stays on the governed hub rail."),
+                        Summary: "Community open-run policy stays on the reviewed community page."),
                     SchedulingPosture: "scheduled",
                     QuickstartAllowed: true,
                     EvidenceLines:
                     [
-                        "Open-run listing remains attached to the signed-in community and campaign rails."
+                        "Open-run listing remains attached to the signed-in community and campaign pages."
                     ],
                     CreatedByUserId: "user-demo-135",
                     CreatedAtUtc: now.AddDays(-5),
@@ -179,10 +179,10 @@ public sealed class HostedBoundedContextCoverageServiceTests
                     ExpectedDurationMinutes: 240,
                     Platform: "discord",
                     Timezone: "Europe/Vienna",
-                    Summary: "Schedule receipt stays on the campaign spine.",
+                    Summary: "Schedule stays with the campaign workspace.",
                     EvidenceLines:
                     [
-                        "Scheduling remains a campaign-owned receipt."
+                        "Scheduling remains in the campaign workspace."
                     ],
                     ScheduledByUserId: "user-demo-135",
                     ScheduledAtUtc: now.AddHours(-12)),
@@ -193,7 +193,7 @@ public sealed class HostedBoundedContextCoverageServiceTests
                     ResolutionApprovalId: "resolution-demo-135",
                     WorldTickId: "worldtick-demo-135",
                     PlayerSafeNewsId: "news-demo-135",
-                    Summary: "Closeout proof stays on the campaign spine and never escapes to public or support routes.",
+                    Summary: "Closeout stays in the campaign workspace and never escapes to public or support routes.",
                     EvidenceLines:
                     [
                         "Closeout and player-safe preview remain campaign-owned."
@@ -262,6 +262,18 @@ public sealed class HostedBoundedContextCoverageServiceTests
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "support_context", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "orchestration_boundary", StringComparison.Ordinal) && string.Equals(item.Route, "/downloads/install", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "bounded_context_closure", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal));
+            string projectionText = string.Join(
+                "\n",
+                bundle.Projections.SelectMany(item => new[]
+                    {
+                        item.Summary
+                    }
+                    .Concat(item.EvidenceLines)
+                    .Concat(item.Actions.Select(action => action.Summary))));
+            Assert.DoesNotContain(" rail", projectionText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("governed", projectionText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(" truth", projectionText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(" proof", projectionText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

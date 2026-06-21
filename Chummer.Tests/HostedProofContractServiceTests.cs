@@ -42,7 +42,7 @@ public sealed class HostedProofContractServiceTests
                             InstallAccessClass: "claimed")
                     ],
                     SupportabilityState: "watch",
-                    SupportabilitySummary: "Preview shelf keeps the live comparison honest while the signed-in return lanes stay first-party."),
+                    SupportabilitySummary: "Preview downloads keep the live comparison honest while the signed-in return paths stay first-party."),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                 encoding: System.Text.Encoding.UTF8);
 
@@ -63,9 +63,9 @@ public sealed class HostedProofContractServiceTests
                 ClusterKey: "public-cluster-002",
                 Kind: "feedback",
                 Status: "new",
-                Title: "Public signal proof",
-                Summary: "Need a governed signal packet lane.",
-                Detail: "Public roadmap and support lanes should stay coordinated.",
+                Title: "Public signal review",
+                Summary: "Need a reviewed signal packet path.",
+                Detail: "Public roadmap and support paths should stay coordinated.",
                 CandidateOwnerRepo: "chummer6-hub",
                 DesignImpactSuspected: true,
                 CreatedAtUtc: now.AddDays(-2),
@@ -82,7 +82,7 @@ public sealed class HostedProofContractServiceTests
                     ListingTitle: "Tacoma docks night extraction",
                     Visibility: "community",
                     Status: "closed",
-                    Summary: "A governed community open run for one night of extraction fallout.",
+                    Summary: "A reviewed community open run for one night of extraction fallout.",
                     TableContractSummary: "Beginner-friendly table with explicit safety tool acknowledgement and spoiler-safe closeout.",
                     JoinPolicy: new OpenRunJoinPolicyProjection(
                         AdmissionMode: "request_to_join",
@@ -100,12 +100,12 @@ public sealed class HostedProofContractServiceTests
                         CommunicationPlatform: "discord",
                         VoiceRequired: true,
                         ObserverMode: "manual_markers",
-                        Summary: "Governed request-to-join open run on the same community rail."),
+                        Summary: "Reviewed request-to-join open run on the same community page."),
                     SchedulingPosture: "scheduled",
                     QuickstartAllowed: true,
                     EvidenceLines:
                     [
-                        "Community visibility keeps the listing discoverable on the governed open-run lane."
+                        "Community visibility keeps the listing discoverable on the reviewed open-run page."
                     ],
                     CreatedByUserId: "gm-demo",
                     CreatedAtUtc: now.AddDays(-3),
@@ -120,10 +120,10 @@ public sealed class HostedProofContractServiceTests
                     ExpectedDurationMinutes: 240,
                     Platform: "discord",
                     Timezone: "Europe/Vienna",
-                    Summary: "Open run is scheduled on the governed Discord handoff lane.",
+                    Summary: "Open run is scheduled on the reviewed Discord handoff page.",
                     EvidenceLines:
                     [
-                        "Scheduling receipt stays on the same governed campaign spine."
+                        "Scheduling record stays in the same reviewed campaign workspace."
                     ],
                     ScheduledByUserId: "gm-demo",
                     ScheduledAtUtc: now.AddDays(-1)),
@@ -138,10 +138,10 @@ public sealed class HostedProofContractServiceTests
                     [
                         "runner-demo"
                     ],
-                    Summary: "Meeting handoff stays a projection lane and never replaces the governed open-run receipts.",
+                    Summary: "Meeting handoff stays a projection path and never replaces the reviewed open-run records.",
                     EvidenceLines:
                     [
-                        "Accepted players still route back through the governed hub lane."
+                        "Accepted players still route back through the reviewed hub page."
                     ],
                     CreatedByUserId: "gm-demo",
                     CreatedAtUtc: now.AddHours(-12)),
@@ -151,7 +151,7 @@ public sealed class HostedProofContractServiceTests
                     ResolutionApprovalId: "resolution-demo-001",
                     WorldTickId: "worldtick-demo-001",
                     PlayerSafeNewsId: "news-demo-001",
-                    Summary: "Open-run closeout files ResolutionReport, WorldTick, and player-safe news on the governed hub lane.",
+                    Summary: "Open-run closeout files ResolutionReport, WorldTick, and player-safe news on the reviewed hub page.",
                     EvidenceLines:
                     [
                         "World memory and player-safe preview stay distinct."
@@ -213,6 +213,19 @@ public sealed class HostedProofContractServiceTests
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal));
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal));
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "account_aware_horizon_conversion", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/account/access", StringComparison.Ordinal));
+            string contractText = string.Join(
+                "\n",
+                bundle.Contracts.SelectMany(item => new[]
+                    {
+                        item.CloseoutPosture,
+                        item.Summary
+                    }
+                    .Concat(item.EvidenceLines)
+                    .Concat(item.Actions.Select(action => action.Summary))));
+            Assert.DoesNotContain(" rail", contractText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("governed", contractText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(" truth", contractText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(" proof", contractText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

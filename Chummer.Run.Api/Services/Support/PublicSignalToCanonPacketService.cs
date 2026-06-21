@@ -60,12 +60,12 @@ public sealed class PublicSignalToCanonPacketService
             UpstreamPatchRequirement: "accepted_feedback_must_patch_chummer_owned_source_before_public_output_changes",
             NoChangeRationalePolicy: "allowed_only_with_explicit_governor_or_design_rationale",
             CloseoutPosture: "Accepted feedback patches Chummer-owned source, metadata config, registry YAML, or guide content before regeneration.",
-            Summary: "Public feedback stays bounded to the governed first-party Participate lane instead of becoming shipping truth by itself.",
+            Summary: "Public feedback stays on the reviewed first-party Participate page instead of changing release status by itself.",
             EvidenceLines:
             [
-                "/feedback redirects to the governed Participate feedback anchor.",
-                "Public feedback may propose demand, but design and Product Governor remain the canon decision authority.",
-                "Accepted improvements patch source-backed public content before any regenerated output is trusted."
+                "/feedback redirects to the reviewed Participate feedback anchor.",
+                "Public feedback may propose demand, but product decisions still need review.",
+                "Accepted improvements patch reviewed public content before regenerated output is published."
             ],
             JourneyProofEventRefs:
             [
@@ -73,7 +73,7 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "productlift_idea_clustered",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "/feedback",
-                    summary: "Public feedback clusters must resolve into a Chummer-owned journey-proof step before queue or design interpretation.")
+                    summary: "Public feedback clusters must resolve into a first-party review step before queue or design interpretation.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -95,7 +95,7 @@ public sealed class PublicSignalToCanonPacketService
             ClaimSensitivity: "projection_only",
             Owner: "chummer6_design",
             DecisionAuthority: "source_backed_roadmap_review",
-            UpstreamPatchRequirement: "projection_changes_must_follow_design_or_release_source_truth",
+            UpstreamPatchRequirement: "projection_changes_must_follow_reviewed_design_or_release_source",
             NoChangeRationalePolicy: "allowed_only_when_public_projection_stays_honest_about_live_state",
             CloseoutPosture: "Roadmap cards stay projection-only until shipped status, source patches, or release records close the gap.",
             Summary: "Roadmap surfaces can project direction, but they do not become implementation, release, or support authority.",
@@ -133,7 +133,7 @@ public sealed class PublicSignalToCanonPacketService
             ClaimSensitivity: "shipped_only",
             Owner: "release_ops",
             DecisionAuthority: "published_release_closeout",
-            UpstreamPatchRequirement: "closeout_claims_must_match_release_status_and_public_shelf_truth",
+            UpstreamPatchRequirement: "closeout_claims_must_match_release_status_and_public_downloads",
             NoChangeRationalePolicy: "disallowed_for_shipped_claims_without_release_status",
             CloseoutPosture: "Changelog entries stay tied to shipped closeout and published release status instead of open roadmap intent.",
             Summary: "The public changelog is a shipped-closeout projection, not a backlog promise or private staging note.",
@@ -141,7 +141,7 @@ public sealed class PublicSignalToCanonPacketService
             [
                 "/changelog redirects to the public shipped-closeout anchor on /now.",
                 "Release status, installer shelf, and shipped-closeout language must agree before the public changelog can claim delivery.",
-                "Unshipped or support-only fixes must not be promoted into changelog truth."
+                "Unshipped or support-only fixes must not be promoted into the public changelog."
             ],
             JourneyProofEventRefs:
             [
@@ -149,7 +149,7 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "voter_notified",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "/changelog",
-                    summary: "Shipped closeout must stay attached to the Chummer-owned voter notification journey proof before public delivery claims resolve.")
+                    summary: "Shipped closeout must stay attached to the first-party voter notification record before public delivery claims resolve.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -164,7 +164,7 @@ public sealed class PublicSignalToCanonPacketService
     {
         string summary = trackedSupportCase is null
             ? "The public support surface routes bugs, account questions, and private feedback into first-party tracked case intake."
-            : $"Tracked support case {trackedSupportCase.CaseId} proves the public contact path becomes a governed first-party case instead of disappearing into email.";
+            : $"Tracked support case {trackedSupportCase.CaseId} keeps the public contact path first-party instead of disappearing into email.";
         return new SignalToCanonPacketProjection(
             PacketId: StableId("signal-support", trackedSupportCase?.CaseId ?? manifest.Version),
             SurfaceId: "support",
@@ -179,15 +179,15 @@ public sealed class PublicSignalToCanonPacketService
             Owner: "support_ops",
             DecisionAuthority: "case_triage_and_release_followthrough",
             UpstreamPatchRequirement: "support_findings_must_patch_help_release_or_runtime_source_before_public_help_copy_changes",
-            NoChangeRationalePolicy: "allowed_only_when_private_case_truth_does_not_require_public_claim_changes",
-            CloseoutPosture: "Public support reports become governed tracked cases, and closeout stays attached to first-party account or reply-email follow-through.",
+            NoChangeRationalePolicy: "allowed_only_when_private_case_context_does_not_require_public_claim_changes",
+            CloseoutPosture: "Public support reports become tracked cases, and closeout stays attached to first-party account or reply-email follow-through.",
             Summary: summary,
             EvidenceLines:
             [
                 "/contact is the first-party public support and private-feedback intake route.",
                 "Tracked support routes keep the case id, status, and release follow-through visible instead of redirecting to a private vendor queue.",
                 trackedSupportCase is null
-                    ? "Guest support still stays first-party and bounded by tracked case intake."
+                    ? "Guest support still stays first-party through tracked case intake."
                     : $"Tracked case {trackedSupportCase.CaseId} is the support-side SignalToCanon packet anchor."
             ],
             JourneyProofEventRefs:
@@ -196,7 +196,7 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "download_started",
                     journeyKey: DownloadClaimLaunchJourneyKey,
                     sourceRef: trackedSupportCase?.CaseId ?? "/contact",
-                    summary: "Support escalation on install and release surfaces stays linked to a Chummer-owned install journey before public help copy changes.")
+                    summary: "Support escalation on install and release surfaces stays linked to a first-party install record before public help copy changes.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -226,7 +226,7 @@ public sealed class PublicSignalToCanonPacketService
             Summary: "ProductLift signal is classified before it becomes queue, roadmap, or closeout input.",
             EvidenceLines:
             [
-                "Public feedback boards collect demand, but source truth still lives in Chummer-owned routes and release status.",
+                "Public feedback boards collect demand, but release decisions still live in Chummer routes and release status.",
                 "Review-threshold ideas need either source-backed movement or an explicit no-change rationale.",
                 "Voter closeout must cite shipped status before public delivery can claim resolution."
             ],
@@ -236,12 +236,12 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "productlift_idea_clustered",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "productlift_signal",
-                    summary: "ProductLift demand stays downstream of a Chummer-owned clustering proof step before queue or roadmap interpretation."),
+                    summary: "ProductLift demand stays downstream of a first-party clustering review before queue or roadmap interpretation."),
                 BuildJourneyProofEventRef(
                     eventKey: "voter_notified",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "productlift_signal",
-                    summary: "Any shipped closeout tied to ProductLift must resolve through the bounded voter notification journey proof.")
+                    summary: "Any shipped closeout tied to ProductLift must resolve through the bounded voter notification record.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -260,17 +260,17 @@ public sealed class PublicSignalToCanonPacketService
             SourceKind: "katteb_public_content_review",
             SourceClassification: "content_improvement",
             Audience: "public_guide_readers",
-            ClaimSensitivity: "canon_sensitive_copy",
+            ClaimSensitivity: "source_sensitive_copy",
             Owner: "chummer6_design",
             DecisionAuthority: "approved_source_packet_review",
-            UpstreamPatchRequirement: "accepted_katteb_recommendations_must_patch_design_canon_or_public_guide_source_before_regeneration",
+            UpstreamPatchRequirement: "accepted_katteb_recommendations_must_patch_design_or_public_guide_source_before_regeneration",
             NoChangeRationalePolicy: "required_when_readability_or_claim_changes_are_rejected",
             CloseoutPosture: "Guide and article improvements stay upstream-first; generated output only changes after approved source packets move.",
             Summary: "Katteb findings are content-improvement proposals, not direct edits to public output.",
             EvidenceLines:
             [
                 "Guide optimization can draft from approved source packets only.",
-                "Accepted copy changes must land in canon or source registries before public regeneration.",
+                "Accepted copy changes must land in reviewed source registries before public regeneration.",
                 "Human review remains required before publication."
             ],
             JourneyProofEventRefs:
@@ -279,7 +279,7 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "productlift_idea_clustered",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "katteb_signal",
-                    summary: "Public content changes can only graduate after a Chummer-owned source packet or clustered demand proof exists.")
+                    summary: "Public content changes can only graduate after a reviewed Chummer source packet or clustered demand review exists.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -303,12 +303,12 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "search_visibility_review",
             UpstreamPatchRequirement: "critical_clickrank_findings_must_patch_chummer_owned_source_or_record_explicit_no_change_rationale",
             NoChangeRationalePolicy: "required_for_unfixed_launch_critical_findings",
-            CloseoutPosture: "Visibility audits can recommend crawl, metadata, schema, and navigation fixes, but public truth only changes through Chummer-owned source or explicit no-change review.",
+            CloseoutPosture: "Visibility audits can recommend crawl, metadata, schema, and navigation fixes, but public copy only changes through reviewed Chummer source or explicit no-change review.",
             Summary: "ClickRank findings are classified visibility work, not direct authority over public claims or route posture.",
             EvidenceLines:
             [
                 "Critical launch-page findings need a source fix or explicit no-change rationale.",
-                "Keyword opportunities should be classified as technical, content, canon-sensitive, navigation, schema, or blocked work.",
+                "Keyword opportunities should be classified as technical, content, source-sensitive, navigation, schema, or blocked work.",
                 "Search audits must not leave stale release, roadmap, or support claims behind."
             ],
             JourneyProofEventRefs:
@@ -345,9 +345,9 @@ public sealed class PublicSignalToCanonPacketService
             Summary: "MetaSurvey-style followup remains a ranking signal, not the priority decision itself.",
             EvidenceLines:
             [
-                "Survey output can strengthen a repeated signal cluster but cannot become backlog truth by itself.",
-                "Quant validation must flow back into Chummer-owned packets before decisions move.",
-                "Public followthrough stays bounded to first-party participate and KARMA FORGE lanes."
+                "Survey output can strengthen a repeated signal cluster but cannot set the backlog by itself.",
+                "Quant validation must flow back into reviewed Chummer packets before decisions move.",
+                "Public followthrough stays on first-party Participate and KARMA FORGE paths."
             ],
             JourneyProofEventRefs:
             [
@@ -355,12 +355,12 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "karma_interview_completed",
                     journeyKey: KarmaForgeJourneyKey,
                     sourceRef: "metasurvey_signal",
-                    summary: "Quant validation remains downstream of a Chummer-owned KARMA FORGE interview and packet chain before decisions move."),
+                    summary: "Quant validation remains downstream of a first-party KARMA FORGE interview and packet chain before decisions move."),
                 BuildJourneyProofEventRef(
                     eventKey: "karma_demand_packet_created",
                     journeyKey: KarmaForgeJourneyKey,
                     sourceRef: "metasurvey_signal",
-                    summary: "Survey ranking must re-enter a Chummer-owned demand packet before Product Governor interpretation.")
+                    summary: "Survey ranking must re-enter a reviewed Chummer demand packet before product interpretation.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -384,13 +384,13 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "signal_cluster_review",
             UpstreamPatchRequirement: "repeated_clusters_must_become_source_patch_or_queue_candidates_through_chummer_owned_review",
             NoChangeRationalePolicy: "required_when_repeated_clusters_do_not_change_queue_or_source",
-            CloseoutPosture: "Repeated public-signal clusters can synthesize bounded queue candidates, but design and Product Governor remain canon authority.",
-            Summary: "Participate is the governed intake lane where public feedback, survey, and hosted signal sources become classified SignalToCanon packets.",
+            CloseoutPosture: "Repeated public-signal clusters can synthesize queue candidates, but design and product review remain the decision point.",
+            Summary: "Participate is the intake page where public feedback, survey, and hosted signal sources become classified product signals.",
             EvidenceLines:
             [
                 "/participate is the hosted intake lane for public-board, survey, and adjacent public signal sources.",
                 "Signal packets classify source, audience, claim sensitivity, owner, decision, and closeout posture before any queue synthesis happens.",
-                "Fleet may synthesize bounded queue candidates from repeated clusters, but the packet is not canon by itself."
+                "Repeated clusters may create queue candidates, but the packet is not a product decision by itself."
             ],
             JourneyProofEventRefs:
             [
@@ -398,7 +398,7 @@ public sealed class PublicSignalToCanonPacketService
                     eventKey: "productlift_idea_clustered",
                     journeyKey: ProductLiftJourneyKey,
                     sourceRef: "signal_intake",
-                    summary: "Repeated public feedback must become a clustered Chummer-owned packet before roadmap or shipped interpretation."),
+                    summary: "Repeated public feedback must become a clustered Chummer packet before roadmap or shipped interpretation."),
                 BuildJourneyProofEventRef(
                     eventKey: "karma_demand_packet_created",
                     journeyKey: KarmaForgeJourneyKey,

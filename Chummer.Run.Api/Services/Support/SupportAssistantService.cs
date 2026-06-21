@@ -340,17 +340,17 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("update") || tokens.Contains("claim") || tokens.Contains("restart"))
         {
-            Add("open_downloads", "Open downloads", "/downloads", "Check the current installer and release posture.");
+            Add("open_downloads", "Open downloads", "/downloads", "Check the current installer and release status.");
         }
 
         if (ShouldUseRulesTruth(tokens))
         {
-            Add("open_home", "Open home", "/home", "Review the current rule environment, campaign workspace, and grounded answer path.");
+            Add("open_home", "Open home", "/home", "Review the current rules setup, campaign workspace, and answer path.");
         }
 
         if (ShouldUseBuildJourneyTruth(tokens))
         {
-            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");
+            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return path.");
         }
 
         return actions.Values.ToList();

@@ -63,8 +63,8 @@ public sealed class PrivacyBoundedSupportStatusService
             ? "/account/support"
             : concierge?.SupportCaseTruth.DetailHref ?? $"/account/support/{Uri.EscapeDataString(latestSupportCase.CaseId)}";
         string summary = latestSupportCase is null
-            ? "Support status stays first-party and install-aware; when no tracked case exists yet, the user should still stay on the account support rail."
-            : $"{HumanizeStatus(latestSupportCase.Status)} support case {latestSupportCase.CaseId} keeps release and install followthrough visible on the first-party account support rail.";
+            ? "Support status stays first-party and install-aware; when no tracked case exists yet, the account support page remains the safe place to continue."
+            : $"{HumanizeStatus(latestSupportCase.Status)} support case {latestSupportCase.CaseId} keeps release and install follow-up visible on the account support page.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-support-status", latestSupportCase?.CaseId ?? manifest.Version),
@@ -79,14 +79,14 @@ public sealed class PrivacyBoundedSupportStatusService
             EvidenceLines:
             [
                 latestSupportCase is null
-                    ? "No tracked support case is active yet, so the first-party intake lane remains the only safe support status route."
+                    ? "No tracked support case is active yet, so the support intake page remains the safe place to start."
                     : $"Case {latestSupportCase.CaseId} is currently {HumanizeStatus(latestSupportCase.Status).ToLowerInvariant()}.",
                 concierge?.ReleaseExplainer.CorrectnessBasis ?? "Support status stays grounded in the same release status that powers downloads, install help, and fix availability.",
                 ResolveFixAvailabilitySummary(manifest)
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the tracked case or the governed support account rail."),
+                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the tracked case or the account support page."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Start first-party intake when no tracked case exists yet."),
                 new PrivacyBoundedSupportStatusActionProjection("open_current_release", "Open current release", "/now", "Compare support posture with the same current release status.")
             ],
@@ -150,8 +150,8 @@ public sealed class PrivacyBoundedSupportStatusService
             route = "/participate?productlift=feedback#productlift-feedback";
         }
         string summary = feedbackPacket is null
-            ? "Feedback stays privacy-bounded until it is classified on the governed Participate lane and absorbed into canon."
-            : "Feedback stays bounded to the governed Participate lane instead of becoming support folklore or telemetry surveillance.";
+            ? "Feedback stays privacy-bounded until it is classified on the Participate page and reviewed for product work."
+            : "Feedback stays bounded to the Participate page instead of becoming support folklore or telemetry surveillance.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-feedback-status", feedbackPacket?.PacketId ?? latestSupportCase?.CaseId ?? manifest.Version),
@@ -175,8 +175,8 @@ public sealed class PrivacyBoundedSupportStatusService
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback lane", route, "Review the governed first-party feedback lane."),
-                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/participate", "Inspect the broader public-signal intake lane."),
+                new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback", route, "Review the first-party feedback path."),
+                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/participate", "Inspect the broader public feedback intake."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Escalate private or account-linked feedback through first-party support.")
             ],
             EmittedAtUtc: now,
@@ -196,7 +196,7 @@ public sealed class PrivacyBoundedSupportStatusService
         int crashCount = context.CrashWorkItems?.Count ?? 0;
         int installCount = context.InstallLinking?.ClaimedInstallations?.Count ?? 0;
         int feedbackCount = feedbackPacket is null ? 0 : 1;
-        string summary = $"Telemetry rollups stay privacy-bounded to counts and route-safe state: {supportCount} support cases, {crashCount} crash work items, {feedbackCount} governed feedback lane, and {installCount} claimed installs.";
+        string summary = $"Telemetry rollups stay privacy-bounded to counts and route-safe state: {supportCount} support cases, {crashCount} crash work items, {feedbackCount} reviewed feedback item, and {installCount} claimed installs.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-telemetry-rollup", $"{supportCount}:{crashCount}:{installCount}:{feedbackCount}:{manifest.Version}"),
@@ -215,8 +215,8 @@ public sealed class PrivacyBoundedSupportStatusService
                     ? "No crash work item is active, so the rollup only reports bounded support and install state."
                     : $"The latest bounded crash rollup points at {latestCrashWorkItem.WorkItemId}, not the raw incident envelope.",
                 feedbackPacket is null
-                    ? "No governed feedback packet is active yet."
-                    : $"The governed feedback rollup stays on {feedbackPacket.DestinationRoute}."
+                    ? "No reviewed feedback item is active yet."
+                    : $"The reviewed feedback rollup stays on {feedbackPacket.DestinationRoute}."
             ],
             Actions:
             [

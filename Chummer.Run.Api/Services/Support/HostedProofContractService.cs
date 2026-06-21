@@ -50,8 +50,8 @@ public sealed class HostedProofContractService
             ? "/account/work#community-ops"
             : context.CommunityHubRoute!;
         string summary = openRun.Closeout is null
-            ? $"{openRun.Listing.ListingTitle} stays on the governed open-run lane until schedule, handoff, and closeout proof all agree."
-            : $"{openRun.Listing.ListingTitle} keeps listing, schedule, meeting-handoff, and closeout proof on the governed open-run lane.";
+            ? $"{openRun.Listing.ListingTitle} stays on the reviewed open-run page until schedule, handoff, and closeout status agree."
+            : $"{openRun.Listing.ListingTitle} keeps listing, schedule, meeting handoff, and closeout status on the reviewed open-run page.";
 
         return new HostedProofContractProjection(
             ContractId: StableId("hosted-proof-open-runs", openRun.Listing.OpenRunId),
@@ -63,19 +63,19 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "community_receipt_only",
             Owner: "campaign_spine",
             DecisionAuthority: "open_run_orchestration_receipts",
-            CloseoutPosture: "Open-run proof only graduates when listing, meeting, and closeout receipts all stay on the same governed hub lane.",
+            CloseoutPosture: "Open-run status only graduates when listing, meeting, and closeout records all stay on the same reviewed hub page.",
             Summary: summary,
             EvidenceLines:
             [
                 openRun.Listing.TableContractSummary,
-                openRun.Schedule?.Summary ?? "A governed schedule receipt still has to land before the meeting-handoff can close the loop.",
-                openRun.MeetingHandoff?.Summary ?? "Meeting-handoff proof is still pending on the governed open-run rail.",
-                openRun.Closeout?.Summary ?? "Closeout proof stays pending until WorldTick and player-safe news receipts materialize."
+                openRun.Schedule?.Summary ?? "A reviewed schedule record still has to land before the meeting handoff can close the loop.",
+                openRun.MeetingHandoff?.Summary ?? "Meeting handoff is still pending on the reviewed open-run page.",
+                openRun.Closeout?.Summary ?? "Closeout status stays pending until WorldTick and player-safe news records exist."
             ],
             Actions:
             [
-                new HostedProofContractActionProjection("open_open_run_detail", "Open open-run detail", route, "Inspect the governed listing, join, schedule, handoff, and closeout receipts on the same hub route."),
-                new HostedProofContractActionProjection("open_community_ops", "Open community ops", comparisonRoute, "Compare the open-run proof against the signed-in community operations rail.")
+                new HostedProofContractActionProjection("open_open_run_detail", "Open open-run detail", route, "Inspect the reviewed listing, join, schedule, handoff, and closeout records on the same hub route."),
+                new HostedProofContractActionProjection("open_community_ops", "Open community ops", comparisonRoute, "Compare the open-run status against the signed-in community operations page.")
             ],
             EmittedAtUtc: now,
             Locale: context.Locale,
@@ -98,18 +98,18 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "projection_only",
             Owner: "public_landing",
             DecisionAuthority: "horizon_detail_review",
-            CloseoutPosture: "Shadowcasters stays a horizon brief until the same proof graduates onto the live published shelf and account-aware return lanes.",
-            Summary: $"Shadowcasters remains a public horizon detail while {manifest.Channel} {manifest.Version} stays the live shelf that keeps the comparison honest.",
+            CloseoutPosture: "Shadowcasters stays a horizon brief until the same work graduates onto the live downloads page and account-aware return paths.",
+            Summary: $"Shadowcasters remains a public horizon detail while {manifest.Channel} {manifest.Version} stays the live release that keeps the comparison honest.",
             EvidenceLines:
             [
-                "/roadmap/shadowcasters-network is the named horizon brief, not the live shelf.",
-                "/roadmap/black-ledger is the adjacent comparison route that keeps the roadmap posture honest before any proof promotion.",
-                "The live release shelf remains the final comparison anchor when a horizon claims it has crossed into shipped truth."
+                "/roadmap/shadowcasters-network is the named horizon brief, not the live release.",
+                "/roadmap/black-ledger is the adjacent comparison route that keeps the roadmap status honest before promotion.",
+                "The live downloads page remains the final comparison anchor when a horizon claims it has shipped."
             ],
             Actions:
             [
                 new HostedProofContractActionProjection("open_shadowcasters_brief", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Read the named horizon brief before comparing it to current release status."),
-                new HostedProofContractActionProjection("compare_black_ledger", "Compare Black Ledger", "/roadmap/black-ledger", "Compare the adjacent world-state horizon that already shares the same governed roadmap rail."),
+                new HostedProofContractActionProjection("compare_black_ledger", "Compare Black Ledger", "/roadmap/black-ledger", "Compare the adjacent world-state horizon that already shares the same reviewed roadmap page."),
                 new HostedProofContractActionProjection("open_horizons", "Open roadmap browser", "/horizons", "Return to the shared horizons browser instead of inventing a horizon-only side surface.")
             ],
             EmittedAtUtc: now,
@@ -136,7 +136,7 @@ public sealed class HostedProofContractService
 
         string route = intake?.Route ?? "/participate";
         string comparisonRoute = roadmap?.DestinationRoute ?? "/horizons?source=roadmap#public-roadmap-projection";
-        string summary = "Public signal proof stays governed by SignalToCanon packets that route demand through Participate, roadmap projection, and first-party support instead of promoting feedback directly into canon.";
+        string summary = "Public signals stay reviewed by product packets that route demand through Participate, roadmap projection, and first-party support instead of promoting feedback directly into product copy.";
 
         return new HostedProofContractProjection(
             ContractId: StableId("hosted-proof-public-signal", $"{manifest.Version}:{route}:{comparisonRoute}"),
@@ -148,24 +148,24 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "classified_signal_only",
             Owner: "product_governor",
             DecisionAuthority: "signal_to_canon_triage",
-            CloseoutPosture: "Public signal proof only closes when intake, roadmap, and support lanes agree on the governed next action.",
+            CloseoutPosture: "Public signal status only closes when intake, roadmap, and support paths agree on the reviewed next action.",
             Summary: summary,
             EvidenceLines:
             [
                 feedback is null
-                    ? "Feedback packets are still missing from the governed public signal lane."
-                    : $"{feedback.Route} redirects to {feedback.DestinationRoute} before canon changes are considered.",
+                    ? "Feedback packets are still missing from the reviewed public signal path."
+                    : $"{feedback.Route} redirects to {feedback.DestinationRoute} before public copy changes are considered.",
                 roadmap is null
-                    ? "Roadmap projection proof is still missing from the governed public signal lane."
+                    ? "Roadmap projection status is still missing from the reviewed public signal path."
                     : $"Roadmap comparison stays on {roadmap.DestinationRoute}.",
                 support is null
-                    ? "Support escalation proof is still missing from the governed public signal lane."
+                    ? "Support escalation status is still missing from the reviewed public signal path."
                     : $"Support escalation remains first-party on {support.Route}."
             ],
             Actions:
             [
-                new HostedProofContractActionProjection("open_signal_intake", "Open Participate", route, "Review the governed intake lane that classifies public signal before queue synthesis."),
-                new HostedProofContractActionProjection("open_roadmap_projection", "Open roadmap projection", comparisonRoute, "Compare the public signal with the governed roadmap projection."),
+                new HostedProofContractActionProjection("open_signal_intake", "Open Participate", route, "Review the intake page that classifies public signal before queue synthesis."),
+                new HostedProofContractActionProjection("open_roadmap_projection", "Open roadmap projection", comparisonRoute, "Compare the public signal with the reviewed roadmap projection."),
                 new HostedProofContractActionProjection("open_support_intake", "Open support intake", support?.Route ?? "/contact", "Escalate private or release-bound issues through first-party support instead of public comments.")
             ],
             EmittedAtUtc: now,
@@ -186,8 +186,8 @@ public sealed class HostedProofContractService
         }
 
         string summary = context.OpenRun is null
-            ? "Community hub proof stays on the signed-in work rail, where community ops and workspace continuity share the same governed account surface."
-            : $"Community hub proof keeps {context.OpenRun.Listing.ListingTitle} attached to the signed-in work rail instead of inventing a separate community microsurface.";
+            ? "Community hub status stays on the signed-in work page, where community operations and workspace continuity share the same reviewed account surface."
+            : $"Community hub status keeps {context.OpenRun.Listing.ListingTitle} attached to the signed-in work page instead of inventing a separate community microsurface.";
 
         return new HostedProofContractProjection(
             ContractId: StableId("hosted-proof-community-hub", $"{context.CommunityHubRoute}:{context.CommunityWorkspaceRoute}"),
@@ -199,20 +199,20 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "signed_in_community",
             Owner: "campaign_spine",
             DecisionAuthority: "community_ops_and_workspace_receipts",
-            CloseoutPosture: "Community proof stays on the signed-in work rail so roster moves, open runs, and workspace receipts remain on one governed account path.",
+            CloseoutPosture: "Community status stays on the signed-in work page so roster moves, open runs, and workspace records remain on one reviewed account path.",
             Summary: summary,
             EvidenceLines:
             [
                 $"{context.CommunityHubRoute} is the signed-in community operations anchor.",
                 $"{context.CommunityWorkspaceRoute} is the shared workspace comparison route for campaign continuity.",
                 context.OpenRun is null
-                    ? "Community proof remains bound to the same governed work rail even before an open-run listing is active."
-                    : $"{context.OpenRun.Listing.OpenRunId} proves community discovery and campaign continuity still point back to the same work rail."
+                    ? "Community status remains bound to the same reviewed work page even before an open-run listing is active."
+                    : $"{context.OpenRun.Listing.OpenRunId} keeps community discovery and campaign continuity pointed back to the same work page."
             ],
             Actions:
             [
-                new HostedProofContractActionProjection("open_community_hub", "Open community hub", context.CommunityHubRoute!, "Inspect the signed-in organizer and roster rail."),
-                new HostedProofContractActionProjection("open_workspace_return", "Open workspace return", context.CommunityWorkspaceRoute!, "Compare community claims with the governed workspace continuity surface.")
+                new HostedProofContractActionProjection("open_community_hub", "Open community hub", context.CommunityHubRoute!, "Inspect the signed-in organizer and roster page."),
+                new HostedProofContractActionProjection("open_workspace_return", "Open workspace return", context.CommunityWorkspaceRoute!, "Compare community claims with the reviewed workspace continuity surface.")
             ],
             EmittedAtUtc: now,
             Locale: context.Locale,
@@ -251,7 +251,7 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "account_aware_continuation",
             Owner: "public_landing_and_install_linking",
             DecisionAuthority: "install_linking_and_horizon_review",
-            CloseoutPosture: "Horizon conversion proof only closes when the public brief and the signed-in install continuation still describe the same published bytes.",
+            CloseoutPosture: "Horizon conversion status only closes when the public brief and the signed-in install continuation still describe the same published bytes.",
             Summary: summary,
             EvidenceLines:
             [
@@ -263,7 +263,7 @@ public sealed class HostedProofContractService
             [
                 new HostedProofContractActionProjection("open_shadowcasters_route", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Review the public horizon brief before stepping into account-aware follow-through."),
                 new HostedProofContractActionProjection("open_account_access", "Open Devices & access", "/account/access", "Inspect the signed-in account-return and recovery path."),
-                new HostedProofContractActionProjection("open_download_dispatch", "Open downloads", "/downloads", "Compare the same published bytes against the open public release shelf.")
+                new HostedProofContractActionProjection("open_download_dispatch", "Open downloads", "/downloads", "Compare the same published bytes against the public downloads page.")
             ],
             EmittedAtUtc: now,
             Locale: context.Locale,

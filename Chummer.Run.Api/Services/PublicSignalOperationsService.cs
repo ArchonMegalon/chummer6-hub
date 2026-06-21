@@ -350,7 +350,7 @@ public sealed class PublicSignalOperationsService
                 FilterLabel: ResolveDetailFilterLabel(normalizedFilter),
                 FilterApplied: !string.Equals(normalizedFilter, "all", StringComparison.Ordinal),
                 BackHref: "/feedback",
-                BackLabel: "Back to feedback lane",
+                BackLabel: "Back to feedback",
                 AggregateArtifactHref: "/feedback/operations",
                 DetailArtifactHref: AppendDetailFilter(sourceDetailArtifactBaseHref, normalizedFilter),
                 RelatedHref: null,
@@ -459,7 +459,7 @@ public sealed class PublicSignalOperationsService
                 FilterLabel: ResolveDetailFilterLabel(normalizedFilter),
                 FilterApplied: !string.Equals(normalizedFilter, "all", StringComparison.Ordinal),
                 BackHref: "/feedback",
-                BackLabel: "Back to feedback lane",
+                BackLabel: "Back to feedback",
                 AggregateArtifactHref: "/feedback/operations",
                 DetailArtifactHref: AppendDetailFilter(threadDetailArtifactBaseHref, normalizedFilter),
                 RelatedHref: AppendDetailFilter(
@@ -1092,22 +1092,22 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady)
         {
             projectionStatusLabel = "Ownership blocked";
-            projectionSummary = $"Closeout recipient projection must stay Hub-owned. This instance is pointed at '{projectionOwner}' instead of '{ExpectedProjectionOwner}', so no first-party follower mapping can be claimed.";
+            projectionSummary = $"Closeout recipients must stay first-party. This instance is pointed at '{projectionOwner}' instead of '{ExpectedProjectionOwner}', so no account follower mapping can be used.";
         }
         else if (!projectionEnabled)
         {
-            projectionStatusLabel = "Recipient projection pending";
-            projectionSummary = $"Hub still needs its own recipient projection pass before shipped public items can turn into closeout candidates. The user return rail should stay on {followSettingsPath} until that mapping exists.";
+            projectionStatusLabel = "Recipient list pending";
+            projectionSummary = $"Recipient matching is still missing. The user return path should stay on {followSettingsPath} until that mapping exists.";
         }
         else if (audience.ProjectedRecipientCount == 0)
         {
             projectionStatusLabel = "No eligible followers";
-            projectionSummary = $"Recipient projection is enabled, but Hub currently has no verified account followers with roadmap updates enabled. The return rail stays on {followSettingsPath} until at least one first-party follower can be projected.";
+            projectionSummary = $"Recipient matching is enabled, but no account followers currently have roadmap updates enabled. The return path stays on {followSettingsPath} until at least one first-party follower qualifies.";
         }
         else
         {
-            projectionStatusLabel = "Recipient projection configured";
-            projectionSummary = $"Hub-owned recipient projection is enabled for public closeout. {audience.ProjectedRecipientCount} verified account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through first-party follow settings, and provider-owned recipient lists still stay out of first-party storage.";
+            projectionStatusLabel = "Recipient list ready";
+            projectionSummary = $"First-party recipient matching is enabled for public closeout. {audience.ProjectedRecipientCount} account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through follow settings, and external recipient lists stay out of first-party storage.";
         }
 
         string consentStatusLabel;
@@ -1115,17 +1115,17 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady || !projectionEnabled)
         {
             consentStatusLabel = "Consent basis pending";
-            consentSummary = "Recipient projection must come first. Once Hub owns the follower mapping, it still needs a first-party consent or transactional-basis receipt before the delivery adapter can be asked to send anything.";
+            consentSummary = "Recipient matching must come first. Once the follower mapping is first-party, it still needs a first-party consent or transactional-basis record before delivery can be attempted.";
         }
         else if (audience.ProjectedRecipientCount == 0)
         {
             consentStatusLabel = "Consent source idle";
-            consentSummary = "The consent source is defined, but no verified account followers currently qualify for public closeout through first-party follow settings.";
+            consentSummary = "The consent source is defined, but no account followers currently qualify for public closeout through first-party follow settings.";
         }
         else if (!consentConfigured)
         {
             consentStatusLabel = "Consent basis pending";
-            consentSummary = "Hub has a projection lane, but this instance still lacks the configured first-party consent basis for public closeout follow-up.";
+            consentSummary = "The recipient path exists, but this instance still lacks the configured first-party consent basis for public closeout follow-up.";
         }
         else
         {
@@ -1138,17 +1138,17 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady || !projectionEnabled || audience.ProjectedRecipientCount == 0 || !consentConfigured)
         {
             queueStatusLabel = "Queue blocked";
-            queueSummary = "The Hub outbox must stay blocked until Hub owns the recipient mapping and the consent basis for public closeout.";
+            queueSummary = "The outbox stays blocked until recipient mapping and consent basis are ready for public closeout.";
         }
         else if (!queueConfigured)
         {
             queueStatusLabel = "Queue adapter pending";
-            queueSummary = "Hub-owned recipient and consent checks are ready, but the EA delivery queue bridge for public closeout is still missing its principal, binding, or API token on this instance.";
+            queueSummary = "Recipient and consent checks are ready, but the delivery queue connection for public closeout is still missing its principal, binding, or API token on this instance.";
         }
         else
         {
             queueStatusLabel = "Queue adapter configured";
-            queueSummary = "This instance can hand a public closeout candidate to the Hub-owned EA delivery queue once release status and governor closeout approval say the message should exist.";
+            queueSummary = "This instance can send a public closeout candidate to the delivery queue once release status and closeout approval say the message should exist.";
         }
 
         string governorStatusLabel;
@@ -1156,12 +1156,12 @@ public sealed class PublicSignalOperationsService
         if (!governorReady)
         {
             governorStatusLabel = "Governor approval pending";
-            governorSummary = "Hub still needs a bounded governed product decision ref before any shipped public item can materialize a first-party outbox candidate.";
+            governorSummary = "A reviewed product decision reference is still required before any shipped public item can create a first-party outbox candidate.";
         }
         else
         {
             governorStatusLabel = "Governor approval configured";
-            governorSummary = $"Public closeout may cite first-party governed product decision {governorDecisionRef} before any outbound send is claimed.";
+            governorSummary = $"Public closeout may cite reviewed product decision {governorDecisionRef} before any outbound send is claimed.";
         }
 
         string releaseProofStatusLabel;
@@ -1169,12 +1169,12 @@ public sealed class PublicSignalOperationsService
         if (!string.IsNullOrWhiteSpace(proofLookup.CurrentnessFailureReason))
         {
             releaseProofStatusLabel = "Release status stale";
-            releaseProofSummary = $"Outbox materialization stays blocked because {proofLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')} for {CloseoutProofRoute}.";
+            releaseProofSummary = $"Outbox creation stays blocked because {proofLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')} for {CloseoutProofRoute}.";
         }
         else if (proofReceipt is null)
         {
             releaseProofStatusLabel = "Release status pending";
-            releaseProofSummary = $"Outbox materialization stays blocked until {CloseoutProofRoute} has a current first-party release status record.";
+            releaseProofSummary = $"Outbox creation stays blocked until {CloseoutProofRoute} has a current first-party release status record.";
         }
         else
         {
@@ -1303,8 +1303,8 @@ public sealed class PublicSignalOperationsService
                 ProviderKey: "ea",
                 StatusLabel: eaSecret is null ? "Pending" : "Configured",
                 Summary: eaSecret is null
-                    ? "The Hub outbox callback setup is still blocked on this instance, so retry, dead-letter, and bounded delivery-failure events cannot yet return through the first-party ingress."
-                    : "The Hub outbox callback setup is configured. Public closeout delivery state can now return through the first-party ingress with retry-window and dead-letter normalization.",
+                    ? "The outbox callback setup is still blocked on this instance, so retry, dead-letter, and bounded delivery-failure events cannot yet return through the first-party ingress."
+                    : "The outbox callback setup is configured. Public closeout delivery state can now return through the first-party ingress with retry-window and dead-letter normalization.",
                 SecretHeader: "X-Outbox-Webhook-Secret",
                 Routes: publicOutboxRoutes),
             new PublicSignalDeliveryOutcomeIngressViewModel(
@@ -2694,7 +2694,7 @@ public sealed class PublicSignalOperationsService
 
     private static ProductLiftCloseoutDeliveryReceiptState NormalizeStoredCloseoutReceipt(ProductLiftCloseoutDeliveryReceiptState receipt)
     {
-        string statusLabel = NormalizeOptional(receipt.StatusLabel) ?? "Recipient projection pending";
+        string statusLabel = NormalizeOptional(receipt.StatusLabel) ?? "Recipient list pending";
         bool deliveryCandidate = receipt.DeliveryCandidate;
         bool voterNotificationAllowed = receipt.VoterNotificationAllowed;
         bool publicClaimAllowed = receipt.PublicClaimAllowed;
@@ -3037,7 +3037,7 @@ public sealed class PublicSignalOperationsService
             SourceReceiptId: sourceReceipt.ReceiptId,
             StatusLabel: statusLabel,
             QueueState: readyForOutbox ? "ready" : "blocked",
-            QueueLane: "Hub outbox candidate, connector.dispatch, then voter_notified journey proof",
+            QueueLane: "First-party outbox candidate, connector.dispatch, then voter_notified journey record",
             DispatchTool: ConnectorDispatchToolName,
             DispatchAction: ConnectorDispatchActionName,
             JourneyEventKey: VoterNotifiedJourneyEventKey,
@@ -3596,7 +3596,7 @@ public sealed class PublicSignalOperationsService
                 StatusLabel = "Sent after recovery",
                 DeliveryState = "sent",
                 ProviderMessageId = NormalizeOptional(existing.ProviderMessageId) ?? existing.DeliveryId,
-                Summary = $"Dispatch recovery finished the bounded Hub outbox sent receipt for {existing.RecipientRef} from source receipt {existing.SourceReceiptId}.",
+                Summary = $"Dispatch recovery finished the first-party outbox sent record for {existing.RecipientRef} from source record {existing.SourceReceiptId}.",
                 Error = null,
                 SuppressionCheck = "passed",
                 RecoveryAttemptCount = existing.RecoveryAttemptCount + 1,
@@ -3653,7 +3653,7 @@ public sealed class PublicSignalOperationsService
                 StatusLabel = "Sent after recovery",
                 DeliveryState = "sent",
                 ProviderMessageId = providerMessageId,
-                Summary = $"Dispatch recovery retried the bounded ProductLift closeout for {existing.RecipientRef} and completed the Hub outbox sent receipt.",
+                Summary = $"Dispatch recovery retried the bounded ProductLift closeout for {existing.RecipientRef} and completed the first-party outbox sent record.",
                 Error = null,
                 SuppressionCheck = "passed",
                 RecoveryAttemptCount = existing.RecoveryAttemptCount + 1,
@@ -4197,7 +4197,7 @@ public sealed class PublicSignalOperationsService
                 $"Governor decision: {governorDecisionRef}",
                 $"Release status record: {releaseProofReceiptId}",
                 "",
-                "This notice stays first-party and bounded to shipped status, follow settings, and the Hub-owned notification timeline."
+                "This notice stays first-party and bounded to shipped status, follow settings, and the first-party notification timeline."
             });
 
     private string ResolveCurrentFollowSettingsPath()
@@ -4367,7 +4367,7 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.ProjectionConfigured)
         {
-            return "Recipient projection pending";
+            return "Recipient list pending";
         }
 
         if (readiness.ProjectedRecipientCount <= 0)
@@ -4419,27 +4419,27 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.OwnerReady)
         {
-            return "Recipient projection must stay Hub-owned before any outbox candidate can be materialized.";
+            return "Recipient matching must stay first-party before any outbox candidate can be created.";
         }
 
         if (!readiness.ProjectionConfigured)
         {
-            return "Hub still needs its own recipient projection pass before a shipped ProductLift item can become an outbox candidate.";
+            return "Recipient matching is still required before a shipped ProductLift item can become an outbox candidate.";
         }
 
         if (readiness.ProjectedRecipientCount <= 0)
         {
-            return "Hub does not currently have any verified account followers with roadmap updates enabled for this outbox lane.";
+            return "No account followers currently have roadmap updates enabled for this outbox path.";
         }
 
         if (!readiness.ConsentConfigured)
         {
-            return "Hub still needs a first-party consent or transactional-basis receipt for ProductLift closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (!readiness.QueueConfigured)
         {
-            return "Recipient projection and consent are ready, but the Hub-owned EA delivery queue bridge is still unconfigured.";
+            return "Recipient matching and consent are ready, but the delivery queue connection is still unconfigured.";
         }
 
         if (!readiness.GovernorApproved)
@@ -4451,14 +4451,14 @@ public sealed class PublicSignalOperationsService
         {
             return readiness.ReleaseProofStatusLabel switch
             {
-                "Release status stale" => "The release status for /changelog is stale, so Hub cannot queue voter closeout yet.",
+                "Release status stale" => "The release status for /changelog is stale, so voter closeout cannot be queued yet.",
                 _ => "The public changelog route still lacks a current first-party release status record."
             };
         }
 
         return readyForOutbox
-            ? "Governor approval, release status, recipient projection, consent, and the Hub queue bridge are all ready. This candidate can move into the Hub-owned outbox contract without claiming the mail already sent."
-            : "The Hub outbox candidate remains blocked until the remaining closeout prerequisites are restored.";
+            ? "Governor approval, release status, recipient matching, consent, and delivery queue are all ready. This candidate can move into the first-party outbox without claiming the mail already sent."
+            : "The outbox candidate remains blocked until the remaining closeout prerequisites are restored.";
     }
 
     private static string BuildCloseoutQueueSummary(
@@ -4468,12 +4468,12 @@ public sealed class PublicSignalOperationsService
     {
         if (!readyForOutbox)
         {
-            return $"Webhook event {sourceReceipt.ReceiptId} stays on the bounded Hub closeout rail, but the outbox candidate is still blocked until governor approval and current changelog status line up with the existing delivery prerequisites.";
+            return $"Webhook event {sourceReceipt.ReceiptId} stays on the bounded closeout path, but the outbox candidate is still blocked until governor approval and current changelog status line up with the existing delivery prerequisites.";
         }
 
         string decisionRef = NormalizeOptional(readiness.GovernorDecisionRef) ?? DefaultGovernorDecisionSourceRef;
         string releaseRecord = NormalizeOptional(readiness.ReleaseProofReceiptId) ?? "current-status";
-        return $"Webhook event {sourceReceipt.ReceiptId} now has governor decision {decisionRef} plus current {readiness.ReleaseProofRoute} status record {releaseRecord}, so Hub can materialize a bounded outbox candidate for voter closeout without treating provider state as notification truth.";
+        return $"Webhook event {sourceReceipt.ReceiptId} now has governor decision {decisionRef} plus current {readiness.ReleaseProofRoute} status record {releaseRecord}, so it can create a bounded outbox candidate for voter closeout without treating delivery state as notification truth.";
     }
 
     private static string BuildCloseoutQueueReceiptId(
@@ -4523,7 +4523,7 @@ public sealed class PublicSignalOperationsService
 
         if (!projectionConfigured)
         {
-            return "Recipient projection pending";
+            return "Recipient list pending";
         }
 
         if (projectedRecipientCount <= 0)
@@ -4589,31 +4589,31 @@ public sealed class PublicSignalOperationsService
 
         if (string.Equals(statusLabel, "Ownership blocked", StringComparison.OrdinalIgnoreCase))
         {
-            return "Recipient projection must stay Hub-owned before ProductLift closeout can move toward first-party delivery.";
+            return "Recipient matching must stay first-party before ProductLift closeout can move toward delivery.";
         }
 
-        if (string.Equals(statusLabel, "Recipient projection pending", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(statusLabel, "Recipient list pending", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hub still needs its own recipient projection pass before any voter-closeout send can be claimed.";
+            return "Recipient matching is still required before any voter-closeout send can be claimed.";
         }
 
         if (string.Equals(statusLabel, "No eligible followers", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hub does not currently have any verified account followers with roadmap updates enabled for this closeout lane.";
+            return "No account followers currently have roadmap updates enabled for this closeout path.";
         }
 
         if (string.Equals(statusLabel, "Consent basis pending", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hub still needs a first-party consent or transactional-basis receipt for ProductLift closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (string.Equals(statusLabel, "Queue adapter pending", StringComparison.OrdinalIgnoreCase))
         {
-            return "Recipient projection and consent are ready, but the Hub-owned EA delivery queue bridge is still unconfigured.";
+            return "Recipient matching and consent are ready, but the delivery queue connection is still unconfigured.";
         }
 
         return deliveryCandidate
-            ? "Template, recipient projection, consent basis, and queue are ready, but release status and governor closeout still gate any actual send."
+            ? "Template, recipient list, consent basis, and queue are ready, but release status and closeout approval still gate any actual send."
             : "First-party closeout is deferred until the remaining delivery prerequisites are restored.";
     }
 
@@ -4656,7 +4656,7 @@ public sealed class PublicSignalOperationsService
             return $"Webhook event {sourceReceipt.ReceiptId} created a bounded first-party closeout candidate for {category.Label}, but the outbound delivery adapter is not configured on this instance yet.";
         }
 
-        return $"Webhook event {sourceReceipt.ReceiptId} created a bounded first-party closeout timeline for {category.Label}. Template and adapter readiness are in place, but Hub still needs its own recipient projection, consent basis, and release, route, guide, or artifact status before any outbound follow-up can be claimed.";
+        return $"Webhook event {sourceReceipt.ReceiptId} created a bounded first-party closeout timeline for {category.Label}. Template and adapter readiness are in place, but recipient matching, consent basis, and release, route, guide, or file status are still required before any outbound follow-up can be claimed.";
     }
 
     private static string BuildCloseoutDeliveryReason(
@@ -4682,30 +4682,30 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.OwnerReady)
         {
-            return "Recipient projection must stay Hub-owned before ProductLift closeout can move toward first-party delivery.";
+            return "Recipient matching must stay first-party before ProductLift closeout can move toward delivery.";
         }
 
         if (!readiness.ProjectionConfigured)
         {
-            return "Hub still needs its own recipient projection pass before any voter-closeout send can be claimed.";
+            return "Recipient matching is still required before any voter-closeout send can be claimed.";
         }
 
         if (readiness.ProjectedRecipientCount <= 0)
         {
-            return "Hub does not currently have any verified account followers with roadmap updates enabled for this closeout lane.";
+            return "No account followers currently have roadmap updates enabled for this closeout path.";
         }
 
         if (!readiness.ConsentConfigured)
         {
-            return "Hub still needs a first-party consent or transactional-basis receipt for ProductLift closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (!readiness.QueueConfigured)
         {
-            return "Recipient projection and consent are ready, but the Hub-owned EA delivery queue bridge is still unconfigured.";
+            return "Recipient matching and consent are ready, but the delivery queue connection is still unconfigured.";
         }
 
-        return "Template, recipient projection, consent basis, and queue are ready, but release status and governor closeout still gate any actual send.";
+        return "Template, recipient list, consent basis, and queue are ready, but release status and closeout approval still gate any actual send.";
     }
 
     private static MatchedFeedbackCategory ResolveMatchedCategory(
