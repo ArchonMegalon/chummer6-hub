@@ -22,6 +22,7 @@ public sealed class ExecutiveAssistantCredentialCatalogService
                 emailKey: "CHUMMER_EA_BLIPAI_APP_EMAIL",
                 passwordKey: "CHUMMER_EA_BLIPAI_APP_PASSWORD",
                 mirrorsDefault: true),
+            BuildIcanpreneurEntry(),
             BuildNamedEntry(
                 toolId: "magicfit",
                 tierKey: "CHUMMER_EA_MAGICFIT_TIER",
@@ -89,6 +90,37 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordAltConfigured: false,
             MirrorsDefault: mirrorsDefault,
             Status: BuildStatus(emailKey, passwordKey));
+    }
+
+    private ExecutiveAssistantCredentialEntry BuildIcanpreneurEntry()
+    {
+        const string tierKey = "CHUMMER_EA_ICANPRENEUR_TIER";
+        const string emailKey = "CHUMMER_EA_ICANPRENEUR_EMAIL";
+        const string passwordKey = "CHUMMER_EA_ICANPRENEUR_PASSWORD";
+        const string baseUrlKey = "CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL";
+        const string fallbackEmailKey = "CHUMMER_EA_DEFAULT_EMAIL";
+        const string fallbackPasswordKey = "CHUMMER_EA_DEFAULT_PASSWORD";
+
+        string? email = GetValue(emailKey) ?? GetValue(fallbackEmailKey);
+        bool loginConfigured = !string.IsNullOrWhiteSpace(email)
+            && (!string.IsNullOrWhiteSpace(GetValue(passwordKey)) || !string.IsNullOrWhiteSpace(GetValue(fallbackPasswordKey)));
+        bool baseUrlConfigured = !string.IsNullOrWhiteSpace(GetValue(baseUrlKey));
+        string status = loginConfigured && baseUrlConfigured
+            ? "bounded_discovery_interview_lane"
+            : loginConfigured ? "login_only" : baseUrlConfigured ? "handoff_only" : "missing";
+
+        return new ExecutiveAssistantCredentialEntry(
+            ToolId: "icanpreneur",
+            Tier: GetValue(tierKey) ?? "3",
+            EmailKey: emailKey,
+            PasswordKey: passwordKey,
+            PasswordAltKey: baseUrlKey,
+            EmailMasked: MaskEmail(email),
+            EmailConfigured: !string.IsNullOrWhiteSpace(email),
+            PasswordConfigured: loginConfigured,
+            PasswordAltConfigured: baseUrlConfigured,
+            MirrorsDefault: true,
+            Status: status);
     }
 
     private ExecutiveAssistantCredentialEntry BuildMagicfitSessionEntry()

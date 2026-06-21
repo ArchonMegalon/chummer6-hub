@@ -16,6 +16,18 @@
 - env_password_key: `CHUMMER_EA_BLIPAI_APP_PASSWORD`
 - mirrors_default: `true`
 
+### icanpreneur
+
+- tier: `3`
+- credential_source: local `.env`
+- env_email_key: `CHUMMER_EA_ICANPRENEUR_EMAIL`
+- env_password_key: `CHUMMER_EA_ICANPRENEUR_PASSWORD`
+- env_base_url_key: `CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL`
+- status: `bounded_discovery_interview_lane`
+- runtime_ready: `false`
+- required_boundary: `adaptive discovery interviews and demand synthesis only; Chummer-owned packets and Product Governor decisions remain canonical; no rules truth, backlog ownership, sourcebook text capture, private campaign truth, release truth, entitlement truth, or publication approval`
+- mirrors_default: `true`
+
 ### magicfit
 
 - tier: `5`

@@ -179,6 +179,29 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
     }
 
     [Fact]
+    public void GetCatalog_tracks_icanpreneur_as_bounded_discovery_lane()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_DEFAULT_EMAIL"] = "operator@example.invalid",
+                ["CHUMMER_EA_DEFAULT_PASSWORD"] = "shared-password",
+                ["CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL"] = "https://discover.example.invalid/icanpreneur"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry icanpreneur = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "icanpreneur");
+        Assert.Equal("3", icanpreneur.Tier);
+        Assert.Equal("bounded_discovery_interview_lane", icanpreneur.Status);
+        Assert.True(icanpreneur.MirrorsDefault);
+        Assert.True(icanpreneur.EmailConfigured);
+        Assert.True(icanpreneur.PasswordConfigured);
+        Assert.True(icanpreneur.PasswordAltConfigured);
+    }
+
+    [Fact]
     public void GetCatalog_surfaces_every_explicit_ltd_inventory_credential_row()
     {
         IConfiguration configuration = new ConfigurationBuilder().Build();

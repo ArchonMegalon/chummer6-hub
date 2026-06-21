@@ -96,6 +96,10 @@ public sealed class LtdDesignMirrorCoverageTests
         Assert.Contains("UNMIXR_VOICE_ID: ${UNMIXR_VOICE_ID:-}", publicEdgeCompose, StringComparison.Ordinal);
 
         Assert.Contains("### blipai.app", ltdInventory, StringComparison.Ordinal);
+        Assert.Contains("### icanpreneur", ltdInventory, StringComparison.Ordinal);
+        Assert.Contains("bounded_discovery_interview_lane", ltdInventory, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL", ltdInventory, StringComparison.Ordinal);
+        Assert.Contains("no rules truth, backlog ownership, sourcebook text capture, private campaign truth, release truth, entitlement truth, or publication approval", ltdInventory, StringComparison.Ordinal);
         Assert.Contains("### magicfit", ltdInventory, StringComparison.Ordinal);
         Assert.Contains("### magicfit_session", ltdInventory, StringComparison.Ordinal);
         Assert.Contains("### prompt_architects", ltdInventory, StringComparison.Ordinal);
