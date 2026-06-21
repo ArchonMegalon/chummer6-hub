@@ -1814,3 +1814,62 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
         "<a class=\"@ToneClass(panel.PrimaryAction.Tone)\" href=\"@panel.PrimaryAction.Href\">@panel.PrimaryAction.Label</a>",
     ):
         assert forbidden_binding not in combined
+
+
+def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargon() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+
+    for forbidden in (
+        '"Open briefing details"',
+        '"Open prep details"',
+        '"Open control details"',
+        '"Open session board packet"',
+        '"Open starter details"',
+        '"Open starter packet"',
+        '"Open ruleset details"',
+        '"Open SR5 head packet"',
+        '"Open acceleration details"',
+        '"Open capability packet"',
+        '"Open primer JSON"',
+        '"Open network details"',
+        '"Open publication details"',
+        '"Open command details"',
+        '"Open command deck packet"',
+        '"Open identity details"',
+        '"Open runner return details"',
+        '"Open command pressure details"',
+        '"Open JSON details"',
+        '"Open watch package details"',
+        '"Open replay JSON"',
+        '"Open mobile PWA JSON"',
+        '"Download player packet"',
+    ):
+        assert forbidden not in controller
+
+    for expected in (
+        '"Open briefing list"',
+        '"Open prep overview"',
+        '"Open control overview"',
+        '"Open session board"',
+        '"Open starter overview"',
+        '"Open starter guide"',
+        '"Open edition overview"',
+        '"Open SR5 guide"',
+        '"Open acceleration overview"',
+        '"Open capability matrix"',
+        '"Open primer data"',
+        '"Open run list"',
+        '"Open publication list"',
+        '"Open command overview"',
+        '"Open command deck"',
+        '"Open identity overview"',
+        '"Open runner return"',
+        '"Open command pressure"',
+        '"Open pressure data"',
+        '"Open watch brief"',
+        '"Open watch data"',
+        '"Open replay data"',
+        '"Open mobile app data"',
+        '"Download player notes"',
+    ):
+        assert expected in controller

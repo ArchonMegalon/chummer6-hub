@@ -5163,7 +5163,7 @@ public sealed class PublicLandingController : Controller
                 .ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open continuity index", "/play/continuity/receipts", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open mobile PWA JSON", "/mobile/pwa.json", "ghost"),
+            TertiaryAction: new TrustPageActionViewModel("Open mobile app data", "/mobile/pwa.json", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
@@ -5178,12 +5178,12 @@ public sealed class PublicLandingController : Controller
             description: "Player-safe dossier cards, mission briefs, and first-party publication history.",
             eyebrow: "Briefings",
             heading: "JACKPOINT",
-            intro: "JACKPOINT now ships a real briefing network: public-safe dossier and mission packets stay readable, while signed-in publication review and campaign-return history stay on named account routes.",
+            intro: "JACKPOINT now ships a real briefing network: public-safe dossiers and mission briefs stay readable, while signed-in publication review and campaign-return history stay on named account pages.",
             boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
-            summaryPoints: ["Dossier cards", "Mission brief packets", "Signed-in publication desk"],
+            summaryPoints: ["Dossier cards", "Mission briefs", "Signed-in publication desk"],
             documents: briefings,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for JACKPOINT" : "Open JACKPOINT", subject is null ? "/login?next=%2Faccount%2Fjackpoint" : "/account/jackpoint", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open briefing details", "/jackpoint/receipts/briefing-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open briefing list", "/jackpoint/receipts/briefing-network.json", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open first briefing", briefings[0].MarkdownRoute, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildJackpointConnectedLanePacket(subject));
@@ -5196,7 +5196,7 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runsites",
             title: "RUNSITE",
-            description: "Site cards, threat clocks, prep paths, and Chummer runsite packets.",
+            description: "Site cards, threat clocks, prep paths, and Chummer runsite notes.",
             eyebrow: "Prep",
             heading: "RUNSITE",
             intro: "RUNSITE now ships as a real prep network: inspectable pack routes stay public-safe, while signed-in workspace prep, runboard continuity, and prep-library launch stay on named Chummer paths.",
@@ -5204,7 +5204,7 @@ public sealed class PublicLandingController : Controller
             summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
             documents: packs,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUNSITE" : "Open RUNSITE", subject is null ? "/login?next=%2Faccount%2Frunsites" : "/account/runsites", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open prep details", "/runsites/receipts/prep-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open prep overview", "/runsites/receipts/prep-network.json", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open first runsite pack", packs[0].MarkdownRoute, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildRunsiteConnectedLanePacket(subject));
@@ -5221,27 +5221,27 @@ public sealed class PublicLandingController : Controller
             heading: "RUN CONTROL",
             intro: "RUN CONTROL now ships a real GM operations surface: public-safe board status stays readable, while signed-in session control, active-scene continuity, reconnect-safe run history, and recap return stay on named campaign paths.",
             boundaryLine: "GM-control surface only. RUN CONTROL does not replace the rules engine, become a generic chat suite, or let hidden state outrank campaign truth.",
-            summaryPoints: ["Session board packet", "Continuity packet", "Signed-in control desk"],
+            summaryPoints: ["Session board", "Continuity board", "Signed-in control desk"],
             documents:
             [
                 new MediaArtifactDocument(
                     "session_board",
-                    "Session board packet",
+                    "Session board",
                     "Inspect the public-safe session-board contract before treating Run Control like a generic operations console.",
                     "/run-control/packets/session_board.md",
                     "/run-control/packets/session_board.json",
                     ["Session status", "Active scene", "Next safe action", "Signed-in desk"]),
                 new MediaArtifactDocument(
                     "continuity_board",
-                    "Continuity packet",
+                    "Continuity board",
                     "Inspect the reconnect and recovery contract that keeps live GM operations anchored to first-party continuity.",
                     "/run-control/packets/continuity_board.md",
                     "/run-control/packets/continuity_board.json",
                     ["Reconnect behavior", "Runboard continuity", "Recovery boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUN CONTROL" : "Open RUN CONTROL", subject is null ? "/login?next=%2Faccount%2Frun-control" : "/account/run-control", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open control details", "/run-control/receipts/control-network.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open session board packet", "/run-control/packets/session_board.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open control overview", "/run-control/receipts/control-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open session board", "/run-control/packets/session_board.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildRunControlConnectedLanePacket(subject, BuildRunControlReceipt(subject)));
     }
@@ -5255,29 +5255,29 @@ public sealed class PublicLandingController : Controller
             description: "Guided first session, recovery status, and continuity without fake automation.",
             eyebrow: "Guided start",
             heading: "ONRAMP",
-            intro: "ONRAMP keeps first-session setup calm: public starter and recovery packets stay readable, while signed-in workspace, continuity restore, and session history stay attached to your account.",
+            intro: "ONRAMP keeps first-session setup calm: public starter and recovery notes stay readable, while signed-in workspace, continuity restore, and session history stay attached to your account.",
             boundaryLine: "Guided starter surface only. ONRAMP does not auto-build characters, invent legality, or let tutorial theater outrank core rules and signed-in restore truth.",
-            summaryPoints: ["Starter packet", "Recovery packet", "Signed-in workspace"],
+            summaryPoints: ["Starter guide", "Recovery guide", "Signed-in workspace"],
             documents:
             [
                 new MediaArtifactDocument(
                     "starter_lane",
-                    "Starter packet",
+                    "Starter guide",
                     "Inspect the public-safe starter contract before treating ONRAMP like an automatic build wizard.",
                     "/onramp/packets/starter_lane.md",
                     "/onramp/packets/starter_lane.json",
                     ["Starter workspace", "First playable session", "Next safe action", "Signed-in desk"]),
                 new MediaArtifactDocument(
                     "recovery_lane",
-                    "Recovery packet",
+                    "Recovery guide",
                     "Inspect the restore and continuity contract that keeps guided setup tied to first-party account truth.",
                     "/onramp/packets/recovery_lane.md",
                     "/onramp/packets/recovery_lane.json",
                     ["Restore status", "Claimed devices", "Conflict summaries", "Recovery boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for ONRAMP" : "Open ONRAMP", subject is null ? "/login?next=%2Faccount%2Fonramp" : "/account/onramp", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open starter details", "/onramp/receipts/guided-starter.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open starter packet", "/onramp/packets/starter_lane.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open starter overview", "/onramp/receipts/guided-starter.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open starter guide", "/onramp/packets/starter_lane.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildOnrampConnectedLanePacket(subject, BuildOnrampReceipt(subject)));
     }
@@ -5291,36 +5291,36 @@ public sealed class PublicLandingController : Controller
             description: "Distinct SR4, SR5, and SR6 ruleset heads without splitting the product into disconnected apps.",
             eyebrow: "Edition expression",
             heading: "EDITION STUDIO",
-            intro: "EDITION STUDIO now ships a bounded ruleset-head path: SR4, SR5, and SR6 head packets stay readable in public, while signed-in edition focus stays attached to the same account-owned workbench.",
+            intro: "EDITION STUDIO now ships a bounded ruleset path: SR4, SR5, and SR6 edition guides stay readable in public, while signed-in edition focus stays attached to the same account-owned workbench.",
             boundaryLine: "Ruleset-head surface only. EDITION STUDIO does not create three disconnected apps, replace core truth with styling, or claim visual flavor as authority.",
-            summaryPoints: ["SR4 head packet", "SR5 head packet", "SR6 head packet"],
+            summaryPoints: ["SR4 guide", "SR5 guide", "SR6 guide"],
             documents:
             [
                 new MediaArtifactDocument(
                     "sr4_head",
-                    "SR4 head packet",
+                    "SR4 guide",
                     "Inspect the SR4 status before treating Edition Studio like decorative theming.",
                     "/edition-studio/packets/sr4_head.md",
                     "/edition-studio/packets/sr4_head.json",
                     ["Legacy muscle memory", "Dense layout", "Signed-in edition focus"]),
                 new MediaArtifactDocument(
                     "sr5_head",
-                    "SR5 head packet",
+                    "SR5 guide",
                     "Inspect the flagship density path that keeps veteran speed and explainability authored together.",
                     "/edition-studio/packets/sr5_head.md",
                     "/edition-studio/packets/sr5_head.json",
                     ["Flagship density", "Explainability", "Signed-in edition focus"]),
                 new MediaArtifactDocument(
                     "sr6_head",
-                    "SR6 head packet",
+                    "SR6 guide",
                     "Inspect the modern ruleset-head path without flattening it into older mental models.",
                     "/edition-studio/packets/sr6_head.md",
                     "/edition-studio/packets/sr6_head.json",
                     ["Campaign-approved path", "Modern pace", "Signed-in edition focus"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for EDITION STUDIO" : "Open EDITION STUDIO", subject is null ? "/login?next=%2Faccount%2Fedition-studio" : "/account/edition-studio", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open ruleset details", "/edition-studio/receipts/ruleset-heads.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open SR5 head packet", "/edition-studio/packets/sr5_head.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open edition overview", "/edition-studio/receipts/ruleset-heads.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open SR5 guide", "/edition-studio/packets/sr5_head.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildEditionStudioConnectedLanePacket(subject, BuildEditionStudioReceipt(subject)));
     }
@@ -5334,29 +5334,29 @@ public sealed class PublicLandingController : Controller
             description: "Optional local acceleration, explicit hosted-first parity, and disableable profiles that never become hidden requirements.",
             eyebrow: "Optional acceleration",
             heading: "LOCAL CO-PROCESSOR",
-            intro: "LOCAL CO-PROCESSOR now ships a bounded optional-acceleration path: public-safe capability and policy packets stay readable, while signed-in profile choice and account-owned local status stay on named Chummer paths.",
+            intro: "LOCAL CO-PROCESSOR now ships a bounded optional-acceleration path: public-safe capability and policy notes stay readable, while signed-in profile choice and account-owned local status stay on named Chummer paths.",
             boundaryLine: "Optional acceleration surface only. LOCAL CO-PROCESSOR does not move truth into local runtime, make desktop compute mandatory, or turn external helpers into hidden product prerequisites.",
-            summaryPoints: ["Capability matrix packet", "Policy boundary packet", "Signed-in optional profile desk"],
+            summaryPoints: ["Capability matrix", "Policy boundary", "Signed-in optional profile desk"],
             documents:
             [
                 new MediaArtifactDocument(
                     "capability_matrix",
-                    "Capability matrix packet",
+                    "Capability matrix",
                     "Inspect the hosted-first capability contract before treating local compute like an unbounded fast path.",
                     "/local-co-processor/packets/capability_matrix.md",
                     "/local-co-processor/packets/capability_matrix.json",
                     ["Hosted-first parity", "Optional local help", "Disableable profiles", "Signed-in desk"]),
                 new MediaArtifactDocument(
                     "policy_boundary",
-                    "Policy boundary packet",
+                    "Policy boundary",
                     "Inspect the privacy and fail-open boundary that keeps local acceleration optional and reviewed.",
                     "/local-co-processor/packets/policy_boundary.md",
                     "/local-co-processor/packets/policy_boundary.json",
                     ["No local truth owner", "No mandatory runtime", "Fail-open fallback", "Privacy boundary"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for LOCAL CO-PROCESSOR" : "Open LOCAL CO-PROCESSOR", subject is null ? "/login?next=%2Faccount%2Flocal-co-processor" : "/account/local-co-processor", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open acceleration details", "/local-co-processor/receipts/optional-acceleration.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open capability packet", "/local-co-processor/packets/capability_matrix.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open acceleration overview", "/local-co-processor/receipts/optional-acceleration.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open capability matrix", "/local-co-processor/packets/capability_matrix.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildLocalCoProcessorConnectedLanePacket(subject, BuildLocalCoProcessorReceipt(subject)));
     }
@@ -5365,15 +5365,15 @@ public sealed class PublicLandingController : Controller
         => await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runbook",
             title: "RUNBOOK PRESS",
-            description: "Printable primers and first-session onboarding packets.",
+            description: "Printable primers and first-session onboarding guides.",
             eyebrow: "Primers",
             heading: "RUNBOOK PRESS",
-            intro: "RUNBOOK PRESS now ships real first-party primers: packets you can hand to a player or GM without sending them into scattered docs.",
-            boundaryLine: "Printable onboarding and prep packets only. This path does not claim a full long-form publication studio yet.",
-            summaryPoints: ["New-player primer", "GM primer", "Printable packets"],
+            intro: "RUNBOOK PRESS now ships real first-party primers: guides you can hand to a player or GM without sending them into scattered docs.",
+            boundaryLine: "Printable onboarding and prep guides only. This path does not claim a full long-form publication studio yet.",
+            summaryPoints: ["New-player primer", "GM primer", "Printable guides"],
             documents: _mediaHorizons.ListRunbookPrimers(),
             primaryAction: new TrustPageActionViewModel("Open first primer", "/runbook/primers/new-runner-primer.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open primer JSON", "/runbook/primers/new-runner-primer.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open primer data", "/runbook/primers/new-runner-primer.json", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open Ready for Tonight", "/ready", "ghost"),
             cancellationToken: cancellationToken);
 
@@ -5397,8 +5397,8 @@ public sealed class PublicLandingController : Controller
             ],
             documents: _communityCreatorHorizons.ListCommunityDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Community Hub" : "Open Community Hub", subject is null ? "/login?next=%2Faccount%2Fcommunity" : "/account/community", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open network details", "/community/receipts/open-run-network.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open run board packet", "/community/open-runs/open_run_board.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open run list", "/community/receipts/open-run-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open run board", "/community/open-runs/open_run_board.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildCommunityHubConnectedLanePacket(subject, summary));
     }
@@ -5423,7 +5423,7 @@ public sealed class PublicLandingController : Controller
             ],
             documents: _communityCreatorHorizons.ListCreatorDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Creator OS" : "Open Creator OS", subject is null ? "/login?next=%2Faccount%2Fcreator" : "/account/creator", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open publication details", "/creator/receipts/publication-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open publication list", "/creator/receipts/publication-network.json", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open publication board", "/creator/packets/publication_board.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildCreatorOsConnectedLanePacket(subject, summary));
@@ -5443,7 +5443,7 @@ public sealed class PublicLandingController : Controller
             boundaryLine: "Quicksilver is a speed surface for the same trusted product. It does not hide legality, invent background automation, or turn stale cached views into authority.",
             summaryPoints:
             [
-                "Command deck packet",
+                "Command deck",
                 "Typed jump targets",
                 "Signed-in focus path"
             ],
@@ -5465,8 +5465,8 @@ public sealed class PublicLandingController : Controller
                     ["Focus routes", "API deck", "Account-owned history"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Quicksilver" : "Open Quicksilver", subject is null ? "/login?next=%2Faccount%2Fquicksilver" : "/account/quicksilver", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open command details", "/quicksilver/receipts/command-network.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open command deck packet", "/quicksilver/packets/command_deck.md", "ghost"),
+            secondaryAction: new TrustPageActionViewModel("Open command overview", "/quicksilver/receipts/command-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open command deck", "/quicksilver/packets/command_deck.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildQuicksilverConnectedLanePacket(subject, receipt));
     }
@@ -5507,8 +5507,8 @@ public sealed class PublicLandingController : Controller
             ],
             Documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             PrimaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Runner Passport" : "Open Runner Passport", subject is null ? "/login?next=%2Faccount%2Fpassport" : "/account/passport", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open identity details", "/passport/receipts/identity-network.json", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open runner return details", "/passport/receipts/runner_return_posture.md", "ghost"),
+            SecondaryAction: new TrustPageActionViewModel("Open identity overview", "/passport/receipts/identity-network.json", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open runner return", "/passport/receipts/runner_return_posture.md", "ghost"),
             ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, _blackLedgerBriefings.BuildWorldTurnBriefing(1)),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -5553,8 +5553,8 @@ public sealed class PublicLandingController : Controller
                 aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) on the return path" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListSignalDeckDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open command pressure details", "/signal-deck/receipts/pressure_posture.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open JSON details", "/signal-deck/receipts/pressure_posture.json", "secondary"),
+            PrimaryAction: new TrustPageActionViewModel("Open command pressure", "/signal-deck/receipts/pressure_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open pressure data", "/signal-deck/receipts/pressure_posture.json", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open Table Pulse Live inbox", "/account/ledger/notifications", "ghost"),
             ConnectedLanePacket: BuildSignalDeckConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -5600,8 +5600,8 @@ public sealed class PublicLandingController : Controller
                 aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) queued" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListLivingWorldDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open watch package details", "/living-world/receipts/watch_package_posture.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open JSON details", "/living-world/receipts/watch_package_posture.json", "secondary"),
+            PrimaryAction: new TrustPageActionViewModel("Open watch brief", "/living-world/receipts/watch_package_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open watch data", "/living-world/receipts/watch_package_posture.json", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open public watch", worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1", "ghost"),
             ConnectedLanePacket: BuildLivingWorldConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -5614,20 +5614,20 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/ghostwire",
             title: "GHOSTWIRE",
-            description: "Replay packets, after-action reports, and consequence carry-forward.",
+            description: "Replay timelines, after-action reports, and consequence carry-forward.",
             eyebrow: "Replay",
             heading: "GHOSTWIRE",
-            intro: "GHOSTWIRE now ships after-action packets: replay timelines, after-action reports, and consequence-chain packets live on real markdown and JSON routes.",
+            intro: "GHOSTWIRE now ships after-action notes: replay timelines, after-action reports, and consequence chains live on real pages.",
             boundaryLine: "Replay stays public-safe. No private transcript path and no retrospective fiction engine are claimed here.",
             summaryPoints:
             [
-                $"{summary.Packages.Count} aftermath packets on record",
+                $"{summary.Packages.Count} aftermath note(s) on record",
                 $"{summary.AfterActionCount} after-action reports",
                 $"{summary.ReplayCount} replay timelines"
             ],
             documents: _waveEightHorizons.ListGhostwireDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             primaryAction: new TrustPageActionViewModel("Open replay timeline", "/ghostwire/after-action/replay_timeline.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open replay JSON", "/ghostwire/after-action/replay_timeline.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open replay data", "/ghostwire/after-action/replay_timeline.json", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open ledger", "/ledger", "ghost"),
             cancellationToken: cancellationToken);
     }
@@ -7509,7 +7509,7 @@ Boundary:
             Verdicts: verdicts,
             RoleKits: kits,
             Packets: packets,
-            PrimaryAction: new TrustPageActionViewModel("Download player packet", "/ready/packet/player.md", "primary"),
+            PrimaryAction: new TrustPageActionViewModel("Download player notes", "/ready/packet/player.md", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open help", "/help", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
