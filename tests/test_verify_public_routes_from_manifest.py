@@ -164,6 +164,7 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
         completed, report = self.run_script(manifest)
 
         self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
         self.assertEqual(report["summary"]["failed_count"], 0)
         self.assertEqual(report["summary"]["route_count"], 6)
         self.assertEqual(report["summary"]["registered_route_count"], 2)
@@ -188,6 +189,7 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
         completed, report = self.run_script(manifest)
 
         self.assertEqual(completed.returncode, 1)
+        self.assertEqual(report["status"], "fail")
         self.assertEqual(report["summary"]["failed_count"], 1)
         self.assertEqual(report["summary"]["failed_paths"], ["/private"])
         self.assertIn("expected anonymous redirect", report["routes"][0]["detail"])
@@ -323,6 +325,7 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
             completed, report = self.run_script(manifest, ["--strict-positive", "--seed-receipts"])
 
         self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
         self.assertEqual(report["summary"]["failed_count"], 0)
         self.assertEqual(report["summary"]["positive_proof_count"], 2)
         self.assertEqual(report["summary"]["seeded_receipt_count"], 2)

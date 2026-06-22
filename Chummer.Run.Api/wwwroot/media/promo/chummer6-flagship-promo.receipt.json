@@ -1,115 +1,16 @@
 {
-  "generated_at_utc": "2026-06-20T19:57:43Z",
-  "status": "published",
+  "generated_at_utc": "2026-06-22T12:55:00Z",
+  "status": "revoked",
   "asset_id": "chummer6-flagship-promo",
-  "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
-  "provider_claim": "MagicFit",
-  "magicfit_claim_allowed": true,
-  "magicfit_final_visual_render_claim": true,
-  "magicfit_source_receipts_retained": true,
-  "magicfit_visual_recut_required": false,
-  "old_synthetic_vector_renderer_removed": true,
-  "source_scene_count": 12,
-  "visual_scene_count": 12,
-  "source_scene_dir": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes",
-  "source_receipt": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json",
-  "provider_receipt": "/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json",
-  "faction_assets_used": false,
-  "scene_titles": [
-    "Table Chaos Ends",
-    "Chummer6 Opens",
-    "Build The Runner",
-    "Rules Explain Themselves",
-    "Black Ledger Lives",
-    "Truth Matrix Holds",
-    "Table Pulse Connects",
-    "The World Reacts",
-    "Karma Forge Improves",
-    "Video Proof Lands",
-    "Play Anywhere Honestly",
-    "Chummer6 Gold Gate"
+  "reason": "faulty_public_promo_audio_pipeline_retired",
+  "public_video_removed": true,
+  "removed_files": [
+    "/media/promo/chummer6-flagship-promo.mp4",
+    "/media/promo/chummer6-flagship-promo.webm",
+    "/media/promo/chummer6-flagship-promo.vtt"
   ],
-  "scene_seconds_before_transitions": 7.958333333333333,
-  "transition_seconds": 0.5,
-  "continuous_audio_track": "unmixr_stitched_cinematic_narration_track",
-  "public_files": {
-    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
-    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
-    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo-poster.png",
-    "captions": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt"
-  },
-  "mp4_probe": {
-    "programs": [],
-    "streams": [
-      {
-        "codec_name": "h264",
-        "codec_type": "video",
-        "width": 1280,
-        "height": 720,
-        "bit_rate": "3672518"
-      },
-      {
-        "codec_name": "aac",
-        "codec_type": "audio",
-        "sample_rate": "96000",
-        "channels": 1,
-        "bit_rate": "200641"
-      }
-    ],
-    "format": {
-      "duration": "90.000000",
-      "size": "43655949"
-    }
-  },
-  "narration_provider": "unmixr-short-tts-beats",
-  "voice_posture": "premium_unmixr_narrator_preferred",
-  "voice_id_public": "",
-  "voice_id_redacted": true,
-  "audio_artifact_cleanup": {
-    "high_tone_notch_hz": 11730,
-    "lowpass_hz": 10000
-  },
-  "audio_quality": {
-    "status": "pass",
-    "beep_artifact_fixed": true,
-    "spectrogram_review": "steady_11730hz_line_removed",
-    "mp4_volume": {
-      "mean_volume_db": -23.7,
-      "max_volume_db": -5.0
-    },
-    "webm_volume": {
-      "mean_volume_db": -23.8,
-      "max_volume_db": -5.0
-    }
-  },
-  "webm_probe": {
-    "programs": [],
-    "streams": [
-      {
-        "codec_name": "vp9",
-        "codec_type": "video",
-        "width": 1280,
-        "height": 720
-      },
-      {
-        "codec_name": "opus",
-        "codec_type": "audio",
-        "sample_rate": "48000",
-        "channels": 1
-      }
-    ],
-    "format": {
-      "duration": "90.013000",
-      "size": "27214712"
-    }
-  },
-  "duration_seconds": 90.0,
-  "public_mp4": "/media/promo/chummer6-flagship-promo.mp4?v=20260620-audio2",
-  "output_audio_duration_seconds": 0.0,
-  "size_bytes": 43655949,
-  "has_audio": true,
-  "has_video": true,
-  "audio_mean_volume_db": -18.0,
-  "audio_max_volume_db": -0.7,
-  "audio_quality_status": "pass"
+  "fallback": {
+    "mode": "static_poster",
+    "poster": "/media/promo/chummer6-flagship-promo-poster.png"
+  }
 }

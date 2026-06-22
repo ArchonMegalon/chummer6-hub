@@ -1,6 +1,7 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-06-19T23:38:49.042306Z",
+  "status": "pass",
+  "generated_at_utc": "2026-06-22T12:57:26.387543Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -309,7 +310,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/feedback",
+      "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -435,7 +436,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/feedback",
+      "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -1533,7 +1534,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?v=1781877871",
+      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?v=1782107654",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -2200,7 +2201,7 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=fxU9jEYhBVn6m3tVrK1y8QDcFYM8ChTW&nonce=_xyl73GHewqvv415viV5zSC0rE8FDBIp&code_challenge=u0qyFmM0O-r_irHgVvJnd-aJzGRnahXAXRFOqWdiS34&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=b3Fdxs60MO4wqhogiFCN0gy9LExX2cFU&nonce=BK4o9Gn51_AtdGuPtY4nIGmL78n9-IH1&code_challenge=n41P6aV1wDNTm43sxAyGtU1vEQ58kPkNw2isSOeCBK4&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },

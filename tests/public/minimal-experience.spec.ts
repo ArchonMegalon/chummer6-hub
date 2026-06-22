@@ -28,22 +28,15 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (!heroImageComplete) {
     failures.push('homepage: hero image did not load with useful dimensions');
   }
-  const productVideo = desktop.locator('[data-homepage-section="workflow"] video[aria-label="Product video"]');
-  await expect(productVideo).toBeVisible();
-  const videoSources = await productVideo.locator('source').evaluateAll((sources) =>
-    sources.map((source) => (source as HTMLSourceElement).getAttribute('src') || ''),
-  );
-  const hasMp4 = videoSources.some((source) => source === '/media/promo/chummer6-flagship-promo.mp4' || source.startsWith('/media/promo/chummer6-flagship-promo.mp4?'));
-  const hasWebm = videoSources.some((source) => source === '/media/promo/chummer6-flagship-promo.webm' || source.startsWith('/media/promo/chummer6-flagship-promo.webm?'));
-  if (!hasMp4 || !hasWebm) {
-    failures.push(`homepage: product video sources are missing or wrong: ${videoSources.join(', ')}`);
-  }
-  const captionTrack = productVideo.locator('track[kind="captions"]');
-  await expect(captionTrack).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo.vtt');
+  const retiredPromo = desktop.locator('[data-homepage-section="workflow"] .minimal-video--retired img');
+  await expect(retiredPromo).toBeVisible();
+  await expect(retiredPromo).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo-poster.png');
+  await expect(desktop.locator('[data-homepage-section="workflow"] video')).toHaveCount(0);
+  const videoSources: string[] = [];
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Need something else?');
   await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Participate');
-  results.push({ surface: 'home', inline_nav_visible: await desktop.locator('.site-nav').isVisible(), hero_image_loaded: heroImageComplete, product_video_sources: videoSources });
+  results.push({ surface: 'home', inline_nav_visible: await desktop.locator('.site-nav').isVisible(), hero_image_loaded: heroImageComplete, product_video_sources: videoSources, product_video_retired: true });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
   const stableLane = desktop.locator('#stable');

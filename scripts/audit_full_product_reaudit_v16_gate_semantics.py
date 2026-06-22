@@ -473,27 +473,39 @@ def main() -> int:
     magicfit_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.receipt.json")
     checks.append(check("MAGICFIT_PROVIDER_ADAPTER_READY" in magicfit_text and magicfit_provider.get("status") == "verified", "MagicFit provider verdict is backed by verified provider receipt"))
     checks.append(check(magicfit_source.get("status") == "pass" and magicfit_source.get("found_scene_count") == 12, "MagicFit flagship source audit proves 12 scenes"))
-    checks.append(check(magicfit_receipt.get("status") == "published" and magicfit_receipt.get("faction_assets_used") is False, "Flagship public promo receipt is published and faction-free"))
-    checks.append(check(magicfit_receipt.get("magicfit_claim_allowed") is True and magicfit_receipt.get("magicfit_final_visual_render_claim") is True and magicfit_receipt.get("visual_scene_count") == 12, "Flagship promo receipt proves MagicFit 12-scene final reel"))
-
-    flagship_reel = run(["python3", "scripts/verify_flagship_promo_12_scene_reel.py", "--asset", "chummer6-flagship-promo"])
-    checks.append(check(flagship_reel["pass"], "Flagship promo has 12 visually distinct sampled scenes", flagship_reel))
+    flagship_poster = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo-poster.png"
+    flagship_removed_files = [
+        RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / public_path.lstrip("/")
+        for public_path in magicfit_receipt.get("removed_files", [])
+        if isinstance(public_path, str)
+    ]
+    checks.append(check(
+        magicfit_receipt.get("status") == "revoked" and magicfit_receipt.get("public_video_removed") is True,
+        "Flagship public promo receipt is revoked after faulty audio pipeline retirement",
+        magicfit_receipt,
+    ))
+    checks.append(check(
+        flagship_poster.is_file() and flagship_removed_files and all(not path.exists() for path in flagship_removed_files),
+        "Flagship public promo fails closed to static poster with video/caption files removed",
+        {
+            "poster": str(flagship_poster),
+            "removed_files": [str(path) for path in flagship_removed_files],
+        },
+    ))
 
     flagship_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.mp4"
     flagship_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.receipt.json")
-    flagship_probe = ffprobe(flagship_mp4)
-    checks.append(check(flagship_receipt.get("status") == "published", "chummer6-flagship-promo has published receipt"))
     checks.append(check(
-        flagship_probe.get("status") == "pass" and flagship_probe.get("has_video") and flagship_probe.get("has_audio") and flagship_probe.get("duration", 0) >= 89.5,
-        "chummer6-flagship-promo is a 90-second audio/video asset",
-        flagship_probe,
+        flagship_receipt.get("status") == "revoked" and not flagship_mp4.exists(),
+        "chummer6-flagship-promo retired video is not publishable media",
+        {"receipt_status": flagship_receipt.get("status"), "mp4_exists": flagship_mp4.exists()},
     ))
 
     horizon_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.mp4"
     horizon_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.receipt.json")
     checks.extend(every_wonder_horizon_receipt_checks(horizon_receipt, ffprobe(horizon_mp4)))
 
-    for asset_id in ("chummer6-flagship-promo", "every-wonder-horizon-promo"):
+    for asset_id in ("every-wonder-horizon-promo",):
         mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / f"{asset_id}.mp4"
         receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / f"{asset_id}.receipt.json")
         probe = ffprobe(mp4)
@@ -510,12 +522,14 @@ def main() -> int:
     pwa = run(pwa_command)
     checks.append(check(pwa["pass"], "PWA notification runtime verifier passes", pwa))
 
-    for script_name, label in (
-        ("scripts/build_chummer6_flagship_promo.py", "flagship promo check mode"),
-        ("scripts/build_every_wonder_horizon_promo.py", "product spine promo check mode"),
-    ):
-        result = run(["python3", script_name, "--check"])
-        checks.append(check(result["pass"], label, result))
+    flagship_builder = run(["python3", "scripts/build_chummer6_flagship_promo.py", "--check"])
+    checks.append(check(
+        flagship_builder["returncode"] == 2 and '"status": "retired"' in flagship_builder["stdout"],
+        "flagship promo builder is retired fail-closed",
+        flagship_builder,
+    ))
+    horizon_builder = run(["python3", "scripts/build_every_wonder_horizon_promo.py", "--check"])
+    checks.append(check(horizon_builder["pass"], "product spine promo check mode", horizon_builder))
 
     failures = [item for item in checks if item["status"] != "pass"]
     payload = {

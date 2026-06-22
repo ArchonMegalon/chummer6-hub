@@ -23,10 +23,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         pages = {
             "https://example.invalid/": """
                 <body class="shell-body shell-public">
-                    <video poster="/media/promo/chummer6-flagship-promo-poster.png">
-                        <source src="/media/promo/chummer6-flagship-promo.mp4?v=test" type="video/mp4" />
-                        <source src="/media/promo/chummer6-flagship-promo.webm" type="video/webm" />
-                    </video>
+                    <img src="/media/promo/chummer6-flagship-promo-poster.png" alt="Chummer product workflow preview" />
                 </body>
             """,
             "https://example.invalid/downloads": """
@@ -51,6 +48,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         self.assertEqual(payload["base_url"], "https://example.invalid")
         self.assertFalse(payload["results"][0]["nav_panel_open"])
         self.assertTrue(payload["results"][0]["hero_image_loaded"])
+        self.assertTrue(payload["results"][0]["product_video_retired"])
 
     def test_main_writes_receipt_and_report(self) -> None:
         module = load_module()

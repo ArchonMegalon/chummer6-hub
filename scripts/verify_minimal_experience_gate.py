@@ -23,6 +23,7 @@ class SourceParser(HTMLParser):
         super().__init__()
         self.sources: list[str] = []
         self.video_posters: list[str] = []
+        self.images: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {key.lower(): value or "" for key, value in attrs}
@@ -30,6 +31,8 @@ class SourceParser(HTMLParser):
             self.sources.append(values["src"])
         if tag.lower() == "video" and values.get("poster"):
             self.video_posters.append(values["poster"])
+        if tag.lower() == "img" and values.get("src"):
+            self.images.append(values["src"])
 
 
 def now_iso() -> str:
@@ -73,15 +76,17 @@ def build_payload(
         for source in parser.sources
         if "/media/promo/chummer6-flagship-promo" in source
     ]
+    poster_sources = [*parser.video_posters, *parser.images]
     poster_urls = [
         urljoin(f"{normalized_base_url}/", poster)
-        for poster in parser.video_posters
+        for poster in poster_sources
         if "/media/promo/chummer6-flagship-promo" in poster
     ]
 
     nav_panel_open = "nav-panel-open" in home_html
     hero_image_loaded = bool(poster_urls) and all(asset_checker(url) for url in poster_urls)
     video_sources_load = all(asset_checker(urljoin(f"{normalized_base_url}/", source)) for source in product_video_sources)
+    product_video_retired = not product_video_sources and bool(poster_urls)
     stable_visible = 'id="stable"' in downloads_html and "Current stable build" in downloads_html
     nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_html
     decision_card_count = count_occurrences(status_html, 'class="minimal-status-pill"')
@@ -91,8 +96,10 @@ def build_payload(
         failures.append("home navigation panel is open by default")
     if not hero_image_loaded:
         failures.append("home product video poster image is missing or unreachable")
-    if not product_video_sources or not video_sources_load:
-        failures.append("home product video sources are missing or unreachable")
+    if product_video_sources and not video_sources_load:
+        failures.append("home product video sources are unreachable")
+    if not product_video_sources and not product_video_retired:
+        failures.append("home product promo fallback image is missing or unreachable")
     if not stable_visible:
         failures.append("downloads stable lane is not visible")
     if not nightly_visible:
@@ -115,6 +122,7 @@ def build_payload(
                 "hero_image_loaded": hero_image_loaded,
                 "product_video_sources": product_video_sources,
                 "product_video_sources_load": video_sources_load,
+                "product_video_retired": product_video_retired,
             },
             {
                 "surface": "downloads",

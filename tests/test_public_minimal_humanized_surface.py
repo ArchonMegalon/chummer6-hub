@@ -244,11 +244,11 @@ def test_homepage_has_minimal_product_video_surface() -> None:
     assert 'data-analytics-event="homepage_open_downloads"' in landing
     assert 'homepage_open_stable' not in landing
     assert 'homepage_open_nightly' not in landing
-    assert 'class="minimal-video"' in landing
-    assert 'aria-label="Product video"' in landing
-    assert "/media/promo/chummer6-flagship-promo.mp4" in landing
-    assert "/media/promo/chummer6-flagship-promo.webm" in landing
-    assert "/media/promo/chummer6-flagship-promo.vtt" in landing
+    assert 'class="minimal-video minimal-video--retired"' in landing
+    assert "/media/promo/chummer6-flagship-promo-poster.png" in landing
+    assert "/media/promo/chummer6-flagship-promo.mp4" not in landing
+    assert "/media/promo/chummer6-flagship-promo.webm" not in landing
+    assert "/media/promo/chummer6-flagship-promo.vtt" not in landing
     assert 'data-homepage-section="downloads"' not in landing
 
 

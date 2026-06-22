@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-20T20:13:30Z",
+  "generated_at_utc": "2026-06-22T12:57:32Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,9 +14,10 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:38:36Z",
+      "generated_at_utc": "2026-06-21T02:51:53Z",
       "fresh_within_hours": 24,
-      "pass": true
+      "structured_failures_count": 0,
+      "pass": false
     },
     "rule_authority_minimum_coverage": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
@@ -24,7 +25,8 @@
       "status": "pass",
       "generated_at_utc": "2026-06-20T19:39:45Z",
       "fresh_within_hours": 24,
-      "pass": true,
+      "structured_failures_count": 0,
+      "pass": false,
       "rulesets": {
         "sr4": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
@@ -437,7 +439,8 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:38:49.825879Z",
       "fresh_within_hours": 24,
-      "pass": true,
+      "structured_failures_count": 0,
+      "pass": false,
       "workflow_assumed_rulesets": [],
       "authority_approved_rulesets": [
         "sr4",
@@ -506,8 +509,9 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-20T18:37:22Z",
+      "generated_at_utc": "2026-06-21T17:07:46Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "desktop_native_model_depth": {
@@ -516,15 +520,17 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:38:49Z",
       "fresh_within_hours": 24,
-      "pass": true
+      "structured_failures_count": 0,
+      "pass": false
     },
     "black_ledger_live_media_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:39:00Z",
+      "generated_at_utc": "2026-06-21T02:52:16Z",
       "fresh_within_hours": 24,
-      "pass": true
+      "structured_failures_count": 0,
+      "pass": false
     },
     "table_pulse_scenario_replay": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
@@ -532,14 +538,16 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:39:00Z",
       "fresh_within_hours": 24,
-      "pass": true
+      "structured_failures_count": 0,
+      "pass": false
     },
     "public_route_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:38:49.042306Z",
+      "generated_at_utc": "2026-06-22T12:57:26.387543Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true,
       "summary": {
         "route_count": 165,
@@ -564,14 +572,25 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:38:49Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
+      "pass": false
+    },
+    "icanpreneur_discovery_lane": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/ICANPRENEUR_DISCOVERY_LANE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-21T17:40:39Z",
+      "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "ltd_optimization_stack": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-20T18:37:22Z",
+      "generated_at_utc": "2026-06-21T17:13:36Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "external_distribution_mirror_proof": {
@@ -580,7 +599,8 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:39:07Z",
       "fresh_within_hours": 24,
-      "pass": true,
+      "structured_failures_count": 0,
+      "pass": false,
       "external_required": false,
       "distribution_resilience_status": "optional_external_mirrors_degraded",
       "advisory_external_failures": [
@@ -598,45 +618,36 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-20T14:31:32Z",
+      "generated_at_utc": "2026-06-22T04:51:43Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "design_quality_gate": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:41:03Z",
+      "generated_at_utc": "2026-06-21T17:23:45Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "windows_installer_visual_audit": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
       "exists": true,
-      "status": "fail",
-      "generated_at_utc": "2026-06-20T20:03:48Z",
+      "status": "pass",
+      "generated_at_utc": "2026-06-21T18:13:26Z",
       "fresh_within_hours": 24,
-      "pass": false,
-      "failures": [
-        "Windows installer visual audit source digest does not match promoted installer"
-      ],
-      "nextActions": [
-        "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
-        "Preferred remote path: run the native Windows proof runner from a controlled Windows host; it captures native Windows evidence only and does not publish downloads.",
-        "Use PowerShell: scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5",
-        "Use PowerShell: scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass",
-        "If you need manual capture, run scripts/capture_windows_installer_visual_audit.ps1 once per surface/DPI for install-progress and completion at default plus scaled DPI.",
-        "If progress and completion screenshots are byte-identical, rerun manual capture with the progress dialog visible before accepting the completion dialog.",
-        "If proof came from a remote Windows runner, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
-        "Commit the generated source receipt and screenshots under /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer.",
-        "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest."
-      ],
+      "structured_failures_count": 0,
+      "pass": true,
+      "failures": [],
+      "nextActions": [],
       "startupReceipt": {
         "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
         "status": "pass",
         "verificationDisposition": null,
         "skipClass": null,
-        "artifactDigest": "sha256:c41d17cea200060b0940f37f18eea6b0bd407c447cd9cd62a8e140e965bc6a51"
+        "artifactDigest": "sha256:c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b"
       },
       "visualAuditSource": {
         "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
@@ -644,7 +655,7 @@
         "status": "pass",
         "platform": "windows",
         "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
-        "artifactSha256": "1d6cc812dab45939d451026deeed627025d9e58f4247dd45bbb25b924158ad1d",
+        "artifactSha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
         "screenshotCount": 4,
         "defaultDpiScreenshotCount": 2,
         "scaledDpiScreenshotCount": 2,
@@ -658,8 +669,9 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:39:09Z",
+      "generated_at_utc": "2026-06-22T12:53:33Z",
       "fresh_within_hours": 24,
+      "structured_failures_count": 0,
       "pass": true
     },
     "operator_release_dashboard": {
@@ -668,7 +680,8 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:41:30Z",
       "fresh_within_hours": 24,
-      "pass": true,
+      "structured_failures_count": 0,
+      "pass": false,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
@@ -686,7 +699,8 @@
       "status": "pass",
       "generated_at_utc": "2026-06-19T23:41:30Z",
       "fresh_within_hours": 24,
-      "pass": true,
+      "structured_failures_count": 0,
+      "pass": false,
       "verdict": "RELEASE_READY",
       "failures": []
     }
@@ -801,6 +815,15 @@
     }
   ],
   "failures": [
-    "windows_installer_visual_audit failed"
+    "live_public_web_recrawl stale",
+    "rule_authority_minimum_coverage stale",
+    "ruleset_readiness stale",
+    "desktop_native_model_depth stale",
+    "black_ledger_live_media_proof stale",
+    "table_pulse_scenario_replay stale",
+    "live_surface_parity stale",
+    "external_distribution_mirror_proof stale",
+    "operator_release_dashboard stale",
+    "release_ready stale"
   ]
 }

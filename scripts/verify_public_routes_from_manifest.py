@@ -575,9 +575,11 @@ def build_report(
     seeded = [route for route in routes if route.seeded_receipt]
     seed_required = [route for route in routes if route.proof_class == "seed_required"]
     negative_failures = [path for path in negative_paths if not path.success]
+    status = "pass" if not failed and not negative_failures else "fail"
 
     return {
         "contract_name": "chummer.public_route_proof",
+        "status": status,
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "base_url": args.base_url,
         "public_host": args.public_host or None,
