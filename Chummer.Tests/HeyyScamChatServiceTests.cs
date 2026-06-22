@@ -495,6 +495,11 @@ public sealed class HeyyScamChatServiceTests
 
         Assert.Equal("passed", result.State);
         Assert.Equal(1, result.SyncedCount);
+        LoggedRequest createTable = Assert.Single(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        using JsonDocument createTablePayload = JsonDocument.Parse(createTable.Body);
+        Assert.False(createTablePayload.RootElement.TryGetProperty("icon", out _));
+        Assert.DoesNotContain("\"unique\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"notNull\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
         LoggedRequest create = Assert.Single(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_heyy/record");
         Assert.Contains("\"Conversation Id\":\"conv-teable\"", create.Body, StringComparison.Ordinal);
         Assert.Contains("436765550423", create.Body, StringComparison.Ordinal);

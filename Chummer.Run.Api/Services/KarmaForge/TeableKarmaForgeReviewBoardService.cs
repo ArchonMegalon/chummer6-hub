@@ -395,7 +395,6 @@ public sealed class TeableKarmaForgeReviewBoardService
             ["name"] = options.TableName,
             ["dbTableName"] = DefaultDbTableName,
             ["description"] = "Administrative KARMA FORGE review-board projection. Chummer Hub remains the system of record.",
-            ["icon"] = "\ud83e\udde0",
             ["fieldKeyType"] = "name",
             ["fields"] = new JsonArray(RequiredFields.Select(static field => field.ToJson()).ToArray())
         };
@@ -751,12 +750,12 @@ public sealed class TeableKarmaForgeReviewBoardService
                 ["type"] = Type,
                 ["name"] = Name,
             };
-            if (Unique)
+            if (Unique && SupportsFieldValidation(Type))
             {
                 node["unique"] = true;
             }
 
-            if (NotNull)
+            if (NotNull && SupportsFieldValidation(Type))
             {
                 node["notNull"] = true;
             }
@@ -768,5 +767,8 @@ public sealed class TeableKarmaForgeReviewBoardService
 
             return node;
         }
+
+        private static bool SupportsFieldValidation(string fieldType)
+            => !string.Equals(fieldType, "singleLineText", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -44,7 +44,11 @@ public sealed class TeableKarmaForgeReviewBoardServiceTests
         Assert.Equal(1, result.SyncedCount);
         Assert.Equal(0, result.FailedCount);
         Assert.Equal("tbl_kf", result.TableId);
-        Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        FakeRequest createTable = Assert.Single(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        using JsonDocument createTablePayload = JsonDocument.Parse(createTable.Body);
+        Assert.False(createTablePayload.RootElement.TryGetProperty("icon", out _));
+        Assert.DoesNotContain("\"unique\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"notNull\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_kf/record");
         Assert.Contains(fixture.Handler.Requests, static item => item.Body.Contains("\"Projection Kind\":\"karma_forge_candidate_review\"", StringComparison.Ordinal));
         Assert.Contains(fixture.Handler.Requests, static item => item.Body.Contains("\"Queue Status\":\"candidate_for_lunacal_followup\"", StringComparison.Ordinal));

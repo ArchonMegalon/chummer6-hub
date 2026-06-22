@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Controllers;
@@ -84,7 +85,11 @@ public sealed class TeableBlackLedgerWorldTickServiceTests
         Assert.Equal(workspace.CampaignId, row.CampaignId);
         Assert.Contains("BLACK LEDGER WorldTick", row.Summary, StringComparison.Ordinal);
         Assert.True(row.GmApproved);
-        Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        FakeRequest createTable = Assert.Single(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        using JsonDocument createTablePayload = JsonDocument.Parse(createTable.Body);
+        Assert.False(createTablePayload.RootElement.TryGetProperty("icon", out _));
+        Assert.DoesNotContain("\"unique\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"notNull\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_blackledger/record");
     }
 

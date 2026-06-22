@@ -58,15 +58,17 @@ public sealed class FlagshipReadinessArtifactService
         }
 
         var relativePath = DefaultReadinessRelativePath.Replace('/', Path.DirectorySeparatorChar);
-        var candidates = new[]
+        string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
+        string[] candidates = new string?[]
             {
-                Path.GetFullPath(Path.Combine("/docker/fleet", relativePath)),
-                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath)),
+                !string.IsNullOrWhiteSpace(canonRoot) ? Path.GetFullPath(Path.Combine(canonRoot, relativePath)) : null,
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath))
             }
+            .OfType<string>()
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         return ResolveFreshestReadinessPath(candidates)

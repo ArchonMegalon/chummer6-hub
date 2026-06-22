@@ -361,7 +361,6 @@ public sealed class TeableHeyyScamChatService
             ["name"] = options.TableName,
             ["dbTableName"] = DefaultDbTableName,
             ["description"] = "Administrative projection of Heyy scam-chat conversations. Chummer Hub remains the system of record.",
-            ["icon"] = "shield",
             ["fieldKeyType"] = "name",
             ["fields"] = new JsonArray(RequiredFields.Select(static field => field.ToJson()).ToArray())
         };
@@ -705,12 +704,12 @@ public sealed class TeableHeyyScamChatService
                 ["type"] = Type,
                 ["name"] = Name,
             };
-            if (Unique)
+            if (Unique && SupportsFieldValidation(Type))
             {
                 node["unique"] = true;
             }
 
-            if (NotNull)
+            if (NotNull && SupportsFieldValidation(Type))
             {
                 node["notNull"] = true;
             }
@@ -722,6 +721,9 @@ public sealed class TeableHeyyScamChatService
 
             return node;
         }
+
+        private static bool SupportsFieldValidation(string fieldType)
+            => !string.Equals(fieldType, "singleLineText", StringComparison.OrdinalIgnoreCase);
     }
 }
 

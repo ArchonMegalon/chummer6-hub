@@ -384,7 +384,6 @@ public sealed class TeableBlackLedgerWorldTickService
             ["name"] = options.TableName,
             ["dbTableName"] = DefaultDbTableName,
             ["description"] = "Administrative BLACK LEDGER world-tick projection. Chummer Hub remains the system of record.",
-            ["icon"] = "\ud83c\udf06",
             ["fieldKeyType"] = "name",
             ["fields"] = new JsonArray(RequiredFields.Select(static field => field.ToJson()).ToArray())
         };
@@ -661,12 +660,12 @@ public sealed class TeableBlackLedgerWorldTickService
                 ["type"] = Type,
                 ["name"] = Name,
             };
-            if (Unique)
+            if (Unique && SupportsFieldValidation(Type))
             {
                 node["unique"] = true;
             }
 
-            if (NotNull)
+            if (NotNull && SupportsFieldValidation(Type))
             {
                 node["notNull"] = true;
             }
@@ -678,5 +677,8 @@ public sealed class TeableBlackLedgerWorldTickService
 
             return node;
         }
+
+        private static bool SupportsFieldValidation(string fieldType)
+            => !string.Equals(fieldType, "singleLineText", StringComparison.OrdinalIgnoreCase);
     }
 }
