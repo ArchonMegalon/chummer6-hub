@@ -463,12 +463,12 @@ public sealed class CampaignSpineService
 
         if (openRun.Listing.JoinPolicy.VoiceRequired && !request.VoiceConsentAcknowledged)
         {
-            conflicts.Add("Voice-required handoff still needs explicit acknowledgement before roster review.");
+            conflicts.Add("Voice participation still needs explicit acknowledgement before roster review.");
         }
 
         if (!request.PlatformReady)
         {
-            warnings.Add("Platform readiness still needs confirmation before the meeting handoff can stay green.");
+            warnings.Add("Platform readiness still needs confirmation before the meeting details can stay green.");
         }
 
         if (dossier is not null
@@ -732,7 +732,7 @@ public sealed class CampaignSpineService
             .ToArray();
         if (acceptedUserIds.Count == 0)
         {
-            throw new InvalidOperationException("Meeting handoff requires at least one accepted roster seat.");
+            throw new InvalidOperationException("Meeting details require at least one accepted roster seat.");
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;

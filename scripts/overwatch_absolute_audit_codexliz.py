@@ -17,7 +17,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 
-ROOT = Path("/docker/chummercomplete/chummer.run-services")
+ROOT = Path(os.environ.get("CODEXLIZ_OVERWATCH_ROOT") or "/docker/chummercomplete/chummer.run-services")
 PLAN_FILE = Path(os.environ.get("CODEXLIZ_OVERWATCH_PLAN_FILE", str(ROOT / "ABSOLUTE_AUDIT_EXECUTION_PLAN_20260508.md")))
 TASK_FILE = Path(os.environ.get("CODEXLIZ_OVERWATCH_TASK_FILE", str(ROOT / "ABSOLUTE_AUDIT_CODEXLIZ_TASK_20260508.md")))
 CLOSURE_SCRIPT = Path(os.environ.get("CODEXLIZ_OVERWATCH_CLOSURE_SCRIPT", str(ROOT / "scripts" / "check_absolute_audit_closure.py")))
@@ -51,7 +51,19 @@ OODA_LOG_MAX_BYTES = int(os.environ.get("CODEXLIZ_OVERWATCH_OODA_LOG_MAX_BYTES",
 LOOP_HISTORY_MAX_BYTES = int(os.environ.get("CODEXLIZ_OVERWATCH_LOOP_HISTORY_MAX_BYTES", str(4 * 1024 * 1024)))
 PROVIDER_MODELS_URL = os.environ.get("CODEXLIZ_OVERWATCH_PROVIDER_MODELS_URL", "http://127.0.0.1:33531/v1/models")
 PROVIDER_TIMEOUT_SECONDS = int(os.environ.get("CODEXLIZ_OVERWATCH_PROVIDER_TIMEOUT_SECONDS", "15"))
-CODEXLIZ_BIN = os.environ.get("CODEXLIZ_OVERWATCH_CODEXLIZ_BIN") or shutil.which("codexliz") or "/home/tibor/.local/bin/codexliz"
+CODEXLIZ_BIN = os.environ.get("CODEXLIZ_OVERWATCH_CODEXLIZ_BIN") or shutil.which("codexliz") or str(Path.home() / ".local" / "bin" / "codexliz")
+DEFAULT_SCAN_DIRS = [
+    str(ROOT.parent),
+    "/docker/EA",
+    "/docker/chummer5a",
+    "/docker/fleet",
+    "/docker/fleet/repos",
+]
+SCAN_DIRS = [
+    entry
+    for entry in (os.environ.get("CODEXLIZ_OVERWATCH_SCAN_DIRS") or os.pathsep.join(DEFAULT_SCAN_DIRS)).split(os.pathsep)
+    if entry
+]
 PYTHON_BIN = shutil.which("python3") or "/usr/bin/python3"
 GIT_BIN = shutil.which("git") or "/usr/bin/git"
 PS_BIN = shutil.which("ps") or "/usr/bin/ps"
@@ -534,18 +546,7 @@ def launch_worker(loop_id: int, prompt_path: Path) -> tuple[subprocess.Popen[str
         "danger-full-access",
         "-C",
         str(ROOT),
-        "--add-dir",
-        "/docker/chummercomplete",
-        "--add-dir",
-        "/docker/EA",
-        "--add-dir",
-        "/docker/chummer5a",
-        "--add-dir",
-        "/docker/fleet",
-        "--add-dir",
-        "/docker/fleet/repos",
-        "--add-dir",
-        "/home/tibor",
+        *[item for scan_dir in SCAN_DIRS for item in ("--add-dir", scan_dir)],
         "-o",
         str(last_path),
         "-",

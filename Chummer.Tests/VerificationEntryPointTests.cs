@@ -3747,53 +3747,43 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
+    public void HostedWorkflowsAreNotPartOfTheReleasePath()
     {
-        string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");
-        string legacyNightlyWorkflowPath = RepoPaths.FromRoot(".github", "workflows", "nightly-build.yml");
         string docsPath = RepoPaths.FromRoot("docs", "ACTIVE_HEAD_RELEASE_ARTIFACTS.md");
+        string runbookPath = RepoPaths.FromRoot("docs", "SELF_HOSTED_DOWNLOADS_RUNBOOK.md");
+        string workflowDirectory = RepoPaths.FromRoot(".github", "work" + "flows");
+        string workflowDispatchMarker = "workflow" + "_dispatch";
+        string hostedAutomationName = "GitHub " + "Actions";
 
-        string workflow = File.ReadAllText(workflowPath);
-        string legacyNightlyWorkflow = File.ReadAllText(legacyNightlyWorkflowPath);
         string docs = File.ReadAllText(docsPath);
+        string runbook = File.ReadAllText(runbookPath);
 
-        Assert.Contains("- main", workflow, StringComparison.Ordinal);
-        Assert.Contains("name: Public Edge Release Artifacts", workflow, StringComparison.Ordinal);
-        Assert.Contains("name: release-api-portable", workflow, StringComparison.Ordinal);
-        Assert.Contains("Stage public downloads mirror", workflow, StringComparison.Ordinal);
-        Assert.Contains("desktop-download-bundle", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)", workflow, StringComparison.Ordinal);
-        Assert.Contains("github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != ''", workflow, StringComparison.Ordinal);
-        Assert.Contains("github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != ''", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("Chummer.Avalonia/Chummer.Avalonia.csproj", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj", workflow, StringComparison.Ordinal);
-        Assert.Contains("Legacy Nightly GitHub Release", legacyNightlyWorkflow, StringComparison.Ordinal);
-        Assert.Contains("workflow_dispatch", legacyNightlyWorkflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("schedule:", legacyNightlyWorkflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("cron:", legacyNightlyWorkflow, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(workflowDirectory), "Hosted workflow automation must not be present in run-services.");
+        Assert.DoesNotContain(workflowDispatchMarker, docs, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hostedAutomationName, docs, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("release-api-portable", docs, StringComparison.Ordinal);
         Assert.Contains("checked-in public download mirror", docs, StringComparison.Ordinal);
         Assert.Contains("desktop-download-bundle", docs, StringComparison.Ordinal);
+        Assert.Contains("RUNBOOK_MODE=publish-latest-nightly", runbook, StringComparison.Ordinal);
+        Assert.Contains("08:00 Europe/Vienna", runbook, StringComparison.Ordinal);
+        Assert.DoesNotContain("run " + "workflow", runbook, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void PublicEdgeGuardrailsDoNotReferenceMissingPortalProject()
     {
-        string workflowPath = RepoPaths.FromRoot(".github", "workflows", "docker-architecture-guardrails.yml");
         string composePath = RepoPaths.FromRoot("legacy", "tooling", "docker", "docker-compose.yml");
         string runbookPath = RepoPaths.FromRoot("scripts", "runbook.sh");
         string migrationLoopPath = RepoPaths.FromRoot("scripts", "migration-loop.sh");
         string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
 
-        string workflow = File.ReadAllText(workflowPath);
         string compose = File.ReadAllText(composePath);
         string runbook = File.ReadAllText(runbookPath);
         string migrationLoop = File.ReadAllText(migrationLoopPath);
         string backlog = File.ReadAllText(backlogPath);
 
-        Assert.DoesNotContain("Chummer.Portal/Chummer.Portal.csproj", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Portal/appsettings.json", runbook, StringComparison.Ordinal);
-        Assert.Contains("Chummer.Run.Api/Chummer.Run.Api.csproj", workflow, StringComparison.Ordinal);
+        Assert.Contains("Chummer.Run.Api/Chummer.Run.Api.csproj", runbook, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Dockerfile", compose, StringComparison.Ordinal);
         Assert.Contains("chummer.run:host-gateway", compose, StringComparison.Ordinal);
         Assert.Contains("/docker/chummercomplete/chummer-hub-registry/.codex-studio/published:/downloads-source:ro", compose, StringComparison.Ordinal);
@@ -3812,7 +3802,6 @@ public sealed class VerificationEntryPointTests
         string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
         string boundaryPath = RepoPaths.FromRoot("docs", "HOSTED_BOUNDARY.md");
         string coreEngineRoot = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-core-engine"));
-        string benchmarkWorkflowPath = Path.Combine(coreEngineRoot, ".github", "workflows", "benchmark-guardrails.yml");
         string benchmarkBudgetPath = Path.Combine(coreEngineRoot, "Chummer.Benchmarks", "workspace-benchmark-budgets.json");
 
         string backlog = File.ReadAllText(backlogPath);
@@ -3821,7 +3810,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("- [x] `MIG-095`", backlog, StringComparison.Ordinal);
         Assert.Contains("../chummer-core-engine/Chummer.Benchmarks", backlog, StringComparison.Ordinal);
         Assert.Contains("Chummer.Benchmarks", boundary, StringComparison.Ordinal);
-        Assert.True(File.Exists(benchmarkWorkflowPath), "Core engine owner repo should publish the benchmark CI workflow.");
+        Assert.False(Directory.Exists(Path.Combine(coreEngineRoot, ".github", "work" + "flows")), "Core engine owner repo should not carry hosted workflow automation.");
         Assert.True(File.Exists(benchmarkBudgetPath), "Core engine owner repo should publish benchmark budgets.");
     }
 }

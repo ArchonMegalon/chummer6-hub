@@ -1,37 +1,53 @@
 WEBVTT
 
 1
-00:00:00.000 --> 00:00:09.940
-A session never breaks because the fiction failed. It breaks because reality intruded first. A tablet sleeps. A laptop wakes crooked.
+00:00:00.000 --> 00:00:06.881
+A session rarely breaks because the story failed. It breaks because reality intruded first.
 
 2
-00:00:09.940 --> 00:00:19.880
-A player reconnects into a scene already moving.
+00:00:06.881 --> 00:00:13.763
+A tablet sleeps, a laptop wakes crooked, a player reconnects into a scene already moving, and suddenly the table is arguing about which version is current.
 
 3
-00:00:19.880 --> 00:00:29.819
+00:00:13.763 --> 00:00:20.644
 NEXUS-PAN exists for that dangerous little gap between what the campaign knows and what the people at the table can trust.
 
 4
-00:00:29.819 --> 00:00:39.759
+00:00:20.644 --> 00:00:27.526
 Presence has to be clear. Change has to be visible. Recovery has to feel calm enough that nobody mistakes panic for drama.
 
 5
-00:00:39.759 --> 00:00:49.699
+00:00:27.526 --> 00:00:34.407
 A reconnect should not become a rules argument. A conflict should surface before it hardens into table folklore.
 
 6
-00:00:49.699 --> 00:00:59.639
+00:00:34.407 --> 00:00:41.288
 Desktop, tablet, phone, remote night, train ride, home table, same campaign, same moment, no scavenger hunt for the current version.
 
 7
-00:00:59.639 --> 00:01:09.579
-For the GM, the promise is simple: can I trust what I am seeing right now.
+00:00:41.288 --> 00:00:48.170
+For the GM, the promise is practical: can I trust what I am seeing right now, and can I recover the room without stopping the fiction.
 
 8
-00:01:09.579 --> 00:01:19.519
-For the player, it is even simpler: rejoin, catch up, answer the scene, stay in the run.
+00:00:48.170 --> 00:00:55.051
+For the player, it is even simpler: rejoin, catch up, answer the scene, and stay in the run.
 
 9
-00:01:19.519 --> 00:01:29.458
+00:00:55.051 --> 00:01:01.933
+The system should make repair feel ordinary.
+
+10
+00:01:01.933 --> 00:01:08.814
+Show what arrived, what changed, what is waiting for approval, and what can be ignored until after the scene.
+
+11
+00:01:08.814 --> 00:01:15.696
+The interface should make small interruptions feel survivable. A stale packet should look stale. A waiting update should say what it affects.
+
+12
+00:01:15.696 --> 00:01:22.577
+A returning player should not need the GM to reconstruct the last ten minutes by hand.
+
+13
+00:01:22.577 --> 00:01:29.458
 NEXUS-PAN is continuity with a pulse, built for crews who refuse to lose the night because one device blinked first.

@@ -33,29 +33,34 @@ def _write_wav(path: Path, seconds: float, *, silent_tail_seconds: float = 0.0) 
         payload = bytearray()
         for index in range(audible_frames):
             seconds = index / sample_rate
-            sample = (
-                0.050 * math.sin(2 * math.pi * 180 * seconds)
-                + 0.045 * math.sin(2 * math.pi * 310 * seconds)
-                + 0.035 * math.sin(2 * math.pi * 760 * seconds)
-                + 0.020 * math.sin(2 * math.pi * 1420 * seconds)
-                + 0.010 * math.sin(2 * math.pi * 2600 * seconds)
-            )
-            envelope = 0.65 + 0.35 * math.sin(2 * math.pi * 5.5 * seconds) ** 2
+            sample = 0.12 * math.sin(2 * math.pi * 1000 * seconds)
+            envelope = 0.80 + 0.20 * math.sin(2 * math.pi * 3.0 * seconds) ** 2
             value = int(sample * envelope * 32767)
             payload.extend(struct.pack("<h", value))
         payload.extend(b"\x00\x00" * silent_tail_frames)
         wav.writeframes(bytes(payload))
 
 
-def test_audio_quality_fails_long_silent_tail(tmp_path: Path) -> None:
+def test_audio_quality_accepts_planned_silent_tail_for_video_fade(tmp_path: Path) -> None:
     audio = _load(AUDIO_SCRIPT, "rebuild_public_video_audio_unmixr_for_test")
     path = tmp_path / "tail.wav"
-    _write_wav(path, 3.0, silent_tail_seconds=1.2)
+    _write_wav(path, 3.0, silent_tail_seconds=audio.NARRATION_END_BEFORE_VIDEO_SECONDS)
+
+    quality = audio.audio_quality(path)
+
+    assert quality["status"] == "pass"
+    assert audio.MIN_TAIL_SILENCE_SECONDS <= quality["tail_silence_seconds"] <= audio.MAX_TAIL_SILENCE_SECONDS
+
+
+def test_audio_quality_fails_excessive_silent_tail(tmp_path: Path) -> None:
+    audio = _load(AUDIO_SCRIPT, "rebuild_public_video_audio_unmixr_long_tail_for_test")
+    path = tmp_path / "tail.wav"
+    _write_wav(path, 4.0, silent_tail_seconds=audio.MAX_TAIL_SILENCE_SECONDS + 0.6)
 
     quality = audio.audio_quality(path)
 
     assert quality["status"] == "fail"
-    assert "audio_ends_early" in quality["reasons"]
+    assert "audio_ends_too_early" in quality["reasons"]
 
 
 def test_first_party_bed_covers_full_duration(tmp_path: Path) -> None:
@@ -67,21 +72,21 @@ def test_first_party_bed_covers_full_duration(tmp_path: Path) -> None:
 
     assert mode == "ambient_bed_only"
     assert quality["status"] == "pass"
-    assert quality["tail_silence_seconds"] <= audio.MAX_EDGE_SILENCE_SECONDS
+    assert audio.MIN_TAIL_SILENCE_SECONDS <= quality["tail_silence_seconds"] <= audio.MAX_TAIL_SILENCE_SECONDS
 
 
 def test_narration_mix_covers_internal_pauses(tmp_path: Path) -> None:
     audio = _load(AUDIO_SCRIPT, "rebuild_public_video_audio_unmixr_narration_for_test")
     narration = tmp_path / "narration.wav"
     output = tmp_path / "mixed.wav"
-    _write_wav(narration, 3.0)
+    _write_wav(narration, audio.active_audio_duration(3.0))
 
     audio.build_mixed_audio(narration, 3.0, output)
     quality = audio.audio_quality(output)
 
     assert quality["status"] == "pass"
-    assert quality["max_silence_seconds"] <= audio.MAX_SILENCE_SECONDS
-    assert quality["tail_silence_seconds"] <= audio.MAX_EDGE_SILENCE_SECONDS
+    assert quality["max_internal_silence_seconds"] <= audio.MAX_SILENCE_SECONDS
+    assert audio.MIN_TAIL_SILENCE_SECONDS <= quality["tail_silence_seconds"] <= audio.MAX_TAIL_SILENCE_SECONDS
 
 
 def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -> None:

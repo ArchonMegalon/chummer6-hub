@@ -198,6 +198,24 @@
 
     static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 
+    static string HomeText(string? value)
+    {
+        var cleaned = PublicText(value);
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            return cleaned;
+        }
+
+        return cleaned
+            .Replace("proof", "check", StringComparison.OrdinalIgnoreCase)
+            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
+            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
+            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
+            .Replace("canonical", "main", StringComparison.OrdinalIgnoreCase)
+            .Replace("truth", "state", StringComparison.OrdinalIgnoreCase)
+            .Replace("provider", "service", StringComparison.OrdinalIgnoreCase);
+    }
+
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -304,7 +322,7 @@
     var homeWhatChangedSummary = leadWorkspaceServerPlane?.ChangePackets.FirstOrDefault()?.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.ClosureSummary
         ?? (recentReceipts.Length > 0
-            ? $"{PublicText(recentReceipts[0].ArtifactLabel)} on {PublicText(recentReceipts[0].Channel)} is still attached to this account."
+            ? $"{HomeText(recentReceipts[0].ArtifactLabel)} on {HomeText(recentReceipts[0].Channel)} is still attached to this account."
             : restoreConflicts > 0
                 ? Model.CampaignSpine.Restore.ConflictSummaries[0]
                 : "Nothing urgent changed. This account is ready for the next install, campaign return, or support follow-up.");
@@ -501,8 +519,8 @@ else
                                                 <article class="app-rail__item">
                                                     <span class="tag">Install</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@PublicText(receipt.ArtifactLabel)</h3>
-                                                        <p>@PublicText(receipt.Version) on @PublicText(receipt.Channel) is still attached to this account if you need to reconnect the copy later.</p>
+                                                        <h3>@HomeText(receipt.ArtifactLabel)</h3>
+                                                        <p>@HomeText(receipt.Version) on @HomeText(receipt.Channel) is still attached to this account if you need to reconnect the copy later.</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                                 </article>
@@ -825,11 +843,11 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.ProvenanceSummary))
                                                                     {
-                                                                        <span> Details: @PublicFacingCopyHumanizer.Clean(leadAftermathShelfEntry.ProvenanceSummary)</span>
+                                                                        <span> Details: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.AuditSummary))
                                                                     {
-                                                                        <span> Note: @leadAftermathShelfEntry.AuditSummary</span>
+                                                                        <span> Note: @HomeText(leadAftermathShelfEntry.AuditSummary)</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.CompatibilitySummary))
                                                                     {
@@ -850,7 +868,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
-                                                                        <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
+                                                                        <span> Publication: @HomeText(leadAftermathShelfEntry.PublicationSummary)</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.Visibility))
                                                                     {
@@ -990,12 +1008,12 @@ else
                                                         <div class="app-rail__copy">
                                                             <h3>@PublicText(leadCommunityOperation.GroupName)</h3>
                                                             <p>
-                                                                @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @PublicText(leadCommunityOperation.CampaignVisibilitySummary)
+                                                                @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @HomeText(leadCommunityOperation.CampaignVisibilitySummary)
                                                                 <span> Roster: @leadCommunityOperation.MemberCount members · @leadCommunityOperation.ActiveCampaignCount campaigns.</span>
                                                                 <span> Pulse: @PublicText(leadCommunityOperation.OperationsSummary)</span>
                                                                 <span> Return: @PublicText(leadCommunityOperation.CampaignReturnSummary)</span>
                                                                 <span> Season / event pulse: @PublicText(leadCommunityOperation.SeasonEventSummary)</span>
-                                                                <span> Publication: @PublicText(leadCommunityOperation.ArtifactPublicationSummary)</span>
+                                                                <span> Publication: @HomeText(leadCommunityOperation.ArtifactPublicationSummary)</span>
                                                                 <span> Support: @PublicText(leadCommunityOperation.SupportEscalationSummary)</span>
                                                                 <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadCommunityEvent))
@@ -1202,7 +1220,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                                                         {
-                                                                            <span> Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary).</span>
+                                                                            <span> Output details: @HomeText(output.ProvenanceSummary).</span>
                                                                         }
                                                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -1245,7 +1263,7 @@ else
                                                             <h3>@PublicText(answer.Question)</h3>
                                                             <p>
                                                                 @PublicText(answer.ShortAnswer)
-                                                                <span> Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel).</span>
+                                                                    <span> Details: @HomeText(answer.ProvenanceLabel).</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Note: @PublicText(answer.EvidenceLines[0])</span>
@@ -1308,7 +1326,7 @@ else
                                                         <h3>@PublicText(publication.Title)</h3>
                                                         <p>
                                                             @PublicText(publication.Summary)
-                                                            <span>Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary).</span>
+                                                            <span>Details: @HomeText(publication.ProvenanceSummary).</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @PublicText(publication.DiscoverySummary)</span>

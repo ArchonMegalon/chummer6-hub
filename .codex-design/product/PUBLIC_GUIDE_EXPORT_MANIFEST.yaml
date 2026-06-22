@@ -10,6 +10,7 @@ sources:
   help_copy: products/chummer/PUBLIC_HELP_COPY.md
   horizon_registry: products/chummer/HORIZON_REGISTRY.yaml
   horizon_docs_root: products/chummer/horizons
+  feature_docs_root: products/chummer/features
   public_guide_policy: products/chummer/PUBLIC_GUIDE_POLICY.md
   public_feature_registry: products/chummer/PUBLIC_FEATURE_REGISTRY.yaml
   public_user_model: products/chummer/PUBLIC_USER_MODEL.md
@@ -31,7 +32,7 @@ rules:
 - Downstream generators must source horizon existence, ordering, and enable/disable state from HORIZON_REGISTRY.yaml.
 - The root `products/chummer/HORIZON_REGISTRY.yaml` is the authority for horizon eligibility; `products/chummer/horizons/HORIZON_REGISTRY.yaml` is only a derived guide-routing index and must not widen, reorder, or otherwise reshape the public set. It must preserve the root registry order exactly.
 - Only horizons with public_guide.enabled == true may appear in Chummer6.
-- "Public guide output must preserve `public_guide.group`: `core_product` entries read as normal Chummer6 product areas, `expansion_bet` entries read as future/large campaign bets, and `folded_into_product` entries stay quiet instead of competing with first-contact product value."
+- Public guide output must keep base product features in PUBLIC_FEATURE_REGISTRY.yaml and products/chummer/features; the Horizon registry is only for true expansion or deeper design lanes.
 - Retired or disabled horizons must disappear from the guide on the next generation pass.
 - Horizon detail pages may elaborate in human language, but may not invent new horizons, owners, or delivery promises.
 - Downstream generators must source non-horizon page classes from PUBLIC_GUIDE_PAGE_REGISTRY.yaml.

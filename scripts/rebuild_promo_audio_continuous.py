@@ -16,12 +16,12 @@ from pathlib import Path
 from typing import Any
 
 
-WORKSPACE = Path("/docker/chummercomplete")
-REPO = WORKSPACE / "chummer.run-services"
+REPO = Path(__file__).resolve().parents[1]
+WORKSPACE = Path(os.environ.get("CHUMMER_WORKSPACE_ROOT", "") or REPO.parent)
 PUBLIC = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 HORIZON_PUBLIC = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons"
-OUT = WORKSPACE / "_completion" / "promo_audio_continuous_20260602"
-TTS_PYTHON = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_venv" / "bin" / "python"
+OUT = Path(os.environ.get("CHUMMER_PROMO_AUDIO_OUT_ROOT", "") or (WORKSPACE / "_completion" / "promo_audio_continuous"))
+TTS_PYTHON = Path(os.environ.get("CHUMMER_PROMO_TTS_PYTHON", "") or (WORKSPACE / "_completion" / "promo_video_rework" / "tts_venv" / "bin" / "python"))
 DOCUMENTARY_VOICE = "en-GB-ThomasNeural"
 FEMALE_DOCUMENTARY_VOICE = "en-US-JennyNeural"
 UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
@@ -31,11 +31,22 @@ UNMIXR_PROMO_VOICE_ENV_KEYS = (
     "UNMIXR_VOICE_ID",
 )
 HIGH_TONE_CLEANUP_FILTER = "equalizer=f=11730:width_type=h:width=420:g=-48,lowpass=f=10000"
-ENV_FILES = (
-    WORKSPACE / "chummer.run-services" / ".env",
-    Path("/docker/EA/.env"),
-    Path("/docker/EA/ea/.env"),
-)
+EXTRA_ENV_FILES_ENV = "CHUMMER_PROMO_AUDIO_ENV_FILES"
+
+
+def configured_env_files() -> tuple[Path, ...]:
+    files = [REPO / ".env", REPO / ".env.local"]
+    extra_files = os.environ.get(EXTRA_ENV_FILES_ENV, "")
+    files.extend(Path(path) for path in re.split(r"[,;:]", extra_files) if path.strip())
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for file in files:
+        key = str(file)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(file)
+    return tuple(unique)
 
 
 @dataclass(frozen=True)
@@ -226,7 +237,7 @@ def env_or_file(key: str) -> str:
     if value:
         return value
     prefix = f"{key}="
-    for env_file in ENV_FILES:
+    for env_file in configured_env_files():
         if not env_file.is_file():
             continue
         for raw_line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():

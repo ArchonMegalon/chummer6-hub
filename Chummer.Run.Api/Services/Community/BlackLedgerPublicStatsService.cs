@@ -710,14 +710,18 @@ public sealed class BlackLedgerPublicStatsService
 
     private static IEnumerable<string> ResolveRootCandidates()
     {
-        string[] candidates =
-        [
+        var candidates = new List<string>
+        {
             Directory.GetCurrentDirectory(),
             AppContext.BaseDirectory,
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
-            "/docker/chummercomplete",
-            "/docker/chummercomplete/chummer-hub-registry",
-        ];
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."))
+        };
+
+        string? configuredRoots = Environment.GetEnvironmentVariable("CHUMMER_BLACK_LEDGER_ROOTS");
+        if (!string.IsNullOrWhiteSpace(configuredRoots))
+        {
+            candidates.AddRange(Regex.Split(configuredRoots, "[,;:]").Where(static value => !string.IsNullOrWhiteSpace(value)));
+        }
 
         foreach (string candidate in candidates
                      .Where(static value => !string.IsNullOrWhiteSpace(value))

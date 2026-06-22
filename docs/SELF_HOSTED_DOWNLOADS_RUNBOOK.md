@@ -32,11 +32,11 @@ Repository variables:
 1. `CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR`
 2. `CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL`
 
-Workflow path:
-1. Run workflow `Public Edge Release Artifacts`.
-2. If `CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR` is configured, deploy job `deploy-downloads` runs automatically after bundle generation.
+Local release path:
+1. Build the release bundle on the controlled release host.
+2. If `CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR` is configured, run `RUNBOOK_MODE=downloads-sync` to deploy the bundle after generation.
 3. `scripts/publish-download-bundle.sh` prunes superseded desktop artifacts from the target downloads root before syncing the freshly built bundle.
-4. Job verifies local deployed manifest and live manifest URL.
+4. The runbook verifies the local deployed manifest and live manifest URL.
 
 Manual path:
 1. `RUNBOOK_MODE=downloads-sync DOWNLOAD_BUNDLE_DIR=<bundleDir> DOWNLOAD_DEPLOY_DIR=<deployDir> DOWNLOADS_SYNC_DEPLOY_MODE=1 DOWNLOADS_SYNC_VERIFY_TARGET=<portalBaseOrManifestUrl> bash scripts/runbook.sh`
@@ -57,15 +57,25 @@ Repository secrets:
 2. `CHUMMER_PORTAL_DOWNLOADS_AWS_SECRET_ACCESS_KEY`
 3. `CHUMMER_PORTAL_DOWNLOADS_AWS_SESSION_TOKEN` (optional)
 
-Workflow path:
-1. Run workflow `Public Edge Release Artifacts`.
-2. If `CHUMMER_PORTAL_DOWNLOADS_S3_URI` is configured, deploy job `deploy-downloads-object-storage` runs automatically after bundle generation.
-3. Job syncs bundle using `scripts/publish-download-bundle-s3.sh`.
-4. Job verifies live manifest URL.
+Local release path:
+1. Build the release bundle on the controlled release host.
+2. If `CHUMMER_PORTAL_DOWNLOADS_S3_URI` is configured, run `RUNBOOK_MODE=downloads-sync-s3` to deploy the bundle after generation.
+3. The runbook syncs the bundle using `scripts/publish-download-bundle-s3.sh`.
+4. The runbook verifies the live manifest URL.
 
 Manual path:
 1. `RUNBOOK_MODE=downloads-sync-s3 DOWNLOAD_BUNDLE_DIR=<bundleDir> CHUMMER_PORTAL_DOWNLOADS_S3_URI=<s3://bucket/path> CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL=<portalBaseOrManifestUrl> [CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL=<endpoint>] bash scripts/runbook.sh`
 2. `RUNBOOK_MODE=downloads-verify DOWNLOADS_VERIFY_LINKS=1 DOWNLOADS_VERIFY_TARGET=<portalBaseOrManifestUrl> bash scripts/runbook.sh`
+
+## Daily Rolling Shelf
+
+Use this path for the normal Windows/Linux rolling shelf:
+
+1. Build only the platform artifacts required for the current verification pass.
+2. Stage the downloads bundle.
+3. Publish with `RUNBOOK_MODE=publish-latest-nightly bash scripts/runbook.sh`.
+
+The command is guarded by the 08:00 Europe/Vienna release window and by the once-per-day shelf rule. Use an explicit emergency override only when the release owner accepts the extra publish.
 
 ## Mode C: Live `chummer.run` HTTP Publish
 

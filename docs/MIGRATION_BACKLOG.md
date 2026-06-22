@@ -245,7 +245,7 @@ Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/
 
 - [x] `MIG-104` Add desktop download manifest + artifacts surface behind portal `/downloads/`.
 Acceptance criteria: platform download matrix is generated from CI artifacts and exposed through a versioned manifest.
-Progress: the public edge now serves local `/downloads/`, file-backed `/downloads/releases.json`, and local `/downloads/<artifact>` files from the checked-in portal-download mirror plus mounted self-hosted artifacts. The local-docker edge proof validates `/downloads/`, `/downloads/releases.json`, and the current public bridge redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) instead of the older docs/api-heavy smoke contract; CI workflow `desktop-downloads-matrix.yml` packages the same mirror into `desktop-download-bundle` with a regenerated manifest for deploy verification.
+Progress: the public edge now serves local `/downloads/`, file-backed `/downloads/releases.json`, and local `/downloads/<artifact>` files from the checked-in portal-download mirror plus mounted self-hosted files. The local-docker edge check validates `/downloads/`, `/downloads/releases.json`, and the current public bridge redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) instead of the older docs/api-heavy smoke contract; the self-hosted release script packages the same mirror into `desktop-download-bundle` with a regenerated manifest for deploy verification.
 
 - [x] `MIG-105` Add browser-hosted Avalonia head entry path (`/avalonia/`) behind the same public origin.
 Acceptance criteria: browser head is reachable from portal and clearly separated from native desktop distribution.

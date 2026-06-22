@@ -32,9 +32,12 @@ public sealed class BeHumanEventAdapterIntegrationTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
+        string view = File.ReadAllText(viewPath);
 
         Assert.Contains("BeHumanEventAdapterPostureService", controller, StringComparison.Ordinal);
-        Assert.False(File.Exists(viewPath));
+        Assert.True(File.Exists(viewPath));
+        Assert.DoesNotContain("BeHuman", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("provider boundary", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("BeHumanEventAdapter: BuildBeHumanEventAdapterPanel()", controller, StringComparison.Ordinal);
     }

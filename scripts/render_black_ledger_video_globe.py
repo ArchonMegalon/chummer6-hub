@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import subprocess
 import tempfile
@@ -15,6 +16,10 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "Chummer.Run.Api" / "wwwroot" / "media" / "ledger" / "globe"
 COMPLETION = ROOT / "_completion" / "black_ledger_video_globe"
+SOURCE_ZIP = Path(
+    os.environ.get("BLACK_LEDGER_VIDEO_GLOBE_SOURCE_ZIP")
+    or Path.home() / "black_ledger_video_globe_magicfit_design_20260529.zip"
+).expanduser()
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
@@ -218,7 +223,7 @@ def main() -> None:
     (COMPLETION / "BLACK_LEDGER_VIDEO_GLOBE_PROVIDER_RECEIPTS.generated.json").write_text(json.dumps({
         "provider": "MagicFit",
         "status": "not_verified_for_this_asset",
-        "source_zip": "/home/tibor/black_ledger_video_globe_magicfit_design_20260529.zip",
+        "source_zip": str(SOURCE_ZIP),
         "fallback_asset": receipt["files"],
         "gold_claim_allowed": False,
     }, indent=2) + "\n")

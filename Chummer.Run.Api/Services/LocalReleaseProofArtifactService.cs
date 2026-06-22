@@ -115,8 +115,7 @@ public sealed class LocalReleaseProofArtifactService
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
-                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath))
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath))
             }
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(File.Exists);

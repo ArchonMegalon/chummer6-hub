@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +16,15 @@ REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons" / "horizon-video-manifest.json"
 AUDIO_REBUILD = REPO / "scripts" / "rebuild_public_video_audio_unmixr.py"
 OUTPUT = REPO / ".codex-studio" / "published" / "HORIZON_VIDEO_AUDIO_EXIT_GATE.generated.json"
-REBUILD_RECEIPT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json")
+PUBLIC_VIDEO_AUDIO_OUT_ROOT_ENV = "CHUMMER_PUBLIC_VIDEO_AUDIO_OUT_ROOT"
+PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS_ENV = "CHUMMER_PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS"
+DEFAULT_REBUILD_ROOT = REPO.parent / "_completion" / "public_video_audio_unmixr"
+REBUILD_RECEIPT = Path(os.environ.get(PUBLIC_VIDEO_AUDIO_OUT_ROOT_ENV, "") or DEFAULT_REBUILD_ROOT) / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
+LEGACY_REBUILD_RECEIPTS = tuple(
+    Path(path.strip()) / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
+    for path in re.split(r"[,;:]", os.environ.get(PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS_ENV, ""))
+    if path.strip()
+)
 PUBLISHED_REBUILD_RECEIPT = REPO / ".codex-studio" / "published" / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
 PUBLISHED_CLEANUP_RECEIPTS = (
     REPO / ".codex-studio" / "published" / "PUBLIC_VIDEO_EXISTING_AUDIO_CLEANUP.generated.json",
@@ -60,8 +70,9 @@ def load_group_receipts(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def rebuild_group_receipts() -> dict[str, dict[str, Any]]:
-    receipts = load_group_receipts(PUBLISHED_REBUILD_RECEIPT)
-    receipts.update(load_group_receipts(REBUILD_RECEIPT))
+    receipts: dict[str, dict[str, Any]] = {}
+    for path in (PUBLISHED_REBUILD_RECEIPT, *LEGACY_REBUILD_RECEIPTS, REBUILD_RECEIPT):
+        receipts.update(load_group_receipts(path))
     return receipts
 
 
@@ -244,8 +255,12 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
             "video_streams_required": 1,
             "silence_gate_dbfs": audio.SILENCE_GATE_DBFS,
             "max_silence_seconds": audio.MAX_SILENCE_SECONDS,
-            "max_start_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
-            "max_tail_silence_seconds": audio.MAX_EDGE_SILENCE_SECONDS,
+            "max_start_silence_seconds": getattr(audio, "MAX_START_SILENCE_SECONDS", audio.MAX_EDGE_SILENCE_SECONDS),
+            "planned_tail_silence_seconds": getattr(audio, "NARRATION_END_BEFORE_VIDEO_SECONDS", 0.0),
+            "min_tail_silence_seconds": getattr(audio, "MIN_TAIL_SILENCE_SECONDS", 0.0),
+            "max_tail_silence_seconds": getattr(audio, "MAX_TAIL_SILENCE_SECONDS", audio.MAX_EDGE_SILENCE_SECONDS),
+            "video_fade_out_seconds": getattr(audio, "VIDEO_FADE_OUT_SECONDS", 0.0),
+            "video_fade_contract": getattr(audio, "VIDEO_FADE_CONTRACT", ""),
             "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
             "clean_speech_receipt_policy": "ALICE, Runsite, Runbook Press, and Table Pulse require a current Unmixr clean-speech receipt; waveform pass metrics or legacy cleanup evidence alone cannot release them",
             "premium_mix_policy": "every public horizon video requires passing measured audio quality plus either a current Unmixr rebuild receipt or current existing-audio cleanup evidence when the asset needed repair; legacy bed/noise styles and dead-air waivers are rejected",

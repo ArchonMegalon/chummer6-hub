@@ -106,8 +106,8 @@ public sealed class PublicLandingService
                     CleanPublicText(card.ActionLabel),
                     card.DetailPrimaryHref,
                     CleanPublicText(card.DetailPrimaryLabel),
-                    CleanPublicText(card.ProofNote),
-                    CleanPublicText(card.Microproof),
+                    CleanPublicText(card.StatusNote ?? card.ProofNote),
+                    CleanPublicText(card.StatusChips ?? card.Microproof),
                     CleanPublicText(card.Pain),
                     CleanPublicText(card.Payoff)))
                 .ToArray());

@@ -60,7 +60,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const navLinks = page.locator('.site-nav a, .site-nav__current');
 
     await expect(heroTitle).toContainText('Chummer');
-    await expect(primaryCta).toContainText('Stable');
+    await expect(primaryCta).toContainText('Download Chummer');
     await expect(workflow).toContainText('What it does');
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(help).toContainText('Need something else?');

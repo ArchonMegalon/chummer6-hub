@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/build_every_wonder_horizon_promo.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "build_every_wonder_horizon_promo.py"
 SPEC = importlib.util.spec_from_file_location("build_every_wonder_horizon_promo", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)

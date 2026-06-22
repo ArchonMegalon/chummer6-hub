@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/final_gold_janitor.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "final_gold_janitor.py"
 
 
 def load_module():

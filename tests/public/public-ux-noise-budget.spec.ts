@@ -19,8 +19,9 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   expect(heroText.toLowerCase()).not.toContain('proof');
   expect(heroText.toLowerCase()).not.toContain('artifact');
   expect(heroText.toLowerCase()).not.toContain('repo');
-  expect(heroText).toContain('Stable');
-  expect(heroText).toContain('Nightly');
+  expect(heroText).toContain('Download Chummer');
+  expect(heroText).not.toContain('Stable');
+  expect(heroText).not.toContain('Nightly');
 
   writeMarkdownArtifact(
     'FINAL_PUBLIC_UX_REDESIGN_VERDICT.md',

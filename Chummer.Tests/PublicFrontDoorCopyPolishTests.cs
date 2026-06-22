@@ -184,7 +184,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("later build-help context", registry, StringComparison.Ordinal);
             Assert.Contains("Derived projections", registry, StringComparison.Ordinal);
             Assert.Contains("Compare grounded tradeoffs with readable history", registry, StringComparison.Ordinal);
-            Assert.Contains("Open the briefing", registry, StringComparison.Ordinal);
+            Assert.Contains("Open JACKPOINT", registry, StringComparison.Ordinal);
             Assert.Contains("Open the prep page", registry, StringComparison.Ordinal);
             Assert.Contains("Open the public page", registry, StringComparison.Ordinal);
             Assert.Contains("working GM-control support", registry, StringComparison.Ordinal);
@@ -194,7 +194,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("Open Anarchy", registry, StringComparison.Ordinal);
             Assert.Contains("Reviewable export", registry, StringComparison.Ordinal);
             Assert.Contains("Replay and after-action history", registry, StringComparison.Ordinal);
-            Assert.Contains("Open the replay page", registry, StringComparison.Ordinal);
+            Assert.Contains("Open GHOSTWIRE", registry, StringComparison.Ordinal);
             Assert.Contains("working capability controls", registry, StringComparison.Ordinal);
             Assert.Contains("Open the acceleration details", registry, StringComparison.Ordinal);
             Assert.Contains("Publish primers, briefing reels, and bundles without losing context.", registry, StringComparison.Ordinal);
@@ -324,7 +324,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "AI-search",
             "core_product` lanes",
             "expansion_bet` lanes",
-            "folded_into_product` lanes",
+            "folded feature lanes",
             "route through an explicit public-guide verdict",
             "omission receipt",
             "proof artifact",
@@ -350,7 +350,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         }
 
         Assert.Contains("product homepage and invitation surface", combined, StringComparison.Ordinal);
-        Assert.Contains("preview cards or first-party pages", combined, StringComparison.Ordinal);
+        Assert.Contains("first-party pages", combined, StringComparison.Ordinal);
         Assert.Contains("approved Chummer copy, screenshots, and release notes", combined, StringComparison.Ordinal);
         Assert.Contains("Clear deeper links", combined, StringComparison.Ordinal);
         Assert.Contains("generation report", combined, StringComparison.Ordinal);
@@ -848,18 +848,19 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         foreach (string required in new[]
         {
             "static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+            "static string HomeText(string? value)",
             "@PublicText(supportCase.Case.Title)",
-            "@PublicText(receipt.ArtifactLabel)",
+            "@HomeText(receipt.ArtifactLabel)",
             "@PublicText(workspace.ChangePackets[0].Summary)",
             "PublicText(leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary)",
-            "PublicText(recentReceipts[0].ArtifactLabel)",
+            "HomeText(recentReceipts[0].ArtifactLabel)",
             "@PublicText(leadWorkspaceServerPlane.PrepLibrary.Summary)",
             "@PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)",
             "@PublicText(leadWorkspaceServerPlane.NextSafeAction.Summary)",
             "@PublicText(handoff.Summary)",
             "@string.Join(\", \", handoff.Outputs.Take(8).Select(item => PublicText(item.Label)))",
             "@PublicText(answer.ShortAnswer)",
-            "@PublicText(leadCommunityOperation.ArtifactPublicationSummary)",
+            "@HomeText(leadCommunityOperation.ArtifactPublicationSummary)",
             "@PublicText(leadAftermathCreatorPublication.Title)",
             "@PublicText(publication.Summary)",
             "@PublicText(device.RestoreSummary)"

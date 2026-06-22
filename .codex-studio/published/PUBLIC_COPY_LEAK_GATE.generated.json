@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-20T14:31:32Z",
-  "base_url": "http://127.0.0.1:5123",
+  "generated_at_utc": "2026-06-22T04:51:43Z",
+  "base_url": "http://127.0.0.1:5077",
   "status": "pass",
   "summary": {
     "route_count": 16,
@@ -110,163 +110,195 @@
   "routes": [
     {
       "route": "/",
-      "url": "http://127.0.0.1:5123/",
+      "url": "http://127.0.0.1:5077/",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/downloads",
-      "url": "http://127.0.0.1:5123/downloads",
+      "url": "http://127.0.0.1:5077/downloads",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/status",
-      "url": "http://127.0.0.1:5123/status",
+      "url": "http://127.0.0.1:5077/status",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/help",
-      "url": "http://127.0.0.1:5123/help",
+      "url": "http://127.0.0.1:5077/help",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/faq",
-      "url": "http://127.0.0.1:5123/faq",
+      "url": "http://127.0.0.1:5077/faq",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/horizons",
-      "url": "http://127.0.0.1:5123/horizons",
+      "url": "http://127.0.0.1:5077/horizons",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/roadmap",
-      "url": "http://127.0.0.1:5123/roadmap",
+      "url": "http://127.0.0.1:5077/roadmap",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/changelog",
-      "url": "http://127.0.0.1:5123/changelog",
+      "url": "http://127.0.0.1:5077/changelog",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/ledger",
-      "url": "http://127.0.0.1:5123/ledger",
+      "url": "http://127.0.0.1:5077/ledger",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/ledger/map",
-      "url": "http://127.0.0.1:5123/ledger/map",
+      "url": "http://127.0.0.1:5077/ledger/map",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/packages",
-      "url": "http://127.0.0.1:5123/packages",
+      "url": "http://127.0.0.1:5077/packages",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/participate",
-      "url": "http://127.0.0.1:5123/participate",
+      "url": "http://127.0.0.1:5077/participate",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/feedback",
-      "url": "http://127.0.0.1:5123/feedback",
+      "url": "http://127.0.0.1:5077/feedback",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/artifacts",
-      "url": "http://127.0.0.1:5123/artifacts",
+      "url": "http://127.0.0.1:5077/artifacts",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/what-is-chummer",
-      "url": "http://127.0.0.1:5123/what-is-chummer",
+      "url": "http://127.0.0.1:5077/what-is-chummer",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     },
     {
       "route": "/login?next=%2Faccount%2Faccess",
-      "url": "http://127.0.0.1:5123/login?next=%2Faccount%2Faccess",
+      "url": "http://127.0.0.1:5077/login?next=%2Faccount%2Faccess",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": null
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
     }
   ]
 }

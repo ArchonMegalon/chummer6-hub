@@ -6,6 +6,7 @@ namespace Chummer.Run.Api.Services;
 public sealed class WindowsProofInstallerService
 {
     private const string ProofInstallerRootKey = "CHUMMER_WINDOWS_PROOF_INSTALLER_ROOT";
+    private const string ProofInstallerRootsKey = "CHUMMER_WINDOWS_PROOF_INSTALLER_ROOTS";
     private const string DownloadsRootKey = "CHUMMER_DOWNLOADS_SOURCE_ROOT";
     private const string PublicDisabledArtifactIdsKey = "CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS";
     private const string ReleaseDisabledArtifactIdsKey = "CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS";
@@ -157,10 +158,15 @@ public sealed class WindowsProofInstallerService
         yield return Path.GetFullPath(Path.Combine(downloadsRoot, "files"));
         yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Chummer.Portal", "downloads", "proof", "windows"));
         yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Chummer.Portal", "downloads", "files"));
-        yield return "/docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads/proof/windows";
-        yield return "/docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads/files";
-        yield return "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files";
-        yield return "/docker/chummercomplete/chummer-presentation/dist-proof";
+
+        var configuredRoots = _configuration[ProofInstallerRootsKey]?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredRoots))
+        {
+            foreach (string root in configuredRoots.Split(new[] { ',', ';', Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                yield return Path.GetFullPath(root);
+            }
+        }
     }
 
     private static string NormalizeFileName(string? fileName)

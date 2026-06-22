@@ -23,6 +23,10 @@
     }
 
     static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    const string ReleaseDetailFamily = "release-detail";
+    var displayFamily = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase)
+        ? ReleaseDetailFamily
+        : Model.Family;
 
     var routeChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
     var seenRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -38,29 +42,29 @@
         routeChoices.Add((PublicText(badge), PublicText(title), PublicText(summary), href, PublicText(label), details.Select(PublicText).ToArray()));
     }
 
-    var primaryRouteTitle = Model.Family switch
+    var primaryRouteTitle = displayFamily switch
     {
         "roadmap" => "Take the next practical step",
-        "live-proof" => "Open the next useful page",
+        ReleaseDetailFamily => "Open the next useful page",
         "preview-concept" => "See what is available now",
         _ => "Continue from this feature"
     };
-    var primaryRouteSummary = Model.Family switch
+    var primaryRouteSummary = displayFamily switch
     {
         "roadmap" => $"{Model.PrimaryAction.Label} opens the next page for this work area.",
-        "live-proof" => $"{Model.PrimaryAction.Label} opens the related product page.",
+        ReleaseDetailFamily => $"{Model.PrimaryAction.Label} opens the related product page.",
         "preview-concept" => $"{Model.PrimaryAction.Label} shows what you can use today.",
         _ => $"{Model.PrimaryAction.Label} continues from this feature."
     };
-    var primaryRouteDetails = Model.Family switch
+    var primaryRouteDetails = displayFamily switch
     {
         "roadmap" => new[] { "Next step", "Current status", "Help nearby" },
-        "live-proof" => new[] { "Product page", "Downloads nearby", "Help nearby" },
+        ReleaseDetailFamily => new[] { "Product page", "Downloads nearby", "Help nearby" },
         "preview-concept" => new[] { "Available now", "Next step", "Help nearby" },
         _ => new[] { "Feature detail", "Next page", "Help nearby" }
     };
 
-    var compareRoute = Model.Family switch
+    var compareRoute = displayFamily switch
     {
         "roadmap" => (
             Href: "/now",
@@ -68,7 +72,7 @@
             Title: "See what is available today",
             Summary: "Use the current status page when you want to know what is ready to use.",
             Details: new[] { "Current status", "Download path", "Known limits" }),
-        "live-proof" => (
+        ReleaseDetailFamily => (
             Href: "/downloads",
             Label: "Open downloads",
             Title: "Install or update Chummer",
@@ -95,7 +99,7 @@
             Title: "Read the longer brief",
             Summary: $"{Model.SecondaryAction.Label} opens the broader context for this feature.",
             Details: new[] { "More context", "Related pages", "Help nearby" })
-        : Model.Family switch
+        : displayFamily switch
         {
             "roadmap" => (
                 Href: "/horizons",
@@ -103,7 +107,7 @@
                 Title: "Open the broader roadmap",
                 Summary: "Move to Maintenance when you want the larger product picture.",
                 Details: new[] { "Roadmap", "Related work", "Current status" }),
-            "live-proof" => (
+            ReleaseDetailFamily => (
                 Href: "/artifacts",
                 Label: "Open detail view",
                 Title: "Open the related detail view",
@@ -267,12 +271,12 @@ else
     </div>
 </section>
 
-@switch (Model.Family)
+@switch (displayFamily)
 {
     case "roadmap":
         @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailRoadmap.cshtml", Model)
         break;
-    case "live-proof":
+    case ReleaseDetailFamily:
         @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailLiveProof.cshtml", Model)
         break;
     case "preview-concept":

@@ -50,12 +50,13 @@ public sealed class PublicLandingServiceTests
             string.Equals(route.Path, "/roadmap/community-hub", StringComparison.Ordinal));
 
         var communityHub = Assert.Single(surface.FeatureCards, static card =>
-            string.Equals(card.Id, "horizon_community_hub", StringComparison.Ordinal));
+            string.Equals(card.Id, "feature_community_hub", StringComparison.Ordinal));
         var blackLedger = Assert.Single(surface.FeatureCards, static card =>
             string.Equals(card.Id, "horizon_black_ledger", StringComparison.Ordinal));
 
         Assert.Equal("/community", communityHub.DetailRoute);
-        Assert.Equal("/community/receipts/open-run-network.json", communityHub.DetailPrimaryHref);
+        Assert.Equal("/community", communityHub.DetailPrimaryHref);
+        Assert.Equal("/community/receipts/open-run-network.json", communityHub.FallbackRoute);
         Assert.Equal("/ledger", blackLedger.DetailRoute);
         Assert.Equal("/ledger/factions", blackLedger.DetailPrimaryHref);
     }
@@ -91,7 +92,7 @@ public sealed class PublicLandingServiceTests
         var document = loader.LoadRequiredYaml<PublicLandingManifestDocument>(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml");
 
         Assert.Contains("player can actually try today", document.ProductProofScopeLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Experimental surfaces stay behind lab routes", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Experimental surfaces stay off the main path", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(document.PublicRoutes!, static route =>
             string.Equals(route.Path, "/packages", StringComparison.Ordinal)
             && string.Equals(route.Purpose, "package_browser", StringComparison.Ordinal));

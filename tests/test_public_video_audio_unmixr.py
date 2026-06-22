@@ -10,7 +10,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/rebuild_public_video_audio_unmixr.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "rebuild_public_video_audio_unmixr.py"
 SPEC = importlib.util.spec_from_file_location("rebuild_public_video_audio_unmixr", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -118,6 +118,11 @@ class PublicVideoAudioUnmixrTests(unittest.TestCase):
         self.assertEqual(voice_id, "alice-female")
         self.assertEqual(source_env, "UNMIXR_ALICE_VOICE_ID")
 
+    def test_default_output_root_is_generic_not_date_stamped(self) -> None:
+        self.assertEqual(MODULE.OUT_ROOT, MODULE.REPO.parent / "_completion" / "public_video_audio_unmixr")
+        self.assertNotIn("20260619", str(MODULE.OUT_ROOT))
+        self.assertEqual(MODULE.LEGACY_OUT_ROOTS, ())
+
     def test_unmixr_api_key_discovery_supports_more_than_three_accounts(self) -> None:
         original_env_or_file = MODULE.LEGACY.env_or_file
         original_secret_env_files = MODULE._unmixr_secret_env_files
@@ -130,7 +135,7 @@ class PublicVideoAudioUnmixrTests(unittest.TestCase):
                         "UNMIXR_API_KEY=main-key",
                         "UNMIXR_API_KEY_FALLBACK_1=backup-one",
                         "UNMIXR_API_KEY_FALLBACK_2=",
-                        "UNMIXR_API_KEY_FALLBACK_3=backup-three",
+                        "UNMIXR_API_KEY_TIER4=backup-three",
                         "UNMIXR_API_KEY_PERSONAL=personal-key",
                         "UNMIXR_API_KEYS=bulk-one,bulk-two",
                     ]
@@ -164,12 +169,59 @@ class PublicVideoAudioUnmixrTests(unittest.TestCase):
                 "UNMIXR_API_KEY_FALLBACK_1",
                 "UNMIXR_API_KEYS[1]",
                 "UNMIXR_API_KEYS[2]",
-                "UNMIXR_API_KEY_FALLBACK_3",
+                "UNMIXR_API_KEY_TIER4",
                 "UNMIXR_API_KEY_PERSONAL",
             ],
         )
         self.assertEqual([value for _, value in keys], ["main-key", "backup-one", "bulk-one", "bulk-two", "backup-three", "personal-key"])
         self.assertEqual(preferred[0], ("UNMIXR_API_KEY_PERSONAL", "personal-key"))
+
+    def test_public_video_uses_operator_configured_unmixr_account_preference(self) -> None:
+        original_env_or_file = MODULE.LEGACY.env_or_file
+        original_secret_env_files = MODULE._unmixr_secret_env_files
+
+        def fake_env_or_file(key: str) -> str:
+            values = {
+                "UNMIXR_API_KEY": "main-key",
+                "UNMIXR_API_KEY_TIER4": "tier-four-key",
+                "UNMIXR_PUBLIC_VIDEO_PREFERRED_API_KEY_ENV": "UNMIXR_API_KEY_TIER4",
+            }
+            return values.get(key, "")
+
+        try:
+            MODULE.LEGACY.env_or_file = fake_env_or_file
+            MODULE._unmixr_secret_env_files = lambda: ()
+            with patch.dict(os.environ, {}, clear=True):
+                keys = MODULE._unmixr_api_keys(MODULE._preferred_public_video_unmixr_api_key_env())
+        finally:
+            MODULE.LEGACY.env_or_file = original_env_or_file
+            MODULE._unmixr_secret_env_files = original_secret_env_files
+
+        self.assertEqual(keys[0], ("UNMIXR_API_KEY_TIER4", "tier-four-key"))
+
+    def test_public_video_does_not_hardcode_a_specific_unmixr_fallback_slot(self) -> None:
+        original_env_or_file = MODULE.LEGACY.env_or_file
+        original_secret_env_files = MODULE._unmixr_secret_env_files
+
+        def fake_env_or_file(key: str) -> str:
+            values = {
+                "UNMIXR_API_KEY": "main-key",
+                "UNMIXR_API_KEY_FALLBACK_3": "tier-four-key",
+            }
+            return values.get(key, "")
+
+        try:
+            MODULE.LEGACY.env_or_file = fake_env_or_file
+            MODULE._unmixr_secret_env_files = lambda: ()
+            with patch.dict(os.environ, {}, clear=True):
+                preferred = MODULE._preferred_public_video_unmixr_api_key_env()
+                keys = MODULE._unmixr_api_keys(preferred)
+        finally:
+            MODULE.LEGACY.env_or_file = original_env_or_file
+            MODULE._unmixr_secret_env_files = original_secret_env_files
+
+        self.assertEqual(preferred, "")
+        self.assertEqual(keys[0], ("UNMIXR_API_KEY", "main-key"))
 
 
 if __name__ == "__main__":

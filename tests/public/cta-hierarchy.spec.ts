@@ -20,11 +20,11 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
-    const expected = ['Stable', 'Nightly'];
-    expect(normalized.slice(0, 2), `${viewport.name} hero CTA order`).toEqual(expected);
+    const expected = ['Download Chummer'];
+    expect(normalized, `${viewport.name} hero CTA order`).toEqual(expected);
 
     const heroBoxes = [];
-    for (let index = 0; index < Math.min(await heroActions.count(), 2); index += 1) {
+    for (let index = 0; index < await heroActions.count(); index += 1) {
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
@@ -40,7 +40,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
     results.push({
       viewport: viewport.name,
-      hero_ctas: normalized.slice(0, 2),
+      hero_ctas: normalized,
       hero_boxes: heroBoxes,
       support_primary_top: supportPrimaryTop,
       inline_nav_visible: await page.locator('.site-nav').isVisible(),
@@ -62,7 +62,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps two ranked CTAs: `Stable`, `Nightly`.',
+      '- Hero keeps one primary CTA: `Download Chummer`.',
       '- Homepage remains compact: hero, workflow, help, and no repeated download strip.',
       '- Release posture stays off the first screen and lives on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',

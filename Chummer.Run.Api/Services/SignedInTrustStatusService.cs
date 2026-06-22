@@ -579,7 +579,7 @@ public sealed class SignedInTrustStatusService
     {
         if (releaseExperience.Recommended is null)
         {
-            return "No release handoff is published yet.";
+            return "No release download is published yet.";
         }
 
         if ((pulse?.ParityClaimsReviewRequired ?? false)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import urllib.request
 from datetime import datetime, timezone
@@ -10,11 +11,11 @@ from pathlib import Path
 from typing import Any
 
 
-WORKSPACE = Path("/docker/chummercomplete")
+WORKSPACE = Path(os.environ.get("CHUMMER_WORKSPACE_ROOT") or "/docker/chummercomplete").expanduser()
 RUN_SERVICES = WORKSPACE / "chummer.run-services"
-OUT = WORKSPACE / "_completion" / "full_product_reaudit_v14"
-ZIP = Path("/home/tibor/chummer6_full_product_reaudit_v14_20260529.zip")
-BASE_URL = "https://chummer.run"
+OUT = Path(os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_OUT_DIR") or WORKSPACE / "_completion" / "full_product_reaudit_v14").expanduser()
+ZIP = Path(os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_ZIP") or Path.home() / "chummer6_full_product_reaudit_v14_20260529.zip").expanduser()
+BASE_URL = os.environ.get("CHUMMER_PUBLIC_BASE_URL") or "https://chummer.run"
 
 
 REQUIRED_OUTPUTS = [

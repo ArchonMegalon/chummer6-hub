@@ -50,8 +50,8 @@ public sealed class HostedProofContractService
             ? "/account/work#community-ops"
             : context.CommunityHubRoute!;
         string summary = openRun.Closeout is null
-            ? $"{openRun.Listing.ListingTitle} stays on the reviewed open-run page until schedule, handoff, and closeout status agree."
-            : $"{openRun.Listing.ListingTitle} keeps listing, schedule, meeting handoff, and closeout status on the reviewed open-run page.";
+            ? $"{openRun.Listing.ListingTitle} stays on the reviewed open-run page until schedule, meeting details, and closeout status agree."
+            : $"{openRun.Listing.ListingTitle} keeps listing, schedule, meeting details, and closeout status on the reviewed open-run page.";
 
         return new HostedProofContractProjection(
             ContractId: StableId("hosted-proof-open-runs", openRun.Listing.OpenRunId),
@@ -68,13 +68,13 @@ public sealed class HostedProofContractService
             EvidenceLines:
             [
                 openRun.Listing.TableContractSummary,
-                openRun.Schedule?.Summary ?? "A reviewed schedule record still has to land before the meeting handoff can close the loop.",
-                openRun.MeetingHandoff?.Summary ?? "Meeting handoff is still pending on the reviewed open-run page.",
+                openRun.Schedule?.Summary ?? "A reviewed schedule record still has to land before the meeting details can close the loop.",
+                openRun.MeetingHandoff?.Summary ?? "Meeting details are still pending on the reviewed open-run page.",
                 openRun.Closeout?.Summary ?? "Closeout status stays pending until WorldTick and player-safe news records exist."
             ],
             Actions:
             [
-                new HostedProofContractActionProjection("open_open_run_detail", "Open open-run detail", route, "Inspect the reviewed listing, join, schedule, handoff, and closeout records on the same hub route."),
+                new HostedProofContractActionProjection("open_open_run_detail", "Open open-run detail", route, "Inspect the reviewed listing, join request, schedule, meeting details, and closeout records on the same hub route."),
                 new HostedProofContractActionProjection("open_community_ops", "Open community ops", comparisonRoute, "Compare the open-run status against the signed-in community operations page.")
             ],
             EmittedAtUtc: now,

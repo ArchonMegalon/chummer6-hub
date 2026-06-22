@@ -941,7 +941,8 @@ public sealed record ParticipatePageViewModel(
     IReadOnlyList<ParticipateItemViewModel> Items,
     string PrivateHelpHref,
     string RoadmapHref,
-    string ChangelogHref);
+    string ChangelogHref,
+    PublicSignalOperationsPacketViewModel? SignalOperations = null);
 
 public sealed record ParticipateLaneViewModel(
     string Label,

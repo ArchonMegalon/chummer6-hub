@@ -124,7 +124,7 @@ public sealed class SupportCasePresentationService
                     ? "Open Devices and access, then continue with the same linked copy when the fixed build reaches your install."
                     : "Watch downloads so this fix can reach your installed channel.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "The underlying issue is fixed, but the release handoff may still be moving."
+                    ? "The underlying issue is fixed, but the release step may still be moving."
                     : $"The underlying issue is fixed and is moving through {fixedReleaseLabel}.",
                 installRailCase ? "Open Devices and access" : "Open downloads",
                 installRailCase ? "/account/access" : "/downloads",
@@ -355,7 +355,7 @@ public sealed class SupportCasePresentationService
                 ? "The fix is ready for the reporter. Update or reinstall on the affected device to pick it up."
                 : $"The fix reached {fixedReleaseLabel}. Update or reinstall on the affected device to pick it up.",
             SupportCaseStatuses.Fixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                ? "The fix exists, but the release handoff is still moving."
+                ? "The fix exists, but the release step is still moving."
                 : $"The fix is already mapped to {fixedReleaseLabel}, but the closure notice has not gone out yet.",
             _ when supportCase.UserNotifiedAtUtc.HasValue => "The closure notice already went out; reopen support only if the same issue still reproduces.",
             _ when supportCase.ReleasedToReporterChannelAtUtc.HasValue => "A reporter-ready fix exists, but the final user-facing closure step is still catching up.",

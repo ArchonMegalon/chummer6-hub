@@ -14,13 +14,13 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.Outputs.Take(8)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Output lanes continue:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.Outputs.Count - 8", view, StringComparison.Ordinal);
-        Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(output.NextSafeAction)", view, StringComparison.Ordinal);
+        Assert.Contains("HomeText(output.ProvenanceSummary)", view, StringComparison.Ordinal);
         Assert.Contains("BuildLabOutputLaneLabel(output.Kind)", view, StringComparison.Ordinal);
-        Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(output.PublicationSummary)", view, StringComparison.Ordinal);
         Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
         Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
-        Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicText(output.AuditSummary)", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
         Assert.Contains("Rules change:", view, StringComparison.Ordinal);
         Assert.Contains("Rules scope:", view, StringComparison.Ordinal);

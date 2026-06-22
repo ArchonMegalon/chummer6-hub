@@ -25,7 +25,15 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
 MEDIA_ROOT = REPO / "Chummer.Run.Api" / "wwwroot" / "media"
-OUT_ROOT = Path("/docker/chummercomplete/_completion/public_video_audio_unmixr_20260619")
+PUBLIC_VIDEO_AUDIO_OUT_ROOT_ENV = "CHUMMER_PUBLIC_VIDEO_AUDIO_OUT_ROOT"
+PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS_ENV = "CHUMMER_PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS"
+DEFAULT_OUT_ROOT = REPO.parent / "_completion" / "public_video_audio_unmixr"
+OUT_ROOT = Path(os.environ.get(PUBLIC_VIDEO_AUDIO_OUT_ROOT_ENV, "") or DEFAULT_OUT_ROOT)
+LEGACY_OUT_ROOTS = tuple(
+    Path(path.strip())
+    for path in re.split(r"[,;:]", os.environ.get(PUBLIC_VIDEO_AUDIO_LEGACY_OUT_ROOTS_ENV, ""))
+    if path.strip()
+)
 PUBLISHED_REBUILD_RECEIPT = REPO / ".codex-studio" / "published" / "PUBLIC_VIDEO_AUDIO_REBUILD.generated.json"
 LEGACY_PROMO_AUDIO = REPO / "scripts" / "rebuild_promo_audio_continuous.py"
 UNMIXR_PROVIDER = "unmixr-short-tts"
@@ -35,12 +43,20 @@ LOW_RUMBLE_HIGHPASS_HZ = 90
 LOW_TONE_CLEANUP_FILTER = "equalizer=f=188:width_type=h:width=90:g=-18,equalizer=f=235:width_type=h:width=105:g=-18"
 NARRATION_START_DELAY_MS = 180
 MAX_SILENCE_SECONDS = 1.00
-MAX_EDGE_SILENCE_SECONDS = 0.30
+MAX_START_SILENCE_SECONDS = 0.30
+MAX_EDGE_SILENCE_SECONDS = MAX_START_SILENCE_SECONDS
+NARRATION_END_BEFORE_VIDEO_SECONDS = 1.20
+NARRATION_END_TOLERANCE_SECONDS = 0.45
+MIN_TAIL_SILENCE_SECONDS = max(0.0, NARRATION_END_BEFORE_VIDEO_SECONDS - NARRATION_END_TOLERANCE_SECONDS)
+MAX_TAIL_SILENCE_SECONDS = NARRATION_END_BEFORE_VIDEO_SECONDS + NARRATION_END_TOLERANCE_SECONDS
+PUBLIC_TAIL_GATE_MIN_DURATION_SECONDS = 2.0
+VIDEO_FADE_OUT_SECONDS = 1.20
+VOICE_FADE_OUT_SECONDS = 0.25
 MIN_AUDIO_COVERAGE_RATIO = 0.98
 MAX_UNCOVERED_TAIL_SECONDS = 0.75
 SILENCE_GATE_DBFS = -42.0
-MIN_CLEAN_TTS_COVERAGE_RATIO = 0.68
-MIN_CLEAN_TTS_TEMPO = 0.68
+MIN_CLEAN_TTS_COVERAGE_RATIO = 0.90
+MIN_CLEAN_TTS_TEMPO = 0.90
 MAX_CLEAN_TTS_TEMPO = 1.16
 MAX_LOW_TONE_RESONANCE_DB = 20.0
 MIN_LOW_TONE_RESONANCE_RATIO = 0.001
@@ -56,8 +72,9 @@ CLEAN_SPEECH_AUDIO_GROUPS = {
     TABLE_PULSE_CLEAN_AUDIO_GROUP,
 }
 AUDIOBOOK_STYLE_NORMALIZATION_FILTER = "dynaudnorm=f=150:g=15,loudnorm=I=-16:TP=-1.5:LRA=11"
-AUDIO_NORMALIZATION_CONTRACT = "ea.public_video_unmixr_beat_trim.v2"
-CLEAN_SPEECH_MIX_CONTRACT = "ea.public_video_clean_speech_no_noise_floor.v2"
+AUDIO_NORMALIZATION_CONTRACT = "ea.public_video_unmixr_beat_trim_end_before_video_fade.v3"
+CLEAN_SPEECH_MIX_CONTRACT = "ea.public_video_clean_speech_no_noise_floor_end_before_video_fade.v3"
+VIDEO_FADE_CONTRACT = "ea.public_video_fade_out_with_unmixr_tail.v1"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 RUNSITE_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
 RUNBOOK_PRESS_CLEAN_AUDIO_STYLE = "clean_premium_narration_no_bed_no_noise_floor"
@@ -76,6 +93,8 @@ UNMIXR_API_KEY_ENV_KEYS = (
 )
 UNMIXR_API_KEYS_BULK_ENV = "UNMIXR_API_KEYS"
 UNMIXR_API_KEY_DYNAMIC_PREFIX = "UNMIXR_API_KEY_"
+UNMIXR_SECRET_ENV_FILES_ENV = "UNMIXR_SECRET_ENV_FILES"
+PUBLIC_VIDEO_PREFERRED_UNMIXR_API_KEY_ENV = "UNMIXR_PUBLIC_VIDEO_PREFERRED_API_KEY_ENV"
 
 DEFAULT_VOICE_ENV_KEYS = (
     "UNMIXR_PREMIUM_NARRATOR_VOICE_ID",
@@ -171,12 +190,18 @@ def _split_bulk_unmixr_api_keys(value: str) -> list[str]:
 
 
 def _unmixr_secret_env_files() -> tuple[Path, ...]:
-    files = [
-        *(Path(path) for path in getattr(LEGACY, "ENV_FILES", ())),
-        REPO / ".env.local",
-        Path("/docker/EA/.env.local"),
-        Path("/docker/EA/ea/.env.local"),
-    ]
+    files: list[Path] = []
+    legacy_configured_env_files = getattr(LEGACY, "configured_env_files", None)
+    if callable(legacy_configured_env_files):
+        files.extend(Path(path) for path in legacy_configured_env_files())
+    else:
+        files.extend(Path(path) for path in getattr(LEGACY, "ENV_FILES", ()))
+    files.extend([REPO / ".env.local", REPO / ".env"])
+    files.extend(
+        Path(path.strip())
+        for path in re.split(r"[,;:]", os.environ.get(UNMIXR_SECRET_ENV_FILES_ENV, ""))
+        if path.strip()
+    )
     unique: list[Path] = []
     seen: set[str] = set()
     for file in files:
@@ -226,6 +251,9 @@ def _unmixr_api_keys(preferred_env: str = "") -> list[tuple[str, str]]:
     for env_key in UNMIXR_API_KEY_ENV_KEYS:
         add_candidate(env_key, LEGACY.env_or_file(env_key))
 
+    if preferred_env and _is_unmixr_api_key_name(preferred_env):
+        add_candidate(preferred_env, LEGACY.env_or_file(preferred_env))
+
     for index, api_key in enumerate(_split_bulk_unmixr_api_keys(LEGACY.env_or_file(UNMIXR_API_KEYS_BULK_ENV)), start=1):
         add_candidate(f"{UNMIXR_API_KEYS_BULK_ENV}[{index}]", api_key)
 
@@ -243,6 +271,20 @@ def _unmixr_api_keys(preferred_env: str = "") -> list[tuple[str, str]]:
     if preferred_env:
         keys.sort(key=lambda item: 0 if item[0] == preferred_env else 1)
     return keys
+
+
+def _preferred_public_video_unmixr_api_key_env() -> str:
+    return LEGACY.env_or_file(PUBLIC_VIDEO_PREFERRED_UNMIXR_API_KEY_ENV)
+
+
+def hydrate_legacy_work_cache(group_key: str, work: Path) -> None:
+    if (work / "unmixr-narration.wav").is_file():
+        return
+    for root in LEGACY_OUT_ROOTS:
+        source = root / group_key
+        if source.is_dir():
+            shutil.copytree(source, work, dirs_exist_ok=True)
+            return
 
 
 def _unmixr_tts_config(voice_id: str, api_key_env: str = "") -> dict[str, str]:
@@ -478,6 +520,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "When the city answers, it does not answer as decoration. It answers with heat, factions, jobs, rumors, and consequences the GM can turn into tomorrow night's trouble. "
         "House rules stop living as arguments in old chat logs. Recaps stop dissolving into rumor. The aftermath becomes signal, and that signal becomes the next run. "
         "From desktop to tablet to phone, from home table to remote night, Chummer6 is for crews who want the world to remember what they did and still be ready when the next door opens. "
+        "The product is not trying to replace the table. It is trying to hold the boring parts steady so the dramatic parts can move faster. "
         "The promise is practical: less ceremony, fewer missing details, more time spent in the scene, and a campaign that can keep moving after the dice stop."
     ),
     "all-horizons-90s-magicfit-promo": (
@@ -495,6 +538,8 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Runsite makes a location feel like a problem, not just a map. Runbook Press turns approved campaign material into primers, packets, and season books. Jackpoint makes aftermath easier to return to when the next session begins. "
         "Some ideas are expansion bets, and they should be named honestly. NEXUS-PAN is device continuity. KARMA FORGE is table-approved house-rule change. BLACK LEDGER is the living city: heat, factions, jobs, news, and fallout that remembers the crew. "
         "Other areas are clearer when they are called what they are: campaign memory, mission-space prep, publishing, community, and specialized play modes. "
+        "That distinction matters because new users need a front door, not a vocabulary test. The workbench should explain what helps tonight, what grows the campaign, and what belongs to a later expansion. "
+        "Each video, guide, and public page should make the same promise in a different register: this is a practical campaign operating system, not a pile of disconnected experiments. "
         "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves. The product gets easier to understand because the names serve the work instead of competing with it."
     ),
     "nexus-pan-90s-deepdive": (
@@ -503,6 +548,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "A reconnect should not become a rules argument. A conflict should surface before it hardens into table folklore. Desktop, tablet, phone, remote night, train ride, home table, same campaign, same moment, no scavenger hunt for the current version. "
         "For the GM, the promise is practical: can I trust what I am seeing right now, and can I recover the room without stopping the fiction. For the player, it is even simpler: rejoin, catch up, answer the scene, and stay in the run. "
         "The system should make repair feel ordinary. Show what arrived, what changed, what is waiting for approval, and what can be ignored until after the scene. "
+        "The interface should make small interruptions feel survivable. A stale packet should look stale. A waiting update should say what it affects. A returning player should not need the GM to reconstruct the last ten minutes by hand. "
         "NEXUS-PAN is continuity with a pulse, built for crews who refuse to lose the night because one device blinked first."
     ),
     "nexus-pan-epic-90s": (
@@ -510,7 +556,8 @@ EXTRA_SCRIPT_BY_GROUP = {
         "The epic version of NEXUS-PAN begins there, with trust as the first dramatic question. Who is connected. What changed. Which state is current enough to act on without breaking the scene. "
         "Packets move. Devices disagree. The table does not need more drama from the software. It needs signal, context, and a clear next step before momentum dies. "
         "When conflict appears, the system should expose it cleanly and let the GM make the call before the fiction tears. The campaign should travel with the crew from desk to tablet to train to home table without export rituals, copied files, or wishful thinking. "
-        "A returning player should receive the humane version of continuity: where you were, what changed, what danger is live, and what move is waiting. That is the fantasy here. Less ceremony, less panic, more run, and a campaign state that still feels trustworthy when the network does not."
+        "A returning player should receive the humane version of continuity: where you were, what changed, what danger is live, and what move is waiting. That is the fantasy here. Less ceremony, less panic, more run, and a campaign state that still feels trustworthy when the network does not. "
+        "The best version feels quiet under stress: sync status, conflict status, pending approvals, and the next playable action all surfaced before anyone has to ask. "
         "The larger promise is not synchronization for its own sake. It is confidence under interruption, so the people can return to the scene instead of negotiating with their tools."
     ),
     "karma-forge-90s-deepdive": (
@@ -520,6 +567,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Campaigns evolve. Their rule environment can evolve with them. But that evolution should feel table-approved, legible, reversible, and connected to the campaign that asked for it. "
         "The GM remains the final authority. The software can show risk, collect reaction, preserve history, and make the next version easier to understand. It should not smuggle private preference into public rules. "
         "A proposed change should carry context: the problem it solves, the characters it touches, the sessions it may affect, and the fallback if the table changes its mind. "
+        "The useful part is restraint: every experiment needs scope, evidence, and a way back before it becomes the new normal. "
         "Karma Forge is for tables that want custom play without surrendering coherence: a place where house rules can become understandable, testable, and safe enough to try."
     ),
     "jackpoint-90s-deepdive": (
@@ -528,6 +576,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Those details need different doors. A player-facing briefing should feel like the world speaking back, not like a database export with the serial numbers still attached. A missed player should return to a clean handoff, not a twenty-minute oral history full of contradictions and fading excitement. "
         "As the season grows longer, memory needs structure. Who owes the crew. Which rumor became dangerous. Which contact changed sides. Which choice is still waiting to collect interest. "
         "The best briefing is short enough to read, rich enough to act on, and careful enough not to leak what should stay behind the screen. It gives a returning player confidence without forcing the table to replay the whole night. "
+        "It can sound like a dramatic handoff while still staying operational: what is player-safe, what belongs to the GM, what changed since last time, and what hook is ready to enter the room. "
         "The table still owns the story. Jackpoint simply gives that story a sharper, more dramatic way to return when next session begins. It turns aftermath into usable memory without stealing the voice of the campaign."
     ),
     TABLE_PULSE_CLEAN_AUDIO_GROUP: (
@@ -535,6 +584,8 @@ EXTRA_SCRIPT_BY_GROUP = {
         "The GM sees the signal first. The system offers pressure, reaction, and aftermath as packets, not commandments. The table can be nudged when a scene needs oxygen and left alone when silence is the better choice. "
         "Players who are not physically in the room can still matter when they join an opposing faction. If they opt in, they can receive a bounded notification, send a reaction, and push back from outside the table without hijacking the moment inside it. "
         "After the run, they can receive a focused summary of what happened, who won, and what fallout now belongs to their side. Consent, quiet hours, opt-outs, and table policy are not decoration around the system. They are the system. "
+        "The shape of the product is deliberately restrained. A pulse can warn the GM that attention is dropping, that a faction reaction is ready, or that the aftermath deserves a clean handoff, but it should never turn the session into a machine watching people perform. "
+        "Good pressure has a human rhythm. It waits for the right moment, gives the table one useful choice, and then gets out of the way before the scene loses its own gravity. "
         "A good pulse is felt in the scene, in the aftermath, and in the rising tension of the campaign, while the software itself almost disappears."
     ),
     "black-ledger-90s-deepdive": (
@@ -543,6 +594,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Faction pressure works best when it creates decisions, not encyclopedia weight. The newsroom gives the city a voice: dramatic, biased, occasionally cruel, and just useful enough to become tomorrow night's hook. "
         "The GM should see what changed and why. Players should feel the city react without receiving private notes they were never meant to know. Public projection stays careful, approval-gated, and useful. "
         "A good city surface does not ask the table to study lore before play. It shows pressure, opportunity, rumor, and consequence in a form the GM can turn into a decision. "
+        "The public view should feel like a broadcast from a living place, while the operator view keeps the cause, risk, and approval state attached. That split is what keeps drama useful instead of noisy. "
         "By the time the next session begins, the world should already have opinions. Black Ledger is for campaigns where the map remembers, the city pushes back, and the fallout is always looking for a new owner."
     ),
     "black-ledger-epic-90s": (
@@ -553,6 +605,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "The GM keeps authority. Public surfaces stay bounded. The city moves because the table approved what happened, and because consequences should have a memory. "
         "The epic promise is a campaign city that grows pressure between sessions without turning the GM into a clerk. The surface should show what is rising, what is cooling, what is now dangerous, and what might become tomorrow night's job. "
         "It should feel like the city took notes while the crew was busy surviving. "
+        "That memory is the feature: visible enough to play, bounded enough to trust. "
         "Black Ledger is for campaigns where the map remembers the damage and develops an attitude about it."
     ),
     "community-hub-90s-deepdive": (
@@ -562,6 +615,7 @@ EXTRA_SCRIPT_BY_GROUP = {
         "For a GM, the hub should reduce coordination drag. For a player, it should make the next honest step obvious. For the table, it should protect expectations before the first scene begins. "
         "The system should respect attention: fewer status pings, clearer commitments, and a clean handoff from interest to attendance to aftermath. "
         "It should also make absence visible early, so the table can adapt before the night is already slipping away. "
+        "The public side can invite people in, but the operating side has to earn trust: who is confirmed, who needs a reminder, what safety expectations apply, and what information the GM still needs before the run opens. "
         "The best outcome remains beautifully simple: the right people find the right run, the night actually happens, and the campaign remembers what came out the other side."
     ),
     "origin-dossier-the-name-she-chose": (
@@ -607,6 +661,9 @@ EXTRA_SCRIPT_BY_GROUP = {
         "The point is not to script the route. The point is to make the site strong enough for improvisation. "
         "If the crew scouts, the space rewards attention. If they rush, the space pushes back. If they split up, the table still understands what each choice costs. "
         "Runsite gives the GM a place that can breathe under pressure and gives the players a location worth planning around. "
+        "A good runsite also carries time: patrol rhythm, response delay, exit pressure, environmental risk, and what changes when the crew trips the wrong line. "
+        "It should help the table ask better questions before the dice start: where can we enter, what can see us, what can trap us, and what do we lose if we wait. "
+        "The goal is not a prettier map. It is a shared tactical memory that keeps the fiction moving when the plan meets resistance. "
         "Before the breach, during the run, and after the fallout, the site remains legible, dangerous, and memorable."
     ),
     "origin-dossier-90s-deepdive": (
@@ -617,34 +674,44 @@ EXTRA_SCRIPT_BY_GROUP = {
         "When ALICE reads approved origin material later, it reads character context, not hidden rules. Weak media can be rejected without damaging the runner. Strong material gives the crew a person to bring into the next job. "
         "The best version feels intimate without becoming invasive. It gives the GM handles, gives the player choices, and keeps approval visible so nobody confuses generated drama with accepted canon. "
         "The result should feel like a campaign artifact, not a profile card: concise, dramatic, useful, and still open enough for the player to surprise everyone at the table. "
+        "A good dossier knows when to stop. It should reveal enough pressure to make play richer, but leave enough air for the player to make new choices at the table. "
         "Not a backstory pasted on top. A life with consequences, ready for the next scene."
     ),
     "black-ledger-3dvista-flythrough": (
         "Black Ledger is the city with a memory. District pressure, faction motion, open jobs, and newsreel fallout give the GM a place to start when the table asks what changed after the last run. "
-        "The flythrough is not decoration. It is a fast way to feel the board: where heat is rising, where opportunity is gathering, and where the crew may have left trouble behind."
+        "The flythrough is not decoration. It is a fast way to feel the board: where heat is rising, where opportunity is gathering, and where the crew may have left trouble behind. "
+        "The camera moves across a campaign surface that should be readable at a glance. Districts carry pressure. Factions carry intent. Jobs carry timing. A quiet corner can become dangerous because the crew made a loud choice three scenes ago. "
+        "For the GM, the value is orientation before improvisation. For players, the value is consequence that feels visible without spoiling the private machinery behind it. "
+        "A clean tour should leave the table with questions worth playing: who is gaining ground, which route became risky, and what opportunity appeared because someone else took damage first. "
+        "The city should look alive because the table made it move, and the next run should begin with that motion already in the room."
     ),
     "black-ledger-video-globe-idle": (
-        "The city is still moving. Black Ledger keeps district pressure, faction heat, and visible fallout close enough for the next decision."
+        "The city is still moving. Black Ledger keeps heat, faction pressure, jobs, and visible fallout close enough for the next decision. Trouble stays visible while the next run waits, and the map keeps score."
     ),
     "ashline-circle-promo": (
         "Ashline Circle sells calm power with dangerous consequences. The public face is wellness, source clarity, and controlled magic heat. "
-        "Behind the polish, the table still needs proof: who changed the risk, where the pressure rose, and why the next ritual matters."
+        "Behind the polish, the table still needs proof: who changed the risk, where the pressure rose, and why the next ritual matters. "
+        "Their stories work best when serenity has teeth: clean rooms, precise language, careful favors, and a cost that only becomes obvious after someone accepts the blessing."
     ),
     "barrens-free-wardens-promo": (
         "Barrens Free Wardens begin where polished systems usually stop. They care about closeout witnesses, recovery saves, and safehouse routes that still work in the rain. "
-        "Less nuyen, more backbone: when the street breaks, they make sure someone gets home."
+        "Less nuyen, more backbone: when the street breaks, they make sure someone gets home. "
+        "Their pressure is practical, local, and stubborn. A good Warden story turns a broken route, a missing witness, or a burned favor into the reason the crew cannot simply walk away."
     ),
     "ghostline-network-promo": (
         "Ghostline Network is for crews that survive by checking the signal before trusting the rumor. Intel confidence, redaction, and dispatch discipline matter here. "
-        "The promise is simple: verify what can be verified, hide what must stay dark, and move before noise becomes a trap."
+        "The promise is simple: verify what can be verified, hide what must stay dark, and move before noise becomes a trap. "
+        "They make uncertainty playable: source quality, exposure risk, and the difference between a useful whisper and a lure with a clean timestamp."
     ),
     "glass-tower-compact-promo": (
         "Glass Tower Compact turns public trust into a weapon with clean edges. License polish, compliance pressure, and calm paperwork all carry consequences. "
-        "The surface is corporate order; the useful part is knowing exactly when that order becomes leverage against someone else."
+        "The surface is corporate order; the useful part is knowing exactly when that order becomes leverage against someone else. "
+        "Their conflicts should feel polite until the room realizes the form was the trap, the exception was intentional, and the signature already moved the heat."
     ),
     "neon-docks-union-promo": (
         "Neon Docks Union keeps the city moving when cargo, drones, and escape windows all collide. Route control is not decoration here. "
-        "It is the difference between a clean handoff, a blocked exit, and a crew learning too late that the dock had already changed sides."
+        "It is the difference between a clean handoff, a blocked exit, and a crew learning too late that the dock had already changed sides. "
+        "Their best pressure is kinetic: cranes, water, manifests, tired crews, and a deadline that turns one wrong gate into a whole district paying attention."
     ),
     "rust-market-syndicate-promo": (
         "Rust Market Syndicate makes every favor visible enough to become dangerous. Debt heat, favor load, and black-market opportunity all share the same table. "
@@ -653,12 +720,12 @@ EXTRA_SCRIPT_BY_GROUP = {
         "Everything is available. Nothing is free. The trick is seeing the cost before the deal starts collecting interest."
     ),
     "turn-1-newsreel": (
-        "Emerald Sprawl opens with pressure in Rust Bazaar. Debt heat is visible, Ashline crews are already watching, and the board is no longer abstract. "
-        "The city remembers who moved first, which district failed to recover, and where tomorrow's trouble is likely to start."
+        "Emerald Sprawl opens in Rust Bazaar. Debt heat is visible, Ashline is watching, and the board is no longer abstract. The city remembers who moved first, and where tomorrow's trouble begins. This is the first public pulse, not the whole story. The GM still owns the reasons behind it, and the table owns the next move."
     ),
     "turn-2-newsreel": (
         "Emerald Sprawl is answering back. Recovery crews pushed Rust Bazaar into the public frame, Ghostline is sorting rumor from dispatch, and faction confidence is moving. "
-        "The board closes with one warning: hesitation is now visible, and the next turn will not wait politely."
+        "The board closes with one warning: hesitation is now visible, and the next turn will not wait politely. "
+        "The point is not to summarize everything. The point is to give the table a public pulse: what changed, who noticed, and which pressure is about to become playable."
     ),
 }
 
@@ -869,6 +936,7 @@ def render_unmixr_narration(
     force_tts: bool = False,
 ) -> tuple[Path, dict[str, Any]]:
     beats = LEGACY.split_script_into_beats(text)
+    hydrate_legacy_work_cache(group_key, work)
     beat_dir = work / "beats"
     beat_dir.mkdir(parents=True, exist_ok=True)
     stitched = work / "unmixr-narration.wav"
@@ -895,9 +963,6 @@ def render_unmixr_narration(
         and str(cached_meta.get("voice_policy") or "") == voice_policy
         and str(cached_meta.get("audio_normalization_contract") or "") == AUDIO_NORMALIZATION_CONTRACT
     )
-    cached_unmixr_exists = stitched.is_file() and stitched.stat().st_size > 0
-    legacy_cached_unmixr_exists = cached_unmixr_exists and not cached_meta
-
     def cached_unmixr_provider_meta(reason: str) -> dict[str, Any]:
         return {
             "provider": UNMIXR_PROVIDER,
@@ -925,7 +990,7 @@ def render_unmixr_narration(
     parts: list[Path] = []
     failures: list[str] = []
     tts_config: dict[str, str] = {}
-    preferred_key_env = ""
+    preferred_key_env = _preferred_public_video_unmixr_api_key_env()
     with unmixr_voice_override(group_key) as resolved:
         voice_id = str(resolved.get("voice_id") or "")
         source_env = str(resolved.get("voice_source_env") or "")
@@ -940,10 +1005,6 @@ def render_unmixr_narration(
             if not ok:
                 failure = f"beat-{index:02d}:{';'.join(beat_errors)}"
                 failures.append(failure)
-                if legacy_cached_unmixr_exists:
-                    cached = cached_unmixr_provider_meta("legacy_unmixr_cache_reused_after_provider_failure")
-                    cached["failures"] = failures
-                    return stitched, cached
                 raise RuntimeError(f"Unmixr TTS failed for {work.name} beat {index}: {failure}")
             tts_config = beat_config
             preferred_key_env = beat_config.get("api_key_env", preferred_key_env)
@@ -1023,6 +1084,12 @@ def bed_filter(total_duration: float, style: str) -> str:
     )
 
 
+def active_audio_duration(total_duration: float) -> float:
+    if total_duration <= PUBLIC_TAIL_GATE_MIN_DURATION_SECONDS:
+        return max(total_duration, 0.1)
+    return max(total_duration - NARRATION_END_BEFORE_VIDEO_SECONDS, 1.0)
+
+
 def build_clean_audiobook_style_audio(narration: Path, total_duration: float, output: Path, group_key: str = ALICE_CLEAN_AUDIO_GROUP) -> str:
     trimmed = output.with_name(f"{output.stem}.alice-clean-source.wav")
     run(
@@ -1061,10 +1128,15 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     if compacted.is_file() and compacted.stat().st_size > 0:
         source = compacted
     source_duration = duration(source)
-    target_voice = max(total_duration, 1.0)
+    target_voice = active_audio_duration(total_duration)
     if source_duration < target_voice * MIN_CLEAN_TTS_COVERAGE_RATIO:
         raise RuntimeError(
             f"{group_key}_unmixr_narration_too_short_for_natural_pacing:"
+            f"{source_duration:.3f}s_for_{target_voice:.3f}s"
+        )
+    if source_duration > target_voice * MAX_CLEAN_TTS_TEMPO:
+        raise RuntimeError(
+            f"{group_key}_unmixr_narration_too_long_for_professional_pacing:"
             f"{source_duration:.3f}s_for_{target_voice:.3f}s"
         )
     tempo = min(max(source_duration / target_voice, MIN_CLEAN_TTS_TEMPO), MAX_CLEAN_TTS_TEMPO)
@@ -1074,12 +1146,15 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
     else:
         voice_prep = f"atrim=0:{target_voice:.3f},asetpts=PTS-STARTPTS"
         fit = "clean_speech_style_natural"
+    fade_start = max(target_voice - VOICE_FADE_OUT_SECONDS, 0.0)
     filter_complex = (
         f"[0:a]{voice_prep},"
         f"highpass=f=145,equalizer=f=94:width_type=h:width=60:g=-24,{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
         f"{AUDIOBOOK_STYLE_NORMALIZATION_FILTER},"
         "highpass=f=145,equalizer=f=94:width_type=h:width=60:g=-18,"
-        f"volume=0.78,alimiter=limit=0.68:level=false,apad,atrim=0:{total_duration:.3f}[a]"
+        f"volume=0.78,alimiter=limit=0.68:level=false,"
+        f"afade=t=out:st={fade_start:.3f}:d={VOICE_FADE_OUT_SECONDS:.3f},"
+        f"apad,atrim=0:{total_duration:.3f}[a]"
     )
     run(
         "ffmpeg",
@@ -1103,7 +1178,15 @@ def build_clean_audiobook_style_audio(narration: Path, total_duration: float, ou
 
 def build_mixed_audio_for_group(group_key: str, narration: Path | None, total_duration: float, output: Path) -> str:
     if narration is None:
-        filter_complex = f"{bed_filter(total_duration, 'ambient')};[bed]highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},loudnorm=I=-22:LRA=8:TP=-2.5,alimiter=limit=0.83,apad,atrim=0:{total_duration:.3f}[a]"
+        active_duration = active_audio_duration(total_duration)
+        fade_start = max(active_duration - VOICE_FADE_OUT_SECONDS, 0.0)
+        filter_complex = (
+            f"{bed_filter(active_duration, 'ambient')};"
+            f"[bed]highpass=f={LOW_RUMBLE_HIGHPASS_HZ},{LOW_TONE_CLEANUP_FILTER},{HIGH_TONE_CLEANUP_FILTER},"
+            "loudnorm=I=-22:LRA=8:TP=-2.5,alimiter=limit=0.83,"
+            f"afade=t=out:st={fade_start:.3f}:d={VOICE_FADE_OUT_SECONDS:.3f},"
+            f"apad,atrim=0:{total_duration:.3f}[a]"
+        )
         run(
             "ffmpeg",
             "-y",
@@ -1124,11 +1207,44 @@ def build_mixed_audio(narration: Path | None, total_duration: float, output: Pat
     return build_mixed_audio_for_group("", narration, total_duration, output)
 
 
+def video_codec_args(output: Path) -> list[str]:
+    if output.suffix.lower() == ".webm":
+        return [
+            "-c:v",
+            "libvpx-vp9",
+            "-crf",
+            "30",
+            "-b:v",
+            "0",
+            "-row-mt",
+            "1",
+            "-deadline",
+            "good",
+            "-cpu-used",
+            "3",
+            "-pix_fmt",
+            "yuv420p",
+        ]
+    return [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+
+
 def remux(video: Path, audio: Path, output: Path, total_duration: float) -> None:
     temp = output.with_name(f"{output.stem}.audio-rebuild.tmp{output.suffix}")
     codec_args = ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"]
     if output.suffix.lower() == ".webm":
         codec_args = ["-c:a", "libopus", "-b:a", "128k"]
+    fade_duration = min(max(VIDEO_FADE_OUT_SECONDS, 0.05), max(total_duration, 0.05))
+    fade_start = max(total_duration - fade_duration, 0.0)
+    video_filter = f"[0:v:0]fade=t=out:st={fade_start:.3f}:d={fade_duration:.3f},format=yuv420p[v]"
     run(
         "ffmpeg",
         "-y",
@@ -1136,14 +1252,15 @@ def remux(video: Path, audio: Path, output: Path, total_duration: float) -> None
         str(video),
         "-i",
         str(audio),
+        "-filter_complex",
+        video_filter,
         "-map",
-        "0:v:0",
+        "[v]",
         "-map",
         "1:a:0",
         "-t",
         f"{total_duration:.3f}",
-        "-c:v",
-        "copy",
+        *video_codec_args(output),
         *codec_args,
         str(temp),
     )
@@ -1275,10 +1392,21 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
     else:
         first_audible_seconds = samples.size / TARGET_SR
         last_audible_end_seconds = 0.0
+    max_internal_silent_frames = 0
+    if non_silent_indexes.size:
+        current_internal_silent_frames = 0
+        for value in silent[int(non_silent_indexes[0]) : int(non_silent_indexes[-1]) + 1]:
+            if bool(value):
+                current_internal_silent_frames += 1
+                max_internal_silent_frames = max(max_internal_silent_frames, current_internal_silent_frames)
+            else:
+                current_internal_silent_frames = 0
     total_seconds = samples.size / TARGET_SR
     media_duration_seconds = duration(path)
     max_silence_seconds = max_silent_frames * frame_samples / TARGET_SR
+    max_internal_silence_seconds = max_internal_silent_frames * frame_samples / TARGET_SR
     tail_silence_seconds = max(0.0, total_seconds - last_audible_end_seconds)
+    uncovered_tail_seconds = media_duration_seconds - total_seconds if media_duration_seconds > 1.0 else 0.0
     status = "pass"
     reasons: list[str] = []
     if peak > 0.98:
@@ -1310,21 +1438,24 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
     if 390 <= mid_tone_peak_hz <= 720 and mid_tone_prominence_db > 18.0 and mid_tone_ratio > 0.030:
         status = "fail"
         reasons.append("mid_frequency_beep_artifact")
-    if max_silence_seconds > MAX_SILENCE_SECONDS and not allow_clean_speech_pauses:
+    if max_internal_silence_seconds > MAX_SILENCE_SECONDS and not allow_clean_speech_pauses:
         status = "fail"
         reasons.append("audio_coverage_gap")
-    if first_audible_seconds > MAX_EDGE_SILENCE_SECONDS:
+    if first_audible_seconds > MAX_START_SILENCE_SECONDS:
         status = "fail"
         reasons.append("audio_starts_late")
-    if tail_silence_seconds > MAX_EDGE_SILENCE_SECONDS:
-        status = "fail"
-        reasons.append("audio_ends_early")
     if media_duration_seconds > 1.0 and total_seconds > 0:
-        uncovered_tail_seconds = media_duration_seconds - total_seconds
         coverage_ratio = total_seconds / media_duration_seconds if media_duration_seconds else 0.0
         if uncovered_tail_seconds > MAX_UNCOVERED_TAIL_SECONDS and coverage_ratio < MIN_AUDIO_COVERAGE_RATIO:
             status = "fail"
             reasons.append("audio_undercovered")
+    if media_duration_seconds >= PUBLIC_TAIL_GATE_MIN_DURATION_SECONDS:
+        if tail_silence_seconds < MIN_TAIL_SILENCE_SECONDS:
+            status = "fail"
+            reasons.append("audio_tail_too_short_for_video_fade")
+        if tail_silence_seconds > MAX_TAIL_SILENCE_SECONDS:
+            status = "fail"
+            reasons.append("audio_ends_too_early")
     return {
         "status": status,
         "reasons": reasons,
@@ -1343,8 +1474,13 @@ def audio_quality(path: Path, *, allow_clean_speech_pauses: bool = False) -> dic
         "mid_tone_power_ratio": round(mid_tone_ratio, 6),
         "silence_gate_dbfs": SILENCE_GATE_DBFS,
         "max_silence_seconds": round(max_silence_seconds, 3),
+        "max_internal_silence_seconds": round(max_internal_silence_seconds, 3),
         "first_audible_seconds": round(first_audible_seconds, 3),
         "tail_silence_seconds": round(tail_silence_seconds, 3),
+        "min_tail_silence_seconds": round(MIN_TAIL_SILENCE_SECONDS, 3),
+        "max_tail_silence_seconds": round(MAX_TAIL_SILENCE_SECONDS, 3),
+        "planned_tail_silence_seconds": round(NARRATION_END_BEFORE_VIDEO_SECONDS, 3),
+        "uncovered_tail_seconds": round(uncovered_tail_seconds, 3),
         "audio_duration_seconds": round(total_seconds, 3),
         "media_duration_seconds": round(media_duration_seconds, 3),
     }
@@ -1386,6 +1522,13 @@ def rebuild_group(group: VideoGroup, *, force_tts: bool = False) -> dict[str, An
                 "backup": str(backup),
                 "fit_mode": fit_mode,
                 "audio_style": audio_style,
+                "active_audio_duration_seconds": round(active_audio_duration(total_duration), 3),
+                "planned_audio_tail_seconds": round(
+                    max(0.0, total_duration - active_audio_duration(total_duration)),
+                    3,
+                ),
+                "video_fade_out_seconds": round(min(VIDEO_FADE_OUT_SECONDS, total_duration), 3),
+                "video_fade_contract": VIDEO_FADE_CONTRACT,
                 "probe": info,
                 "audio_streams": sum(1 for stream in streams if stream.get("codec_type") == "audio"),
                 "video_streams": sum(1 for stream in streams if stream.get("codec_type") == "video"),
@@ -1491,8 +1634,11 @@ def main() -> int:
             "audio_streams_required": 1,
             "video_streams_required": 1,
             "max_silence_seconds_at_gate_dbfs": MAX_SILENCE_SECONDS,
-            "max_start_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
-            "max_tail_silence_seconds": MAX_EDGE_SILENCE_SECONDS,
+            "max_start_silence_seconds": MAX_START_SILENCE_SECONDS,
+            "planned_tail_silence_seconds": NARRATION_END_BEFORE_VIDEO_SECONDS,
+            "min_tail_silence_seconds": MIN_TAIL_SILENCE_SECONDS,
+            "max_tail_silence_seconds": MAX_TAIL_SILENCE_SECONDS,
+            "video_fade_out_seconds": VIDEO_FADE_OUT_SECONDS,
             "max_uncovered_tail_seconds": MAX_UNCOVERED_TAIL_SECONDS,
             "min_audio_coverage_ratio": MIN_AUDIO_COVERAGE_RATIO,
             "silence_gate_dbfs": SILENCE_GATE_DBFS,
@@ -1502,10 +1648,13 @@ def main() -> int:
             "premium_mix_required": "clean Unmixr narration with no synthetic noise floor; legacy bed/noise mixes are rejected. Every narrated public promo/video group must carry a passing rebuild receipt before release.",
             "clean_speech_mix_contract": CLEAN_SPEECH_MIX_CONTRACT,
             "audio_normalization_contract": AUDIO_NORMALIZATION_CONTRACT,
+            "video_fade_contract": VIDEO_FADE_CONTRACT,
         },
         "provider_posture": {
             "narration_provider": "unmixr-short-tts",
             "unmixr_required": True,
+            "preferred_api_key_env": _preferred_public_video_unmixr_api_key_env(),
+            "provider_failure_cache_fallback_allowed": False,
             "non_narrated_mode": "clean first-party cinematic ambient bed only when no narration source exists",
             "artifact_filters": {
                 "notch_hz": 11730,

@@ -133,6 +133,8 @@ internal sealed class PublicFeatureCardDocument
     public string? DetailPrimaryLabel { get; init; }
     public string? ProofNote { get; init; }
     public string? Microproof { get; init; }
+    public string? StatusNote { get; init; }
+    public string? StatusChips { get; init; }
     public string? Pain { get; init; }
     public string? Payoff { get; init; }
 }

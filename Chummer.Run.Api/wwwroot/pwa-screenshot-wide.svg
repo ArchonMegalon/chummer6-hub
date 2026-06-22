@@ -12,7 +12,7 @@
   <rect x="100" y="100" width="1312" height="220" rx="28" fill="#102434"/>
   <text x="140" y="166" fill="#88e4ff" font-family="Space Grotesk, Arial, sans-serif" font-size="34">CHUMMER MOBILE</text>
   <text x="140" y="236" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="64" font-weight="700">Installable shell with continuity and role entry</text>
-  <text x="140" y="290" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="24">The PWA keeps installs, reconnect posture, and public-safe session return on one first-party lane.</text>
+  <text x="140" y="290" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="24">The PWA keeps installs, reconnect status, and session return in one first-party workspace.</text>
   <rect x="100" y="364" width="380" height="500" rx="28" fill="#102434"/>
   <rect x="510" y="364" width="430" height="500" rx="28" fill="#102434"/>
   <rect x="970" y="364" width="442" height="500" rx="28" fill="#102434"/>
@@ -20,7 +20,7 @@
   <text x="136" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Prompt readiness, online state, and manifest/service worker status.</text>
   <text x="136" y="596" fill="#d2f36a" font-family="IBM Plex Mono, monospace" font-size="28">READY WHEN SUPPORTED</text>
   <text x="546" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Role entry</text>
-  <text x="546" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Player, GM, and observer routes converge on one bounded shell.</text>
+  <text x="546" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Player, GM, and observer entry stay in one clear shell.</text>
   <text x="1006" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Continuity</text>
-  <text x="1006" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Claimed installs, reconnect posture, and safe return paths remain visible.</text>
+  <text x="1006" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Claimed installs, reconnect status, and safe return paths remain visible.</text>
 </svg>

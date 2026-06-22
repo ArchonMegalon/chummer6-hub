@@ -29,17 +29,19 @@ public sealed class PublicSignalProjectionBridgeViewTests
     public void FeedbackRoadmapAndChangelogRoutesCarryTheSharedProjectionPacketWithoutForcingOperationalCopyEverywhere()
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
+        string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string changelogViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml");
 
-        string feedbackView = File.ReadAllText(feedbackViewPath);
+        Assert.False(File.Exists(feedbackViewPath));
+        string participateView = File.ReadAllText(participateViewPath);
         string roadmapView = File.ReadAllText(roadmapViewPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
-        Assert.DoesNotContain("var signalProjection = Model.SignalProjection;", feedbackView, StringComparison.Ordinal);
+        Assert.DoesNotContain("var signalProjection = Model.SignalProjection;", participateView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", changelogView, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicSignalProjectionPacket", feedbackView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicSignalProjectionPacket", participateView, StringComparison.Ordinal);
         Assert.Contains("Model.SignalLoop", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", changelogView, StringComparison.Ordinal);

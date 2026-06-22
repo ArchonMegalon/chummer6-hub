@@ -21,10 +21,10 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "organizer_closeout_posture",
             "Organizer closeout",
-            "How scheduling, handoff, and closeout stay clear without exposing private table details.",
+            "How scheduling, meeting details, and closeout stay clear without exposing private table details.",
             "/community/open-runs/organizer_closeout_posture.md",
             "/community/open-runs/organizer_closeout_posture.json",
-            ["Organizer path", "Meeting handoff", "Closeout status"]),
+            ["Organizer path", "Meeting details", "Closeout status"]),
         new(
             "moderation_boundary",
             "Moderation rules",
@@ -619,7 +619,7 @@ public sealed class CommunityCreatorHorizonsService
         => id switch
         {
             "open_run_board" => "The public board can show title, seats, summary, and scheduling. Private roster notes, meeting links, and applicant detail stay signed-in.",
-            "organizer_closeout_posture" => "Scheduling, handoff, and closeout status stay in Chummer, but private meeting access stays signed-in.",
+            "organizer_closeout_posture" => "Scheduling, meeting details, and closeout status stay in Chummer, but private meeting access stays signed-in.",
             _ => "Moderation rules and appeals stay visible. Private case handling never becomes a public reputation score."
         };
 

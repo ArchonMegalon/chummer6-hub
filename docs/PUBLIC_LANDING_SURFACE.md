@@ -2,12 +2,12 @@
 
 `chummer.run` is the public product front door, download surface, and help entry for Chummer.
 
-## Canonical split
+## Ownership
 
 - `chummer6-design` owns landing structure, copy constraints, route map, feature registry, user model, and media briefs.
-- `chummer6-hub` projects that canon on the hosted surface.
+- `chummer6-hub` renders that product direction on the hosted surface.
 - `Chummer6` remains the richer downstream explainer and guide.
-- `fleet` may publish or synchronize downstream public artifacts, but it does not own landing meaning.
+- supporting systems may synchronize files and indexes, but they do not own what the public site says.
 
 ## Current hosted routes
 
@@ -21,7 +21,6 @@ Front-door and current-build routes:
 - `/downloads/concierge`
 - `/docs`
 - `/docs/chummer6-quickstart`
-- `/docs/chummer6-quickstart/receipts/publication.json`
 - `/docs/chummer6-quickstart/download.pdf`
 - `/packages`
 - `/packages/{packageId}`
@@ -76,12 +75,12 @@ Help, policy, and signed-in overlays:
 
 `/participate/codex` remains the deeper preview booster flow behind the friendlier participate entry page.
 Guest access to `/home` and `/account` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
-Package routes are intentionally split across public browser, account tracking, and operator summary rails so install packages, rules packages, artifact bundles, and governed community proposals do not collapse into one unowned shelf.
+Package routes are intentionally split across public browsing, account tracking, and maintenance pages so installs, rules packages, downloadable files, and community proposals do not collapse into one confusing shelf.
 `/mobile`, `/pwa`, `/play`, `/player`, `/gm`, `/observer`, and the legacy `/session` alias keep installability, reconnect posture, and role-aware mobile entry on first-party routes instead of leaving them implicit in docs.
-`/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are bounded wrapper routes: optional guided branching may appear there, but download truth, release truth, support truth, account truth, and governed invite follow-through remain first-party Hub rails.
-`/docs` is a governed document-portal surface: Chummer owns source documents, access policy, and truth; FlipLink is a candidate viewer layer only after provider verification and publication proof exist.
+`/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are guided helper routes. They may branch by situation, but downloads, support, account return, and invites remain first-party Chummer pages.
+`/docs` is a Chummer-owned document area. External viewers can help display files, but the document and access rules stay with Chummer.
 `/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
-Discoverable publication pages may still open bounded creator or moderated public-validation follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
+Discoverable publication pages may still open creator or review follow-up pages without turning publication pages, testimonials, or media pages into support or install pages.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/ledger` and `/black-ledger` are intentionally direct-access lab routes until Black Ledger clears the normal-user visual and behavior bar.
 `/roadmap` is the public planning surface. `/horizons` remains only as a compatibility maintenance alias for older links and should not be promoted, indexed, or presented as a normal product category.
@@ -92,9 +91,9 @@ Guest access to `/participate/codex` should fall back to `/login?next=...` so th
 - `packages`: public browser routes for packages and bundles.
 - `mobile_pwa_play`: public install and play projection routes.
 - `account_packages`: registered-only package tracking routes that stay out of public launch claims.
-- `admin_packages`: operator-only package summary route that stays out of public manifest claims.
+- `admin_packages`: maintenance-only package summary route that stays out of public navigation.
 
-## Source of truth
+## Source Files
 
 The hosted landing surface reads mirrored design canon from:
 
@@ -106,10 +105,10 @@ The hosted landing surface reads mirrored design canon from:
 - `.codex-design/product/PROGRESS_REPORT.generated.json`
 - `.codex-design/product/PROGRESS_REPORT.generated.html`
 - `.codex-design/product/PROGRESS_REPORT_POSTER.svg` for the generated progress report export only
-- related mirrored public-surface canon files
+- related mirrored public-surface files
 
 The hosted surface must not invent a second feature map or public route story.
-The guest shell must expose both `Sign in` and `Create account`, and the media layer must come from canonical asset slots rather than raw scene-family labels.
+The guest shell must expose both `Sign in` and `Create account`, and the media layer must come from named asset slots rather than raw scene-family labels.
 The raster-only campaign rule applies to public front-door imagery, not to generated progress-report exports.
 
 ## Public versus registered
@@ -125,7 +124,7 @@ Public visitors get:
 - downloads
 - participate entry
 - public status
-- featured artifacts
+- featured files
 
 Registered overlays may add:
 
@@ -145,5 +144,5 @@ Public cards should land on deliberate first-party routes by default; self-linki
 - do not name providers or LTDs
 - do not show empty placeholder boxes
 - explain what is real today and what is coming next
-- keep participation language user-facing (`participate`, `guided contribution`) before operator-facing
-- do not leak operator terms like `Fleet`, `device-code auth`, or `worker host` on landing-adjacent public pages
+- keep participation language user-facing (`participate`, `guided contribution`)
+- do not leak maintenance terms like `Fleet`, `device-code auth`, or `worker host` on landing-adjacent public pages

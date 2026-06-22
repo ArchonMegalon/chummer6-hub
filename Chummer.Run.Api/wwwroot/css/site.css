@@ -8104,11 +8104,11 @@ body {
 
 .minimal-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(280px, 0.78fr);
-  gap: clamp(0.9rem, 2vw, 1.35rem);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.58fr);
+  gap: clamp(0.8rem, 1.6vw, 1.1rem);
   align-items: center;
   min-height: auto;
-  padding: clamp(0.8rem, 1.6vw, 1.15rem) 0;
+  padding: clamp(0.65rem, 1.3vw, 0.95rem) 0;
 }
 
 .minimal-kicker {
@@ -8126,8 +8126,8 @@ body {
   max-width: 12ch;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(2.25rem, 4.7vw, 3.6rem);
-  line-height: 0.96;
+  font-size: clamp(2rem, 3.8vw, 3rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -8141,9 +8141,9 @@ body {
 .minimal-page-hero p,
 .minimal-section__lead p {
   max-width: 39rem;
-  margin: 0.62rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--minimal-muted);
-  font-size: clamp(0.98rem, 1.3vw, 1.08rem);
+  font-size: clamp(0.96rem, 1.1vw, 1.03rem);
   line-height: 1.42;
 }
 
@@ -8151,13 +8151,13 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  margin-top: 0.9rem;
+  margin-top: 0.72rem;
 }
 
 .minimal-meta {
-  margin: 0.72rem 0 0;
+  margin: 0.55rem 0 0;
   color: var(--minimal-muted);
-  font-size: 0.94rem;
+  font-size: 0.86rem;
 }
 
 .minimal-hero__visual {
@@ -8176,7 +8176,7 @@ body {
 
 .minimal-hero__visual--screenshot {
   aspect-ratio: 16 / 9;
-  max-height: 218px;
+  max-height: 176px;
 }
 
 .minimal-hero__visual--screenshot img {

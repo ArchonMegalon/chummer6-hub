@@ -40,12 +40,12 @@
       "sizes": "1512x982",
       "type": "image/svg+xml",
       "form_factor": "wide",
-      "label": "Tablet and desktop shell showing player, GM, and observer entry on one bounded mobile rail."
+      "label": "Tablet and desktop view with player, GM, and observer entry in one mobile workspace."
     }
   ],
   "shortcuts": [
     {
-      "name": "Open mobile rail",
+      "name": "Open mobile workspace",
       "short_name": "Mobile",
       "url": "/mobile"
     },

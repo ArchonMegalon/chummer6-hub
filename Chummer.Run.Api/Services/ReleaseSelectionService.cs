@@ -73,7 +73,7 @@ public sealed class ReleaseSelectionService
             : experience.InstallSteps ?? new List<string>();
         var guestDownloadAvailable = manifest.Downloads.Any(static artifact =>
             !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
-        // macOS preview posture stays on one Terminal command instead of a raw DMG handoff.
+        // macOS preview posture stays on one Terminal command instead of a raw DMG download.
         // The guided setup path verifies the published DMG digest before install continuity is claimed.
         var guestGateArtifactHref = recommended is null || guestDownloadAvailable
             ? "/downloads"
@@ -518,12 +518,12 @@ public sealed class ReleaseSelectionService
 
         if (authenticated && UsesWindowsBootstrapFlow(download))
         {
-            return "Open the Windows install handoff, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.";
+            return "Open the Windows setup path, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.";
         }
 
         if (authenticated && UsesLinuxBootstrapFlow(download))
         {
-            return "Open the Linux install handoff. It gives you a short-lived shell command that offers Auto select for the matching Linux desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the applications menu or add Desktop links, verifies the published package digest, and confirms the selected apps linked back successfully.";
+            return "Open the Linux setup path. It gives you a short-lived shell command that offers Auto select for the matching Linux desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the applications menu or add Desktop links, verifies the published package digest, and confirms the selected apps linked back successfully.";
         }
 
         if (UsesMacBootstrapFlow(download))

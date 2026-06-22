@@ -15,7 +15,6 @@ public sealed class WeeklyProductPulseArtifactService
     private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
     private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string LocalReleaseProofFileKey = "CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE";
-    private const string DefaultFleetArtifactRoot = "/docker/fleet/.codex-studio/published";
     private const string FleetArtifactRootKey = "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT";
     private const string JourneyGatesFileName = "JOURNEY_GATES.generated.json";
     private const string SupportPacketsFileName = "SUPPORT_CASE_PACKETS.generated.json";
@@ -285,8 +284,7 @@ public sealed class WeeklyProductPulseArtifactService
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", normalizedRelativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedRelativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", normalizedRelativePath)),
-                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", normalizedRelativePath))
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", normalizedRelativePath))
             }
             .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -309,7 +307,10 @@ public sealed class WeeklyProductPulseArtifactService
 
         return new[]
             {
-                Path.Combine(DefaultFleetArtifactRoot, fileName)
+                Path.Combine(Directory.GetCurrentDirectory(), ".codex-studio", "published", fileName),
+                Path.Combine(Directory.GetCurrentDirectory(), "..", ".codex-studio", "published", fileName),
+                Path.Combine(AppContext.BaseDirectory, ".codex-studio", "published", fileName),
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".codex-studio", "published", fileName)
             }
             .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
             .Distinct(StringComparer.OrdinalIgnoreCase)

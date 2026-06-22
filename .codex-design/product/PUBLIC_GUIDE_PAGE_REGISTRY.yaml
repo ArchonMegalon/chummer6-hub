@@ -148,8 +148,8 @@ page_types:
     max_technical_depth: medium
     visual_density_profile: page_index
     must_show_semantic_anchors:
-    - product areas separated from expansion bets
-    - folded infrastructure kept quieter than user value
+    - base product features separated from expansion bets
+    - horizon pages reserved for true deeper design lanes
     - multiple grounded clues instead of one sign
     allowed_sources:
     - products/chummer/HORIZON_REGISTRY.yaml
@@ -158,7 +158,7 @@ page_types:
     - products/chummer/projects/*.md
     - products/chummer/horizons/HORIZON_REGISTRY.yaml
     required_topics:
-    - product area versus expansion bet split
+    - base feature versus horizon split
     - table pain
     - compatibility path for older deep links
     - public-enabled horizon set only
@@ -168,6 +168,7 @@ page_types:
     allowed_sources:
     - products/chummer/HORIZON_REGISTRY.yaml
     - products/chummer/horizons/*.md
+    - products/chummer/features/*.md
     - products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md
     forbidden_sources:
     - products/chummer/projects/*.md

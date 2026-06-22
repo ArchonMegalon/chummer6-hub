@@ -85,13 +85,14 @@ signed_in_dispatch_summary: Use the published installer for this device. Claim y
 signed_in_dispatch_steps:
   - Start from the public download or signed-in claim page for the platform you are installing.
   - Follow the platform-specific guided install path; when macOS needs the setup lane, that path begins with a short-lived Terminal install command.
-  - The happy path must apply the install claim automatically on first successful launch or from the online claim page instead of depending on a manual claim-code ritual.
+  - First launch must offer a clear claim path and a clear continue-unlinked path; closing the claim window keeps the app open as an unlinked install.
+  - The happy path must apply the install claim automatically from the online claim page instead of depending on a manual claim-code ritual.
   - If Chummer reports missing rule packs or amend packages during restore, follow the explicit recovery guidance before trusting the restored result.
   - Reopen Devices and access later only for recovery, relinking, or support follow-through.
 install_steps:
   - Download the current published package for your platform.
   - Finish setup for that package, then launch Chummer.
-  - Create an account when you want download receipts, recovery, and support history to stay attached.
+  - Create an account when you want download receipts, recovery, and support history to stay attached; otherwise continue unlinked.
   - If a restored runner or campaign needs rule packs or amend packages that are not present locally, Chummer must say so before compute continues.
   - Use Devices and access later if you need to reconnect a downloaded copy back to the same account.
 account_required_install_steps:
@@ -100,7 +101,7 @@ account_required_install_steps:
   - Finish setup for that package and launch Chummer.
   - Follow the platform-specific guided install path where one exists; macOS setup continuity begins with a Terminal command only when that guided setup lane is the active route.
   - Resolve any shown rule-environment or package mismatch before trusting the restored workspace.
-  - Let the happy path attach the install automatically; use claim/recovery details only when Chummer explicitly falls back to recovery mode.
+  - Let the happy path attach the install automatically from the online claim page; if the user closes the claim window, keep the install local and unlinked instead of blocking startup.
 windows_requirements:
   - 64-bit Windows 10 or newer.
   - Enough free disk space for the installed release plus future updates.

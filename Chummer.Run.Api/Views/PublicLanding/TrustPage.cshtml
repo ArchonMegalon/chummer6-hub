@@ -91,7 +91,7 @@
     {
         string installHref = ContextualPreviewHref(Model.SupportIntake.InstallAccessHref);
         string installSummary = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary)
-            ? "Devices and access stays the calm relink, reclaim, and recovery page after the installer or app does the real work."
+            ? "Devices and access is where you relink, reclaim, or recover this copy."
             : Model.SupportIntake.InstallRailSummary!;
         string installTitle = Model.SupportIntake.RecoveryModeOnly
             ? "Install recovery stays on the same device page"
@@ -422,7 +422,7 @@ else if (!contactPage)
                 <div class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Recovery stays on this install page" : "Return to the guided installer after support")</h3>
+                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Return to recovery when you are ready" : "Return to setup when you are ready")</h3>
                             <p>@PublicText(Model.SupportIntake.InstallRailSummary)</p>
                         </div>
                         <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a>

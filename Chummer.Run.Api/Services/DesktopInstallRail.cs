@@ -98,10 +98,10 @@ internal static class DesktopInstallRail
 
         return new DesktopInstallRailContext(
             ReturnHref: $"/downloads/install/{Uri.EscapeDataString(normalizedArtifactId)}",
-            ReturnLabel: recoveryMode ? "Return to recovery" : "Return to installer",
+            ReturnLabel: recoveryMode ? "Return to recovery" : "Return to setup",
             Summary: recoveryMode
-                ? "This case stays with the same linked copy. Go back to recovery when you are ready to retry, and only use a recovery code if Chummer entered recovery mode on that device."
-                : "This case stays with the same linked copy. Go back to the installer when you are ready to retry install, first launch, or update on that device.",
+                ? "This case stays with the same linked copy. Go back to recovery when you are ready to retry, and only use a recovery code if Chummer asks for one on that device."
+                : "This case stays with the same linked copy. Go back to setup when you are ready to retry install, first launch, or update on that device.",
             RecoveryModeOnly: recoveryMode);
     }
 
@@ -122,7 +122,7 @@ internal static class DesktopInstallRail
             PlatformId: NormalizeSupportPrefill(artifact.PlatformId),
             Arch: NormalizeSupportPrefill(artifact.Arch),
             FallbackPosture: recoveryMode
-                ? "Recovery fallback only. Continue the guided setup or in-app update first, and use this claim code only if Chummer says the device entered recovery mode."
+                ? "Recovery fallback only. Continue setup or the in-app update first, and use this claim code only if Chummer asks for it on that device."
                 : "Guided setup and in-app update are the default path. Claim codes are a recovery fallback, not a browser redemption step.",
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."

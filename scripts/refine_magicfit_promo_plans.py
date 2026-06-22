@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -11,11 +12,21 @@ from typing import Any
 import yaml
 
 
-WORKSPACE = Path("/docker/chummercomplete")
-WORK = WORKSPACE / "_work" / "refined_magicfit_promo_plans_20260531"
-OUT = WORKSPACE / "_completion" / "refined_magicfit_promo_plans_20260531"
-DETAILED_ZIP = Path("/home/tibor/jammer6_each_horizon_detailed_screenplays_magicfit_20260531.zip")
-EPIC_ZIP = Path("/home/tibor/jammer6_epic_rewrite_blackledger_nexuspan_magicfit_20260531.zip")
+def env_path(name: str, default: Path | str) -> Path:
+    return Path(os.environ.get(name) or default).expanduser()
+
+
+WORKSPACE = env_path("CHUMMER_WORKSPACE_ROOT", "/docker/chummercomplete")
+WORK = env_path("CHUMMER_MAGICFIT_REFINED_PLAN_WORK_DIR", WORKSPACE / "_work" / "refined_magicfit_promo_plans_20260531")
+OUT = env_path("CHUMMER_MAGICFIT_REFINED_PLAN_OUT_DIR", WORKSPACE / "_completion" / "refined_magicfit_promo_plans_20260531")
+DETAILED_ZIP = env_path(
+    "CHUMMER_MAGICFIT_DETAILED_SCREENPLAY_ZIP",
+    Path.home() / "jammer6_each_horizon_detailed_screenplays_magicfit_20260531.zip",
+)
+EPIC_ZIP = env_path(
+    "CHUMMER_MAGICFIT_EPIC_SCREENPLAY_ZIP",
+    Path.home() / "jammer6_epic_rewrite_blackledger_nexuspan_magicfit_20260531.zip",
+)
 
 HUMANIZED_CAPTURE_STYLE = (
     "Humanized capture style: ground this like a practical live-action tabletop/product documentary clip, "
@@ -247,8 +258,8 @@ def main() -> int:
     unzip_once(DETAILED_ZIP)
     unzip_once(EPIC_ZIP)
 
-    detailed_root = WORK / "jammer6_each_horizon_detailed_screenplays_magicfit_20260531"
-    epic_root = WORK / "jammer6_epic_rewrite_blackledger_nexuspan_magicfit_20260531"
+    detailed_root = WORK / DETAILED_ZIP.stem
+    epic_root = WORK / EPIC_ZIP.stem
     assets = detailed_horizon_assets(detailed_root) + epic_assets(epic_root)
     total_scenes = sum(len(asset["scenes"]) for asset in assets)
 

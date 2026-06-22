@@ -192,7 +192,7 @@
             : "Living Newsroom watch framing is armed, but this workspace has not attached a current carry-forward or memory packet yet.";
     var selectedWorkspaceRunnerPassportSummary = selectedWorkspaceLeadConsequence is not null
         ? "Runner Passport continuity is now attached to real command fallout on this workspace instead of sitting as a detached trust card."
-        : "Runner Passport is ready to stamp bounded trust continuity the moment the next reviewed reaction lands on this workspace.";
+        : "Runner Passport is ready to update the moment the next reviewed reaction lands on this workspace.";
     var selectedRun = Model.SelectedRun;
     var selectedRunWorkspace = selectedRun is null
         ? null
@@ -412,7 +412,7 @@
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
             "lane_pending" => "Keep this page open while activation completes.",
             "waiting_for_slot" => "Stay on this page and retry for a fresh code if authorization expires.",
-            "active" => "Assign bounded contribution work and track progress.",
+            "active" => "Assign contribution work and track progress.",
             "stopped" => "Start a new invite when the participant is ready again.",
             "revoked" => "Open a new invite with fresh consent and authorization.",
             _ => "Open participation details and choose the latest recovery action."
@@ -1293,7 +1293,7 @@
                         }
                         @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No entitlement-sync history is attached to this account right now.</p>
+                            <p class="muted-copy">No account sync history is attached to this account right now.</p>
                         }
                         else
                         {
@@ -1319,7 +1319,7 @@
                         }
                         @if (entitlementSyncReceipts.ConflictReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No entitlement-sync conflicts are active for this account right now.</p>
+                            <p class="muted-copy">No account sync problems are active for this account right now.</p>
                         }
                         else
                         {
@@ -2464,8 +2464,8 @@
                             else
                             {
                                 <div class="settings-form">
-                                    <p><strong>Stage travel prefetch</strong></p>
-                                    <p class="muted-copy">Claim a device from Downloads or Devices &amp; access first. The staged packet stays bounded to dossiers, campaigns, rule environments, recent files, and prep packets while secrets and runtime caches stay install-local.</p>
+                                    <p><strong>Prepare offline travel files</strong></p>
+                                    <p class="muted-copy">Claim a device from Downloads or Devices &amp; access first. Chummer can prepare dossiers, campaigns, rules settings, recent files, and prep notes while secrets and local caches stay on this device.</p>
                                     <div class="stacked-actions">
                                         <a class="button-like button-like--secondary" href="/downloads">Claim a device from Downloads</a>
                                         <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
@@ -2657,7 +2657,7 @@
                                                     @if (!string.IsNullOrWhiteSpace(item.TrustBand))
                                                     {
                                                         <span> Status: @HumanizeStatus(item.TrustBand, "Draft").</span>
-                                                        <span> Discoverable now: @(item.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                        <span> Discoverable now: @(item.Discoverable ? "Available" : "Not shared yet").</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                     {
@@ -2802,7 +2802,7 @@
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Inbox and reactions</span>
-                                    <strong>Use the signed-in Table Pulse Live inbox to trigger or review the next bounded response.</strong>
+                                    <strong>Use the signed-in Table Pulse Live inbox to trigger or review the next response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Workspace return</span>
@@ -3133,7 +3133,7 @@
                             }
                             <div class="settings-summary-row">
                                 <span>Discoverable now</span>
-                                <strong>@(selectedCreatorPublication.Discoverable ? "Eligible now" : "Still bounded")</strong>
+                                <strong>@(selectedCreatorPublication.Discoverable ? "Available" : "Not shared yet")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Status</span>
@@ -3626,7 +3626,7 @@
                                                 @if (!string.IsNullOrWhiteSpace(item.TrustBand))
                                                 {
                                                     <span> Status: @HumanizeStatus(item.TrustBand, "Draft").</span>
-                                                    <span> Discoverable now: @(item.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                    <span> Discoverable now: @(item.Discoverable ? "Available" : "Not shared yet").</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                 {
@@ -3870,7 +3870,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Details: @PublicText(publication.ProvenanceSummary). Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @PublicText(publication.DiscoverySummary) Available: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Details: @PublicText(publication.ProvenanceSummary). Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @PublicText(publication.DiscoverySummary) Available: @(publication.Discoverable ? "Available" : "Not shared yet"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                     {
                                         <span> Status: @publication.TrustSummary</span>

@@ -50,13 +50,18 @@ public sealed class BlackLedgerFactionOnboardingService
 
     private static bool MagicFitFactionProviderVerified()
     {
-        string path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "_completion", "magicfit_provider", "MAGICFIT_PROVIDER_VERIFICATION.generated.json"));
-        if (!File.Exists(path))
-        {
-            path = "/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json";
-        }
+        string? path = new[]
+            {
+                Environment.GetEnvironmentVariable("CHUMMER_MAGICFIT_PROVIDER_VERIFICATION_FILE"),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "_completion", "magicfit_provider", "MAGICFIT_PROVIDER_VERIFICATION.generated.json")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "_completion", "magicfit_provider", "MAGICFIT_PROVIDER_VERIFICATION.generated.json")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "_completion", "magicfit_provider", "MAGICFIT_PROVIDER_VERIFICATION.generated.json"))
+            }
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(File.Exists);
 
-        if (!File.Exists(path))
+        if (path is null)
         {
             return false;
         }
@@ -92,24 +97,19 @@ public sealed class BlackLedgerFactionOnboardingService
 
     private static JsonElement? TryLoadMagicFitFactionManifest(string normalizedFactionId)
     {
-        string path = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "..",
-            "_completion",
-            "faction_video_series",
-            "generated",
-            normalizedFactionId,
-            "video_manifest.generated.json"));
-        if (!File.Exists(path))
-        {
-            path = $"/docker/chummercomplete/_completion/faction_video_series/generated/{normalizedFactionId}/video_manifest.generated.json";
-        }
+        string? configuredRoot = Environment.GetEnvironmentVariable("CHUMMER_FACTION_VIDEO_SERIES_ROOT");
+        string? path = new[]
+            {
+                !string.IsNullOrWhiteSpace(configuredRoot) ? Path.Combine(configuredRoot, "generated", normalizedFactionId, "video_manifest.generated.json") : null,
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "_completion", "faction_video_series", "generated", normalizedFactionId, "video_manifest.generated.json")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "_completion", "faction_video_series", "generated", normalizedFactionId, "video_manifest.generated.json")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "_completion", "faction_video_series", "generated", normalizedFactionId, "video_manifest.generated.json"))
+            }
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(File.Exists);
 
-        if (!File.Exists(path))
+        if (path is null)
         {
             return null;
         }

@@ -621,8 +621,7 @@ public sealed class GmSessionVideoFoundryService
     }
 
     private bool IsSessionAccountConfigured()
-        => !string.IsNullOrWhiteSpace(GetSessionAccountEmail())
-            || File.Exists("/docker/EA/.env");
+        => !string.IsNullOrWhiteSpace(GetSessionAccountEmail());
 
     private string BuildQueueIsolationStatus()
     {

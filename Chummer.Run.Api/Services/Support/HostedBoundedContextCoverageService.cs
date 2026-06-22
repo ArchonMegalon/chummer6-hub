@@ -196,7 +196,7 @@ public sealed class HostedBoundedContextCoverageService
             : $"/api/v1/campaign-spine/me/open-runs/{Uri.EscapeDataString(openRun.Listing.OpenRunId)}";
         string summary = openRun is null
             ? "Campaign context keeps workspace continuity and run return on the signed-in work page even when no reviewed open run is active."
-            : $"{openRun.Listing.ListingTitle} keeps workspace continuity, schedule, meeting handoff, and closeout status on the reviewed campaign workspace.";
+            : $"{openRun.Listing.ListingTitle} keeps workspace continuity, schedule, meeting details, and closeout status on the reviewed campaign workspace.";
 
         return new HostedBoundedContextCoverageProjection(
             ProjectionId: StableId("hosted-bounded-context-campaign", openRun?.Listing.WorkspaceId ?? manifest.Version),
@@ -281,8 +281,8 @@ public sealed class HostedBoundedContextCoverageService
         string locale)
     {
         string summary = installation is null
-            ? "Install and orchestration adapters stay boundary-owned: they help downloads, claim, artifact launch, and Fleet handoff without replacing public, account, or campaign status."
-            : $"{installation.Platform ?? "desktop"} {installation.Channel} {installation.Version} keeps install claim, release upload, and Fleet handoff as adapter seams rather than standalone product decisions.";
+            ? "Install and orchestration adapters stay boundary-owned: they help downloads, claim, artifact launch, and Fleet release steps without replacing public, account, or campaign status."
+            : $"{installation.Platform ?? "desktop"} {installation.Channel} {installation.Version} keeps install claim, release upload, and Fleet release steps as adapter seams rather than standalone product decisions.";
 
         return new HostedBoundedContextCoverageProjection(
             ProjectionId: StableId("hosted-bounded-context-orchestration", installation?.InstallationId ?? receipt?.ReceiptId ?? manifest.Version),

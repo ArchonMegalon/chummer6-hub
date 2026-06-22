@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import argparse
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,11 +12,17 @@ from typing import Any
 import yaml
 
 
-WORKSPACE = Path("/docker/chummercomplete")
+WORKSPACE = Path(os.environ.get("CHUMMER_WORKSPACE_ROOT") or "/docker/chummercomplete").expanduser()
 RUN_SERVICES = WORKSPACE / "chummer.run-services"
-SOURCE_ZIP = Path("/home/tibor/jammer6_all_horizons_90s_magicfit_promo_20260531.zip")
-SOURCE_ROOT = WORKSPACE / "_work" / "jammer6_all_horizons_90s_magicfit_promo_20260531" / "jammer6_all_horizons_90s_magicfit_promo_20260531"
-OUT = WORKSPACE / "_completion" / "horizons_90s_promo"
+SOURCE_ZIP = Path(
+    os.environ.get("CHUMMER_MAGICFIT_HORIZONS_90S_SOURCE_ZIP")
+    or Path.home() / "jammer6_all_horizons_90s_magicfit_promo_20260531.zip"
+).expanduser()
+SOURCE_ROOT = Path(
+    os.environ.get("CHUMMER_MAGICFIT_HORIZONS_90S_SOURCE_ROOT")
+    or WORKSPACE / "_work" / SOURCE_ZIP.stem / SOURCE_ZIP.stem
+).expanduser()
+OUT = Path(os.environ.get("CHUMMER_MAGICFIT_HORIZONS_90S_OUT_DIR") or WORKSPACE / "_completion" / "horizons_90s_promo").expanduser()
 PUBLIC_ASSET_BASE = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 ASSET_ID = "all-horizons-90s-magicfit-promo"
 

@@ -14,10 +14,10 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   await expect(desktop.locator('.site-nav')).toBeVisible();
   await expect(desktop.locator('[data-nav-toggle]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
-  await expect(desktop.locator('.minimal-hero__lead')).toContainText('without losing the details between sessions');
+  await expect(desktop.locator('.minimal-hero__lead')).toContainText('A Shadowrun character manager');
   const heroActions = await desktop.locator('.minimal-hero .minimal-actions a.button-like').allTextContents();
-  if (heroActions.map((text) => text.trim()).join('|') !== 'Stable|Nightly') {
-    failures.push(`homepage: expected Stable then Nightly hero actions, found ${heroActions.join(', ')}`);
+  if (heroActions.map((text) => text.trim()).join('|') !== 'Download Chummer') {
+    failures.push(`homepage: expected one Download Chummer hero action, found ${heroActions.join(', ')}`);
   }
   const heroImage = desktop.locator('.minimal-hero__visual img');
   await expect(heroImage).toBeVisible();
@@ -103,7 +103,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: homepage starts with Stable and Nightly, avoids duplicate homepage download strips, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
+      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

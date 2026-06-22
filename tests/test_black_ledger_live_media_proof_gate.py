@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/verify_black_ledger_live_media_proof.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_black_ledger_live_media_proof.py"
 
 
 def load_module():

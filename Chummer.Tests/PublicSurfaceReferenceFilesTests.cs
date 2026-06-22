@@ -215,21 +215,14 @@ public sealed class PublicSurfaceReferenceFilesTests
 
         (string id, string currentState)[] shippedRows =
         {
-            ("nexus-pan", "shipped_mvp"),
             ("alice", "shipped_mvp"),
             ("karma-forge", "shipped_mvp"),
             ("knowledge-fabric", "shipped_mvp"),
             ("jackpoint", "signed_in_command_lane_live"),
             ("black-ledger", "signed_in_command_lane_live"),
-            ("community-hub", "signed_in_command_lane_live"),
             ("runsite", "signed_in_command_lane_live"),
             ("runbook-press", "shipped_mvp"),
-            ("edition-studio", "shipped_mvp"),
-            ("run-control", "shipped_mvp"),
-            ("local-co-processor", "shipped_mvp"),
-            ("ghostwire", "shipped_mvp"),
             ("table-pulse", "signed_in_command_lane_live"),
-            ("quicksilver", "shipped_mvp")
         };
 
         foreach ((string shippedId, string currentState) in shippedRows)
@@ -250,6 +243,13 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.DoesNotContain("Public copy may describe Community Hub as a bounded horizon and curated preview only", registry, StringComparison.Ordinal);
         Assert.DoesNotContain("Public copy may describe Ghostwire as a receipt-backed replay and forensics horizon only", registry, StringComparison.Ordinal);
         Assert.DoesNotContain("Public copy may describe Table Pulse as a bounded GM-governed live heat and private aftermath horizon only", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: nexus-pan", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: community-hub", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: run-control", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: edition-studio", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: local-co-processor", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: quicksilver", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("- id: ghostwire", registry, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -261,12 +261,14 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "runsite.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "runbook-press.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "table-pulse.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "community-hub.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "edition-studio.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "run-control.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "local-co-processor.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "quicksilver.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "alice.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "karma-forge.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "origin-dossier.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "FEATURES", "community-hub.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "FEATURES", "edition-studio.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "FEATURES", "run-control.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "FEATURES", "local-co-processor.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "FEATURES", "quicksilver.md"),
         };
 
         string combined = string.Join("\n", shippedGuideFiles.Select(File.ReadAllText));
@@ -280,18 +282,28 @@ public sealed class PublicSurfaceReferenceFilesTests
     {
         string[] shippedHorizonDocs =
         {
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "nexus-pan.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "knowledge-fabric.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runbook-press.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "table-pulse.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "edition-studio.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "run-control.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "local-co-processor.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "jackpoint.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runsite.md"),
-            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "quicksilver.md"),
             RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "origin-dossier.md"),
         };
+
+        foreach (string featureDoc in new[]
+        {
+            "nexus-pan.md",
+            "community-hub.md",
+            "edition-studio.md",
+            "run-control.md",
+            "local-co-processor.md",
+            "quicksilver.md",
+            "ghostwire.md",
+        })
+        {
+            Assert.False(File.Exists(RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", featureDoc)));
+            Assert.True(File.Exists(RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "features", featureDoc)));
+        }
 
         string combined = string.Join("\n", shippedHorizonDocs.Select(File.ReadAllText));
 
@@ -310,14 +322,14 @@ public sealed class PublicSurfaceReferenceFilesTests
         {
             ("lane_creator", "/creator", "Shipped MVP"),
             ("real_mobile_projection", "/mobile", "Live now"),
-            ("horizon_nexus_pan", "/play/continuity", "Shipped MVP"),
+            ("feature_nexus_pan", "/play/continuity", "Shipped MVP"),
             ("horizon_knowledge_fabric", "/rules", "Shipped MVP"),
             ("horizon_karma_forge", "/participate/karma-forge", "Shipped MVP"),
-            ("horizon_edition_studio", "/edition-studio", "Shipped MVP"),
-            ("horizon_run_control", "/run-control", "Shipped MVP"),
-            ("horizon_local_co_processor", "/local-co-processor", "Shipped MVP"),
+            ("feature_edition_studio", "/edition-studio", "Shipped MVP"),
+            ("feature_run_control", "/run-control", "Shipped MVP"),
+            ("feature_local_co_processor", "/local-co-processor", "Shipped MVP"),
             ("horizon_runbook_press", "/runbook", "Shipped MVP"),
-            ("horizon_quicksilver", "/quicksilver", "Shipped MVP"),
+            ("feature_quicksilver", "/quicksilver", "Shipped MVP"),
         };
 
         foreach ((string id, string href, string badge) in shippedCards)

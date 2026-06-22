@@ -32,6 +32,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
 
 def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
     trust_page = read("Chummer.Run.Api/Views/PublicLanding/TrustPage.cshtml")
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    install_setup = read("Chummer.Run.Api/Services/DesktopInstallRail.cs")
 
     for expected in (
         'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
@@ -84,8 +86,30 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "<p class=\"muted-copy\">@Model.SupportIntake.ResponseExpectation</p>",
         "<p>@Model.SupportIntake.InstallRailSummary</p>",
         ">@Model.SupportIntake.InstallRailLabel</a>",
+        "installer or app does the real work",
+        "Return to the guided installer after support",
     ):
         assert forbidden not in trust_page
+
+    combined = "\n".join((trust_page, controller, install_setup))
+    for forbidden in (
+        "Fixer Board",
+        "Return to installer",
+        "Go back to the installer",
+        "only use a recovery code if Chummer entered recovery mode",
+        "use this claim code only if Chummer says the device entered recovery mode",
+    ):
+        assert forbidden not in combined
+
+    for expected in (
+        "Devices and access is where you relink, reclaim, or recover this copy.",
+        "Return to setup when you are ready",
+        "Public feedback should start on the feedback page.",
+        "Return to setup",
+        "Go back to setup when you are ready",
+        "use this claim code only if Chummer asks for it on that device",
+    ):
+        assert expected in combined
 
 
 def test_faq_page_cleans_dynamic_public_copy_before_rendering() -> None:
@@ -212,12 +236,119 @@ def test_homepage_has_minimal_product_video_surface() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
+    assert "A Shadowrun character manager for building, updating, and bringing clean sheets to the table." in landing
+    assert "Download Chummer" in landing
+    assert 'href="/downloads"' in landing
+    assert 'href="/downloads#stable"' not in landing
+    assert 'href="/downloads#nightly"' not in landing
+    assert 'data-analytics-event="homepage_open_downloads"' in landing
+    assert 'homepage_open_stable' not in landing
+    assert 'homepage_open_nightly' not in landing
     assert 'class="minimal-video"' in landing
     assert 'aria-label="Product video"' in landing
     assert "/media/promo/chummer6-flagship-promo.mp4" in landing
     assert "/media/promo/chummer6-flagship-promo.webm" in landing
     assert "/media/promo/chummer6-flagship-promo.vtt" in landing
     assert 'data-homepage-section="downloads"' not in landing
+
+
+def test_pwa_install_assets_do_not_use_internal_release_language() -> None:
+    asset_paths = (
+        "Chummer.Run.Api/wwwroot/manifest.webmanifest",
+        "Chummer.Run.Api/wwwroot/site.webmanifest",
+        "Chummer.Run.Api/wwwroot/manifest.json",
+        "Chummer.Run.Api/wwwroot/pwa-screenshot-wide.svg",
+        "Chummer.Run.Api/wwwroot/pwa-screenshot-mobile.svg",
+        "Chummer.Run.Api/wwwroot/favicon.svg",
+        "Chummer.Run.Api/wwwroot/pwa-icon.svg",
+    )
+    forbidden_terms = (
+        "posture",
+        "bounded",
+        "rail",
+        "lane",
+        "handoff",
+        "proof",
+        "receipt",
+        "artifact",
+        "provider",
+        "generated",
+    )
+
+    for path in asset_paths:
+        source = read(path).lower()
+        for term in forbidden_terms:
+            assert term not in source, f"{path} should not expose internal term {term!r}"
+
+
+def test_static_receipts_and_proofs_are_never_indexable() -> None:
+    program = read("Chummer.Run.Api/Program.cs")
+    indexable_function = program.split("static bool IsIndexablePublicPath(PathString path)", 1)[1].split("static bool IsLegacyMacReleaseBootstrapArtifactPath", 1)[0]
+    wwwroot = REPO_ROOT / "Chummer.Run.Api" / "wwwroot"
+    internal_static_assets = sorted(
+        path
+        for path in wwwroot.rglob("*")
+        if path.is_file()
+        and (
+            path.name.endswith(".receipt.json")
+            or path.name.endswith(".generated.json")
+            or "/proofs/" in path.as_posix()
+            or (
+                path.name.endswith("manifest.json")
+                and "/media/" in path.as_posix()
+            )
+        )
+    )
+
+    assert "app.UseStaticFiles(new StaticFileOptions" in program
+    assert "OnPrepareResponse = fileContext =>" in program
+    assert 'fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy' in program
+    assert 'const string NoIndexRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";' in program
+    assert internal_static_assets
+
+    for path in internal_static_assets:
+        public_path = "/" + path.relative_to(wwwroot).as_posix()
+        assert f'path.Equals("{public_path}"' not in indexable_function
+
+    assert 'path.StartsWithSegments("/media"' not in indexable_function
+    assert 'path.StartsWithSegments("/proofs"' not in indexable_function
+
+    for path in (
+        "/",
+        "/downloads",
+        "/status",
+        "/help",
+        "/privacy",
+        "/ledger",
+    ):
+        assert f'path.Equals("{path}", StringComparison.OrdinalIgnoreCase)' in program
+
+
+def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
+    landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
+    mobile = read("Chummer.Run.Api/Views/PublicLanding/MobileProjection.cshtml")
+    changelog = read("Chummer.Run.Api/Views/PublicLanding/Changelog.cshtml")
+    ledger_workspace = read("Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml")
+    site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
+
+    combined = "\n".join((mobile, changelog, ledger_workspace))
+
+    for forbidden in (
+        ">Open manifest<",
+        ">Open service worker<",
+        ">Open PWA JSON<",
+        ">Open mobile setup file<",
+        "service worker",
+        "PWA JSON",
+        "internal notes",
+        "internal details",
+        "hands off",
+    ):
+        assert forbidden not in combined
+
+    assert "Open mobile view" in mobile
+    assert "Open setup help" in mobile
+    assert "campaign-only details" in ledger_workspace
     assert "Get the app" not in landing
     assert "Need something else?" in landing
     assert 'href="/participate"' in landing
@@ -1280,10 +1411,10 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
     assert "Report saved" in support_submitted
     assert "Submission saved" in karma_submitted
     assert "Step saved" in karma_submitted
-    assert "Details: @PublicFacingCopyHumanizer.Clean(leadAftermathShelfEntry.ProvenanceSummary)" in home
-    assert "Output details: @PublicFacingCopyHumanizer.Clean(output.ProvenanceSummary)" in home
-    assert "Details: @PublicFacingCopyHumanizer.Clean(answer.ProvenanceLabel)" in home
-    assert "Details: @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in home
+    assert "Details: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)" in home
+    assert "Output details: @HomeText(output.ProvenanceSummary)" in home
+    assert "Details: @HomeText(answer.ProvenanceLabel)" in home
+    assert "Details: @HomeText(publication.ProvenanceSummary)" in home
     assert "Hint: @PublicText(sourceHintLine)" in home
 
 
@@ -1823,6 +1954,7 @@ def test_feature_detail_partials_use_account_detail_language() -> None:
         "Open account detail",
         "Compare against your account detail view",
         "Open account detail view",
+        "@RoadmapText(Model.ProofNote)",
     ):
         assert expected in combined
 
@@ -1876,6 +2008,17 @@ def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> No
             ">@choice.Label</a>",
         ):
             assert forbidden not in source
+
+
+def test_feature_detail_normalizes_release_detail_language_before_rendering() -> None:
+    feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")
+
+    assert 'const string ReleaseDetailFamily = "release-detail";' in feature
+    assert 'displayFamily = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase)' in feature
+    assert feature.count('"live-proof"') == 1
+    assert 'case "live-proof":' not in feature
+    assert '"live-proof" =>' not in feature
+    assert 'Model.Family switch' not in feature
 
 
 def test_publication_detail_page_uses_plain_labels() -> None:
@@ -2052,8 +2195,8 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     ):
         assert forbidden not in combined
 
-    assert "app page, manifest, and service worker" in mobile
-    assert "continuity page" in mobile
+    assert "offline return path" in mobile
+    assert "continuity page" not in mobile
     assert "entry points meet in one shell" in mobile
     assert "This page keeps rule answers short" in knowledge
     assert "Chummer export, not book text" in anarchy
@@ -2195,6 +2338,14 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         "publication contract",
         "guided-mastery contract",
         "local-acceleration contract",
+        "limited handoff path",
+        "Use export as a handoff",
+        "Foundry-style export is a handoff.",
+        "what Chummer can hand off",
+        "public-safe trust posture",
+        "meeting handoff",
+        "first-party account rails",
+        "The packet is still local",
     ):
         assert forbidden not in controller
 
@@ -2256,6 +2407,14 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         "The public guides show the SR4, SR5, and SR6 posture without pretending styling itself is rules.",
         "The public guide shows which workloads may accelerate locally while keeping hosted mode available.",
         "Use the command deck when you want the current jump targets before opening a build, rule, workspace, or publication surface.",
+        "limited export path",
+        "Use export when it helps",
+        "Foundry-style export creates files for another tool.",
+        "what Chummer can export",
+        "Runner Passport keeps account identity connected",
+        "meeting links",
+        "Chummer account pages",
+        "This submission stays on this form",
     ):
         assert expected in controller
 
@@ -2310,7 +2469,7 @@ def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> Non
         "no_automatic_world_changes",
         "no_public_surveillance",
         "Account lane",
-        "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox",
+        "Runner Passport keeps account identity connected to the Table Pulse inbox",
         "Signal Deck is armed, but no reviewed consequence cue has been written yet for this account path.",
         "the account command loop can still carry inbox reactions",
         "account command paths",
@@ -2344,14 +2503,21 @@ def test_foundry_export_copy_uses_limited_handoff_language() -> None:
     ):
         assert forbidden not in controller
 
-    for expected in (
+    for forbidden in (
         "Foundry export remains a limited handoff path, not a separate flagship feature.",
-        "Export support",
         "This route explains what Chummer can hand off toward Foundry-style targets without making export support look like a separate product.",
+        "Foundry-style export is a handoff.",
+    ):
+        assert forbidden not in controller
+
+    for expected in (
+        "Foundry export remains a limited export path, not a separate flagship feature.",
+        "Export support",
+        "This route explains what Chummer can export toward Foundry-style targets without making export support look like a separate product.",
         "Export path",
         "No separate public Foundry feature",
         "Chummer keeps the campaign state",
-        "Foundry-style export is a handoff.",
+        "Foundry-style export creates files for another tool.",
         "Chummer keeps campaign state, moderation status, and active table work in Chummer even when a VTT target exists.",
         "Export only",
         "Chummer keeps the record",
@@ -2364,7 +2530,11 @@ def test_foundry_export_copy_uses_limited_handoff_language() -> None:
 def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     venue = read("Chummer.Run.Api/Views/PublicLanding/GmSessionVenue.cshtml")
-    combined = "\n".join((controller, venue))
+    community_creator = read("Chummer.Run.Api/Services/CommunityCreatorHorizonsService.cs")
+    hosted_contract = read("Chummer.Run.Api/Services/Support/HostedProofContractService.cs")
+    hosted_context = read("Chummer.Run.Api/Services/Support/HostedBoundedContextCoverageService.cs")
+    campaign_spine = read("Chummer.Run.Api/Services/Community/CampaignSpineService.cs")
+    combined = "\n".join((controller, venue, community_creator, hosted_contract, hosted_context, campaign_spine))
 
     for forbidden in (
         "Public-safe venue status for an open run without leaking private room details.",
@@ -2388,6 +2558,18 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "meeting-service automation still remains projection-only",
         "Chummer still owns accepted roster and run truth.",
         "run truth, roster truth, or consequence truth",
+        "How scheduling, handoff, and closeout stay clear",
+        "Meeting handoff",
+        "Scheduling, handoff, and closeout status stay in Chummer",
+        "schedule, handoff, and closeout status agree",
+        "schedule, meeting handoff, and closeout status",
+        "meeting handoff can close the loop",
+        "Meeting handoff is still pending",
+        "schedule, handoff, and closeout records",
+        "Fleet handoff",
+        "Voice-required handoff",
+        "meeting handoff can stay green",
+        "Meeting handoff requires",
     ):
         assert forbidden not in combined
 
@@ -2397,7 +2579,7 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "Public session title or run label.",
         "ready for account participants",
         "Public venue status only",
-        "Account Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on Chummer campaign pages.",
+        "Account Community Hub keeps open-run listing, join review, scheduling, meeting links, and closeout on Chummer campaign pages.",
         "RulesOwner = \"Chummer\"",
         "WorldOwner = \"Chummer\"",
         "public board status and safety limits stay readable, while account listing",
@@ -2414,6 +2596,53 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "Chummer still keeps accepted roster and run status.",
         "does not hand run, roster, or closeout records to chat tools, meeting tools, or public boards.",
         "Room available to account participants",
+        "How scheduling, meeting details, and closeout stay clear without exposing private table details.",
+        "Meeting details",
+        "Scheduling, meeting details, and closeout status stay in Chummer",
+        "schedule, meeting details, and closeout status agree",
+        "keeps listing, schedule, meeting details, and closeout status",
+        "meeting details can close the loop",
+        "Meeting details are still pending",
+        "schedule, meeting details, and closeout records",
+        "Fleet release steps",
+        "Voice participation still needs explicit acknowledgement",
+        "meeting details can stay green",
+        "Meeting details require",
+    ):
+        assert expected in combined
+
+
+def test_support_and_download_copy_uses_setup_and_release_language() -> None:
+    support = read("Chummer.Run.Api/Services/Support/SupportCasePresentationService.cs")
+    release = read("Chummer.Run.Api/Services/ReleaseSelectionService.cs")
+    public_signal = read("Chummer.Run.Api/Services/PublicSignalOperationsService.cs")
+    trust = read("Chummer.Run.Api/Services/SignedInTrustStatusService.cs")
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    combined = "\n".join((support, release, public_signal, trust, controller))
+
+    for forbidden in (
+        "release handoff may still be moving",
+        "release handoff is still moving",
+        "Windows install handoff",
+        "Linux install handoff",
+        "raw DMG handoff",
+        "Moderation and help handoff",
+        "First-party help handoff",
+        "No release handoff is published yet.",
+        "first-party Fixer Board",
+    ):
+        assert forbidden not in combined
+
+    for expected in (
+        "release step may still be moving",
+        "release step is still moving",
+        "Windows setup path",
+        "Linux setup path",
+        "raw DMG download",
+        "Moderation and help review",
+        "First-party help review",
+        "No release download is published yet.",
+        "Chummer feedback page",
     ):
         assert expected in combined
 
@@ -2479,3 +2708,30 @@ def test_account_context_services_use_account_language_instead_of_signed_in_rail
         "account area",
     ):
         assert expected in sources
+
+
+def test_account_view_hides_internal_status_language_from_signed_in_users() -> None:
+    account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+
+    for forbidden in (
+        "bounded trust continuity",
+        "Assign bounded contribution work",
+        "entitlement-sync history",
+        "entitlement-sync conflicts",
+        "The staged packet stays bounded",
+        "Still bounded",
+        "next bounded response",
+    ):
+        assert forbidden not in account
+
+    for expected in (
+        "Runner Passport is ready to update",
+        "Assign contribution work and track progress.",
+        "No account sync history is attached",
+        "No account sync problems are active",
+        "Prepare offline travel files",
+        "secrets and local caches stay on this device",
+        "Not shared yet",
+        "review the next response",
+    ):
+        assert expected in account

@@ -1,6 +1,6 @@
 # Horizons
 
-Horizons are the canonical registry for campaign-adjacent product areas, expansion bets, and deeper design lanes in Project Chummer.
+Horizons are the canonical registry for campaign-adjacent expansion bets and deeper design lanes in Project Chummer.
 
 They exist so public storytelling, deeper guide pages, and future product intent stay tied to `chummer6-design` instead of becoming a separate marketing shelf.
 
@@ -9,8 +9,7 @@ For the writing, public-guide, and media standard, use `HORIZON_DESIGN_INSTRUCTI
 ## Rules
 
 * Horizon docs are canon for lane posture, not promises of shipment.
-* Mature lanes may be grouped as `core_product` in public guide output; they should read like normal Chummer6 value, not distant future brands.
-* Infrastructure and polish lanes may be grouped as `folded_into_product`; they should support the workbench or campaign layer quietly instead of competing with the public story.
+* Mature base-client areas belong in `PUBLIC_FEATURE_REGISTRY.yaml` and `features/*.md`, not in the Horizon registry.
 * Horizon docs must stay consistent with `VISION.md`, `ARCHITECTURE.md`, `EXTERNAL_TOOLS_PLANE.md`, and `PROGRAM_MILESTONES.yaml`.
 * The public `Chummer6` guide may explain Horizons in human language, but it may not outrun this directory.
 * Public horizon output must satisfy `HORIZON_DESIGN_INSTRUCTIONS.md`: human value first, no repo-speak, no foundation-code checklists, no unsupported shipment claims, and no decorative AR that does not fit the scene.
@@ -37,15 +36,11 @@ The subdirectory `horizons/HORIZON_REGISTRY.yaml` is a derived guide-routing ind
 
 ## Horizon families
 
-Horizons should group into stable capability families rather than reading like an unstructured idea list. Public guide output should then make a second split: normal product areas, larger expansion bets, and folded-in infrastructure.
+Horizons should group into stable capability families rather than reading like an unstructured idea list. Public guide output should keep them separate from normal product features.
 
 Current families are:
 
-* expert-speed and command surfaces
-* ruleset-specific authored heads
 * guided mastery and teaching
-* GM operations and campaign control
-* session continuity
 * build and simulation
 * governed rules evolution
 * knowledge fabric and explainability
@@ -55,7 +50,6 @@ Current families are:
 * spatial exploration
 * replay and forensics
 * table coaching and social dynamics
-* optional local acceleration
 * community signal
 
 ## Canon layers
@@ -71,23 +65,16 @@ They must not carry a private hardcoded horizon catalog.
 
 ## Registry
 
-Read `horizons/README.md` first, then the relevant lane docs:
+Read `horizons/README.md` first, then the relevant lane docs. Base product features such as NEXUS-PAN, Run Control, Edition Studio, Community Hub, Ghostwire, Local Co-Processor, and Quicksilver live under `features/*.md`.
 
-* `horizons/quicksilver.md`
-* `horizons/edition-studio.md`
-* `horizons/run-control.md`
-* `horizons/nexus-pan.md`
 * `horizons/alice.md`
 * `horizons/karma-forge.md`
 * `horizons/black-ledger.md`
-* `horizons/community-hub.md`
 * `horizons/knowledge-fabric.md`
 * `horizons/jackpoint.md`
 * `horizons/runsite.md`
 * `horizons/runbook-press.md`
-* `horizons/ghostwire.md`
 * `horizons/table-pulse.md`
-* `horizons/local-co-processor.md`
 
 ## Required fields for every horizon
 

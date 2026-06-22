@@ -69,7 +69,6 @@ public sealed class GoldReadinessArtifactService
         string relativePath = DefaultRelativePath.Replace('/', Path.DirectorySeparatorChar);
         return new[]
             {
-                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),

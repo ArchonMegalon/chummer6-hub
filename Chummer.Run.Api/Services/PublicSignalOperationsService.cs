@@ -2686,7 +2686,7 @@ public sealed class PublicSignalOperationsService
             DedupKey = NormalizeOptional(receipt.DedupKey) ?? $"source:{NormalizeOptional(receipt.SourceReceiptId) ?? "unknown"}:{NormalizeOptional(receipt.RouteKind) ?? "routing"}",
             SourceReceiptId = NormalizeOptional(receipt.SourceReceiptId) ?? "unknown",
             RouteKind = NormalizeOptional(receipt.RouteKind) ?? "support_handoff",
-            StatusLabel = NormalizeOptional(receipt.StatusLabel) ?? "First-party help handoff",
+            StatusLabel = NormalizeOptional(receipt.StatusLabel) ?? "First-party help review",
             TargetPath = NormalizeOptional(receipt.TargetPath) ?? "/help",
             Summary = NormalizeOptional(receipt.Summary) ?? "Public signal was redirected to a calmer first-party boundary."
         };
@@ -2912,13 +2912,13 @@ public sealed class PublicSignalOperationsService
         if (category.PrivacySensitive)
         {
             routeKind = "moderation_review";
-            statusLabel = category.SupportMisrouteLikely ? "Moderation and help handoff" : "Moderation review required";
+            statusLabel = category.SupportMisrouteLikely ? "Moderation and help review" : "Moderation review required";
             targetPath = "/contact#support-intake";
         }
         else
         {
             routeKind = "support_handoff";
-            statusLabel = "First-party help handoff";
+            statusLabel = "First-party help review";
             targetPath = ResolveSupportTargetPath(category);
         }
 
@@ -4894,7 +4894,7 @@ public sealed class PublicSignalOperationsService
         }
 
         return configuredCount == 0
-            ? "No hosted public-board routes are configured here yet, so the first-party Fixer Board, roadmap, and changelog stay authoritative for public navigation."
+            ? "No hosted public-board routes are configured here yet, so the Chummer feedback page, roadmap, and changelog stay authoritative for public navigation."
             : $"{configuredCount} of {ProductLiftRoutePaths.Length} hosted public-board routes are configured. Promotion stays blocked until the full domain split is complete and consistent.";
     }
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import yaml
@@ -19,7 +20,11 @@ def main() -> int:
     args = parse_args()
     path = Path(args.seed_path)
     if not path.is_absolute():
-      path = Path("/docker/chummercomplete/chummer-hub-registry").joinpath(args.seed_path)
+        registry_root = Path(
+            os.environ.get("CHUMMER_HUB_REGISTRY_ROOT")
+            or Path(__file__).resolve().parents[2] / "chummer-hub-registry"
+        )
+        path = registry_root.joinpath(args.seed_path)
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     failures: list[str] = []
 

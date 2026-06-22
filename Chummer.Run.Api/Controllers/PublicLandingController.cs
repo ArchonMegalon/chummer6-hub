@@ -844,10 +844,7 @@ public sealed class PublicLandingController : Controller
             Path.Combine(Directory.GetCurrentDirectory(), "fleet", "_completion", "clickrank"),
             Path.Combine(Directory.GetCurrentDirectory(), ".integrated", "fleet", "_completion", "clickrank"),
             Path.Combine(AppContext.BaseDirectory, ".codex-studio", "published"),
-            Path.Combine(Directory.GetCurrentDirectory(), ".codex-studio", "published"),
-            "/docker/chummercomplete/_completion/clickrank",
-            "/docker/chummercomplete/fleet/_completion/clickrank",
-            "/docker/chummercomplete/.integrated/fleet/_completion/clickrank"
+            Path.Combine(Directory.GetCurrentDirectory(), ".codex-studio", "published")
         ];
 
         foreach (string root in roots)
@@ -2021,6 +2018,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
+        PublicSignalOperationsPacketViewModel? signalOperations = BuildOptionalSignalOperationsPacket();
         var model = new ParticipatePageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 "Participate",
@@ -2073,7 +2071,8 @@ public sealed class PublicLandingController : Controller
             },
             PrivateHelpHref: "/contact#support-intake",
             RoadmapHref: "/roadmap",
-            ChangelogHref: "/changelog");
+            ChangelogHref: "/changelog",
+            SignalOperations: signalOperations);
 
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
@@ -2887,11 +2886,11 @@ public sealed class PublicLandingController : Controller
         var model = await BuildHorizonPreviewPageModel(
             pageId: "foundry-export-boundary",
             title: "Foundry export boundary",
-            description: "Foundry export remains a limited handoff path, not a separate flagship feature.",
+            description: "Foundry export remains a limited export path, not a separate flagship feature.",
             currentPath: "/exports/foundry",
             eyebrow: "Export support",
             heading: "Foundry export boundary",
-            intro: "This route explains what Chummer can hand off toward Foundry-style targets without making export support look like a separate product.",
+            intro: "This route explains what Chummer can export toward Foundry-style targets without making export support look like a separate product.",
             summaryPoints:
             [
                 "Export path",
@@ -2900,7 +2899,7 @@ public sealed class PublicLandingController : Controller
             ],
             sections:
             [
-                new TrustPageSectionViewModel("foundry-boundary", "Export limits", "Use export as a handoff", "Foundry-style export is a handoff. Chummer keeps campaign state, moderation status, and active table work in Chummer even when a VTT target exists.", ["Export only", "Chummer keeps the record", "No outside owner"]),
+                new TrustPageSectionViewModel("foundry-boundary", "Export limits", "Use export when it helps", "Foundry-style export creates files for another tool. Chummer keeps campaign state, moderation status, and active table work in Chummer even when a VTT target exists.", ["Export only", "Chummer keeps the record", "No outside owner"]),
                 new TrustPageSectionViewModel("foundry-next", "Current status", "Use the shipped paths", "The shipped product story now lives on the active native and public features. This route remains as a simple export explainer, not as a parked roadmap promise.", ["Shipped features elsewhere", "Export stays clear", "No stale parked claim"])
             ],
             actions:
@@ -2947,7 +2946,7 @@ public sealed class PublicLandingController : Controller
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
                 AftermathHref = "/account/work#aftermath-packages",
-                Summary = "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
+                Summary = "Runner Passport keeps account identity connected to the Table Pulse inbox, leader command, and aftermath return path."
             },
             Boundary = new
             {
@@ -3010,7 +3009,7 @@ public sealed class PublicLandingController : Controller
                 ScheduleApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/schedule",
                 MeetingHandoffApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/meeting-handoff",
                 CloseoutApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/closeout",
-                Summary = "Account Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on Chummer campaign pages."
+                Summary = "Account Community Hub keeps open-run listing, join review, scheduling, meeting links, and closeout on Chummer campaign pages."
             },
             Boundary = new
             {
@@ -3058,7 +3057,7 @@ public sealed class PublicLandingController : Controller
                 PublicationDetailHrefTemplate = "/account/creator/{publicationId}",
                 PublicationFallbackDetailHrefTemplate = "/account/work/publications/{publicationId}",
                 PublicDetailHrefTemplate = "/artifacts/publications/{publicationId}",
-                Summary = "Signed-in Creator OS keeps publication draft, review, publish, and campaign-return history on first-party account rails."
+                Summary = "Signed-in Creator OS keeps publication draft, review, publish, and campaign-return history on Chummer account pages."
             },
             Boundary = new
             {
@@ -3137,7 +3136,7 @@ public sealed class PublicLandingController : Controller
         {
             var invalidModel = await BuildKarmaForgePageModel(
                 request,
-                "The packet is still local to this form until the required fields and consent are complete.",
+                "This submission stays on this form until the required fields and consent are complete.",
                 validationErrors,
                 cancellationToken,
                 subject);
@@ -5429,7 +5428,7 @@ public sealed class PublicLandingController : Controller
             description: "Open-run board, organizer closeout status, and moderation-safe public paths.",
             eyebrow: "Community",
             heading: "Community Hub",
-            intro: "Community Hub now ships a real open-run network: public board status and safety limits stay readable, while account listing, join review, scheduling, meeting handoff, and closeout stay on the same campaign path.",
+            intro: "Community Hub now ships a real open-run network: public board status and safety limits stay readable, while account listing, join review, scheduling, meeting links, and closeout stay on the same campaign path.",
             boundaryLine: "Public pages show board status and safety limits. Private roster notes, meeting access, and case handling stay in Chummer account pages.",
             summaryPoints:
             [
@@ -5787,7 +5786,7 @@ public sealed class PublicLandingController : Controller
 
         return new BlackLedgerConnectedLanePacketViewModel(
             Heading: "Community Hub operations",
-            Summary: "The Community Hub path now carries open-run board status, join review, scheduling, meeting handoff, and closeout on one Chummer campaign path.",
+            Summary: "The Community Hub path now carries open-run board status, join review, scheduling, meeting links, and closeout on one Chummer campaign path.",
             BoundaryLine: "Community Hub can show venue status and service handoff, but it does not hand run, roster, or closeout records to chat tools, meeting tools, or public boards.",
             Cues: cues);
     }
@@ -9360,7 +9359,7 @@ Boundary:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download link is the problem."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.")
+                new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Public feedback should start on the feedback page. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
             DefaultKind: overrides.Kind,
             DefaultTitle: overrides.Title,
@@ -10334,7 +10333,7 @@ Boundary:
     {
         if (releaseExperience.Recommended is null)
         {
-            return "No release handoff is published yet.";
+            return "No release download is published yet.";
         }
 
         if (pulse.MissingDesktopClientCoverage || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
