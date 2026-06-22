@@ -15,7 +15,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current stable build", view, StringComparison.Ordinal);
         Assert.Contains("Latest published build", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Use Help if install or update does not behave as expected.", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
@@ -88,7 +88,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
         Assert.Contains("Use this when you want the newest Windows or Linux release.", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Use Help if install or update does not behave as expected.", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
@@ -184,8 +184,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Open milestones", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What we are working on next", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Suggest a change", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Near-term work", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Shipped updates", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
     }
