@@ -3199,7 +3199,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/roadmap/black-ledger")]
     public IActionResult BlackLedgerRoadmapAlias()
-        => Redirect("/ledger/map");
+        => Redirect("/horizons");
 
     [HttpGet("/ledger/stats")]
     [Produces("text/html")]

@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-feature-detail";
+    ViewData["SurfaceClass"] = "surface-feature-detail surface-minimal";
     static string NormalizeDetailRoute(string href)
     {
         var trimmed = (href ?? string.Empty).Trim();
@@ -137,6 +137,70 @@
         "Setup help");
 }
 
+@if (!Model.Chrome.Authenticated)
+{
+    <section class="minimal-page-hero feature-detail-compact">
+        <div>
+            <p class="minimal-kicker">@PublicText(Model.Eyebrow)</p>
+            <h1>@PublicText(Model.Heading)</h1>
+            <p>@PublicText(Model.Intro)</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>
+                @if (Model.SecondaryAction is not null
+                    && !string.Equals(
+                        NormalizeDetailRoute(Model.SecondaryAction.Href),
+                        NormalizeDetailRoute(Model.PrimaryAction.Href),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@PublicText(Model.SecondaryAction.Label)</a>
+                }
+            </div>
+        </div>
+        @if (Model.Asset is not null)
+        {
+            <div class="minimal-hero__visual minimal-hero__visual--screenshot feature-detail-compact__asset">
+                @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", Model.Asset)
+            </div>
+        }
+    </section>
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Current state</h2>
+        </div>
+        <div class="minimal-platform-list">
+            @foreach (var fact in Model.Facts.Take(3))
+            {
+                <article>
+                    <h3>@PublicText(fact.Label)</h3>
+                    <p>@PublicText(fact.Body)</p>
+                </article>
+            }
+        </div>
+    </section>
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Next</h2>
+            <p>Use the direct action first. Open Help only when setup, account, or private recovery detail is involved.</p>
+        </div>
+        <div class="minimal-download-strip">
+            @foreach (var choice in routeChoices.Take(2))
+            {
+                <a class="minimal-download-strip__item" href="@choice.Href">
+                    <span>@PublicText(choice.Badge)</span>
+                    <strong>@PublicText(choice.Label)</strong>
+                </a>
+            }
+            <a class="minimal-download-strip__item" href="/help">
+                <span>Help</span>
+                <strong>Open help</strong>
+            </a>
+        </div>
+    </section>
+}
+else
+{
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
@@ -229,3 +293,4 @@
         <a class="cta-link cta-link--ghost" href="/help">Open help</a>
     </div>
 </section>
+}

@@ -87,7 +87,7 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   const participateResponse = await request.get(`${baseUrl}/participate`, { maxRedirects: 0 });
   expect(participateResponse.status()).toBe(200);
   const participateText = await participateResponse.text();
-  expect(participateText).toContain('First-party page');
+  expect(participateText).toContain('Participate');
   expect(participateText).not.toContain('ProductLift');
   expect(participateText).not.toContain('productlift.dev');
 
@@ -221,4 +221,42 @@ test('downloads concierge reads like instant support, not internal governance', 
   ]) {
     expect(bodyText, `/downloads/concierge should not expose "${term}"`).not.toContain(term);
   }
+});
+
+test('public feature detail pages stay compact and human-facing', async ({ page }) => {
+  const paths = ['/artifacts/explanation-receipt-trail', '/artifacts/current-preview-build'] as const;
+  const blockedTerms = ['AI', 'ALICE', 'Alice', 'Black Ledger', 'proof', 'receipt', 'artifact', 'operator', 'governed'];
+
+  for (const path of paths) {
+    await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
+    const metrics = await page.evaluate(() => {
+      const main = document.querySelector('main') || document.body;
+      const text = (main.textContent || '').replace(/\s+/g, ' ').trim();
+      return {
+        text,
+        wordCount: text.length === 0 ? 0 : text.split(/\s+/).length,
+        linkCount: main.querySelectorAll('a').length,
+        buttonCount: main.querySelectorAll('a.button-like, button').length,
+        sectionCount: main.querySelectorAll('section').length,
+      };
+    });
+
+    expect(metrics.wordCount, `${path} word count`).toBeLessThanOrEqual(260);
+    expect(metrics.linkCount, `${path} link count`).toBeLessThanOrEqual(6);
+    expect(metrics.buttonCount, `${path} action count`).toBeLessThanOrEqual(3);
+    expect(metrics.sectionCount, `${path} section count`).toBeLessThanOrEqual(3);
+    for (const term of blockedTerms) {
+      expect(metrics.text, `${path} should not expose "${term}"`).not.toContain(term);
+    }
+  }
+});
+
+test('unfinished campaign city route stays hidden from the public roadmap path', async ({ page }) => {
+  await page.goto(`${baseUrl}/roadmap/black-ledger`, { waitUntil: 'domcontentloaded' });
+  expect(new URL(page.url()).pathname).toBe('/horizons');
+  const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
+  expect(bodyText).toContain('Not the front door');
+  expect(bodyText).not.toContain('Black Ledger');
+  expect(bodyText).not.toContain('Open Black Ledger');
+  expect(bodyText).not.toContain('command map');
 });
