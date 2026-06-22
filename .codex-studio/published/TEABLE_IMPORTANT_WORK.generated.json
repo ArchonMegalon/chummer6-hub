@@ -132,7 +132,7 @@
       "cadence": "daily until covered",
       "source": "Product direction",
       "why_it_matters": "A dossier should read like a deliberate character book, not generated filler or a form summary.",
-      "next_action": "Run the generated story through the Humanizer lane before FlipLink/book, audiobook, video, and Alice ingestion; keep advanced steering collapsed by default.",
+      "next_action": "Run the generated story through the Undetectable Humanizer LTD lane before FlipLink/book, audiobook, video, and Alice ingestion; keep advanced steering collapsed by default.",
       "acceptance_gate": "Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, book-first output, voice choice, video option, and Alice using the final story."
     },
     {
@@ -467,7 +467,7 @@
       "status": "active",
       "cadence": "weekly",
       "source": "Gold audit",
-      "why_it_matters": "Owned tools such as Dadan, Rybbit, NeuronWriter, Humanizer, VidBoard, and Subscribr need explicit bounded roles.",
+      "why_it_matters": "Owned tools such as Dadan, Rybbit, NeuronWriter, Undetectable Humanizer LTD, VidBoard, and Subscribr need explicit bounded roles.",
       "next_action": "Keep LTDs.md and provider receipts current without surfacing provider names on user-facing pages.",
       "acceptance_gate": "Inventory lists every owned LTD with role, tier, status, boundaries, and proof path, while public pages stay quiet."
     },
