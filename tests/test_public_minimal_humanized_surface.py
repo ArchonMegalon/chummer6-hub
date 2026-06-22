@@ -236,7 +236,7 @@ def test_public_views_use_neutral_note_markup_instead_of_proof_markup() -> None:
     ]
 
     assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Feedback.cshtml").exists()
-    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
 
     for view_path in public_views:
         source = read(view_path)
@@ -244,14 +244,19 @@ def test_public_views_use_neutral_note_markup_instead_of_proof_markup() -> None:
         assert "workflow-card__note" in source
 
 
-def test_deleted_participation_surface_redirects_instead_of_rendering_character_helper_copy() -> None:
+def test_participation_surface_renders_first_party_without_character_helper_copy() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
 
-    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
-    assert 'private const string DefaultProductLiftFeedbackUrl = "https://chummer6.productlift.dev";' in controller
-    assert "public IActionResult ParticipatePage()" in controller
-    assert "=> Redirect(ResolveProductLiftFeedbackUrl());" in controller
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert "DefaultProductLiftFeedbackUrl" not in controller
+    assert "https://chummer6.productlift.dev" not in controller
+    assert "public async Task<IActionResult> ParticipatePage" in controller
+    assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
+    assert "First-party page" in participate
     assert "BuildParticipatePageModel(" not in controller
+    assert "ExternalBoardUrl" not in controller
+    assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
 
     for forbidden in (
         "ALICE build ghosts",
@@ -261,6 +266,7 @@ def test_deleted_participation_surface_redirects_instead_of_rendering_character_
         "AI-generated",
     ):
         assert forbidden not in controller
+        assert forbidden not in participate
 
 
 def test_character_helper_page_uses_account_helper_language() -> None:
@@ -278,10 +284,12 @@ def test_character_helper_page_uses_account_helper_language() -> None:
 
 def test_participation_redirect_avoids_public_decision_and_account_explanation_page() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
 
-    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
-    assert "public IActionResult ParticipatePage()" in controller
-    assert "ResolveProductLiftFeedbackUrl()" in controller
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert "public async Task<IActionResult> ParticipatePage" in controller
+    assert "ResolveProductLiftFeedbackUrl()" not in controller
+    assert "productlift.dev" not in participate.lower()
 
     for forbidden in (
         "Account-only programs stay below the fold",
@@ -300,6 +308,7 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
         "optional signed-in paths",
     ):
         assert forbidden not in controller
+        assert forbidden not in participate
 
 
 def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
@@ -565,12 +574,15 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
 def test_minimal_palette_stays_neutral_and_readable() -> None:
     site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
-    assert "--minimal-page: #fcfdfc;" in site_css
-    assert "--minimal-surface: #ffffff;" in site_css
-    assert "--minimal-ink: #0d0d0d;" in site_css
-    assert "--minimal-muted: #5d5d5d;" in site_css
-    assert "--minimal-line: #e4e7eb;" in site_css
-    assert "rgba(255, 255, 255, 0.96)" in site_css
+    assert "--minimal-page: #0f1110;" in site_css
+    assert "--minimal-surface: #151815;" in site_css
+    assert "--minimal-ink: #f4f1e8;" in site_css
+    assert "--minimal-muted: #a8a49a;" in site_css
+    assert "--minimal-line: #2b302c;" in site_css
+    assert "--minimal-soft: #20241f;" in site_css
+    assert "--minimal-page: #fcfdfc;" not in site_css
+    assert "--minimal-surface: #ffffff;" not in site_css
+    assert "--minimal-ink: #0d0d0d;" not in site_css
     assert "--minimal-page: #f7f6f2;" not in site_css
     assert "--minimal-surface: #fffefa;" not in site_css
     assert "--minimal-soft: #ece8df;" not in site_css
@@ -583,9 +595,9 @@ def test_public_form_controls_have_os_dark_safe_defaults() -> None:
 
     assert 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])' in site_css
     assert "select option,\nselect optgroup" in site_css
-    assert "color-scheme: light;" in site_css
+    assert "color-scheme: dark;" in site_css
     assert "caret-color: var(--ink-strong);" in site_css
-    assert "background: #ffffff;" in site_css
+    assert "background: var(--bg-surface);" in site_css
     assert "color: var(--ink-strong);" in site_css
     assert "::placeholder" in site_css
     assert "opacity: 1;" in site_css
@@ -597,7 +609,7 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
         read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml"),
     ]
-    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
     combined = "\n".join(sources)
 
     for forbidden in (
@@ -1595,7 +1607,7 @@ def test_public_pages_use_plain_promises_and_summaries_instead_of_claim_jargon()
         assert forbidden not in combined
 
     assert "What this path covers" in anarchy
-    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
     assert "no public summary beyond the saved state" in feedback_lookup
 
 

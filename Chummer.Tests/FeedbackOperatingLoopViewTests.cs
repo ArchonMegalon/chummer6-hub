@@ -6,22 +6,27 @@ namespace Chummer.Tests;
 public sealed class FeedbackOperatingLoopViewTests
 {
     [Fact]
-    public void PublicFeedbackAndParticipatePagesAreDeletedAndRedirectedToProductLift()
+    public void PublicFeedbackRedirectsToFirstPartyParticipatePage()
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
+        string participateView = File.ReadAllText(participateViewPath);
 
         Assert.False(File.Exists(feedbackViewPath));
-        Assert.False(File.Exists(participateViewPath));
-        Assert.Contains("private const string DefaultProductLiftFeedbackUrl = \"https://chummer6.productlift.dev\";", controller, StringComparison.Ordinal);
+        Assert.True(File.Exists(participateViewPath));
+        Assert.DoesNotContain("DefaultProductLiftFeedbackUrl", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://chummer6.productlift.dev", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
-        Assert.Contains("public IActionResult ParticipatePage()", controller, StringComparison.Ordinal);
-        Assert.Contains("=> Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> ParticipatePage", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(\"/participate\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("BuildParticipatePageModel(", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Participate.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("ExternalBoardUrl", controller, StringComparison.Ordinal);
+        Assert.Contains("First-party page", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift", participateView, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

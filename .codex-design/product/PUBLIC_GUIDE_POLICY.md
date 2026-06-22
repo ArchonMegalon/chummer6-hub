@@ -21,7 +21,7 @@ It is not a second design authority.
 * `PUBLIC_PART_REGISTRY.yaml` owns public part pages.
 * `PUBLIC_FAQ_REGISTRY.yaml` and `PUBLIC_HELP_COPY.md` own FAQ/help participation copy.
 * The root `products/chummer/HORIZON_REGISTRY.yaml` owns horizon existence, order, and public-guide eligibility.
-* root `products/chummer/HORIZON_REGISTRY.yaml` is the only source of truth for horizon public-guide eligibility and order.
+* root `products/chummer/HORIZON_REGISTRY.yaml` sets horizon public-guide eligibility and order.
 * `products/chummer/horizons/HORIZON_REGISTRY.yaml` is a derived guide-routing index only; it may not widen eligibility, reorder horizons, or create a second canon. It must preserve the root registry order exactly.
 * If the guide and design canon disagree, the guide is wrong and must be corrected.
 * Generated public guide output must include a human-facing help/support page that explains guided contribution and points readers at the Hub participation endpoint.

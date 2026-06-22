@@ -82,7 +82,7 @@ public sealed class HubPageChromeServiceTests
             ["Home", "Participate", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("https://chummer6.productlift.dev", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/participate", chrome.PrimaryNavigation[1].Href);
         Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
     }
 

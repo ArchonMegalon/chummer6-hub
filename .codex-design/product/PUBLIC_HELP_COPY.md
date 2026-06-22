@@ -8,13 +8,13 @@ If you want to help, start with the public front door:
 * send lightweight product feedback
 * flag confusing public copy
 * suggest a future product direction
-* suggest or vote on a public ProductLift idea when it is not support, account, install, crash, private campaign, or copyrighted rules text
+* suggest or vote on a public idea when it is not support, account, install, crash, private campaign, or copyrighted rules text
 
 That keeps feedback public and legible.
 
-ProductLift feedback is public. Do not post private logs, account data, campaign spoilers, copyrighted source text, crash dumps, or support requests there. Use Chummer Help for support.
+Public feedback is public. Do not post private logs, account data, campaign spoilers, copyrighted source text, crash dumps, or support requests there. Use Chummer Help for support.
 
-ProductLift roadmap and changelog pages are public planning views from Chummer. They are not implementation priority, release authority, or support-case state.
+Roadmap and changelog pages are public planning views from Chummer. They are not implementation priority, release authority, or support-case state.
 
 ## Chummer Instant Help
 
@@ -52,7 +52,7 @@ That is a relationship choice, not a special per-user build.
 When a public concierge widget appears on `/downloads`, `/now`, `/help`, or another public low-risk page:
 
 * the first-party help or release article remains the main answer
-* the first-party help or release article remains the fixed truth
+* the first-party help or release article remains the place to rely on
 * the widget is a preview overlay that helps the user choose a safe next step
 * normal help choices stay visible and must still work when the widget is disabled
 * recovery language must point at the real help, relinking, or escalation path instead of claiming the widget fixed anything itself

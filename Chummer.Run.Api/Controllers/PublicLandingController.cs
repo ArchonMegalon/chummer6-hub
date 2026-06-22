@@ -32,8 +32,6 @@ public sealed class PublicLandingController : Controller
 {
     private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
-    private const string ProductLiftFeedbackUrlEnvironmentVariable = "CHUMMER_PRODUCTLIFT_FEEDBACK_URL";
-    private const string DefaultProductLiftFeedbackUrl = "https://chummer6.productlift.dev";
 
     private readonly PublicLandingService _landing;
     private readonly FlipLinkDocumentPortalService _flipLinkDocumentPortal;
@@ -2021,8 +2019,64 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/participate")]
     [Produces("text/html")]
-    public IActionResult ParticipatePage()
-        => Redirect(ResolveProductLiftFeedbackUrl());
+    public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
+    {
+        var model = new ParticipatePageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                "Participate",
+                "Send ideas, rough edges, and table friction to Chummer without leaving the site.",
+                "/participate",
+                cancellationToken),
+            Lanes: new[]
+            {
+                new ParticipateLaneViewModel(
+                    "Idea",
+                    "Suggest something useful",
+                    "Use this for product ideas, workflow gaps, or small improvements that would make Chummer easier to use.",
+                    "#participate-submit",
+                    "Add an idea"),
+                new ParticipateLaneViewModel(
+                    "Bug",
+                    "Report a public bug",
+                    "Use this for safe public bugs. Send logs, account details, and private campaign material through Help instead.",
+                    "/contact#support-intake",
+                    "Open help"),
+                new ParticipateLaneViewModel(
+                    "Roadmap",
+                    "See what is being considered",
+                    "Roadmap is planning, changelog is shipped work, and Participate is the place to say what should change.",
+                    "/roadmap",
+                    "Open roadmap")
+            },
+            Items: new[]
+            {
+                new ParticipateItemViewModel(
+                    8,
+                    "Import existing Chummer5A characters",
+                    "Bring established characters forward without rebuilding every detail by hand.",
+                    "Gathering votes"),
+                new ParticipateItemViewModel(
+                    7,
+                    "Readable dark mode everywhere",
+                    "Keep text, inputs, popups, and menus legible in late-session desktop and web use.",
+                    "In progress"),
+                new ParticipateItemViewModel(
+                    5,
+                    "Clear update progress",
+                    "Show what is happening during startup updates so users do not launch a second copy.",
+                    "In progress"),
+                new ParticipateItemViewModel(
+                    3,
+                    "AUR package for Arch-based Linux",
+                    "Make the Linux install path fit Arch-based desktops instead of relying on converted packages.",
+                    "Gathering votes")
+            },
+            PrivateHelpHref: "/contact#support-intake",
+            RoadmapHref: "/roadmap",
+            ChangelogHref: "/changelog");
+
+        return View("~/Views/PublicLanding/Participate.cshtml", model);
+    }
 
     [HttpGet("/participate/build-ghosts")]
     [Produces("text/html")]
@@ -3791,11 +3845,11 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/feedback")]
     [Produces("text/html")]
     public IActionResult FeedbackPage()
-        => Redirect(ResolveProductLiftFeedbackUrl());
+        => Redirect("/participate");
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
-        => Redirect(ResolveProductLiftFeedbackUrl());
+        => Redirect("/participate");
 
     [HttpPost("/feedback/providers/productlift/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
@@ -8446,18 +8500,6 @@ Boundary:
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
         return _campaignSpine.GetAccountSummary(user, installLinking);
-    }
-
-    private string ResolveProductLiftFeedbackUrl()
-    {
-        string configured = (_configuration[ProductLiftFeedbackUrlEnvironmentVariable] ?? string.Empty).Trim();
-        if (Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri)
-            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
-        {
-            return uri.ToString();
-        }
-
-        return DefaultProductLiftFeedbackUrl;
     }
 
     private BuildGhostConciergeTeaserViewModel BuildBuildGhostConciergeTeaser()

@@ -117,7 +117,7 @@ def test_route_result_fails_when_minimal_route_contains_strict_forbidden_copy():
     assert "lane" not in detail
 
 
-def test_participation_external_redirect_is_allowed_without_scanning_provider_copy():
+def test_participation_external_redirect_fails_because_participate_is_first_party():
     module = load_module()
 
     class FakeResponse:
@@ -134,9 +134,10 @@ def test_participation_external_redirect_is_allowed_without_scanning_provider_co
 
     result = module.verify_route(FakeSession(), "https://chummer.run", "/participate")
 
-    assert result.success is True
+    assert result.success is False
     assert result.redirect_external is True
     assert result.redirect_url == "https://chummer6.productlift.dev"
+    assert result.detail == "route redirects outside Chummer from an unapproved public path"
     assert result.forbidden_hits == []
 
 

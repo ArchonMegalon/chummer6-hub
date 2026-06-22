@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
   <title id="title">Chummer PWA icon</title>
   <desc id="desc">Angular neon monogram for the Chummer public install rail.</desc>
-  <rect width="192" height="192" rx="36" fill="#07131c" />
+  <rect width="192" height="192" rx="36" fill="#0f1110" />
   <path d="M48 46h22v100H48zm74 0h22v100h-22zM70 46h52v22H70zm0 78h52v22H70zm0-39h52v22H70z" fill="#d8f06f" />
   <path d="M96 28c31 0 56 25 56 56v24c0 31-25 56-56 56s-56-25-56-56V84c0-31 25-56 56-56Zm0 18c-21 0-38 17-38 38v24c0 21 17 38 38 38s38-17 38-38V84c0-21-17-38-38-38Z" fill="#1f8f7a" fill-opacity="0.32" />
 </svg>

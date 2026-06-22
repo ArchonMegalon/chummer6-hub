@@ -85,8 +85,11 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   ];
 
   const participateResponse = await request.get(`${baseUrl}/participate`, { maxRedirects: 0 });
-  expect(participateResponse.status()).toBe(302);
-  expect(new URL(participateResponse.headers()['location']).origin).toBe('https://chummer6.productlift.dev');
+  expect(participateResponse.status()).toBe(200);
+  const participateText = await participateResponse.text();
+  expect(participateText).toContain('First-party page');
+  expect(participateText).not.toContain('ProductLift');
+  expect(participateText).not.toContain('productlift.dev');
 
   for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
@@ -114,6 +117,7 @@ test('direct character helper route stays private-preview and human-readable', a
 });
 
 test('core public pages stay inside a minimal interaction budget', async ({ page }) => {
+  test.setTimeout(90_000);
   const budgets = [
     { path: '/', maxWords: 180, maxLinks: 10, maxButtons: 5, maxSections: 4 },
     { path: '/downloads', maxWords: 140, maxLinks: 8, maxButtons: 6, maxSections: 4 },

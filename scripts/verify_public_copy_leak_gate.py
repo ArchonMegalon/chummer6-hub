@@ -45,11 +45,7 @@ MINIMAL_PUBLIC_ROUTES = {
     "/what-is-chummer",
     "/login",
 }
-ALLOWED_EXTERNAL_REDIRECT_ROUTES = {
-    "/participate",
-    "/feedback",
-    "/help/feedback",
-}
+ALLOWED_EXTERNAL_REDIRECT_ROUTES: set[str] = set()
 FORBIDDEN_PATTERNS = [
     r"\bchummer-api\b",
     r"\bchummer6-hub\b",

@@ -935,6 +935,27 @@ public sealed record ReleaseUploadPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
+public sealed record ParticipatePageViewModel(
+    SiteChromeViewModel Chrome,
+    IReadOnlyList<ParticipateLaneViewModel> Lanes,
+    IReadOnlyList<ParticipateItemViewModel> Items,
+    string PrivateHelpHref,
+    string RoadmapHref,
+    string ChangelogHref);
+
+public sealed record ParticipateLaneViewModel(
+    string Label,
+    string Title,
+    string Summary,
+    string Href,
+    string ActionLabel);
+
+public sealed record ParticipateItemViewModel(
+    int Score,
+    string Title,
+    string Summary,
+    string Status);
+
 public sealed record KarmaForgeIntakePageViewModel(
     SiteChromeViewModel Chrome,
     string Eyebrow,
