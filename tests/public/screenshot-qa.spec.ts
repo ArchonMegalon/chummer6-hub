@@ -32,13 +32,13 @@ const supportingSurfaces = [
     id: 'ledger-map',
     route: '/ledger/map',
     screenshotPrefix: 'ledger-map',
-    requiredText: ['campaign city command map', 'Track who is moving first.', 'Turn 2'],
+    requiredText: ['Campaign city command map', 'Track who is moving first.', 'Turn 1'],
   },
   {
     id: 'help',
     route: '/help',
     screenshotPrefix: 'help',
-    requiredText: ['Get help without guessing', 'Choose the right path.'],
+    requiredText: ['Get help without guessing', 'Choose the right path'],
   },
 ] as const;
 
