@@ -11,8 +11,9 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   await expect(hero).toContainText('A Shadowrun character manager');
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveCount(0);
   await expect(page.getByText('Black Ledger')).toHaveCount(0);
-  await expect(hero.getByRole('link')).toHaveCount(1);
+  await expect(hero.getByRole('link')).toHaveCount(2);
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
+  await expect(hero.locator('.minimal-hero__visual')).toHaveAttribute('href', '/media/promo/chummer6-flagship-promo.mp4');
 
   await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
 

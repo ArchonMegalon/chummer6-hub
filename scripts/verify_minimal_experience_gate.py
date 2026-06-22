@@ -24,6 +24,7 @@ class SourceParser(HTMLParser):
         self.sources: list[str] = []
         self.video_posters: list[str] = []
         self.images: list[str] = []
+        self.links: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {key.lower(): value or "" for key, value in attrs}
@@ -33,6 +34,8 @@ class SourceParser(HTMLParser):
             self.video_posters.append(values["poster"])
         if tag.lower() == "img" and values.get("src"):
             self.images.append(values["src"])
+        if tag.lower() == "a" and values.get("href"):
+            self.links.append(values["href"])
 
 
 def now_iso() -> str:
@@ -76,17 +79,18 @@ def build_payload(
         for source in parser.sources
         if "/media/promo/chummer6-flagship-promo" in source
     ]
-    poster_sources = [*parser.video_posters, *parser.images]
-    poster_urls = [
-        urljoin(f"{normalized_base_url}/", poster)
-        for poster in poster_sources
-        if "/media/promo/chummer6-flagship-promo" in poster
+    product_video_links = [
+        link
+        for link in parser.links
+        if "/media/promo/chummer6-flagship-promo" in link
     ]
+    poster_sources = [*parser.video_posters, *parser.images]
+    image_urls = [urljoin(f"{normalized_base_url}/", image) for image in parser.images]
 
     nav_panel_open = "nav-panel-open" in home_html
-    hero_image_loaded = bool(poster_urls) and all(asset_checker(url) for url in poster_urls)
+    hero_image_loaded = bool(image_urls) and all(asset_checker(url) for url in image_urls)
     video_sources_load = all(asset_checker(urljoin(f"{normalized_base_url}/", source)) for source in product_video_sources)
-    product_video_retired = not product_video_sources and bool(poster_urls)
+    promo_video_link_load = all(asset_checker(urljoin(f"{normalized_base_url}/", link)) for link in product_video_links)
     stable_visible = 'id="stable"' in downloads_html and "Current stable build" in downloads_html
     nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_html
     decision_card_count = count_occurrences(status_html, 'class="minimal-status-pill"')
@@ -95,11 +99,13 @@ def build_payload(
     if nav_panel_open:
         failures.append("home navigation panel is open by default")
     if not hero_image_loaded:
-        failures.append("home product video poster image is missing or unreachable")
+        failures.append("home hero image is missing or unreachable")
+    if not product_video_sources and not product_video_links:
+        failures.append("home promo video entry is missing")
     if product_video_sources and not video_sources_load:
         failures.append("home product video sources are unreachable")
-    if not product_video_sources and not product_video_retired:
-        failures.append("home product promo fallback image is missing or unreachable")
+    if product_video_links and not promo_video_link_load:
+        failures.append("home promo video link is unreachable")
     if not stable_visible:
         failures.append("downloads stable lane is not visible")
     if not nightly_visible:
@@ -122,7 +128,8 @@ def build_payload(
                 "hero_image_loaded": hero_image_loaded,
                 "product_video_sources": product_video_sources,
                 "product_video_sources_load": video_sources_load,
-                "product_video_retired": product_video_retired,
+                "product_video_links": product_video_links,
+                "product_video_links_load": promo_video_link_load,
             },
             {
                 "surface": "downloads",
@@ -151,7 +158,7 @@ def write_outputs(payload: dict, completion_root: Path) -> None:
                 "",
                 f"- Generated: {payload['generated_at_utc']}",
                 f"- Base URL: {payload['base_url']}",
-                "- Checks: navigation closed by default, homepage product video/poster reachable, downloads exposes Stable and Nightly, status exposes one release decision plus next actions.",
+                "- Checks: navigation closed by default, homepage hero image plus promo-video entry reachable, downloads exposes Stable and Nightly, status exposes one release decision plus next actions.",
                 "",
                 *[f"- {failure}" for failure in payload["failures"]],
                 *[f"- {result['surface']} checked" for result in payload["results"]],

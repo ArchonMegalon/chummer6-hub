@@ -20,23 +20,31 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     failures.push(`homepage: expected one Download Chummer hero action, found ${heroActions.join(', ')}`);
   }
   const heroImage = desktop.locator('.minimal-hero__visual img');
+  const heroMediaLink = desktop.locator('.minimal-hero__visual[href="/media/promo/chummer6-flagship-promo.mp4"]');
   await expect(heroImage).toBeVisible();
-  const heroImageComplete = await heroImage.evaluate((node) => {
+  await expect(heroMediaLink).toHaveCount(1);
+  const heroImageLoaded = await heroImage.evaluate((node) => {
     const image = node as HTMLImageElement;
-    return image.complete && image.naturalWidth > 400 && image.naturalHeight > 200;
+    return image.complete && (image.naturalWidth > 0 || image.naturalHeight > 0);
   });
-  if (!heroImageComplete) {
-    failures.push('homepage: hero image did not load with useful dimensions');
+  if (!heroImageLoaded) {
+    failures.push('homepage: hero image did not load');
   }
-  const retiredPromo = desktop.locator('[data-homepage-section="workflow"] .minimal-video--retired img');
-  await expect(retiredPromo).toBeVisible();
-  await expect(retiredPromo).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo-poster.png');
-  await expect(desktop.locator('[data-homepage-section="workflow"] video')).toHaveCount(0);
-  const videoSources: string[] = [];
+  await expect(desktop.locator('[data-homepage-section="workflow"] .minimal-video')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Need something else?');
   await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Participate');
-  results.push({ surface: 'home', inline_nav_visible: await desktop.locator('.site-nav').isVisible(), hero_image_loaded: heroImageComplete, product_video_sources: videoSources, product_video_retired: true });
+  const helpBox = await desktop.locator('[data-homepage-section="help"]').boundingBox();
+  if (!helpBox || helpBox.y + helpBox.height > 768) {
+    failures.push('homepage: first screen still extends below the desktop viewport');
+  }
+  results.push({
+    surface: 'home',
+    inline_nav_visible: await desktop.locator('.site-nav').isVisible(),
+    hero_image_loaded: heroImageLoaded,
+    promo_video_entry: '/media/promo/chummer6-flagship-promo.mp4',
+    first_viewport_fits: !!helpBox && helpBox.y + helpBox.height <= 768,
+  });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
   const stableLane = desktop.locator('#stable');

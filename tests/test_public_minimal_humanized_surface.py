@@ -232,9 +232,8 @@ def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
     assert "Downloads first" in horizons
 
 
-def test_homepage_has_minimal_product_video_surface() -> None:
+def test_homepage_has_minimal_promo_entry_surface() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
-    site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
     assert "A Shadowrun character manager for building, updating, and bringing clean sheets to the table." in landing
     assert "Download Chummer" in landing
@@ -242,11 +241,13 @@ def test_homepage_has_minimal_product_video_surface() -> None:
     assert 'href="/downloads#stable"' not in landing
     assert 'href="/downloads#nightly"' not in landing
     assert 'data-analytics-event="homepage_open_downloads"' in landing
+    assert 'data-analytics-event="homepage_open_promo_video"' in landing
     assert 'homepage_open_stable' not in landing
     assert 'homepage_open_nightly' not in landing
-    assert 'class="minimal-video minimal-video--retired"' in landing
-    assert "/media/promo/chummer6-flagship-promo-poster.png" in landing
-    assert "/media/promo/chummer6-flagship-promo.mp4" not in landing
+    assert 'class="minimal-hero__visual minimal-hero__visual--screenshot"' in landing
+    assert 'href="/media/promo/chummer6-flagship-promo.mp4"' in landing
+    assert "/media/product/chummer-desktop-runner.png" in landing
+    assert "/media/promo/chummer6-flagship-promo.mp4" in landing
     assert "/media/promo/chummer6-flagship-promo.webm" not in landing
     assert "/media/promo/chummer6-flagship-promo.vtt" not in landing
     assert 'data-homepage-section="downloads"' not in landing
