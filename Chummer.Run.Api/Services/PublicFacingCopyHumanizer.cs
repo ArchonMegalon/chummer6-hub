@@ -147,6 +147,8 @@ public static partial class PublicFacingCopyHumanizer
         cleaned = ReviewPassedRegex().Replace(cleaned, "The return path is ready.");
         cleaned = HelpPreparedStatusRegex().Replace(cleaned, "help prepared an update");
         cleaned = HelpPreparedUpdateForRegex().Replace(cleaned, "An update is ready for $1.");
+        cleaned = DetailsIsRegex().Replace(cleaned, "$1details are");
+        cleaned = ReviewDetailsRegex().Replace(cleaned, "review");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         cleaned = cleaned.Trim();
@@ -202,4 +204,10 @@ public static partial class PublicFacingCopyHumanizer
 
     [GeneratedRegex(@"\ba\s+update\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AUpdateRegex();
+
+    [GeneratedRegex(@"\b(The\s+|the\s+)?details\s+is\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DetailsIsRegex();
+
+    [GeneratedRegex(@"\breview\s+details\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ReviewDetailsRegex();
 }
