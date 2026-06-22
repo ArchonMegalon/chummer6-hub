@@ -294,7 +294,31 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
-def build_assets() -> tuple[list[PromoAsset], PromoAsset]:
+def retired_product_trailer() -> dict[str, Any]:
+    receipt_path = PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8")) if receipt_path.is_file() else {}
+    removed_files = [
+        RUN_SERVICES_ROOT / public_path.lstrip("/")
+        for public_path in receipt.get("removed_files", [])
+        if isinstance(public_path, str)
+    ]
+    poster_path = PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png"
+    return {
+        "asset_id": "chummer6-flagship-promo",
+        "public_name": "Chummer6 Product Trailer",
+        "kind": "product",
+        "status": "retired",
+        "receipt_path": str(receipt_path),
+        "receipt_status": receipt.get("status"),
+        "public_video_removed": receipt.get("public_video_removed") is True,
+        "poster_path": str(poster_path),
+        "poster_exists": poster_path.is_file(),
+        "removed_files_missing": bool(removed_files) and all(not path.exists() for path in removed_files),
+        "removed_files": [str(path) for path in removed_files],
+    }
+
+
+def build_assets() -> tuple[list[PromoAsset], dict[str, Any]]:
     faction_assets: list[PromoAsset] = []
     for slug, public_name in FACTIONS:
         faction_assets.append(
@@ -314,24 +338,7 @@ def build_assets() -> tuple[list[PromoAsset], PromoAsset]:
                 expected_camera_motion=True,
             )
         )
-    # The faction captions live on routes, but the actual text is route-backed and should be downloaded for audit.
-    # Store the product trailer locally because that asset already has a local VTT file.
-    product = gather_asset(
-        asset_id="chummer6-flagship-promo",
-        public_name="Chummer6 Product Trailer",
-        kind="product",
-        mp4_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.mp4",
-        webm_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.webm",
-        poster_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png",
-        captions_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.vtt",
-        storyboard_shots=12,
-        expected_people=0,
-        expected_action="product proof reel",
-        expected_environment="multiple",
-        expected_conflict="release proof",
-        expected_camera_motion=True,
-    )
-    return (faction_assets, product)
+    return (faction_assets, retired_product_trailer())
 
 
 def main() -> int:
@@ -366,20 +373,12 @@ def main() -> int:
             )
         )
 
-    product_asset = gather_asset(
-        asset_id="chummer6-flagship-promo",
-        public_name="Chummer6 Product Trailer",
-        kind="product",
-        mp4_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.mp4",
-        webm_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.webm",
-        poster_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png",
-        captions_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.vtt",
-        storyboard_shots=12,
-        expected_people=0,
-        expected_action="product proof reel",
-        expected_environment="multiple",
-        expected_conflict="release proof",
-        expected_camera_motion=True,
+    product_asset = retired_product_trailer()
+    product_retired_pass = (
+        product_asset["receipt_status"] == "revoked"
+        and product_asset["public_video_removed"]
+        and product_asset["poster_exists"]
+        and product_asset["removed_files_missing"]
     )
 
     provider = {
@@ -398,12 +397,17 @@ def main() -> int:
         {
             "generated_at_utc": "2026-05-25T10:30:00Z",
             "faction_videos": [asdict(asset) for asset in faction_assets],
-            "product_trailer": asdict(product_asset),
+            "product_trailer": product_asset,
         },
     )
 
     faction_motion = [score_motion(asset) for asset in faction_assets]
-    product_motion = score_motion(product_asset)
+    product_motion = {
+        "asset_id": product_asset["asset_id"],
+        "verdict": "pass" if product_retired_pass else "fail",
+        "status": "retired",
+        "notes": ["Retired faulty public promo video; static poster is the only allowed public fallback."],
+    }
     write_json(
         OUTPUT_ROOT / "PROMO_MOTION_SCORE.generated.json",
         {
@@ -415,7 +419,12 @@ def main() -> int:
     )
 
     faction_people = [score_people(asset) for asset in faction_assets]
-    product_people = score_people(product_asset)
+    product_people = {
+        "asset_id": product_asset["asset_id"],
+        "verdict": "pass" if product_retired_pass else "fail",
+        "status": "retired",
+        "notes": ["No human-quality claim is made for the retired video asset."],
+    }
     write_json(
         OUTPUT_ROOT / "PROMO_PEOPLE_ACTION_SCORE.generated.json",
         {
@@ -447,28 +456,16 @@ def main() -> int:
         """
 # Chummer6 Product Promo Script
 
-The current product trailer is a 90-second first-party motion piece focused on the Chummer6 client: compact desktop workbench, runner build, rules authority, GM cockpit, campaign tracking, Table Pulse, public install/status truth, Feedback Loop, Karma Forge, mouse-first control reachability, Fleet proof, and CTA. It deliberately excludes faction-specific content from the product promo.
+The prior product trailer is retired because public audio quality was not reliably verified. The current public fallback is the static product workflow poster until a human-reviewed video pipeline exists.
 """,
     )
     write_text(
         OUTPUT_ROOT / "PROMO_SHOTLIST.yaml",
         """
 product_trailer:
-  status: generated
-  target_duration_seconds: 90
-  required_sequences:
-    - open the client
-    - runner build with profile edits and visible operator
-    - SR4/SR5/SR6 rules authority receipts
-    - GM cockpit with visible escalation and player consequence
-    - campaign tracking with map/newsroom/consequence signals
-    - Table Pulse remote reaction and GM receipt
-    - public PWA/download/status truth
-    - Feedback Loop and Karma Forge
-    - mouse-first desktop controls
-    - Fleet proof stack
-    - no-noise public presentation
-    - final CTA
+  status: retired
+  fallback: static product workflow poster
+  replacement_requirement: human-reviewed public video pipeline
 faction_promos:
   status: out_of_scope_for_product_trailer
   requirement: excluded from Chummer6 flagship product promo
@@ -480,12 +477,8 @@ faction_promos:
 factions:
   status: excluded_from_product_trailer
 product_trailer:
-  required_people:
-    - runner
-    - desktop user
-    - GM
-    - remote participant
-    - creator/community participant
+  status: retired
+  public_claim: static fallback only
 """,
     )
     if not HUMAN_REVIEW_PATH.exists():
