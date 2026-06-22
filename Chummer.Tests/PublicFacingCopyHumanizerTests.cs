@@ -9,6 +9,8 @@ public sealed class PublicFacingCopyHumanizerTests
     [InlineData("The proof trail is not copy a human would write.", "The details are not copy a human would write.")]
     [InlineData("An AI assistant generated a provider artifact receipt.", "Help prepared a service file record.")]
     [InlineData("Open the horizon-only proof page for validation checks.", "Open the private details for review.")]
+    [InlineData("The micro-proof exposes provenance, audit summary, and deterministic runtime state.", "The status note exposes source, review, and consistent app state.")]
+    [InlineData("A bounded-failure artifact factory result remains in the publication lane.", "A not ready file builder result remains in the publishing path.")]
     public void Clean_RemovesInternalAndAiFlavoredPublicCopy(string source, string expected)
     {
         string cleaned = PublicFacingCopyHumanizer.Clean(source);
@@ -24,5 +26,13 @@ public sealed class PublicFacingCopyHumanizerTests
         Assert.DoesNotContain("horizon", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("validation", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("checks", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("micro-proof", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("provenance", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("audit summary", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("deterministic", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("runtime", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bounded-failure", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("artifact factory", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("publication lane", cleaned, StringComparison.OrdinalIgnoreCase);
     }
 }
