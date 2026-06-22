@@ -33,32 +33,12 @@
     var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
 
     static string CalmRoadmapText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("proof receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
-            .Replace("provider", "external service", StringComparison.OrdinalIgnoreCase)
-            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
-            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
-            .Replace("Alice", "character helper", StringComparison.OrdinalIgnoreCase)
-            .Replace("Black Ledger", "campaign city", StringComparison.OrdinalIgnoreCase)
+        => PublicFacingCopyHumanizer.Clean(value)
+            .Replace("external service", "public service", StringComparison.OrdinalIgnoreCase)
             .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizon", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("implementation tranche", "implementation slice", StringComparison.OrdinalIgnoreCase);
-    }
 
     var signalLanes = new[]
     {

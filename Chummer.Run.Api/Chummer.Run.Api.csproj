@@ -16,6 +16,11 @@
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="wwwroot\**\*.audio-rebuild.tmp.*" />
+    <None Include="wwwroot\**\*.audio-rebuild.tmp.*" Visible="false" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

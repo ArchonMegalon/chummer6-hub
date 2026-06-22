@@ -1,22 +1,11 @@
 @model FeatureDetailPageViewModel
 @{
     static string RoadmapText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return PublicFacingCopyHumanizer.Clean(value)
-            .Replace("Black Ledger", "campaign city", StringComparison.OrdinalIgnoreCase)
-            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
-            .Replace("Alice", "character helper", StringComparison.OrdinalIgnoreCase)
+        => PublicFacingCopyHumanizer.Clean(value)
             .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizon", "planned work", StringComparison.OrdinalIgnoreCase)
+            .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase)
             .Replace("implementation tranche", "implementation slice", StringComparison.OrdinalIgnoreCase);
-    }
 }
 
 <section class="role-matrix">

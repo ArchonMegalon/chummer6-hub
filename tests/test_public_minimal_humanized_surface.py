@@ -525,6 +525,31 @@ def test_public_humanizer_cleans_plural_internal_terms() -> None:
         assert phrase in humanizer
 
 
+def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> None:
+    for view_path in (
+        "Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/Changelog.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/Packages.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml",
+        "Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml",
+    ):
+        source = read(view_path)
+        assert "PublicFacingCopyHumanizer.Clean" in source
+        for duplicated_rule in (
+            '.Replace("proof',
+            '.Replace("receipts"',
+            '.Replace("receipt"',
+            '.Replace("provider"',
+            '.Replace("horizons"',
+            '.Replace("horizon"',
+            '.Replace("ALICE"',
+            '.Replace("Alice"',
+            '.Replace("Black Ledger"',
+        ):
+            assert duplicated_rule not in source
+
+
 def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
     entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
 

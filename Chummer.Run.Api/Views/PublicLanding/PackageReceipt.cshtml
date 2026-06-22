@@ -5,19 +5,8 @@
     ViewData["SurfaceClass"] = "surface-package-receipt";
 
     static string PublicPackageText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return PublicFacingCopyHumanizer.Clean(value)
-            .Replace("receipts", "updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "update", StringComparison.OrdinalIgnoreCase)
-            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
-            .Replace("rail", "page", StringComparison.OrdinalIgnoreCase)
-            .Replace("lane", "path", StringComparison.OrdinalIgnoreCase);
-    }
+        => PublicFacingCopyHumanizer.Clean(value)
+            .Replace("records", "updates", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">

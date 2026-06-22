@@ -5,29 +5,10 @@
     ViewData["SurfaceClass"] = "surface-packages";
 
     static string PublicPackageText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("Governed", "Reviewed", StringComparison.OrdinalIgnoreCase)
-            .Replace("governance", "review", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipts", "updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "update", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "updates", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "update", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
+        => PublicFacingCopyHumanizer.Clean(value)
             .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
             .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
-            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
-            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
-            .Replace("rail", "path", StringComparison.OrdinalIgnoreCase)
-            .Replace("lane", "path", StringComparison.OrdinalIgnoreCase);
-    }
+            .Replace("records", "updates", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">

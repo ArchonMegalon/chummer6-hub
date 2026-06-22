@@ -29,30 +29,10 @@
     }
 
     static string PublicChangelogText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return PublicFacingCopyHumanizer.Clean(value)
-            .Replace("proof receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
+        => PublicFacingCopyHumanizer.Clean(value)
             .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
             .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifacts", "files", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
-            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizons", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("horizon", "planned item", StringComparison.OrdinalIgnoreCase)
-            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
-            .Replace("Alice", "character helper", StringComparison.OrdinalIgnoreCase)
-            .Replace("Black Ledger", "campaign city", StringComparison.OrdinalIgnoreCase);
-    }
+            .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="evidence-header route-anchor-target" id="public-shipped-closeout">
