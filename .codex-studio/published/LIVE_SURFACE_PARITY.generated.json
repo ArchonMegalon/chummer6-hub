@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-19T23:38:49Z",
+  "generated_at_utc": "2026-06-22T13:59:07Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
@@ -11,9 +11,9 @@
       "final_url": "https://chummer.run/",
       "status_code": 200,
       "required_texts": [
-        "Build and maintain Shadowrun characters without losing the details between sessions.",
-        "Stable",
-        "Nightly",
+        "A Shadowrun character manager for building, updating, and bringing clean sheets to the table.",
+        "Download Chummer",
+        "Windows and Linux.",
         "What it does"
       ],
       "missing_required_texts": [],

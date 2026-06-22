@@ -21,9 +21,9 @@ SURFACES = [
     {
         "path": "/",
         "required_texts": [
-            "Build and maintain Shadowrun characters without losing the details between sessions.",
-            "Stable",
-            "Nightly",
+            "A Shadowrun character manager for building, updating, and bringing clean sheets to the table.",
+            "Download Chummer",
+            "Windows and Linux.",
             "What it does",
         ],
         "forbidden_texts": [
