@@ -662,6 +662,13 @@ def test_public_humanizer_cleans_plural_internal_terms() -> None:
         assert phrase in humanizer
 
 
+def test_account_home_does_not_replace_proof_language_with_check_language() -> None:
+    home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
+
+    assert '.Replace("proof", "check"' not in home
+    assert '.Replace("proof", "status"' in home
+
+
 def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> None:
     for view_path in (
         "Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml",
