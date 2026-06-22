@@ -83,8 +83,10 @@
     };
 
     var buildAction = chrome.HeaderActions.FirstOrDefault(action => isBuildAction(action.Href));
+    var showBuildActionInHeader = !minimalSurface;
     var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
     var visibleHeaderActions = nonBuildHeaderActions
+        .Where(action => !(minimalSurface && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)))
         .Where(action => routeKey is not "landing" || !normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
         .ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
@@ -356,7 +358,7 @@
                     <a class="site-actions__link" href="/help">Help</a>
                     <a class="site-actions__link" href="/faq">FAQ</a>
                     <a class="site-actions__link" href="/contact">Contact</a>
-                    @if (buildAction is not null)
+                    @if (showBuildActionInHeader && buildAction is not null)
                     {
                         if (isBuildCurrent)
                         {
@@ -423,7 +425,7 @@
                             <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
                         }
                     }
-                    @if (buildAction is not null)
+                    @if (showBuildActionInHeader && buildAction is not null)
                     {
                         if (buildAction.Current)
                         {
