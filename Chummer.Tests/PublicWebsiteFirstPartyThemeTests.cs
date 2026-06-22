@@ -39,8 +39,10 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("participate-shell", view, StringComparison.Ordinal);
+        Assert.Contains("participate-lanes", view, StringComparison.Ordinal);
         Assert.Contains("participate-quick-form", view, StringComparison.Ordinal);
         Assert.Contains("Send feedback", view, StringComparison.Ordinal);
+        Assert.Contains("Current themes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Made with", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProductLift", view, StringComparison.OrdinalIgnoreCase);

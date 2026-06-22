@@ -92,7 +92,7 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   expect(participateText).not.toContain('ProductLift');
   expect(participateText).not.toContain('productlift.dev');
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/participate', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
     const pageSource = await page.content();
@@ -124,6 +124,7 @@ test('core public pages stay inside a minimal interaction budget', async ({ page
     { path: '/downloads', maxWords: 140, maxLinks: 8, maxButtons: 6, maxSections: 4 },
     { path: '/status', maxWords: 110, maxLinks: 5, maxButtons: 3, maxSections: 3 },
     { path: '/help', maxWords: 450, maxLinks: 16, maxButtons: 3, maxSections: 3 },
+    { path: '/participate', maxWords: 280, maxLinks: 12, maxButtons: 5, maxSections: 3 },
     { path: '/roadmap', maxWords: 420, maxLinks: 12, maxButtons: 6, maxSections: 3 },
     { path: '/what-is-chummer', maxWords: 130, maxLinks: 4, maxButtons: 3, maxSections: 3 },
     { path: '/downloads/concierge', maxWords: 260, maxLinks: 7, maxButtons: 2, maxSections: 4 },

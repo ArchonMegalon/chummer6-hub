@@ -16,16 +16,21 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertIn('return Redirect("/login?next=%2Fparticipate%2Fcodex");', controller)
         self.assertNotIn('return Redirect("/auth/google/start?next=%2Fparticipate%2Fcodex");', controller)
 
-    def test_participate_public_view_uses_google_auth_handoff(self) -> None:
+    def test_participate_public_view_stays_public_and_first_party(self) -> None:
         text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
-        self.assertIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text)
+        self.assertIn('href="@Model.PrivateHelpHref"', text)
+        self.assertIn('href="@Model.RoadmapHref"', text)
+        self.assertIn('href="@Model.ChangelogHref"', text)
+        self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
+        self.assertNotIn("ProductLift", text)
 
     def test_feedback_public_view_stays_on_participation_surface(self) -> None:
-        text = FEEDBACK_VIEW.read_text(encoding="utf-8")
-        self.assertIn('href="/feedback"', text)
-        self.assertIn('href="/roadmap"', text)
-        self.assertIn('href="/help"', text)
+        self.assertFalse(FEEDBACK_VIEW.exists())
+        text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
+        self.assertIn("participate-shell", text)
+        self.assertIn("participate-quick-form", text)
+        self.assertIn("participate-lanes", text)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
 
 

@@ -392,8 +392,12 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
     assert "participate-shell" in participate
-    assert "share what matters for your table" in participate.lower()
+    assert "tell us what slows the table down" in participate.lower()
     assert "participate-quick-form" in participate
+    assert "participate-lanes" in participate
+    assert "@foreach (var lane in Model.Lanes)" in participate
+    assert "@lane.ActionLabel" in participate
+    assert "Current themes" in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
