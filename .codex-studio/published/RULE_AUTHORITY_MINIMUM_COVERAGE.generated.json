@@ -1,9 +1,9 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-20T19:39:45Z",
+  "generated_at_utc": "2026-06-22T13:24:00Z",
   "source_generated_at_utc": {
-    "full_completion": "2026-06-19T23:15:54Z",
-    "operator_gold": "2026-06-19T23:15:10Z"
+    "full_completion": "2026-06-20T22:36:48Z",
+    "operator_gold": "2026-06-22T06:21:24Z"
   },
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
@@ -147,7 +147,7 @@
     },
     "sr5": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
-      "rulefact_count": 473,
+      "rulefact_count": 330,
       "final_verdict": "SR5_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR5_RULE_AUTHORITY_READY",
       "full_completion_rule_authority_ready": true,
@@ -165,7 +165,6 @@
       "provider_group_coverage": {
         "enforced": true,
         "provider_fact_counts": {
-          "SR5ShellCatalogProvider": 143,
           "SR5CapabilityHostProvider": 14,
           "SR5DiceProvider": 3,
           "SR5TestProvider": 4,
