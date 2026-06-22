@@ -40,7 +40,9 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   }
   const captionTrack = productVideo.locator('track[kind="captions"]');
   await expect(captionTrack).toHaveAttribute('src', '/media/promo/chummer6-flagship-promo.vtt');
-  await expect(desktop.locator('[data-homepage-section="downloads"]')).toContainText('Get the app');
+  await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
+  await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Need something else?');
+  await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Participate');
   results.push({ surface: 'home', inline_nav_visible: await desktop.locator('.site-nav').isVisible(), hero_image_loaded: heroImageComplete, product_video_sources: videoSources });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
@@ -101,7 +103,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: nav closed by default, homepage starts with Stable and Nightly, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
+      '- Checks: homepage starts with Stable and Nightly, avoids duplicate homepage download strips, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

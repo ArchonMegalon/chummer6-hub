@@ -7,80 +7,58 @@
 
 <section class="minimal-page-hero participate-hero">
     <div>
-        <h1>What should Chummer do next?</h1>
-        <p>Tell us how Chummer could be more useful at the table. Keep account details and private campaign notes in Help.</p>
+        <h1>Share what matters for your table</h1>
+        <p>
+            Use this lane for quick, public feedback on builds, usability, and behavior.
+            Keep account-only details for private help.
+        </p>
     </div>
 </section>
 
-<section class="participate-toolbar" aria-label="Idea filters">
-    <div class="participate-filter">
-        <span>All</span>
-        <span>Bug</span>
-        <span>Feature</span>
-        <span>Linux</span>
-        <span>Desktop</span>
-    </div>
-    <form class="participate-search" method="get" action="/participate">
-        <label class="sr-only" for="participateSearch">Search ideas</label>
-        <input id="participateSearch" name="q" placeholder="Search" autocomplete="off" />
-        <button type="submit">Go</button>
-    </form>
-</section>
+<section class="participate-shell">
+    <h2>Fast feedback</h2>
+    <p class="participate-shell__lead">
+        Choose one action, and we keep each request focused and reviewable.
+    </p>
 
-<section class="participate-board" aria-label="Public ideas">
-    <div class="participate-board__main">
-        <div class="participate-items">
-            @foreach (var item in Model.Items)
-            {
-                <article class="participate-item">
-                    <span class="participate-item__score">^ @item.Score</span>
-                    <div class="participate-item__copy">
-                        <h2>@item.Title</h2>
-                        <p>@item.Summary</p>
-                        <span>@item.Status</span>
-                    </div>
-                </article>
-            }
+    <div class="participate-actions">
+        <a class="button-like button-like--primary" href="@Model.PrivateHelpHref">I need help with a specific issue</a>
+        <a class="button-like" href="@Model.RoadmapHref">See what is in planning</a>
+        <a class="button-like" href="@Model.ChangelogHref">See what already shipped</a>
+    </div>
+
+    <form class="participate-quick-form" method="get" action="/contact">
+        <div class="field">
+            <label for="participateTitle">Short title</label>
+            <input id="participateTitle" name="subject" maxlength="120" placeholder="One concrete suggestion or bug report" />
         </div>
-    </div>
+        <div class="field">
+            <label for="participateSummary">Details</label>
+            <textarea id="participateSummary" name="message" rows="6" maxlength="1200" placeholder="What happened, what you expected, and why it matters."></textarea>
+        </div>
+        <div class="field">
+            <label for="participateKind">Category</label>
+            <select id="participateKind" name="topic">
+                <option value="">Choose category</option>
+                <option value="feature">Feature</option>
+                <option value="bug">Bug</option>
+                <option value="desktop">Desktop UX</option>
+                <option value="install">Install or update</option>
+                <option value="linux">Linux</option>
+            </select>
+        </div>
+        <button class="button-like button-like--primary" type="submit">Send feedback</button>
+    </form>
 
-    <aside class="participate-submit" id="participate-submit">
-        <h2>Add feature or bug</h2>
-        <p>Short and concrete is best.</p>
-        <form class="settings-form" method="get" action="/contact">
-            <input type="hidden" name="kind" value="feedback" />
-            <div class="field">
-                <label for="participateTitle">Title</label>
-                <input id="participateTitle" name="subject" maxlength="120" placeholder="One thing that should improve" />
-            </div>
-            <div class="field">
-                <label for="participateSummary">Details</label>
-                <div class="participate-editor-toolbar" aria-hidden="true">
-                    <span>B</span>
-                    <span>I</span>
-                    <span>U</span>
-                    <span>Link</span>
-                </div>
-                <textarea id="participateSummary" name="message" rows="7" maxlength="1200" placeholder="Describe the idea or bug."></textarea>
-            </div>
-            <div class="field">
-                <label for="participateKind">Type</label>
-                <select id="participateKind" name="topic">
-                    <option value="">Choose a category</option>
-                    <option value="feature">Feature</option>
-                    <option value="bug">Bug</option>
-                    <option value="desktop">Desktop UI</option>
-                    <option value="install">Install or update</option>
-                    <option value="linux">Linux</option>
-                </select>
-            </div>
-            <button class="button-like button-like--primary" type="submit">Continue</button>
-        </form>
-    </aside>
-</section>
-
-<section class="participate-links" aria-label="Other public lanes">
-    <a href="@Model.RoadmapHref">Roadmap</a>
-    <a href="@Model.ChangelogHref">Changelog</a>
-    <a href="@Model.PrivateHelpHref">Private help</a>
+    <section class="participate-items" aria-label="Current public themes">
+        <h3>Themes we are currently prioritizing</h3>
+        <p>Quick updates from the table:</p>
+        @foreach (var item in Model.Items)
+        {
+            <article>
+                <h4>@item.Title</h4>
+                <p>@item.Summary</p>
+            </article>
+        }
+    </section>
 </section>

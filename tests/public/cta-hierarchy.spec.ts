@@ -63,7 +63,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '# Homepage Simplification Changelog',
       '',
       '- Hero keeps two ranked CTAs: `Stable`, `Nightly`.',
-      '- Homepage remains on the four-section model: hero, workflow, downloads, help.',
+      '- Homepage remains compact: hero, workflow, help, and no repeated download strip.',
       '- Release posture stays off the first screen and lives on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),

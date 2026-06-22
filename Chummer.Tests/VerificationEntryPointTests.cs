@@ -3556,7 +3556,10 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("Open Black Ledger", landingView, StringComparison.Ordinal);
         Assert.Contains("Stable</a>", landingView, StringComparison.Ordinal);
         Assert.Contains("Nightly</a>", landingView, StringComparison.Ordinal);
-        Assert.Contains("Get the app", landingView, StringComparison.Ordinal);
+        Assert.Contains("<h2>Need something else?</h2>", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-homepage-section=\"downloads\"", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get the app", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);
     }
 

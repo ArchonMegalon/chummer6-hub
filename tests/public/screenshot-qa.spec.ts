@@ -56,15 +56,15 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const primaryCta = page.locator('.minimal-hero .minimal-actions a.button-like').first();
     const footer = page.locator('[data-public-section="footer"]');
     const workflow = page.locator('[data-homepage-section="workflow"]');
-    const downloads = page.locator('[data-homepage-section="downloads"]');
     const help = page.locator('[data-homepage-section="help"]');
     const navLinks = page.locator('.site-nav a, .site-nav__current');
 
     await expect(heroTitle).toContainText('Chummer');
     await expect(primaryCta).toContainText('Stable');
     await expect(workflow).toContainText('What it does');
-    await expect(downloads).toContainText('Get the app');
-    await expect(help).toContainText('Help');
+    await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
+    await expect(help).toContainText('Need something else?');
+    await expect(help).toContainText('Participate');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {

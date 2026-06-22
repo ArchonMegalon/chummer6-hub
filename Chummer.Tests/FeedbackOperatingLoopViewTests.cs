@@ -25,8 +25,8 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("ExternalBoardUrl", controller, StringComparison.Ordinal);
-        Assert.Contains("participate-toolbar", participateView, StringComparison.Ordinal);
-        Assert.Contains("Add feature or bug", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-shell", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-quick-form", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", participateView, StringComparison.OrdinalIgnoreCase);
     }
@@ -40,10 +40,11 @@ public sealed class FeedbackOperatingLoopViewTests
         string roadmapView = File.ReadAllText(roadmapViewPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
-        Assert.Contains("var signalLoop = Model.SignalLoop;", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Related pages", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Open changelog", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("@signalLoop.FollowSettingsHref", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Roadmap", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What we are working on next", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("See recent updates", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("/changelog", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Suggest a change", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
         Assert.Contains("Loop return", changelogView, StringComparison.Ordinal);
         Assert.Contains("Browse roadmap", changelogView, StringComparison.Ordinal);

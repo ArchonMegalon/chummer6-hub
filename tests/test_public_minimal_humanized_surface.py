@@ -217,6 +217,10 @@ def test_homepage_has_minimal_product_video_surface() -> None:
     assert "/media/promo/chummer6-flagship-promo.mp4" in landing
     assert "/media/promo/chummer6-flagship-promo.webm" in landing
     assert "/media/promo/chummer6-flagship-promo.vtt" in landing
+    assert 'data-homepage-section="downloads"' not in landing
+    assert "Get the app" not in landing
+    assert "Need something else?" in landing
+    assert 'href="/participate"' in landing
     assert ".minimal-video" in site_css
     assert "aspect-ratio: 16 / 9;" in site_css
 

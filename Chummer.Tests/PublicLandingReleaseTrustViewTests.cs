@@ -35,8 +35,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Nightly</a>", view, StringComparison.Ordinal);
         Assert.Contains("minimal-hero__visual--screenshot", view, StringComparison.Ordinal);
         Assert.Contains("/media/product/chummer-desktop-runner.png", view, StringComparison.Ordinal);
-        Assert.Contains("Get the app", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Need something else?</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-homepage-section=\"downloads\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get the app", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Open Black Ledger", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Replay Turn 1", view, StringComparison.Ordinal);
@@ -144,9 +146,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.True(File.Exists(publicViewPath));
         Assert.Contains("public async Task<IActionResult> ParticipatePage", publicController, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", publicController, StringComparison.Ordinal);
-        Assert.Contains("participate-toolbar", publicView, StringComparison.Ordinal);
-        Assert.Contains("participate-board", publicView, StringComparison.Ordinal);
-        Assert.Contains("Add feature or bug", publicView, StringComparison.Ordinal);
+        Assert.Contains("participate-shell", publicView, StringComparison.Ordinal);
+        Assert.Contains("participate-actions", publicView, StringComparison.Ordinal);
+        Assert.Contains("send feedback", publicView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("First-party page", publicView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", publicView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
@@ -540,8 +542,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", status, StringComparison.Ordinal);
 
-        Assert.Contains("participate-links", feedback, StringComparison.Ordinal);
-        Assert.Contains("Private help", feedback, StringComparison.Ordinal);
+        Assert.Contains("participate-shell", feedback, StringComparison.Ordinal);
+        Assert.Contains("participate-quick-form", feedback, StringComparison.Ordinal);
+        Assert.Contains("/contact", feedback, StringComparison.Ordinal);
+        Assert.Contains("private help", feedback, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
 
         Assert.Contains("Character tools for Shadowrun.", productStory, StringComparison.Ordinal);
@@ -1237,9 +1241,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("=> Redirect(\"/participate\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("public IActionResult ParticipatePage()\n        => Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
-        Assert.Contains("participate-toolbar", participateView, StringComparison.Ordinal);
-        Assert.Contains("Tell us how Chummer could be more useful at the table.", participateView, StringComparison.Ordinal);
-        Assert.Contains("Add feature or bug", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-shell", participateView, StringComparison.Ordinal);
+        Assert.Contains("share what matters for your table", participateView, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Send feedback", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift", participateView, StringComparison.Ordinal);

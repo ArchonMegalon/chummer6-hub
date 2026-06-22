@@ -15,10 +15,7 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   await expect(hero.getByRole('link', { name: 'Stable' })).toHaveAttribute('href', '/downloads#stable');
   await expect(hero.getByRole('link', { name: 'Nightly' })).toHaveAttribute('href', '/downloads#nightly');
 
-  const downloads = page.locator('[data-homepage-section="downloads"]');
-  await expect(downloads.getByRole('link', { name: /Stable/ })).toHaveAttribute('href', '/downloads#stable');
-  await expect(downloads.getByRole('link', { name: /Nightly/ })).toHaveAttribute('href', '/downloads#nightly');
-  await expect(downloads.getByRole('link', { name: /Status/ })).toHaveAttribute('href', '/status');
+  await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
 
   const badLinks = await page.locator('a[href="#"], a[href=""], a[href^="javascript:void"]').evaluateAll((items) =>
     items.map((item) => (item as HTMLAnchorElement).outerHTML),

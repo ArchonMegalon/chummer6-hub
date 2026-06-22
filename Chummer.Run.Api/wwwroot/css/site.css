@@ -7893,13 +7893,13 @@ body {
 
 /* Minimal public front door, June 2026 redesign. */
 .surface-minimal {
-  --minimal-page: #202428;
-  --minimal-surface: #2a2f34;
-  --minimal-ink: #f8f9fa;
-  --minimal-muted: #adb5bd;
-  --minimal-line: rgba(248, 249, 250, 0.14);
+  --minimal-page: #0f1110;
+  --minimal-surface: #151815;
+  --minimal-ink: #f4f1e8;
+  --minimal-muted: #a8a49a;
+  --minimal-line: #2b302c;
   --minimal-accent: #9ee0d1;
-  --minimal-soft: #24292e;
+  --minimal-soft: #20241f;
   color-scheme: dark;
   background: var(--minimal-page);
   color: var(--minimal-ink);
@@ -8494,7 +8494,7 @@ body {
 }
 
 .participate-hero {
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.8rem;
 }
 
 .participate-hero h1 {
@@ -8510,175 +8510,61 @@ body {
   line-height: 1.45;
 }
 
-.participate-toolbar {
+.participate-items {
+  margin-top: 1.2rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.8rem;
-  align-items: center;
-  margin-bottom: 0.9rem;
+  gap: 0.75rem;
+  border-top: 1px solid var(--minimal-line);
+  padding-top: 1rem;
 }
 
-.participate-search {
-  display: flex;
-  min-width: min(20rem, 100%);
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.participate-search input {
-  width: 100%;
-  min-height: 36px;
+.participate-shell {
+  display: grid;
+  gap: 1rem;
   border: 1px solid var(--minimal-line);
-  border-radius: 999px;
+  border-radius: 12px;
+  padding: clamp(1rem, 1.8vw, 1.4rem);
   background: var(--minimal-surface);
-  color: var(--minimal-ink);
-  padding: 0.5rem 0.85rem;
 }
 
-.participate-search button {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--minimal-line);
-  border-radius: 999px;
-  background: var(--minimal-surface);
-  color: var(--minimal-ink);
-  cursor: pointer;
-}
-
-.participate-search input::placeholder {
+.participate-shell__lead {
+  margin: 0;
   color: var(--minimal-muted);
 }
 
-.participate-lanes .minimal-lane-card {
-  min-height: 15rem;
-}
-
-.participate-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 330px);
-  gap: clamp(0.8rem, 1.6vw, 1.2rem);
-  align-items: start;
-  border: 0;
-  padding: 0;
-}
-
-.participate-board__main {
-  min-width: 0;
-}
-
-.participate-filter {
+.participate-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0;
-}
-
-.participate-filter span {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  border: 1px solid var(--minimal-line);
-  border-radius: 999px;
-  padding: 0.4rem 0.75rem;
-  color: var(--minimal-muted);
-  background: var(--minimal-surface);
-  font-size: 0.92rem;
-}
-
-.participate-filter span:first-child {
-  color: var(--minimal-ink);
-  border-color: rgba(244, 241, 232, 0.32);
-}
-
-.participate-items {
-  display: grid;
   gap: 0.75rem;
 }
 
-.participate-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 1.2rem;
-  align-items: start;
-  border: 1px solid var(--minimal-line);
-  border-radius: 12px;
-  background: var(--minimal-surface);
-  padding: clamp(1rem, 2vw, 1.35rem);
+.participate-actions .button-like {
+  background: var(--minimal-soft);
 }
 
-.participate-item__score {
-  display: inline-flex;
-  min-width: 2.7rem;
-  height: 2rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--minimal-line);
-  border-radius: 999px;
-  color: var(--minimal-ink);
-  background: var(--minimal-page);
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.participate-item__copy {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.participate-item h2,
-.participate-submit h2 {
-  margin: 0;
-  color: var(--minimal-ink);
-  font-size: 1.05rem;
-  line-height: 1.25;
-}
-
-.participate-item p,
-.participate-submit p {
-  margin: 0;
-  color: var(--minimal-muted);
-  line-height: 1.5;
-}
-
-.participate-item__copy > span {
-  width: fit-content;
-  border-radius: 999px;
-  background: rgba(158, 224, 209, 0.18);
-  color: var(--minimal-accent);
-  padding: 0.22rem 0.55rem;
-  font-size: 0.82rem;
-}
-
-.participate-submit {
-  position: sticky;
-  top: 5.75rem;
-  display: grid;
-  gap: 0.75rem;
-  border: 1px solid var(--minimal-line);
-  border-radius: 12px;
-  background: var(--minimal-surface);
-  padding: clamp(1rem, 2.4vw, 1.35rem);
-}
-
-.participate-submit .settings-form {
+.participate-quick-form {
   display: grid;
   gap: 0.72rem;
 }
 
-.participate-submit .field {
+.participate-quick-form .field {
   display: grid;
   gap: 0.4rem;
 }
 
-.participate-submit .field label {
+.participate-quick-form .field label,
+.participate-shell h3,
+.participate-items h3,
+.participate-shell h2,
+.participate-items h4 {
   color: var(--minimal-ink);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
-.participate-submit input,
-.participate-submit textarea,
-.participate-submit select {
+.participate-quick-form input,
+.participate-quick-form textarea,
+.participate-quick-form select {
   width: 100%;
   border-radius: 10px;
   padding: 0.65rem 0.75rem;
@@ -8689,43 +8575,20 @@ body {
   caret-color: var(--minimal-ink);
 }
 
-.participate-editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-height: 36px;
-  border: 1px solid var(--minimal-line);
-  border-bottom: 0;
-  border-radius: 10px 10px 0 0;
-  padding: 0.35rem 0.55rem;
-  color: var(--minimal-ink);
-  background: var(--minimal-soft);
-  font-size: 0.88rem;
-}
-
-.participate-editor-toolbar + textarea {
-  border-radius: 0 0 10px 10px;
-}
-
-.participate-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 0 0 1.5rem;
-}
-
-.participate-links a {
+.participate-items p {
+  margin: 0;
   color: var(--minimal-muted);
-  font-size: 0.95rem;
-  text-decoration: none;
 }
 
-.participate-links a:hover,
-.participate-links a:focus-visible {
-  color: var(--minimal-ink);
-  text-decoration: underline;
-  text-underline-offset: 0.24rem;
+.participate-items article {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--minimal-line);
+  border-radius: 10px;
+  background: var(--minimal-page);
+}
+
+.participate-items article p {
+  margin: 0.3rem 0 0;
 }
 
 .surface-minimal .route-choice-card {
@@ -8827,20 +8690,9 @@ body {
     max-height: 260px;
   }
 
-  .participate-board {
-    grid-template-columns: 1fr;
-  }
-
-  .participate-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .participate-search {
-    min-width: 0;
-  }
-
-  .participate-submit {
-    position: static;
+  .participate-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .minimal-hero {

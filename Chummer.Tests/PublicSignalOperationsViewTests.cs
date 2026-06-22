@@ -13,8 +13,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.False(File.Exists(feedbackViewPath));
         string participateView = File.ReadAllText(participateViewPath);
 
-        Assert.Contains("participate-toolbar", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-board", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-shell", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-quick-form", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);
