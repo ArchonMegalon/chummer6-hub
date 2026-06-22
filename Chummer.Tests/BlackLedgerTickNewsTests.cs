@@ -36,7 +36,7 @@ public sealed class BlackLedgerTickNewsTests
         Assert.DoesNotContain("Open data", turnReviewView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("What this packet says", turnReviewView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Faction leader briefing", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerLeaderBriefing.cshtml")), StringComparison.Ordinal);
-        Assert.Contains("Controlled signal", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml")), StringComparison.Ordinal);
+        Assert.Contains("Advisory", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAdvisory.cshtml")), StringComparison.Ordinal);
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
         Assert.Contains("Account notifications", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Open notification history", accountView, StringComparison.Ordinal);

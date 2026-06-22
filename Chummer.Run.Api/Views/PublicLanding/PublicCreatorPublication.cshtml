@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = PublicPublicationText(Model.Publication.Title);
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-artifacts surface-minimal";
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     // Keep comparisons narrow until the related page records are current.
@@ -57,38 +58,38 @@
                 : "Limited release";
 
     var publicationPostureTitle = publicationRouteReviewRequired
-        ? "Why this publication is still limited"
-        : "Why this publication is live";
+        ? "Why this page stays brief"
+        : "What this page covers";
     var publicationPostureCopy = publicationRouteReviewRequired
-        ? "This page keeps the useful detail and next step together while public availability stays limited."
-        : "This page keeps discovery, status, comparison, history, moderation, and the next step together instead of scattering them across separate pages.";
+        ? "This page keeps the useful parts together while broader comparison copy stays short."
+        : "This page keeps the publication, its status, and the next useful links together.";
     var routeStateLabel = HumanizeStatus(Model.RouteState, "Limited");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
         ?? "No visible publication history is attached to this public page yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open account return view" : "Create account for account return";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open your library" : "Create account for your library";
     var signedInShelfSummary = Model.Chrome.Authenticated
-        ? "Use the account return view when you want personal, campaign, creator, and public returns to stay in one calmer place."
-        : "Public discovery works without an account. Sign in only when you want private account return, campaign return, and creator next steps in one place.";
+        ? "Use your library when you want personal, campaign, creator, and public returns to stay in one calmer place."
+        : "Public discovery works without an account. Sign in only when you want your private library, campaign return, and creator next steps in one place.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
     {
         new
         {
-            Badge = "Publication discovery",
-            Title = "Stay in the gallery when you want history, origin, or comparison",
-            Summary = "This publication detail page belongs to the gallery. Use it when you want related items instead of jumping straight to downloads.",
+            Badge = "Gallery",
+            Title = "Stay in the gallery for story, origin, or comparison",
+            Summary = "Use this page when you want the publication itself, not the installer.",
             Href = Model.BackHref,
-            Label = "Back to publication discovery",
-            Details = new[] { "Details first", "Related items", "Comparison nearby" }
+            Label = "Back to gallery",
+            Details = new[] { "Story first", "Related work", "Comparison nearby" }
         },
         new
         {
-            Badge = "Creator help",
-            Title = "Use creator help when the next job is intake or creator follow-up",
-            Summary = "Creator help keeps creator intake and follow-up separate from downloads, support, and account settings.",
+            Badge = "Creator",
+            Title = "Open creator help for intake or follow-up",
+            Summary = "Keep creator questions separate from downloads, support, and account settings.",
             Href = creatorConciergeHref,
             Label = "Open creator help",
             Details = new[] { "Creator intake", "Follow-up visible", "No install confusion" }
@@ -96,30 +97,30 @@
         new
         {
             Badge = "Downloads",
-            Title = "Leave this page when the next job is installing the product",
-            Summary = "The publication page should never compete with the recommended build, platform status, or install help. Downloads still owns that decision.",
+            Title = "Open downloads when you want the app",
+            Summary = "Downloads owns the installer, platform status, and setup help.",
             Href = "/downloads",
             Label = "Open downloads",
-            Details = new[] { "Install path", "Install notes nearby", "Clear install path" }
+            Details = new[] { "Install path", "Current build", "Setup help nearby" }
         },
         new
         {
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Account return keeps public and private returns together"
-                : "Create the account only when you want the account-return view too",
+                ? "Your library keeps public and private returns together"
+                : "Create an account only when you want your library too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
             Details = Model.Chrome.Authenticated
-                ? new[] { "Personal and campaign returns", "Creator next steps", "Same detail view" }
+                ? new[] { "Personal and campaign returns", "Creator next steps", "Same library" }
                 : new[] { "Public first", "Account adds return paths", "Public discovery stays open" }
         },
         new
         {
-            Badge = "Public testimonials",
-            Title = "Use the testimonial page when you want moderated public feedback instead of support follow-up",
-            Summary = "The testimonial page keeps ratings, media captures, and moderation separate from support cases, install recovery, and publication approval.",
+            Badge = "Testimonials",
+            Title = "Open testimonials for public feedback",
+            Summary = "Use the testimonial page for moderated public feedback.",
             Href = testimonialConciergeHref,
             Label = "Open testimonial page",
             Details = new[] { "Moderated feedback", "Optional media", "Support stays separate" }
@@ -127,8 +128,8 @@
         new
         {
             Badge = "Help",
-            Title = "Use Chummer help as soon as the issue becomes support or recovery",
-            Summary = "If the problem needs logs, account recovery, install repair, or private campaign detail, leave the publication page and move to help or support immediately.",
+            Title = "Use Chummer help for support or recovery",
+            Summary = "Leave this page when the issue becomes setup, recovery, or private support.",
             Href = "/help",
             Label = "Open help",
             Details = new[] { "Setup help", "Private help", "No page confusion" }
@@ -136,11 +137,46 @@
     };
 }
 
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Choose gallery, downloads, account return, or help on purpose.</h2>
-        <p class="editorial-copy">A publication detail page should make origin, comparison, and the next step clear. It should not pretend to be the install page, a support queue, or a disguised account wall.</p>
+<section class="minimal-page-hero route-anchor-target">
+    <div>
+        <p class="eyebrow">Publication</p>
+        <h1>@PublicPublicationText(Model.Publication.Title)</h1>
+        <p>@PublicPublicationText(Model.Publication.Summary)</p>
+    </div>
+    <div class="minimal-status-pill">
+        <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
+        <strong>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</strong>
+        <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
+        <span>Page status: @routeStateLabel</span>
+    </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Publication route split">
+    <article class="status-decision-strip__card">
+        <span class="tag">Gallery</span>
+        <h2>Stay in the gallery for story, origin, or comparison.</h2>
+        <p>Use this page for the publication itself. Downloads, help, and your library keep their own jobs.</p>
+        <a class="button-like button-like--ghost" href="@Model.BackHref">Back to gallery</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Downloads</span>
+        <h2>Open downloads when you want the app.</h2>
+        <p>Downloads owns the installer, platform status, and setup help.</p>
+        <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Help</span>
+        <h2>Use Chummer help for support or recovery.</h2>
+        <p>Leave this page when the issue becomes setup, recovery, or private support.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Where next</p>
+        <h2>Choose gallery, downloads, library, or help.</h2>
+        <p>Use this page for the publication itself. Downloads, help, and your library keep their own jobs.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -161,42 +197,24 @@
     </div>
 </section>
 
-<section class="story-cinematic">
-    <div class="story-cinematic__copy">
-        <p class="eyebrow">Public shared publication</p>
-        <h1 class="page-title">@PublicPublicationText(Model.Publication.Title)</h1>
-        <p class="page-copy">@PublicPublicationText(Model.Publication.Summary)</p>
-        <div class="trust-claim__details">
-            <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
-            <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
-            <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
-            <span>Page: @routeStateLabel</span>
-        </div>
-        @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
-        {
-            <p class="muted-copy">@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)</p>
-            <p class="muted-copy">Some desktop work is still open, so this public summary stays short.</p>
-        }
-        <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
-            <a class="button-like button-like--ghost" href="/artifacts">Open detail view</a>
-        </div>
-    </div>
-</section>
-
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">Shared publication</p>
         <h2 class="editorial-title">@publicationPostureTitle</h2>
         <p class="editorial-copy">@publicationPostureCopy</p>
+        @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
+        {
+            <p class="muted-copy">@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)</p>
+            <p class="muted-copy">Some desktop work is still open, so this page stays short.</p>
+        }
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
-            <span class="tag">Publication kind</span>
+            <span class="tag">Type</span>
             <p>@HumanizeStatus(Model.Publication.Kind, "Publication")</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Details</span>
+            <span class="tag">Origin</span>
             <p>@PublicPublicationText(Model.Publication.ProvenanceSummary)</p>
         </article>
         <article class="trust-rail">
@@ -220,20 +238,20 @@
             }
         </article>
         <article class="trust-rail">
-            <span class="tag">Supporting details</span>
-            <p>@Model.RequiredReceiptRefs.Count related detail@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") available.</p>
+            <span class="tag">Related pages</span>
+            <p>@Model.RequiredReceiptRefs.Count related page@(Model.RequiredReceiptRefs.Count == 1 ? string.Empty : "s") available.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {
             <article class="trust-rail">
-                <span class="tag">Compare by</span>
+                <span class="tag">Compare</span>
                 <p>@PublicPublicationText(Model.Publication.ComparisonSummary)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Publication.LineageSummary))
         {
             <article class="trust-rail">
-                <span class="tag">History</span>
+                <span class="tag">Earlier</span>
                 <p>@PublicPublicationText(Model.Publication.LineageSummary)</p>
             </article>
         }
@@ -269,13 +287,13 @@
 </section>
 
 <section class="release-footnote">
-    <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use this page to inspect the publication, then move to the page that owns the next job.</h2>
-    <p class="editorial-copy">Stay in publication discovery for related items, open Downloads when you actually want the build, or leave for Help when the issue becomes private, recovery-bound, or support-owned.</p>
+    <p class="eyebrow">Next</p>
+    <h2 class="editorial-title">Read this page, then move on.</h2>
+    <p class="editorial-copy">Go back for related work, open Downloads for the app, or open Help for support.</p>
     <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to publication discovery</a>
-        <a class="cta-link cta-link--secondary" href="/artifacts">Open detail view</a>
+        <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to gallery</a>
+        <a class="cta-link cta-link--secondary" href="/artifacts">Open library</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>
-    <p class="muted-copy">Need private help instead? <a class="inline-link" href="/contact#support-intake">Open support intake</a>.</p>
+    <p class="muted-copy">Need private help instead? <a class="inline-link" href="/contact#support-intake">Open support</a>.</p>
 </section>

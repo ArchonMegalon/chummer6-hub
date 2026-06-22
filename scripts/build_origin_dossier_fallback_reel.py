@@ -6,9 +6,17 @@ import math
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+import sys
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -231,23 +239,13 @@ def write_vtt() -> None:
 
 
 def render_narration() -> tuple[Path, str]:
-    text_file = BUILD_DIR / "origin-dossier-narration.txt"
-    raw = BUILD_DIR / "origin-dossier-flite.wav"
+    raw = BUILD_DIR / "origin-dossier-unmixr.mp3"
     final = BUILD_DIR / "origin-dossier-audio.wav"
-    text_file.write_text(NARRATION, encoding="utf-8")
-    run(
-        "ffmpeg",
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        f"flite=textfile={text_file}:voice=slt",
-        "-ar",
-        "48000",
-        "-ac",
-        "1",
-        str(raw),
+    profile = load_profile(
+        prefixes=("UNMIXR_ORIGIN_DOSSIER_FALLBACK_REEL", "UNMIXR_ORIGIN_DOSSIER"),
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
     )
+    render_short_tts(NARRATION, raw, profile=profile)
     raw_duration = duration(raw)
     target_vo = 84.0
     tempo = raw_duration / target_vo if raw_duration else 1.0
@@ -277,7 +275,7 @@ def render_narration() -> tuple[Path, str]:
         "pcm_s16le",
         str(final),
     )
-    return final, f"ffmpeg-flite-slt-atempo-{tempo:.3f}"
+    return final, f"unmixr-short-tts-{profile['voice_id']}-atempo-{tempo:.3f}"
 
 
 def build_video(slides: list[Path], audio: Path) -> None:

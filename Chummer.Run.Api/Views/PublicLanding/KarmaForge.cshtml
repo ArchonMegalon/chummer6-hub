@@ -3,48 +3,48 @@
 @{
     ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-karma-forge";
+    ViewData["SurfaceClass"] = "surface-karma-forge surface-minimal";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE sections";
     ViewData["ContextSidebarSummary"] = "Use the section links to send a table problem and see what happens next.";
     ViewData["ContextSidebarLinks"] = new[]
     {
-        new PublicNavigationLink("Intake", "#karma-forge-intake"),
-        new PublicNavigationLink("Workflow", "#external-stages"),
+        new PublicNavigationLink("Request form", "#karma-forge-intake"),
+        new PublicNavigationLink("What happens next", "#external-stages"),
         new PublicNavigationLink("Track questions", "#track-questions"),
-        new PublicNavigationLink("Review decisions", "#candidate-decisions"),
-        new PublicNavigationLink("Recent requests", "#recent-packets"),
+        new PublicNavigationLink("Likely outcomes", "#candidate-decisions"),
+        new PublicNavigationLink("Saved requests", "#recent-packets"),
     };
     bool hasErrors = Model.Form.ValidationErrors.Count > 0;
     var historyHref = Model.Form.Authenticated
         ? "#recent-packets"
         : "/signup?next=%2Fparticipate%2Fkarma-forge";
     var historyLabel = Model.Form.Authenticated
-        ? "Open my request history"
-        : "Create account for request history";
+        ? "Open my requests"
+        : "Create account for saved requests";
     var historyTitle = Model.Form.Authenticated
         ? "Open your recent requests"
-        : "Create an account only if you want request history";
+        : "Create an account only if you want saved requests";
     var historySummary = Model.Form.Authenticated
-        ? "Account history keeps recent requests and next steps together."
-        : "The public intake works without an account. Sign in only if you want your request history saved.";
+        ? "Your saved requests and next steps stay together."
+        : "The public request form works without an account. Sign in only if you want saved requests.";
     var routeChoices = new[]
     {
         new
         {
-            Badge = "Intake",
+            Badge = "Request",
             Title = "Submit a rules or table problem",
-            Summary = "Use this page when something at the table is slowing play, causing confusion, or needs a Chummer-shaped fix.",
+            Summary = "Use this page when something at the table slows play, causes confusion, or needs a Chummer fix.",
             Href = "#karma-forge-intake",
-            Label = "Start the intake",
+            Label = "Start request",
             Details = new[] { "Describe the problem", "Pick the edition", "Send it" }
         },
         new
         {
-            Badge = "Roadmap family",
-            Title = "Read the roadmap only if you want the larger plan",
+            Badge = "Roadmap",
+            Title = "Open the roadmap only if you want the larger plan",
             Summary = "Stay here to submit a request. Open the roadmap when you want to understand where this work may go later.",
             Href = "/roadmap/karma-forge",
-            Label = "Read the maintenance note",
+            Label = "Open roadmap",
             Details = new[] { "Larger plan", "Related work", "No intake required" }
         },
         new
@@ -73,7 +73,7 @@
             Title = "Use Help for setup, account, or bug problems",
             Summary = "If the problem is install repair, account recovery, or a normal bug report, Help is the right place.",
             Href = "/contact#support-intake",
-            Label = "Open support intake",
+            Label = "Open Help",
             Details = new[] { "Install help", "Account help", "Bug reports" }
         }
     };
@@ -111,8 +111,8 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="#karma-forge-intake">Start the intake</a>
-        <a class="button-like button-like--secondary" href="/roadmap/karma-forge">Read the maintenance note</a>
+        <a class="button-like button-like--primary" href="#karma-forge-intake">Start request</a>
+        <a class="button-like button-like--secondary" href="/roadmap/karma-forge">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/participate">Back to participate</a>
     </div>
 </section>
@@ -144,13 +144,13 @@
 
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Current queue</p>
-        <h2 class="editorial-title">Recent intake at a glance.</h2>
+        <p class="eyebrow">Current requests</p>
+        <h2 class="editorial-title">Recent requests at a glance.</h2>
         <p class="editorial-copy">These numbers show what people are sending in.</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
-            <span class="tag">Queue</span>
+            <span class="tag">Waiting</span>
             <p>@Model.Dashboard.GovernorQueueCount request(s) waiting for review.</p>
         </article>
         <article class="trust-rail">
@@ -182,7 +182,7 @@
                 <h3>@SanitizePublicText(stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</h3>
                 <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__details">
-                    <span>Request status</span>
+                    <span>Status</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
@@ -209,7 +209,7 @@
 <section class="trust-page-layout">
     <div class="trust-page-sections">
         <article class="trust-page-section trust-page-section--form" id="karma-forge-intake">
-            <p class="eyebrow">Intake</p>
+            <p class="eyebrow">Request</p>
             <h2>Describe the problem.</h2>
             <p>Tell Chummer what is breaking trust or pace at the table.</p>
 
@@ -233,14 +233,14 @@
             <form class="settings-form" method="post" action="@Model.Form.ActionHref">
                 @Html.AntiForgeryToken()
                 <div class="field">
-                    <label for="trackKey">Follow-up track</label>
+                    <label for="trackKey">Request type</label>
                     <select id="trackKey" name="TrackKey" required>
                         @foreach (var option in Model.Form.TrackOptions)
                         {
                             <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTrackKey, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SanitizePublicText(option.Label)</option>
                         }
                     </select>
-                    <p class="muted-copy">@SanitizePublicText(Model.SelectedTrack.Family) prompts are currently loaded below.</p>
+                    <p class="muted-copy">@SanitizePublicText(Model.SelectedTrack.Family) prompts are shown below.</p>
                 </div>
                 <div class="field">
                     <label for="respondentRole">Respondent role</label>
@@ -288,11 +288,11 @@
                     </select>
                 </div>
                 <div class="field">
-                    <label for="feedbackPrompt">Prompt or one-line frame</label>
+                    <label for="feedbackPrompt">Short frame</label>
                     <input id="feedbackPrompt" name="FeedbackPrompt" maxlength="280" value="@Model.Form.DefaultFeedbackPrompt" placeholder="Our table needs campaign-scoped gear unlocks without hidden legality changes." />
                 </div>
                 <div class="field">
-                    <label for="userWordsSummary">User words</label>
+                    <label for="userWordsSummary">In your words</label>
                     <textarea id="userWordsSummary" name="UserWordsSummary" rows="4" placeholder="What did the table actually ask for?" required>@Model.Form.DefaultUserWordsSummary</textarea>
                 </div>
                 <div class="field">
@@ -300,17 +300,17 @@
                     <textarea id="currentWorkaround" name="CurrentWorkaround" rows="4" placeholder="How are you handling this today?" required>@Model.Form.DefaultCurrentWorkaround</textarea>
                 </div>
                 <details class="details-drawer">
-                    <summary>Optional synthesis fields</summary>
+                    <summary>Optional extra detail</summary>
                     <div class="field">
-                        <label for="interpretedNeedSummary">Interpreted need</label>
+                        <label for="interpretedNeedSummary">Optional rewrite</label>
                         <textarea id="interpretedNeedSummary" name="InterpretedNeedSummary" rows="4" placeholder="Rewrite the need into a Chummer-owned summary.">@Model.Form.DefaultInterpretedNeedSummary</textarea>
                     </div>
                     <div class="field">
-                        <label for="impactNotes">Trust and impact notes</label>
+                        <label for="impactNotes">Impact notes</label>
                         <textarea id="impactNotes" name="ImpactNotes" rows="4" placeholder="Call out build impact, rollback, player visibility, approvals, and portability.">@Model.Form.DefaultImpactNotes</textarea>
                     </div>
                     <div class="field">
-                        <label for="shareabilityNotes">Shareability notes</label>
+                        <label for="shareabilityNotes">Reuse notes</label>
                         <textarea id="shareabilityNotes" name="ShareabilityNotes" rows="4" placeholder="Is this campaign-local, reusable, publishable, or version-sensitive?">@Model.Form.DefaultShareabilityNotes</textarea>
                     </div>
                 </details>
@@ -345,7 +345,7 @@
                 </details>
                 <div class="stacked-actions">
                     <button class="button-like button-like--primary" type="submit">Send request</button>
-                    <a class="button-like button-like--ghost" href="/contact#support-intake">This is really a normal support issue</a>
+                    <a class="button-like button-like--ghost" href="/contact#support-intake">This is a support issue</a>
                 </div>
             </form>
         </article>
@@ -363,10 +363,10 @@
         </article>
 
         <article class="trust-page-section" id="candidate-decisions">
-            <p class="eyebrow">Priority decisions</p>
-            <h2>Every request should land on a clear decision.</h2>
+            <p class="eyebrow">Likely outcomes</p>
+            <h2>Each request should land on a clear outcome.</h2>
             <p>Discovery does not skip straight to implementation.</p>
-            <p class="muted-copy">The request stays clear before any routing or follow-up.</p>
+            <p class="muted-copy">The request stays clear before anything changes.</p>
             <div class="settings-summary-list">
                 @foreach (var decision in Model.CandidateDecisions)
                 {
@@ -390,12 +390,12 @@
         </article>
 
         <article class="trust-page-section" id="recent-packets">
-            <p class="eyebrow">Account history</p>
-            <h2>Your recent KARMA FORGE requests</h2>
-            <p>@(Model.Form.Authenticated ? "Account submissions stay visible here with current queue status." : "Sign in if you want request history beyond this page.")</p>
+            <p class="eyebrow">Saved requests</p>
+            <h2>Your recent requests</h2>
+            <p>@(Model.Form.Authenticated ? "Your requests stay visible here with current status." : "Sign in if you want saved requests beyond this page.")</p>
             @if (Model.RecentSubmissions.Count == 0)
             {
-                <p class="muted-copy">No account KARMA FORGE requests are visible on this account yet.</p>
+                <p class="muted-copy">No saved KARMA FORGE requests are visible yet.</p>
             }
             else
             {

@@ -10,11 +10,11 @@ public sealed class ArtifactsFlagshipViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-artifacts\";", view, StringComparison.Ordinal);
-        Assert.Contains("Current usable detail surfaces", view, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-artifacts surface-minimal\";", view, StringComparison.Ordinal);
+        Assert.Contains("Current library pages", view, StringComparison.Ordinal);
         Assert.Contains("Open downloads", view, StringComparison.Ordinal);
-        Assert.Contains("Pick details, downloads, account history, or help without mixing their jobs.", view, StringComparison.Ordinal);
-        Assert.Contains("Account return view", view, StringComparison.Ordinal);
+        Assert.Contains("Choose library, downloads, account return, or help.", view, StringComparison.Ordinal);
+        Assert.Contains("Your library", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -23,10 +23,10 @@ public sealed class ArtifactsFlagshipViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Public publication detail", view, StringComparison.Ordinal);
-        Assert.Contains("Account return view", view, StringComparison.Ordinal);
-        Assert.Contains("Current usable detail surfaces", view, StringComparison.Ordinal);
-        Assert.Contains("Opening next in the detail view", view, StringComparison.Ordinal);
+        Assert.Contains("Public library", view, StringComparison.Ordinal);
+        Assert.Contains("Your library", view, StringComparison.Ordinal);
+        Assert.Contains("Current library pages", view, StringComparison.Ordinal);
+        Assert.Contains("Opening next", view, StringComparison.Ordinal);
         Assert.Contains("artifact-gallery__grid", view, StringComparison.Ordinal);
         Assert.Contains("ArtifactViewHref(view)", view, StringComparison.Ordinal);
     }

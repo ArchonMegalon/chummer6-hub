@@ -25,11 +25,11 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         Assert.Contains("ResolveSupportIntakeRailFromQuery()", controller, StringComparison.Ordinal);
         Assert.Contains("BuildSupportRailQuery(installRail)", controller, StringComparison.Ordinal);
         Assert.Contains(
-            "Open the Windows install handoff, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.",
+            "Open the Windows setup path, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.",
             releaseSelection,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.",
+            "Account linking is optional. A claim code appears only if setup needs recovery.",
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -37,7 +37,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
-        Assert.Contains("Recovery stays on this install page", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
+        Assert.Contains("Devices and access is where you relink, reclaim, or recover this copy.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
         Assert.Contains(
             "Enter each code in Chummer if it opens in recovery mode on the already-downloaded device. Do not redeem claim codes in a browser tab.",
             accountView,

@@ -249,21 +249,12 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ProductStoryPage(CancellationToken cancellationToken)
     {
-        var surface = _landing.LoadSurface();
-        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new StoryPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Chummer?", surface.ProofLine, "/what-is-chummer", cancellationToken),
-            Surface: surface,
-            Assets: assetCatalog,
-            Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/what-is-chummer"),
-            TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/what-is-chummer"),
-            ReleaseExperience: releaseExperience,
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                "What Is Chummer?",
+                "Character tools for Shadowrun.",
+                "/what-is-chummer",
+                cancellationToken));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
     }
 

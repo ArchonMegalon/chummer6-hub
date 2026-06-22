@@ -11,7 +11,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const desktop = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1366, height: 768 } });
 
   await desktop.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await expect(desktop.locator('.site-nav')).toBeVisible();
+  await expect(desktop.locator('.site-nav')).toHaveCount(0);
   await expect(desktop.locator('[data-nav-toggle]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
   await expect(desktop.locator('.minimal-hero__lead')).toContainText('A Shadowrun character manager');
@@ -30,20 +30,23 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (!heroImageLoaded) {
     failures.push('homepage: hero image did not load');
   }
-  await expect(desktop.locator('[data-homepage-section="workflow"] .minimal-video')).toHaveCount(0);
+  await expect(desktop.locator('.minimal-hero__points')).toContainText('Create');
+  await expect(desktop.locator('.minimal-hero__points')).toContainText('Track');
+  await expect(desktop.locator('.minimal-hero__points')).toContainText('Review');
+  await expect(desktop.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
-  await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Need something else?');
-  await expect(desktop.locator('[data-homepage-section="help"]')).toContainText('Participate');
-  const helpBox = await desktop.locator('[data-homepage-section="help"]').boundingBox();
-  if (!helpBox || helpBox.y + helpBox.height > 768) {
-    failures.push('homepage: first screen still extends below the desktop viewport');
+  await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');
+  await expect(desktop.locator('.minimal-inline-links')).toContainText('Participate');
+  const heroBox = await desktop.locator('[data-homepage-section="hero"]').boundingBox();
+  if (!heroBox || heroBox.y + heroBox.height > 768) {
+    failures.push('homepage: hero still extends below the desktop viewport');
   }
   results.push({
     surface: 'home',
-    inline_nav_visible: await desktop.locator('.site-nav').isVisible(),
+    inline_nav_visible: false,
     hero_image_loaded: heroImageLoaded,
     promo_video_entry: '/media/promo/chummer6-flagship-promo.mp4',
-    first_viewport_fits: !!helpBox && helpBox.y + helpBox.height <= 768,
+    first_viewport_fits: !!heroBox && heroBox.y + heroBox.height <= 768,
   });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });

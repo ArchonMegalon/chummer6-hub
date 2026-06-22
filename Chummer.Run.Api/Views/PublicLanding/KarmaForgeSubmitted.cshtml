@@ -97,8 +97,8 @@
 <section class="editorial-block" id="review-next-steps">
     <div class="editorial-block__lead">
         <p class="eyebrow">Next steps</p>
-        <h2 class="editorial-title">The next steps stay clear from follow-up through closeout.</h2>
-        <p class="editorial-copy">These steps can sharpen, schedule, review, decide, or close out the request. Chummer still makes the final product decision.</p>
+        <h2 class="editorial-title">The next steps stay clear from review to closeout.</h2>
+        <p class="editorial-copy">These steps can sharpen, schedule, review, decide, or close the request.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var stage in Model.ExternalStages)
@@ -136,7 +136,7 @@
     <div class="trust-page-sections">
         <article class="trust-page-section" id="next-questions">
             <p class="eyebrow">Next questions queue</p>
-            <h2>Questions that should sharpen the next pass</h2>
+            <h2>Questions for the next pass</h2>
             <p>@(Model.FollowUpAllowed ? "Follow-up is allowed, so these are the most likely questions Chummer will ask next." : "Follow-up is off, but these questions can still sharpen the request if you return later.")</p>
             <ul class="trust-page-section__list">
                 @foreach (var question in Model.NextQuestions)
@@ -148,8 +148,8 @@
 
         <article class="trust-page-section" id="next-steps">
             <p class="eyebrow">What happens next</p>
-            <h2>What should happen before any implementation talk</h2>
-            <p>These next steps stay attached to the saved rules request instead of becoming loose follow-up notes.</p>
+            <h2>What should happen before anything changes</h2>
+            <p>These next steps stay attached to the saved request instead of turning into loose notes.</p>
             <ul class="trust-page-section__list">
                 @foreach (var step in Model.NextSteps)
                 {
@@ -161,8 +161,8 @@
 
         <article class="trust-page-section" id="saved-details">
             <p class="eyebrow">Saved details</p>
-            <h2>The saved details are visible here</h2>
-            <p>These previews show what Chummer saved for this submission.</p>
+            <h2>What Chummer saved</h2>
+            <p>These previews show what Chummer saved for this request.</p>
 
             <details class="details-drawer">
                 <summary>Saved rules request</summary>

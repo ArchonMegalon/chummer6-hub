@@ -7,16 +7,18 @@
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
-    ViewData["SurfaceClass"] = helpPage
+    ViewData["SurfaceClass"] = helpPage || contactPage
         ? "surface-help surface-minimal"
         : "surface-trust-page";
-    ViewData["ContextSidebarHeading"] = helpPage ? "Help" : "Page sections";
-    ViewData["ContextSidebarSummary"] = helpPage
-        ? "Jump to the path that fits the problem."
+    ViewData["ContextSidebarHeading"] = helpPage || contactPage ? null : "Page sections";
+    ViewData["ContextSidebarSummary"] = helpPage || contactPage
+        ? null
         : "Jump between the current sections.";
-    ViewData["ContextSidebarLinks"] = Model.Sections
-        .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
-        .ToArray();
+    ViewData["ContextSidebarLinks"] = helpPage || contactPage
+        ? Array.Empty<PublicNavigationLink>()
+        : Model.Sections
+            .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
+            .ToArray();
     var deferSupportPanels = helpPage || contactPage;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
@@ -103,9 +105,9 @@
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
             Id: "public-issues",
-            Badge: "Public feedback",
+            Badge: "Participate",
             Title: "Use Participate for ideas and safe public bugs",
-            Summary: "Feature requests and public UX friction belong there. Logs, account issues, and private campaign detail do not.",
+            Summary: "Feature requests and safe public UX bugs belong there. Logs, account issues, and private campaign detail do not.",
             Href: "/feedback",
             Label: "Open feedback",
             Details: new[] { "Public page", "Votes show demand", "No private logs" }));
@@ -141,12 +143,12 @@
     }
 }
 
-<section class="@(helpPage ? "minimal-page-hero" : "trust-page-hero")">
-    <div class="@(helpPage ? string.Empty : "trust-page-hero__copy")">
-        <p class="@(helpPage ? "minimal-kicker" : "eyebrow")">@PublicText(Model.Eyebrow)</p>
-        <h1 class="@(helpPage ? string.Empty : "page-title")">@PublicText(Model.Heading)</h1>
-        <p class="@(helpPage ? string.Empty : "page-copy")">@PublicText(Model.Intro)</p>
-        @if (!helpPage && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
+<section class="@((helpPage || contactPage) ? "minimal-page-hero" : "trust-page-hero")">
+    <div class="@((helpPage || contactPage) ? string.Empty : "trust-page-hero__copy")">
+        <p class="@((helpPage || contactPage) ? "minimal-kicker" : "eyebrow")">@PublicText(Model.Eyebrow)</p>
+        <h1 class="@((helpPage || contactPage) ? string.Empty : "page-title")">@PublicText(Model.Heading)</h1>
+        <p class="@((helpPage || contactPage) ? string.Empty : "page-copy")">@PublicText(Model.Intro)</p>
+        @if (!(helpPage || contactPage) && (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate)))
         {
             <div class="trust-claim__details">
                 @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate))
@@ -159,7 +161,7 @@
                 }
             </div>
         }
-        @if (!policyPage && !helpPage && Model.SummaryPoints is { Count: > 0 })
+        @if (!policyPage && !(helpPage || contactPage) && Model.SummaryPoints is { Count: > 0 })
         {
             <div class="trust-claim__details">
                 @foreach (var point in Model.SummaryPoints)
@@ -169,15 +171,7 @@
             </div>
         }
     </div>
-    @if (helpPage)
-    {
-        <div class="minimal-status-pill" aria-label="Help options">
-            <span>Start here</span>
-            <strong>Pick the problem</strong>
-            <span>Install, account, bug, or question</span>
-        </div>
-    }
-    else
+    @if (!(helpPage || contactPage))
     {
         <div class="stacked-actions">
             @foreach (var action in Model.Actions)
@@ -232,7 +226,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Pick the problem</h2>
-            <p>Each card has a first step. Use the second link only when the first one does not fit.</p>
+            <p>Each card starts with the best first step. Use the second link only if needed.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -294,7 +288,7 @@ else if (!contactPage)
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Pick the path</h2>
-            <p>Use the public lane for ideas and safe bugs. Use the private case form when the issue needs logs, account detail, or recovery.</p>
+            <p>Use Participate for ideas and safe public bugs. Use the support form when the issue needs logs, account detail, or recovery.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -315,8 +309,8 @@ else if (!contactPage)
         </div>
     </section>
 
-    <section class="trust-page-sections" id="support-intake">
-        <article class="trust-page-section trust-page-section--form">
+    <section class="minimal-section minimal-section--tight" id="support-intake">
+        <article class="trust-page-section trust-page-section--form minimal-help-card">
             <p class="eyebrow">Private support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
             <p>@PublicText(Model.SupportIntake.Intro)</p>
@@ -402,7 +396,6 @@ else if (!contactPage)
                     <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>
                 </div>
             </form>
-            <p class="muted-copy">@PublicText(Model.SupportIntake.ResponseExpectation)</p>
             @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailHref)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))

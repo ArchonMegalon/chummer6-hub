@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Download setup";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-downloads";
+    ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
     var showCompactDispatchInfo = Model.CompactDispatchLayout
         && (!string.IsNullOrWhiteSpace(Model.DispatchNote)
             || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
@@ -49,7 +49,7 @@
         {
             Badge = "Status",
             Title = "See the current build",
-            Summary = "Use status when you want to confirm the published build and platform availability.",
+            Summary = "Use What works today when you want to confirm the published build and platform availability.",
             Href = "/now",
             Label = "Open what works today",
             Details = new[] { "Current build", "Platform status", "Known limits" }
@@ -109,8 +109,8 @@
         {
             <p class="page-copy">@PublicDispatchText(Model.Summary)</p>
             <p class="release-stage__note">@PublicDispatchText(Model.DispatchNote)</p>
-            <p class="release-stage__note">Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
-            <p class="release-stage__note">Support stays with this downloaded copy.</p>
+            <p class="release-stage__note">Account linking is optional. A claim code appears only if setup needs recovery.</p>
+            <p class="release-stage__note">Support stays with this install.</p>
             <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
         }
     </div>
@@ -120,7 +120,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Finish this install.</h2>
-        <p class="editorial-copy">Start the installer. Chummer can link this copy to your account later if you want recovery and support history attached.</p>
+        <p class="editorial-copy">Start the installer. Link this copy later only if you want recovery and support history attached.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -153,13 +153,13 @@
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@PublicDispatchText(Model.SecondaryDownloadLabel)</a>
                 </div>
-                <p class="muted-copy">Use this direct installer only when support asks for it. The guided setup below is the normal path.</p>
+                <p class="muted-copy">Use this direct installer only if support asks for it. Guided setup below is the normal path.</p>
                 <details class="release-disclosure">
                 <summary>Guided setup</summary>
                     <div class="release-disclosure__body">
                         <div class="code-panel">
                             <div class="code-panel__label">@PublicDispatchTextOr(Model.BootstrapCommandLabel, "Install command")</div>
-                            <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Paste this into your platform shell.")</strong></p>
+                            <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Run this in your terminal.")</strong></p>
                             <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
                             @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                             {
@@ -190,7 +190,7 @@
             {
                 <div class="code-panel">
                     <div class="code-panel__label">@PublicDispatchTextOr(Model.BootstrapCommandLabel, "Install command")</div>
-                    <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Paste this into your platform shell.")</strong></p>
+                    <p class="handoff-command__intro"><strong>@PublicDispatchTextOr(Model.BootstrapCommandIntro, "Run this in your terminal.")</strong></p>
                     <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
                     @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                     {

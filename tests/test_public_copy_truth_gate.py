@@ -18,7 +18,7 @@ def test_feedback_public_copy_truth_gate_script_exists() -> None:
 
 
 def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
-    feedback = read("Chummer.Run.Api/Views/PublicLanding/Feedback.cshtml")
+    feedback = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
     operations = read("Chummer.Run.Api/Views/Shared/_PublicSignalOperationsPacket.cshtml")
     projection = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
     spec = importlib.util.spec_from_file_location("public_copy_truth_gate", GATE_SCRIPT)
@@ -27,20 +27,20 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     sys.path.insert(0, str(GATE_SCRIPT.parent))
     spec.loader.exec_module(gate_module)
 
-    assert "Votes show demand. Chummer decides what ships." in feedback
-    assert "The loop closes only after people can use it" in feedback
-    assert "Use the page that matches the job." in feedback
-    assert "Public feedback is for ideas and safe bugs." in feedback
+    assert "Tell us what slows the table down." in feedback
+    assert "Public feedback for ideas, friction, and safe bugs. Private or account-linked problems go to Help." in feedback
+    assert "Choose where it should go" in feedback
+    assert "Start with the shortest path." in feedback
     assert "Public Feedback And Content Registry" not in feedback
     assert "Open the Alice compare bench" not in feedback
     assert "BLACK LEDGER" not in feedback
     assert "release-backed closeout" not in feedback
-    assert "First-party follow-up is not posted here yet." in operations
-    assert "account-backed follow-up waits until the shipped path is available on this host" in operations
+    assert "Chummer follow-up is not visible here yet." in operations
+    assert "account follow-up waits until the shipped path is available on this host" in operations
     assert "Public feedback stays easy to sort." in operations
-    assert "Decision context" in projection
+    assert "Context" in projection
     assert "Decision sources" not in projection
-    assert "Open the Chummer page" in projection
+    assert "Open page" in projection
     assert "Open first-party fallback" not in projection
     assert "Boundary conditions" not in projection
     assert "Before it ships" in projection

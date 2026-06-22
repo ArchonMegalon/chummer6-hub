@@ -1,9 +1,9 @@
 @using Chummer.Run.Api.Services
 @model PublicSignalOperationsDetailPageViewModel
 @{
-    ViewData["Title"] = Model.Detail.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Detail.Heading);
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-participate";
+    ViewData["SurfaceClass"] = "surface-participate surface-minimal";
     var detail = Model.Detail;
     var routingReceipts = detail.RoutingReceipts.ToArray();
     var closeoutReceipts = detail.CloseoutReceipts.ToArray();
@@ -48,57 +48,57 @@
 }
 
 <section class="release-footnote route-anchor-target">
-    <p class="eyebrow">@detail.Eyebrow</p>
-    <h1 class="page-title">@detail.Heading</h1>
-    <p class="page-copy">@detail.Summary</p>
+    <p class="eyebrow">@PublicFeedbackText(detail.Eyebrow)</p>
+    <h1 class="page-title">@PublicFeedbackText(detail.Heading)</h1>
+    <p class="page-copy">@PublicFeedbackText(detail.Summary)</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@detail.BackHref">@detail.BackLabel</a>
-        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Download item details</a>
-        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Download activity summary</a>
-        <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Search another item</a>
+        <a class="button-like button-like--primary" href="@detail.BackHref">@PublicFeedbackText(detail.BackLabel)</a>
+        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Download item JSON</a>
+        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Download summary JSON</a>
+        <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Find another item</a>
         @if (!string.IsNullOrWhiteSpace(detail.RelatedHref) && !string.IsNullOrWhiteSpace(detail.RelatedLabel))
         {
-            <a class="button-like button-like--ghost" href="@detail.RelatedHref">@detail.RelatedLabel</a>
+            <a class="button-like button-like--ghost" href="@detail.RelatedHref">@PublicFeedbackText(detail.RelatedLabel)</a>
         }
     </div>
-    <p class="muted-copy">@detail.DetailKindLabel · @detail.DetailKeyLabel: @detail.DetailKey</p>
+    <p class="muted-copy">@PublicFeedbackText(detail.DetailKindLabel) · @PublicFeedbackText(detail.DetailKeyLabel): @detail.DetailKey</p>
 </section>
 
 @if (savedPivots.Length > 0)
 {
-    <section class="status-decision-strip" aria-label="Saved filters">
+    <section class="status-decision-strip" aria-label="Saved views">
         @foreach (var pivot in savedPivots)
         {
             <article class="status-decision-strip__card">
-                <span class="tag">@(pivot.Current ? "Current filter" : "Saved filter")</span>
-                <h2>@pivot.Label · @pivot.Count thread@(pivot.Count == 1 ? string.Empty : "s")</h2>
-                <p>@pivot.Summary</p>
+                <span class="tag">@(pivot.Current ? "Current" : "Saved")</span>
+                <h2>@PublicFeedbackText(pivot.Label) · @pivot.Count thread@(pivot.Count == 1 ? string.Empty : "s")</h2>
+                <p>@PublicFeedbackText(pivot.Summary)</p>
                 <div class="stacked-actions">
                     <a class="button-like @(pivot.Current ? "button-like--primary" : "button-like--secondary")" href="@pivot.Href">
                         @(pivot.Current ? "Viewing this filter" : "Open this filter")
                     </a>
-                    <a class="button-like button-like--ghost" href="@pivot.ArtifactHref">Open filter details</a>
+                    <a class="button-like button-like--ghost" href="@pivot.ArtifactHref">Open filter JSON</a>
                 </div>
             </article>
         }
     </section>
 }
 
-<section class="status-decision-strip" aria-label="Activity summary">
+<section class="status-decision-strip" aria-label="Overview">
     <article class="status-decision-strip__card">
         <span class="tag">Activity</span>
         <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this view.</h2>
         <p>@dispatchReceipts.Length message update@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length follow-up update@(journeyReceipts.Length == 1 ? string.Empty : "s") are joined here.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Follow-up status</span>
+        <span class="tag">Follow-up</span>
         <h2>@queueReceipts.Length follow-up item@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this view.</h2>
         <p>@closeoutReceipts.Length resolution update@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing update@(routingReceipts.Length == 1 ? string.Empty : "s") keep the next step visible.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Private details</span>
-        <h2>Raw delivery bodies stay out of Chummer storage.</h2>
-        <p>This page only uses limited metadata, hashed recipient identity, and Chummer status.</p>
+        <h2>Raw delivery bodies stay out of this page.</h2>
+        <p>Only limited metadata, hashed recipient identity, and Chummer status are shown here.</p>
     </article>
 </section>
 
@@ -106,9 +106,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Current filter</p>
-            <h2 class="editorial-title">@detail.FilterLabel are currently isolated on this view.</h2>
-            <p class="editorial-copy">The thread, message, outcome, and follow-up sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the filter you selected.</p>
+            <p class="eyebrow">Current view</p>
+            <h2 class="editorial-title">@PublicFeedbackText(detail.FilterLabel) are isolated on this page.</h2>
+            <p class="editorial-copy">The thread, message, outcome, and follow-up sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s").</p>
         </div>
     </section>
 }
@@ -118,8 +118,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Original item</p>
-            <h2 class="editorial-title">The original item stays visible as the root of this view.</h2>
-            <p class="editorial-copy">This keeps the public feedback item, category, and next action tied to the later message and follow-up state.</p>
+            <h2 class="editorial-title">The original item anchors this page.</h2>
+            <p class="editorial-copy">The item, category, and next step stay tied to later message and follow-up updates.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -158,7 +158,7 @@
                 }
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@SourceDetailHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">@SourceDetailActionLabel(sourceReceipt.HotFilterKey, sourceReceipt.HotFilterLabel)</a>
-                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open details</a>
+                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId, sourceReceipt.HotFilterKey)">Open JSON</a>
                 </div>
             </article>
         </div>
@@ -170,8 +170,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Activity</p>
-            <h2 class="editorial-title">Routing, follow-up status, and message readiness stay clear before anything is sent.</h2>
-            <p class="editorial-copy">This keeps voter follow-up and send status on the same page as the later delivery timeline, including recipient threads, message updates, outcome updates, follow-up, and saved filters.</p>
+            <h2 class="editorial-title">Routing, follow-up, and send state stay on one page.</h2>
+            <p class="editorial-copy">This keeps the early decisions beside the later delivery timeline.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in routingReceipts)
@@ -190,7 +190,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open JSON</a>
                     </div>
                 </article>
             }
@@ -198,7 +198,7 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">@PublicFeedbackText(receipt.StatusLabel)</span>
-                    <h3>Resolution @PublicFeedbackText(receipt.DeliveryState)</h3>
+                    <h3>Outcome · @PublicFeedbackText(receipt.DeliveryState)</h3>
                     <p>@PublicFeedbackText(receipt.Summary)</p>
                     <div class="route-choice-card__details">
                         <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
@@ -215,7 +215,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open JSON</a>
                     </div>
                 </article>
             }
@@ -245,7 +245,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open JSON</a>
                     </div>
                 </article>
             }
@@ -259,7 +259,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Filtered result</p>
             <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this filtered view.</h2>
-            <p class="editorial-copy">Use the saved filters above to reopen the full original item or jump straight to another filtered state without leaving this page.</p>
+            <p class="editorial-copy">Use the saved views above to reopen the full item or jump to another filtered state.</p>
         </div>
     </section>
 }
@@ -269,8 +269,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Recipient threads</p>
-            <h2 class="editorial-title">The message history, latest outcome update, and follow-up detail now sit on one recipient timeline.</h2>
-            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected item or message history.</p>
+            <h2 class="editorial-title">Each recipient thread stays on one timeline.</h2>
+            <p class="editorial-copy">Message, outcome, and follow-up updates stay grouped by recipient thread.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var thread in recipientThreads)
@@ -298,8 +298,8 @@
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Download message details</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Download message JSON</a>
                     </div>
                 </article>
             }
@@ -312,8 +312,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Message updates</p>
-            <h2 class="editorial-title">Every outbound message attempt stays visible.</h2>
-            <p class="editorial-copy">This keeps send status, suppression state, retry timing, and delivery identity aligned to one message view.</p>
+            <h2 class="editorial-title">Each outbound attempt stays visible.</h2>
+            <p class="editorial-copy">Send state, retry timing, and delivery identity stay aligned to one message view.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in dispatchReceipts)
@@ -346,8 +346,8 @@
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Download message details</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Download message JSON</a>
                     </div>
                 </article>
             }
@@ -360,8 +360,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Delivery updates</p>
-            <h2 class="editorial-title">Delivery updates stay clear and attributable.</h2>
-            <p class="editorial-copy">Identity match mode, recipient matching, and delivery state stay visible without storing raw delivery bodies.</p>
+            <h2 class="editorial-title">Delivery state stays clear.</h2>
+            <p class="editorial-copy">Identity match mode, recipient matching, and delivery state stay visible without raw delivery bodies.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in deliveryOutcomes)
@@ -388,8 +388,8 @@
                         }
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread details</a>
-                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Download message details</a>
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Download message JSON</a>
                     </div>
                 </article>
             }
@@ -402,8 +402,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Follow-up</p>
-            <h2 class="editorial-title">Follow-up detail only appears after the message timeline completes.</h2>
-            <p class="editorial-copy">These rows show voter notifications tied to the same review decision and release status used by the message timeline.</p>
+            <h2 class="editorial-title">Follow-up appears after the message timeline completes.</h2>
+            <p class="editorial-copy">These rows show voter notifications tied to the same review decision and message timeline.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in journeyReceipts)
@@ -427,7 +427,7 @@
                     }
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">@SourceDetailActionLabel(receipt.SourceHotFilterKey, receipt.SourceHotFilterLabel)</a>
-                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open details</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open JSON</a>
                     </div>
                 </article>
             }

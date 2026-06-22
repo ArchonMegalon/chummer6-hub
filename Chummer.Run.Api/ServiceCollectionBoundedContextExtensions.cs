@@ -63,9 +63,11 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<TeableUserProjectionService>();
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddSingleton<TeableHeyyScamChatService>();
+        services.AddSingleton<TeableExecutiveAssistantChannelService>();
         services.AddHostedService<TeableUserProjectionSyncWorker>();
         services.AddHostedService<TeableBlackLedgerWorldTickSyncWorker>();
         services.AddHostedService<TeableHeyyScamChatSyncWorker>();
+        services.AddHostedService<TeableExecutiveAssistantChannelSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();

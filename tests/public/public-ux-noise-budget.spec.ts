@@ -7,12 +7,12 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const sections = page.locator('[data-homepage-section]');
-  await expect(sections).toHaveCount(3);
+  await expect(sections).toHaveCount(2);
 
   const navLabels = await page.locator('.site-nav a, .site-nav__current').evaluateAll((items) =>
     items.map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
   );
-  expect(navLabels).toEqual(['Home', 'Participate', 'Help']);
+  expect(navLabels).toEqual([]);
 
   const hero = page.locator('[data-homepage-section="hero"]');
   const heroText = (await hero.textContent()) || '';
@@ -28,8 +28,8 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
     [
       '# Final public UX redesign verdict',
       '',
-      '- Homepage sections: `3`',
-      '- Primary nav: `Home, Participate, Help`',
+      '- Homepage sections: `2`',
+      '- Primary nav on landing: `hidden`',
       '- First-screen proof noise: `0`',
       '- Verdict: `READY`',
     ].join('\n'),

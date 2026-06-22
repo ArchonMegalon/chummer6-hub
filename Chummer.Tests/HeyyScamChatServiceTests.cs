@@ -201,14 +201,13 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
-    public async Task ApproveDraftWhatsappModeIgnoresLegacyAllowBlockRecipientLists()
+    public async Task ApproveDraftWhatsappModeRespectsWhatsappRecipientAllowAndBlockedLists()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = ConsentingTestPhone,
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
             ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
@@ -232,13 +231,46 @@ public sealed class HeyyScamChatServiceTests
                 DryRun: false),
             CancellationToken.None);
 
-        Assert.Equal("sent_whatsapp_approved", approval.Status);
-        Assert.Null(approval.FailureReason);
-        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
-        using JsonDocument json = JsonDocument.Parse(request.Body);
-        JsonElement payload = json.RootElement.GetProperty("payload_json");
-        Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
-        Assert.Equal(ScammerFixturePhone, payload.GetProperty("recipient").GetString());
+        Assert.Equal("suppressed_whatsapp_recipient_invalid", approval.Status);
+        Assert.Equal("recipient_invalid", approval.FailureReason);
+
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeBlocksRecipientInConfiguredBlocklist()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = $"{ConsentingTestPhone}, {MetaTestPhone}",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = ScammerFixturePhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-blocked-list",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-blocked-list",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ScammerFixturePhone,
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("suppressed_whatsapp_recipient_invalid", approval.Status);
+        Assert.Equal("recipient_invalid", approval.FailureReason);
     }
 
     [Fact]
@@ -283,6 +315,48 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal("whatsapp_approved", metadata.GetProperty("delivery_mode").GetString());
         Assert.True(metadata.GetProperty("manual_approval_required").GetBoolean());
         Assert.False(metadata.GetProperty("auto_send_allowed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeHonorsConfiguredWhatsappDeliveryRouteEa()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE"] = "ea",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-route-ea",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-route-ea",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ConsentingTestPhone,
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        using JsonDocument json = JsonDocument.Parse(request.Body);
+        JsonElement payload = json.RootElement.GetProperty("payload_json");
+        Assert.Equal("whatsapp", payload.GetProperty("channel").GetString());
     }
 
     [Fact]
@@ -358,7 +432,7 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal("suppressed_sms_unconfigured", summary.Status);
         Assert.Equal("real_sms_delivery_unconfigured", summary.FailureReason);
         Assert.Equal("[phone-redacted:*6419]", summary.RecipientMasked);
-        Assert.Contains("Mode: draft-only", summary.Content, StringComparison.Ordinal);
+        Assert.Contains("Operator summary for", summary.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Body.Contains("\"channel\":\"sms\"", StringComparison.Ordinal));
     }
 
@@ -400,7 +474,7 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
-    public async Task FiveIncomingTurnsCreateOperatorWhatsappSummaryIgnoresLegacyAllowlist()
+    public async Task FiveIncomingTurnsCreateOperatorWhatsappSummaryRespectsRecipientAllowlist()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
         {
@@ -409,8 +483,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_CHANNEL"] = "whatsapp",
             ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = "+15555550103",
-            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS"] = MetaTestPhone,
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS"] = MetaTestPhone,
             ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
@@ -509,6 +582,76 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task TeableProjectionEscapesConversationIdForTqlFilter()
+    {
+        const string conversationId = "conv-with'special value";
+
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED"] = "true",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_API_KEY"] = "teable-token",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_API_BASE_URL"] = "https://app.teable.ai/api",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_BASE_ID"] = "base-demo",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_TABLE_ID"] = "tbl_heyy",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: conversationId,
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        await fixture.Teable.SyncAllAsync();
+
+        LoggedRequest getRequest = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Get && item.Path.StartsWith("/api/table/tbl_heyy/record?", StringComparison.Ordinal));
+        string? filter = ExtractFilterByTql(getRequest.Path);
+        Assert.NotNull(filter);
+        Assert.Equal("{Conversation Id} = 'conv-with\\'special value'", filter);
+    }
+
+    [Fact]
+    public async Task ApprovalUpdatesTeableProjectionWhenConversationTranscriptChanges()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED"] = "true",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_API_KEY"] = "teable-token",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_API_BASE_URL"] = "https://app.teable.ai/api",
+            ["CHUMMER_TEABLE_HEYY_SCAM_CHAT_BASE_ID"] = "base-demo",
+        }, attachTeableToService: true);
+
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-teable-approval",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        const string approvedText = "Bitte warte kurz, ich muss erst die Brille suchen.";
+
+        await fixture.Service.ApproveDraftAsync(
+            "conv-teable-approval",
+            new HeyyScamChatApproveDraftRequest(
+                ConfirmManualApproval: true,
+                DeliveryMode: "manual_copy",
+                ApprovedText: approvedText,
+                DryRun: false),
+            CancellationToken.None);
+
+        await fixture.Teable.SyncAllAsync();
+
+        LoggedRequest latestProjection = fixture.Handler.Requests
+            .Last(item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_heyy/record");
+        Assert.Contains(approvedText, latestProjection.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InternalControllerRequiresBearerAndCanIngestAuthorizedMessage()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
@@ -568,7 +711,7 @@ public sealed class HeyyScamChatServiceTests
     {
         private readonly string _root;
 
-        public Fixture(IReadOnlyDictionary<string, string?>? overrides = null)
+        public Fixture(IReadOnlyDictionary<string, string?>? overrides = null, bool attachTeableToService = false)
         {
             _root = Path.Combine(Path.GetTempPath(), "heyy-scam-chat-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
@@ -601,7 +744,7 @@ public sealed class HeyyScamChatServiceTests
                 new HttpClient(Handler),
                 Store,
                 Configuration,
-                null,
+                attachTeableToService ? Teable : null,
                 NullLogger<HeyyScamChatService>.Instance);
         }
 
@@ -700,6 +843,24 @@ public sealed class HeyyScamChatServiceTests
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
+    }
+
+    private static string? ExtractFilterByTql(string path)
+    {
+        int marker = path.IndexOf("filterByTql=", StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            return null;
+        }
+
+        string encoded = path[(marker + "filterByTql=".Length)..];
+        int next = encoded.IndexOf('&', StringComparison.Ordinal);
+        if (next >= 0)
+        {
+            encoded = encoded[..next];
+        }
+
+        return Uri.UnescapeDataString(encoded);
     }
 
     private sealed record LoggedRequest(HttpMethod Method, string Path, string Body);

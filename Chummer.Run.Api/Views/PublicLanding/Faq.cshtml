@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model FaqPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-faq surface-minimal";
     var accessPosture = Model.AccessPosture;
@@ -12,9 +12,9 @@
     {
         new
         {
-            Badge = "Current status",
-            Title = "See what you can use today",
-            Summary = "Use this when you want to know whether something is ready now, needs care, or is still coming next.",
+            Badge = "What works today",
+            Title = "Check current status first",
+            Summary = "Use this when you want to know what is ready now, what needs care, and what is still coming next.",
             Href = "/now",
             Label = "Open what works today",
             Highlights = new[] { "Ready now", "Needs care", "Coming next" }
@@ -23,14 +23,14 @@
         {
             Badge = "Downloads",
             Title = "Open downloads when you want to install",
-            Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package and setup help without making you read a long answer first.",
+            Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package and setup help without making you dig through a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
             Highlights = new[] { "Latest build", "Setup help", "Known issues" }
         },
         new
         {
-            Badge = "Account value",
+            Badge = "Account",
             Title = Model.Chrome.Authenticated
                 ? "Account keeps recovery, devices, and support together"
                 : "Create an account when you want recovery and support history",
@@ -100,27 +100,20 @@
     string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
-        <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
-        <h1 class="page-title">@PublicText(Model.Heading)</h1>
-        <p class="page-copy">@PublicText(Model.Intro)</p>
-    </div>
-    <div class="stacked-actions">
-        @foreach (var action in Model.Actions)
-        {
-            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@PublicText(action.Label)</a>
-        }
+<section class="minimal-page-hero">
+    <div>
+        <p class="minimal-kicker">@PublicText(Model.Eyebrow)</p>
+        <h1>@PublicText(Model.Heading)</h1>
+        <p>@PublicText(Model.Intro)</p>
     </div>
 </section>
 
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Fast answers</p>
-        <h2 class="editorial-title">Get the answer or leave with the right next page.</h2>
-        <p class="editorial-copy">Use the FAQ for normal questions. Use support when the answer depends on your device, account, logs, or campaign.</p>
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <h2>Quick paths</h2>
+        <p>Use the FAQ for normal questions. Use support when the answer depends on your device, account, logs, or campaign.</p>
     </div>
-    <div class="route-choice-grid">
+    <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact">
         @foreach (var choice in faqRouteChoices)
         {
             <article class="route-choice-card">
@@ -139,11 +132,11 @@
     </div>
 </section>
 
-<section class="faq-stack">
+<section class="faq-stack minimal-section minimal-section--tight">
     <div class="trust-page-section">
         <p class="eyebrow">Search</p>
-        <h2>Plain answers first, deeper help right behind them</h2>
-        <p>Use the search when you know the topic, or scan the grouped sections below when the question is still broad.</p>
+        <h2>Find the answer fast</h2>
+        <p>Search when you know the topic, or scan the grouped sections below when the question is still broad.</p>
         <label class="field" for="faqFilter">
             <span>Search the FAQ</span>
             <input id="faqFilter" type="search" placeholder="account, install, update, recovery" data-faq-filter />
@@ -173,12 +166,13 @@
     }
 </section>
 
-<section class="release-footnote">
-    <p class="eyebrow">Still stuck?</p>
-    <h2 class="editorial-title">Open support instead of guessing</h2>
-    <p class="editorial-copy">If the FAQ answered only part of the question, open support and keep the case in one place.</p>
-    <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="/contact#support-intake">Still stuck? Open support</a>
+<section class="minimal-section minimal-section--support">
+    <div class="minimal-section__lead">
+        <h2>Still stuck?</h2>
+        <p>If the FAQ answered only part of the question, open support and keep the case in one place.</p>
+    </div>
+    <div class="minimal-actions">
+        <a class="button-like button-like--secondary" href="/contact#support-intake">Open support</a>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
 </section>

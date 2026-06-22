@@ -3,8 +3,6 @@
     ViewData["Title"] = "Chummer — Shadowrun character manager";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing surface-minimal";
-    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var buildLabel = Model.ReleaseExperience.Display.BuildLabel;
     var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
     var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
 }
@@ -12,46 +10,26 @@
 <section class="minimal-hero" data-homepage-section="hero">
     <div class="minimal-hero__copy">
         <h1>Chummer</h1>
-        <p class="minimal-hero__lead">A Shadowrun character manager for building, updating, and bringing clean sheets to the table.</p>
+        <p class="minimal-hero__lead">A Shadowrun character manager for clean sheets and faster tables.</p>
+        <ul class="minimal-hero__points" aria-label="What Chummer does">
+            <li>Create</li>
+            <li>Track</li>
+            <li>Review</li>
+            <li>Run</li>
+        </ul>
         <div class="minimal-actions" aria-label="Main downloads">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
         </div>
-        <p class="minimal-meta">Windows and Linux. @buildLabel. @publishedLabel.</p>
+        <p class="minimal-meta">Windows and Linux.</p>
+        <p class="minimal-inline-links">
+            <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
+            <a href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+        </p>
     </div>
-    <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/chummer6-flagship-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Open promo video" aria-label="Open promo video">
+    <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/chummer6-flagship-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Open promo video" aria-label="Open promo video" title="Open promo video">
         <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" loading="eager" decoding="async" />
+        <span class="minimal-hero__visual-badge">Watch promo</span>
     </a>
-</section>
-
-<section class="minimal-section" data-homepage-section="workflow">
-    <div class="minimal-section__lead">
-        <h2>What it does</h2>
-    </div>
-    <div class="minimal-three">
-        <article>
-            <h3>Create</h3>
-            <p>Start the sheet, choose the ruleset, and keep the build readable while you work.</p>
-        </article>
-        <article>
-            <h3>Track</h3>
-            <p>Keep gear, qualities, contacts, and advancement tidy as the campaign changes.</p>
-        </article>
-        <article>
-            <h3>Review</h3>
-            <p>Check totals, warnings, and changes before the sheet reaches the table.</p>
-        </article>
-    </div>
-</section>
-
-<section class="minimal-section minimal-section--support" data-homepage-section="help" data-public-section="footer">
-    <div class="minimal-section__lead">
-        <h2>Need something else?</h2>
-        <p>Use Help for setup or recovery. Use Participate for public feedback.</p>
-    </div>
-    <div class="minimal-actions">
-        <a class="button-like button-like--primary" href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
-        <a class="button-like button-like--ghost" href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
-    </div>
 </section>
 
 @if (Model.Chrome.Authenticated)

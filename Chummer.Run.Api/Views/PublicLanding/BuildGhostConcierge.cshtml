@@ -10,7 +10,7 @@
 
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-participate";
+    ViewData["SurfaceClass"] = "surface-participate surface-minimal";
     var projection = Model.Projection;
 
     string SanitizePublicCopy(string value)
@@ -53,12 +53,12 @@
 
 <section class="status-decision-strip" aria-label="Character helper operating split">
     <article class="status-decision-strip__card">
-        <span class="tag">Concierge</span>
+        <span class="tag">Greeting</span>
         <h2>@SanitizePublicCopy(projection.FacePopStatus)</h2>
         <p>Short greeting, routing, and intake only. It can help a builder arrive at the right Chummer path without becoming the path.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Explainer</span>
+        <span class="tag">Guide</span>
         <h2>@SanitizePublicCopy(projection.AnswerlyStatus)</h2>
         <p>@SanitizePublicCopy(projection.HumanizedSummary)</p>
     </article>
@@ -77,7 +77,7 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Concierge can</span>
+            <span class="tag">Greeting can</span>
             <h3>Open the conversation</h3>
             <p>Capture the comparison question and route the builder into the right next step.</p>
             <div class="route-choice-card__details">
@@ -88,7 +88,7 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Explainer can</span>
+            <span class="tag">Guide can</span>
             <h3>Explain the boundary</h3>
             <p>Clarify what the draft comparison means without computing mechanics or choosing the final character.</p>
             <div class="route-choice-card__details">
@@ -99,8 +99,8 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Chummer must</span>
-            <h3>Own the real compare bench</h3>
+            <span class="tag">Chummer keeps</span>
+            <h3>Keep the real compare bench</h3>
             <p>@SanitizePublicCopy(projection.RuntimeBoundary)</p>
             <div class="route-choice-card__details">
                 @foreach (var item in projection.ChummerResponsibilities)
@@ -136,7 +136,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Account helper</p>
-            <h2 class="editorial-title">The real compare bench is now a named account path.</h2>
+            <h2 class="editorial-title">The real compare bench lives in your account.</h2>
             <p class="editorial-copy">@SanitizePublicCopy(signedInBench.Summary)</p>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="@signedInBench.EntryHref">@SanitizePublicCopy(signedInBench.EntryLabel)</a>
@@ -169,7 +169,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Feedback loop</p>
         <h2 class="editorial-title">When comparison fails, send the useful details.</h2>
-        <p class="editorial-copy">Private compare or apply faults should open support with the right context already attached. Public shaping feedback should stay on the public board.</p>
+        <p class="editorial-copy">Private compare or apply faults should open support with the right context already attached. Design feedback should stay public.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -179,10 +179,10 @@
             <a class="editorial-strip__action" href="@projection.ClientReportHref">Open helper report</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Public shaping</span>
+            <span class="tag">Public feedback</span>
             <h3>Keep design feedback public</h3>
-            <p>Use the public board when the ask is about workflow design, visibility, or polish rather than a private failure.</p>
-            <a class="editorial-strip__action" href="@projection.PublicFeedbackHref">Open public feedback</a>
+            <p>Use public feedback when the ask is about workflow design, visibility, or polish rather than a private failure.</p>
+            <a class="editorial-strip__action" href="@projection.PublicFeedbackHref">Open feedback</a>
         </article>
     </div>
 </section>

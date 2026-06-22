@@ -847,15 +847,7 @@ public sealed record AnarchyPageViewModel(
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record StoryPageViewModel(
-    SiteChromeViewModel Chrome,
-    PublicLandingSurfaceDto Surface,
-    AssetCatalogViewModel Assets,
-    IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
-    IReadOnlyList<PublicFeatureCardDto> TrustPillars,
-    IReadOnlyList<ResolvedPublicCardViewModel> Lanes,
-    ReleaseExperienceViewModel ReleaseExperience,
-    PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SiteChromeViewModel Chrome);
 
 public sealed record NowPageViewModel(
     SiteChromeViewModel Chrome,

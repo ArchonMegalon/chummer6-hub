@@ -90,6 +90,8 @@ public sealed record HeyyScamChatOperatorSummaryReceipt(
 public sealed class HeyyScamChatService
 {
     private const string DefaultDeliveryBaseUrl = "http://127.0.0.1:8090";
+    private const string DefaultPersonaId = "empathetic_slow_typing_old_lady";
+    private const int DefaultMinimumDelaySeconds = 240;
     private const string ConnectorDispatchTool = "connector.dispatch";
     private const string DeliverySendAction = "delivery.send";
     private const string EmailChannel = "email";
@@ -101,8 +103,55 @@ public sealed class HeyyScamChatService
     private const string WhatsAppApprovedDeliveryMode = "whatsapp_approved";
     private const string OperatorSummaryChannelSms = "sms";
     private const string OperatorSummaryChannelWhatsapp = "whatsapp";
-    private const string PersonaId = "empathetic_slow_typing_old_lady";
-    private const int MinimumOldLadyDelaySeconds = 240;
+    private const string WhatsappDeliveryRouteConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE";
+    private const string PersonaIdConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_ID";
+    private const string PersonaSystemPromptConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_SYSTEM_PROMPT";
+    private const string PersonaDraftPromptTemplateConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_DRAFT_PROMPT_TEMPLATE";
+    private const string PersonaFallbackDraftsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_FALLBACK_DRAFTS";
+    private const string PersonaDraftPacingHintConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_DRAFT_PACING_HINT";
+    private const string PersonaSafetySummaryConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_SAFETY_SUMMARY";
+    private const string PersonaMinimumDelaySecondsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_MINIMUM_DELAY_SECONDS";
+    private const string WhatsappAllowedRecipientsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS";
+    private const string WhatsappBlockedRecipientsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS";
+    private const string WhatsappDeliveryRouteMeta = "meta";
+    private const string WhatsappDeliveryRouteEa = "ea";
+
+    private const string DefaultPersonaSystemPrompt =
+        """
+        You generate draft-only scambait replies for an operator-controlled safety workflow.
+        Do not claim a message was sent. Do not include bank details, real payment instructions, codes, links, addresses, or identity data.
+        The persona is a warm, empathetic, elderly Viennese lady who types slowly, gets confused by apps, mixes up harmless names/places/dates, and wants to help but cannot successfully send money.
+        Use gentle Austrian/Viennese wording sparingly: mei, geh, Servus, Bussi, Busserl, na geh, schau, Bankerl, Kastl, Gackerl, grantig, Jause.
+        It is allowed to invent harmless wrong details like the wrong child's name, a confused holiday memory, or a mistaken appointment, as long as those details are not real secrets, addresses, payment data, or verification codes.
+        Fictional memory card:
+        - Name: Herta, late 70s, widowed, lives in Vienna and often says she is near Meidling, Hietzing, or the Naschmarkt because she mixes errands up.
+        - Daughter memory: her daughter is Sabine, but Herta often writes Sabi, Bine, or briefly confuses her with cousin Renate.
+        - Plausible family memories: Sabine once lost a red school bag on tram 62, disliked Marillenknodel as a child, had a yellow raincoat, and once cried because a budgie named Peppi flew around the kitchen.
+        - Daily habits: Herta goes slowly, makes tea, checks the Spar leaflet, feeds neighbor cat Mitzi, searches for her glasses, and misunderstands banking apps as the blue Kastl.
+        Use those memories as confused verification questions and harmless wrong details.
+        Behavioral tic: she forgets details from earlier in the same chat, then writes that she scrolled back and the other person was right. Example style: "Ach ja, ich hab jetzt hinaufgescrollt, du hast eh recht, ich hab das schon wieder vergessen."
+        Keep the reply short, plausible for WhatsApp, in German, and suitable for manual approval.
+        Avoid insults, threats, harassment, or instructions to commit fraud.
+        """;
+
+    private const string DefaultPersonaDraftPromptTemplate =
+        """
+        Draft one next reply only.
+        Required behavior: Viennese old lady, empathetic, slow typing, confused with banking/apps, invent harmless wrong details, no real data, no actual payment.
+        Fictional persona memory: Herta from Vienna, daughter Sabine/Sabi/Bine, tram 62 red school bag, yellow raincoat, budgie Peppi, neighbor cat Mitzi, Marillenknodel confusion, glasses always missing.
+        Conversation so far:
+        """;
+
+    private static readonly string[] DefaultPersonaFallbackDrafts =
+    [
+        "Na geh, mein Schatz, was ist denn passiert? Ich tipp so langsam, die Brille ist wieder beim Teekastl. Bist du die Sabi? Sag mir bitte erst, welche Farbe dein Regenmantel damals bei der 62er-Bim hatte.",
+        "Mei, ich will dir ja helfen, wirklich. Ich hab jetzt hinaufgescrollt, du hast eh recht, du hast neue Nummer geschrieben. Aber dieses blaue Bank-Kastl dreht sich nur im Kreis.",
+        "Ach ja, ich hab das schon wieder vergessen und jetzt zurückgeschaut. Am Geld soll es nicht scheitern, Bussi, aber die Zahlen hüpfen. War das dein rotes Schulsackerl in der 62er?",
+        "Na geh, du hast eh recht, ich hab es grad beim Zurückscrollen gesehen. Ich bin noch da, nur sehr langsam. Nach der Jause probier ich es wieder, bitte nicht grantig sein mit mir."
+    ];
+
+    private const string DefaultPersonaSafetySummary = "Draft-only persona-aware reply. No automatic WhatsApp send, no real payment, no private credentials.";
+    private const string DefaultPersonaPacingHint = "Wait 4-9 minutes before manual send; send as one short German message with hesitant punctuation.";
 
     private static readonly Regex PhoneLikePattern = new(@"\+?\d[\d\s().-]{6,}\d", RegexOptions.Compiled);
     private static readonly Regex EmailPattern = new(@"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -124,6 +173,23 @@ public sealed class HeyyScamChatService
         "2fa",
         "otp"
     ];
+
+    private enum WhatsappDeliveryRouteKind
+    {
+        Meta,
+        Ea,
+    }
+
+    private sealed record WhatsappDeliveryRoute(WhatsappDeliveryRouteKind Kind, string? BindingId = null);
+
+    private sealed record HeyyScamChatPersonaProfile(
+        string PersonaId,
+        string SystemPrompt,
+        string DraftPromptTemplate,
+        string DraftPacingHint,
+        int MinimumDelaySeconds,
+        string SafetySummary,
+        IReadOnlyList<string> FallbackDrafts);
 
     private readonly HttpClient _httpClient;
     private readonly CommunityStore _store;
@@ -148,6 +214,7 @@ public sealed class HeyyScamChatService
     public async Task<HeyyScamChatDraftResponse> IngestIncomingAsync(HeyyScamChatIngestRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        HeyyScamChatPersonaProfile personaProfile = ResolvePersonaProfile();
         string channel = NormalizeChannel(request.Channel);
         string counterpartyHandle = AccountService.NormalizeOptional(request.CounterpartyHandle) ?? "unknown";
         string counterpartyHash = HashPrivate("counterparty", counterpartyHandle);
@@ -163,12 +230,13 @@ public sealed class HeyyScamChatService
                 channel,
                 MaskHandle(counterpartyHandle),
                 counterpartyHash,
+                personaProfile.PersonaId,
                 redactedMessage,
                 receivedAt);
             _store.PersistLocked();
         }
 
-        HeyyScamChatDraftState draft = await GenerateDraftAsync(conversation, cancellationToken);
+        HeyyScamChatDraftState draft = await GenerateDraftAsync(conversation, personaProfile, cancellationToken);
         lock (_store.Gate)
         {
             int index = _store.HeyyScamChatConversations.FindIndex(item =>
@@ -196,7 +264,7 @@ public sealed class HeyyScamChatService
 
         _teable?.QueueSyncConversation(conversation);
         await DispatchTurnSummaryIfDueAsync(conversation, cancellationToken);
-        return ToDraftResponse(conversationId, draft, conversation.Enrichment);
+        return ToDraftResponse(conversationId, draft, conversation.Enrichment, personaProfile.PersonaId, personaProfile.SafetySummary);
     }
 
     public HeyyScamChatConversationResponse? GetConversation(string conversationId)
@@ -233,6 +301,7 @@ public sealed class HeyyScamChatService
         string operatorId = AccountService.NormalizeOptional(request.OperatorId) ?? "operator";
         DateTimeOffset now = DateTimeOffset.UtcNow;
         HeyyScamChatConversationState conversation;
+        HeyyScamChatConversationState? syncedConversation = null;
         HeyyScamChatApprovalReceipt? existingReceipt;
 
         lock (_store.Gate)
@@ -408,10 +477,16 @@ public sealed class HeyyScamChatService
                         UpdatedAtUtc = receipt.AttemptedAtUtc,
                         Messages = current.Messages.Concat([approvalMessage]).ToArray()
                     };
+                    syncedConversation = _store.HeyyScamChatConversations[index];
                 }
             }
 
             _store.PersistLocked();
+        }
+
+        if (syncedConversation is not null)
+        {
+            _teable?.QueueSyncConversation(syncedConversation);
         }
 
         return ToApprovalResponse(receipt);
@@ -545,6 +620,7 @@ public sealed class HeyyScamChatService
         string channel,
         string counterpartyMasked,
         string counterpartyHash,
+        string personaId,
         string redactedMessage,
         DateTimeOffset receivedAt)
     {
@@ -553,7 +629,7 @@ public sealed class HeyyScamChatService
             Direction: "incoming",
             Text: redactedMessage,
             SafetyLabel: "redacted_scam_intake",
-            PacingHint: "Do not answer immediately; wait like a slow, cautious older person.",
+            PacingHint: "Do not answer immediately; wait like a careful operator-controlled draft lane.",
             CreatedAtUtc: receivedAt);
         int index = _store.HeyyScamChatConversations.FindIndex(item =>
             string.Equals(item.ConversationId, conversationId, StringComparison.OrdinalIgnoreCase));
@@ -579,7 +655,7 @@ public sealed class HeyyScamChatService
             CounterpartyMasked: counterpartyMasked,
             CounterpartyHash: counterpartyHash,
             Mode: DraftOnlyMode,
-            PersonaId: PersonaId,
+            PersonaId: personaId,
             SafetyStatus: "draft_only_manual_approval",
             Enrichment: BuildEnrichment(channel, createdMessages),
             CreatedAtUtc: receivedAt,
@@ -590,9 +666,64 @@ public sealed class HeyyScamChatService
         return created;
     }
 
-    private async Task<HeyyScamChatDraftState> GenerateDraftAsync(HeyyScamChatConversationState conversation, CancellationToken cancellationToken)
+    private HeyyScamChatPersonaProfile ResolvePersonaProfile()
     {
-        string fallback = BuildFallbackDraft(conversation.Messages.Count(static item => item.Direction == "incoming"));
+        string personaId = AccountService.NormalizeOptional(_configuration[PersonaIdConfigKey]) ?? DefaultPersonaId;
+        string systemPrompt = AccountService.NormalizeOptional(_configuration[PersonaSystemPromptConfigKey]) ?? DefaultPersonaSystemPrompt;
+        string draftPromptTemplate = AccountService.NormalizeOptional(_configuration[PersonaDraftPromptTemplateConfigKey]) ?? DefaultPersonaDraftPromptTemplate;
+        string draftPacingHint = AccountService.NormalizeOptional(_configuration[PersonaDraftPacingHintConfigKey]) ?? DefaultPersonaPacingHint;
+        string safetySummary = AccountService.NormalizeOptional(_configuration[PersonaSafetySummaryConfigKey]) ?? DefaultPersonaSafetySummary;
+        int minimumDelaySeconds = int.TryParse(_configuration[PersonaMinimumDelaySecondsConfigKey], out int parsed)
+            ? parsed
+            : DefaultMinimumDelaySeconds;
+        IReadOnlyList<string> fallbackDrafts = ResolveFallbackDrafts(_configuration[PersonaFallbackDraftsConfigKey]);
+        return new(
+            PersonaId: personaId,
+            SystemPrompt: systemPrompt,
+            DraftPromptTemplate: draftPromptTemplate,
+            DraftPacingHint: draftPacingHint,
+            MinimumDelaySeconds: minimumDelaySeconds,
+            SafetySummary: safetySummary,
+            FallbackDrafts: fallbackDrafts);
+    }
+
+    private static IReadOnlyList<string> ResolveFallbackDrafts(string? rawFallbackDrafts)
+    {
+        if (string.IsNullOrWhiteSpace(rawFallbackDrafts))
+        {
+            return DefaultPersonaFallbackDrafts;
+        }
+
+        try
+        {
+            string[]? parsed = JsonSerializer.Deserialize<string[]>(rawFallbackDrafts);
+            if (parsed is not null && parsed.Length > 0)
+            {
+                string[] cleaned = parsed
+                    .Where(static value => !string.IsNullOrWhiteSpace(value))
+                    .Select(static value => value.Trim())
+                    .ToArray();
+                return cleaned.Length > 0 ? cleaned : DefaultPersonaFallbackDrafts;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        string[] fallbackDrafts = rawFallbackDrafts
+            .Split(['\n', '\r', ';', '|'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(static value => value.Trim())
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+        return fallbackDrafts.Length > 0 ? fallbackDrafts : DefaultPersonaFallbackDrafts;
+    }
+
+    private async Task<HeyyScamChatDraftState> GenerateDraftAsync(
+        HeyyScamChatConversationState conversation,
+        HeyyScamChatPersonaProfile personaProfile,
+        CancellationToken cancellationToken)
+    {
+        string fallback = BuildFallbackDraft(conversation.Messages.Count(static item => item.Direction == "incoming"), personaProfile);
         string draft = fallback;
         string status = "generated_fallback";
         string? failureReason = null;
@@ -601,7 +732,7 @@ public sealed class HeyyScamChatService
         {
             if (ChatEaConfigured())
             {
-                string? eaDraft = await GenerateDraftViaEaAsync(conversation, cancellationToken);
+                string? eaDraft = await GenerateDraftViaEaAsync(conversation, personaProfile, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(eaDraft))
                 {
                     draft = eaDraft;
@@ -631,20 +762,23 @@ public sealed class HeyyScamChatService
         return new HeyyScamChatDraftState(
             DraftId: $"heyydraft_{Guid.NewGuid():N}"[..23],
             DraftText: draft,
-            PacingHint: "Wait 4-9 minutes before manual send; send as one short German message with hesitant punctuation.",
-            MinimumDelaySeconds: MinimumOldLadyDelaySeconds,
+            PacingHint: personaProfile.DraftPacingHint,
+            MinimumDelaySeconds: personaProfile.MinimumDelaySeconds,
             Status: status,
             FailureReason: failureReason,
             CreatedAtUtc: DateTimeOffset.UtcNow);
     }
 
-    private async Task<string?> GenerateDraftViaEaAsync(HeyyScamChatConversationState conversation, CancellationToken cancellationToken)
+    private async Task<string?> GenerateDraftViaEaAsync(
+        HeyyScamChatConversationState conversation,
+        HeyyScamChatPersonaProfile personaProfile,
+        CancellationToken cancellationToken)
     {
         string baseUrl = ResolveChatBaseUrl()!.TrimEnd('/');
         string model = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_MODEL"])
             ?? AccountService.NormalizeOptional(_configuration["ANSWERLY_OPENAI_COMPAT_MODEL_ID"])
             ?? "answerly-support-assistant";
-        string prompt = BuildDraftPrompt(conversation);
+        string prompt = BuildDraftPrompt(conversation, personaProfile);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/chat/completions")
         {
             Content = JsonContent.Create(new
@@ -652,7 +786,7 @@ public sealed class HeyyScamChatService
                 model,
                 messages = new[]
                 {
-                    new { role = "system", content = BuildSystemPrompt() },
+                    new { role = "system", content = personaProfile.SystemPrompt },
                     new { role = "user", content = prompt }
                 },
                 stream = false
@@ -802,15 +936,27 @@ public sealed class HeyyScamChatService
         string idempotencyKey,
         CancellationToken cancellationToken)
     {
-        if (MetaWhatsAppConfigured())
+        WhatsappDeliveryRoute route = ResolveWhatsappDeliveryRoute();
+        if (route.Kind == WhatsappDeliveryRouteKind.Meta)
         {
             return await SendApprovedDraftToMetaWhatsappAsync(approvedText, recipient, idempotencyKey, cancellationToken);
         }
 
+        return await SendApprovedDraftToEaWhatsappAsync(conversation, approvedText, recipient, operatorId, idempotencyKey, cancellationToken, route.BindingId);
+    }
+
+    private async Task<string> SendApprovedDraftToEaWhatsappAsync(
+        HeyyScamChatConversationState conversation,
+        string approvedText,
+        string recipient,
+        string operatorId,
+        string idempotencyKey,
+        CancellationToken cancellationToken,
+        string? bindingIdOverride)
+    {
         string apiToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN");
         string principalId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID");
-        string bindingId = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"])
-            ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
+        string bindingId = bindingIdOverride ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
         string baseUrl = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL").Trim().TrimEnd('/');
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/tools/execute");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
@@ -909,15 +1055,26 @@ public sealed class HeyyScamChatService
         string eventKey,
         CancellationToken cancellationToken)
     {
-        if (MetaWhatsAppConfigured())
+        WhatsappDeliveryRoute route = ResolveWhatsappDeliveryRoute();
+        if (route.Kind == WhatsappDeliveryRouteKind.Meta)
         {
             return await SendMetaWhatsappTextAsync(content, recipient, eventKey, cancellationToken);
         }
 
+        return await SendTurnSummaryEaWhatsappAsync(conversation, content, recipient, eventKey, cancellationToken, route.BindingId);
+    }
+
+    private async Task<string> SendTurnSummaryEaWhatsappAsync(
+        HeyyScamChatConversationState conversation,
+        string content,
+        string recipient,
+        string eventKey,
+        CancellationToken cancellationToken,
+        string? bindingIdOverride)
+    {
         string apiToken = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN");
         string principalId = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID");
-        string bindingId = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"])
-            ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
+        string bindingId = bindingIdOverride ?? RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID");
         string baseUrl = RequiredConfig("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL").Trim().TrimEnd('/');
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/tools/execute");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
@@ -1169,23 +1326,30 @@ public sealed class HeyyScamChatService
 
     private static string BuildTurnSummaryContent(HeyyScamChatConversationState conversation, int incomingTurns, int threshold)
     {
-        IReadOnlyList<HeyyScamChatMessage> recent = conversation.Messages.TakeLast(10).ToArray();
+        IReadOnlyList<HeyyScamChatMessage> recent = conversation.Messages.TakeLast(4).ToArray();
         string latestDraft = conversation.LatestDraft?.DraftText ?? "No draft generated yet.";
+        string safeCounterparty = conversation.CounterpartyMasked;
+        string safePersona = string.IsNullOrWhiteSpace(conversation.PersonaId) ? "default" : conversation.PersonaId;
+        string latestDraftHint = latestDraft.Length > 220 ? $"{latestDraft[..217]}..." : latestDraft;
+        string recentNarrative = recent.Count == 0
+            ? "No recent turn data is available."
+            : string.Join(" ", recent.Select(static message => $"{message.Direction}: {message.Text}"));
         StringBuilder builder = new();
-        builder.Append("Heyy scam-chat summary: ");
+        builder.Append("Operator summary for ");
+        builder.Append(safeCounterparty);
+        builder.Append(" on persona ");
+        builder.Append(safePersona);
+        builder.Append(". ");
+        builder.Append("Incoming turns ");
         builder.Append(incomingTurns);
-        builder.Append('/');
+        builder.Append(" in a draft-only workflow; update every ");
         builder.Append(threshold);
-        builder.Append(" turns for ");
-        builder.Append(conversation.CounterpartyMasked);
-        builder.Append(". Mode: draft-only, manual approval required");
-        builder.Append(". Latest old-lady draft: ");
-        builder.Append(latestDraft);
-        builder.Append(" Recent: ");
-        foreach (HeyyScamChatMessage message in recent)
-        {
-            builder.Append(message.Direction).Append(": ").Append(message.Text).Append(" | ");
-        }
+        builder.Append(" turns. ");
+        builder.Append("Latest draft: ");
+        builder.Append(latestDraftHint);
+        builder.Append(". ");
+        builder.Append("Recent context: ");
+        builder.Append(recentNarrative);
 
         return Truncate(builder.ToString(), 1400);
     }
@@ -1195,8 +1359,8 @@ public sealed class HeyyScamChatService
         StringBuilder builder = new();
         builder.AppendLine($"Heyy scam-chat digest for {date:yyyy-MM-dd}");
         builder.AppendLine();
-        builder.AppendLine("Safety posture: draft-only. No WhatsApp or SMS messages are sent by Chummer. Manual approval is required for any outgoing text.");
-        builder.AppendLine("Persona: empathetic, slow-typing older lady; confused enough to avoid completing payments; never shares real financial, identity, or verification data.");
+        builder.AppendLine("Safety posture: draft-only with manual approval for any outbound text.");
+        builder.AppendLine("Persona profile is configurable; never shares real financial, identity, or verification data.");
         builder.AppendLine();
 
         if (conversations.Count == 0)
@@ -1231,32 +1395,15 @@ public sealed class HeyyScamChatService
         return builder.ToString().Trim();
     }
 
-    private static string BuildSystemPrompt()
-        => """
-           You generate draft-only scambait replies for an operator-controlled safety workflow.
-           Do not claim a message was sent. Do not include bank details, real payment instructions, codes, links, addresses, or identity data.
-           The persona is a warm, empathetic, elderly Viennese lady who types slowly, gets confused by apps, mixes up harmless names/places/dates, and wants to help but cannot successfully send money.
-           Use gentle Austrian/Viennese wording sparingly: mei, geh, Servus, Bussi, Busserl, na geh, schau, Bankerl, Kastl, Gackerl, grantig, Jause.
-           It is allowed to invent harmless wrong details like the wrong child's name, a confused holiday memory, or a mistaken appointment, as long as those details are not real secrets, addresses, payment data, or verification codes.
-           Fictional memory card:
-           - Name: Herta, late 70s, widowed, lives in Vienna and often says she is near Meidling, Hietzing, or the Naschmarkt because she mixes errands up.
-           - Daughter memory: her daughter is Sabine, but Herta often writes Sabi, Bine, or briefly confuses her with cousin Renate.
-           - Plausible family memories: Sabine once lost a red school bag on tram 62, disliked Marillenknodel as a child, had a yellow raincoat, and once cried because a budgie named Peppi flew around the kitchen.
-           - Daily habits: Herta goes slowly, makes tea, checks the Spar leaflet, feeds neighbor cat Mitzi, searches for her glasses, and misunderstands banking apps as the blue Kastl.
-           Use those memories as confused verification questions and harmless wrong details.
-           Behavioral tic: she forgets details from earlier in the same chat, then writes that she scrolled back and the other person was right. Example style: "Ach ja, ich hab jetzt hinaufgescrollt, du hast eh recht, ich hab das schon wieder vergessen."
-           Keep the reply short, plausible for WhatsApp, in German, and suitable for manual approval.
-           Avoid insults, threats, harassment, or instructions to commit fraud.
-           """;
-
-    private static string BuildDraftPrompt(HeyyScamChatConversationState conversation)
+    private static string BuildDraftPrompt(HeyyScamChatConversationState conversation, HeyyScamChatPersonaProfile personaProfile)
     {
         StringBuilder builder = new();
-        builder.AppendLine("Draft one next reply only.");
-        builder.AppendLine($"Mode: {DraftOnlyMode}");
-        builder.AppendLine("Required behavior: Viennese old lady, empathetic, slow typing, confused with banking/apps, invent harmless wrong details, no real data, no actual payment.");
-        builder.AppendLine("Fictional persona memory: Herta from Vienna, daughter Sabine/Sabi/Bine, tram 62 red school bag, yellow raincoat, budgie Peppi, neighbor cat Mitzi, Marillenknodel confusion, glasses always missing.");
-        builder.AppendLine("Conversation so far:");
+        builder.AppendLine(personaProfile.DraftPromptTemplate);
+        if (!personaProfile.DraftPromptTemplate.Contains("Conversation so far", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.AppendLine("Conversation so far:");
+        }
+
         foreach (HeyyScamChatMessage message in conversation.Messages.TakeLast(8))
         {
             builder.Append(message.Direction).Append(": ").AppendLine(message.Text);
@@ -1265,14 +1412,19 @@ public sealed class HeyyScamChatService
         return builder.ToString();
     }
 
-    private static string BuildFallbackDraft(int incomingCount)
-        => incomingCount switch
+    private static string BuildFallbackDraft(int incomingCount, HeyyScamChatPersonaProfile personaProfile)
+    {
+        IReadOnlyList<string> fallbackDrafts = personaProfile.FallbackDrafts.Count > 0
+            ? personaProfile.FallbackDrafts
+            : DefaultPersonaFallbackDrafts;
+        if (incomingCount <= 0)
         {
-            <= 1 => "Na geh, mein Schatz, was ist denn passiert? Ich tipp so langsam, die Brille ist wieder beim Teekastl. Bist du die Sabi? Sag mir bitte erst, welche Farbe dein Regenmantel damals bei der 62er-Bim hatte.",
-            2 => "Mei, ich will dir ja helfen, wirklich. Ich hab jetzt hinaufgescrollt, du hast eh recht, du hast neue Nummer geschrieben. Aber dieses blaue Bank-Kastl dreht sich nur im Kreis.",
-            3 => "Ach ja, ich hab das schon wieder vergessen und jetzt zurückgeschaut. Am Geld soll es nicht scheitern, Bussi, aber die Zahlen hüpfen. War das dein rotes Schulsackerl in der 62er?",
-            _ => "Na geh, du hast eh recht, ich hab es grad beim Zurückscrollen gesehen. Ich bin noch da, nur sehr langsam. Nach der Jause probier ich es wieder, bitte nicht grantig sein mit mir."
-        };
+            return fallbackDrafts[0];
+        }
+
+        int index = Math.Clamp(incomingCount - 1, 0, fallbackDrafts.Count - 1);
+        return fallbackDrafts[index];
+    }
 
     private static HeyyScamChatEnrichmentResponse BuildEnrichment(string channel, IReadOnlyList<HeyyScamChatMessage> messages)
     {
@@ -1344,18 +1496,23 @@ public sealed class HeyyScamChatService
         return UnsafeOutgoingTerms.All(term => !lowered.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static HeyyScamChatDraftResponse ToDraftResponse(string conversationId, HeyyScamChatDraftState draft, HeyyScamChatEnrichmentResponse enrichment)
+    private static HeyyScamChatDraftResponse ToDraftResponse(
+        string conversationId,
+        HeyyScamChatDraftState draft,
+        HeyyScamChatEnrichmentResponse enrichment,
+        string personaId,
+        string safetySummary)
         => new(
             ConversationId: conversationId,
             Mode: DraftOnlyMode,
             ManualApprovalRequired: true,
             AutoSendAllowed: false,
-            PersonaId: PersonaId,
+            PersonaId: personaId,
             DraftText: draft.DraftText,
             PacingHint: draft.PacingHint,
             MinimumDelaySeconds: draft.MinimumDelaySeconds,
             Enrichment: enrichment,
-            SafetySummary: "Draft-only old-lady persona. No automatic WhatsApp send, no real payment, no private credentials.",
+            SafetySummary: safetySummary,
             Status: draft.Status,
             FailureReason: draft.FailureReason);
 
@@ -1363,6 +1520,7 @@ public sealed class HeyyScamChatService
     {
         HeyyScamChatApprovalReceipt[] approvals;
         HeyyScamChatOperatorSummaryReceipt[] summaries;
+        string safetySummary = ResolvePersonaProfile().SafetySummary;
         lock (_store.Gate)
         {
             approvals = _store.HeyyScamChatApprovalReceipts
@@ -1394,7 +1552,14 @@ public sealed class HeyyScamChatService
                     PacingHint: message.PacingHint,
                     CreatedAtUtc: message.CreatedAtUtc))
                 .ToArray(),
-            LatestDraft: conversation.LatestDraft is null ? null : ToDraftResponse(conversation.ConversationId, conversation.LatestDraft, conversation.Enrichment),
+            LatestDraft: conversation.LatestDraft is null
+                ? null
+                : ToDraftResponse(
+                    conversation.ConversationId,
+                    conversation.LatestDraft,
+                    conversation.Enrichment,
+                    conversation.PersonaId,
+                    safetySummary),
             Approvals: approvals.Select(static receipt => ToApprovalResponse(receipt)).ToArray(),
             OperatorSummaries: summaries.Select(static receipt => ToOperatorSummaryResponse(receipt)).ToArray());
     }
@@ -1685,6 +1850,34 @@ public sealed class HeyyScamChatService
             ?? AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"]);
     }
 
+    private WhatsappDeliveryRoute ResolveWhatsappDeliveryRoute()
+    {
+        string? preferred = AccountService.NormalizeOptional(_configuration[WhatsappDeliveryRouteConfigKey]);
+        if (string.Equals(preferred, WhatsappDeliveryRouteMeta, StringComparison.OrdinalIgnoreCase)
+            && MetaWhatsAppConfigured())
+        {
+            return new(WhatsappDeliveryRouteKind.Meta);
+        }
+
+        if (string.Equals(preferred, WhatsappDeliveryRouteEa, StringComparison.OrdinalIgnoreCase)
+            && RealWhatsAppDeliveryConfigured())
+        {
+            return new(WhatsappDeliveryRouteKind.Ea, ResolveWhatsappEaBindingId());
+        }
+
+        if (MetaWhatsAppConfigured())
+        {
+            return new(WhatsappDeliveryRouteKind.Meta);
+        }
+
+        if (RealWhatsAppDeliveryConfigured())
+        {
+            return new(WhatsappDeliveryRouteKind.Ea, ResolveWhatsappEaBindingId());
+        }
+
+        return new(WhatsappDeliveryRouteKind.Ea, ResolveWhatsappEaBindingId());
+    }
+
     private bool RedactNumbers()
         => bool.TryParse(_configuration["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"], out bool redact) && redact;
 
@@ -1723,9 +1916,31 @@ public sealed class HeyyScamChatService
             && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"])
             && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"]);
 
+    private string? ResolveWhatsappEaBindingId()
+        => AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"])
+            ?? AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID"]);
+
     private bool IsWhatsappRecipientAllowed(string recipient)
     {
-        return NormalizeRecipientForAllowlist(recipient) is not null;
+        string? normalized = NormalizeRecipientForAllowlist(recipient);
+        if (normalized is null)
+        {
+            return false;
+        }
+
+        IReadOnlyList<string> blocked = ResolveRecipientList(WhatsappBlockedRecipientsConfigKey);
+        if (blocked.Contains(normalized, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        IReadOnlyList<string> allowed = ResolveRecipientList(WhatsappAllowedRecipientsConfigKey);
+        if (allowed.Count == 0)
+        {
+            return true;
+        }
+
+        return allowed.Contains(normalized, StringComparer.Ordinal);
     }
 
     private bool IsValidWhatsAppBindingConfig()
@@ -1733,6 +1948,23 @@ public sealed class HeyyScamChatService
             && !string.IsNullOrWhiteSpace(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"])
             && (AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"]) is not null
                 || AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID"]) is not null);
+
+    private IReadOnlyList<string> ResolveRecipientList(string configKey)
+    {
+        string? raw = _configuration[configKey];
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        return raw
+            .Split([';', ',', '|', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(NormalizeRecipientForAllowlist)
+            .Where(static recipient => recipient is not null)
+            .Select(static recipient => recipient!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 
     private static string? NormalizeRecipientForAllowlist(string? recipient)
     {

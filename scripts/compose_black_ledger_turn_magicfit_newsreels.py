@@ -2,15 +2,19 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
-import os
 import subprocess
 import tempfile
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts
 
 
 ROOT = Path("/docker/chummercomplete")
@@ -18,12 +22,6 @@ MANIFEST = ROOT / "_completion" / "black_ledger_magicfit_newsreels" / "BLACK_LED
 CLIPS = ROOT / "_completion" / "black_ledger_magicfit_newsreels" / "magicfit_clips"
 NEWSREELS_ROOT = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "ledger" / "newsreels"
 VOICE = "en-US-AvaNeural"
-UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
-UNMIXR_ENV_FILES = [
-    Path("/docker/EA/.env.local"),
-    Path("/docker/EA/.env"),
-    Path("/docker/chummercomplete/chummer.run-services/.env"),
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,26 +32,6 @@ def parse_args() -> argparse.Namespace:
 
 def run(*args: str) -> None:
     subprocess.run(list(args), check=True)
-
-
-def env_or_file(key: str) -> str:
-    value = os.environ.get(key, "").strip()
-    if value:
-        return value
-    for env_file in UNMIXR_ENV_FILES:
-        if not env_file.is_file():
-            continue
-        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            left, right = line.split("=", 1)
-            if left.strip() != key:
-                continue
-            parsed = right.strip().strip("'").strip('"')
-            if parsed:
-                return parsed
-    return ""
 
 
 def duration(path: Path) -> float:
@@ -75,120 +53,16 @@ def duration(path: Path) -> float:
     return float(result.stdout.strip())
 
 
-def unmixr_config() -> dict[str, str] | None:
-    api_key = env_or_file("UNMIXR_API_KEY")
-    voice_id = env_or_file("UNMIXR_VOICE_ID")
-    if not api_key or not voice_id:
-        return None
-    return {
-        "api_key": api_key,
-        "voice_id": voice_id,
-        "language": env_or_file("UNMIXR_LANGUAGE") or "en-US",
-        "speaking_rate": env_or_file("UNMIXR_SPEAKING_RATE") or "medium",
-        "speaking_pitch": env_or_file("UNMIXR_SPEAKING_PITCH") or "low",
-        "speaking_volume": env_or_file("UNMIXR_SPEAKING_VOLUME") or "medium",
-    }
-
-
 def scene_voice_profile(scene: dict) -> dict[str, str]:
-    config = unmixr_config() or {}
     role = str(scene.get("voice_role") or "narrator").strip().lower()
+    defaults = {"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"}
     if role == "ork_reporter":
-        return {
-            "voice_id": env_or_file("UNMIXR_ORK_REPORTER_VOICE_ID") or config.get("voice_id", ""),
-            "language": env_or_file("UNMIXR_ORK_REPORTER_LANGUAGE") or config.get("language", "en-US"),
-            "speaking_rate": env_or_file("UNMIXR_ORK_REPORTER_RATE") or "slow",
-            "speaking_pitch": env_or_file("UNMIXR_ORK_REPORTER_PITCH") or "low",
-            "speaking_volume": env_or_file("UNMIXR_ORK_REPORTER_VOLUME") or "medium",
-        }
+        defaults["speaking_rate"] = "slow"
+        return load_profile(prefixes=("UNMIXR_ORK_REPORTER",), defaults=defaults)
     if role == "anchor":
-        return {
-            "voice_id": env_or_file("UNMIXR_ANCHOR_VOICE_ID") or config.get("voice_id", ""),
-            "language": env_or_file("UNMIXR_ANCHOR_LANGUAGE") or config.get("language", "en-US"),
-            "speaking_rate": env_or_file("UNMIXR_ANCHOR_RATE") or "medium",
-            "speaking_pitch": env_or_file("UNMIXR_ANCHOR_PITCH") or "low",
-            "speaking_volume": env_or_file("UNMIXR_ANCHOR_VOLUME") or "medium",
-        }
-    return {
-        "voice_id": env_or_file("UNMIXR_NARRATOR_VOICE_ID") or config.get("voice_id", ""),
-        "language": env_or_file("UNMIXR_NARRATOR_LANGUAGE") or config.get("language", "en-US"),
-        "speaking_rate": env_or_file("UNMIXR_NARRATOR_RATE") or "slow",
-        "speaking_pitch": env_or_file("UNMIXR_NARRATOR_PITCH") or "low",
-        "speaking_volume": env_or_file("UNMIXR_NARRATOR_VOLUME") or "medium",
-    }
-
-
-def render_unmixr_tts(text: str, output: Path, scene: dict | None = None) -> bool:
-    config = unmixr_config()
-    if config is None:
-        return False
-    profile = scene_voice_profile(scene or {})
-    payload = json.dumps(
-        {
-            "text": text,
-            "voice_id": profile["voice_id"],
-            "language": profile["language"],
-            "speaking_rate": profile["speaking_rate"],
-            "speaking_pitch": profile["speaking_pitch"],
-            "speaking_volume": profile["speaking_volume"],
-            "output_type": output.suffix.lstrip(".") or "mp3",
-            "response_type": "url",
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        UNMIXR_API_URL,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        audio_url = str(body.get("audio_url") or "").strip()
-        if not audio_url:
-            return False
-        with urllib.request.urlopen(audio_url, timeout=120) as audio_response:
-            output.write_bytes(audio_response.read())
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        return False
-    return output.is_file() and output.stat().st_size > 0
-
-
-async def render_tts(text: str, output: Path) -> None:
-    helper = output.with_suffix(".edge_tts.py")
-    helper.write_text(
-        "import asyncio, edge_tts, pathlib, sys\n"
-        "voice = sys.argv[1]\n"
-        "text = pathlib.Path(sys.argv[2]).read_text(encoding='utf-8')\n"
-        "output = pathlib.Path(sys.argv[3])\n"
-        "async def main():\n"
-        "    await edge_tts.Communicate(text=text, voice=voice, rate='-9%', pitch='-7Hz').save(str(output))\n"
-        "asyncio.run(main())\n",
-        encoding="utf-8",
-    )
-    text_path = output.with_suffix(".txt")
-    text_path.write_text(text, encoding="utf-8")
-    edge_python = next((candidate for candidate in [
-        "/tmp/black-ledger-newsreel-venv/bin/python",
-        "/tmp/black-ledger-newsreel-venv/bin/python3",
-        "/docker/chummercomplete/_completion/promo_video_rework_20260602/tts_venv/bin/python",
-    ] if Path(candidate).is_file()), None)
-    if edge_python is None:
-        raise RuntimeError("edge_tts interpreter unavailable")
-    try:
-        run(edge_python, str(helper), VOICE, str(text_path), str(output))
-    finally:
-        helper.unlink(missing_ok=True)
-        text_path.unlink(missing_ok=True)
-
-
-def render_flite_tts(text: str, output: Path) -> None:
-    escaped = text.replace("\\", "\\\\").replace("'", "\\'")
-    run("ffmpeg", "-y", "-f", "lavfi", "-i", f"flite=text='{escaped}':voice=slt", "-c:a", "pcm_s16le", str(output))
+        return load_profile(prefixes=("UNMIXR_ANCHOR",), defaults=defaults)
+    defaults["speaking_rate"] = "slow"
+    return load_profile(prefixes=("UNMIXR_NARRATOR",), defaults=defaults)
 
 
 def render_music(output: Path, seconds: float) -> None:
@@ -274,18 +148,7 @@ def compose_asset(asset: dict) -> dict:
                 str(seg),
             )
             speech = temp / f"{scene['id']}.mp3"
-            if not render_unmixr_tts(str(scene["narration"]), speech, scene):
-                speech_provider = "edge-tts"
-                try:
-                    asyncio.run(render_tts(str(scene["narration"]), speech))
-                except Exception:
-                    speech_provider = "ffmpeg-flite"
-                    speech = temp / f"{scene['id']}.wav"
-                    render_flite_tts(str(scene["narration"]), speech)
-            if not speech.exists():
-                speech_provider = "ffmpeg-flite"
-                speech = temp / f"{scene['id']}.wav"
-                render_flite_tts(str(scene["narration"]), speech)
+            render_short_tts(str(scene["narration"]), speech, profile=scene_voice_profile(scene))
             aligned = temp / f"{scene['id']}.m4a"
             run(
                 "ffmpeg",

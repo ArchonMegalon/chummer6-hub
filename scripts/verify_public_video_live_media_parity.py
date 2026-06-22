@@ -67,8 +67,8 @@ def cache_busted_url(base_url: str, public_path: str, digest: str) -> str:
 
 
 def load_audio_module():
-    script = REPO / "scripts" / "rebuild_public_video_audio_unmixr.py"
-    spec = importlib.util.spec_from_file_location("rebuild_public_video_audio_unmixr_for_live_parity", script)
+    script = REPO / "scripts" / "public_video_audio_quality.py"
+    spec = importlib.util.spec_from_file_location("public_video_audio_quality_for_live_parity", script)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"failed to load audio verifier: {script}")
     module = importlib.util.module_from_spec(spec)

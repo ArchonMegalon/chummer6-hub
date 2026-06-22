@@ -44,24 +44,24 @@
 
     var primaryRouteTitle = displayFamily switch
     {
-        "roadmap" => "Take the next practical step",
-        ReleaseDetailFamily => "Open the next useful page",
-        "preview-concept" => "See what is available now",
-        _ => "Continue from this feature"
+        "roadmap" => "Open the next page",
+        ReleaseDetailFamily => "Open the related page",
+        "preview-concept" => "See what works today",
+        _ => "Continue"
     };
     var primaryRouteSummary = displayFamily switch
     {
-        "roadmap" => $"{Model.PrimaryAction.Label} opens the next page for this work area.",
-        ReleaseDetailFamily => $"{Model.PrimaryAction.Label} opens the related product page.",
-        "preview-concept" => $"{Model.PrimaryAction.Label} shows what you can use today.",
-        _ => $"{Model.PrimaryAction.Label} continues from this feature."
+        "roadmap" => $"{Model.PrimaryAction.Label} is the next useful page.",
+        ReleaseDetailFamily => $"{Model.PrimaryAction.Label} opens the related page.",
+        "preview-concept" => $"{Model.PrimaryAction.Label} shows what works today.",
+        _ => $"{Model.PrimaryAction.Label} is the next useful step."
     };
     var primaryRouteDetails = displayFamily switch
     {
-        "roadmap" => new[] { "Next step", "Current status", "Help nearby" },
-        ReleaseDetailFamily => new[] { "Product page", "Downloads nearby", "Help nearby" },
-        "preview-concept" => new[] { "Available now", "Next step", "Help nearby" },
-        _ => new[] { "Feature detail", "Next page", "Help nearby" }
+        "roadmap" => new[] { "Next page", "Current status", "Help nearby" },
+        ReleaseDetailFamily => new[] { "Related page", "Downloads nearby", "Help nearby" },
+        "preview-concept" => new[] { "Live now", "Next page", "Help nearby" },
+        _ => new[] { "Feature page", "Next page", "Help nearby" }
     };
 
     var compareRoute = displayFamily switch
@@ -69,26 +69,26 @@
         "roadmap" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "See what is available today",
-            Summary: "Use the current status page when you want to know what is ready to use.",
-            Details: new[] { "Current status", "Download path", "Known limits" }),
+            Title: "See what works today",
+            Summary: "Use the current status page for the live product.",
+            Details: new[] { "Current status", "Downloads", "Known limits" }),
         ReleaseDetailFamily => (
             Href: "/downloads",
             Label: "Open downloads",
-            Title: "Install or update Chummer",
+            Title: "Open downloads",
             Summary: "Use downloads when you need the current Windows or Linux installer.",
             Details: new[] { "Installer", "Platform choice", "Help nearby" }),
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "See what is available today",
-            Summary: "Use the current status page before planning around an upcoming feature.",
+            Title: "See what works today",
+            Summary: "Use the current status page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "See what is available today",
-            Summary: "Use the current status page when availability matters more than the feature brief.",
+            Title: "See what works today",
+            Summary: "Use the current status page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" })
     };
 
@@ -96,7 +96,7 @@
         ? (
             Href: Model.SecondaryAction.Href,
             Label: Model.SecondaryAction.Label,
-            Title: "Read the longer brief",
+            Title: "Read more",
             Summary: $"{Model.SecondaryAction.Label} opens the broader context for this feature.",
             Details: new[] { "More context", "Related pages", "Help nearby" })
         : displayFamily switch
@@ -104,25 +104,25 @@
             "roadmap" => (
                 Href: "/horizons",
                 Label: "Open maintenance",
-                Title: "Open the broader roadmap",
-                Summary: "Move to Maintenance when you want the larger product picture.",
+                Title: "Open maintenance",
+                Summary: "Maintenance holds the broader product work.",
                 Details: new[] { "Roadmap", "Related work", "Current status" }),
             ReleaseDetailFamily => (
                 Href: "/artifacts",
-                Label: "Open detail view",
-                Title: "Open the related detail view",
-                Summary: "Use the detail view when you want nearby items and history together.",
-                Details: new[] { "Details", "Related items", "History" }),
+                Label: "Open library",
+                Title: "Open the library",
+                Summary: "Use the library when you want related items and history together.",
+                Details: new[] { "Library", "Related items", "History" }),
             "preview-concept" => (
                 Href: "/artifacts",
-                Label: "Open detail view",
-                Title: "Open the related detail view",
-                Summary: "Use the detail view when you want nearby items and availability context together.",
-                Details: new[] { "Details", "Related items", "Availability" }),
+                Label: "Open library",
+                Title: "Open the library",
+                Summary: "Use the library when you want related items and current context together.",
+                Details: new[] { "Library", "Related items", "Current context" }),
             _ => (
                 Href: "/roadmap",
                 Label: "Open roadmap",
-                Title: "Open the broader roadmap",
+                Title: "Open roadmap",
                 Summary: "Open the roadmap when you need surrounding context.",
                 Details: new[] { "Roadmap", "Related pages", "Current status" })
         };
@@ -132,8 +132,8 @@
     AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Details);
     AddRouteChoice(
         "Help",
-        "Get help if this becomes a setup or account issue",
-        "Use help for private account follow-up, install repair, logs, or campaign-specific recovery.",
+        "Use Chummer help for support or recovery",
+        "Open help for setup, recovery, or private account issues.",
         "/help",
         "Open help",
         "Support",
@@ -186,7 +186,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Next</h2>
-            <p>Use the direct action first. Open Help only when setup, account, or private recovery detail is involved.</p>
+            <p>Use the main action first. Open Chummer help only when setup, account, or private recovery detail is involved.</p>
         </div>
         <div class="minimal-download-strip">
             @foreach (var choice in routeChoices.Take(2))
@@ -232,9 +232,9 @@ else
 
 <section class="editorial-block" id="feature-route-map">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Where to go next.</h2>
-        <p class="editorial-copy">Pick the next page for the job: install, status, details, or help.</p>
+        <p class="eyebrow">Where next</p>
+        <h2 class="editorial-title">Choose the next page.</h2>
+        <p class="editorial-copy">Open the page that matches the job: install, status, details, or help.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -288,9 +288,9 @@ else
 }
 
 <section class="release-footnote">
-    <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use the feature detail to answer one question, then move to the page that owns the next job.</h2>
-    <p class="editorial-copy">Take the explicit next action when the card is clear, compare against current release status when availability matters, and leave for help as soon as the issue becomes private, recovery-bound, or support-owned.</p>
+    <p class="eyebrow">Next</p>
+    <h2 class="editorial-title">Read this page, then move on.</h2>
+    <p class="editorial-copy">Take the direct action when it is clear. Open status for the live product, or Help for support.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>
         <a class="cta-link cta-link--secondary" href="@deeperRoute.Href">@PublicText(deeperRoute.Label)</a>

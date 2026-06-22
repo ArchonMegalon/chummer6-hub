@@ -6,13 +6,13 @@
 }
 
 <section class="minimal-page-hero participate-hero">
-    <div>
+    <div class="participate-hero__copy">
         <p class="minimal-kicker">Participate</p>
         <h1>Tell us what slows the table down.</h1>
         <p>Public feedback for ideas, friction, and safe bugs. Private or account-linked problems go to Help.</p>
     </div>
-    <div class="minimal-status-pill" aria-label="Participate posture">
-        <span>Public lane</span>
+    <div class="minimal-status-pill participate-hero__status" aria-label="Participate posture">
+        <span>Public route</span>
         <strong>Ideas and safe bugs</strong>
         <span>Private help stays separate</span>
     </div>
@@ -21,17 +21,26 @@
 <section class="participate-shell">
     <div class="participate-shell__header">
         <div>
-            <h2>Choose a lane</h2>
-            <p class="participate-shell__lead">Start with the shortest path.</p>
+            <h2>Public board</h2>
+            <p class="participate-shell__lead">Post a small problem, check what other users are pushing on, or move to roadmap, changelog, or Help.</p>
         </div>
         <div class="participate-actions">
-            <a class="button-like button-like--primary" href="@Model.PrivateHelpHref">Open Help</a>
             <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
             <a class="button-like" href="@Model.ChangelogHref">Changelog</a>
+            <a class="button-like button-like--primary" href="@Model.PrivateHelpHref">Open Help</a>
         </div>
     </div>
 
-    <div class="participate-lanes">
+    <div class="participate-toolbar" aria-label="Board summary">
+        <div class="participate-toolbar__chips">
+            <span class="participate-chip">Public board</span>
+            <span class="participate-chip">Short posts</span>
+            <span class="participate-chip">Safe bugs only</span>
+        </div>
+        <p class="participate-toolbar__note">Use Help when the issue needs logs, account detail, or recovery.</p>
+    </div>
+
+    <div class="participate-lanes" aria-label="Board lanes">
         @foreach (var lane in Model.Lanes)
         {
             <article class="participate-lane">
@@ -43,11 +52,14 @@
         }
     </div>
 
-    <div class="participate-workbench">
+    <div class="participate-board">
         <form class="participate-quick-form" id="participate-submit" method="get" action="/contact">
-            <div class="participate-quick-form__lead">
-                <h3>Send feedback</h3>
-                <p>Keep it short. One issue or suggestion per message.</p>
+            <div class="participate-quick-form__header">
+                <div class="participate-quick-form__lead">
+                    <h3>Send feedback</h3>
+                    <p>Keep it short. One issue or suggestion per message.</p>
+                </div>
+                <span class="participate-count">Public post</span>
             </div>
             <div class="participate-quick-form__top">
                 <div class="field">
@@ -81,9 +93,24 @@
                 <h3>Current themes</h3>
                 <p>What users are pushing on right now.</p>
             </div>
+            <div class="participate-items__controls">
+                <label class="field" for="participateThemeFilter">
+                    <span>Search themes</span>
+                    <input id="participateThemeFilter" type="search" placeholder="dark mode, updater, import" data-participate-filter />
+                </label>
+                <label class="field" for="participateThemeStatus">
+                    <span>Status</span>
+                    <select id="participateThemeStatus" data-participate-status-filter>
+                        <option value="">All</option>
+                        <option value="gathering votes">Gathering votes</option>
+                        <option value="in progress">In progress</option>
+                    </select>
+                </label>
+            </div>
+            <p class="participate-items__empty" data-participate-empty hidden>No themes match this filter yet.</p>
             @foreach (var item in Model.Items)
             {
-                <article>
+                <article data-participate-item data-participate-status="@item.Status.ToLowerInvariant()" data-participate-text="@($"{item.Title} {item.Summary} {item.Status}".ToLowerInvariant())">
                     <div class="participate-item__topline">
                         <span>@item.Status</span>
                         <strong>@item.Score</strong>

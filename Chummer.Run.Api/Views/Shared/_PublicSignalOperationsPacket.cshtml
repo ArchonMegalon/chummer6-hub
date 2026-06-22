@@ -3,13 +3,13 @@
     bool followThroughReady = Model.CloseoutDispatchSentCount > 0 && !string.IsNullOrWhiteSpace(Model.ReleaseProofReceiptId);
     bool publicSignalLive = Model.ReceiptCount > 0 || Model.CategoryCount > 0;
     string followThroughHeading = followThroughReady
-        ? "Chummer follow-up examples are visible now."
-        : "First-party follow-up is not posted here yet.";
+        ? "Chummer follow-up is visible now."
+        : "Chummer follow-up is not visible here yet.";
     string followThroughSummary = followThroughReady
         ? $"{Model.CloseoutDispatchSentCount} follow-up update(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
             ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
-            : "Public feedback can still show demand, but account-backed follow-up waits until the shipped path is available on this host.";
+            : "Public feedback can still show demand, but account follow-up waits until the shipped path is available on this host.";
     string readinessTag = followThroughReady ? "Posted follow-up examples" : "Pending follow-up";
 }
 
@@ -21,8 +21,8 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Public board</span>
-            <h3>@(publicSignalLive ? "Public signal is live on Chummer pages." : "Public signal is still warming up on this host.")</h3>
+            <span class="tag">Public feedback</span>
+            <h3>@(publicSignalLive ? "Public feedback is live on Chummer pages." : "Public feedback is still warming up on this host.")</h3>
             <p>@Model.CategoryCount category@(Model.CategoryCount == 1 ? string.Empty : "ies") keep ideas, safe public bugs, and likely private issues separated before they blur into support or roadmap copy.</p>
             <div class="route-choice-card__details">
                 <span>@Model.CategoryCount public category@(Model.CategoryCount == 1 ? string.Empty : "ies")</span>
@@ -45,13 +45,13 @@
         <article class="route-choice-card">
             <span class="tag">Private help</span>
             <h3>Private help still leaves this page immediately.</h3>
-            <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public board noise.</p>
+            <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public feedback.</p>
             <div class="route-choice-card__details">
                 <span>Help for private follow-up</span>
                 <span>Roadmap for planned movement</span>
                 <span>Changelog for shipped updates</span>
             </div>
-            <a class="editorial-strip__action" href="/contact#support-intake">Open private support</a>
+            <a class="editorial-strip__action" href="/contact#support-intake">Open Help</a>
         </article>
     </div>
 </section>

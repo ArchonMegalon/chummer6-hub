@@ -23,7 +23,7 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("CopyCommandLabel: BuildCopyCommandLabel(bootstrapPlatform)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/downloads/install/{artifactId}/bootstrap.ps1", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("DownloadDispatchWindowsBootstrapScript", controller, StringComparison.Ordinal);
-        Assert.Contains("Open the Windows install handoff, download the published setup .exe", releaseSelection, StringComparison.Ordinal);
+        Assert.Contains("Open the Windows setup path, download the published setup .exe", releaseSelection, StringComparison.Ordinal);
         Assert.DoesNotContain("short-lived PowerShell command", releaseSelection, StringComparison.Ordinal);
         Assert.Contains("_ => \"Copy install command\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows preview build", controller, StringComparison.Ordinal);
@@ -41,13 +41,13 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Choose the latest build for Windows or Linux.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Windows and Linux installers.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\" data-platform=\"@platform.PlatformId\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\" data-platform=\"@platform.PlatformId\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Current stable build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Latest published build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Use Help if install or update does not behave as expected.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Use Help for install or update trouble.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", downloadsView, StringComparison.Ordinal);

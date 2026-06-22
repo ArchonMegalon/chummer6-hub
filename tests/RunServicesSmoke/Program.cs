@@ -2409,7 +2409,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
     Assert(downloadDispatchSource.Contains("Account linking is optional.", StringComparison.Ordinal), "download handoff should keep account linking optional and reserve claim codes for recovery fallback.");
-    Assert(downloadDispatchSource.Contains("Support stays on the same install rail", StringComparison.Ordinal), "download handoff should keep support recovery on the same install rail instead of splitting it into a separate browser ritual.");
+    Assert(downloadDispatchSource.Contains("Support stays with this install.", StringComparison.Ordinal), "download handoff should keep support recovery attached to the same install instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
     Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
@@ -2916,13 +2916,12 @@ async Task VerifyPublicLandingProjectionAsync()
 
     var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
     var storyModel = storyView?.Model as StoryPageViewModel;
-    Assert(storyModel is not null && storyModel.TrustPillars.Count == 3, "product story page should expose the three trust pillars.");
-    Assert(storyModel!.TrustPulse is not null, "guest product story should surface the weekly public trust pulse.");
-    Assert(storyModel.SignedInStatus is null, "guest product story should not project install-specific signed-in trust posture.");
+    Assert(storyModel is not null, "product story page should render through the MVC view layer.");
+    Assert(string.Equals(storyModel!.Chrome.CurrentPath, "/what-is-chummer", StringComparison.Ordinal), "product story page should keep its first-party route in chrome.");
     var authenticatedStoryView = await authenticatedLandingController.ProductStoryPage(CancellationToken.None) as ViewResult;
     var authenticatedStoryModel = authenticatedStoryView?.Model as StoryPageViewModel;
-    Assert(authenticatedStoryModel?.TrustPulse is not null, "authenticated product story should keep the weekly public trust pulse visible.");
-    Assert(authenticatedStoryModel?.SignedInStatus is not null, "authenticated product story should project the shared signed-in trust status.");
+    Assert(authenticatedStoryModel is not null, "authenticated product story page should render through the MVC view layer.");
+    Assert(authenticatedStoryModel!.Chrome.Authenticated, "authenticated product story page should keep authenticated chrome.");
     var roadmapDetailView = await controller.RoadmapDetailPage("runsite", CancellationToken.None) as ViewResult;
     var roadmapDetailModel = roadmapDetailView?.Model as FeatureDetailPageViewModel;
     Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");

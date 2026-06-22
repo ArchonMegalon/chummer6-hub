@@ -11,7 +11,7 @@ public sealed class TrustPageFlagshipViewTests
         string trustView = File.ReadAllText(trustViewPath);
 
         Assert.Contains("Pick the problem", trustView, StringComparison.Ordinal);
-        Assert.Contains("Each card has a first step. Use the second link only when the first one does not fit.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Each card starts with the best first step. Use the second link only if needed.", trustView, StringComparison.Ordinal);
         Assert.Contains("minimal-help-card__details", trustView, StringComparison.Ordinal);
         Assert.Contains("Quick notes", trustView, StringComparison.Ordinal);
         Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);

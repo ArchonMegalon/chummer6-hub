@@ -10,9 +10,9 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Why this work matters now</p>
-        <h2 class="editorial-title">Current pain, expected unlock, and the live surface you should compare first</h2>
-        <p class="editorial-copy">Roadmap pages should explain why the work exists, what it changes for users, and which live surface keeps the promise honest today.</p>
+        <p class="eyebrow">Why now</p>
+        <h2 class="editorial-title">Why this work matters.</h2>
+        <p class="editorial-copy">This page explains the problem, the payoff, and the live page to compare against.</p>
     </div>
     <div class="role-matrix__grid">
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
@@ -43,8 +43,8 @@
 {
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
-            <p class="eyebrow">What following this work means</p>
-            <h2 class="editorial-title">Compare it against the current product before treating it as promised</h2>
+            <p class="eyebrow">Useful cues</p>
+            <h2 class="editorial-title">Compare it with the live product before you treat it as ready.</h2>
         </div>
         <div class="trust-claim__details">
             @foreach (var item in Model.MicroProof)
@@ -59,21 +59,21 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Not live yet</h3>
-            <p>This page names the work honestly before it reaches the live public release. Use the current product surface to compare what already exists.</p>
+            <p>This work is still planned. Compare it with the live product before you count on it.</p>
         </div>
         <a class="inline-link" href="/now">Compare with what works today</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Next honest page</h3>
-            <p>@RoadmapText(Model.PrimaryAction.Label) is the in-product next step. The deeper brief stays secondary so roadmap pages stay useful without pulling you away from the product.</p>
+            <h3>Next page</h3>
+            <p>@RoadmapText(Model.PrimaryAction.Label) is the next useful page.</p>
         </div>
         <a class="inline-link" href="@Model.PrimaryAction.Href">@RoadmapText(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Need a decision instead?</h3>
-            <p>When the gap between the roadmap and today’s live surface is still unclear, support is the right place to ask what is blocked versus what is already usable.</p>
+            <h3>Need a concrete answer?</h3>
+            <p>Open support when you need help deciding what is blocked and what is already usable.</p>
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>

@@ -28,22 +28,25 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
-    const supportSection = page.locator('[data-public-section="footer"]');
-    const supportPrimary = supportSection.locator('.button-like--primary');
-    const supportPrimaryTop = (await supportPrimary.boundingBox())?.y ?? 0;
-    const heroPrimaryTop = heroBoxes[0]?.y ?? 0;
-    if (supportPrimaryTop <= heroPrimaryTop) {
-      failures.push(`${viewport.name}: support CTA surfaced above hero CTA`);
+    await expect(page.locator('[data-homepage-section="help"]')).toHaveCount(0);
+    const nonHeroPrimaryCtas = await page.locator('main .button-like--primary').evaluateAll((items) =>
+      items
+        .filter((item) => !item.closest('.minimal-hero'))
+        .map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean),
+    );
+    if (nonHeroPrimaryCtas.length > 0) {
+      failures.push(`${viewport.name}: found competing primary CTA(s) outside the hero: ${nonHeroPrimaryCtas.join(', ')}`);
     }
-    await expect(page.locator('.site-nav')).toBeVisible();
+    await expect(page.locator('.site-nav')).toHaveCount(0);
     await expect(page.locator('[data-nav-toggle]')).toHaveCount(0);
 
     results.push({
       viewport: viewport.name,
       hero_ctas: normalized,
       hero_boxes: heroBoxes,
-      support_primary_top: supportPrimaryTop,
-      inline_nav_visible: await page.locator('.site-nav').isVisible(),
+      competing_primary_ctas: nonHeroPrimaryCtas,
+      inline_nav_visible: false,
     });
 
     await page.close();
@@ -63,9 +66,9 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '# Homepage Simplification Changelog',
       '',
       '- Hero keeps one primary CTA: `Download Chummer`.',
-      '- Homepage remains compact: hero, workflow, help, and no repeated download strip.',
+      '- Homepage remains compact: hero, workflow, and no repeated support block or download strip.',
       '- Release posture stays off the first screen and lives on Status instead.',
-      '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
+      '- Support paths stay inline in the hero instead of competing as a second CTA block.',
     ].join('\n'),
   );
 

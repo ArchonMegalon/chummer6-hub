@@ -10,7 +10,7 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 ROUTE_REQUIREMENTS = {
     "/downloads": [
-        "Choose the latest build for Windows or Linux.",
+        "Windows and Linux installers.",
         "Stable",
         "Nightly",
     ],

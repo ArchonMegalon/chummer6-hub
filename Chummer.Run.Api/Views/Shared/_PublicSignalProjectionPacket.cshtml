@@ -91,12 +91,12 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
-            <h3>Open the Chummer page</h3>
+            <h3>Open page</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__details">
                 <span>Role: @Model.Role</span>
                 <span>Public page: @Model.PublicPath</span>
-                <span>Chummer path: @Model.FallbackPath</span>
+                <span>Fallback page: @Model.FallbackPath</span>
                 <span>@SanitizeProjectionText(Model.TruthPosture)</span>
             </div>
             <a class="editorial-strip__action" href="@Model.FallbackPath">Open page</a>
@@ -104,7 +104,7 @@
         <article class="route-choice-card">
             <span class="tag">How this works</span>
             <h3>@Model.CoreRule</h3>
-            <p>The public board can collect visible demand, but Chummer review still decides what changes.</p>
+            <p>Public feedback can collect visible demand, but Chummer review still decides what changes.</p>
             @if (authorityFlow.Length > 0)
             {
                 <div class="compact-rail">
@@ -123,7 +123,7 @@
         <article class="route-choice-card">
             <span class="tag">Limits</span>
             <h3>Decision paths stay explicit.</h3>
-            <p>Public feedback can move into review, but it cannot become support, roadmap, or release status by itself.</p>
+            <p>Public feedback can move into review, but it does not replace help, roadmap, or release updates.</p>
             @if (decisionRoutes.Length > 0)
             {
                 <div class="route-choice-card__details">
@@ -147,15 +147,15 @@
             <div class="compact-rail">
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>Required public warning</h3>
+                        <h3>Public note</h3>
                         <p>@SanitizeProjectionText(Model.PublicWarning)</p>
                     </div>
                 </article>
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Product review</span>
-            <h3>Planning and shipped updates stay separate from the public board.</h3>
+            <span class="tag">Review</span>
+            <h3>Planning and shipped updates stay separate from public feedback.</h3>
             <p>These links keep feedback connected to product review without turning public comments into promises.</p>
             @if (sourceRecords.Length > 0)
             {
@@ -171,7 +171,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                        <h3>Decision context</h3>
+                        <h3>Context</h3>
                         <p>@string.Join(" / ", decisionContextItems)</p>
                         </div>
                     </article>
@@ -180,7 +180,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>First board set</h3>
+                            <h3>First boards</h3>
                             <p>@string.Join(" / ", boardTargets)</p>
                         </div>
                     </article>

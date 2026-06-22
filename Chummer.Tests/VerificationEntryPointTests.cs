@@ -641,7 +641,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("dispatch-inline-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("data-install-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Install details", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Account linking is optional. A claim code appears only if setup needs recovery.", dispatchView, StringComparison.Ordinal);
         Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
         Assert.Contains("if (autoStartDownload)", dispatchView, StringComparison.Ordinal);
@@ -3552,11 +3552,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Request.Headers.UserAgent.ToString()", controller, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.ActionLabel", service, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.DispatchHref", service, StringComparison.Ordinal);
-        Assert.Contains("Build and maintain Shadowrun characters without losing the details between sessions.", landingView, StringComparison.Ordinal);
+        Assert.Contains("A Shadowrun character manager for clean sheets and faster tables.", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open Black Ledger", landingView, StringComparison.Ordinal);
-        Assert.Contains("Stable</a>", landingView, StringComparison.Ordinal);
-        Assert.Contains("Nightly</a>", landingView, StringComparison.Ordinal);
-        Assert.Contains("<h2>Need something else?</h2>", landingView, StringComparison.Ordinal);
+        Assert.Contains("Download Chummer", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/downloads\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("minimal-inline-links", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-homepage-section=\"help\"", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("Get the app", landingView, StringComparison.Ordinal);
@@ -3577,10 +3578,15 @@ public sealed class VerificationEntryPointTests
         string storyView = File.ReadAllText(storyViewPath);
         string nowView = File.ReadAllText(nowViewPath);
         string statusView = File.ReadAllText(statusViewPath);
+        int storyModelStart = viewModels.IndexOf("public sealed record StoryPageViewModel(", StringComparison.Ordinal);
+        int nextModelStart = viewModels.IndexOf("public sealed record NowPageViewModel(", StringComparison.Ordinal);
+        string storyViewModelBlock = storyModelStart >= 0 && nextModelStart > storyModelStart
+            ? viewModels[storyModelStart..nextModelStart]
+            : viewModels;
 
-        Assert.Contains("ReleaseExperience: releaseExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("new StoryPageViewModel(", controller, StringComparison.Ordinal);
         Assert.Contains("StoryPageViewModel(", viewModels, StringComparison.Ordinal);
-        Assert.Contains("ReleaseExperienceViewModel ReleaseExperience", viewModels, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReleaseExperienceViewModel ReleaseExperience", storyViewModelBlock, StringComparison.Ordinal);
         Assert.Contains("href=\"/downloads\"", storyView, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.ReleaseExperience.GuestGatePrimaryHref", storyView, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref", nowView, StringComparison.Ordinal);
@@ -3740,7 +3746,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PRIVACY_AND_RETENTION_BOUNDARIES.md", service, StringComparison.Ordinal);
         Assert.Contains("PUBLIC_TRUST_CONTENT.yaml", service, StringComparison.Ordinal);
         Assert.Contains("PrivacyBoundaryPanelViewModel? PrivacyBoundary", viewModel, StringComparison.Ordinal);
-        Assert.Contains("Retention window:", partial, StringComparison.Ordinal);
+        Assert.Contains("Kept for:", partial, StringComparison.Ordinal);
         Assert.Contains("Model.PrivacyBoundary", accountView, StringComparison.Ordinal);
         Assert.Contains("/api/public/privacy-boundaries", audit, StringComparison.Ordinal);
         Assert.Contains("chummer.public_privacy_boundaries", audit, StringComparison.Ordinal);

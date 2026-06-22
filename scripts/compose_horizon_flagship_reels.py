@@ -2,18 +2,23 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
 import re
 import shutil
 import subprocess
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+import sys
 from typing import Any
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts, slug_prefix
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -25,7 +30,6 @@ TTS_PYTHON = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_ve
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
-UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
 
 
 DOCUMENTARY_VOICE = "en-GB-ThomasNeural"
@@ -251,60 +255,6 @@ def duration(path: Path) -> float:
     return float(dict(payload.get("format") or {}).get("duration") or 0.0)
 
 
-def unmixr_config() -> dict[str, str] | None:
-    api_key = os.environ.get("UNMIXR_API_KEY", "").strip()
-    voice_id = os.environ.get("UNMIXR_VOICE_ID", "").strip()
-    if not api_key or not voice_id:
-        return None
-    return {
-        "api_key": api_key,
-        "voice_id": voice_id,
-        "language": os.environ.get("UNMIXR_LANGUAGE", "en-US").strip() or "en-US",
-        "speaking_rate": os.environ.get("UNMIXR_SPEAKING_RATE", "medium").strip() or "medium",
-        "speaking_pitch": os.environ.get("UNMIXR_SPEAKING_PITCH", "low").strip() or "low",
-        "speaking_volume": os.environ.get("UNMIXR_SPEAKING_VOLUME", "medium").strip() or "medium",
-    }
-
-
-def render_unmixr_tts(text: str, output: Path) -> bool:
-    config = unmixr_config()
-    if config is None:
-        return False
-    payload = json.dumps(
-        {
-            "text": text,
-            "voice_id": config["voice_id"],
-            "language": config["language"],
-            "speaking_rate": config["speaking_rate"],
-            "speaking_pitch": config["speaking_pitch"],
-            "speaking_volume": config["speaking_volume"],
-            "output_type": output.suffix.lstrip(".") or "mp3",
-            "response_type": "url",
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        UNMIXR_API_URL,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        audio_url = str(body.get("audio_url") or "").strip()
-        if not audio_url:
-            return False
-        with urllib.request.urlopen(audio_url, timeout=120) as audio_response:
-            output.write_bytes(audio_response.read())
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        return False
-    return output.exists() and output.stat().st_size > 0
-
-
 def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
     fade_in = min(0.8 if mode == "scene" else 1.4, max(target_len / 3.0, 0.15))
     fade_out = min(0.9 if mode == "scene" else 2.6, max(target_len / 3.0, 0.2))
@@ -365,63 +315,25 @@ def write_vtt(path: Path, scenes: list[ScenePlan]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-async def render_edge_tts(text: str, voice: str, output: Path) -> bool:
-    if not TTS_PYTHON.is_file():
-        return False
-    helper = OUT / "render_edge_tts_horizon.py"
-    helper.write_text(
-        "import asyncio, edge_tts, pathlib, sys\n"
-        "async def main():\n"
-        "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    await edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-7Hz').save(str(output))\n"
-        "asyncio.run(main())\n",
-        encoding="utf-8",
+def _scene_profile(asset_id: str, scene: ScenePlan) -> dict[str, str]:
+    return load_profile(
+        prefixes=(
+            slug_prefix("UNMIXR_HORIZON", asset_id, scene.scene_id),
+            slug_prefix("UNMIXR_HORIZON", asset_id),
+            slug_prefix("UNMIXR_HORIZON", scene.title),
+        ),
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
     )
-    proc = await asyncio.create_subprocess_exec(
-        str(TTS_PYTHON),
-        str(helper),
-        voice,
-        text,
-        str(output),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        print(stderr.decode("utf-8", errors="replace"))
-        return False
-    return output.is_file() and output.stat().st_size > 0
 
 
-async def render_narration_files(asset_id: str, scenes: list[ScenePlan], work: Path) -> tuple[list[Path], str]:
+def render_narration_files(asset_id: str, scenes: list[ScenePlan], work: Path) -> tuple[list[Path], str]:
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
-    provider = "edge-tts"
+    provider = "unmixr-short-tts"
     for index, scene in enumerate(scenes, start=1):
         output = narration_dir / f"{index:02}.mp3"
-        ok = render_unmixr_tts(scene.narration, output)
-        if ok:
-            provider = "unmixr-short-tts"
-        else:
-            ok = await render_edge_tts(scene.narration, scene.voice, output)
-        if not ok:
-            provider = "ffmpeg-flite"
-            output = narration_dir / f"{index:02}.wav"
-            escaped = scene.narration.replace("\\", "\\\\").replace("'", "\\'")
-            run(
-                "ffmpeg",
-                "-y",
-                "-f",
-                "lavfi",
-                "-i",
-                f"flite=text='{escaped}':voice=slt",
-                "-ar",
-                "48000",
-                "-ac",
-                "1",
-                str(output),
-            )
+        render_short_tts(scene.narration, output, profile=_scene_profile(asset_id, scene))
         outputs.append(output)
     return outputs, provider
 
@@ -555,7 +467,7 @@ def compose_asset(asset: dict[str, Any]) -> dict[str, Any]:
     for scene in scenes:
         if not scene.clip.is_file() or not scene.sidecar.is_file():
             raise SystemExit(f"missing MagicFit clip/sidecar for {asset_id}/{scene.scene_id}")
-    narration_files, narration_provider = asyncio.run(render_narration_files(asset_id, scenes, work))
+    narration_files, narration_provider = render_narration_files(asset_id, scenes, work)
     video_segments: list[Path] = []
     audio_segments: list[Path] = []
     for index, scene in enumerate(scenes, start=1):

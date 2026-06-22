@@ -10,9 +10,10 @@ public sealed class SupportSubmittedFlagshipViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Pick the next page without losing the case.", view, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-support-submitted surface-minimal\";", view, StringComparison.Ordinal);
+        Assert.Contains("Choose the next page.", view, StringComparison.Ordinal);
         Assert.Contains("Case details", view, StringComparison.Ordinal);
-        Assert.Contains("Keep the case moving on the same support path.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep the case handy.", view, StringComparison.Ordinal);
         Assert.Contains("This page keeps the current case state", view, StringComparison.Ordinal);
         Assert.Contains("Open what works today", view, StringComparison.Ordinal);
         Assert.Contains("Same recovery path", view, StringComparison.Ordinal);

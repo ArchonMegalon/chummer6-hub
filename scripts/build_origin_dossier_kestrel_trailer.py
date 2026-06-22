@@ -8,9 +8,17 @@ import shutil
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+import sys
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -20,7 +28,6 @@ PUBLIC_ROOT = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "horizons
 BUILD_DIR = WORKSPACE / "_completion" / "origin_dossier_kestrel_trailer_20260619"
 SOURCE_IMAGE = WORKSPACE / "Chummer6" / "assets" / "horizons" / "origin-dossier.png"
 MAGICFIT_STATUS = WORKSPACE / "_completion" / "origin_dossier_horizon_20260618" / "ORIGIN_DOSSIER_MAGICFIT_RENDER_STATUS.generated.json"
-EDGE_TTS = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_venv" / "bin" / "edge-tts"
 
 ASSET_ID = "origin_dossier_90s_deepdive"
 PUBLIC_NAME = "origin-dossier-the-name-she-chose-20260619"
@@ -384,41 +391,15 @@ def write_vtt(path: Path, total_seconds: float) -> None:
 
 def render_voice() -> tuple[Path, str, float]:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    text_path = BUILD_DIR / "origin-dossier-kestrel-narration.txt"
-    text_path.write_text(NARRATION, encoding="utf-8")
-    raw_mp3 = BUILD_DIR / "origin-dossier-kestrel-aria.mp3"
+    raw_mp3 = BUILD_DIR / "origin-dossier-kestrel-unmixr.mp3"
     voice_wav = BUILD_DIR / "origin-dossier-kestrel-voice.wav"
-    if EDGE_TTS.is_file():
-        run(
-            str(EDGE_TTS),
-            "--voice",
-            "en-US-AriaNeural",
-            "--rate=-4%",
-            "--pitch=-5Hz",
-            "--text",
-            NARRATION,
-            "--write-media",
-            str(raw_mp3),
-        )
-        provider = "edge-tts/en-US-AriaNeural/female restrained narration"
-        source_audio = raw_mp3
-    else:
-        raw_flite = BUILD_DIR / "origin-dossier-kestrel-flite.wav"
-        run(
-            "ffmpeg",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            f"flite=textfile={text_path}:voice=slt",
-            "-ar",
-            "48000",
-            "-ac",
-            "1",
-            str(raw_flite),
-        )
-        provider = "ffmpeg-flite-slt-fallback"
-        source_audio = raw_flite
+    profile = load_profile(
+        prefixes=("UNMIXR_ORIGIN_DOSSIER_KESTREL", "UNMIXR_ORIGIN_DOSSIER"),
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
+    )
+    render_short_tts(NARRATION, raw_mp3, profile=profile)
+    provider = f"unmixr-short-tts/{profile['voice_id']}"
+    source_audio = raw_mp3
     run(
         "ffmpeg",
         "-y",

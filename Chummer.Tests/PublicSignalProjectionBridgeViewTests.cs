@@ -11,13 +11,13 @@ public sealed class PublicSignalProjectionBridgeViewTests
         string partial = File.ReadAllText(partialPath);
 
         Assert.Contains("@model PublicSignalProjectionPacketViewModel", partial, StringComparison.Ordinal);
-        Assert.Contains("Open the Chummer page", partial, StringComparison.Ordinal);
+        Assert.Contains("Open page", partial, StringComparison.Ordinal);
         Assert.Contains("@Model.CoreRule", partial, StringComparison.Ordinal);
         Assert.Contains("Limits", partial, StringComparison.Ordinal);
-        Assert.Contains("Required public warning", partial, StringComparison.Ordinal);
-        Assert.Contains("Product review", partial, StringComparison.Ordinal);
-        Assert.Contains("Decision context", partial, StringComparison.Ordinal);
-        Assert.Contains("Planning and shipped updates stay separate from the public board.", partial, StringComparison.Ordinal);
+        Assert.Contains("Public note", partial, StringComparison.Ordinal);
+        Assert.Contains("Review", partial, StringComparison.Ordinal);
+        Assert.Contains("Context", partial, StringComparison.Ordinal);
+        Assert.Contains("Planning and shipped updates stay separate from public feedback.", partial, StringComparison.Ordinal);
         Assert.DoesNotContain("Open first-party fallback", partial, StringComparison.Ordinal);
         Assert.DoesNotContain("Boundary conditions", partial, StringComparison.Ordinal);
         Assert.DoesNotContain("sourceReceipts", partial, StringComparison.Ordinal);
@@ -39,11 +39,10 @@ public sealed class PublicSignalProjectionBridgeViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.DoesNotContain("var signalProjection = Model.SignalProjection;", participateView, StringComparison.Ordinal);
-        Assert.Contains("var signalProjection = Model.SignalProjection;", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("var signalProjection = Model.SignalProjection;", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalProjection = Model.SignalProjection;", changelogView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalProjectionPacket", participateView, StringComparison.Ordinal);
-        Assert.Contains("Model.SignalLoop", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("milestoneFollowUp", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicSignalProjectionPacket", roadmapView, StringComparison.Ordinal);
         Assert.Contains("milestoneFollowUp", changelogView, StringComparison.Ordinal);
         Assert.DoesNotContain("@await Html.PartialAsync(\"~/Views/Shared/_PublicSignalProjectionPacket.cshtml\", signalProjection)", changelogView, StringComparison.Ordinal);
     }

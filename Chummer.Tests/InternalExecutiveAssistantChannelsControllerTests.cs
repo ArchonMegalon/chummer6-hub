@@ -78,6 +78,31 @@ public sealed class InternalExecutiveAssistantChannelsControllerTests
     }
 
     [Fact]
+    public void IngestMessage_usesRecipientFallbackWhenWebhookSwapsWhatsappFields()
+    {
+        Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_CHANNEL_MESSAGING_WEBHOOK_TOKEN"] = "internal-token"
+        });
+
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer internal-token";
+        ActionResult<ExecutiveAssistantChannelMessageDto> result = fixture.Controller.IngestMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: null,
+                RecipientHandle: "+43 664 791 6419",
+                CounterpartyHandle: "+43 700 000 0000",
+                MessageText: "playback works now",
+                MessageId: "wa-swapped-1"));
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var message = Assert.IsType<ExecutiveAssistantChannelMessageDto>(ok.Value);
+        Assert.Equal("wa-swapped-1", message.MessageId);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelMessages);
+        Assert.Equal("436647916419", fixture.Store.ExecutiveAssistantChannelMessages[0].CounterpartyHandle);
+    }
+
+    [Fact]
     public void IngestMessage_rejectsUnlinkedIncomingRouteAsConflict()
     {
         Fixture fixture = new(new Dictionary<string, string?>

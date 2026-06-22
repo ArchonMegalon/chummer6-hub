@@ -19,7 +19,8 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "https://ea.test",
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = "principal-runner",
-            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_TELEGRAM_BINDING_ID"] = "telegram-binding"
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_TELEGRAM_BINDING_ID"] = "telegram-binding",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "false"
         });
 
         const string subjectId = "subject.ea.runner";
@@ -200,7 +201,8 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
         using Fixture fixture = new(new Dictionary<string, string?>
         {
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = string.Empty,
-            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = string.Empty
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = string.Empty,
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "false"
         });
 
         const string subjectId = "subject.ea.runner.offline";
@@ -232,7 +234,8 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = "ea-token",
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = "principal-runner",
             ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"] = "business-binding",
-            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"] = "web-session-binding"
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"] = "web-session-binding",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "false"
         });
 
         const string subjectId = "subject.ea.runner.whatsapp.web";
@@ -323,6 +326,59 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
     }
 
     [Fact]
+    public void IngestIncomingMessage_routesWhatsappByRecipientHandleWhenCounterpartyFieldCarriesBusinessNumber()
+    {
+        using Fixture fixture = new();
+
+        const string subjectId = "subject.ea.incoming.whatsapp.recipient";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelMessageDto message = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: null,
+                RecipientHandle: "+43 664 791 6419",
+                CounterpartyHandle: "+43 700 000 0000",
+                MessageText: "These samples are fine now",
+                MessageId: "wa-message-recipient-1"));
+
+        Assert.Equal("incoming", message.Direction);
+        Assert.Equal("received", message.DeliveryStatus);
+        Assert.Equal("wa-message-recipient-1", message.MessageId);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelConversations);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelMessages);
+        Assert.Equal("436647916419", fixture.Store.ExecutiveAssistantChannelConversations[0].CounterpartyHandle);
+    }
+
+    [Fact]
+    public void IngestIncomingMessage_rejectsAmbiguousRouteWhenCounterpartyAndRecipientMatchDifferentUsers()
+    {
+        using Fixture fixture = new();
+
+        const string subjectA = "subject.ea.incoming.whatsapp.ambiguous.a";
+        const string subjectB = "subject.ea.incoming.whatsapp.ambiguous.b";
+        fixture.Accounts.EnsureUserWithStatus(subjectA, "Runner A", "runner-a@example.com");
+        fixture.Accounts.EnsureUserWithStatus(subjectB, "Runner B", "runner-b@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectA, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectB, "whatsapp_official_business", "+43 664 111 2222", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectA, null));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectB, null));
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: null,
+                RecipientHandle: "+43 664 111 2222",
+                CounterpartyHandle: "+43 664 791 6419",
+                MessageText: "route this",
+                MessageId: "wa-message-ambiguous-1")));
+
+        Assert.Contains("Ambiguous incoming whatsapp_official_business routing", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IngestIncomingMessage_requiresRoutableIncomingTarget()
     {
         using Fixture fixture = new();
@@ -337,6 +393,239 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
                 MessageId: null)));
     }
 
+    [Fact]
+    public void IngestIncomingMessage_dedupesRecentWebhookRetryWhenProviderMessageIdIsMissing()
+    {
+        using Fixture fixture = new();
+
+        const string subjectId = "subject.ea.incoming.retry";
+        DateTimeOffset receivedAt = DateTimeOffset.Parse("2026-06-22T16:10:00Z");
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelMessageDto first = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: subjectId,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 123 455",
+                MessageText: "Ping mich bitte spaeter an.",
+                MessageId: null,
+                ConversationId: null,
+                ReceivedAtUtc: receivedAt));
+
+        ExecutiveAssistantChannelMessageDto second = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: subjectId,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 123 455",
+                MessageText: "Ping mich bitte spaeter an.",
+                MessageId: null,
+                ConversationId: null,
+                ReceivedAtUtc: receivedAt.AddSeconds(20)));
+
+        Assert.Equal(first.MessageId, second.MessageId);
+        Assert.Single(fixture.Store.ExecutiveAssistantChannelMessages);
+    }
+
+    [Fact]
+    public void IngestIncomingMessage_keepsDistinctRepeatedMessagesOutsideRetryWindowWhenProviderMessageIdIsMissing()
+    {
+        using Fixture fixture = new();
+
+        const string subjectId = "subject.ea.incoming.repeat";
+        DateTimeOffset receivedAt = DateTimeOffset.Parse("2026-06-22T16:10:00Z");
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelMessageDto first = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: subjectId,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 123 455",
+                MessageText: "Bist du da?",
+                MessageId: null,
+                ConversationId: null,
+                ReceivedAtUtc: receivedAt));
+
+        ExecutiveAssistantChannelMessageDto second = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: subjectId,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 123 455",
+                MessageText: "Bist du da?",
+                MessageId: null,
+                ConversationId: null,
+                ReceivedAtUtc: receivedAt.AddMinutes(3)));
+
+        Assert.NotEqual(first.MessageId, second.MessageId);
+        Assert.Equal(2, fixture.Store.ExecutiveAssistantChannelMessages.Count);
+    }
+
+    [Fact]
+    public async Task TeableSyncAll_projectsStoredExecutiveAssistantConversationTranscript()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "true",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_KEY"] = "teable-key",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_BASE_URL"] = "https://app.teable.ai/api",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_BASE_ID"] = "base-demo"
+        });
+
+        const string subjectId = "subject.ea.teable.sync";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+        string userId = fixture.Accounts.EnsureUser(subjectId).UserId;
+
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.ExecutiveAssistantChannelConversations.Add(new ExecutiveAssistantChannelConversationState(
+                ConversationId: "whatsapp_official_business:sync-1",
+                UserId: userId,
+                ChannelKind: "whatsapp_official_business",
+                CounterpartyHandle: "436647916419",
+                CounterpartyHash: new string('a', 64),
+                Status: "active",
+                CreatedAtUtc: DateTimeOffset.Parse("2026-06-22T10:00:00Z"),
+                UpdatedAtUtc: DateTimeOffset.Parse("2026-06-22T10:06:00Z"),
+                LatestMessageId: "eam-2"));
+            fixture.Store.ExecutiveAssistantChannelMessages.Add(new ExecutiveAssistantChannelMessageState(
+                MessageId: "eam-1",
+                ConversationId: "whatsapp_official_business:sync-1",
+                ChannelKind: "whatsapp_official_business",
+                Direction: "incoming",
+                Text: "Kannst du mir helfen?",
+                SafetyLabel: "safe",
+                DeliveryStatus: "received",
+                CreatedAtUtc: DateTimeOffset.Parse("2026-06-22T10:01:00Z"),
+                CounterpartyHandle: "436647916419",
+                DeliveryRef: null,
+                FailureReason: null,
+                IdempotencyKey: null));
+            fixture.Store.ExecutiveAssistantChannelMessages.Add(new ExecutiveAssistantChannelMessageState(
+                MessageId: "eam-2",
+                ConversationId: "whatsapp_official_business:sync-1",
+                ChannelKind: "whatsapp_official_business",
+                Direction: "outbound",
+                Text: "Ja, schick mir die Datei.",
+                SafetyLabel: "safe",
+                DeliveryStatus: "sent",
+                CreatedAtUtc: DateTimeOffset.Parse("2026-06-22T10:05:00Z"),
+                CounterpartyHandle: "436647916419",
+                DeliveryRef: "delivery-1",
+                FailureReason: null,
+                IdempotencyKey: "idem-1"));
+            fixture.Store.PersistLocked();
+        }
+
+        TeableExecutiveAssistantChannelSyncResult result = await fixture.Teable.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        Assert.Equal(1, result.SyncedCount);
+        RecordedRequest createTable = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/base/base-demo/table/");
+        Assert.DoesNotContain("\"unique\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"notNull\"", createTable.Body, StringComparison.OrdinalIgnoreCase);
+        RecordedRequest createRecord = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_ea_channel/record");
+        using JsonDocument created = JsonDocument.Parse(createRecord.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.Equal("whatsapp_official_business", fields.GetProperty("Channel Kind").GetString());
+        Assert.Equal("outbound", fields.GetProperty("Latest Direction").GetString());
+        Assert.Contains("incoming: Kannst du mir helfen?", fields.GetProperty("Transcript").GetString(), StringComparison.Ordinal);
+        Assert.Contains("outbound: Ja, schick mir die Datei.", fields.GetProperty("Transcript").GetString(), StringComparison.Ordinal);
+
+        TeableExecutiveAssistantChannelDashboard dashboard = fixture.Teable.GetDashboard();
+        Assert.Equal("ready", dashboard.State);
+        Assert.Single(dashboard.Rows);
+        Assert.Equal("sent", dashboard.Rows[0].LatestDeliveryStatus);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_autosyncsExecutiveAssistantConversationToTeable()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = "principal-runner",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"] = "business-binding",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "true",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_KEY"] = "teable-key",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_BASE_URL"] = "https://app.teable.ai/api",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_BASE_ID"] = "base-demo"
+        });
+
+        const string subjectId = "subject.ea.teable.send";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelSendResult result = await fixture.Service.SendMessageAsync(
+            subjectId,
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelSendRequest("Hier ist die naechste Probe.", CounterpartyHandle: null, IdempotencyKey: "autosync-send-1"),
+            CancellationToken.None);
+
+        Assert.Equal("sent", result.Status);
+        await fixture.WaitForRequestAsync(HttpMethod.Post, "/api/table/tbl_ea_channel/record");
+
+        RecordedRequest createRecord = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_ea_channel/record");
+        using JsonDocument created = JsonDocument.Parse(createRecord.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.Equal("sent", fields.GetProperty("Latest Delivery Status").GetString());
+        Assert.Contains("outbound: Hier ist die naechste Probe.", fields.GetProperty("Transcript").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IngestIncomingMessage_autosyncsExecutiveAssistantConversationToTeable()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "true",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_KEY"] = "teable-key",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_BASE_URL"] = "https://app.teable.ai/api",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_BASE_ID"] = "base-demo"
+        });
+
+        const string subjectId = "subject.ea.teable.ingest";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelMessageDto message = fixture.Service.IngestIncomingMessage(
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelIncomingMessageRequest(
+                SubjectId: subjectId,
+                RecipientHandle: null,
+                CounterpartyHandle: "+43 664 123 455",
+                MessageText: "Das war die richtige Datei.",
+                MessageId: "wa-msg-sync-1"));
+
+        Assert.Equal("wa-msg-sync-1", message.MessageId);
+        await fixture.WaitForRequestAsync(HttpMethod.Post, "/api/table/tbl_ea_channel/record");
+
+        RecordedRequest createRecord = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_ea_channel/record");
+        using JsonDocument created = JsonDocument.Parse(createRecord.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.Equal("incoming", fields.GetProperty("Latest Direction").GetString());
+        Assert.Equal("received", fields.GetProperty("Latest Delivery Status").GetString());
+        Assert.Contains("incoming: Das war die richtige Datei.", fields.GetProperty("Transcript").GetString(), StringComparison.Ordinal);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -349,7 +638,8 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
             var values = new Dictionary<string, string?>
             {
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
-                ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "https://ea.test"
+                ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "https://ea.test",
+                ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "false"
             };
             if (overrides is not null)
             {
@@ -367,20 +657,42 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
             Accounts = new AccountService(Store);
             Links = new IdentityLinkService(Store, Accounts);
             Handler = new FakeHandler();
+            Teable = new TeableExecutiveAssistantChannelService(
+                Store,
+                Configuration,
+                new StaticHttpClientFactory(new HttpClient(Handler)),
+                NullLogger<TeableExecutiveAssistantChannelService>.Instance);
             Service = new ExecutiveAssistantChannelMessagingService(
                 new HttpClient(Handler),
                 Store,
                 Accounts,
                 Configuration,
-                NullLogger<ExecutiveAssistantChannelMessagingService>.Instance);
+                NullLogger<ExecutiveAssistantChannelMessagingService>.Instance,
+                Teable);
         }
 
         public IConfiguration Configuration { get; }
         public CommunityStore Store { get; }
         public AccountService Accounts { get; }
         public IdentityLinkService Links { get; }
+        public TeableExecutiveAssistantChannelService Teable { get; }
         public ExecutiveAssistantChannelMessagingService Service { get; }
         public FakeHandler Handler { get; }
+
+        public async Task WaitForRequestAsync(HttpMethod method, string path, int attempts = 40)
+        {
+            for (int i = 0; i < attempts; i++)
+            {
+                if (Handler.Requests.Any(item => item.Method == method && item.Path == path))
+                {
+                    return;
+                }
+
+                await Task.Delay(25);
+            }
+
+            throw new TimeoutException($"Timed out waiting for {method} {path}.");
+        }
 
         public void Dispose()
         {
@@ -391,8 +703,22 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
         }
     }
 
+    private sealed class StaticHttpClientFactory : IHttpClientFactory
+    {
+        private readonly HttpClient _client;
+
+        public StaticHttpClientFactory(HttpClient client)
+        {
+            _client = client;
+        }
+
+        public HttpClient CreateClient(string name) => _client;
+    }
+
     private sealed class FakeHandler : System.Net.Http.HttpMessageHandler
     {
+        private readonly HashSet<string> _fields = new(StringComparer.OrdinalIgnoreCase);
+
         public List<RecordedRequest> Requests { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -406,6 +732,44 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
             if (request.Method == HttpMethod.Post && path == "/v1/tools/execute")
             {
                 return Json(HttpStatusCode.OK, """{"target_ref":"ea-target-1"}""");
+            }
+
+            if (request.Method == HttpMethod.Get && path == "/api/base/base-demo/table")
+            {
+                return Json(HttpStatusCode.OK, "[]");
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/base/base-demo/table/")
+            {
+                return Json(HttpStatusCode.Created, """{"id":"tbl_ea_channel"}""");
+            }
+
+            if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_ea_channel/field", StringComparison.Ordinal))
+            {
+                string payload = JsonSerializer.Serialize(_fields.Select(static name => new { id = $"fld_{name.Replace(" ", "_", StringComparison.Ordinal)}", name }).ToArray());
+                return Json(HttpStatusCode.OK, payload);
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/table/tbl_ea_channel/field")
+            {
+                using JsonDocument document = JsonDocument.Parse(body);
+                string name = document.RootElement.GetProperty("name").GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _fields.Add(name);
+                }
+
+                return Json(HttpStatusCode.Created, $$"""{"id":"fld_{{_fields.Count}}","name":{{JsonSerializer.Serialize(name)}}}""");
+            }
+
+            if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_ea_channel/record?", StringComparison.Ordinal))
+            {
+                return Json(HttpStatusCode.OK, """{"records":[]}""");
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/table/tbl_ea_channel/record")
+            {
+                return Json(HttpStatusCode.Created, """{"records":[{"id":"rec_ea_channel"}]}""");
             }
 
             return Json(HttpStatusCode.NotFound, $$"""{"path":{{JsonSerializer.Serialize(path)}}}""");

@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-artifacts";
+    ViewData["SurfaceClass"] = "surface-artifacts surface-minimal";
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     // Keep public comparisons narrow until the related route records are current.
@@ -31,23 +31,23 @@
                 ? "#preview-artifacts"
                 : "#artifact-route-map";
     var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Account return view" : "Create account for account return";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Open your library" : "Create account for your library";
     var routeChoices = new[]
     {
         new
         {
-            Badge = "Detail view",
-            Title = "Inspect dossiers, recaps, and shared publications here",
-            Summary = "Use this page when you want background and detail without confusing that with the install decision.",
+            Badge = "Library",
+            Title = "Open dossiers, recaps, and shared publications here",
+            Summary = "Use this page when you want background and full pages, not an installer.",
             Href = artifactShelfPrimaryHref,
-            Label = "Open detail view",
-            Details = new[] { "Readable detail", "Related files", "Background" }
+            Label = "Open library",
+            Details = new[] { "Readable pages", "Related files", "Background" }
         },
         new
         {
             Badge = "Downloads",
-            Title = "Go back to downloads when you actually want the build",
-            Summary = "Downloads remains the place to pick an installer, see install notes, and get setup help. This page should not compete with that decision.",
+            Title = "Go back to downloads when you want the app",
+            Summary = "Downloads is still where you pick an installer, see install notes, and get setup help.",
             Href = "/downloads",
             Label = "Open downloads",
             Details = new[] { "Install path", "Same file for everyone", "Support nearby" }
@@ -56,11 +56,11 @@
         {
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Personal, campaign, creator, and public returns stay in one account view"
-                : "Sign in when you want the private account-return view as well as public detail pages",
+                ? "Personal, campaign, creator, and public returns stay in one library"
+                : "Sign in when you want your private library together with public pages",
             Summary = Model.Chrome.Authenticated
-                ? "The account view keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
-                : "Public detail pages work without an account. Sign in only when you want private account return and campaign or creator-owned next steps.",
+                ? "Your library keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
+                : "Public pages work without an account. Sign in only when you want private return paths and creator- or campaign-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Details = Model.Chrome.Authenticated
@@ -70,8 +70,8 @@
         new
         {
             Badge = "Help",
-            Title = "Leave the detail view when the problem becomes support or recovery",
-            Summary = "Install failures, account recovery, and private campaign issues belong in Chummer help. These detail pages should support that work, not replace it.",
+            Title = "Use Chummer help when the next job is support or recovery",
+            Summary = "Install failures, account recovery, and private campaign issues belong in Chummer help.",
             Href = "/help",
             Label = "Open help",
             Details = new[] { "Setup help", "Private help", "No page confusion" }
@@ -139,15 +139,15 @@
             : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-detail-view";
     static string ArtifactViewTitle(string view) => view switch
     {
-        "personal" => "Personal view",
-        "campaign" => "Campaign view",
-        "creator" => "Creator view",
-        "public" => "Public view",
-        _ => "All views"
+        "personal" => "Personal",
+        "campaign" => "Campaign",
+        "creator" => "Creator",
+        "public" => "Public",
+        _ => "All"
     };
     static string ArtifactViewSummary(string view) => view switch
     {
-        "personal" => "Keep account-side runner and return details visible without losing the shared history they belong to.",
+        "personal" => "Keep your runner and return details visible without losing the shared history they belong to.",
         "campaign" => "Stay on the shared crew and continuity page for campaign-owned files, prep notes, Table Pulse Aftermath return cues, and replay next steps.",
         "creator" => "Inspect creator-linked history, confidence, availability, and next steps for published or publication-ready work.",
         "public" => "Inspect published shared-publication pages so discoverable creator work and publication detail stay together while you are signed in.",
@@ -169,36 +169,52 @@
         : "These campaign, primer, dossier, recap, replay, and run-module outputs are live after review and moderation.";
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
+<section class="minimal-page-hero route-anchor-target">
+    <div>
         <p class="eyebrow">@PublicText(Model.Eyebrow)</p>
-        <h1 class="page-title">@PublicText(Model.Heading)</h1>
-        <p class="page-copy">Dossiers, recaps, and release details belong on a clear detail page, not in a vague gallery. Use this page for history and background, then go back to downloads when you actually want the build.</p>
-        <div class="trust-claim__details">
-            <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
-            <span>@previewItems.Length opening next</span>
-            @if (publicationRouteReviewRequired)
-            {
-                <span>Limited detail</span>
-            }
-            @if (Model.Chrome.Authenticated)
-            {
-                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) account history card(s)</span>
-            }
-        </div>
+        <h1>@PublicText(Model.Heading)</h1>
+        <p>Use this page for dossiers, recaps, and release details. Go back to downloads when you want the app.</p>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Open detail view</a>
-        <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
-        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+    <div class="minimal-status-pill">
+        <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail page(s)</span>
+        <strong>@previewItems.Length opening next</strong>
+        @if (publicationRouteReviewRequired)
+        {
+            <span>Limited detail</span>
+        }
+        @if (Model.Chrome.Authenticated)
+        {
+            <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) account history page(s)</span>
+        }
     </div>
 </section>
 
-<section class="editorial-block" id="artifact-route-map">
-    <div class="editorial-block__lead">
+<section class="status-decision-strip" id="artifact-route-map" aria-label="Library route split">
+    <article class="status-decision-strip__card">
+        <span class="tag">Library</span>
+        <h2>Open dossiers, recaps, and shared publications here.</h2>
+        <p>This page is for history and background. Downloads, account recovery, and help still keep their own jobs.</p>
+        <a class="button-like button-like--ghost" href="@artifactShelfPrimaryHref">Open library</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Downloads</span>
+        <h2>Go back to downloads when you want the app.</h2>
+        <p>Downloads is still where you pick an installer, see install notes, and get setup help.</p>
+        <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Help</span>
+        <h2>Use Chummer help when the next job is support or recovery.</h2>
+        <p>Install failures, account recovery, and private campaign issues belong in Chummer help.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Pick details, downloads, account history, or help without mixing their jobs.</h2>
-        <p class="editorial-copy">The detail view should make outputs and background tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
+        <h2>Choose library, downloads, account return, or help.</h2>
+        <p>This page is for history and background. Downloads, account recovery, and help still keep their own jobs.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -223,7 +239,7 @@
 {
     <section class="artifact-gallery" id="public-detail-view">
         <div class="artifact-gallery__lead">
-            <p class="eyebrow">Public publication detail</p>
+            <p class="eyebrow">Public library</p>
             <h2 class="editorial-title">@governedDiscoveryTitle</h2>
             <p class="editorial-copy">@governedDiscoveryCopy</p>
             @if (publicationRouteReviewRequired)
@@ -292,7 +308,7 @@
 {
     <section class="continuity-band" id="signed-in-detail-view">
         <div class="continuity-band__copy">
-            <p class="eyebrow">Account return view</p>
+            <p class="eyebrow">Your library</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
             <div class="stacked-actions">
@@ -453,8 +469,8 @@
     <section class="artifact-gallery" id="current-detail-surfaces">
         <div class="artifact-gallery__lead">
             <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
-            <h2 class="editorial-title">Current usable detail surfaces</h2>
-            <p class="editorial-copy">These are the detail surfaces you can use or inspect today. They support the install decision; they do not replace downloads.</p>
+            <h2 class="editorial-title">Current library pages</h2>
+            <p class="editorial-copy">These pages are ready to use today. They support the install decision; they do not replace downloads.</p>
         </div>
         <div class="artifact-gallery__grid">
             @foreach (var card in liveItems)
@@ -499,8 +515,8 @@
     <section class="editorial-block" id="preview-artifacts">
         <div class="editorial-block__lead">
             <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
-            <h2 class="editorial-title">Opening next in the detail view</h2>
-            <p class="editorial-copy">These future-facing detail surfaces stay visible so you can compare what is opening next against what is already usable today, without pretending they are live yet.</p>
+            <h2 class="editorial-title">Opening next</h2>
+            <p class="editorial-copy">These pages stay visible so you can compare what is opening next against what is already usable today, without pretending they are live yet.</p>
         </div>
         <div class="compact-rail">
             @foreach (var card in previewItems)
@@ -530,8 +546,8 @@
 {
     <section class="editorial-block">
         <article class="route-callout">
-            <span class="tag">Temporarily thin view</span>
-            <h3>The detail view is not populated on this request.</h3>
+            <span class="tag">Nothing here yet</span>
+            <h3>This detail page is empty right now.</h3>
             <p>Use downloads for the live build, what works today for current product status, or help if you expected a specific file to be visible here already.</p>
             <div class="route-callout__actions">
                 <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>

@@ -460,7 +460,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Install Chummer');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Choose the latest build for Windows or Linux.');
+    await expectVisible(page, 'text=Windows and Linux installers.');
     await expectVisible(page, 'text=Build run-');
     await expectVisible(page, 'text=Platforms');
     await assertNoBannedCopy(page, 'Downloads');

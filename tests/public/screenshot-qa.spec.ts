@@ -20,7 +20,7 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Choose the latest build for Windows or Linux.', 'Stable', 'Nightly'],
+    requiredText: ['Install Chummer', 'Windows and Linux installers.', 'Stable', 'Nightly'],
   },
   {
     id: 'status',
@@ -66,17 +66,19 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
 
     const heroTitle = page.locator('.minimal-hero h1');
     const primaryCta = page.locator('.minimal-hero .minimal-actions a.button-like').first();
-    const footer = page.locator('[data-public-section="footer"]');
-    const workflow = page.locator('[data-homepage-section="workflow"]');
-    const help = page.locator('[data-homepage-section="help"]');
+    const hero = page.locator('[data-homepage-section="hero"]');
+    const footer = page.locator('.site-footer');
     const navLinks = page.locator('.site-nav a, .site-nav__current');
 
     await expect(heroTitle).toContainText('Chummer');
     await expect(primaryCta).toContainText('Download Chummer');
-    await expect(workflow).toContainText('What it does');
+    await expect(page.locator('.minimal-hero__points')).toContainText('Create');
+    await expect(page.locator('.minimal-hero__points')).toContainText('Track');
+    await expect(page.locator('.minimal-hero__points')).toContainText('Review');
+    await expect(page.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
-    await expect(help).toContainText('Need something else?');
-    await expect(help).toContainText('Participate');
+    await expect(page.locator('.minimal-inline-links')).toContainText('Help');
+    await expect(page.locator('.minimal-inline-links')).toContainText('Participate');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {
@@ -89,8 +91,12 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
 
     const heroBox = await heroTitle.boundingBox();
     const ctaBox = await primaryCta.boundingBox();
+    const heroSectionBox = await hero.boundingBox();
     if (!heroBox || !ctaBox) {
       failures.push(`${viewport.width}x${viewport.height}: hero title or primary CTA is not visible`);
+    }
+    if (viewport.width >= 1024 && (!heroSectionBox || heroSectionBox.y + heroSectionBox.height > viewport.height)) {
+      failures.push(`${viewport.width}x${viewport.height}: hero still exceeds the first viewport`);
     }
     const navCount = await navLinks.count();
     if (navCount > 4) {
@@ -105,6 +111,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
       overflow_px: overflow,
       hero_visible: !!heroBox,
       cta_visible: !!ctaBox,
+      hero_first_viewport_fit: !heroSectionBox ? false : heroSectionBox.y + heroSectionBox.height <= viewport.height,
       footer_visible: await footer.isVisible(),
       inline_nav_visible: await page.locator('.site-nav').isVisible(),
       screenshot: screenshotName,

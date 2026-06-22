@@ -1013,7 +1013,7 @@ else
                                                                 <span> Pulse: @PublicText(leadCommunityOperation.OperationsSummary)</span>
                                                                 <span> Return: @PublicText(leadCommunityOperation.CampaignReturnSummary)</span>
                                                                 <span> Season / event pulse: @PublicText(leadCommunityOperation.SeasonEventSummary)</span>
-                                                                <span> Publication: @HomeText(leadCommunityOperation.ArtifactPublicationSummary)</span>
+                                                                <span> Shared: @HomeText(leadCommunityOperation.ArtifactPublicationSummary)</span>
                                                                 <span> Support: @PublicText(leadCommunityOperation.SupportEscalationSummary)</span>
                                                                 <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadCommunityEvent))
@@ -1022,7 +1022,7 @@ else
                                                                 }
                                                                 @if (leadCommunityBoard is not null)
                                                                 {
-                                                                    <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
+                                                                    <span> Run: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
                                                                     @if (!string.IsNullOrWhiteSpace(leadCommunityBoard.RecapSummary))
                                                                     {
                                                                         <span> Recap: @leadCommunityBoard.RecapSummary</span>
@@ -1046,7 +1046,7 @@ else
                                                                 {
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
-                                                                <span> Guide: release notes, downloads, and support stay on the same view.</span>
+                                                                <span> Guide: release notes, downloads, and support stay together.</span>
                                                                 <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open what works today for the latest availability.")</span>
                                                                 <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open what works today for the latest fix status.")</span>
                                                                 <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open what works today for the latest notes.")</span>

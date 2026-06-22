@@ -36,25 +36,29 @@ public sealed class ExecutiveAssistantChannelMessagingService
 
     private const int MaxMessagesPerConversation = 500;
     private const int MaxConversationsPerUserChannel = 100;
+    private static readonly TimeSpan InboundDuplicateWindow = TimeSpan.FromMinutes(2);
 
     private readonly HttpClient _httpClient;
     private readonly CommunityStore _store;
     private readonly AccountService _accounts;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ExecutiveAssistantChannelMessagingService> _logger;
+    private readonly TeableExecutiveAssistantChannelService? _teable;
 
     public ExecutiveAssistantChannelMessagingService(
         HttpClient httpClient,
         CommunityStore store,
         AccountService accounts,
         IConfiguration configuration,
-        ILogger<ExecutiveAssistantChannelMessagingService>? logger = null)
+        ILogger<ExecutiveAssistantChannelMessagingService>? logger = null,
+        TeableExecutiveAssistantChannelService? teable = null)
     {
         _httpClient = httpClient;
         _store = store;
         _accounts = accounts;
         _configuration = configuration;
         _logger = logger ?? NullLogger<ExecutiveAssistantChannelMessagingService>.Instance;
+        _teable = teable;
     }
 
     public IReadOnlyList<ExecutiveAssistantChannelConversationDto> ListConversations(string subjectId, string channelKind, int take = 24)
@@ -235,8 +239,11 @@ public sealed class ExecutiveAssistantChannelMessagingService
             EnsureConversationMessageLimitLocked(conversation.ConversationId);
             EnsureConversationLimitLocked(user.UserId, normalizedChannelKind);
             _store.PersistLocked();
+            conversation = _store.ExecutiveAssistantChannelConversations.First(item =>
+                string.Equals(item.ConversationId, conversation.ConversationId, StringComparison.OrdinalIgnoreCase));
         }
 
+        _teable?.QueueSyncConversation(conversation);
         return BuildSendResult(outboundMessage, duplicate: false);
     }
 
@@ -250,7 +257,16 @@ public sealed class ExecutiveAssistantChannelMessagingService
         DateTimeOffset receivedAt = request.ReceivedAtUtc ?? DateTimeOffset.UtcNow;
         string? normalizedSubjectId = AccountService.NormalizeOptional(request.SubjectId);
         string? providedRecipientHandle = AccountService.NormalizeOptional(request.RecipientHandle);
-        HubUserDto user = ResolveIncomingUser(normalizedChannelKind, normalizedSubjectId, providedRecipientHandle, normalizedCounterparty);
+        string? normalizedRecipientHandle = providedRecipientHandle is null
+            ? null
+            : NormalizeCounterpartyHandle(normalizedChannelKind, providedRecipientHandle);
+        IncomingRouteResolution resolution = ResolveIncomingRoute(
+            normalizedChannelKind,
+            normalizedSubjectId,
+            normalizedCounterparty,
+            normalizedRecipientHandle);
+        HubUserDto user = resolution.User;
+        string normalizedExternalHandle = resolution.ExternalHandle;
 
         ChannelLinkDto? link = GetLinkedChannel(user.UserId, normalizedChannelKind);
         if (link is null)
@@ -259,17 +275,26 @@ public sealed class ExecutiveAssistantChannelMessagingService
         }
 
         string normalizedConversationId = AccountService.NormalizeOptional(request.ConversationId)
-            ?? BuildConversationId(user.UserId, normalizedChannelKind, HashPrivate("counterparty", normalizedCounterparty));
-        string messageId = AccountService.NormalizeOptional(request.MessageId) ?? AccountService.NewId("eami");
+            ?? BuildConversationId(user.UserId, normalizedChannelKind, HashPrivate("counterparty", normalizedExternalHandle));
+        string? providerMessageId = AccountService.NormalizeOptional(request.MessageId);
+        string messageId = providerMessageId ?? AccountService.NewId("eami");
 
+        ExecutiveAssistantChannelConversationState syncedConversation;
+        ExecutiveAssistantChannelMessageDto dto;
         lock (_store.Gate)
         {
             ExecutiveAssistantChannelConversationState conversation = GetOrCreateConversationLocked(
                 user.UserId,
                 normalizedChannelKind,
-                normalizedCounterparty,
+                normalizedExternalHandle,
                 normalizedConversationId,
                 receivedAt);
+
+            if (providerMessageId is null
+                && TryFindRecentInboundDuplicateLocked(conversation.ConversationId, normalizedExternalHandle, normalizedText, receivedAt) is ExecutiveAssistantChannelMessageState duplicate)
+            {
+                return ToMessageDto(duplicate);
+            }
 
             ExecutiveAssistantChannelMessageState? existing = _store.ExecutiveAssistantChannelMessages.FirstOrDefault(item =>
                 string.Equals(item.ConversationId, conversation.ConversationId, StringComparison.OrdinalIgnoreCase)
@@ -288,7 +313,7 @@ public sealed class ExecutiveAssistantChannelMessagingService
                 SafetyLabel: SubjectMessageSafetyLabel,
                 DeliveryStatus: MessageStatusReceived,
                 CreatedAtUtc: receivedAt,
-                CounterpartyHandle: normalizedCounterparty,
+                CounterpartyHandle: normalizedExternalHandle,
                 DeliveryRef: null,
                 FailureReason: null,
                 IdempotencyKey: null);
@@ -309,38 +334,73 @@ public sealed class ExecutiveAssistantChannelMessagingService
             EnsureConversationMessageLimitLocked(conversation.ConversationId);
             EnsureConversationLimitLocked(user.UserId, normalizedChannelKind);
             _store.PersistLocked();
-
-            return ToMessageDto(incomingMessage);
+            syncedConversation = _store.ExecutiveAssistantChannelConversations[conversationIndex];
+            dto = ToMessageDto(incomingMessage);
         }
+
+        _teable?.QueueSyncConversation(syncedConversation);
+        return dto;
     }
 
-    private HubUserDto ResolveIncomingUser(
+    private ExecutiveAssistantChannelMessageState? TryFindRecentInboundDuplicateLocked(
+        string conversationId,
+        string normalizedCounterpartyHandle,
+        string normalizedText,
+        DateTimeOffset receivedAt)
+    {
+        return _store.ExecutiveAssistantChannelMessages.FirstOrDefault(item =>
+            string.Equals(item.ConversationId, conversationId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Direction, MessageDirectionIncoming, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.CounterpartyHandle, normalizedCounterpartyHandle, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Text, normalizedText, StringComparison.Ordinal)
+            && Math.Abs((item.CreatedAtUtc - receivedAt).TotalSeconds) <= InboundDuplicateWindow.TotalSeconds);
+    }
+
+    private IncomingRouteResolution ResolveIncomingRoute(
         string channelKind,
         string? subjectId,
-        string? recipientHandle,
-        string normalizedCounterpartyHandle)
+        string normalizedCounterpartyHandle,
+        string? normalizedRecipientHandle)
     {
         if (subjectId is not null)
         {
             HubUserDto? subjectUser = _accounts.GetBySubject(subjectId);
             if (subjectUser is not null)
             {
-                return subjectUser;
+                return new IncomingRouteResolution(subjectUser, normalizedCounterpartyHandle, "subject_id");
             }
         }
 
-        HubUserDto? resolved = FindUserByChannelRecipient(channelKind, normalizedCounterpartyHandle);
-        if (resolved is null)
+        HubUserDto? counterpartyUser = FindUserByChannelRecipient(channelKind, normalizedCounterpartyHandle);
+        HubUserDto? recipientUser = string.IsNullOrWhiteSpace(normalizedRecipientHandle)
+            ? null
+            : FindUserByChannelRecipient(channelKind, normalizedRecipientHandle);
+
+        if (counterpartyUser is not null && recipientUser is not null
+            && !string.Equals(counterpartyUser.UserId, recipientUser.UserId, StringComparison.OrdinalIgnoreCase))
         {
-            string recipientDetail = recipientHandle is null
-                ? "no recipient handle was supplied"
-                : $"recipient handle {recipientHandle} was supplied";
-            throw new ArgumentException(
-                $"Unable to route incoming {channelKind} message to an EA-linked user for counterparty {normalizedCounterpartyHandle}; {recipientDetail}.");
+            throw new InvalidOperationException(
+                $"Ambiguous incoming {channelKind} routing; counterparty {normalizedCounterpartyHandle} and recipient {normalizedRecipientHandle} resolve to different EA-linked users.");
         }
 
-        return resolved;
+        if (counterpartyUser is not null)
+        {
+            return new IncomingRouteResolution(counterpartyUser, normalizedCounterpartyHandle, "counterparty_handle");
+        }
+
+        if (recipientUser is not null && normalizedRecipientHandle is not null)
+        {
+            return new IncomingRouteResolution(recipientUser, normalizedRecipientHandle, "recipient_handle");
+        }
+
+        string recipientDetail = normalizedRecipientHandle is null
+            ? "no recipient handle was supplied"
+            : $"recipient handle {normalizedRecipientHandle} was supplied";
+        throw new ArgumentException(
+            $"Unable to route incoming {channelKind} message to an EA-linked user for counterparty {normalizedCounterpartyHandle}; {recipientDetail}.");
     }
+
+    private sealed record IncomingRouteResolution(HubUserDto User, string ExternalHandle, string RouteSource);
 
     private HubUserDto? FindUserByChannelRecipient(string channelKind, string normalizedRecipient)
     {

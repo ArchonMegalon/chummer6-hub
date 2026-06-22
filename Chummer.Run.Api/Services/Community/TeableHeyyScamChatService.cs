@@ -124,7 +124,7 @@ public sealed class TeableHeyyScamChatService
         new("Risk Signals", "longText", Description: "Detected risk signals, one per line."),
         new("Missing Context Checks", "longText", Description: "What the operator should verify outside the scam chat."),
         new("Forbidden Actions", "longText", Description: "Actions the bot and operator flow must not perform."),
-        new("Suggested Delay Seconds", "singleLineText", Description: "Old-lady slow typing delay suggestion."),
+        new("Suggested Delay Seconds", "singleLineText", Description: "Persona-configured slow typing delay suggestion."),
         new("Transcript", "longText", Description: "Conversation transcript according to configured redaction policy."),
         new("Latest Draft", "longText", Description: "Latest manual-approval draft."),
         new("Latest Pacing Hint", "longText", Description: "How slowly to reply if manually approved."),
@@ -439,7 +439,8 @@ public sealed class TeableHeyyScamChatService
 
     private async Task<string?> FindExistingRecordIdAsync(string tableId, string conversationId, TeableOptions options, CancellationToken cancellationToken)
     {
-        string filter = Uri.EscapeDataString($"{{Conversation Id}} = '{conversationId}'");
+        string escapedConversationId = conversationId.Replace("'", "\\'", StringComparison.Ordinal);
+        string filter = Uri.EscapeDataString($"{{Conversation Id}} = '{escapedConversationId}'");
         string path = $"{options.ApiBaseUrl}/table/{Uri.EscapeDataString(tableId)}/record?fieldKeyType=name&take=1&filterByTql={filter}";
         JsonDocument response = await SendAsync(HttpMethod.Get, path, null, options.ApiKey, cancellationToken);
         using (response)

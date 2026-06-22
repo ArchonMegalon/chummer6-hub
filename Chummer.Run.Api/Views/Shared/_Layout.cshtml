@@ -89,6 +89,7 @@
         .Where(action => !(minimalSurface && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)))
         .Where(action => routeKey is not "landing" || !normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
         .ToArray();
+    var showPrimaryNavInHeader = !minimalSurface && routeKey is not "landing";
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
@@ -112,6 +113,12 @@
         .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
         .Select(group => group.First())
         .ToArray();
+    if (minimalSurface)
+    {
+        footerLinks = footerLinks
+            .Where(link => link.Href is "/status" or "/help" or "/contact")
+            .ToArray();
+    }
     var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
     var contextSidebarHeading = ViewData["ContextSidebarHeading"] as string;
     var contextSidebarSummary = ViewData["ContextSidebarSummary"] as string;
@@ -381,20 +388,23 @@
                     <span class="site-brand__wordmark">CHUMMER</span>
                     <span class="site-brand__surface">Shadowrun character manager</span>
                 </a>
-                <nav class="site-nav" aria-label="Primary navigation">
-                    @foreach (var link in primarySiteLinks)
-                    {
-                        var current = isContextualRouteCurrent(link.Href);
-                        if (current)
+                @if (showPrimaryNavInHeader)
+                {
+                    <nav class="site-nav" aria-label="Primary navigation">
+                        @foreach (var link in primarySiteLinks)
                         {
-                            <span class="site-nav__current">@link.Label</span>
+                            var current = isContextualRouteCurrent(link.Href);
+                            if (current)
+                            {
+                                <span class="site-nav__current">@link.Label</span>
+                            }
+                            else
+                            {
+                                <a href="@link.Href">@link.Label</a>
+                            }
                         }
-                        else
-                        {
-                            <a href="@link.Href">@link.Label</a>
-                        }
-                    }
-                </nav>
+                    </nav>
+                }
                 <div class="site-actions">
                     @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
                     {
@@ -504,7 +514,7 @@
                     }
                     else
                     {
-                        <p>Current published release.</p>
+                        <p>Release live.</p>
                     }
                     @if (!minimalSurface)
                     {

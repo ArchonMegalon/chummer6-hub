@@ -11993,7 +11993,7 @@ def main() -> int:
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Choose the latest build for Windows or Linux.",
+                "Windows and Linux installers.",
                 "Nightly",
                 "Stable",
                 "Build run-",

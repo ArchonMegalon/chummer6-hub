@@ -13,13 +13,15 @@ def read(relative_path: str) -> str:
 def test_main_public_routes_use_minimal_surface_contract() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
+    dispatch = read("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml")
     status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
     horizons = read("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml")
     product_story = read("Chummer.Run.Api/Views/PublicLanding/ProductStory.cshtml")
     faq = read("Chummer.Run.Api/Views/PublicLanding/Faq.cshtml")
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     trust_page = read("Chummer.Run.Api/Views/PublicLanding/TrustPage.cshtml")
 
-    for source in (landing, downloads, status, horizons, product_story, faq):
+    for source in (landing, downloads, dispatch, status, horizons, product_story, faq, shelf):
         assert 'surface-minimal' in source
 
     assert 'surface-help surface-minimal' in trust_page
@@ -57,7 +59,6 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "@PublicText(option.Label)",
         "@PublicText(Model.SupportIntake.AccountSupportLabel)",
         "@PublicText(Model.SupportIntake.InstallAccessLabel)",
-        "@PublicText(Model.SupportIntake.ResponseExpectation)",
         "@PublicText(Model.SupportIntake.InstallRailLabel)",
     ):
         assert expected in trust_page
@@ -117,7 +118,6 @@ def test_faq_page_cleans_dynamic_public_copy_before_rendering() -> None:
         "@PublicText(Model.Eyebrow)",
         "@PublicText(Model.Heading)",
         "@PublicText(Model.Intro)",
-        "@PublicText(action.Label)",
         "@PublicText(choice.Badge)",
         "@PublicText(choice.Title)",
         "@PublicText(choice.Summary)",
@@ -132,7 +132,6 @@ def test_faq_page_cleans_dynamic_public_copy_before_rendering() -> None:
         ">@Model.Eyebrow</p>",
         ">@Model.Heading</h1>",
         ">@Model.Intro</p>",
-        ">@action.Label</a>",
         "<span class=\"tag\">@choice.Badge</span>",
         "<h3>@choice.Title</h3>",
         "<p>@choice.Summary</p>",
@@ -233,7 +232,7 @@ def test_public_front_door_hides_unready_campaign_and_ai_language() -> None:
 def test_homepage_has_minimal_promo_entry_surface() -> None:
     landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
 
-    assert "A Shadowrun character manager for building, updating, and bringing clean sheets to the table." in landing
+    assert "A Shadowrun character manager for clean sheets and faster tables." in landing
     assert "Download Chummer" in landing
     assert 'href="/downloads"' in landing
     assert 'href="/downloads#stable"' not in landing
@@ -349,7 +348,8 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     assert "Open setup help" in mobile
     assert "campaign-only details" in ledger_workspace
     assert "Get the app" not in landing
-    assert "Need something else?" in landing
+    assert "minimal-inline-links" in landing
+    assert 'data-homepage-section="help"' not in landing
     assert 'href="/participate"' in landing
     assert ".minimal-video" in site_css
     assert "aspect-ratio: 16 / 9;" in site_css
@@ -454,10 +454,10 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
 def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
     packet = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
 
-    assert "Open the Chummer page" in packet
+    assert "Open page" in packet
     assert "How this works" in packet
     assert "Limits" in packet
-    assert "Public feedback can move into review" in packet
+    assert "Public feedback can move into review, but it does not replace help, roadmap, or release updates." in packet
     assert "guided review path" in packet
 
     for forbidden in (
@@ -486,9 +486,9 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
     assert "KARMA FORGE request saved" in controller
     assert "The request is saved. Chummer can now show the likely review route and the next questions." in controller
     assert "Consent must be accepted before Chummer can save the request." in controller
-    assert "Account history keeps recent requests and next steps together." in karma_forge
-    assert "Account submissions stay visible here with current queue status." in karma_forge
-    assert "No account KARMA FORGE requests are visible on this account yet." in karma_forge
+    assert "Your saved requests and next steps stay together." in karma_forge
+    assert "Your requests stay visible here with current status." in karma_forge
+    assert "No saved KARMA FORGE requests are visible yet." in karma_forge
     assert "new PublicNavigationLink(\"Saved details\", \"#saved-details\")" in karma_submitted
     assert "id=\"saved-details\"" in karma_submitted
     assert 'journeyRef.EventKey.Replace("_", " ", StringComparison.OrdinalIgnoreCase)' in karma_submitted
@@ -1379,9 +1379,9 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
 
     assert "Original item" in feedback_operations
     assert "Open related details" in feedback_operations
-    assert "Open details" in feedback_operations
-    assert "Download message details" in feedback_operations
-    assert "Download item details" in feedback_operations
+    assert "Open JSON" in feedback_operations
+    assert "Download message JSON" in feedback_operations
+    assert "Download item JSON" in feedback_operations
     assert "posted follow-up update" in signal_operations
     assert "message update" in feedback_operations
     assert "follow-up update" in feedback_operations
@@ -1577,14 +1577,15 @@ def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
     ):
         assert forbidden not in combined
 
-    assert "Search by item id" in lookup
+    assert "Search by item, message, recipient, delivery, or reference id." in lookup
     assert "Items and threads" in lookup
     assert "Items only" in lookup
     assert "Chummer history" in lookup
     assert "saved state" in lookup
-    assert "saved items" in lookup
-    assert "No item or thread matched this query" in lookup
-    assert "Open details" in lookup
+    assert "saved feedback" in lookup
+    assert "No item or thread matched" in lookup
+    assert "Open result" in lookup
+    assert "Open JSON" in lookup
     assert "Open lookup data" not in lookup
     assert "Open detail data" not in lookup
     assert "<th scope=\"col\">Entries</th>" in leaderboards
@@ -1721,8 +1722,8 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "@Model.Receipt.ActorLabel" not in package_receipt
     assert "@Model.Package.Title" not in package_receipt
     assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
-    assert "<span class=\"tag\">Details</span>" in publication
-    assert "related detail" in publication
+    assert "<span class=\"tag\">Origin</span>" in publication
+    assert "related page" in publication
 
 
 def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -> None:
@@ -1858,6 +1859,11 @@ def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
         "@PublicPrivacyText(Model.PrimaryAction.Label)",
         "@PublicPrivacyText(domain.RetentionSummary)",
         "@PublicPrivacyText(rule.BlockedSummary)",
+        "Kept for:",
+        "Removed from public pages:",
+        "Public:",
+        "Account:",
+        "Never shown:",
         "@PublicSignedInTrustText(Model.Heading)",
         "@PublicSignedInTrustText(Model.PrimaryAction.Label)",
         "@PublicSignedInTrustText(row.Label)",
@@ -1906,13 +1912,14 @@ def test_public_detail_page_uses_account_language_instead_of_signed_in_labels() 
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
 
     for expected in (
-        "Account return view",
+        "Open your library",
         "Account return",
-        "one account view",
-        "The account view keeps aftermath",
-        "account history card(s)",
-        "account history, or help",
-        "Account history",
+        "one library",
+        "your runner and return details visible",
+        "Your library keeps aftermath",
+        "account history page(s)",
+        "account return, or help",
+        "Your library",
     ):
         assert expected in shelf
 
@@ -1933,11 +1940,10 @@ def test_public_publication_page_uses_account_return_language() -> None:
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
 
     for expected in (
-        "Open account return view",
-        "Create account for account return",
-        "Use the account return view",
-        "Account return keeps public and private returns together",
-        "Choose gallery, downloads, account return, or help on purpose.",
+        "Open your library",
+        "Create account for your library",
+        "Your library keeps public and private returns together",
+        "Choose gallery, downloads, library, or help.",
     ):
         assert expected in publication
 
@@ -1947,7 +1953,7 @@ def test_public_publication_page_uses_account_return_language() -> None:
         "Use the signed-in detail view",
         "Signed-in account return keeps public and private returns together",
         "signed-in account-return view",
-        "Choose gallery, downloads, signed-in account return, or help on purpose.",
+        "Choose gallery, downloads, signed-in account return, or help.",
     ):
         assert forbidden not in publication
 
@@ -2048,7 +2054,8 @@ def test_publication_detail_page_uses_plain_labels() -> None:
         assert forbidden not in publication
 
     assert "Limited detail" in publication
-    assert "Page: @routeStateLabel" in publication
+    assert "Page status: @routeStateLabel" in publication
+    assert "ViewData[\"SurfaceClass\"] = \"surface-artifacts surface-minimal\";" in publication
     assert "ViewData[\"Title\"] = PublicPublicationText(Model.Publication.Title)" in publication
     assert "@PublicPublicationText(Model.Publication.Title)" in publication
     assert "@PublicPublicationText(Model.Publication.Summary)" in publication
@@ -2057,13 +2064,13 @@ def test_publication_detail_page_uses_plain_labels() -> None:
     assert "@Model.Publication.Title" not in publication
     assert "@Model.Publication.Summary" not in publication
     assert "@Model.TrustPulse.RouteGuardSummary" not in publication
-    assert "Install notes nearby" in publication
-    assert "Clear install path" in publication
+    assert "Current build" in publication
+    assert "Setup help nearby" in publication
     assert "Public discovery stays open" in publication
-    assert "Some desktop work is still open, so this public summary stays short." in publication
+    assert "Some desktop work is still open, so this page stays short." in publication
     assert "Status</span>" in publication
     assert "History</span>" in publication
-    assert "related detail" in publication
+    assert "related page" in publication
 
 
 def test_faction_workspace_uses_page_language_instead_of_route_language() -> None:

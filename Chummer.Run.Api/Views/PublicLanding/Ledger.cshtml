@@ -174,7 +174,7 @@
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Lead dispatch</span>
                 <strong>@(leadDispatch is null ? "Dispatch queue open" : PublicFacingCopyHumanizer.Clean(leadDispatch.Title))</strong>
-                <p>@(leadDispatch is null ? "Public board hooks are staged and ready for the next turn." : PublicFacingCopyHumanizer.Clean(leadDispatch.Summary))</p>
+                <p>@(leadDispatch is null ? "Public hooks are staged and ready for the next turn." : PublicFacingCopyHumanizer.Clean(leadDispatch.Summary))</p>
             </article>
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Focus faction</span>
@@ -212,7 +212,7 @@
         <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@PublicFacingCopyHumanizer.Clean(accountCtaLabel)">
             <span class="tag">Faction workspace</span>
             <strong>@PublicFacingCopyHumanizer.Clean(accountCtaLabel)</strong>
-            <p>Step from the public board into the account-side faction workspace.</p>
+            <p>Step from the public map into the faction workspace in your account.</p>
         </a>
     </nav>
 </section>

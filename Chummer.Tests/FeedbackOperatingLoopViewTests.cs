@@ -41,12 +41,12 @@ public sealed class FeedbackOperatingLoopViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("Roadmap", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("What we are working on next", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("See recent updates", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What is next", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Open changelog", roadmapView, StringComparison.Ordinal);
         Assert.Contains("/changelog", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Suggest a change", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Participate", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Loop return", changelogView, StringComparison.Ordinal);
+        Assert.Contains("What changed, and what comes next.", changelogView, StringComparison.Ordinal);
         Assert.Contains("Browse roadmap", changelogView, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.FollowSettingsHref", changelogView, StringComparison.Ordinal);
     }

@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-AUDIO_SCRIPT = REPO_ROOT / "scripts" / "rebuild_public_video_audio_unmixr.py"
+AUDIO_SCRIPT = REPO_ROOT / "scripts" / "public_video_audio_quality.py"
 GATE_SCRIPT = REPO_ROOT / "scripts" / "verify_horizon_video_audio_exit_gate.py"
 
 
@@ -18,14 +18,15 @@ def _load(path: Path, name: str):
     return module
 
 
-def test_public_video_audio_rebuild_module_is_retired_fail_closed(tmp_path: Path) -> None:
-    audio = _load(AUDIO_SCRIPT, "rebuild_public_video_audio_unmixr_for_test")
+def test_public_video_audio_quality_module_is_active() -> None:
+    audio = _load(AUDIO_SCRIPT, "public_video_audio_quality_for_test")
 
-    quality = audio.audio_quality(tmp_path / "tail.wav")
+    quality = audio.audio_quality(Path("/does/not/exist/asset.mp4"))
 
-    assert audio.PIPELINE_RETIRED is True
+    assert audio.UNMIXR_PROVIDER == "unmixr-short-tts"
     assert quality["status"] == "fail"
-    assert "retired_faulty_public_video_audio_pipeline" in quality["reasons"][0]
+    assert quality["reasons"] == ["audio_file_missing:/does/not/exist/asset.mp4"]
+    assert audio.retirement_receipt().get("pipeline") == "public_video_audio_quality"
 
 
 def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -> None:
@@ -51,6 +52,10 @@ def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -
         SILENCE_GATE_DBFS = -42.0
         MAX_SILENCE_SECONDS = 0.70
         MAX_EDGE_SILENCE_SECONDS = 0.30
+        ALICE_VOICE_POLICY = "unmixr_premium_female_required_no_edge_fallback"
+        ALICE_VOICE_GENDER = "female"
+        ALICE_VOICE_QUALITY = "premium"
+        ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 
         @staticmethod
         def probe(path):

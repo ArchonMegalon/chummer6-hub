@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import textwrap
 from pathlib import Path
+import sys
 from typing import Iterable
 
 import requests
@@ -15,10 +16,16 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts
+
+
 FPS = 30
 WIDTH = 1920
 HEIGHT = 1080
-DEFAULT_VOICE = "en-US-JennyNeural"
 NEWSREEL_ROOT = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "wwwroot" / "media" / "ledger" / "newsreels"
 
 
@@ -26,8 +33,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render first-party Black Ledger turn newsreel videos with narration and score.")
     parser.add_argument("--turn", type=int, default=1, help="Turn number to render.")
     parser.add_argument("--base-url", default="", help="Optional running Chummer base URL. When omitted the script launches a temporary local app.")
-    parser.add_argument("--voice", default=DEFAULT_VOICE, help="Edge TTS voice id.")
-    parser.add_argument("--edge-python", default="", help="Optional Python executable that can import edge_tts.")
     return parser.parse_args()
 
 
@@ -126,48 +131,12 @@ def write_vtt(path: Path, timings: list[tuple[float, float, str]]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def find_edge_python(explicit: str) -> str:
-    candidates = [explicit.strip()] if explicit.strip() else []
-    candidates.extend([
-        "/tmp/black-ledger-newsreel-venv/bin/python",
-        "/tmp/black-ledger-newsreel-venv/bin/python3",
-    ])
-    for candidate in candidates:
-        if candidate and Path(candidate).is_file():
-            return candidate
-    raise RuntimeError("No Python executable with edge_tts available. Pass --edge-python.")
-
-
-def render_narration(edge_python: str, voice: str, script_text: str, output_path: Path, work_root: Path) -> None:
-    script_path = work_root / "newsreel-script.txt"
-    script_path.write_text(script_text, encoding="utf-8")
-    temp_code = work_root / "edge_tts_render.py"
-    temp_code.write_text(
-        """
-import asyncio
-import pathlib
-import sys
-import edge_tts
-
-voice = sys.argv[1]
-script_path = pathlib.Path(sys.argv[2])
-output_path = pathlib.Path(sys.argv[3])
-
-async def main() -> None:
-    text = script_path.read_text(encoding="utf-8")
-    communicate = edge_tts.Communicate(text=text, voice=voice)
-    await communicate.save(str(output_path))
-
-asyncio.run(main())
-""".strip()
-        + "\n",
-        encoding="utf-8",
+def render_narration(script_text: str, output_path: Path) -> dict[str, str]:
+    profile = load_profile(
+        prefixes=("UNMIXR_BLACK_LEDGER_NEWSREEL",),
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
     )
-    subprocess.run(
-        [edge_python, str(temp_code), voice, str(script_path), str(output_path)],
-        check=True,
-        cwd=str(RUN_SERVICES_ROOT),
-    )
+    return render_short_tts(script_text, output_path, profile=profile)
 
 
 def ffprobe_duration(path: Path) -> float:
@@ -392,7 +361,7 @@ def draw_scene(
     return image.convert("RGB")
 
 
-def build_video_assets(payload: dict, output_root: Path, edge_python: str, voice: str) -> dict:
+def build_video_assets(payload: dict, output_root: Path) -> dict:
     output_root.mkdir(parents=True, exist_ok=True)
     slug = f"turn-{payload['toTurn']}-newsreel"
     mp4_path = output_root / f"{slug}.mp4"
@@ -406,7 +375,7 @@ def build_video_assets(payload: dict, output_root: Path, edge_python: str, voice
         frames_root = Path(temp_dir)
         narration_path = frames_root / "narration.mp3"
         music_path = frames_root / "music.wav"
-        render_narration(edge_python, voice, script_text, narration_path, frames_root)
+        profile = render_narration(script_text, narration_path)
         narration_duration = ffprobe_duration(narration_path)
         total_duration = max(16.0, narration_duration + 1.0)
         render_music(music_path, total_duration)
@@ -510,6 +479,7 @@ def build_video_assets(payload: dict, output_root: Path, edge_python: str, voice
         "timings": timings,
         "narration_duration_seconds": narration_duration,
         "duration_seconds": total_duration,
+        "voice_id": profile["voice_id"],
         "mp4_path": str(mp4_path),
         "webm_path": str(webm_path),
         "poster_path": str(poster_path),
@@ -537,25 +507,24 @@ def write_receipt(turn: int, base_url: str, render: dict, payload: dict) -> None
         "webm_path": render["webm_path"],
         "poster_path": render["poster_path"],
         "captions_path": render["captions_path"],
-        "voice": DEFAULT_VOICE,
+        "voice": render.get("voice_id") or "",
     }
     write_json(completion_path("BLACK_LEDGER_TURN_NEWSREEL_RENDER.generated.json"), proof)
 
 
-def run(base_url: str, turn: int, voice: str, edge_python: str) -> int:
+def run(base_url: str, turn: int) -> int:
     payload = load_payload(base_url, turn)
-    render = build_video_assets(payload, NEWSREEL_ROOT, edge_python, voice)
+    render = build_video_assets(payload, NEWSREEL_ROOT)
     write_receipt(turn, base_url, render, payload)
     return 0
 
 
 def main() -> int:
     args = parse_args()
-    edge_python = find_edge_python(args.edge_python)
     if args.base_url:
-        return run(args.base_url, args.turn, args.voice, edge_python)
+        return run(args.base_url, args.turn)
     with LocalHubApp() as app:
-        return run(app.base_url, args.turn, args.voice, edge_python)
+        return run(app.base_url, args.turn)
 
 
 if __name__ == "__main__":

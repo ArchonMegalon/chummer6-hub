@@ -5,11 +5,11 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-roadmap surface-minimal";
 
-    var milestones = Model.Milestones.Take(3).ToArray();
+    var milestones = Model.Milestones.Take(4).ToArray();
     var plannedWork = Model.Horizons
         .Where(item => PublicSurfaceStatus.IsPreparingNext(item.Card.Badge)
             || PublicSurfaceStatus.IsDesigningInPublic(item.Card.Badge))
-        .Take(3)
+        .Take(4)
         .ToArray();
 
     static string RoadmapText(string? value)
@@ -22,41 +22,87 @@
             .Replace("implementation", "work", StringComparison.OrdinalIgnoreCase);
 }
 
-<section class="feature-detail-hero route-anchor-target">
-    <p class="eyebrow">Roadmap</p>
-    <h1 class="page-title">What we are working on next</h1>
-    <p class="page-copy">A short view of direction and open work. Use the changelog for what already shipped, and feedback when you want to ask for a change.</p>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/feedback">Suggest a change</a>
-        <a class="button-like button-like--secondary" href="/changelog">See recent updates</a>
-        <a class="button-like button-like--ghost" href="/now">What works today</a>
+<section class="minimal-page-hero route-anchor-target roadmap-signal">
+    <div>
+        <p class="eyebrow">Roadmap</p>
+        <h1>What is next</h1>
+        <p>A short view of current work and later ideas. Use the changelog for shipped changes.</p>
+    </div>
+    <div class="minimal-status-pill">
+        <span>Planning surface</span>
+        <strong>Current work</strong>
+        <span>Later ideas</span>
+        <span>Changelog covers shipped work</span>
     </div>
 </section>
 
-<section class="feature-detail-panel" aria-labelledby="roadmap-active-work">
-    <div>
+<section class="status-decision-strip roadmap-signal-grid" aria-label="Roadmap route split">
+    <article class="status-decision-strip__card">
+        <span class="tag">Participate</span>
+        <h2>Votes inform demand.</h2>
+        <p>Feedback, planning, shipped updates, and private help stay on different pages.</p>
+        <a class="button-like button-like--ghost" href="/participate">Participate</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Shipped</span>
+        <h2>Use changelog for live changes.</h2>
+        <p>Recent requests at a glance. The changelog owns what is already in the app or public routes.</p>
+        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Help</span>
+        <h2>Use Help for setup, account, or bug problems.</h2>
+        <p>Leave this page when the next step needs support instead of planning context.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </article>
+</section>
+
+<section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
+    <div class="minimal-section__lead">
         <p class="eyebrow">Now</p>
-        <h2 id="roadmap-active-work" class="editorial-title">Near-term work</h2>
-        <p class="editorial-copy">These items are active enough to mention publicly, but they are not promises until they appear in the changelog.</p>
+        <h2 id="roadmap-active-work">Current work</h2>
+        <p>These items are active enough to mention publicly. They are not promises until they reach the changelog.</p>
     </div>
 
     @if (milestones.Length == 0)
     {
-        <article class="feature-detail-card">
-            <span class="tag tag--quiet">Not loaded</span>
+        <article class="minimal-empty">
             <h3>Milestones are temporarily unavailable</h3>
-            <p>Try the changelog or feedback page while this view catches up.</p>
+            <p>Try the changelog or participate page while this view catches up.</p>
         </article>
     }
     else
     {
-        <div class="route-choice-grid">
+        <div class="minimal-lane-grid">
             @foreach (var milestone in milestones)
             {
-                <article class="feature-detail-card">
+                <article class="minimal-lane-card">
                     <span class="tag">@RoadmapText(milestone.StatusLabel)</span>
                     <h3>@RoadmapText(milestone.Title)</h3>
                     <p>@RoadmapText(milestone.CasualSummary)</p>
+                    <dl class="roadmap-milestone-facts milestone-drawer__tease">
+                        <div>
+                            <dt>Difficulty:</dt>
+                            <dd>@RoadmapText(milestone.DifficultyLabel) · @RoadmapText(milestone.DifficultySummary)</dd>
+                        </div>
+                        <div>
+                            <dt>Claimed:</dt>
+                            <dd>@(milestone.Claimed ? RoadmapText(milestone.ClaimedLabel) : "No") · @RoadmapText(milestone.ClaimedSummary)</dd>
+                        </div>
+                        <div>
+                            <dt>Dependencies:</dt>
+                            <dd>
+                                @if (milestone.Dependencies.Count == 0)
+                                {
+                                    <span>@RoadmapText(milestone.DependencySummary)</span>
+                                }
+                                else
+                                {
+                                    <span>@string.Join(", ", milestone.Dependencies.Select(static dependency => $"{dependency.Title} ({dependency.StatusLabel})"))</span>
+                                }
+                            </dd>
+                        </div>
+                    </dl>
                 </article>
             }
         </div>
@@ -65,22 +111,37 @@
 
 @if (plannedWork.Length > 0)
 {
-    <section class="feature-detail-panel" aria-labelledby="roadmap-planned-work">
-        <div>
+    <section class="minimal-section minimal-section--tight" aria-labelledby="roadmap-planned-work">
+        <div class="minimal-section__lead">
             <p class="eyebrow">Later</p>
-            <h2 id="roadmap-planned-work" class="editorial-title">Ideas worth following</h2>
-            <p class="editorial-copy">A few larger directions are visible so contributors can decide where their feedback belongs.</p>
+            <h2 id="roadmap-planned-work">Worth watching</h2>
+            <p>A few larger directions stay visible so people know where their feedback belongs.</p>
         </div>
-        <div class="route-choice-grid">
+        <div class="minimal-lane-grid">
             @foreach (var item in plannedWork)
             {
-                <article class="feature-detail-card">
+                <article class="minimal-lane-card">
                     <span class="tag">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
                     <h3>@RoadmapText(item.Card.Title)</h3>
                     <p>@RoadmapText(item.Card.Summary)</p>
-                    <a class="editorial-strip__action" href="@item.Action.Href">@RoadmapText(item.Action.Label)</a>
+                    <div class="minimal-actions">
+                        <a class="button-like button-like--ghost" href="@item.Action.Href">@RoadmapText(item.Action.Label)</a>
+                    </div>
                 </article>
             }
         </div>
     </section>
 }
+
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Next</p>
+        <h2>Read the direction, then move on.</h2>
+        <p>Use Participate for demand, Changelog for shipped changes, or What works today for the current app.</p>
+    </div>
+    <div class="minimal-actions">
+        <a class="button-like button-like--primary" href="/participate">Participate</a>
+        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
+        <a class="button-like button-like--ghost" href="/now">What works today</a>
+    </div>
+</section>

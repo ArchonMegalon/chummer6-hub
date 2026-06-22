@@ -2,18 +2,18 @@
 @{
     ViewData["Title"] = "Black Ledger advisory voting";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-ledger";
+    ViewData["SurfaceClass"] = "surface-ledger surface-minimal";
 }
 
 <section class="ledger-flagship ledger-flagship--notifications">
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">Controlled signal</p>
+        <p class="eyebrow">Advisory</p>
         <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
         <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
         <p class="ledger-flagship__support">@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="/account/ledger/notifications">Open inbox</a>
-            <a class="button-like button-like--secondary" href="/account/ledger">Back to command</a>
+            <a class="button-like button-like--secondary" href="/account/ledger">Back to Black Ledger</a>
             <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open public globe</a>
         </div>
     </div>
@@ -35,8 +35,8 @@
         <div class="ledger-flagship__nav" aria-label="Advisory command paths">
             <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/notifications">
                 <span class="tag">Inbox</span>
-                <strong>World-turn inbox</strong>
-                <p>Read the turn package and delivery path before pushing advice up the chain.</p>
+                <strong>Turn inbox</strong>
+                <p>Read the turn package and delivery path before sending advice onward.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
                 <span class="tag">World state</span>
@@ -54,13 +54,13 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Command doctrine</p>
+        <p class="eyebrow">How it works</p>
         <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)</h2>
         <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Governance</span>
+            <span class="tag">Rule</span>
             <p>@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
         </article>
     </div>
@@ -152,12 +152,12 @@
 
 @if (Model.Summary.ExecutiveSummaries.Count > 0)
 {
-    <section class="editorial-block">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Executive intake</p>
-            <h2 class="editorial-title">What reaches the faction leader</h2>
-            <p class="editorial-copy">The leader receives the GM stack as signal, not as chain-of-command replacement.</p>
-        </div>
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Leader brief</p>
+        <h2 class="editorial-title">What reaches the faction leader</h2>
+        <p class="editorial-copy">The leader receives the GM stack as signal, not as chain-of-command replacement.</p>
+    </div>
         <div class="route-choice-grid">
             @foreach (var summary in Model.Summary.ExecutiveSummaries)
             {

@@ -2,26 +2,27 @@
 @{
     ViewData["Title"] = "Feedback Activity";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-participate";
+    ViewData["SurfaceClass"] = "surface-participate surface-minimal";
     var lookup = Model.Lookup;
     var results = lookup.Results.ToArray();
+    static string PublicLookupText(string? value) => PublicFacingCopyHumanizer.Clean(value);
 }
 
 <section class="release-footnote route-anchor-target">
-    <p class="eyebrow">@lookup.Eyebrow</p>
-    <h1 class="page-title">@lookup.Heading</h1>
-    <p class="page-copy">@lookup.Summary</p>
+    <p class="eyebrow">@PublicLookupText(lookup.Eyebrow)</p>
+    <h1 class="page-title">@PublicLookupText(lookup.Heading)</h1>
+    <p class="page-copy">@PublicLookupText(lookup.Summary)</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--ghost" href="/feedback">Back to feedback</a>
-        <a class="button-like button-like--ghost" href="/feedback/operations">Open aggregate detail</a>
+        <a class="button-like button-like--ghost" href="/feedback">Back to Participate</a>
+        <a class="button-like button-like--ghost" href="/feedback/operations">Open summary</a>
     </div>
-    <p class="muted-copy">Search by item id, message id, recipient ref, address hash, delivery id, or item reference.</p>
+    <p class="muted-copy">Search by item, message, recipient, delivery, or reference id.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Feedback lookup controls">
     <article class="status-decision-strip__card">
-        <span class="tag">Lookup controls</span>
-        <h2>Search one saved feedback area instead of scanning the whole archive.</h2>
+        <span class="tag">Search</span>
+        <h2>Search saved feedback without scanning everything.</h2>
         <form class="auth-form" method="get" action="/feedback/operations/lookup">
             <label class="field" for="feedbackOperationsLookupQuery">
                 <span>Search query</span>
@@ -37,34 +38,34 @@
             </label>
             <div class="stacked-actions">
                 <button class="button-like button-like--secondary" type="submit">Search feedback</button>
-                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open details</a>
+                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open JSON</a>
             </div>
         </form>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Current scope</span>
-        <h2>@lookup.ScopeLabel</h2>
+        <span class="tag">Current view</span>
+        <h2>@PublicLookupText(lookup.ScopeLabel)</h2>
         <p>@lookup.ResultCount result@(lookup.ResultCount == 1 ? string.Empty : "s") are currently in view.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Private details stay private</span>
-        <h2>Lookup stays inside Chummer history and hashed identity.</h2>
+        <h2>Lookup stays inside saved Chummer history.</h2>
         <p>No raw delivery payload body, no raw recipient email, and no public summary beyond the saved state.</p>
     </article>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Lookup results</p>
-        <h2 class="editorial-title">Recent results and exact matches share one public-safe page.</h2>
-        <p class="editorial-copy">When no query is present, this page shows recent saved feedback areas. When a query is present, it narrows the search across saved items and recipient threads using Chummer identifiers only.</p>
+        <p class="eyebrow">Results</p>
+        <h2 class="editorial-title">Recent matches stay on one page.</h2>
+        <p class="editorial-copy">Without a query, this page shows recent saved feedback. With a query, it narrows the list to matching items and recipient threads.</p>
     </div>
     @if (results.Length == 0)
     {
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">No match</span>
-                <h3>No item or thread matched this query</h3>
+                <h3>No item or thread matched</h3>
                 <p>Try an item id, dispatch id, recipient ref, delivery id, delivery message id, or item reference from the aggregate feedback page.</p>
             </article>
         </div>
@@ -73,26 +74,26 @@
     {
         <div class="route-choice-grid">
             @foreach (var result in results)
-            {
-                <article class="route-choice-card">
-                    <span class="tag">@result.ResultKindLabel</span>
-                    <h3>@result.Heading</h3>
-                    <p>@result.Summary</p>
-                    <div class="route-choice-card__details">
-                        <span>@result.MatchReason</span>
+        {
+            <article class="route-choice-card">
+                <span class="tag">@PublicLookupText(result.ResultKindLabel)</span>
+                <h3>@PublicLookupText(result.Heading)</h3>
+                <p>@PublicLookupText(result.Summary)</p>
+                <div class="route-choice-card__details">
+                        <span>@PublicLookupText(result.MatchReason)</span>
                         <span>@result.KeyLabel: @result.Key</span>
                         @if (!string.Equals(result.FilterKey, "all", StringComparison.Ordinal))
                         {
-                            <span>Context filter: @result.FilterLabel</span>
+                            <span>Filter: @PublicLookupText(result.FilterLabel)</span>
                         }
                         <span>@result.LastTouchedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
-                    </div>
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="@result.Href">Open drilldown</a>
-                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open details</a>
-                    </div>
-                </article>
-            }
+                </div>
+                <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@result.Href">Open result</a>
+                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open JSON</a>
+                </div>
+            </article>
+        }
         </div>
     }
 </section>

@@ -2,21 +2,26 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+import sys
 from typing import Any
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _unmixr_tts import load_profile, render_short_tts, slug_prefix
 
 
 WORKSPACE = Path("/docker/chummercomplete")
 PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 OUT = WORKSPACE / "_completion" / "promo_video_rework_20260602"
-TTS_PYTHON = OUT / "tts_venv" / "bin" / "python"
-VOICE = "en-GB-ThomasNeural"
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
@@ -92,65 +97,6 @@ def write_vtt(path: Path, scenes: tuple[Scene, ...]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-async def render_edge_tts(text: str, output: Path) -> bool:
-    if not TTS_PYTHON.is_file():
-        return False
-    code = (
-        "import asyncio, edge_tts, pathlib, sys\n"
-        "async def main():\n"
-        "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-7Hz')\n"
-        "    await communicate.save(str(output))\n"
-        "asyncio.run(main())\n"
-    )
-    helper = OUT / "render_edge_tts.py"
-    helper.write_text(code, encoding="utf-8")
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            str(TTS_PYTHON),
-            str(helper),
-            VOICE,
-            text,
-            str(output),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await proc.communicate()
-    except Exception:
-        return False
-    if proc.returncode != 0:
-        print(stderr.decode("utf-8", errors="replace"))
-        return False
-    return output.is_file() and output.stat().st_size > 0
-
-
-async def render_edge_tts_voice(text: str, output: Path, voice: str) -> bool:
-    global VOICE
-    old_voice = VOICE
-    VOICE = voice
-    try:
-        return await render_edge_tts(text, output)
-    finally:
-        VOICE = old_voice
-
-
-def render_flite_tts(text: str, output: Path) -> None:
-    escaped = text.replace("\\", "\\\\").replace("'", "\\'")
-    run(
-        "ffmpeg",
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        f"flite=text='{escaped}':voice=slt",
-        "-ar",
-        "48000",
-        "-ac",
-        "1",
-        str(output),
-    )
-
-
 def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
     fade_in = min(1.4 if mode == "continuous" else 0.55, max(target_len / 3.0, 0.15))
     fade_out = min(2.8 if mode == "continuous" else 0.75, max(target_len / 3.0, 0.2))
@@ -162,27 +108,46 @@ def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
         "0.018*sin(2*PI*(86+2.4*sin(2*PI*0.037*t))*t)+"
         "0.011*sin(2*PI*129*t)+0.007*sin(2*PI*172*t)+0.004*sin(2*PI*258*t)'"
         f":s=48000:d={target_len:.3f},"
-        "highpass=f=32,lowpass=f=3600,bass=g=2.8:f=94:w=0.8,"
+        "highpass=f=45,lowpass=f=5200,bass=g=1.2:f=108:w=0.9,"
         f"tremolo=f={tremolo_freq:.3f}:d={tremolo_depth:.3f},"
-        "acompressor=threshold=-30dB:ratio=1.8:attack=30:release=280:makeup=1.5,"
+        "acompressor=threshold=-28dB:ratio=1.4:attack=36:release=300:makeup=1.05,"
         f"afade=t=in:st=0:d={fade_in:.3f},"
         f"afade=t=out:st={max(target_len - fade_out, 0):.3f}:d={fade_out:.3f},"
-        "volume=1.32[bed]"
+        "volume=1.12[bed]"
     )
 
 
-async def render_narration_files(reel: Reel, work: Path) -> tuple[list[Path], str]:
+def narration_filter(target_vo_len: float) -> str:
+    fade_in = 0.10
+    fade_out = 0.24 if target_vo_len <= 4.2 else 0.28
+    return (
+        f"[rawvo]afade=t=in:st=0:d={fade_in:.2f},afade=t=out:st={max(target_vo_len - fade_out, 0):.3f}:d={fade_out:.2f},"
+        "highpass=f=70,lowpass=f=8400,"
+        "acompressor=threshold=-24dB:ratio=1.8:attack=24:release=260:makeup=1.6,"
+        "alimiter=limit=0.88,"
+        "loudnorm=I=-16:LRA=9:TP=-1.5[vo0]"
+    )
+
+
+def _reel_profile(reel: Reel, scene: Scene | None = None) -> dict[str, str]:
+    scene_token = slug_prefix(scene.voice or reel.voice) if scene is not None else ""
+    prefixes = [slug_prefix("UNMIXR_PROMO_REEL", reel.asset_id)]
+    if scene_token:
+        prefixes.insert(0, slug_prefix("UNMIXR_PROMO_REEL", reel.asset_id, scene_token))
+    return load_profile(
+        prefixes=prefixes,
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
+    )
+
+
+def render_narration_files(reel: Reel, work: Path) -> tuple[list[Path], str]:
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
-    provider = "edge-tts"
+    provider = "unmixr-short-tts"
     outputs: list[Path] = []
     for index, scene in enumerate(reel.scenes):
         output = narration_dir / f"{index + 1:02}.mp3"
-        ok = await render_edge_tts_voice(scene.narration, output, scene.voice or reel.voice)
-        if not ok:
-            provider = "ffmpeg-flite"
-            output = narration_dir / f"{index + 1:02}.wav"
-            render_flite_tts(scene.narration, output)
+        render_short_tts(scene.narration, output, profile=_reel_profile(reel, scene))
         outputs.append(output)
     return outputs, provider
 
@@ -191,17 +156,13 @@ def full_reel_duration(reel: Reel) -> float:
     return sum(scene.duration for scene in reel.scenes)
 
 
-async def render_continuous_voiceover(reel: Reel, work: Path) -> tuple[Path, str]:
+def render_continuous_voiceover(reel: Reel, work: Path) -> tuple[Path, str]:
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
     script = " ".join(scene.narration for scene in reel.scenes)
     output = narration_dir / "continuous.mp3"
-    ok = await render_edge_tts_voice(script, output, reel.voice)
-    if ok:
-        return output, "edge-tts-continuous"
-    fallback = narration_dir / "continuous.wav"
-    render_flite_tts(script, fallback)
-    return fallback, "ffmpeg-flite-continuous"
+    render_short_tts(script, output, profile=_reel_profile(reel))
+    return output, "unmixr-short-tts-continuous"
 
 
 def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> None:
@@ -216,7 +177,9 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
         stretch = max(narration_len / target_vo_len, 0.88)
         vo_filter = f"atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
     filters = [
-        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,highpass=f=72,lowpass=f=9000,bass=g=2.4:f=110:w=0.65,acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0]",
+        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,"
+        "highpass=f=72,lowpass=f=9000,"
+        "acompressor=threshold=-23dB:ratio=1.9:attack=22:release=260:makeup=1.7,alimiter=limit=0.88,loudnorm=I=-16:LRA=9:TP=-1.5[vo0]",
         cinematic_bed_filter(target_len, mode="continuous"),
         f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.10[vo]",
         f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
@@ -250,10 +213,7 @@ def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
         filters.append(f"[0:a]atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
     else:
         filters.append(f"[0:a]atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
-    if scene.voice_treatment == "ork_news":
-        filters.append(f"[rawvo]atempo=0.84,rubberband=pitch=0.70,afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=54,lowpass=f=5400,bass=g=5.8:f=102:w=0.60,acompressor=threshold=-20dB:ratio=3.9:attack=18:release=240:makeup=4.4,alimiter=limit=0.89[vo0]")
-    else:
-        filters.append(f"[rawvo]afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=72,lowpass=f=9000,bass=g=2.4:f=110:w=0.65,acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0]")
+    filters.append(narration_filter(target_vo_len))
     filters.append(cinematic_bed_filter(scene_len, mode="scene"))
     filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.11[vo]")
     filters.append(f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]")
@@ -362,9 +322,9 @@ def build_reel(reel: Reel) -> dict[str, Any]:
     audio_segments: list[Path] = []
     narration_provider = ""
     if reel.continuous_voiceover:
-        continuous_narration, narration_provider = asyncio.run(render_continuous_voiceover(reel, work))
+        continuous_narration, narration_provider = render_continuous_voiceover(reel, work)
     else:
-        narration_files, narration_provider = asyncio.run(render_narration_files(reel, work))
+        narration_files, narration_provider = render_narration_files(reel, work)
     for index, scene in enumerate(reel.scenes):
         video_segment = segments / f"{index + 1:02}.video.mp4"
         audio_segment = segments / f"{index + 1:02}.audio.wav"
@@ -453,10 +413,13 @@ def build_reel(reel: Reel) -> dict[str, Any]:
         "source_claim": reel.source_claim,
         "visual_source": "MagicFit scene clips only",
         "narration_provider": narration_provider,
-        "voice": reel.voice if narration_provider.startswith("edge-tts") else "ffmpeg flite slt",
+        "voice": _reel_profile(reel)["voice_id"],
         "scene_count": len(reel.scenes),
         "duration_seconds": sum(scene.duration for scene in reel.scenes),
+        "visual_scene_count": len(reel.scenes),
         "continuous_audio_track": "spoken_narration_plus_low_music_bed",
+        "magicfit_claim_allowed": True,
+        "magicfit_final_visual_render_claim": True,
         "scene_narration": [
             {
                 "clip": str(scene.clip),
@@ -580,16 +543,16 @@ def flagship_reel() -> Reel:
             float(duration),
             captions[i],
             narration[i],
-            voice="en-GB-ThomasNeural" if clip == "10_newsroom.mp4" else None,
-            voice_treatment="ork_news" if clip == "10_newsroom.mp4" else "trailer",
+            voice=None,
+            voice_treatment="trailer",
         )
         for i, (clip, duration) in enumerate(zip(clips, durations))
     )
     return Reel(
         asset_id="chummer6-flagship-promo",
         title="Chummer6 Flagship Promo",
-        render_mode="magicfit_fresh_rerender_with_scene_timed_trailer_and_ork_news_voiceover",
-        source_claim="12 freshly rerendered MagicFit flagship scene clips with no generated product-name text, scene-timed trailer voiceover, and separate ork newsroom voice",
+        render_mode="magicfit_fresh_rerender_with_scene_timed_trailer_voiceover",
+        source_claim="12 freshly rerendered MagicFit flagship scene clips with no generated product-name text and scene-timed trailer voiceover",
         scenes=scenes,
         voice="en-GB-ThomasNeural",
         continuous_voiceover=False,

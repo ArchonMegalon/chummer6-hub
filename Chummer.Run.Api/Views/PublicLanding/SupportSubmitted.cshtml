@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-support-submitted";
+    ViewData["SurfaceClass"] = "surface-support-submitted surface-minimal";
     var primaryAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
     var helpAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Href, "/help", StringComparison.OrdinalIgnoreCase))
         ?? new TrustPageActionViewModel("Return to help", "/help", "secondary");
@@ -37,16 +37,16 @@
 
     responseRoutes.Add((
         Badge: "Current status",
-        Title: "Use what works today when you need the current fix status",
-        Summary: "Downloads, status, and known caution stay on the release surfaces when you need to know whether a fix is already user-available instead of merely accepted into support.",
+        Title: "Open what works today for fix status",
+        Summary: "Use the release surfaces when you need to know whether a fix is already user-available.",
         Href: "/now",
         Label: "Open what works today",
         Details: new[] { "Current release", "Known caution", "Release-linked" }));
 
     responseRoutes.Add((
         Badge: "Help",
-        Title: "Return to help if the issue changes shape",
-        Summary: "Use help when the question turns back into direction: install trouble, account recovery, product questions, or figuring out which Chummer page should own the next move.",
+        Title: "Return to help if the issue changes",
+        Summary: "Use help when the question turns back into direction: install trouble, account recovery, or product questions.",
         Href: helpAction.Href,
         Label: helpAction.Label,
         Details: new[] { "Chummer help", "Safe next step", "Account optional" }));
@@ -114,7 +114,7 @@
 <section class="continuity-band support-submitted-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">What happens next</p>
-        <h2 class="editorial-title">The report is in Chummer now, with a clear next page attached.</h2>
+        <h2 class="editorial-title">The report is saved.</h2>
         <p class="editorial-copy">@PublicSupportSubmittedText(Model.ResponseExpectation)</p>
     </div>
     <div class="continuity-band__panel">
@@ -130,8 +130,8 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Next steps</p>
-        <h2 class="editorial-title">Pick the next page without losing the case.</h2>
+        <p class="eyebrow">Next</p>
+        <h2 class="editorial-title">Choose the next page.</h2>
         <p class="editorial-copy">Use the page that matches the next job: saved support history, release status, help, or the same install path.</p>
     </div>
     <div class="route-choice-grid">
@@ -156,7 +156,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Case details</p>
-        <h2 class="editorial-title">Keep the case moving on the same support path.</h2>
+        <h2 class="editorial-title">Keep the case handy.</h2>
         <p class="editorial-copy">
             @(Model.TrackedCaseSummary is null
                 ? "This page keeps the case id, reply path, and account return visible until the next update arrives."
