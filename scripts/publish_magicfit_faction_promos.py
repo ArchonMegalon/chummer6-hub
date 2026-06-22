@@ -16,7 +16,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import UnmixrTtsError, load_profile, render_short_tts, slug_prefix
+from _unmixr_tts import (
+    UNMIXR_SHORT_TTS_PROVIDER,
+    UnmixrTtsError,
+    load_profile,
+    render_short_tts,
+    slug_prefix,
+)
 
 
 ROOT = Path("/docker/chummercomplete")
@@ -103,7 +109,7 @@ def narration_for(payload: dict) -> str:
     )
 
 
-def make_audio_track(video: Path, narration_text: str, faction_slug: str, output: Path) -> tuple[float, str]:
+def make_audio_track(video: Path, narration_text: str, faction_slug: str, output: Path) -> tuple[float, str, dict[str, str]]:
     with tempfile.TemporaryDirectory(prefix="faction-promo-audio-") as temp_dir:
         temp_root = Path(temp_dir)
         narration = temp_root / "narration.mp3"
@@ -142,7 +148,7 @@ def make_audio_track(video: Path, narration_text: str, faction_slug: str, output
             "160k",
             str(output),
         )
-    return narration_duration, "unmixr-short-tts"
+    return narration_duration, UNMIXR_SHORT_TTS_PROVIDER, profile
 
 
 def mux_video(video: Path, audio: Path, output: Path, *, scale: str | None = None, codec: str = "libx264") -> None:
@@ -189,7 +195,7 @@ def publish_faction(slug: str) -> dict:
     public_poster = PUBLIC_ROOT / f"{slug}-promo-poster.png"
     public_receipt = PUBLIC_ROOT / f"{slug}-promo.receipt.json"
 
-    narration_duration, narration_provider = make_audio_track(source_mp4, narration_text, slug, public_audio)
+    narration_duration, narration_provider, narration_profile = make_audio_track(source_mp4, narration_text, slug, public_audio)
     mux_video(source_mp4, public_audio, public_mp4)
     mux_video(source_mp4, public_audio, public_mobile, scale="scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1")
     mux_video(source_webm if source_webm.is_file() else source_mp4, public_audio, public_webm, codec="libvpx-vp9")
@@ -202,7 +208,7 @@ def publish_faction(slug: str) -> dict:
         "provider_status": "VERIFIED_PROVIDER",
         "render_mode": "magicfit_cinematic_faction_promo_with_narration",
         "narration_provider": narration_provider,
-        "voice": voice,
+        "voice": narration_profile["voice_id"],
         "slug": slug,
         "title": payload.get("title"),
         "captions": payload.get("captions") or [],
@@ -221,7 +227,7 @@ def publish_faction(slug: str) -> dict:
     return {
         "slug": slug,
         "status": "pass",
-        "voice": voice,
+        "voice": narration_profile["voice_id"],
         "narration_provider": narration_provider,
         "narration_duration_seconds": round(narration_duration, 3),
         "public_mp4": str(public_mp4),

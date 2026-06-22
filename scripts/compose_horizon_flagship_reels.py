@@ -18,7 +18,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import load_profile, render_short_tts, slug_prefix
+from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER, load_profile, render_short_tts, slug_prefix
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -330,7 +330,7 @@ def render_narration_files(asset_id: str, scenes: list[ScenePlan], work: Path) -
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
-    provider = "unmixr-short-tts"
+    provider = UNMIXR_SHORT_TTS_PROVIDER
     for index, scene in enumerate(scenes, start=1):
         output = narration_dir / f"{index:02}.mp3"
         render_short_tts(scene.narration, output, profile=_scene_profile(asset_id, scene))

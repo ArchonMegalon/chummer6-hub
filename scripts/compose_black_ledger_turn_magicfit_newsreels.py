@@ -14,7 +14,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import load_profile, render_short_tts
+from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER, load_profile, render_short_tts
 
 
 ROOT = Path("/docker/chummercomplete")
@@ -122,7 +122,7 @@ def compose_asset(asset: dict) -> dict:
         temp = Path(temp_dir)
         concat = temp / "concat.txt"
         concat_lines: list[str] = []
-        speech_provider = "unmixr-scene-tts"
+        speech_provider = UNMIXR_SHORT_TTS_PROVIDER
         audio_segments: list[Path] = []
         for scene in asset["scenes"]:
             src = clip_path(asset_id, scene["id"])

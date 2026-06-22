@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services;
@@ -224,14 +225,13 @@ public sealed class ExecutiveAssistantCredentialCatalogService
         const string emailKey = "CHUMMER_EA_UNMIXR_EMAIL";
         const string passwordKey = "CHUMMER_EA_UNMIXR_PASSWORD";
         const string apiKey = "UNMIXR_API_KEY";
-        const string voiceIdKey = "UNMIXR_VOICE_ID";
         const string usernameKey = "UNMIXR_USERNAME";
         const string loginPasswordKey = "UNMIXR_PASSWORD";
 
         string? email = GetValue(emailKey);
         bool hasEaLogin = !string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(GetValue(passwordKey));
         bool hasProviderLogin = !string.IsNullOrWhiteSpace(GetValue(usernameKey)) && !string.IsNullOrWhiteSpace(GetValue(loginPasswordKey));
-        bool hasRuntimeVoice = !string.IsNullOrWhiteSpace(GetValue(apiKey)) && !string.IsNullOrWhiteSpace(GetValue(voiceIdKey));
+        bool hasRuntimeVoice = HasUnmixrRuntimeConfiguration();
 
         return new ExecutiveAssistantCredentialEntry(
             ToolId: "unmixr",
@@ -242,9 +242,40 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             EmailMasked: MaskEmail(email),
             EmailConfigured: !string.IsNullOrWhiteSpace(email),
             PasswordConfigured: !string.IsNullOrWhiteSpace(GetValue(passwordKey)),
-            PasswordAltConfigured: !string.IsNullOrWhiteSpace(GetValue(apiKey)),
+            PasswordAltConfigured: hasRuntimeVoice,
             MirrorsDefault: true,
             Status: hasRuntimeVoice ? "configured" : hasEaLogin || hasProviderLogin ? "login_only" : "missing");
+    }
+
+    private bool HasUnmixrRuntimeConfiguration()
+    {
+        if (!string.IsNullOrWhiteSpace(GetValue("UNMIXR_API_KEY")) && !string.IsNullOrWhiteSpace(GetValue("UNMIXR_VOICE_ID")))
+        {
+            return true;
+        }
+
+        foreach (string key in _configuration.AsEnumerable().Select(item => item.Key))
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            Match match = Regex.Match(key, @"^UNMIXR_ACCOUNT_[A-Za-z0-9_]+_API_KEY$");
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string account = key["UNMIXR_ACCOUNT_".Length..^"_API_KEY".Length];
+            string voiceKey = $"UNMIXR_ACCOUNT_{account}_VOICE_ID";
+            if (!string.IsNullOrWhiteSpace(GetValue(voiceKey)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ExecutiveAssistantCredentialEntry BuildSingleKeyEntry(

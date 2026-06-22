@@ -16,7 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import load_profile, render_short_tts
+from _unmixr_tts import load_profile, provider_token, render_short_tts
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -275,7 +275,7 @@ def render_narration() -> tuple[Path, str]:
         "pcm_s16le",
         str(final),
     )
-    return final, f"unmixr-short-tts-{profile['voice_id']}-atempo-{tempo:.3f}"
+    return final, provider_token(profile, style="atempo", tempo=tempo)
 
 
 def build_video(slides: list[Path], audio: Path) -> None:

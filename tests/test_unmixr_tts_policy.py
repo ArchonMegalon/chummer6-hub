@@ -57,6 +57,74 @@ def test_unmixr_helper_raises_when_not_configured(tmp_path: Path) -> None:
         helper.load_config(env_files=(tmp_path / "missing.env",))
 
 
+def test_unmixr_helper_selects_account_by_credit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    helper = _load(HELPER_PATH, "unmixr_tts_helper_for_account_selection_test")
+    monkeypatch.setenv("UNMIXR_PREFERRED_ACCOUNT", "")
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "UNMIXR_ACCOUNT_A_API_KEY=a-key",
+                "UNMIXR_ACCOUNT_A_VOICE_ID=a-voice",
+                "UNMIXR_ACCOUNT_A_CREDITS=12",
+                "UNMIXR_ACCOUNT_B_API_KEY=b-key",
+                "UNMIXR_ACCOUNT_B_VOICE_ID=b-voice",
+                "UNMIXR_ACCOUNT_B_CREDITS=37",
+                "UNMIXR_SPEAKING_RATE=medium",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    profile = helper.load_profile(
+        env_files=(env_file,),
+        prefixes=("UNMIXR_TEST",),
+    )
+
+    assert profile["account"] == "b"
+    assert profile["voice_id"] == "b-voice"
+    assert profile["api_key"] == "b-key"
+
+
+def test_unmixr_helper_prefers_prefix_account(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    helper = _load(HELPER_PATH, "unmixr_tts_helper_for_profile_account_override_test")
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "UNMIXR_ACCOUNT_A_API_KEY=a-key",
+                "UNMIXR_ACCOUNT_A_VOICE_ID=a-voice",
+                "UNMIXR_ACCOUNT_B_API_KEY=b-key",
+                "UNMIXR_ACCOUNT_B_VOICE_ID=b-voice",
+                "UNMIXR_TEST_ACCOUNT= a",
+                "UNMIXR_TEST_VOICE_ID=forced-voice",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    profile = helper.load_profile(
+        prefixes=("UNMIXR_TEST",),
+        env_files=(env_file,),
+        defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
+    )
+
+    assert profile["account"] == "a"
+    assert profile["voice_id"] == "forced-voice"
+
+
+def test_unmixr_provider_token_styles() -> None:
+    helper = _load(HELPER_PATH, "unmixr_tts_helper_for_provider_token_test")
+    profile = {"voice_id": "v-voice-42"}
+
+    assert helper.provider_token(profile) == "unmixr-short-tts"
+    assert helper.provider_token(profile, style="continuous") == "unmixr-short-tts-continuous"
+    assert helper.provider_token(profile, style="voice") == "unmixr-short-tts/v-voice-42"
+    assert helper.provider_token(profile, style="atempo", tempo=1.234) == "unmixr-short-tts-v-voice-42-atempo-1.234"
+
+
 def test_flagship_promo_script_has_no_edge_or_flite_tts_fallback() -> None:
     source = PROMO_SCRIPT.read_text(encoding="utf-8")
 

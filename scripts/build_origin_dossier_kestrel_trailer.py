@@ -18,7 +18,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import load_profile, render_short_tts
+from _unmixr_tts import load_profile, provider_token, render_short_tts
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -398,7 +398,7 @@ def render_voice() -> tuple[Path, str, float]:
         defaults={"speaking_rate": "medium", "speaking_pitch": "low", "speaking_volume": "medium"},
     )
     render_short_tts(NARRATION, raw_mp3, profile=profile)
-    provider = f"unmixr-short-tts/{profile['voice_id']}"
+    provider = provider_token(profile, style="voice")
     source_audio = raw_mp3
     run(
         "ffmpeg",

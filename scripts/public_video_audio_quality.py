@@ -6,10 +6,16 @@ import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+import sys
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
-UNMIXR_PROVIDER = "unmixr-short-tts"
+from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER
+
+UNMIXR_PROVIDER = UNMIXR_SHORT_TTS_PROVIDER
 CLEAN_SPEECH_AUDIO_GROUPS: set[str] = set()
 SILENCE_GATE_DBFS = -42.0
 MAX_SILENCE_SECONDS = 0.70

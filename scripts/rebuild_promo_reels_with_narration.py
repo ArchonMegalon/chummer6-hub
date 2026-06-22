@@ -16,7 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import load_profile, render_short_tts, slug_prefix
+from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER, load_profile, provider_token, render_short_tts, slug_prefix
 
 
 WORKSPACE = Path("/docker/chummercomplete")
@@ -143,7 +143,7 @@ def _reel_profile(reel: Reel, scene: Scene | None = None) -> dict[str, str]:
 def render_narration_files(reel: Reel, work: Path) -> tuple[list[Path], str]:
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
-    provider = "unmixr-short-tts"
+    provider = UNMIXR_SHORT_TTS_PROVIDER
     outputs: list[Path] = []
     for index, scene in enumerate(reel.scenes):
         output = narration_dir / f"{index + 1:02}.mp3"
@@ -162,7 +162,7 @@ def render_continuous_voiceover(reel: Reel, work: Path) -> tuple[Path, str]:
     script = " ".join(scene.narration for scene in reel.scenes)
     output = narration_dir / "continuous.mp3"
     render_short_tts(script, output, profile=_reel_profile(reel))
-    return output, "unmixr-short-tts-continuous"
+    return output, provider_token(_reel_profile(reel), style="continuous")
 
 
 def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> None:
