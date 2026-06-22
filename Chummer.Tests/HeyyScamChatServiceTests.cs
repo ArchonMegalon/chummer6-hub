@@ -360,6 +360,75 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task ApproveDraftWhatsappModeFallsBackToMetaWhenRoutePreferredEaIsUnavailable()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE"] = "ea",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-route-fallback",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-route-fallback",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ConsentingTestPhone,
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Equal("whatsapp_approved", approval.DeliveryMode);
+        Assert.Equal("wamid.meta1", approval.DeliveryRef);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        Assert.Equal("whatsapp", JsonDocument.Parse(request.Body).RootElement.GetProperty("messaging_product").GetString());
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeIsSuppressedWhenNoWhatsappProviderConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+        });
+        await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-unconfigured",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-unconfigured",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ConsentingTestPhone,
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("suppressed_whatsapp_delivery_unconfigured", approval.Status);
+        Assert.Equal("real_whatsapp_delivery_unconfigured", approval.FailureReason);
+        Assert.Empty(fixture.Handler.Requests);
+    }
+
+    [Fact]
     public async Task ApproveDraftWhatsappModeSendsThroughMetaCloudApiWhenConfigured()
     {
         using Fixture fixture = new(new Dictionary<string, string?>

@@ -178,6 +178,7 @@ public sealed class HeyyScamChatService
     {
         Meta,
         Ea,
+        Unavailable,
     }
 
     private sealed record WhatsappDeliveryRoute(WhatsappDeliveryRouteKind Kind, string? BindingId = null);
@@ -937,6 +938,11 @@ public sealed class HeyyScamChatService
         CancellationToken cancellationToken)
     {
         WhatsappDeliveryRoute route = ResolveWhatsappDeliveryRoute();
+        if (route.Kind == WhatsappDeliveryRouteKind.Unavailable)
+        {
+            throw new InvalidOperationException("real_whatsapp_delivery_unconfigured");
+        }
+
         if (route.Kind == WhatsappDeliveryRouteKind.Meta)
         {
             return await SendApprovedDraftToMetaWhatsappAsync(approvedText, recipient, idempotencyKey, cancellationToken);
@@ -1059,6 +1065,11 @@ public sealed class HeyyScamChatService
         if (route.Kind == WhatsappDeliveryRouteKind.Meta)
         {
             return await SendMetaWhatsappTextAsync(content, recipient, eventKey, cancellationToken);
+        }
+
+        if (route.Kind == WhatsappDeliveryRouteKind.Unavailable)
+        {
+            throw new InvalidOperationException("real_whatsapp_delivery_unconfigured");
         }
 
         return await SendTurnSummaryEaWhatsappAsync(conversation, content, recipient, eventKey, cancellationToken, route.BindingId);
@@ -1875,7 +1886,7 @@ public sealed class HeyyScamChatService
             return new(WhatsappDeliveryRouteKind.Ea, ResolveWhatsappEaBindingId());
         }
 
-        return new(WhatsappDeliveryRouteKind.Ea, ResolveWhatsappEaBindingId());
+        return new(WhatsappDeliveryRouteKind.Unavailable, null);
     }
 
     private bool RedactNumbers()
