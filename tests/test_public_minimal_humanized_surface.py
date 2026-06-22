@@ -253,7 +253,9 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
-    assert "First-party page" in participate
+    assert "participate-shell" in participate
+    assert "share what matters for your table" in participate.lower()
+    assert "participate-quick-form" in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
@@ -659,9 +661,14 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     preview_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml")
 
     for required in (
-        "@CalmRoadmapText(milestone.StatusLabel)",
-        "@CalmRoadmapText(dependency.StatusLabel)",
-        "@CalmRoadmapText(signalLoop.FollowSettingsLabel)",
+        "static string RoadmapText(string? value)",
+        "@RoadmapText(milestone.StatusLabel)",
+        "@RoadmapText(milestone.Title)",
+        "@RoadmapText(milestone.CasualSummary)",
+        "@RoadmapText(item.Card.Title)",
+        "@RoadmapText(item.Card.Summary)",
+        "@RoadmapText(item.Action.Label)",
+        "PublicSurfaceStatus.DisplayLabel(item.Card.Badge)",
     ):
         assert required in roadmap
 
