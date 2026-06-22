@@ -141,7 +141,7 @@ The registry is the canonical source for both classes after promotion. The UI re
 
 `chummer.run` is the only official source for downloading the Chummer client.
 
-Release automation must never publish build artifacts directly to GitHub releases, GitHub Actions artifact shelves, repo attachments, or any repo-hosted binary channel as a user-facing client download. GitHub remains source and development evidence infrastructure only. If a user can acquire an installer, archive, update payload, or preview client, that acquisition path must start from `chummer.run` and resolve through registry-backed release truth.
+Release automation must never publish build artifacts directly to GitHub releases, repository automation artifact shelves, repo attachments, or any repo-hosted binary channel as a user-facing client download. GitHub remains source and development evidence infrastructure only. If a user can acquire an installer, archive, update payload, or preview client, that acquisition path must start from `chummer.run` and resolve through registry-backed release truth.
 
 Repo-local build outputs may exist only as private CI/staging evidence until they are promoted into the registry-backed `chummer.run` download or install handoff surface.
 

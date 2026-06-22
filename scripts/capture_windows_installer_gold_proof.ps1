@@ -113,6 +113,7 @@ $receipt = [ordered]@{
     platform = "windows"
     arch = $Arch
     rid = $Rid
+    ui_desktop_run_id = "windows-installer-gold-proof:$HeadId:$Rid:$Version"
     readyCheckpoint = "pre_ui_event_loop"
     hostClass = "native-windows"
     operatingSystem = $os.Caption

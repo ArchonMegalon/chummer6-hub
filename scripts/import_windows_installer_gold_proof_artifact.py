@@ -209,8 +209,8 @@ def run_verifier(downloads_root: Path) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Import a windows-installer-gold-proof workflow artifact into the downloads proof shelf.")
-    parser.add_argument("artifact", type=Path, help="Downloaded GitHub Actions artifact directory or zip.")
+    parser = argparse.ArgumentParser(description="Import a windows-installer-gold-proof bundle into the downloads proof shelf.")
+    parser.add_argument("artifact", type=Path, help="Exported Windows proof bundle directory or zip.")
     parser.add_argument("--downloads-root", type=Path, default=DEFAULT_DOWNLOADS_ROOT)
     parser.add_argument("--verify", action="store_true", help="Run verify_windows_installer_visual_audit.py after import.")
     return parser.parse_args()

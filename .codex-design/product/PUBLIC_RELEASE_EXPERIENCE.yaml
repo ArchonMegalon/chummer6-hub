@@ -43,7 +43,7 @@ public_concierge_summary: Public concierge widgets may appear only as bounded pr
 flagship_release_rules:
   - The shelf must present one obvious primary download path per supported platform.
   - Every official client download or install handoff must start from chummer.run and resolve through registry-backed release truth.
-  - GitHub releases, GitHub Actions artifacts, repo attachments, and repo-hosted binary shelves must not be used as public client download sources.
+  - GitHub releases, repository automation artifacts, repo attachments, and repo-hosted binary shelves must not be used as public client download sources.
   - Avalonia is the flagship desktop head. Blazor Desktop is only a compatibility fallback when the platform matrix and release copy both say so.
   - If Blazor Desktop is the only visible desktop head for a lane or the recommended download, the release page must treat it as the flagship route and require the same flagship checks as Avalonia.
   - Public release-detail wording is limited to posted files, recent checks, and inspectable trails; it must not imply that all current product surfaces are flagship-ready.

@@ -1,4 +1,4 @@
-`compat/Chummer.Media.Contracts.dll` is the CI fallback snapshot for `Chummer.Run.Contracts` when the owner repo is unavailable in GitHub Actions.
+`compat/Chummer.Media.Contracts.dll` is the local automation fallback snapshot for `Chummer.Run.Contracts` when the owner repo is unavailable.
 
 - Source repo: `ArchonMegalon/chummer6-media-factory`
 - Source commit: `f6af2c7929beca22858fb50ba8a6e22b934e3ab6`

@@ -110,10 +110,10 @@ Required post-publish checks:
 
 Windows installer gold proof:
 1. This proof is a native Windows visual/startup gate only. It must not publish downloads or promote a release.
-2. Preferred remote path: run GitHub Actions workflow `Windows Installer Gold Proof` from `.github/workflows/windows-installer-gold-proof.yml`.
-3. The workflow captures the promoted installer startup receipt plus installer progress/completion screenshots on a native Windows runner, then uploads artifact `windows-installer-gold-proof`.
+2. Preferred remote path: run the native Windows proof runner from a controlled Windows host.
+3. The runner captures the promoted installer startup receipt plus installer progress/completion screenshots, then exports a `windows-installer-gold-proof` bundle.
 4. Auto-captured screenshots are intentionally marked `review_required`; a human must inspect clipping/readability before changing those rows to `pass`.
-5. Import the downloaded workflow artifact from this repository root:
+5. Import the exported proof bundle from this repository root:
 `python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify`
 6. Local native-Windows fallback:
 `scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5`

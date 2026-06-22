@@ -16,7 +16,7 @@ The downloads surface is a download shelf first:
 
 `chummer.run` is the only official client download source.
 
-Build artifacts, installers, archives, update payloads, and preview clients must not be published directly to GitHub releases, GitHub Actions artifacts, repo attachments, or other repo-hosted binary shelves as an end-user download path. GitHub may host source, issues, and development records, but public acquisition must route through `chummer.run` download or install handoff surfaces backed by the release registry.
+Build artifacts, installers, archives, update payloads, and preview clients must not be published directly to GitHub releases, repository automation artifacts, repo attachments, or other repo-hosted binary shelves as an end-user download path. GitHub may host source, issues, and development records, but public acquisition must route through `chummer.run` download or install handoff surfaces backed by the release registry.
 
 ## CTA labels
 
@@ -56,7 +56,7 @@ The public shelf must:
 The public shelf must not:
 
 * read like a raw artifact bucket
-* send users to GitHub releases, GitHub Actions artifacts, or repo-hosted binaries to download the client
+* send users to GitHub releases, repository automation artifacts, or repo-hosted binaries to download the client
 * bury the recommended build beneath archives
 * imply sign-in is required for open public installers
 * pretend portable archives are the default when canon says installer-first

@@ -28,9 +28,9 @@ Current runtime registration remains explicit: default headless/desktop/web path
 
 ### Phase 0: Freeze the seam
 
-- [ ] `MIG-001` CI: make `scripts/migration-loop.sh 1` a required PR check.
-Acceptance criteria: CI blocks merge on loop failure; required status check is enforced in branch protection.
-Progress: workflow job `linux-migration-loop` added in `.github/workflows/docker-architecture-guardrails.yml`; branch protection enforcement still requires GitHub repo settings update and is now the only remaining external/non-repo blocker for the migration parity phases.
+- [ ] `MIG-001` Automation: make `scripts/migration-loop.sh 1` a required merge check.
+Acceptance criteria: merge is blocked on loop failure; required status enforcement is configured outside the repository.
+Progress: `linux-migration-loop` exists as a local/self-hosted automation entrypoint; external enforcement is the remaining non-repo blocker for the migration parity phases.
 
 - [x] `MIG-002` Guardrails: extend architecture tests to fail when UI heads reference `Chummer.Application`, `Chummer.Core`, or `Chummer.Infrastructure`.
 Acceptance criteria: new/updated tests fail on forbidden project references and pass on current allowed topology.
@@ -218,12 +218,12 @@ Acceptance criteria: workspace lifecycle policy (retention, cleanup, recovery) i
 Progress: `WorkspaceLifecyclePolicyService` now prunes expired/orphaned restore summaries before workspace projection, active users regenerate restore packets from durable dossier/campaign/install truth in the same flow, seeded workspace continuity timestamps stay stable when no content changed, and `docs/HOSTED_WORKSPACE_RETENTION_RUNBOOK.md` plus `WorkspaceLifecycleRetentionVerification` keep the policy executable.
 
 - [x] `MIG-094` Publish first-class release artifacts for API, Blazor, and Avalonia.
-Acceptance criteria: CI produces versioned, reproducible deliverables for all active heads and documents deployment procedures.
-Progress: workflow `Public Edge Release Artifacts` now triggers on `main`, publishes `release-api-portable`, and packages the checked-in public downloads mirror into `desktop-download-bundle` with a freshly generated manifest. Deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`, and the repo no longer claims to source-build boundary-external desktop heads it does not contain.
+Acceptance criteria: automation produces versioned, reproducible deliverables for all active heads and documents deployment procedures.
+Progress: the public edge release path publishes `release-api-portable` and packages the checked-in public downloads mirror into `desktop-download-bundle` with a freshly generated manifest. Deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`, and the repo no longer claims to source-build boundary-external desktop heads it does not contain.
 
 - [x] `MIG-095` Add benchmark guardrails for import/section/save paths.
-Acceptance criteria: `Chummer.Benchmarks` includes migration-critical workloads with performance budgets checked in CI.
-Progress: benchmark ownership stays in `../chummer-core-engine/Chummer.Benchmarks`, where `workspace.import.bastion`, `workspace.section.skills.bastion`, and `workspace.save.bastion` now run against explicit budgets in CI via `.github/workflows/benchmark-guardrails.yml`; this repo consumes that owner-repo proof instead of cloning the benchmark surface locally.
+Acceptance criteria: `Chummer.Benchmarks` includes migration-critical workloads with performance budgets checked by the owner repo.
+Progress: benchmark ownership stays in `../chummer-core-engine/Chummer.Benchmarks`, where `workspace.import.bastion`, `workspace.section.skills.bastion`, and `workspace.save.bastion` run against explicit budgets; this repo consumes that owner-repo proof instead of cloning the benchmark surface locally.
 
 ### Phase 10: Public edge and tunnel gateway
 
