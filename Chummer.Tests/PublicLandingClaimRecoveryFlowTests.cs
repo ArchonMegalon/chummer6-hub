@@ -29,7 +29,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             releaseSelection,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.",
+            "Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.",
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains(

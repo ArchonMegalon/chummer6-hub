@@ -57,7 +57,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Current filter", detailView, StringComparison.Ordinal);
         Assert.Contains("Open filter details", detailView, StringComparison.Ordinal);
         Assert.Contains("Download message details", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download related details", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open details", detailView, StringComparison.Ordinal);
         Assert.Contains("Open thread details", detailView, StringComparison.Ordinal);
         Assert.Contains("Open related details", detailView, StringComparison.Ordinal);
         Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
@@ -97,7 +97,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Search feedback", lookupView, StringComparison.Ordinal);
         Assert.Contains("Private details stay private", lookupView, StringComparison.Ordinal);
         Assert.DoesNotContain("bounded", lookupView, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Open lookup data", lookupView, StringComparison.Ordinal);
+        Assert.Contains("Open details", lookupView, StringComparison.Ordinal);
         Assert.Contains("Lookup results", lookupView, StringComparison.Ordinal);
         Assert.Contains("Items and threads", lookupView, StringComparison.Ordinal);
         Assert.Contains("Context filter:", lookupView, StringComparison.Ordinal);

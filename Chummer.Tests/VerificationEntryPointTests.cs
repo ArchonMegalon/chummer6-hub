@@ -641,7 +641,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("dispatch-inline-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("data-install-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Install details", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("Use claim-code fallback only when Chummer explicitly says it is in recovery mode.", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.", dispatchView, StringComparison.Ordinal);
         Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
         Assert.Contains("if (autoStartDownload)", dispatchView, StringComparison.Ordinal);
@@ -3473,7 +3473,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("BuildPublicTrustPulsePanel", controller, StringComparison.Ordinal);
         Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
         Assert.Contains("PublicTrustPulseTrendPointViewModel", viewModel, StringComparison.Ordinal);
-        Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
+        Assert.Contains("Weekly update", partial, StringComparison.Ordinal);
         Assert.Contains("trust-pulse-trend", body, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
         Assert.Contains("Closure health", controller, StringComparison.Ordinal);

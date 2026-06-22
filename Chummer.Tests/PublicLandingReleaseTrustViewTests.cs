@@ -117,7 +117,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Start the installer, then let Chummer connect this copy to your account.", view, StringComparison.Ordinal);
+        Assert.Contains("Start the installer. Chummer can link this copy to your account later if you want recovery and support history attached.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Pick another installer", view, StringComparison.Ordinal);
         Assert.Contains("Manage linked devices", view, StringComparison.Ordinal);

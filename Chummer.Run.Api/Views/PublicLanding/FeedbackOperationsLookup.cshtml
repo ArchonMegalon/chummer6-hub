@@ -1,6 +1,6 @@
 @model PublicSignalOperationsLookupPageViewModel
 @{
-    ViewData["Title"] = "Feedback Activity Lookup";
+    ViewData["Title"] = "Feedback Activity";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
     var lookup = Model.Lookup;
@@ -37,7 +37,7 @@
             </label>
             <div class="stacked-actions">
                 <button class="button-like button-like--secondary" type="submit">Search feedback</button>
-                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open lookup data</a>
+                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open details</a>
             </div>
         </form>
     </article>
@@ -89,7 +89,7 @@
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="@result.Href">Open drilldown</a>
-                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open detail data</a>
+                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open details</a>
                     </div>
                 </article>
             }

@@ -22,7 +22,7 @@
         {
             Badge = "This device",
             Title = "Finish setup here",
-            Summary = "Keep this page open while the installer starts and this copy connects to your account.",
+            Summary = "Keep this page open while the installer starts. You can connect this copy to your account, or keep using it unlinked.",
             Href = "#signed-in-download",
             Label = "Continue setup",
             Details = new[] { Model.PlatformLabel, Model.Display.BuildLabel, "This device" }
@@ -109,7 +109,7 @@
         {
             <p class="page-copy">@PublicDispatchText(Model.Summary)</p>
             <p class="release-stage__note">@PublicDispatchText(Model.DispatchNote)</p>
-            <p class="release-stage__note">Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
+            <p class="release-stage__note">Account linking is optional. Use the claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
             <p class="release-stage__note">Support stays with this downloaded copy.</p>
             <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
         }
@@ -120,7 +120,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Finish this install.</h2>
-        <p class="editorial-copy">Start the installer, then let Chummer connect this copy to your account.</p>
+        <p class="editorial-copy">Start the installer. Chummer can link this copy to your account later if you want recovery and support history attached.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)

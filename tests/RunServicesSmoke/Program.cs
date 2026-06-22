@@ -2408,7 +2408,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
-    Assert(downloadDispatchSource.Contains("Automatic account linking is the default path.", StringComparison.Ordinal), "download handoff should explicitly keep automatic linking as the default and reserve claim codes for recovery fallback.");
+    Assert(downloadDispatchSource.Contains("Account linking is optional.", StringComparison.Ordinal), "download handoff should keep account linking optional and reserve claim codes for recovery fallback.");
     Assert(downloadDispatchSource.Contains("Support stays on the same install rail", StringComparison.Ordinal), "download handoff should keep support recovery on the same install rail instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");

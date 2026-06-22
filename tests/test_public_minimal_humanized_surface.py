@@ -1238,7 +1238,7 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
 
     assert "Original item" in feedback_operations
     assert "Open related details" in feedback_operations
-    assert "Download related details" in feedback_operations
+    assert "Open details" in feedback_operations
     assert "Download message details" in feedback_operations
     assert "Download item details" in feedback_operations
     assert "posted follow-up update" in signal_operations
@@ -1443,8 +1443,9 @@ def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
     assert "saved state" in lookup
     assert "saved items" in lookup
     assert "No item or thread matched this query" in lookup
-    assert "Open lookup data" in lookup
-    assert "Open detail data" in lookup
+    assert "Open details" in lookup
+    assert "Open lookup data" not in lookup
+    assert "Open detail data" not in lookup
     assert "<th scope=\"col\">Entries</th>" in leaderboards
 
 

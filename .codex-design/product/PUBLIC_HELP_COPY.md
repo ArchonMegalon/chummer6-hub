@@ -52,7 +52,7 @@ That is a relationship choice, not a special per-user build.
 When a public concierge widget appears on `/downloads`, `/now`, `/help`, or another public low-risk page:
 
 * the first-party help or release article remains the main answer
-* the first-party help or release article remains the place to rely on
+* the first-party help or release article remains the source users should follow
 * the widget is a preview overlay that helps the user choose a safe next step
 * normal help choices stay visible and must still work when the widget is disabled
 * recovery language must point at the real help, relinking, or escalation path instead of claiming the widget fixed anything itself

@@ -6,7 +6,7 @@
 <p>@PublicTrustPulseText(Model.Summary)</p>
 @if (Model.MicroProof.Count > 0)
 {
-    <div class="trust-claim__details">
+    <div class="trust-claim__details" aria-label="Current notes">
         @foreach (var item in Model.MicroProof)
         {
             <span>@PublicTrustPulseText(item)</span>
@@ -15,7 +15,7 @@
 }
 @if (Model.TrendSamples.Count > 1)
 {
-    <div class="trust-pulse-trend" aria-label="Measured progress points">
+    <div class="trust-pulse-trend" aria-label="Progress over time">
         @foreach (var sample in Model.TrendSamples)
         {
             <article class="trust-pulse-trend__point@(sample.Current ? " trust-pulse-trend__point--current" : string.Empty)">
