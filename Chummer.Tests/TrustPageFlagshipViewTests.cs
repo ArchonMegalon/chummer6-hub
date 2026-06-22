@@ -15,33 +15,35 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("minimal-help-card__details", trustView, StringComparison.Ordinal);
         Assert.Contains("Quick notes", trustView, StringComparison.Ordinal);
         Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);
-        Assert.Contains("Public feedback, account return, and install recovery stay nearby.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Pick the path", trustView, StringComparison.Ordinal);
+        Assert.Contains("route-choice-grid--compact", trustView, StringComparison.Ordinal);
         Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
-        Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use Participate for ideas and safe public bugs", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the trust boundary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the rule boundary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Details</h2>", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("one fallback", trustView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Fallback:", trustView, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ContactSupportFormShowsCaseTypeGuideBeforeTheFormFields()
+    public void ContactSupportPageShowsRouteChoicesBeforeTheFormFields()
     {
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string trustView = File.ReadAllText(trustViewPath);
 
-        int caseTypeGuideIndex = trustView.IndexOf("Safe public feedback should start on the public feedback page", StringComparison.Ordinal);
+        int routeChoiceIndex = trustView.IndexOf("Use Participate for ideas and safe public bugs", StringComparison.Ordinal);
         int formIndex = trustView.IndexOf("<form class=\"settings-form\"", StringComparison.Ordinal);
 
-        Assert.True(caseTypeGuideIndex >= 0, "contact support view should explain the case choices before the form");
+        Assert.True(routeChoiceIndex >= 0, "contact support view should show the routing choices before the form");
         Assert.True(formIndex >= 0, "contact support form should still exist");
-        Assert.True(caseTypeGuideIndex < formIndex, "case-type guide should appear before the support form");
-        Assert.Contains("Safe public feedback should start on the public feedback page. Choose this form only when the issue needs private or account-linked follow-up.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Model.SupportIntake.Options", trustView, StringComparison.Ordinal);
+        Assert.True(routeChoiceIndex < formIndex, "route choices should appear before the support form");
+        Assert.Contains("Keep one issue per case so the reply stays clear.", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Case-type guide", trustView, StringComparison.Ordinal);
     }
 }

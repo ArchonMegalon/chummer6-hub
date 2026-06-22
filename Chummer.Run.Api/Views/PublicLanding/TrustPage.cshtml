@@ -103,9 +103,9 @@
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
             Id: "public-issues",
-            Badge: "Public signal",
-            Title: "Safe public feedback should start on the public feedback page",
-            Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public feedback page. Install failures, account issues, logs, and private campaign detail do not.",
+            Badge: "Public feedback",
+            Title: "Use Participate for ideas and safe public bugs",
+            Summary: "Feature requests and public UX friction belong there. Logs, account issues, and private campaign detail do not.",
             Href: "/feedback",
             Label: "Open feedback",
             Details: new[] { "Public page", "Votes show demand", "No private logs" }));
@@ -113,21 +113,21 @@
             Id: "right-lane",
             Badge: "Private support",
             Title: "Use the support form when the issue needs logs or account detail",
-            Summary: "Support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs or support history.",
+            Summary: "Use this for crashes, install recovery, broken behavior, or anything that should stay private.",
             Href: "#support-intake",
             Label: "Open support intake",
             Details: new[] { "Private reply", "Saved case", "Account optional" }));
         contactRouteChoices.Add((
             Id: "tracked-support",
             Badge: "Saved history",
-            Title: "Create an account when you want support history in one place",
+            Title: "Create an account only when you want case history",
             Summary: "Guest submissions are allowed. An account keeps the case, recovery state, and later replies in one place.",
             Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
             Label: Model.SupportIntake.AccountSupportLabel,
             Details: new[] { "Guest allowed", "History in Account", "No outside account" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
-            Badge: "Account return",
+            Badge: "Return to setup",
             Title: installTitle,
             Summary: installSummary,
             Href: installHref,
@@ -138,14 +138,6 @@
                 "Devices & access stays simple",
                 "Account return"
             }));
-        contactRouteChoices.Add((
-            Id: "guided-routing",
-            Badge: "Guided routing",
-            Title: "Open one guided page when you are not sure where to start",
-            Summary: "The guide keeps feedback, support, install return, and account help separate without making you choose from a long list.",
-            Href: "/contact/concierge",
-            Label: "Open concierge",
-            Details: new[] { "Optional", "Simple fallback", "Help stays visible" }));
     }
 }
 
@@ -299,9 +291,33 @@ else if (!contactPage)
 
 @if (Model.SupportIntake is not null && contactPage)
 {
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Pick the path</h2>
+            <p>Use the public lane for ideas and safe bugs. Use the private case form when the issue needs logs, account detail, or recovery.</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
+            @foreach (var choice in contactRouteChoices)
+            {
+                <article class="route-choice-card" id="@choice.Id">
+                    <span class="tag">@PublicText(choice.Badge)</span>
+                    <h3>@PublicText(choice.Title)</h3>
+                    <p>@PublicText(choice.Summary)</p>
+                    <div class="route-choice-card__details">
+                        @foreach (var item in choice.Details)
+                        {
+                            <span>@PublicText(item)</span>
+                        }
+                    </div>
+                    <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
+                </article>
+            }
+        </div>
+    </section>
+
     <section class="trust-page-sections" id="support-intake">
         <article class="trust-page-section trust-page-section--form">
-            <p class="eyebrow">Support intake</p>
+            <p class="eyebrow">Private support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
             <p>@PublicText(Model.SupportIntake.Intro)</p>
 
@@ -309,23 +325,7 @@ else if (!contactPage)
             {
                 <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
             }
-
-            <div class="editorial-block__lead trust-page-section__lead">
-                <p class="eyebrow">Case-type guide</p>
-                <h3>Choose the path that fits the issue before you attach logs</h3>
-                <p class="muted-copy">Safe public feedback should start on the public feedback page. Choose this form only when the issue needs private or account-linked follow-up.</p>
-            </div>
-            <div class="compact-rail">
-                @foreach (var option in Model.SupportIntake.Options)
-                {
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>@PublicText(option.Label)</h3>
-                            <p>@PublicText(option.Description)</p>
-                        </div>
-                    </article>
-                }
-            </div>
+            <p class="muted-copy">Keep one issue per case so the reply stays clear.</p>
 
             <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
@@ -407,46 +407,10 @@ else if (!contactPage)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
             {
-                <div class="compact-rail">
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Return to recovery when you are ready" : "Return to setup when you are ready")</h3>
-                            <p>@PublicText(Model.SupportIntake.InstallRailSummary)</p>
-                        </div>
-                        <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a>
-                    </article>
-                </div>
+                <p class="muted-copy">Need to go back to setup? <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a></p>
             }
         </article>
     </section>
-
-    if (contactPage)
-    {
-        <section class="editorial-block">
-            <div class="editorial-block__lead">
-                <p class="eyebrow">Need a different path?</p>
-                <h2 class="editorial-title">Public feedback, account return, and install recovery stay nearby.</h2>
-                <p class="editorial-copy">Start the case form first when you already know this needs private follow-up. Use the other options below when the issue is public, install-specific, or better handled from your account.</p>
-            </div>
-            <div class="route-choice-grid">
-                @foreach (var choice in contactRouteChoices)
-                {
-                    <article class="route-choice-card" id="@choice.Id">
-                        <span class="tag">@PublicText(choice.Badge)</span>
-                        <h3>@PublicText(choice.Title)</h3>
-                        <p>@PublicText(choice.Summary)</p>
-                        <div class="route-choice-card__details">
-                            @foreach (var item in choice.Details)
-                            {
-                                <span>@PublicText(item)</span>
-                            }
-                        </div>
-                        <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
-                    </article>
-                }
-            </div>
-        </section>
-    }
 }
 
 @if (Model.SignedInStatus is not null && deferSupportPanels)

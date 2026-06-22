@@ -28,7 +28,7 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'Pick the problem' in trust_page
     assert 'minimal-help-card__details' in trust_page
     assert 'Quick notes' in trust_page
-    assert 'other options below' in trust_page
+    assert 'route-choice-grid--compact' in trust_page
     assert 'other routes below' not in trust_page
 
 
@@ -55,11 +55,9 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "@PublicText(Model.SupportIntake.Intro)",
         "@PublicText(Model.SupportIntake.SubmissionNotice)",
         "@PublicText(option.Label)",
-        "@PublicText(option.Description)",
         "@PublicText(Model.SupportIntake.AccountSupportLabel)",
         "@PublicText(Model.SupportIntake.InstallAccessLabel)",
         "@PublicText(Model.SupportIntake.ResponseExpectation)",
-        "@PublicText(Model.SupportIntake.InstallRailSummary)",
         "@PublicText(Model.SupportIntake.InstallRailLabel)",
     ):
         assert expected in trust_page
@@ -82,11 +80,9 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "<p>@Model.SupportIntake.Intro</p>",
         "@Model.SupportIntake.SubmissionNotice</p>",
         "<h3>@option.Label</h3>",
-        "<p>@option.Description</p>",
         ">@Model.SupportIntake.AccountSupportLabel</a>",
         ">@Model.SupportIntake.InstallAccessLabel</a>",
         "<p class=\"muted-copy\">@Model.SupportIntake.ResponseExpectation</p>",
-        "<p>@Model.SupportIntake.InstallRailSummary</p>",
         ">@Model.SupportIntake.InstallRailLabel</a>",
         "installer or app does the real work",
         "Return to the guided installer after support",
@@ -105,9 +101,9 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
 
     for expected in (
         "Devices and access is where you relink, reclaim, or recover this copy.",
-        "Return to setup when you are ready",
         "Public feedback should start on the feedback page.",
         "Return to setup",
+        "Need to go back to setup?",
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
     ):

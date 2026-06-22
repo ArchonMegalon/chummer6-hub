@@ -46,6 +46,12 @@ const supportingSurfaces = [
     screenshotPrefix: 'participate',
     requiredText: ['Tell us what slows the table down.', 'Send feedback', 'Current themes'],
   },
+  {
+    id: 'contact',
+    route: '/contact',
+    screenshotPrefix: 'contact',
+    requiredText: ['Open the right support case', 'Pick the path', 'Submit support case'],
+  },
 ] as const;
 
 test('public flagship screenshots stay readable across live surfaces', async ({ browser }) => {

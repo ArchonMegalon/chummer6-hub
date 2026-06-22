@@ -556,7 +556,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Your recent package activity", packages, StringComparison.Ordinal);
         Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
 
-        Assert.Contains("support history in one place", trustPage, StringComparison.Ordinal);
+        Assert.Contains("case history", trustPage, StringComparison.Ordinal);
         Assert.DoesNotContain("human escalation", trustPage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Browser handoff", trustPage, StringComparison.Ordinal);
 
@@ -1118,11 +1118,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string trustView = File.ReadAllText(trustViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use Participate for ideas and safe public bugs", trustView, StringComparison.Ordinal);
         Assert.Contains("Href: \"/feedback\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open feedback\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Safe public feedback should start on the public feedback page. Choose this form only when the issue needs private or account-linked follow-up.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use the public lane for ideas and safe bugs. Use the private case form when the issue needs logs, account detail, or recovery.", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);
     }
 
     [Fact]

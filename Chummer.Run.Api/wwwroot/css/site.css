@@ -6998,6 +6998,29 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.route-choice-grid--compact {
+  gap: 0.8rem;
+}
+
+.route-choice-grid--compact .route-choice-card {
+  gap: 0.6rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.route-choice-grid--compact .route-choice-card__details {
+  gap: 0.35rem;
+}
+
+.route-choice-grid--compact .route-choice-card__details span {
+  padding: 0.28rem 0.55rem;
+}
+
+.trust-page-section--form > .muted-copy:first-of-type {
+  margin-top: -0.15rem;
+}
+
 .ledger-command-map--pregold .black-ledger-geoscape__stage {
   min-height: clamp(440px, 68vh, 760px);
 }
