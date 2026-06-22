@@ -25,7 +25,9 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("ExternalBoardUrl", controller, StringComparison.Ordinal);
-        Assert.Contains("First-party page", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-toolbar", participateView, StringComparison.Ordinal);
+        Assert.Contains("Add feature or bug", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", participateView, StringComparison.OrdinalIgnoreCase);
     }
 

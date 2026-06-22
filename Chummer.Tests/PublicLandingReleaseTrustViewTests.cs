@@ -144,7 +144,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.True(File.Exists(publicViewPath));
         Assert.Contains("public async Task<IActionResult> ParticipatePage", publicController, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", publicController, StringComparison.Ordinal);
-        Assert.Contains("First-party page", publicView, StringComparison.Ordinal);
+        Assert.Contains("participate-toolbar", publicView, StringComparison.Ordinal);
+        Assert.Contains("participate-board", publicView, StringComparison.Ordinal);
+        Assert.Contains("Add feature or bug", publicView, StringComparison.Ordinal);
+        Assert.DoesNotContain("First-party page", publicView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", publicView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
@@ -500,7 +503,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void PublicLandingSupportAndStoryPagesAvoidFollowThroughJargon()
     {
         string statusPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
-        string feedbackPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
+        string feedbackPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string productStoryPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml");
         string packagesPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Packages.cshtml");
         string trustPagePath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
@@ -536,7 +539,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", status, StringComparison.Ordinal);
 
-        Assert.Contains("Announce the update after people can use it.", feedback, StringComparison.Ordinal);
+        Assert.Contains("participate-links", feedback, StringComparison.Ordinal);
+        Assert.Contains("Private help", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
 
         Assert.Contains("Character tools for Shadowrun.", productStory, StringComparison.Ordinal);
@@ -655,14 +659,14 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void ParticipateViewLinksToTheBuildGhostConciergeWithoutClaimingToolTruth()
+    public void ParticipateViewKeepsBuildGhostConciergeOutOfThePublicBoard()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Character help preview", view, StringComparison.Ordinal);
-        Assert.Contains("Open character helper", view, StringComparison.Ordinal);
-        Assert.Contains("The compare and apply decision still stays inside Chummer.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Character help preview", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open character helper", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("The compare and apply decision still stays inside Chummer.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1232,9 +1236,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("=> Redirect(\"/participate\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("public IActionResult ParticipatePage()\n        => Redirect(ResolveProductLiftFeedbackUrl());", controller, StringComparison.Ordinal);
-        Assert.Contains("First-party page", participateView, StringComparison.Ordinal);
-        Assert.Contains("Keep private logs, account details, and campaign secrets in Help.", participateView, StringComparison.Ordinal);
-        Assert.Contains("Add an idea", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-toolbar", participateView, StringComparison.Ordinal);
+        Assert.Contains("Tell us how Chummer could be more useful at the table.", participateView, StringComparison.Ordinal);
+        Assert.Contains("Add feature or bug", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("feedback returns here, roadmap resolves through Horizons, and shipped closeout resolves through What works today.", participateView, StringComparison.Ordinal);

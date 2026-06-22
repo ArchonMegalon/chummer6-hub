@@ -7,57 +7,35 @@
 
 <section class="minimal-page-hero participate-hero">
     <div>
-        <p class="minimal-kicker">Participate</p>
         <h1>What should Chummer do next?</h1>
-        <p>Send useful ideas, public bugs, and table friction. Keep private logs, account details, and campaign secrets in Help.</p>
-    </div>
-    <div class="minimal-status-pill">
-        <span>Public signal</span>
-        <strong>First-party page</strong>
-        <p>Chummer keeps the public discussion here. Private support stays separate.</p>
+        <p>Tell us how Chummer could be more useful at the table. Keep account details and private campaign notes in Help.</p>
     </div>
 </section>
 
-<section class="minimal-section minimal-section--tight" aria-label="Participation routes">
-    <div class="minimal-lane-grid participate-lanes">
-        @foreach (var lane in Model.Lanes)
-        {
-            <article class="minimal-lane-card">
-                <div class="minimal-lane-card__head">
-                    <span>@lane.Label</span>
-                    <h2>@lane.Title</h2>
-                </div>
-                <p>@lane.Summary</p>
-                <div class="minimal-platform-actions">
-                    <a class="button-like button-like--secondary" href="@lane.Href">@lane.ActionLabel</a>
-                </div>
-            </article>
-        }
+<section class="participate-toolbar" aria-label="Idea filters">
+    <div class="participate-filter">
+        <span>All</span>
+        <span>Bug</span>
+        <span>Feature</span>
+        <span>Linux</span>
+        <span>Desktop</span>
     </div>
+    <form class="participate-search" method="get" action="/participate">
+        <label class="sr-only" for="participateSearch">Search ideas</label>
+        <input id="participateSearch" name="q" placeholder="Search" autocomplete="off" />
+        <button type="submit">Go</button>
+    </form>
 </section>
 
-<section class="minimal-section participate-board" aria-label="Public ideas">
+<section class="participate-board" aria-label="Public ideas">
     <div class="participate-board__main">
-        <div class="minimal-section__lead">
-            <h2>Open ideas</h2>
-            <p>Vote on work that should stay visible to everyone. Use Help when the issue needs private detail.</p>
-        </div>
-
-        <div class="participate-filter" aria-label="Idea filters">
-            <span>All</span>
-            <span>Bug</span>
-            <span>Feature</span>
-            <span>Linux</span>
-            <span>Desktop</span>
-        </div>
-
         <div class="participate-items">
             @foreach (var item in Model.Items)
             {
                 <article class="participate-item">
-                    <span class="participate-item__score">@item.Score</span>
+                    <span class="participate-item__score">^ @item.Score</span>
                     <div class="participate-item__copy">
-                        <h3>@item.Title</h3>
+                        <h2>@item.Title</h2>
                         <p>@item.Summary</p>
                         <span>@item.Status</span>
                     </div>
@@ -67,7 +45,7 @@
     </div>
 
     <aside class="participate-submit" id="participate-submit">
-        <h2>Add an idea</h2>
+        <h2>Add feature or bug</h2>
         <p>Short and concrete is best.</p>
         <form class="settings-form" method="get" action="/contact">
             <input type="hidden" name="kind" value="feedback" />
@@ -77,11 +55,18 @@
             </div>
             <div class="field">
                 <label for="participateSummary">Details</label>
-                <textarea id="participateSummary" name="message" rows="7" maxlength="1200" placeholder="What happened, what you expected, and why it matters."></textarea>
+                <div class="participate-editor-toolbar" aria-hidden="true">
+                    <span>B</span>
+                    <span>I</span>
+                    <span>U</span>
+                    <span>Link</span>
+                </div>
+                <textarea id="participateSummary" name="message" rows="7" maxlength="1200" placeholder="Describe the idea or bug."></textarea>
             </div>
             <div class="field">
                 <label for="participateKind">Type</label>
                 <select id="participateKind" name="topic">
+                    <option value="">Choose a category</option>
                     <option value="feature">Feature</option>
                     <option value="bug">Bug</option>
                     <option value="desktop">Desktop UI</option>
@@ -94,23 +79,8 @@
     </aside>
 </section>
 
-<section class="minimal-section minimal-section--support">
-    <div class="minimal-section__lead">
-        <h2>Use the right lane</h2>
-        <p>Public ideas belong here. Current status, shipped updates, and private help stay on their own pages.</p>
-    </div>
-    <div class="minimal-download-strip">
-        <a class="minimal-download-strip__item" href="@Model.RoadmapHref">
-            <span>Roadmap</span>
-            <strong>See planned work</strong>
-        </a>
-        <a class="minimal-download-strip__item" href="@Model.ChangelogHref">
-            <span>Changelog</span>
-            <strong>See what shipped</strong>
-        </a>
-        <a class="minimal-download-strip__item" href="@Model.PrivateHelpHref">
-            <span>Help</span>
-            <strong>Send private details</strong>
-        </a>
-    </div>
+<section class="participate-links" aria-label="Other public lanes">
+    <a href="@Model.RoadmapHref">Roadmap</a>
+    <a href="@Model.ChangelogHref">Changelog</a>
+    <a href="@Model.PrivateHelpHref">Private help</a>
 </section>
