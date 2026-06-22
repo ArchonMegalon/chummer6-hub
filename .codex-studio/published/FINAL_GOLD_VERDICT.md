@@ -1,6 +1,6 @@
 # NOT_GOLD
 
-Generated: 2026-06-22T12:57:32Z
+Generated: 2026-06-22T13:06:43Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -11,7 +11,7 @@ Accepted boundaries: yes
 - FAIL `external_distribution_mirror_proof`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json`
   - mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass; external_required=False
 - PASS `icanpreneur_discovery_lane`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/ICANPRENEUR_DISCOVERY_LANE.generated.json`
-- FAIL `live_public_web_recrawl`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json`
+- PASS `live_public_web_recrawl`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json`
 - FAIL `live_surface_parity`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json`
 - PASS `ltd_optimization_stack`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json`
 - FAIL `operator_release_dashboard`: `pass` at `/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
@@ -32,7 +32,6 @@ Accepted boundaries: yes
 - `optional_external_mirrors_degraded`: Local registry and public edge are release-blocking and passing, but optional external mirrors are degraded.
 
 ## Failures
-- live_public_web_recrawl stale
 - rule_authority_minimum_coverage stale
 - ruleset_readiness stale
 - desktop_native_model_depth stale

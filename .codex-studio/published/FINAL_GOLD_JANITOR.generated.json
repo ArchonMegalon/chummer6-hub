@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-22T12:57:32Z",
+  "generated_at_utc": "2026-06-22T13:06:43Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,10 +14,10 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-21T02:51:53Z",
+      "generated_at_utc": "2026-06-22T13:06:36Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "rule_authority_minimum_coverage": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
@@ -815,7 +815,6 @@
     }
   ],
   "failures": [
-    "live_public_web_recrawl stale",
     "rule_authority_minimum_coverage stale",
     "ruleset_readiness stale",
     "desktop_native_model_depth stale",
