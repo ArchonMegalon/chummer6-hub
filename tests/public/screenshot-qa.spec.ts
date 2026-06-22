@@ -38,7 +38,7 @@ const supportingSurfaces = [
     id: 'help',
     route: '/help',
     screenshotPrefix: 'help',
-    requiredText: ['Get help without guessing', 'Choose the right path'],
+    requiredText: ['Get help without guessing', 'Pick the problem'],
   },
 ] as const;
 

@@ -12,7 +12,7 @@
         : "surface-trust-page";
     ViewData["ContextSidebarHeading"] = helpPage ? "Help" : "Page sections";
     ViewData["ContextSidebarSummary"] = helpPage
-        ? "Jump to the help path that matches the problem."
+        ? "Jump to the path that fits the problem."
         : "Jump between the current sections.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
@@ -83,7 +83,9 @@
                 Summary: pageSection.Body,
                 Href: ContextualPreviewHref(routeAction.Href),
                 Label: routeAction.Label,
-                Details: Array.Empty<string>()));
+                Details: (pageSection.Bullets ?? Array.Empty<string>())
+                    .Where(static bullet => !string.IsNullOrWhiteSpace(bullet))
+                    .ToArray()));
         }
     }
 
@@ -179,8 +181,8 @@
     {
         <div class="minimal-status-pill" aria-label="Help options">
             <span>Start here</span>
-            <strong>Pick one path</strong>
-            <span>Install, account, support, or FAQ</span>
+            <strong>Pick the problem</strong>
+            <span>Install, account, bug, or question</span>
         </div>
     }
     else
@@ -237,8 +239,8 @@
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Choose the right path</h2>
-            <p>Start with the page that matches the problem. Each path has a clear next step and a second option if that does not fit.</p>
+            <h2>Pick the problem</h2>
+            <p>Each card has a first step. Use the second link only when the first one does not fit.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -248,37 +250,23 @@
                     <span>@PublicText(choice.Badge)</span>
                     <h3>@PublicText(choice.Title)</h3>
                     <p>@PublicText(choice.Summary)</p>
+                    @if (choice.Details.Length > 0)
+                    {
+                        <details class="minimal-help-card__details">
+                            <summary>Quick notes</summary>
+                            <ul>
+                                @foreach (var item in choice.Details)
+                                {
+                                    <li>@PublicText(item)</li>
+                                }
+                            </ul>
+                        </details>
+                    }
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
                     @if (fallbackAction is not null)
                     {
                         <p class="muted-copy">If that does not fit: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
                     }
-                </article>
-            }
-        </div>
-    </section>
-
-    <section class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <h2>Details</h2>
-        </div>
-        <div class="minimal-platform-list">
-            @foreach (var pageSection in Model.Sections)
-            {
-                <article>
-                    <details>
-                        <summary>@PublicText(pageSection.Heading)</summary>
-                        <p>@PublicText(pageSection.Body)</p>
-                        @if (pageSection.Bullets is { Count: > 0 })
-                        {
-                            <ul>
-                                @foreach (var bullet in pageSection.Bullets)
-                                {
-                                    <li>@PublicText(bullet)</li>
-                                }
-                            </ul>
-                        }
-                    </details>
                 </article>
             }
         </div>

@@ -8503,6 +8503,17 @@ body {
   background: transparent;
 }
 
+.surface-help .minimal-page-hero {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.surface-help .minimal-help-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
 .minimal-help-card {
   display: grid;
   align-content: start;
@@ -8510,12 +8521,30 @@ body {
   border: 1px solid var(--minimal-line);
   border-radius: 12px;
   background: var(--minimal-surface);
+  padding: 0.9rem 1rem;
 }
 
 .minimal-help-card > span {
   color: var(--minimal-muted);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.minimal-help-card__details {
+  margin: -0.15rem 0 0;
+}
+
+.minimal-help-card__details summary {
+  font-size: 0.9rem;
+}
+
+.minimal-help-card__details ul {
+  margin: 0.55rem 0 0;
+  padding-left: 1rem;
+}
+
+.minimal-help-card__details li {
+  margin: 0.2rem 0;
 }
 
 .surface-minimal details {
@@ -8726,6 +8755,10 @@ body {
 
   .minimal-three,
   .minimal-download-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .surface-help .minimal-help-grid {
     grid-template-columns: 1fr;
   }
 

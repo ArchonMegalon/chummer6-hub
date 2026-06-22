@@ -7,7 +7,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const sections = page.locator('[data-homepage-section]');
-  await expect(sections).toHaveCount(4);
+  await expect(sections).toHaveCount(3);
 
   const navLabels = await page.locator('.site-nav a, .site-nav__current').evaluateAll((items) =>
     items.map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
@@ -28,7 +28,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
     [
       '# Final public UX redesign verdict',
       '',
-      '- Homepage sections: `4`',
+      '- Homepage sections: `3`',
       '- Primary nav: `Home, Participate, Help`',
       '- First-screen proof noise: `0`',
       '- Verdict: `READY`',
@@ -42,7 +42,7 @@ test('help page stays practical instead of exposing internal policy language', a
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
   await expect(page.locator('h1')).toContainText('Get help without guessing');
-  expect(bodyText).toContain('Choose the right path');
+  expect(bodyText).toContain('Pick the problem');
   expect(bodyText).not.toContain('Provider-backed help');
   expect(bodyText).not.toContain('Retention window');
   expect(bodyText).not.toContain('receipt');

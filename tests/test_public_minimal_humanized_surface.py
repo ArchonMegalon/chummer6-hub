@@ -25,7 +25,9 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'surface-help surface-minimal' in trust_page
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
-    assert 'Pick one path' in trust_page
+    assert 'Pick the problem' in trust_page
+    assert 'minimal-help-card__details' in trust_page
+    assert 'Quick notes' in trust_page
     assert 'other options below' in trust_page
     assert 'other routes below' not in trust_page
 

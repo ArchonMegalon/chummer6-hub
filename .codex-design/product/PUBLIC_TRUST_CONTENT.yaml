@@ -5,7 +5,7 @@ trust_pages:
   - id: help
     eyebrow: "Help"
     heading: "Get help without guessing"
-    intro: "Start here for downloads, sign-in recovery, and support."
+    intro: "Pick the problem. Chummer sends you to the right place."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -26,15 +26,15 @@ trust_pages:
       - id: install-update
         eyebrow: "Install or update"
         heading: "Start with Downloads"
-        body: "Downloads has Stable and Nightly installers for Windows and Linux. Use Help when install or update does not behave as expected."
+        body: "Downloads has the current Windows and Linux builds. Come back here when install or update goes wrong."
         bullets:
           - "Stable is the calm default."
           - "Nightly is the newest published build."
-          - "Create an account only when you want tracked support or recovery."
+          - "An account is optional."
       - id: sign-in-recovery
         eyebrow: "Sign-in or account recovery"
         heading: "Use Account for recovery"
-        body: "Sign in when you want support history, recovery, and install return tied to your account."
+        body: "Use Account when you want recovery, support history, or this copy tied back to you."
         bullets:
           - "Guest use is allowed."
           - "Account support keeps follow-up in one place."
@@ -42,15 +42,15 @@ trust_pages:
       - id: product-bug
         eyebrow: "Product bug"
         heading: "Send bugs through Contact"
-        body: "Use Contact for install trouble, product bugs, and practical feedback. Public issue threads are optional."
+        body: "Use Contact for broken behavior, install trouble, or UI friction that blocks the table."
         bullets:
           - "Use Contact for install trouble, product bugs, or UX friction."
-          - "Use Account > Support if you want your support history saved in one place."
-          - "Choose a public issue thread only when the bug should be public."
+          - "Use Account > Support if you want the case saved in one place."
+          - "Public issue threads stay optional."
       - id: product-question
         eyebrow: "Product question or UX confusion"
         heading: "Ask Chummer first"
-        body: "FAQ and Help should answer the normal questions without making you dig through project details."
+        body: "FAQ handles normal questions. Contact is there when the answer is still missing."
         bullets:
           - "FAQ answers normal product questions in plain language."
           - "Support cases stay separate from public feedback."
