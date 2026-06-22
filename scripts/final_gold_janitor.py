@@ -161,20 +161,27 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
         generated_at = str(payload.get("generated_at_utc") or payload.get("generatedAt") or "")
         is_fresh = generated_at_is_fresh(generated_at, RECRAWL_MAX_AGE_HOURS) if name in FRESHNESS_REQUIRED_GATES else True
         status_value = str(payload.get("status") or "").strip().lower()
+        structured_failures = payload.get("failures")
+        has_structured_failures = isinstance(structured_failures, list) and len(structured_failures) > 0
         passed = path.is_file() and status_value in {"pass", "passed", "ready"} and is_fresh
         if name == "public_route_proof" and path.is_file():
             summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
             passed = (
-                int(summary.get("route_count") or 0) > 0
+                status_value in {"pass", "passed", "ready"}
+                and int(summary.get("route_count") or 0) > 0
                 and int(summary.get("failed_count") or 0) == 0
                 and int(summary.get("negative_path_failed_count") or 0) == 0
                 and is_fresh
             )
             status_value = "pass" if passed else "fail"
+        if passed and has_structured_failures:
+            passed = False
         if not passed:
             reason = f"{name} missing" if not path.is_file() else f"{name} failed"
             if path.is_file() and name in FRESHNESS_REQUIRED_GATES and not is_fresh:
                 reason = f"{name} stale"
+            elif path.is_file() and status_value in {"pass", "passed", "ready"} and has_structured_failures:
+                reason = f"{name} has structured failures"
             failures.append(reason)
         required_gates[name] = {
             "path": str(path),
@@ -182,6 +189,7 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             "status": status_value or payload.get("status", "missing"),
             "generated_at_utc": generated_at,
             "fresh_within_hours": RECRAWL_MAX_AGE_HOURS if name in FRESHNESS_REQUIRED_GATES else None,
+            "structured_failures_count": len(structured_failures) if isinstance(structured_failures, list) else 0,
             "pass": passed,
         }
         if name == "rule_authority_minimum_coverage" and path.is_file():

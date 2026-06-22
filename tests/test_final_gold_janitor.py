@@ -81,6 +81,67 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertIn("live_public_web_recrawl stale", payload["failures"])
 
+    def test_payload_fails_when_public_route_receipt_status_disagrees_with_summary(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-route-status-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "fail",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_route_proof failed", payload["failures"])
+        self.assertFalse(payload["required_gates"]["public_route_proof"]["pass"])
+
+    def test_payload_fails_required_receipts_that_report_structured_failures(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-structured-failures-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "design_quality_gate":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "failures": ["homepage still exposes internal review wording"],
+                    }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["design_quality_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("design_quality_gate has structured failures", payload["failures"])
+        self.assertEqual(1, gate["structured_failures_count"])
+        self.assertFalse(gate["pass"])
+
     def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-dual-write-") as temp_dir:
