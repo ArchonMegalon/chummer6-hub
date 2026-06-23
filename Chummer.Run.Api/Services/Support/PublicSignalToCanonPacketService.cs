@@ -50,7 +50,7 @@ public sealed class PublicSignalToCanonPacketService
             PacketId: StableId("signal-feedback", manifest.Version),
             SurfaceId: "feedback",
             Route: "/feedback",
-            DestinationRoute: "/feedback",
+            DestinationRoute: "/participate?source=feedback#public-feedback",
             SourceKind: "productlift_feedback",
             SourceClassification: "public_feedback_signal",
             Audience: "public_feedback",
