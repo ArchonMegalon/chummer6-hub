@@ -8,17 +8,17 @@
 <section class="ledger-flagship ledger-flagship--notifications">
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Account notifications</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
         <div class="trust-claim__details">
-            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)</span>
-            <span>Policy: @PublicFacingCopyHumanizer.Clean(Model.Status.Policy)</span>
-            <span>Messages: @Model.Status.ReceiptCount</span>
+            <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)</span>
+            <span>Policy: @UndetectableHumanizerCopyAdapter.Humanize(Model.Status.Policy)</span>
+            <span>Updates: @Model.Status.ReceiptCount</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn review</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn recap</a>
             <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory</a>
             <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
         </div>
@@ -35,7 +35,7 @@
                 data-tick-headline="Newsreel pressure live."
                 data-primary-label="Open Turn 1"
                 data-primary-href="@Model.Status.TurnHref"
-                data-secondary-label="Open turn review"
+                data-secondary-label="Open turn recap"
                 data-secondary-href="/account/ledger/worldtick/validation"></div>
         </div>
         <div class="ledger-flagship__nav" aria-label="Notification command paths">
@@ -46,7 +46,7 @@
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
                 <span class="tag">World state</span>
-                <strong>Review the turn</strong>
+                <strong>Open turn recap</strong>
                 <p>Every inbox line should trace back to the same world turn.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger">
@@ -73,32 +73,32 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Table Pulse Live</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Summary)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.Summary)</p>
         </div>
         <div class="trust-claim__details">
-            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.VerdictLabel)</span>
-            <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.ConsentPosture)</span>
+            <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.VerdictLabel)</span>
+            <span>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.ConsentPosture)</span>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Boundary</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.BoundaryLine)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.BoundaryLine)</p>
             </article>
         </div>
         <div class="trust-claim__details">
             @foreach (var label in Model.TablePulsePacket.Labels)
             {
-                <span>@PublicFacingCopyHumanizer.Clean(label)</span>
+                <span>@UndetectableHumanizerCopyAdapter.Humanize(label)</span>
             }
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var cue in Model.TablePulsePacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.Label)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(cue.Label)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(cue.Summary)</p>
                     <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
                     </div>
@@ -108,33 +108,33 @@
         @if (!string.IsNullOrWhiteSpace(Model.TablePulsePacket.AdjudicationSummary))
         {
             <div class="trust-claim__details">
-                <span>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AdjudicationSummary)</span>
+                <span>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.AdjudicationSummary)</span>
             </div>
         }
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Heat</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.HeatPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.HeatPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Notifications</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.NotificationPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.NotificationPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Remote reaction</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.RemoteReactionPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.RemoteReactionPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Signal Deck</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.SignalDeckPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.SignalDeckPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Runner Passport</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.RunnerPassportPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.RunnerPassportPosture)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.AftermathPosture)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.AftermathPosture)</p>
                 <div class="route-choice-card__details">
                     <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath</a>
                 </div>
@@ -165,13 +165,13 @@
                 @foreach (var option in Model.TablePulsePacket.ReactionOptions)
                 {
                     <article class="route-choice-card">
-                        <span class="tag">@PublicFacingCopyHumanizer.Clean(option.Kind)</span>
-                        <h3>@PublicFacingCopyHumanizer.Clean(option.Label)</h3>
-                        <p>@PublicFacingCopyHumanizer.Clean(option.Summary)</p>
+                        <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(option.Kind)</span>
+                        <h3>@UndetectableHumanizerCopyAdapter.Humanize(option.Label)</h3>
+                        <p>@UndetectableHumanizerCopyAdapter.Humanize(option.Summary)</p>
                         <form method="post" action="/account/ledger/notifications/table-pulse/react">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="reactionId" value="@option.ReactionId" />
-                            <button class="button-like button-like--secondary" type="submit">@PublicFacingCopyHumanizer.Clean(option.ActionLabel)</button>
+                            <button class="button-like button-like--secondary" type="submit">@UndetectableHumanizerCopyAdapter.Humanize(option.ActionLabel)</button>
                         </form>
                     </article>
                 }
@@ -185,8 +185,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Advisory signal</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.NoDemocracyNote)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -209,16 +209,16 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
+            <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var beat in Model.WorldTurnBriefing.NewsreelBullets.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Inbox beat</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(beat)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(beat)</p>
                 </article>
             }
         </div>
@@ -229,7 +229,7 @@
         <section class="editorial-block ledger-newsreel-broadcast" id="newsreel-player">
             <div class="editorial-block__lead">
                 <p class="eyebrow">Inbox watch package</p>
-                <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.PackageLabel)</h2>
+                <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.PackageLabel)</h2>
                 <p class="editorial-copy">Open the same anchor-led bulletin your inbox is referring to instead of reading a dead status card.</p>
             </div>
             <div class="ledger-newsreel-broadcast__shell">
@@ -245,8 +245,8 @@
                         Your browser cannot play this video here.
                     </video>
                     <div class="trust-claim__details">
-                        <span>Anchor: @PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AnchorName)</span>
-                        <span>Desk: @PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.DeskLabel)</span>
+                        <span>Anchor: @UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.AnchorName)</span>
+                        <span>Desk: @UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.DeskLabel)</span>
                         <span>Duration: @Model.WorldTurnBriefing.Broadcast.DurationLabel</span>
                     </div>
                 </div>
@@ -260,11 +260,11 @@
                                 @foreach (var beat in Model.WorldTurnBriefing.Broadcast.ActionBeats.Take(3))
                                 {
                                     <article class="ledger-newsreel-broadcast__action-card">
-                                        <span class="tag">@PublicFacingCopyHumanizer.Clean(beat.ActorKind)</span>
-                                        <h4>@PublicFacingCopyHumanizer.Clean(beat.BeatLabel)</h4>
-                                        <p class="ledger-newsreel-broadcast__action-actor">@PublicFacingCopyHumanizer.Clean(beat.ActorLabel)</p>
-                                        <p>@PublicFacingCopyHumanizer.Clean(beat.ActionSummary)</p>
-                                        <p class="ledger-newsreel-broadcast__action-detail">@PublicFacingCopyHumanizer.Clean(beat.ProofNote)</p>
+                                        <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(beat.ActorKind)</span>
+                                        <h4>@UndetectableHumanizerCopyAdapter.Humanize(beat.BeatLabel)</h4>
+                                        <p class="ledger-newsreel-broadcast__action-actor">@UndetectableHumanizerCopyAdapter.Humanize(beat.ActorLabel)</p>
+                                        <p>@UndetectableHumanizerCopyAdapter.Humanize(beat.ActionSummary)</p>
+                                        <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.Humanize(beat.ProofNote)</p>
                                     </article>
                                 }
                             </div>
@@ -273,8 +273,8 @@
                     <article class="route-choice-card">
                         <span class="tag">Audio</span>
                         <h3>Broadcast mix</h3>
-                        <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AudioPosture)</p>
-                        <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.MusicPosture)</p>
+                        <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.AudioPosture)</p>
+                        <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.MusicPosture)</p>
                         <div class="route-choice-card__details">
                             <a href="@Model.WorldTurnBriefing.Broadcast.WatchHref">Watch</a>
                         </div>
@@ -287,7 +287,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Inbox queue</p>
+        <p class="eyebrow">Inbox</p>
         <h2 class="editorial-title">Actual messages, not just status</h2>
         <p class="editorial-copy">The account path now shows the turn, world state, leader digest, and faction promo as separate inbox items.</p>
     </div>
@@ -295,12 +295,12 @@
         @foreach (var message in Model.InboxMessages)
         {
             <article class="route-choice-card">
-                <span class="tag">@PublicFacingCopyHumanizer.Clean(message.Eyebrow)</span>
-                <h3>@PublicFacingCopyHumanizer.Clean(message.Heading)</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(message.Summary)</p>
+                <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(message.Eyebrow)</span>
+                <h3>@UndetectableHumanizerCopyAdapter.Humanize(message.Heading)</h3>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(message.Summary)</p>
                 <div class="route-choice-card__details">
-                    <span>Status: @PublicFacingCopyHumanizer.Clean(message.StatusLabel)</span>
-                    <a href="@message.Href">@PublicFacingCopyHumanizer.Clean(message.CtaLabel)</a>
+                    <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(message.StatusLabel)</span>
+                    <a href="@message.Href">@UndetectableHumanizerCopyAdapter.Humanize(message.CtaLabel)</a>
                 </div>
             </article>
         }
@@ -310,15 +310,15 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Delivery status</p>
-        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Status.Summary)</p>
+        <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)</h2>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Status.Summary)</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var note in Model.DeliveryNotes)
         {
             <article class="route-choice-card">
                 <span class="tag">Policy note</span>
-                <p>@PublicFacingCopyHumanizer.Clean(note)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(note)</p>
             </article>
         }
     </div>
@@ -329,22 +329,22 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Saved updates</p>
-            <h2 class="editorial-title">Recent delivery attempts</h2>
+            <h2 class="editorial-title">Recent deliveries</h2>
             <p class="editorial-copy">Delivery or suppression history for the seeded Turn 1 newsreel.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in Model.Status.Receipts)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
-                    <h3>Delivery attempt</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(receipt.Status)</span>
+                    <h3>Delivery update</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)</p>
                     <div class="route-choice-card__details">
-                        <span>Recipient: @PublicFacingCopyHumanizer.Clean(receipt.RecipientLabel)</span>
-                        <span>Attempted: @receipt.AttemptedAtUtc</span>
+                        <span>To: @UndetectableHumanizerCopyAdapter.Humanize(receipt.RecipientLabel)</span>
+                        <span>Sent: @receipt.AttemptedAtUtc</span>
                         @if (!string.IsNullOrWhiteSpace(receipt.FailureReason))
                         {
-                            <span>Reason: @PublicFacingCopyHumanizer.Clean(receipt.FailureReason)</span>
+                            <span>Reason: @UndetectableHumanizerCopyAdapter.Humanize(receipt.FailureReason)</span>
                         }
                     </div>
                 </article>
@@ -357,16 +357,16 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Turn details</p>
-            <h2 class="editorial-title">Send this for review</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ValidationPacket.Summary)</p>
+            <p class="eyebrow">Current turn</p>
+            <h2 class="editorial-title">What drives this inbox</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ValidationPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var check in Model.ValidationPacket.Checks.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Detail</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(check)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(check)</p>
                 </article>
             }
         </div>

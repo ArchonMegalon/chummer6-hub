@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-packages";
 
     static string PublicPackageText(string? value)
-        => PublicFacingCopyHumanizer.Clean(value)
+        => UndetectableHumanizerCopyAdapter.Humanize(value)
             .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
             .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
             .Replace("records", "updates", StringComparison.OrdinalIgnoreCase);
@@ -17,8 +17,8 @@
         <h1 class="page-title">@PublicPackageText(Model.Heading)</h1>
         <p class="page-copy">@PublicPackageText(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>@Model.Packages.Count package(s)</span>
-            <span>@Model.Classes.Count package class(es)</span>
+            <span>@Model.Packages.Count packages</span>
+            <span>@Model.Classes.Count types</span>
             <span>@PublicPackageText(Model.ScopeLabel)</span>
         </div>
     </div>
@@ -34,7 +34,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Package types</p>
+        <p class="eyebrow">Types</p>
         <h2 class="editorial-title">Know what you are looking at before you install anything.</h2>
         <p class="editorial-copy">Downloads, rules data, add-ons, and ideas are different things. This page keeps those choices separate.</p>
     </div>
@@ -58,7 +58,7 @@
 
 <section class="editorial-block" id="package-browser">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Available paths</p>
+        <p class="eyebrow">Browse</p>
         <h2 class="editorial-title">Start with the package that matches the job.</h2>
         <p class="editorial-copy">Use Downloads for the app. Use rules data and add-ons only when you know they fit the character or table you are working on.</p>
     </div>
@@ -71,13 +71,13 @@
                 <p>@PublicPackageText(package.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>@PublicPackageText(package.StatusLabel)</span>
-                    <span>@package.VoteCount vote(s)</span>
-                    <span>@package.FollowCount follow(s)</span>
+                    <span>@package.VoteCount votes</span>
+                    <span>@package.FollowCount follows</span>
                 </div>
                 <p><strong>Works with:</strong> @PublicPackageText(package.CompatibilitySummary)</p>
-                <p><strong>Review:</strong> @PublicPackageText(package.GovernanceSummary)</p>
+                <p><strong>Best for:</strong> @PublicPackageText(package.GovernanceSummary)</p>
                 <p><strong>Notes:</strong> @PublicPackageText(package.EvidenceSummary)</p>
-                <a class="editorial-strip__action" href="@package.DetailHref">Open package detail</a>
+                <a class="editorial-strip__action" href="@package.DetailHref">Open details</a>
             </article>
         }
     </div>
@@ -87,7 +87,7 @@
 {
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Recent activity</p>
+        <p class="eyebrow">Recent updates</p>
         <h2 class="editorial-title">Your recent package activity</h2>
         <p class="editorial-copy">Recent votes and follows stay with your account so you can return to them later.</p>
     </div>
@@ -100,7 +100,7 @@
                     <p>@PublicPackageText(receipt.RouteSummary)</p>
                     <p><strong>@PublicPackageText(receipt.ActorLabel)</strong> · @receipt.RecordedAtLabel</p>
                 </div>
-                <a class="editorial-strip__action" href="@receipt.Href">Open activity</a>
+                <a class="editorial-strip__action" href="@receipt.Href">Open update</a>
             </article>
         }
     </section>

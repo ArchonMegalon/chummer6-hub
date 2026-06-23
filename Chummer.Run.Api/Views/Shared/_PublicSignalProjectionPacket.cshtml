@@ -31,12 +31,12 @@
             return string.Empty;
         }
 
-        return PublicFacingCopyHumanizer.Clean(value
+        return UndetectableHumanizerCopyAdapter.Humanize(value
             .Replace("Canonical Roadmap Truth", "Roadmap decisions", StringComparison.OrdinalIgnoreCase)
             .Replace("Release Truth", "Release status", StringComparison.OrdinalIgnoreCase)
             .Replace("Support Case Truth", "Support cases", StringComparison.OrdinalIgnoreCase)
             .Replace("Implementation Priority", "Implementation priority", StringComparison.OrdinalIgnoreCase)
-            .Replace("Public Signal To Canon Pipeline", "Public Signal Review Pipeline", StringComparison.OrdinalIgnoreCase)
+            .Replace("Public Signal To Canon Pipeline", "Public Signal Update Flow", StringComparison.OrdinalIgnoreCase)
             .Replace("Canon is decided by Chummer", "Product decisions happen in Chummer", StringComparison.OrdinalIgnoreCase)
             .Replace("canonical patch or milestone", "product decision or milestone", StringComparison.OrdinalIgnoreCase)
             .Replace("canonical", "product decision", StringComparison.OrdinalIgnoreCase)
@@ -45,9 +45,9 @@
             .Replace("projection", "public view", StringComparison.OrdinalIgnoreCase)
             .Replace("Product Governor", "product decision", StringComparison.OrdinalIgnoreCase)
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
-            .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
+            .Replace("EA synthesis", "product planning", StringComparison.OrdinalIgnoreCase)
             .Replace("productlift_idea_clustered", "public feedback signal", StringComparison.OrdinalIgnoreCase)
-            .Replace("Icanpreneur", "guided review path", StringComparison.OrdinalIgnoreCase)
+            .Replace("Icanpreneur", "guided planning path", StringComparison.OrdinalIgnoreCase)
             .Replace("Deftform", "structured pre-screen", StringComparison.OrdinalIgnoreCase)
             .Replace("FacePop", "public invitation", StringComparison.OrdinalIgnoreCase)
             .Replace("Lunacal", "scheduled follow-up", StringComparison.OrdinalIgnoreCase)
@@ -91,7 +91,7 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
-            <h3>Open page</h3>
+            <h3>Open details</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__details">
                 <span>Role: @Model.Role</span>
@@ -99,12 +99,12 @@
                 <span>Fallback page: @Model.FallbackPath</span>
                 <span>@SanitizeProjectionText(Model.TruthPosture)</span>
             </div>
-            <a class="editorial-strip__action" href="@Model.FallbackPath">Open page</a>
+            <a class="editorial-strip__action" href="@Model.FallbackPath">Open details</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">How this works</span>
             <h3>@Model.CoreRule</h3>
-            <p>Public feedback can collect visible demand, but Chummer review still decides what changes.</p>
+            <p>Public feedback can show visible demand, but Chummer still decides what changes.</p>
             @if (authorityFlow.Length > 0)
             {
                 <div class="compact-rail">
@@ -122,8 +122,8 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Limits</span>
-            <h3>Decision paths stay explicit.</h3>
-            <p>Public feedback can move into review, but it does not replace help, roadmap, or release updates.</p>
+            <h3>Decision paths stay clear.</h3>
+            <p>Public feedback can move into planning, but it does not replace help, roadmap, or release updates.</p>
             @if (decisionRoutes.Length > 0)
             {
                 <div class="route-choice-card__details">
@@ -154,9 +154,9 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Review</span>
+            <span class="tag">Planning</span>
             <h3>Planning and shipped updates stay separate from public feedback.</h3>
-            <p>These links keep feedback connected to product review without turning public comments into promises.</p>
+            <p>These links keep feedback connected to product planning without turning public comments into promises.</p>
             @if (sourceRecords.Length > 0)
             {
                 <div class="route-choice-card__details">

@@ -40,7 +40,7 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "Public feedback stays easy to sort." in operations
     assert "Context" in projection
     assert "Decision sources" not in projection
-    assert "Open page" in projection
+    assert "Open details" in projection
     assert "Open first-party fallback" not in projection
     assert "Boundary conditions" not in projection
     assert "Before it ships" in projection
@@ -53,3 +53,12 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "proof-bound" not in gate_module.REQUIRED_SOURCE_PHRASES
     assert "release-backed closeout" in gate_module.FORBIDDEN_HTML_PHRASES
     assert "proof-bound" in gate_module.FORBIDDEN_HTML_PHRASES
+
+
+def test_auth_entry_uses_account_language_in_public_copy() -> None:
+    auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
+
+    assert "the account area" in auth_entry
+    assert "Your home and account pages for return, recovery, and the next step." in auth_entry
+    assert "the signed-in product" not in auth_entry
+    assert "Your signed-in home and account pages for return, recovery, and the next step." not in auth_entry

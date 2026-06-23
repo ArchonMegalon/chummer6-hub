@@ -2,34 +2,34 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Preview</p>
+        <p class="eyebrow">Planned</p>
         <h2 class="editorial-title">What this concept is for.</h2>
         <p class="editorial-copy">This page stays honest about what is ready and points to the next useful place.</p>
     </div>
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
             <span class="tag">Readiness</span>
-            <p>This concept is still preview-only. Use the roadmap or help when you need the next step.</p>
+            <p>This concept is still planned. Use the roadmap or help when you need the next step.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
         {
             <article class="role-matrix__cell">
                 <span class="tag">Why it matters</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.Pain)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Pain)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Payoff))
         {
             <article class="role-matrix__cell">
                 <span class="tag">What it could unlock</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.Payoff)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Payoff)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
         {
             <article class="role-matrix__cell">
-                <span class="tag">What to watch for next</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.ProofNote)</p>
+                <span class="tag">Watch next</span>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.ProofNote)</p>
             </article>
         }
     </div>
@@ -39,13 +39,13 @@
 {
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Useful cues</p>
+            <p class="eyebrow">Helpful cues</p>
             <h2 class="editorial-title">These cues should move onto the live product before you treat this as ready.</h2>
         </div>
         <div class="trust-claim__details">
             @foreach (var item in Model.MicroProof)
             {
-                <span>@PublicFacingCopyHumanizer.Clean(item)</span>
+                <span>@UndetectableHumanizerCopyAdapter.Humanize(item)</span>
             }
         </div>
     </section>
@@ -54,7 +54,7 @@
 <section class="compact-rail">
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Still a concept</h3>
+            <h3>Still planned</h3>
             <p>Follow the roadmap here, not an install story.</p>
         </div>
         <a class="inline-link" href="/roadmap">Open roadmap</a>
@@ -62,25 +62,25 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Next page</h3>
-            <p>@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label) is the cleanest place to follow this without treating it as already shipped.</p>
+            <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label) is the cleanest place to follow this without treating it as already shipped.</p>
         </div>
-        <a class="inline-link" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
+        <a class="inline-link" href="@Model.PrimaryAction.Href">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Need the live product?</h3>
-            <p>Open the detail view when you need current context instead of the preview concept.</p>
+            <p>Open saved pages when you need current context instead of the planned concept.</p>
         </div>
-        <a class="inline-link" href="/artifacts">Open detail view</a>
+        <a class="inline-link" href="/artifacts">Open saved pages</a>
     </article>
     @if (Model.Chrome.Authenticated)
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Open account detail</h3>
-                <p>The account detail view keeps your personal, campaign, and publication history together while this concept is still preview-only.</p>
+                <h3>Use your account details</h3>
+                <p>Open account detail when you want your personal, campaign, and publication history together while this concept is still planned.</p>
             </div>
-            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account detail view</a>
+            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account detail</a>
         </article>
     }
 </section>

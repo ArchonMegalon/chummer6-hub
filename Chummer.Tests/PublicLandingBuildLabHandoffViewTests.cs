@@ -47,7 +47,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.ExchangeParityLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Import/export fit:", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Exchange parity:", view, StringComparison.Ordinal);
-        Assert.Contains("Parity note:", view, StringComparison.Ordinal);
+        Assert.Contains("Import/export note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PortabilityPillarSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PortabilityPillarLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Portability:", view, StringComparison.Ordinal);
@@ -56,7 +56,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner note:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
-        Assert.Contains("Output details:", view, StringComparison.Ordinal);
+        Assert.Contains("Output background:", view, StringComparison.Ordinal);
         Assert.Contains("Output type:", view, StringComparison.Ordinal);
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
         Assert.Contains("Output status:", view, StringComparison.Ordinal);
@@ -72,6 +72,6 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("Compatibility: @leadAftermathShelfEntry.CompatibilitySummary", view, StringComparison.Ordinal);
-        Assert.Contains("Lineage: @leadAftermathShelfEntry.LineageSummary", view, StringComparison.Ordinal);
+        Assert.Contains("History: @leadAftermathShelfEntry.LineageSummary", view, StringComparison.Ordinal);
     }
 }

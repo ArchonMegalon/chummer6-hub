@@ -6,13 +6,10 @@
     var releaseAvailabilityLabel = IsReleaseAvailable(Model.Manifest.ProofStatus)
         ? "Available"
         : "Unavailable";
-    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = Model.VerifiedAtLabel
-        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd");
+    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
+    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
-    static string PublicStatusText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 @functions {

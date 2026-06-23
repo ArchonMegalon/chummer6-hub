@@ -1102,12 +1102,12 @@ public sealed class PublicSignalOperationsService
         else if (audience.ProjectedRecipientCount == 0)
         {
             projectionStatusLabel = "No eligible followers";
-            projectionSummary = $"Recipient matching is enabled, but no account followers currently have roadmap updates enabled. The return path stays on {followSettingsPath} until at least one first-party follower qualifies.";
+            projectionSummary = $"Recipient matching is enabled, but no account followers currently follow upcoming updates. The return path stays on {followSettingsPath} until at least one Chummer follower qualifies.";
         }
         else
         {
             projectionStatusLabel = "Recipient list ready";
-            projectionSummary = $"First-party recipient matching is enabled for public closeout. {audience.ProjectedRecipientCount} account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through follow settings, and external recipient lists stay out of first-party storage.";
+            projectionSummary = $"Chummer recipient matching is enabled for public closeout. {audience.ProjectedRecipientCount} account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through follow settings, and external recipient lists stay out of Chummer storage.";
         }
 
         string consentStatusLabel;
@@ -4429,7 +4429,7 @@ public sealed class PublicSignalOperationsService
 
         if (readiness.ProjectedRecipientCount <= 0)
         {
-            return "No account followers currently have roadmap updates enabled for this outbox path.";
+            return "No account followers currently follow upcoming updates for this outbox path.";
         }
 
         if (!readiness.ConsentConfigured)
@@ -4599,7 +4599,7 @@ public sealed class PublicSignalOperationsService
 
         if (string.Equals(statusLabel, "No eligible followers", StringComparison.OrdinalIgnoreCase))
         {
-            return "No account followers currently have roadmap updates enabled for this closeout path.";
+            return "No account followers currently follow upcoming updates for this closeout path.";
         }
 
         if (string.Equals(statusLabel, "Consent basis pending", StringComparison.OrdinalIgnoreCase))
@@ -4692,7 +4692,7 @@ public sealed class PublicSignalOperationsService
 
         if (readiness.ProjectedRecipientCount <= 0)
         {
-            return "No account followers currently have roadmap updates enabled for this closeout path.";
+            return "No account followers currently follow upcoming updates for this closeout path.";
         }
 
         if (!readiness.ConsentConfigured)

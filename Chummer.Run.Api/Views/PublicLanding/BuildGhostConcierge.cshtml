@@ -1,11 +1,11 @@
 @model BuildGhostConciergePageViewModel
 @{
     var publicHelperRoute = string.Equals(Model.Chrome.CurrentPath, "/alice", StringComparison.OrdinalIgnoreCase);
-    var pageTitle = publicHelperRoute ? "Character helper" : Model.Chrome.Title;
-    var eyebrow = publicHelperRoute ? "Private preview" : Model.Eyebrow;
-    var heading = publicHelperRoute ? "Character helper" : Model.Heading;
+    var pageTitle = publicHelperRoute ? "Character help" : Model.Chrome.Title;
+    var eyebrow = publicHelperRoute ? "Optional" : Model.Eyebrow;
+    var heading = publicHelperRoute ? "Character help" : Model.Heading;
     var intro = publicHelperRoute
-        ? "This preview is kept off the main public path. Use it only when you want to review the account helper before returning to the app."
+        ? "Use this page only when you want help before returning to Chummer."
         : Model.Intro;
 
     ViewData["Title"] = pageTitle;
@@ -26,11 +26,11 @@
         return value
             .Replace(conciergeToken, "public concierge", StringComparison.OrdinalIgnoreCase)
             .Replace(explainerToken, "plain-language explainer", StringComparison.OrdinalIgnoreCase)
-            .Replace("ALICE", "character helper", StringComparison.OrdinalIgnoreCase)
+            .Replace("ALICE", "character help", StringComparison.OrdinalIgnoreCase)
             .Replace("Build Ghost", "draft build", StringComparison.OrdinalIgnoreCase)
             .Replace("build-ghost", "draft build", StringComparison.OrdinalIgnoreCase)
-            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
-            .Replace("governor", "review", StringComparison.OrdinalIgnoreCase)
+            .Replace("governed", "guided", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor", "guide", StringComparison.OrdinalIgnoreCase)
             .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
             .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
@@ -51,11 +51,11 @@
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Character helper operating split">
+<section class="status-decision-strip" aria-label="Character helper split">
     <article class="status-decision-strip__card">
         <span class="tag">Greeting</span>
         <h2>@SanitizePublicCopy(projection.FacePopStatus)</h2>
-        <p>Short greeting, routing, and intake only. It can help a builder arrive at the right Chummer path without becoming the path.</p>
+        <p>Short greeting, routing, and intake only. It helps a builder arrive at the right Chummer path without becoming the path.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Guide</span>
@@ -72,13 +72,13 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Account path</p>
-        <h2 class="editorial-title">Use the helper to get oriented, then let Chummer do the work.</h2>
+        <h2 class="editorial-title">Use this page to get oriented, then let Chummer do the work.</h2>
         <p class="editorial-copy">@SanitizePublicCopy(projection.CanonicalLane)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Greeting can</span>
-            <h3>Open the conversation</h3>
+            <span class="tag">Start here</span>
+            <h3>Open the guide</h3>
             <p>Capture the comparison question and route the builder into the right next step.</p>
             <div class="route-choice-card__details">
                 @foreach (var item in projection.FacePopResponsibilities)
@@ -88,7 +88,7 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Guide can</span>
+            <span class="tag">Explains</span>
             <h3>Explain the boundary</h3>
             <p>Clarify what the draft comparison means without computing mechanics or choosing the final character.</p>
             <div class="route-choice-card__details">
@@ -99,8 +99,8 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Chummer keeps</span>
-            <h3>Keep the real compare bench</h3>
+            <span class="tag">Chummer handles</span>
+            <h3>Keep comparison inside Chummer</h3>
             <p>@SanitizePublicCopy(projection.RuntimeBoundary)</p>
             <div class="route-choice-card__details">
                 @foreach (var item in projection.ChummerResponsibilities)
@@ -114,8 +114,8 @@
 
 <section class="trust-claims">
     <div class="trust-claims__lead">
-        <p class="eyebrow">Details</p>
-        <h2 class="editorial-title">The helper should leave clear changes.</h2>
+        <p class="eyebrow">What stays visible</p>
+        <h2 class="editorial-title">Every change should stay easy to follow.</h2>
         <p class="editorial-copy">A builder should be able to see what was compared, what changed, and whether the draft was applied or discarded.</p>
     </div>
     <div class="trust-claims__grid">
@@ -124,7 +124,7 @@
             <article class="trust-claim">
                 <span class="tag">Detail</span>
                 <h3>@SanitizePublicCopy(artifact)</h3>
-                <p>Chummer keeps the final result. The helper only prepares a draft.</p>
+                <p>Chummer keeps the final result. This page only prepares a draft.</p>
             </article>
         }
     </div>
@@ -135,22 +135,22 @@
     var signedInBench = Model.SignedInBench;
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Account helper</p>
-            <h2 class="editorial-title">The real compare bench lives in your account.</h2>
+            <p class="eyebrow">Account view</p>
+            <h2 class="editorial-title">The real comparison lives in your account.</h2>
             <p class="editorial-copy">@SanitizePublicCopy(signedInBench.Summary)</p>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="@signedInBench.EntryHref">@SanitizePublicCopy(signedInBench.EntryLabel)</a>
                 @if (!string.IsNullOrWhiteSpace(signedInBench.LeadHandoffHref))
                 {
-                    <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open lead build setup</a>
+                    <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open build setup</a>
                 }
             </div>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">@SanitizePublicCopy(signedInBench.StatusLabel)</span>
-                <h3>@SanitizePublicCopy(signedInBench.LeadHandoffTitle ?? "Character helper workbench")</h3>
-                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The account helper keeps tradeoffs, rule differences, and reviewed output history on the account page.")</p>
+                <h3>@SanitizePublicCopy(signedInBench.LeadHandoffTitle ?? "Character help workspace")</h3>
+                <p>@SanitizePublicCopy(signedInBench.LeadHandoffSummary ?? "The account page keeps tradeoffs, rule differences, and earlier results together.")</p>
                 @if (signedInBench.ProofPoints is { Count: > 0 })
                 {
                     <div class="route-choice-card__details">
@@ -176,7 +176,7 @@
             <span class="tag">Client bug path</span>
             <h3>Report compare or apply drift</h3>
             <p>Use the support query when the helper miscompares, misroutes, or applies the wrong variant.</p>
-            <a class="editorial-strip__action" href="@projection.ClientReportHref">Open helper report</a>
+            <a class="editorial-strip__action" href="@projection.ClientReportHref">Open support</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">Public feedback</span>

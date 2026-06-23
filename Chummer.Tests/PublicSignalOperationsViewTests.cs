@@ -51,17 +51,16 @@ public sealed class PublicSignalOperationsViewTests
 
         Assert.Contains("@model PublicSignalOperationsDetailPageViewModel", detailView, StringComparison.Ordinal);
         Assert.Contains("surface-participate surface-minimal", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download item JSON", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download summary JSON", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download page data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download overview", detailView, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Overview\"", detailView, StringComparison.Ordinal);
         Assert.Contains("Activity", detailView, StringComparison.Ordinal);
-        Assert.Contains("Original item", detailView, StringComparison.Ordinal);
+        Assert.Contains("Starting point", detailView, StringComparison.Ordinal);
         Assert.Contains("Saved views", detailView, StringComparison.Ordinal);
         Assert.Contains("Current view", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open filter JSON", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download message JSON", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open JSON", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open thread", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open page data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open conversation", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open conversation data", detailView, StringComparison.Ordinal);
         Assert.Contains("Open related details", detailView, StringComparison.Ordinal);
         Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("sourceReceipt.HotFilterLabel", detailView, StringComparison.Ordinal);
@@ -70,10 +69,11 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("detail.DetailKindLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("detail.FilterLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("savedPivots", detailView, StringComparison.Ordinal);
-        Assert.Contains("Find another item", detailView, StringComparison.Ordinal);
+        Assert.Contains("Find another update", detailView, StringComparison.Ordinal);
         Assert.Contains("PublicFeedbackText(sourceReceipt.StatusLabel)", detailView, StringComparison.Ordinal);
         Assert.Contains("PublicFeedbackText(receipt.RouteKind)", detailView, StringComparison.Ordinal);
-        Assert.Contains("Outcome · @PublicFeedbackText(receipt.DeliveryState)", detailView, StringComparison.Ordinal);
+        Assert.Contains("Delivery · @PublicFeedbackText(receipt.DeliveryState)", detailView, StringComparison.Ordinal);
+        Assert.Contains("Message update · @PublicFeedbackText(receipt.DeliveryState)", detailView, StringComparison.Ordinal);
         Assert.Contains("PublicFeedbackText(receipt.QueueLane)", detailView, StringComparison.Ordinal);
         Assert.Contains("PublicFeedbackText(receipt.ProviderState)", detailView, StringComparison.Ordinal);
         Assert.Contains("PublicFeedbackText(receipt.IdentityMatchMode)", detailView, StringComparison.Ordinal);
@@ -85,9 +85,9 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("queue status stay clear", detailView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("No public outcome claim", detailView, StringComparison.Ordinal);
         Assert.DoesNotContain("Drilldown summary", detailView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Download item data", detailView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Download thread data", detailView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Download related data", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download item JSON", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download message JSON", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open filter JSON", detailView, StringComparison.Ordinal);
     }
 
     [Fact]

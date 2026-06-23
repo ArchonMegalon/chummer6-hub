@@ -11,11 +11,8 @@
     var shippedNow = Model.AvailableToday.Take(4).ToArray();
     var stillCaution = Model.Inspectable.Take(4).ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = Model.VerifiedAtLabel
-        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd");
+    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
+    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
     string ContextualPreviewHref(string? href)
     {
@@ -29,7 +26,7 @@
     }
 
     static string PublicChangelogText(string? value)
-        => PublicFacingCopyHumanizer.Clean(value)
+        => UndetectableHumanizerCopyAdapter.Humanize(value)
             .Replace("Evidence", "Notes", StringComparison.OrdinalIgnoreCase)
             .Replace("evidence", "notes", StringComparison.OrdinalIgnoreCase)
             .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase);
@@ -73,7 +70,7 @@
 
 <section class="minimal-section">
     <div class="minimal-section__lead">
-        <p class="eyebrow">Recent updates</p>
+        <p class="eyebrow">What changed</p>
         <h2>Recent changes in the current release</h2>
         <p>These product improvements are live enough to belong in the changelog.</p>
     </div>
@@ -100,7 +97,7 @@
     <div class="minimal-lane-grid">
         <article class="minimal-lane-card">
             <span>Available now</span>
-            <h2>Live outcomes</h2>
+            <h2>Ready to use</h2>
             <p>These items already have a public path and belong in the changelog.</p>
             <div class="minimal-help-grid">
                 <article class="minimal-help-card">
@@ -120,7 +117,7 @@
         </article>
         <article class="minimal-lane-card">
             <span>Next</span>
-            <h2>What is next</h2>
+            <h2>What comes next</h2>
             <p>What changed, and what comes next.</p>
             <p>Use Roadmap when you want direction instead of live changes.</p>
             @if (milestoneFollowUp.Length > 0)
@@ -159,7 +156,7 @@
 {
     <section class="minimal-section minimal-section--tight">
         <details class="minimal-details">
-            <summary>Still under caution or inspection</summary>
+            <summary>Needs care before wider use</summary>
             <dl>
                 @foreach (var card in stillCaution)
                 {

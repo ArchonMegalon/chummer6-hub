@@ -67,6 +67,8 @@ public sealed class TeableUserProjectionService
     private const int PatchConcurrency = 8;
     private const string WhatsappAiSupportPurpose = "ai_support_only";
     private const string WhatsappAiSupportOpeningPrompt = "Ask what questions the user has before giving product guidance.";
+    private const string WhatsappAiSupportPurposeConfigKey = "CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_PURPOSE";
+    private const string WhatsappAiSupportOpeningPromptConfigKey = "CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_OPENING_PROMPT";
 
     private static readonly TeableFieldDefinition[] RequiredFields =
     [
@@ -569,6 +571,8 @@ public sealed class TeableUserProjectionService
 
     private IReadOnlyList<TeableUserProjectionRow> GetStoredUsers()
     {
+        string defaultWhatsappAiSupportPurpose = ResolveWhatsappAiSupportPurpose();
+        string defaultWhatsappAiSupportOpeningPrompt = ResolveWhatsappAiSupportOpeningPrompt();
         lock (_store.Gate)
         {
             return _store.UsersById.Values
@@ -604,12 +608,22 @@ public sealed class TeableUserProjectionService
                         WhatsappAiSupportPhoneLast4: digits.Length >= 4 ? digits[^4..] : digits,
                         WhatsappAiSupportEnabled: hasWhatsappSupportPhone,
                         WhatsappNotificationsEnabled: whatsapp?.NotificationsEnabled ?? false,
-                        WhatsappAiSupportPurpose: hasWhatsappSupportPhone ? Normalize(whatsapp?.Purpose) ?? WhatsappAiSupportPurpose : string.Empty,
-                        WhatsappAiSupportOpeningPrompt: hasWhatsappSupportPhone ? Normalize(whatsapp?.AiSupportOpeningPrompt) ?? WhatsappAiSupportOpeningPrompt : string.Empty);
+                        WhatsappAiSupportPurpose: hasWhatsappSupportPhone
+                            ? Normalize(whatsapp?.Purpose) ?? defaultWhatsappAiSupportPurpose
+                            : string.Empty,
+                        WhatsappAiSupportOpeningPrompt: hasWhatsappSupportPhone
+                            ? Normalize(whatsapp?.AiSupportOpeningPrompt) ?? defaultWhatsappAiSupportOpeningPrompt
+                            : string.Empty);
                 })
                 .ToArray();
         }
     }
+
+    private string ResolveWhatsappAiSupportPurpose()
+        => Normalize(_configuration[WhatsappAiSupportPurposeConfigKey]) ?? WhatsappAiSupportPurpose;
+
+    private string ResolveWhatsappAiSupportOpeningPrompt()
+        => Normalize(_configuration[WhatsappAiSupportOpeningPromptConfigKey]) ?? WhatsappAiSupportOpeningPrompt;
 
     private static string BuildWorkspacePrepHistory(IReadOnlyList<WorkspacePrepLibrarySearchHistoryItem>? history)
     {

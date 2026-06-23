@@ -13,13 +13,7 @@
         .ToArray();
 
     static string RoadmapText(string? value)
-        => PublicFacingCopyHumanizer.Clean(value)
-            .Replace("planned work", "future work", StringComparison.OrdinalIgnoreCase)
-            .Replace("maintenance", "future work", StringComparison.OrdinalIgnoreCase)
-            .Replace("Claimed", "Started", StringComparison.OrdinalIgnoreCase)
-            .Replace("claim", "start", StringComparison.OrdinalIgnoreCase)
-            .Replace("implementation slice", "work item", StringComparison.OrdinalIgnoreCase)
-            .Replace("implementation", "work", StringComparison.OrdinalIgnoreCase);
+        => UndetectableHumanizerCopyAdapter.HumanizeRoadmap(value);
 }
 
 <section class="minimal-page-hero route-anchor-target roadmap-signal">

@@ -895,11 +895,11 @@ public sealed class PublicReleaseManifestService
         {
             string coverageSummary = DesktopTupleCoverageGapSummary(filteredCoverage);
             rolloutState = "coverage_incomplete";
-            rolloutReason = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
+            rolloutReason = $"The current release is published, but a few desktop combinations are still catching up: {coverageSummary}.";
             supportabilityState = "review_required";
-            supportabilitySummary = $"The current release is live, but some support paths stay limited because {coverageSummary}.";
-            knownIssueSummary = "Some desktop downloads stay hidden until the platform status is current again.";
-            fixAvailabilitySummary = "Confirm the fix against the live channel before closing support loops.";
+            supportabilitySummary = $"This release is live. Some desktop combinations are still catching up: {coverageSummary}.";
+            knownIssueSummary = "A few desktop downloads stay hidden until those combinations are current again.";
+            fixAvailabilitySummary = "Check the live download page again after the updated build lands.";
         }
 
         return EnsureContractName(manifest with
@@ -1030,11 +1030,11 @@ public sealed class PublicReleaseManifestService
                 {
                     string coverageSummary = DesktopTupleCoverageGapSummary(JsonSerializer.SerializeToElement(coverage, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
                     manifest["rolloutState"] = "coverage_incomplete";
-                    manifest["rolloutReason"] = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
+                    manifest["rolloutReason"] = $"The current release is published, but a few desktop combinations are still catching up: {coverageSummary}.";
                     manifest["supportabilityState"] = "review_required";
-                    manifest["supportabilitySummary"] = $"The current release is live, but some support paths stay limited because {coverageSummary}.";
-                    manifest["knownIssueSummary"] = "Some desktop downloads stay hidden until the platform status is current again.";
-                    manifest["fixAvailabilitySummary"] = "Confirm the fix against the live channel before closing support loops.";
+                    manifest["supportabilitySummary"] = $"This release is live. Some desktop combinations are still catching up: {coverageSummary}.";
+                    manifest["knownIssueSummary"] = "A few desktop downloads stay hidden until those combinations are current again.";
+                    manifest["fixAvailabilitySummary"] = "Check the live download page again after the updated build lands.";
                 }
             }
         }
@@ -1119,8 +1119,10 @@ public sealed class PublicReleaseManifestService
             }
 
             rationale = rationale
-                .Replace("guest-readable so desktop channel", "entitlement-backed so desktop channel", StringComparison.OrdinalIgnoreCase)
-                .Replace("guest-readable install guidance", "entitlement-backed install guidance", StringComparison.OrdinalIgnoreCase);
+                .Replace("available as a public download", "available as a linked download", StringComparison.OrdinalIgnoreCase)
+                .Replace("retained as a public download", "retained as a linked download", StringComparison.OrdinalIgnoreCase)
+                .Replace("listed as a public download", "listed as a linked download", StringComparison.OrdinalIgnoreCase)
+                .Replace("visible as a public download", "visible as a linked download", StringComparison.OrdinalIgnoreCase);
 
             row["rationale"] = rationale;
         }
@@ -1912,19 +1914,19 @@ public sealed class PublicReleaseManifestService
         string routeRole = NormalizeToken(GetJsonString(routeRow["routeRole"]));
         string publicationState = ArtifactPublicationState(routeRow);
         string installPosture = string.Equals(installAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-            ? "entitlement-backed"
-            : "guest-readable";
+            ? "a linked download"
+            : "a public download";
 
         return publicationState switch
         {
             "published" =>
-                $"{channelId} keeps {tupleId} {installPosture} so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals.",
+                $"{channelId} keeps {tupleId} available as {installPosture} so installs, updates, and recovery stay easy to follow.",
             "retained" =>
-                $"{channelId} keeps {(string.IsNullOrWhiteSpace(routeRole) ? "desktop" : routeRole)} tuple {tupleId} retained with {installPosture} install guidance so recovery participation and reward refs stay governed.",
+                $"{channelId} keeps {(string.IsNullOrWhiteSpace(routeRole) ? "desktop" : routeRole)} tuple {tupleId} retained as {installPosture} for recovery while the main download stays focused.",
             "revoked" =>
-                $"{channelId} keeps revoked tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward recovery without reopening installs.",
+                $"{channelId} keeps revoked tuple {tupleId} listed as {installPosture} for recovery context without reopening the download.",
             _ =>
-                $"{channelId} keeps preview tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward posture before wider publication."
+                $"{channelId} keeps preview tuple {tupleId} visible as {installPosture} while this preview is still settling."
         };
     }
 

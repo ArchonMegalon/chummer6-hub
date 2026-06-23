@@ -2433,7 +2433,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         DecisionNotice watchoutNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "workspace_watchout", StringComparison.Ordinal));
         Assert.Equal(
-            "A previous campaign workspace needs review before you continue. Open the shared campaign view for the safe next step.",
+            "A previous campaign workspace needs attention before you continue. Open the shared campaign view for the safe next step.",
             watchoutNotice.Summary);
         Assert.DoesNotContain("uuid", watchoutNotice.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("closed workspace", watchoutNotice.Summary, StringComparison.OrdinalIgnoreCase);
@@ -2467,7 +2467,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         DecisionNotice portableExchangeNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.Ordinal));
         Assert.Equal(
-            "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            "Portable exchange needs attention before you continue. Open the workspace lane for the safe next step.",
             portableExchangeNotice.Summary);
         Assert.DoesNotContain("uuid", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("closed workspace", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
@@ -2501,7 +2501,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         DecisionNotice portableExchangeNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.Ordinal));
         Assert.Equal(
-            "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            "Portable exchange needs attention before you continue. Open the workspace lane for the safe next step.",
             portableExchangeNotice.Summary);
         Assert.DoesNotContain("7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
     }

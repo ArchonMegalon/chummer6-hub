@@ -8,12 +8,12 @@
 <section class="ledger-flagship ledger-flagship--account">
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Faction command</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <p class="ledger-flagship__support">This is the account campaign city view: one globe, one board state, one faction state, and one professional world-turn briefing.</p>
         <div class="trust-claim__details">
-            <span>Faction: @PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</span>
-            <span>Membership: @PublicFacingCopyHumanizer.Clean(Model.Allegiance.MembershipType)</span>
+            <span>Faction: @UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)</span>
+            <span>Membership: @UndetectableHumanizerCopyAdapter.Humanize(Model.Allegiance.MembershipType)</span>
             <span>Lock until: @Model.Allegiance.LockUntilUtc?.ToString("yyyy-MM-dd")</span>
         </div>
         <div class="stacked-actions">
@@ -52,8 +52,8 @@
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
                 <span class="tag">World state</span>
-                <strong>Turn review</strong>
-                <p>Review the current turn before it moves further.</p>
+                <strong>Current turn summary</strong>
+                <p>Open the current turn details before it moves further.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/notifications">
                 <span class="tag">Inbox</span>
@@ -74,18 +74,18 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">World turn inbox</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.StatusLabel)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.Summary)</p>
         </div>
         <div class="trust-claim__details">
-            <span>Policy: @PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Policy)</span>
-            <span>Messages: @Model.NewsreelStatus.ReceiptCount</span>
+            <span>Policy: @UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.Policy)</span>
+            <span>Updates: @Model.NewsreelStatus.ReceiptCount</span>
             <span>Recipients sent: @Model.NewsreelStatus.RecipientCount</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification history</a>
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.TurnHref">Open Turn 1</a>
-            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn review</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open turn recap</a>
         </div>
     </section>
 }
@@ -95,8 +95,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Advisory command</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.NoDemocracyNote)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
@@ -123,20 +123,20 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
+            <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">World state</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.StateSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.StateSummary)</p>
             </article>
             @foreach (var item in Model.WorldTurnBriefing.NewsreelBullets.Take(2))
             {
                 <article class="route-choice-card">
                     <span class="tag">Newsreel beat</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(item)</p>
                 </article>
             }
         </div>
@@ -148,21 +148,21 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Leader readout</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Summary)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Pressure call</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(item)</p>
                 </article>
             }
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="/account/ledger/factions/@Model.LeaderDigest.FactionId/leader-briefing">Open leader brief</a>
-            <a class="button-like button-like--secondary" href="@Model.LeaderDigest.ValidationHref">Open leader details</a>
+            <a class="button-like button-like--secondary" href="@Model.LeaderDigest.ValidationHref">Open leader readout</a>
         </div>
     </section>
 }
@@ -172,21 +172,21 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Next actions</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Summary)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             <article class="route-choice-card">
                 <span class="tag">Signal Deck</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.SignalDeckSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.SignalDeckSummary)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Runner Passport</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.RunnerPassportSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.RunnerPassportSummary)</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Living Newsroom</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.LivingNewsroomSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.LivingNewsroomSummary)</p>
                 <div class="route-choice-card__details">
                     <a href="@Model.FollowThroughPacket.LivingNewsroomHref">Watch</a>
                     <a href="/living-world">Open Living World</a>
@@ -194,23 +194,23 @@
             </article>
             <article class="route-choice-card">
                 <span class="tag">Aftermath</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.AftermathSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.AftermathSummary)</p>
                 <div class="route-choice-card__details">
                     <a href="@Model.FollowThroughPacket.AftermathHref">Open aftermath</a>
                 </div>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Boundary</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.BoundaryLine)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.BoundaryLine)</p>
             </article>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var cue in Model.FollowThroughPacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.Label)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(cue.Label)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(cue.Summary)</p>
                     <div class="route-choice-card__details">
                         <a href="@cue.Href">Open</a>
                     </div>
@@ -231,7 +231,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">Faction identity</span>
-                <p>@PublicFacingCopyHumanizer.Clean(item)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(item)</p>
             </article>
         }
     </div>
@@ -243,24 +243,24 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction promo</p>
             <h2 class="editorial-title">Faction video draft</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.CampaignHook)</p>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.CampaignHook)</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
-                <span class="tag">@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)</span>
-                <h3>@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.PublicName)</h3>
-                <p>Format: @PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.RenderMode)</p>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.AudiencePromise)</p>
+                <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.ProviderStatus)</span>
+                <h3>@UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.PublicName)</h3>
+                <p>Format: @UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.RenderMode)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.AudiencePromise)</p>
                 <div class="route-choice-card__details">
                     @foreach (var format in Model.PromoArtifact.FormatLabels)
                     {
-                        <span>@PublicFacingCopyHumanizer.Clean(format)</span>
+                        <span>@UndetectableHumanizerCopyAdapter.Humanize(format)</span>
                     }
                 </div>
                 <div class="stacked-actions">
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.HtmlHref">Open promo brief</a>
-                    <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open details</a>
-                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open status</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open promo notes</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open promo summary</a>
                 </div>
             </article>
         </div>
@@ -272,15 +272,15 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">World state</p>
-            <h2 class="editorial-title">Current turn details</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ValidationPacket.Summary)</p>
+            <h2 class="editorial-title">Current turn summary</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ValidationPacket.Summary)</p>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var check in Model.ValidationPacket.Checks.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Detail</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(check)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(check)</p>
                 </article>
             }
         </div>
@@ -291,17 +291,17 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Recent activity</p>
-            <h2 class="editorial-title">Recent activity</h2>
-            <p class="editorial-copy">Recent decisions stay easy to review.</p>
+            <p class="eyebrow">Recent updates</p>
+            <h2 class="editorial-title">Recent updates</h2>
+            <p class="editorial-copy">Recent decisions stay easy to scan.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in Model.RecentActionReceipts)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)</span>
-                    <h3>Recent decision</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(receipt.ResultSummary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(receipt.ActionLabel)</span>
+                    <h3>Latest change</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(receipt.ResultSummary)</p>
                     <a class="editorial-strip__action" href="@receipt.Href">Open details</a>
                 </article>
             }

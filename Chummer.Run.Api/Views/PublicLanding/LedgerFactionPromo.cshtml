@@ -12,12 +12,12 @@
     <img class="faction-detail-hero__logo" src="@logoHref" alt="@($"{Model.Promo.PublicName} logo")" loading="lazy" />
     <div class="faction-detail-hero__copy">
         <p class="eyebrow">Faction war bulletin</p>
-        <h1 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>Status: @PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)</span>
-            <span>Format: @PublicFacingCopyHumanizer.Clean(Model.Promo.RenderMode)</span>
-            <span>Fallback: @PublicFacingCopyHumanizer.Clean(Model.Promo.FallbackRenderMode)</span>
+            <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.ProviderStatus)</span>
+            <span>Format: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.RenderMode)</span>
+            <span>Fallback: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.FallbackRenderMode)</span>
             <span>Safety: public</span>
         </div>
         <div class="stacked-actions">
@@ -30,17 +30,17 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">First-party motion bulletin</p>
-        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Promo.StaticCardLabel)</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Promo.CampaignHook)</p>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Promo.StorylineSummary)</p>
+        <p class="eyebrow">Featured motion bulletin</p>
+        <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StaticCardLabel)</h2>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CampaignHook)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StorylineSummary)</p>
     </div>
     <div id="promo-player" class="route-choice-card" data-storyboard-player>
         <div class="trust-claim__details">
-            <span>Mode: @PublicFacingCopyHumanizer.Clean(Model.Promo.PlaybackLabel)</span>
+            <span>Mode: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PlaybackLabel)</span>
             <span>Captions: included</span>
-            <span>Narration: @PublicFacingCopyHumanizer.Clean(Model.Promo.NarratorPosture)</span>
-            <span>Build: @PublicFacingCopyHumanizer.Clean(Model.Promo.RenderPipelineLabel)</span>
+            <span>Narration: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.NarratorPosture)</span>
+            <span>Build: @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.RenderPipelineLabel)</span>
         </div>
         <video class="faction-promo-video"
                controls
@@ -66,18 +66,18 @@
             {
                 var frame = Model.Promo.StoryboardFrames[index];
                 <article class="route-choice-card" data-storyboard-frame="@(index)" hidden="@(index == 0 ? null : "hidden")">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(frame.Label)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(Model.Promo.PublicName)</h3>
-                    <p class="faction-storyboard-frame__visual">@PublicFacingCopyHumanizer.Clean(frame.VisualHook)</p>
-                    <p class="faction-storyboard-frame__action">@PublicFacingCopyHumanizer.Clean(frame.ActionBeat)</p>
-                    <p class="faction-storyboard-frame__payoff">@PublicFacingCopyHumanizer.Clean(frame.ProofPayoff)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(frame.Label)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PublicName)</h3>
+                    <p class="faction-storyboard-frame__visual">@UndetectableHumanizerCopyAdapter.Humanize(frame.VisualHook)</p>
+                    <p class="faction-storyboard-frame__action">@UndetectableHumanizerCopyAdapter.Humanize(frame.ActionBeat)</p>
+                    <p class="faction-storyboard-frame__payoff">@UndetectableHumanizerCopyAdapter.Humanize(frame.ProofPayoff)</p>
                 </article>
             }
         </div>
         <div class="trust-claim__details">
             @for (int index = 0; index < Model.Promo.CaptionLines.Count; index += 1)
             {
-                <span>Caption @(index + 1): @PublicFacingCopyHumanizer.Clean(Model.Promo.CaptionLines[index])</span>
+                <span>Caption @(index + 1): @UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CaptionLines[index])</span>
             }
         </div>
     </div>
@@ -87,16 +87,16 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Screenplay</p>
         <h2 class="editorial-title">How the reel is structured</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Promo.AudiencePromise)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.AudiencePromise)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var scene in Model.Promo.ScreenplayScenes)
         {
             <article class="route-choice-card">
-                <span class="tag">@PublicFacingCopyHumanizer.Clean(scene.Label) · @scene.DurationLabel</span>
-                <p>@PublicFacingCopyHumanizer.Clean(scene.Purpose)</p>
-                <p>@PublicFacingCopyHumanizer.Clean(scene.VisualDirection)</p>
-                <p>@PublicFacingCopyHumanizer.Clean(scene.NarratorLine)</p>
+                <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(scene.Label) · @scene.DurationLabel</span>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(scene.Purpose)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(scene.VisualDirection)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(scene.NarratorLine)</p>
             </article>
         }
     </div>
@@ -113,7 +113,7 @@
         {
             <article class="route-choice-card">
                 <span class="tag">Format</span>
-                <p>@PublicFacingCopyHumanizer.Clean(format)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(format)</p>
             </article>
         }
     </div>
@@ -121,7 +121,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Review</p>
+        <p class="eyebrow">Quality</p>
         <h2 class="editorial-title">Quality list</h2>
         <p class="editorial-copy">Before this is promoted, the promo should play like a real scene: clear motion, clear captions, clean audio, and no private material.</p>
     </div>
@@ -148,7 +148,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Approval</span>
-            <p>The video is not ready until a named reviewer approves it.</p>
+            <p>The video is not ready until a named owner signs it off.</p>
         </article>
     </div>
 </section>
@@ -236,6 +236,6 @@
         }
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open status</a>
+        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open promo summary</a>
     </div>
 </section>

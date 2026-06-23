@@ -36,7 +36,7 @@ public sealed class BlackLedgerFactionAllegianceTests
         Assert.Contains("Found Major Faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Challenger", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Open watch page", promoView, StringComparison.Ordinal);
-        Assert.Contains("First-party motion bulletin", promoView, StringComparison.Ordinal);
+        Assert.Contains("Featured motion bulletin", promoView, StringComparison.Ordinal);
         Assert.Contains("<video", promoView, StringComparison.Ordinal);
         Assert.Contains("data-storyboard-player", promoView, StringComparison.Ordinal);
     }

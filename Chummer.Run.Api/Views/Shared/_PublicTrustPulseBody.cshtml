@@ -1,6 +1,6 @@
 @model PublicTrustPulsePanelViewModel
 @{
-    static string PublicTrustPulseText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicTrustPulseText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <p>@PublicTrustPulseText(Model.Summary)</p>

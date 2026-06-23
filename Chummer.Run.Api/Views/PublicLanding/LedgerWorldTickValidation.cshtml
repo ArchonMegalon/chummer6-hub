@@ -1,6 +1,6 @@
 @model BlackLedgerWorldTickValidationPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
@@ -8,16 +8,16 @@
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">World turn</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>World: @PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)</span>
+            <span>World: @UndetectableHumanizerCopyAdapter.Humanize(Model.Packet.WorldName)</span>
             <span>Turn: @Model.Packet.ToTurn</span>
             <span>Status: current</span>
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Download details</a>
+        <a class="button-like button-like--primary" href="/account/ledger/worldtick/validation.json">Download turn data</a>
         <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open inbox</a>
         <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
     </div>
@@ -27,14 +27,14 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Turn summary</p>
         <h2 class="editorial-title">What changed this turn</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Packet.Summary)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Packet.Summary)</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var item in Model.Packet.Checks)
         {
             <article class="route-choice-card">
                 <span class="tag">Detail</span>
-                <p>@PublicFacingCopyHumanizer.Clean(item)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(item)</p>
             </article>
         }
     </div>
@@ -44,9 +44,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)</p>
+            <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)</p>
         </div>
     </section>
 }
@@ -56,14 +56,14 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Leader view</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName) leader digest</h2>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.PublicName) leader digest</h2>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
             @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
             {
                 <article class="route-choice-card">
                     <span class="tag">Match</span>
-                    <p>@PublicFacingCopyHumanizer.Clean(item)</p>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(item)</p>
                 </article>
             }
         </div>

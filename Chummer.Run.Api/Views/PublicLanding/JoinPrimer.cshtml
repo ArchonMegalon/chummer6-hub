@@ -3,7 +3,7 @@
     ViewData["Title"] = Model.InviteCodePresent ? "Campaign invite primer" : "Campaign primer";
     ViewData["Chrome"] = Model.Chrome;
 
-    static string PublicJoinText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicJoinText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string ToneClass(string tone) => tone switch
     {

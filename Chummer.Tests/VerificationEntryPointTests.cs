@@ -641,7 +641,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("dispatch-inline-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("data-install-info", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Install details", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("Account linking is optional. A claim code appears only if setup needs recovery.", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Account linking is optional. A recovery code appears only if setup needs recovery.", dispatchView, StringComparison.Ordinal);
         Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
         Assert.Contains("if (autoStartDownload)", dispatchView, StringComparison.Ordinal);
@@ -3643,7 +3643,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PublicationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
-        Assert.Contains("Recent prep launches", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent prep starts", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent travel prefetch history", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent aftermath recap packages and replay outputs", accountView, StringComparison.Ordinal);
     }

@@ -1,6 +1,6 @@
 @model SupportSubmittedPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-support-submitted surface-minimal";
     var primaryAction = Model.Actions.FirstOrDefault(action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
@@ -16,7 +16,7 @@
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
 
-    static string PublicSupportSubmittedText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicSupportSubmittedText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     if (primaryAction is not null)
     {
@@ -26,13 +26,13 @@
                 ? "Keep this report on the account support page"
                 : "Create an account if you want support history here",
             Summary: Model.Chrome.Authenticated
-                ? "The next tracked update should stay inside Chummer instead of vanishing into side channels."
+                ? "The next update should stay inside Chummer so you can find it in the same place."
                 : "Guest follow-up still works on reply email, but an account keeps later support history, linked installs, and recovery on one calmer return path.",
             Href: primaryAction.Href,
             Label: primaryAction.Label,
             Details: Model.Chrome.Authenticated
                 ? new[] { "Same report", "Saved updates", "Private reply" }
-                : new[] { "Guest still works", "History in Account", "No personalized binary" }));
+                : new[] { "Guest still works", "History in Account", "Same download for everyone" }));
     }
 
     responseRoutes.Add((
@@ -41,7 +41,7 @@
         Summary: "Use the release surfaces when you need to know whether a fix is already user-available.",
         Href: "/now",
         Label: "Open what works today",
-        Details: new[] { "Current release", "Known caution", "Release-linked" }));
+        Details: new[] { "Current release", "Known caution", "Latest changes" }));
 
     responseRoutes.Add((
         Badge: "Help",
@@ -58,7 +58,7 @@
             Title: Model.TrackedCaseSummary?.NeedsLinkedInstall == true || Model.TrackedCaseSummary?.NeedsInstallUpdate == true
                 ? "Return to the same install page for relink, update, or reclaim"
                 : "Return to the same install page after support",
-            Summary: "The installer or affected copy still owns relink, reclaim, and recovery. This confirmation page should not split the install flow into a browser-only ritual.",
+            Summary: "The installer or affected copy still handles relink, reclaim, and recovery. This page should send you back to the same setup path.",
             Href: installAction.Href,
             Label: installAction.Label,
             Details: new[] { "Same install page", "Devices & access stays calm", "Same recovery path" }));
@@ -66,11 +66,11 @@
 
     if (Model.TrackedCaseSummary is not null)
     {
-        helperFacts.Add(("Current case state", $"{Model.TrackedCaseSummary.StatusLabel} · {Model.TrackedCaseSummary.StageLabel} · {Model.TrackedCaseSummary.UpdatedLabel}"));
+        helperFacts.Add(("Current case status", $"{Model.TrackedCaseSummary.StatusLabel} · {Model.TrackedCaseSummary.StageLabel} · {Model.TrackedCaseSummary.UpdatedLabel}"));
         helperFacts.Add(("Next safe action", Model.TrackedCaseSummary.NextSafeAction));
         helperFacts.Add(("Follow-up", Model.TrackedCaseSummary.FollowUpLaneSummary));
         helperFacts.Add(("Release", Model.TrackedCaseSummary.ReleaseProgressSummary));
-        helperFacts.Add(("Linked install state", Model.TrackedCaseSummary.InstallReadinessSummary));
+        helperFacts.Add(("Install", Model.TrackedCaseSummary.InstallReadinessSummary));
         helperFacts.Add(("Fix", Model.TrackedCaseSummary.VerificationSummary));
         if (!string.IsNullOrWhiteSpace(Model.TrackedCaseSummary.AffectedInstallSummary))
         {
@@ -84,8 +84,8 @@
         helperFacts.Add(("Keep this page handy", "Use this confirmation page whenever you need to return to the report from support, downloads, or a later account return path."));
         helperFacts.Add((Model.Chrome.Authenticated ? "Watch Account > Support" : "Watch your reply email",
             Model.Chrome.Authenticated
-                ? "Tracked cases stay in the account surface, so tracked fixes and reporter-ready updates should reappear there instead of vanishing into side channels."
-                : "Guest support replies should come back through the email path attached to the case, so keep that inbox visible until the next tracked update lands."));
+                ? "Saved cases stay on the account support page, so later updates should show up in the same place."
+                : "Guest support replies should return by email, so keep that inbox visible until the next update arrives."));
         if (installAction is not null)
         {
             helperFacts.Add(("Account return", "If the report started from an install or recovery page, return to that same guided copy after support tells you the next safe move."));
@@ -131,8 +131,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Next</p>
-        <h2 class="editorial-title">Choose the next page.</h2>
-        <p class="editorial-copy">Use the page that matches the next job: saved support history, release status, help, or the same install path.</p>
+        <h2 class="editorial-title">Choose the next step.</h2>
+        <p class="editorial-copy">Use the page that matches the next job: saved support history, current release status, help, or the same install path.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var route in responseRoutes)
@@ -160,7 +160,7 @@
         <p class="editorial-copy">
             @(Model.TrackedCaseSummary is null
                 ? "This page keeps the case id, reply path, and account return visible until the next update arrives."
-                : "This page keeps the current case state, install readiness, release progress, and follow-up visible without forcing you back into guesswork.")
+                : "This page keeps the current case status, install state, release progress, and follow-up visible in one place.")
         </p>
     </div>
     <section class="compact-rail">

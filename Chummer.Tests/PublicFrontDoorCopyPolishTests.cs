@@ -541,7 +541,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("Proof receipts and public proofs show provider validation checks passed.");
 
-        Assert.Equal("Status details and public status details show service review ready.", cleaned);
+        Assert.Equal("Details and public details show service ready.", cleaned);
         Assert.DoesNotContain("proof", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("receipt", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("provider", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -554,7 +554,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     {
         string cleaned = PublicFacingCopyHumanizer.Clean("Signal Deck command rail keeps governed consequence posture, receipts, and bounded aftermath on first-party rails.");
 
-        Assert.Equal("Signal Deck command path keeps reviewed consequence status, records, and limited aftermath on Chummer paths.", cleaned);
+        Assert.Equal("Signal Deck command path keeps consequence status, records, and limited aftermath on Chummer paths.", cleaned);
         Assert.DoesNotContain("rail", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("governed", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("posture", cleaned, StringComparison.OrdinalIgnoreCase);
@@ -575,19 +575,19 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.Contains("export path", combined, StringComparison.Ordinal);
         Assert.Contains("Download starter file", view, StringComparison.Ordinal);
         Assert.Contains("downloadable setup", view, StringComparison.Ordinal);
-        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Eyebrow)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Heading)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.TertiaryAction.Label)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(verdict.RoleLabel)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(verdict.StatusLabel)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Label)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.RoleLane)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(kit.Label)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.RoleId)", view, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(packet.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.TertiaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(verdict.RoleLabel)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(verdict.StatusLabel)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(action.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(kit.RoleLane)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(kit.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(packet.RoleId)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(packet.Label)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.PrimaryAction.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.SecondaryAction.Label", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.TertiaryAction.Label", view, StringComparison.Ordinal);
@@ -687,18 +687,18 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string ledger = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
         string factionWorkspace = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
 
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Intro)", media, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)", media, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(document.Summary)", media, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)", media, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.Summary)", media, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(document.Summary)", media, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"page-copy\">@Model.Intro</p>", media, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.ConnectedLanePacket.Summary</p>", media, StringComparison.Ordinal);
         Assert.DoesNotContain("<p>@document.Summary</p>", media, StringComparison.Ordinal);
 
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.Summary)", leaderBriefing, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.GmCockpitPacket.BoundaryLine)", leaderBriefing, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.Summary)", leaderBriefing, StringComparison.Ordinal);
-        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", leaderBriefing, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.GmCockpitPacket.Summary)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.GmCockpitPacket.BoundaryLine)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(cue.Summary)", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", leaderBriefing, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Digest.PublicName)", leaderBriefing, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.GmCockpitPacket.Summary</p>", leaderBriefing, StringComparison.Ordinal);
         Assert.DoesNotContain("<p>@Model.GmCockpitPacket.BoundaryLine</p>", leaderBriefing, StringComparison.Ordinal);
         Assert.DoesNotContain("<span>Faction: @Model.Digest.PublicName</span>", leaderBriefing, StringComparison.Ordinal);
@@ -706,16 +706,16 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-            "PublicFacingCopyHumanizer.Clean(step.Label)",
-            "PublicFacingCopyHumanizer.Clean(Model.ExistingFactionSummary)",
-            "PublicFacingCopyHumanizer.Clean(faction.Type)",
-            "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(faction.Summary)",
-            "PublicFacingCopyHumanizer.Clean(Model.MajorFounderSummary)",
-            "PublicFacingCopyHumanizer.Clean(Model.ChallengerFounderSummary)",
-            "PublicFacingCopyHumanizer.Clean(Model.MajorSlotsWarning)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+            "UndetectableHumanizerCopyAdapter.Humanize(step.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.ExistingFactionSummary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(faction.Type)",
+            "UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(faction.Summary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.MajorFounderSummary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.ChallengerFounderSummary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.MajorSlotsWarning)"
         })
         {
             Assert.Contains(required, onboarding, StringComparison.Ordinal);
@@ -723,12 +723,12 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-            "PublicFacingCopyHumanizer.Clean(archetype.Name)",
-            "PublicFacingCopyHumanizer.Clean(rival.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(perk.Name)",
-            "PublicFacingCopyHumanizer.Clean(flaw.Name)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+            "UndetectableHumanizerCopyAdapter.Humanize(archetype.Name)",
+            "UndetectableHumanizerCopyAdapter.Humanize(rival.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(perk.Name)",
+            "UndetectableHumanizerCopyAdapter.Humanize(flaw.Name)"
         })
         {
             Assert.Contains(required, factionCreate, StringComparison.Ordinal);
@@ -736,39 +736,39 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.StaticCardLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.CampaignHook)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.StorylineSummary)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.PlaybackLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(frame.Label)",
-            "PublicFacingCopyHumanizer.Clean(frame.VisualHook)",
-            "PublicFacingCopyHumanizer.Clean(frame.ActionBeat)",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.CaptionLines[index])",
-            "PublicFacingCopyHumanizer.Clean(Model.Promo.AudiencePromise)",
-            "PublicFacingCopyHumanizer.Clean(scene.Label)",
-            "PublicFacingCopyHumanizer.Clean(scene.Purpose)",
-            "PublicFacingCopyHumanizer.Clean(scene.VisualDirection)",
-            "PublicFacingCopyHumanizer.Clean(scene.NarratorLine)",
-            "PublicFacingCopyHumanizer.Clean(format)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StaticCardLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CampaignHook)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StorylineSummary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PlaybackLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(frame.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(frame.VisualHook)",
+            "UndetectableHumanizerCopyAdapter.Humanize(frame.ActionBeat)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CaptionLines[index])",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.AudiencePromise)",
+            "UndetectableHumanizerCopyAdapter.Humanize(scene.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(scene.Purpose)",
+            "UndetectableHumanizerCopyAdapter.Humanize(scene.VisualDirection)",
+            "UndetectableHumanizerCopyAdapter.Humanize(scene.NarratorLine)",
+            "UndetectableHumanizerCopyAdapter.Humanize(format)"
         })
         {
             Assert.Contains(required, factionPromo, StringComparison.Ordinal);
         }
 
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Label)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(action.Effect)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Type)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Title)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(dispatch.Summary)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(signal)", factionWorkspace, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.PrivacyNote)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(action.Label)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(action.Effect)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(signal)", factionWorkspace, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(receipt.ActionLabel)", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"editorial-copy\">@Model.PrivacyNote</p>", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<span>Faction: @Model.Faction.PublicName</span>", factionWorkspace, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2 class=\"editorial-title\">@Model.Faction.PublicName</h2>", factionWorkspace, StringComparison.Ordinal);
@@ -782,28 +782,28 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
                  {
-                     "PublicFacingCopyHumanizer.Clean(Model.Eyebrow)",
-                     "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-                     "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-                     "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
-                     "PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)",
-                     "PublicFacingCopyHumanizer.Clean(Model.World.PublicName)",
-                     "PublicFacingCopyHumanizer.Clean(Model.World.TurnHeadline)",
-                     "PublicFacingCopyHumanizer.Clean(Model.World.MapNote)",
-                     "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
-                     "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
-                     "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
-                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
-                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)",
-                     "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.ScopeLabel)",
-                     "PublicFacingCopyHumanizer.Clean(faction.Type)",
-                     "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
-                     "PublicFacingCopyHumanizer.Clean(ledger.Label)",
-                     "PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName)",
-                     "PublicFacingCopyHumanizer.Clean(accountCtaLabel)",
-                     "PublicFacingCopyHumanizer.Clean(selectedFaction.FactionLeader)",
-                     "PublicFacingCopyHumanizer.Clean(selectedFaction.FieldGm)",
-                     "PublicFacingCopyHumanizer.Clean(selectedFaction.IntelProvider)"
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.World.PublicName)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.World.TurnHeadline)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.World.MapNote)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.StatusLabel)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.Summary)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.ScopeLabel)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(faction.Type)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(ledger.Label)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.PublicName)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FactionLeader)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FieldGm)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.IntelProvider)"
                  })
         {
             Assert.Contains(required, ledger, StringComparison.Ordinal);
@@ -847,8 +847,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+            "static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
             "static string HomeText(string? value)",
+            "=> UndetectableHumanizerCopyAdapter.HumanizeHome(value);",
             "@PublicText(supportCase.Case.Title)",
             "@HomeText(receipt.ArtifactLabel)",
             "@PublicText(workspace.ChangePackets[0].Summary)",
@@ -900,7 +901,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+            "static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
             "@PublicText(publication.Title)",
             "@PublicText(publication.Summary)",
             "@PublicText(publication.DiscoverySummary)",
@@ -954,19 +955,19 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(Model.Allegiance.MembershipType)",
-            "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-            "PublicFacingCopyHumanizer.Clean(item)",
-            "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.FollowThroughPacket.Heading)",
-            "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Allegiance.MembershipType)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.StatusLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+            "UndetectableHumanizerCopyAdapter.Humanize(item)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.FollowThroughPacket.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(receipt.ActionLabel)"
         })
         {
             Assert.Contains(required, accountHome, StringComparison.Ordinal);
@@ -974,14 +975,14 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)",
-            "PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)",
-            "PublicFacingCopyHumanizer.Clean(ballot.Heading)",
-            "PublicFacingCopyHumanizer.Clean(option.Label)",
-            "PublicFacingCopyHumanizer.Clean(summary.Heading)",
-            "PublicFacingCopyHumanizer.Clean(item)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Intro)",
+            "UndetectableHumanizerCopyAdapter.Humanize(ballot.AudienceLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(ballot.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(option.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(summary.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(item)"
         })
         {
             Assert.Contains(required, advisory, StringComparison.Ordinal);
@@ -989,35 +990,35 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.TablePulsePacket.BoundaryLine)",
-            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.AdvisorySummary.NoDemocracyNote)",
-            "PublicFacingCopyHumanizer.Clean(label)",
-            "PublicFacingCopyHumanizer.Clean(cue.StatusLabel)",
-            "PublicFacingCopyHumanizer.Clean(receipt.RecipientLabel)",
-            "PublicFacingCopyHumanizer.Clean(receipt.FailureReason)",
-            "PublicFacingCopyHumanizer.Clean(option.Kind)",
-            "PublicFacingCopyHumanizer.Clean(option.Label)",
-            "PublicFacingCopyHumanizer.Clean(option.Summary)",
-            "PublicFacingCopyHumanizer.Clean(option.ActionLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
-            "PublicFacingCopyHumanizer.Clean(beat)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AnchorName)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
-            "PublicFacingCopyHumanizer.Clean(beat.ActorKind)",
-            "PublicFacingCopyHumanizer.Clean(beat.BeatLabel)",
-            "PublicFacingCopyHumanizer.Clean(beat.ActorLabel)",
-            "PublicFacingCopyHumanizer.Clean(message.Eyebrow)",
-            "PublicFacingCopyHumanizer.Clean(message.Heading)",
-            "PublicFacingCopyHumanizer.Clean(message.Summary)",
-            "PublicFacingCopyHumanizer.Clean(message.StatusLabel)",
-            "PublicFacingCopyHumanizer.Clean(message.CtaLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)"
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.BoundaryLine)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.AdvisorySummary.NoDemocracyNote)",
+            "UndetectableHumanizerCopyAdapter.Humanize(label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(receipt.RecipientLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(receipt.FailureReason)",
+            "UndetectableHumanizerCopyAdapter.Humanize(option.Kind)",
+            "UndetectableHumanizerCopyAdapter.Humanize(option.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(option.Summary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(option.ActionLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)",
+            "UndetectableHumanizerCopyAdapter.Humanize(beat)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.AnchorName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(beat.ActorKind)",
+            "UndetectableHumanizerCopyAdapter.Humanize(beat.BeatLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(beat.ActorLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(message.Eyebrow)",
+            "UndetectableHumanizerCopyAdapter.Humanize(message.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(message.Summary)",
+            "UndetectableHumanizerCopyAdapter.Humanize(message.StatusLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(message.CtaLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)"
         })
         {
             Assert.Contains(required, notifications, StringComparison.Ordinal);
@@ -1025,15 +1026,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string required in new[]
         {
-            "ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);",
-            "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-            "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-            "PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-            "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
-            "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName)",
-            "PublicFacingCopyHumanizer.Clean(item)"
+            "ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Packet.WorldName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.PublicName)",
+            "UndetectableHumanizerCopyAdapter.Humanize(item)"
         })
         {
             Assert.Contains(required, validation, StringComparison.Ordinal);
@@ -1269,10 +1270,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                  {
                      "PublicKnowledgeText(Model.Heading)",
                      "PublicKnowledgeText(Model.PrimaryAction.Label)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Status)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Provenance)"
+                     "PublicKnowledgeText(receipt.Status)",
+                     "PublicKnowledgeText(receipt.Topic)",
+                     "PublicKnowledgeText(receipt.Summary)",
+                     "PublicKnowledgeText(receipt.Provenance)"
                  })
         {
             Assert.Contains(cleanedBinding, knowledgeFabric, StringComparison.Ordinal);
@@ -1282,10 +1283,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
                  {
                      "PublicNexusText(Model.Heading)",
                      "PublicNexusText(Model.PlatformSummary)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Status)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Topic)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Summary)",
-                     "PublicFacingCopyHumanizer.Clean(receipt.Route)"
+                     "UndetectableHumanizerCopyAdapter.Humanize(receipt.Status)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(receipt.Topic)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)",
+                     "UndetectableHumanizerCopyAdapter.Humanize(receipt.Route)"
                  })
         {
             Assert.Contains(cleanedBinding, nexusPan, StringComparison.Ordinal);

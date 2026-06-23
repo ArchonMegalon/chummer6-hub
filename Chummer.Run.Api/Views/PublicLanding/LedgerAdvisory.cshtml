@@ -8,9 +8,9 @@
 <section class="ledger-flagship ledger-flagship--notifications">
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Advisory</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
-        <p class="ledger-flagship__support">@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
+        <p class="ledger-flagship__support">@UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.NoDemocracyNote)</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="/account/ledger/notifications">Open inbox</a>
             <a class="button-like button-like--secondary" href="/account/ledger">Back to Black Ledger</a>
@@ -40,7 +40,7 @@
             </a>
             <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
                 <span class="tag">World state</span>
-                <strong>Turn review</strong>
+                <strong>Turn details</strong>
                 <p>Keep the advisory loop clear and tied to the same world state.</p>
             </a>
             <a class="ledger-flagship__nav-card" href="@Model.Summary.OpenMailHref">
@@ -55,13 +55,13 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">How it works</p>
-        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)</p>
+        <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Heading)</h2>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Intro)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Rule</span>
-            <p>@PublicFacingCopyHumanizer.Clean(Model.Summary.NoDemocracyNote)</p>
+            <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.NoDemocracyNote)</p>
         </article>
     </div>
 </section>
@@ -78,11 +78,11 @@
             @foreach (var ballot in Model.Summary.PlayerBallots)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(ballot.Heading)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(ballot.Summary)</p>
-                    <p><strong>State:</strong> @PublicFacingCopyHumanizer.Clean(ballot.AdvisoryPosture)</p>
-                    <p><strong>Destination:</strong> @PublicFacingCopyHumanizer.Clean(ballot.ResultDestination)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(ballot.AudienceLabel)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(ballot.Heading)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(ballot.Summary)</p>
+                    <p><strong>State:</strong> @UndetectableHumanizerCopyAdapter.Humanize(ballot.AdvisoryPosture)</p>
+                    <p><strong>Destination:</strong> @UndetectableHumanizerCopyAdapter.Humanize(ballot.ResultDestination)</p>
                     @if (ballot.UserMayVote)
                     {
                         <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
@@ -91,7 +91,7 @@
                             @foreach (var option in ballot.Options)
                             {
                                 <button class="button-like @(option.Selected ? "button-like--primary" : "button-like--secondary")" type="submit" name="optionId" value="@option.OptionId">
-                                    @PublicFacingCopyHumanizer.Clean(option.Label) · @option.VoteShareLabel
+                                    @UndetectableHumanizerCopyAdapter.Humanize(option.Label) · @option.VoteShareLabel
                                 </button>
                             }
                         </form>
@@ -99,7 +99,7 @@
                     <div class="route-choice-card__details">
                         @foreach (var option in ballot.Options)
                         {
-                            <span>@PublicFacingCopyHumanizer.Clean(option.Label): @option.VoteCount vote(s)</span>
+                            <span>@UndetectableHumanizerCopyAdapter.Humanize(option.Label): @option.VoteCount vote(s)</span>
                         }
                     </div>
                 </article>
@@ -120,11 +120,11 @@
             @foreach (var ballot in Model.Summary.GmBallots)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(ballot.Heading)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(ballot.Summary)</p>
-                    <p><strong>State:</strong> @PublicFacingCopyHumanizer.Clean(ballot.AdvisoryPosture)</p>
-                    <p><strong>Destination:</strong> @PublicFacingCopyHumanizer.Clean(ballot.ResultDestination)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(ballot.AudienceLabel)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(ballot.Heading)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(ballot.Summary)</p>
+                    <p><strong>State:</strong> @UndetectableHumanizerCopyAdapter.Humanize(ballot.AdvisoryPosture)</p>
+                    <p><strong>Destination:</strong> @UndetectableHumanizerCopyAdapter.Humanize(ballot.ResultDestination)</p>
                     @if (ballot.UserMayVote)
                     {
                         <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
@@ -133,7 +133,7 @@
                             @foreach (var option in ballot.Options)
                             {
                                 <button class="button-like @(option.Selected ? "button-like--primary" : "button-like--secondary")" type="submit" name="optionId" value="@option.OptionId">
-                                    @PublicFacingCopyHumanizer.Clean(option.Label) · @option.VoteShareLabel
+                                    @UndetectableHumanizerCopyAdapter.Humanize(option.Label) · @option.VoteShareLabel
                                 </button>
                             }
                         </form>
@@ -141,7 +141,7 @@
                     <div class="route-choice-card__details">
                         @foreach (var option in ballot.Options)
                         {
-                            <span>@PublicFacingCopyHumanizer.Clean(option.Label): @option.VoteCount vote(s)</span>
+                            <span>@UndetectableHumanizerCopyAdapter.Humanize(option.Label): @option.VoteCount vote(s)</span>
                         }
                     </div>
                 </article>
@@ -163,13 +163,13 @@
             {
                 <article class="route-choice-card">
                     <span class="tag">Leader brief</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(summary.Heading)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(summary.Summary)</p>
-                    <p><strong>Leader state:</strong> @PublicFacingCopyHumanizer.Clean(summary.ExecutivePosture)</p>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(summary.Heading)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(summary.Summary)</p>
+                    <p><strong>Leader state:</strong> @UndetectableHumanizerCopyAdapter.Humanize(summary.ExecutivePosture)</p>
                     <div class="route-choice-card__details">
                         @foreach (var item in summary.Highlights)
                         {
-                            <span>@PublicFacingCopyHumanizer.Clean(item)</span>
+                            <span>@UndetectableHumanizerCopyAdapter.Humanize(item)</span>
                         }
                     </div>
                 </article>

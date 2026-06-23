@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-session-venue";
     var isManage = string.Equals(Model.Section, "manage", StringComparison.OrdinalIgnoreCase);
     var isCloseout = string.Equals(Model.Section, "closeout", StringComparison.OrdinalIgnoreCase);
-    static string PublicGmVenueText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicGmVenueText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="release-footnote">

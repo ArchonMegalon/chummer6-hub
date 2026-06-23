@@ -581,7 +581,7 @@ public sealed class BlackLedgerFactionOnboardingService
                 : "Anchor-led bulletin with first-party narration and captions.",
             RenderPipelineLabel: useMagicFit
                 ? "MagicFit scene render -> Chummer narration/mix -> public route package"
-                : "First-party motion bulletin -> captions -> storyboard fallback",
+                : "Featured motion bulletin -> captions -> storyboard fallback",
             HtmlHref: $"/ledger/factions/{normalizedFactionId}/promo",
             JsonHref: $"/ledger/factions/{normalizedFactionId}/promo.json",
             CaptionsHref: $"/ledger/factions/{normalizedFactionId}/promo.vtt",

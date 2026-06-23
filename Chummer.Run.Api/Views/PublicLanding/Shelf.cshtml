@@ -1,7 +1,7 @@
 @using Chummer.Campaign.Contracts
 @model ShelfPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-artifacts surface-minimal";
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
@@ -24,24 +24,24 @@
         .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
         .ToArray();
     var artifactShelfPrimaryHref = rankedPublicCreatorPublications.Length > 0
-        ? "#public-detail-view"
+        ? "#public-shared-publications"
         : liveItems.Length > 0
             ? "#current-detail-surfaces"
             : previewItems.Length > 0
                 ? "#preview-artifacts"
-                : "#artifact-route-map";
+                : "#library-route-map";
     var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Open your library" : "Create account for your library";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Create account for saved pages";
     var routeChoices = new[]
     {
         new
         {
             Badge = "Library",
-            Title = "Open dossiers, recaps, and shared publications here",
+            Title = "Open saved pages for dossiers, recaps, and shared publications",
             Summary = "Use this page when you want background and full pages, not an installer.",
             Href = artifactShelfPrimaryHref,
-            Label = "Open library",
-            Details = new[] { "Readable pages", "Related files", "Background" }
+            Label = "Open saved pages",
+            Details = new[] { "Readable pages", "Related pages", "Background" }
         },
         new
         {
@@ -56,15 +56,15 @@
         {
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Personal, campaign, creator, and public returns stay in one library"
-                : "Sign in when you want your private library together with public pages",
+                ? "Your library keeps public and private returns together"
+                : "Sign in when you want your private pages together with public pages",
             Summary = Model.Chrome.Authenticated
                 ? "Your library keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
                 : "Public pages work without an account. Sign in only when you want private return paths and creator- or campaign-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Details = Model.Chrome.Authenticated
-                ? new[] { "Table Pulse Aftermath", "Creator next steps", "Same return view" }
+                ? new[] { "Table Pulse Aftermath", "Creator next steps", "one library" }
                 : new[] { "Public first", "Account adds return paths", "No auth wall for detail pages" }
         },
         new
@@ -79,29 +79,7 @@
     };
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "active" => "Ready",
-            "linked" => "Ready",
-            "pending" => "Pending",
-            "pending_verification" => "Confirmation sent",
-            "verified" => "Confirmed",
-            "approved" => "Approved",
-            "self_service" => "Self-service",
-            "review" => "Needs review",
-            "warning" => "Needs attention",
-            "attention" => "Needs attention",
-            "ready" => "Ready",
-            "revoked" => "Revoked",
-            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
-        };
-    }
+        => UndetectableHumanizerCopyAdapter.HumanizeStatusLabel(value, fallback);
 
     static bool IsDiscoverablePublicCreatorPublication(CreatorPublicationProjection? publication)
         => publication is not null
@@ -132,7 +110,7 @@
             ? "Open public publication"
             : "Open publication status";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
-    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
             ? "/artifacts#signed-in-detail-view"
@@ -151,7 +129,7 @@
         "campaign" => "Stay on the shared crew and continuity page for campaign-owned files, prep notes, Table Pulse Aftermath return cues, and replay next steps.",
         "creator" => "Inspect creator-linked history, confidence, availability, and next steps for published or publication-ready work.",
         "public" => "Inspect published shared-publication pages so discoverable creator work and publication detail stay together while you are signed in.",
-        _ => "When you are signed in, the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together instead of splitting them into separate stories."
+        _ => "When you are signed in, your library keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together instead of splitting them into separate stories."
     };
 
     string PublicationAvailabilityLabel(bool discoverable)
@@ -161,12 +139,12 @@
                 ? "Ready now"
                 : "Limited release";
 
-    var governedDiscoveryTitle = publicationRouteReviewRequired
+    var publicDiscoveryTitle = publicationRouteReviewRequired
         ? "Shared publications with limited detail"
         : "Published shared publications";
-    var governedDiscoveryCopy = publicationRouteReviewRequired
+    var publicDiscoveryCopy = publicationRouteReviewRequired
         ? "These campaign, primer, dossier, recap, replay, and run-module outputs are visible now. Some comparisons stay brief until they are useful and current."
-        : "These campaign, primer, dossier, recap, replay, and run-module outputs are live after review and moderation.";
+        : "These campaign, primer, dossier, recap, replay, and run-module outputs are live now.";
 }
 
 <section class="minimal-page-hero route-anchor-target">
@@ -177,10 +155,10 @@
     </div>
     <div class="minimal-status-pill">
         <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail page(s)</span>
-        <strong>@previewItems.Length opening next</strong>
+        <strong>@previewItems.Length coming next</strong>
         @if (publicationRouteReviewRequired)
         {
-            <span>Limited detail</span>
+            <span>Short summary</span>
         }
         @if (Model.Chrome.Authenticated)
         {
@@ -189,12 +167,12 @@
     </div>
 </section>
 
-<section class="status-decision-strip" id="artifact-route-map" aria-label="Library route split">
+<section class="status-decision-strip" id="library-route-map" aria-label="Saved page options">
     <article class="status-decision-strip__card">
         <span class="tag">Library</span>
-        <h2>Open dossiers, recaps, and shared publications here.</h2>
+        <h2>Open saved pages for dossiers, recaps, and shared publications.</h2>
         <p>This page is for history and background. Downloads, account recovery, and help still keep their own jobs.</p>
-        <a class="button-like button-like--ghost" href="@artifactShelfPrimaryHref">Open library</a>
+        <a class="button-like button-like--ghost" href="@artifactShelfPrimaryHref">Open saved pages</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Downloads</span>
@@ -213,7 +191,7 @@
 <section class="minimal-section minimal-section--tight">
     <div class="minimal-section__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2>Choose library, downloads, account return, or help.</h2>
+        <h2>Choose saved pages, downloads, account return, or help.</h2>
         <p>This page is for history and background. Downloads, account recovery, and help still keep their own jobs.</p>
     </div>
     <div class="route-choice-grid">
@@ -237,15 +215,15 @@
 
 @if (rankedPublicCreatorPublications.Length > 0)
 {
-    <section class="artifact-gallery" id="public-detail-view">
+    <section class="artifact-gallery" id="public-shared-publications">
         <div class="artifact-gallery__lead">
-            <p class="eyebrow">Public library</p>
-            <h2 class="editorial-title">@governedDiscoveryTitle</h2>
-            <p class="editorial-copy">@governedDiscoveryCopy</p>
+            <p class="eyebrow">Public pages</p>
+            <h2 class="editorial-title">@publicDiscoveryTitle</h2>
+            <p class="editorial-copy">@publicDiscoveryCopy</p>
             @if (publicationRouteReviewRequired)
             {
                 <article class="route-callout">
-                    <span class="tag">Limited detail</span>
+                    <span class="tag">Short summary</span>
                     <h3>These publications are visible now, with a shorter public summary for now.</h3>
                     <p>You can inspect the publication and background today. The limit is only how broadly this page compares it to other work.</p>
                     <p>Broader comparisons return when they are useful and current.</p>
@@ -270,7 +248,7 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
+                        <p><strong>Details:</strong> @PublicText(publication.ProvenanceSummary)</p>
                         <p><strong>Discovery:</strong> @PublicText(publication.DiscoverySummary)</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
@@ -286,7 +264,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                         {
-                            <p><strong>Moderation:</strong> @PublicText(publication.ModerationSummary)</p>
+                            <p><strong>Decision notes:</strong> @PublicText(publication.ModerationSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                         {
@@ -328,7 +306,7 @@
             <article class="continuity-band__fact">
                 <span>Visible creator cards</span>
                 <strong>@signedInCreatorPublications.Length</strong>
-                <p>Creator-linked lineage, availability, and publication next steps in one place.</p>
+                <p>Creator-linked history, availability, and publication next steps in one place.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Selected view</span>
@@ -337,7 +315,7 @@
             </article>
             <article class="continuity-band__fact">
                 <span>Boundary</span>
-                <strong>@(publicationRouteReviewRequired ? "Public wording still reviewed" : "Public wording ready now")</strong>
+                <strong>@(publicationRouteReviewRequired ? "Public wording still being simplified" : "Public wording ready now")</strong>
                 <p>Account return can stay useful even while the public publication page is still limited.</p>
             </article>
         </div>
@@ -373,11 +351,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                         {
-                            <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(item.ProvenanceSummary)</p>
+                            <p><strong>Details:</strong> @PublicText(item.ProvenanceSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                         {
-                            <p><strong>Note:</strong> @PublicFacingCopyHumanizer.Clean(item.AuditSummary)</p>
+                            <p><strong>Note:</strong> @PublicText(item.AuditSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                         {
@@ -422,7 +400,7 @@
                             <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
                             <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
                         </div>
-                        <p><strong>Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)</p>
+                        <p><strong>Details:</strong> @PublicText(publication.ProvenanceSummary)</p>
                         <p><strong>Discovery:</strong> @PublicText(publication.DiscoverySummary)</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
@@ -446,7 +424,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                         {
-                            <p><strong>Moderation:</strong> @PublicText(publication.ModerationSummary)</p>
+                            <p><strong>Decision notes:</strong> @PublicText(publication.ModerationSummary)</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                         {
@@ -469,7 +447,7 @@
     <section class="artifact-gallery" id="current-detail-surfaces">
         <div class="artifact-gallery__lead">
             <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
-            <h2 class="editorial-title">Current library pages</h2>
+            <h2 class="editorial-title">Current pages</h2>
             <p class="editorial-copy">These pages are ready to use today. They support the install decision; they do not replace downloads.</p>
         </div>
         <div class="artifact-gallery__grid">
@@ -491,7 +469,7 @@
                             <span>@PublicText(card.Action.Label)</span>
                             @if (!string.IsNullOrWhiteSpace(card.Card.MicroProof))
                             {
-                                <span>@PublicFacingCopyHumanizer.Clean(card.Card.MicroProof)</span>
+                                <span>@PublicText(card.Card.MicroProof)</span>
                             }
                         </div>
                         @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
@@ -500,7 +478,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
-                            <p><strong>Note:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
+                            <p><strong>Note:</strong> @PublicText(card.Card.ProofNote)</p>
                         }
                         <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>
                     </div>
@@ -515,8 +493,8 @@
     <section class="editorial-block" id="preview-artifacts">
         <div class="editorial-block__lead">
             <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
-            <h2 class="editorial-title">Opening next</h2>
-            <p class="editorial-copy">These pages stay visible so you can compare what is opening next against what is already usable today, without pretending they are live yet.</p>
+            <h2 class="editorial-title">Coming next</h2>
+            <p class="editorial-copy">These pages stay visible so you can compare what is coming next against what is already usable today, without pretending they are live yet.</p>
         </div>
         <div class="compact-rail">
             @foreach (var card in previewItems)
@@ -532,7 +510,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                         {
-                            <p><strong>Next:</strong> @PublicFacingCopyHumanizer.Clean(card.Card.ProofNote)</p>
+                            <p><strong>Next:</strong> @PublicText(card.Card.ProofNote)</p>
                         }
                     </div>
                     <a class="editorial-strip__action" href="@card.Action.Href">@PublicText(card.Action.Label)</a>

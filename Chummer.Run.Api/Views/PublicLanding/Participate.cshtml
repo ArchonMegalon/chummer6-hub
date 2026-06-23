@@ -11,7 +11,7 @@
         <h1>Tell us what slows the table down.</h1>
         <p>Public feedback for ideas, friction, and safe bugs. Private or account-linked problems go to Help.</p>
     </div>
-    <div class="minimal-status-pill participate-hero__status" aria-label="Participate posture">
+    <div class="minimal-status-pill participate-hero__status" aria-label="Participate summary">
         <span>Public route</span>
         <strong>Ideas and safe bugs</strong>
         <span>Private help stays separate</span>
@@ -22,7 +22,7 @@
     <div class="participate-shell__header">
         <div>
             <h2>Public board</h2>
-            <p class="participate-shell__lead">Post a small problem, check what other users are pushing on, or move to roadmap, changelog, or Help.</p>
+            <p class="participate-shell__lead">Choose where it should go. Start with the shortest path.</p>
         </div>
         <div class="participate-actions">
             <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
@@ -40,7 +40,7 @@
         <p class="participate-toolbar__note">Use Help when the issue needs logs, account detail, or recovery.</p>
     </div>
 
-    <div class="participate-lanes" aria-label="Board lanes">
+    <div class="participate-lanes" aria-label="Board sections">
         @foreach (var lane in Model.Lanes)
         {
             <article class="participate-lane">

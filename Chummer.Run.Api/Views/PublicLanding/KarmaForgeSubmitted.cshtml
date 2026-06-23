@@ -1,44 +1,21 @@
 @using Chummer.Run.Api.Services
 @model KarmaForgeSubmittedPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
-    ViewData["ContextSidebarHeading"] = "KARMA FORGE submission";
-    ViewData["ContextSidebarSummary"] = "Use the section links for next questions, next steps, and saved details.";
+    ViewData["ContextSidebarHeading"] = "Request update";
+    ViewData["ContextSidebarSummary"] = "Use the section links for next questions, next steps, and saved notes.";
     ViewData["ContextSidebarLinks"] = new[]
     {
         new PublicNavigationLink("Next questions", "#next-questions"),
         new PublicNavigationLink("Next steps", "#next-steps"),
-        new PublicNavigationLink("Saved details", "#saved-details"),
+        new PublicNavigationLink("Saved notes", "#saved-details"),
     };
-    var governedDecisionLabel = string.Concat("Product", " Governor");
-    var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Reviewed product decision", StringComparison.OrdinalIgnoreCase);
+    var productDecisionLabel = string.Concat("Product", " Governor");
+    var queueStatusLabel = Model.QueueStatus.Replace(productDecisionLabel, "Product decision", StringComparison.OrdinalIgnoreCase);
     string SanitizePublicText(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        string cleaned = value
-            .Replace(string.Concat("Product", " Governor"), "product decision", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Ican", "preneur"), "guided review path", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Next", "Step"), "review path", StringComparison.OrdinalIgnoreCase)
-            .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase)
-            .Replace("bounded", "limited", StringComparison.OrdinalIgnoreCase)
-            .Replace("normalized", "saved", StringComparison.OrdinalIgnoreCase)
-            .Replace("packet", "request", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "note", StringComparison.OrdinalIgnoreCase)
-            .Replace("governed", "reviewed", StringComparison.OrdinalIgnoreCase)
-            .Replace("HouseRuleDemandPacket", "rules request", StringComparison.OrdinalIgnoreCase)
-            .Replace("KarmaForgeCandidate", "saved request", StringComparison.OrdinalIgnoreCase);
-
-        return PublicFacingCopyHumanizer.Clean(cleaned);
-    }
+        => UndetectableHumanizerCopyAdapter.HumanizeKarmaForgeSubmitted(value);
 }
 
 <section class="trust-page-hero">
@@ -47,7 +24,7 @@
         <h1 class="page-title">@SanitizePublicText(Model.Heading)</h1>
         <p class="page-copy">@SanitizePublicText(Model.Intro)</p>
         <div class="trust-claim__details">
-            <span>Submission saved</span>
+            <span>Request saved</span>
             <span>@SanitizePublicText(Model.TrackTitle)</span>
             <span>@SanitizePublicText(queueStatusLabel)</span>
         </div>
@@ -87,7 +64,7 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Saved detail</h3>
+                <h3>Saved note</h3>
                 <p>@SanitizePublicText(highlight)</p>
             </div>
         </article>
@@ -97,8 +74,8 @@
 <section class="editorial-block" id="review-next-steps">
     <div class="editorial-block__lead">
         <p class="eyebrow">Next steps</p>
-        <h2 class="editorial-title">The next steps stay clear from review to closeout.</h2>
-        <p class="editorial-copy">These steps can sharpen, schedule, review, decide, or close the request.</p>
+        <h2 class="editorial-title">The next steps stay clear from planning to closeout.</h2>
+        <p class="editorial-copy">These steps can sharpen, schedule, decide, or close the request.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var stage in Model.ExternalStages)
@@ -135,7 +112,7 @@
 <section class="trust-page-layout">
     <div class="trust-page-sections">
         <article class="trust-page-section" id="next-questions">
-            <p class="eyebrow">Next questions queue</p>
+            <p class="eyebrow">Next questions</p>
             <h2>Questions for the next pass</h2>
             <p>@(Model.FollowUpAllowed ? "Follow-up is allowed, so these are the most likely questions Chummer will ask next." : "Follow-up is off, but these questions can still sharpen the request if you return later.")</p>
             <ul class="trust-page-section__list">
@@ -160,16 +137,16 @@
         </article>
 
         <article class="trust-page-section" id="saved-details">
-            <p class="eyebrow">Saved details</p>
+            <p class="eyebrow">Saved notes</p>
             <h2>What Chummer saved</h2>
-            <p>These previews show what Chummer saved for this request.</p>
+            <p>These notes show what Chummer saved for this request.</p>
 
             <details class="details-drawer">
-                <summary>Saved rules request</summary>
+                <summary>Saved request</summary>
                 <pre>@SanitizePublicText(Model.PacketJson)</pre>
             </details>
             <details class="details-drawer">
-                <summary>Saved review state</summary>
+                <summary>Saved planning notes</summary>
                 <pre>@SanitizePublicText(Model.CandidateJson)</pre>
             </details>
             <details class="details-drawer">

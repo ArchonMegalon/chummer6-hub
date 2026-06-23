@@ -1910,7 +1910,7 @@ public sealed class ReleaseBundlePromotionService
 
         return proofPassed
             ? "Only send fixed notices after the affected install can receive the published channel artifact now on the release page."
-            : "Verify fix availability against the live channel artifact before closing support loops.";
+            : "Check the live release page before sending a fixed notice.";
     }
 
     private static bool DesktopTupleCoverageIsComplete(JsonObject coverage)

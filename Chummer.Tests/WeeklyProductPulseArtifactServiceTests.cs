@@ -28,8 +28,8 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         Assert.Equal(1, document.RootElement.GetProperty("journey_gate_health").GetProperty("blocked_count").GetInt32());
         Assert.Equal("Public-fit polish", document.RootElement.GetProperty("supporting_signals").GetProperty("phase_label").GetString());
         Assert.Equal("Core Engine", document.RootElement.GetProperty("supporting_signals").GetProperty("longest_pole").GetString());
-        Assert.Contains("route-canary validation", document.RootElement.GetProperty("supporting_signals").GetProperty("launch_readiness").GetString(), StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("Pilot defaults are governed", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("default_status").GetString());
+        Assert.Contains("route canaries", document.RootElement.GetProperty("supporting_signals").GetProperty("launch_readiness").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Pilot defaults are settled", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("default_status").GetString());
         Assert.Equal("2026-04-12", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("review_due").GetString());
         Assert.Equal("Promote once canaries stay green and support fallout remains clear through the next route review.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
         Assert.Equal("clear", document.RootElement.GetProperty("supporting_signals").GetProperty("closure_health").GetProperty("state").GetString());
@@ -39,6 +39,8 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         Assert.Equal("moving", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("state").GetString());
         Assert.Equal("up", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("direction").GetString());
         Assert.Equal(2, document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("delta_percent").GetInt32());
+        Assert.Contains("journey status is", document.RootElement.GetProperty("summary").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("journey proof is", document.RootElement.GetProperty("summary").GetString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -57,7 +59,7 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         using JsonDocument document = JsonDocument.Parse(json);
 
         Assert.Equal("2026-04-12", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("review_due").GetString());
-        Assert.Equal("Hold broad promotion until the public release status is current on the public edge.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
+        Assert.Equal("Hold the broader rollout until the public release status is current.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
     }
 
     private sealed class WeeklyPulseFixture : IDisposable
@@ -121,11 +123,11 @@ public sealed class WeeklyProductPulseArtifactServiceTests
                     {
                         ["phase_label"] = "Scale & stabilize",
                         ["longest_pole"] = "Cloud & Publishing",
-                        ["launch_readiness"] = "Hold launch expansion pending route-canary validation.",
+                        ["launch_readiness"] = "Hold launch expansion while route canaries are still being checked.",
                         ["provider_route_stewardship"] = new Dictionary<string, object?>
                         {
-                            ["default_status"] = "Pilot defaults are governed",
-                            ["canary_status"] = "Canary green on all active lanes",
+                            ["default_status"] = "Pilot defaults are settled",
+                            ["canary_status"] = "Canary green across all active routes",
                             ["review_due"] = "2026-06-01",
                             ["next_decision"] = "Promote once support fallout remains stable."
                         }

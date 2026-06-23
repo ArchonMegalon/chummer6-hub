@@ -82,7 +82,7 @@
         }
 
         return notices is { Count: > 0 }
-            ? "A previous campaign workspace needs review before you continue. Open the campaign workspace for the safe next step."
+            ? "A previous campaign workspace needs attention before you continue. Open the campaign workspace for the safe next step."
             : null;
     }
 
@@ -179,10 +179,10 @@
     };
     var summary = Model.CurrentSection switch
     {
-        "access" => "Keep install return, release status, and support follow-up in one calmer place instead of searching the whole account surface.",
+        "access" => "Keep install return, release status, and support history in one calmer place instead of searching the whole account surface.",
         "work" => "Pick up dossiers, active runs, and the next useful path without turning Home into a deeper work page.",
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
-        _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is opening next."
+        _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is planned next."
     };
 
     string ContextualPreviewHref(string? href)
@@ -196,56 +196,13 @@
         return resolvedHref;
     }
 
-    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string HomeText(string? value)
-    {
-        var cleaned = PublicText(value);
-        if (string.IsNullOrWhiteSpace(cleaned))
-        {
-            return cleaned;
-        }
-
-        return cleaned
-            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase)
-            .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
-            .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("operator", "maintainer", StringComparison.OrdinalIgnoreCase)
-            .Replace("canonical", "main", StringComparison.OrdinalIgnoreCase)
-            .Replace("truth", "state", StringComparison.OrdinalIgnoreCase)
-            .Replace("provider", "service", StringComparison.OrdinalIgnoreCase);
-    }
+        => UndetectableHumanizerCopyAdapter.HumanizeHome(value);
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "active" => "Ready",
-            "linked" => "Ready",
-            "pending" => "Pending",
-            "pending_verification" => "Confirmation sent",
-            "verified" => "Confirmed",
-            "published" => "Published",
-            "campaign_approved" => "Campaign-approved",
-            "sandbox" => "Sandbox",
-            "approved" => "Approved",
-            "self_service" => "Self-service",
-            "current" => "Current",
-            "next" => "Next",
-            "completed" => "Completed",
-            "review" => "Needs review",
-            "warning" => "Needs attention",
-            "attention" => "Needs attention",
-            "ready" => "Ready",
-            "revoked" => "Revoked",
-            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
-        };
-    }
+        => UndetectableHumanizerCopyAdapter.HumanizeStatusLabel(value, fallback);
 
     static string RuleEnvironmentLifecycleLabel(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
         => environment.ApprovalState.Trim().ToLowerInvariant() switch
@@ -297,19 +254,19 @@
     var leadTravelDevice = leadWorkspaceServerPlane?.TravelMode.Devices.FirstOrDefault();
     var homeContinuityHeadline = leadWorkspaceServerPlane?.NextSafeAction.Label
         ?? (releasedOrNotifiedCases.Length > 0
-            ? "A tracked fix or next step is waiting"
+            ? "A next step is waiting"
             : pendingClaims > 0
-                ? "A linked install still needs its return path finished"
+                ? "A linked install still needs one step"
                 : claimedInstallations > 0
-                    ? "This account already has a live return path"
-                    : "Start the first linked install from this account");
+                    ? "This account is already linked"
+                    : "Start the first linked install here");
     var homeContinuitySummary = leadWorkspaceServerPlane?.NextSafeAction.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.NextSafeAction
         ?? (pendingClaims > 0
-            ? "Finish the claim on the device that already has the build, then use Devices & access only for relink, reclaim, or recovery."
+            ? "Finish the claim on the device that already has the build, then return here if you need to relink it."
             : claimedInstallations > 0
-                ? "Downloads, support, and campaign return stay attached to the same account."
-                : "Use this account to keep install return, support, and campaign return attached from the first successful launch.");
+                ? "Downloads, support, and saved work stay attached to the same account."
+                : "Use this account if you want installs, support, and saved work tied together from the first launch.");
     var homeRoleSummary = !string.IsNullOrWhiteSpace(leadWorkspaceServerPlane?.Workspace.DeviceRoleSummary)
         ? PublicText(leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary)
         : leadTravelDevice is not null
@@ -318,14 +275,14 @@
                 ? $"{claimedInstallations} linked install(s) are already attached to this account."
                 : pendingClaims > 0
                     ? $"{pendingClaims} pending claim(s) are waiting on their original device."
-                    : "No claimed install or workspace role is attached yet.";
+                    : "No install is linked yet.";
     var homeWhatChangedSummary = leadWorkspaceServerPlane?.ChangePackets.FirstOrDefault()?.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.ClosureSummary
         ?? (recentReceipts.Length > 0
             ? $"{HomeText(recentReceipts[0].ArtifactLabel)} on {HomeText(recentReceipts[0].Channel)} is still attached to this account."
             : restoreConflicts > 0
                 ? Model.CampaignSpine.Restore.ConflictSummaries[0]
-                : "Nothing urgent changed. This account is ready for the next install, campaign return, or support follow-up.");
+                : "Nothing urgent changed. This account is ready for the next install, return, or support step.");
 }
 
 <section class="home-command">
@@ -340,9 +297,9 @@
     @Html.AntiForgeryToken()
 </div>
 
-<section class="home-cockpit-strip" aria-label="Account continuity cockpit">
+<section class="home-cockpit-strip" aria-label="Home summary">
     <div class="home-cockpit-strip__lead">
-        <p class="eyebrow">Continuity cockpit</p>
+        <p class="eyebrow">Home</p>
         <h2>@homeContinuityHeadline</h2>
         <p>@homeContinuitySummary</p>
         <div class="stacked-actions">
@@ -360,19 +317,19 @@
     </div>
     <div class="home-cockpit-strip__panel">
         <article class="home-cockpit-strip__fact">
-            <span>Install and role</span>
+            <span>Install</span>
             <strong>@homeRoleSummary</strong>
             <p>The same download still works for everyone. Use as guest or link this copy later.</p>
         </article>
         <article class="home-cockpit-strip__fact">
-            <span>What changed for me</span>
+            <span>Recent change</span>
             <strong>@homeWhatChangedSummary</strong>
             <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
         </article>
         <article class="home-cockpit-strip__fact">
-            <span>Support and return</span>
+            <span>Support</span>
             <strong>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].StageLabel : "Calm return path")</strong>
-            <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No tracked support closure is blocking the next install, campaign, or recovery step right now.")</p>
+            <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No support issue is blocking the next install, return, or recovery step right now.")</p>
         </article>
         <article class="home-cockpit-strip__fact">
             <span>Current release</span>
@@ -468,7 +425,7 @@ else
                 <article class="app-action-card">
                     <span class="tag">Devices &amp; access</span>
                     <h2>Keep this copy connected</h2>
-                    <p>Link this install, review access rights, and keep the claim path visible without digging through support copy.</p>
+                    <p>Link this install, keep access rights clear, and keep the claim path visible without digging through support copy.</p>
                     <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
                 </article>
             </div>
@@ -533,7 +490,7 @@ else
                                                         <h3>Campaign return needs confirmation</h3>
                                                         <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Review campaign return</a>
+                                                    <a class="inline-link" href="/account/work">Open campaign return</a>
                                                 </article>
                                             }
                                         }
@@ -548,7 +505,7 @@ else
                                                 <span class="tag">Current release</span>
                                                 <div class="app-rail__copy">
                                                     <h3>Use the current release</h3>
-                                                    <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
+                                                    <p>See what changed, what is working today, and whether this is the right moment to install or update.</p>
                                                 </div>
                                                 <a class="inline-link" href="/now">Open what works today</a>
                                             </article>
@@ -588,8 +545,8 @@ else
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
                                         @* Campaign workspace. GM readiness cues. *@
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, Rule environments, and GM readiness cues so the account home view points to the next safe page without turning Home into a deeper work page.</p>
-                                        <p class="muted-copy">Campaign workspace return, rules answers, Device roles, Rule environments, and GM readiness cues stay visible here before you open the deeper account work page.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current work stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
+                                        <p class="muted-copy">Recent work, rules answers, and active sessions stay visible here before you open the deeper work page.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
@@ -598,13 +555,13 @@ else
                                                 <span class="tag">Ready</span>
                                                 <div class="app-rail__copy">
                                                     <h3>No long-lived runner yet</h3>
-                                                    <p>Your first install and first workspace are ready to be stitched into a real session here.</p>
+                                                    <p>Your first install and first campaign space are ready to become a real session here.</p>
                                                 </div>
                                                 @if (hasSeedableStarterWork)
                                                 {
                                                     <div class="stacked-actions">
                                                         <button id="seedStarterWorkspace" class="button-like button-like--primary" type="button">Start first playable session</button>
-                                                        <a class="inline-link" href="/account/access">Review install setup first</a>
+                                                        <a class="inline-link" href="/account/access">Open install setup first</a>
                                                     </div>
                                                     <p id="starterWorkspaceNotice" class="muted-copy" aria-live="polite"></p>
                                                 }
@@ -652,7 +609,7 @@ else
                                             @foreach (var workspace in workspaces)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Campaign workspace</span>
+                                                    <span class="tag">Workspace</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@workspace.CampaignName</h3>
                                                         <p>
@@ -667,10 +624,10 @@ else
                                                             }
                                                             @if (workspace.FirstPlayableSession is not null)
                                                             {
-                                                                <span> First playable session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
-                                                                <span> Rules ready: @workspace.FirstPlayableSession.RuleReadySummary</span>
-                                                                <span> Return summary: @workspace.FirstPlayableSession.ReturnLaneSummary</span>
-                                                                <span> Session readiness: @workspace.FirstPlayableSession.CampaignReadySummary</span>
+                                                                <span> First session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
+                                                                <span> Rules: @workspace.FirstPlayableSession.RuleReadySummary</span>
+                                                                <span> Return: @workspace.FirstPlayableSession.ReturnLaneSummary</span>
+                                                                <span> Ready: @workspace.FirstPlayableSession.CampaignReadySummary</span>
                                                             }
                                                             @if (workspace.NextSessionCarryForward is not null)
                                                             {
@@ -703,7 +660,7 @@ else
                                                             @if (leadWorkspaceServerPlane is not null
                                                                 && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
                                                             {
-                                                                <span> State: @PublicText(leadWorkspaceState?.Label).</span>
+                                                                <span> Status: @PublicText(leadWorkspaceState?.Label).</span>
                                                                 @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                                 {
                                                                     <span> Change: @PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)</span>
@@ -715,18 +672,18 @@ else
                                                                 @if (leadFirstPlayableSession is not null)
                                                                 {
                                                                     <span> First session: @PublicText(leadFirstPlayableSession.CampaignStartSummary)</span>
-                                                                <span> Legal runner: @PublicText(leadFirstPlayableSession.RuleReadySummary)</span>
-                                                                <span> Understandable return: @PublicText(leadFirstPlayableSession.ReturnLaneSummary)</span>
-                                                                <span> Campaign readiness: @PublicText(leadFirstPlayableSession.CampaignReadySummary)</span>
+                                                            <span> Rules: @PublicText(leadFirstPlayableSession.RuleReadySummary)</span>
+                                                            <span> Return: @PublicText(leadFirstPlayableSession.ReturnLaneSummary)</span>
+                                                            <span> Ready: @PublicText(leadFirstPlayableSession.CampaignReadySummary)</span>
                                                                 }
-                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count file(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
+                                                                <span> Prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count file(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
                                                                 {
                                                                     <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count file(s).</span>
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(leadPortableExchangeSummary))
                                                                 {
-                                                                    <span> Portable exchange: @PublicText(leadPortableExchangeSummary)</span>
+                                                                    <span> Local copy: @PublicText(leadPortableExchangeSummary)</span>
                                                                 }
                                                             }
                                                         </p>
@@ -766,11 +723,11 @@ else
                                                             <span> Next: @PublicText(leadWorkspaceServerPlane.NextSafeAction.Summary)</span>
                                                             @if (!string.IsNullOrWhiteSpace(leadPortableExchangeSummary))
                                                             {
-                                                                <span> Portable exchange: @PublicText(leadPortableExchangeSummary)</span>
+                                                                <span> Local copy: @PublicText(leadPortableExchangeSummary)</span>
                                                             }
                                                             else if (!string.IsNullOrWhiteSpace(leadWorkspaceDecisionNoticeSummary))
                                                             {
-                                                                <span> Workspace review: @PublicText(leadWorkspaceDecisionNoticeSummary)</span>
+                                                                <span> Workspace note: @PublicText(leadWorkspaceDecisionNoticeSummary)</span>
                                                             }
                                                         </p>
                                                     </div>
@@ -788,9 +745,9 @@ else
                                                                 <span> Playable kickoff: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Next: @leadFirstPlayableSession.NextSafeAction</span>
                                                             </p>
-                                                            <p class="muted-copy">Legal runner: @leadFirstPlayableSession.RuleReadySummary</p>
-                                                            <p class="muted-copy">Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</p>
-                                                            <p class="muted-copy">Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary</p>
+                                                            <p class="muted-copy">Rules: @leadFirstPlayableSession.RuleReadySummary</p>
+                                                            <p class="muted-copy">Return: @leadFirstPlayableSession.ReturnLaneSummary</p>
+                                                            <p class="muted-copy">Ready: @leadFirstPlayableSession.CampaignReadySummary</p>
                                                             @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
                                                             {
                                                                 <p class="muted-copy">Note: @leadFirstPlayableEvidence</p>
@@ -803,9 +760,9 @@ else
                                                 @if (leadNextSessionCarryForward is not null)
                                                 {
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Next-session carry-forward</span>
+                                                        <span class="tag">Next session</span>
                                                         <div class="app-rail__copy">
-                                                            <h3>Next-session carry-forward</h3>
+                                                            <h3>Next session</h3>
                                                             <p>
                                                                 @leadNextSessionCarryForward.Summary
                                                                 <span> Return: @leadNextSessionCarryForward.ReturnSummary</span>
@@ -828,7 +785,7 @@ else
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
                                                                 @leadAftermathPackage.Summary
-                                                                <span> Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace, not in a disconnected recap.</span>
+                                                                <span> Aftermath stays with this workspace.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
                                                                 {
                                                                     <span> Note: @leadAftermathEvidence</span>
@@ -843,7 +800,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.ProvenanceSummary))
                                                                     {
-                                                                        <span> Details: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)</span>
+                                                                        <span> Background: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.AuditSummary))
                                                                     {
@@ -855,7 +812,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.LineageSummary))
                                                                     {
-                                                                        <span> Lineage: @leadAftermathShelfEntry.LineageSummary</span>
+                                                                        <span> History: @leadAftermathShelfEntry.LineageSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationState))
                                                                     {
@@ -888,7 +845,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.LineageSummary))
                                                                     {
-                                                                        <span> Lineage: @leadAftermathCreatorPublication.LineageSummary</span>
+                                                                        <span> History: @leadAftermathCreatorPublication.LineageSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.CampaignReturnSummary))
                                                                     {
@@ -900,7 +857,7 @@ else
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.ModerationSummary))
                                                                     {
-                                                                        <span> Moderation: @leadAftermathCreatorPublication.ModerationSummary</span>
+                                                                        <span> Decision notes: @leadAftermathCreatorPublication.ModerationSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.NextSafeAction))
                                                                     {
@@ -1186,7 +1143,7 @@ else
                                                                 {
                                                                     foreach (var parityLine in handoff.ExchangeParityLines.Take(2))
                                                                     {
-                                                                        <span> Parity note: @PublicText(parityLine)</span>
+                                                                        <span> Import/export note: @PublicText(parityLine)</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.PortabilityPillarLines is { Count: > 0 })
@@ -1220,7 +1177,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                                                         {
-                                                                            <span> Output details: @HomeText(output.ProvenanceSummary).</span>
+                                                                            <span> Output background: @HomeText(output.ProvenanceSummary).</span>
                                                                         }
                                                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -1241,7 +1198,7 @@ else
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.LineageSummary))
                                                                         {
-                                                                            <span> Output lineage: @PublicText(output.LineageSummary).</span>
+                                                                            <span> Output history: @PublicText(output.LineageSummary).</span>
                                                                         }
                                                                     }
                                                                 }
@@ -1263,7 +1220,7 @@ else
                                                             <h3>@PublicText(answer.Question)</h3>
                                                             <p>
                                                                 @PublicText(answer.ShortAnswer)
-                                                                    <span> Details: @HomeText(answer.ProvenanceLabel).</span>
+                                                                    <span> Background: @HomeText(answer.ProvenanceLabel).</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Note: @PublicText(answer.EvidenceLines[0])</span>
@@ -1326,7 +1283,7 @@ else
                                                         <h3>@PublicText(publication.Title)</h3>
                                                         <p>
                                                             @PublicText(publication.Summary)
-                                                            <span>Details: @HomeText(publication.ProvenanceSummary).</span>
+                                                            <span>Background: @HomeText(publication.ProvenanceSummary).</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @PublicText(publication.DiscoverySummary)</span>
@@ -1340,7 +1297,7 @@ else
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                                                             {
-                                                                <span> Lineage: @PublicText(publication.LineageSummary)</span>
+                                                                <span> History: @PublicText(publication.LineageSummary)</span>
                                                             }
                                                             <span>Available now: @(publication.Discoverable ? "Eligible now" : "Limited").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
@@ -1358,7 +1315,7 @@ else
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
                                                             {
-                                                                <span> Moderation: @PublicText(publication.ModerationSummary)</span>
+                                                                <span> Decision notes: @PublicText(publication.ModerationSummary)</span>
                                                             }
                                                         </p>
                                                     </div>
@@ -1474,7 +1431,7 @@ else
                     <a class="button-like button-like--secondary" href="/auth/google/link?next=/home">Link Google</a>
                 }
                 <div class="check-grid">
-                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow roadmap updates</span></label>
+                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow upcoming updates</span></label>
                     <label class="check-row"><input id="onboardingBeta" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me to the right beta when it opens</span></label>
                 </div>
             </section>
@@ -1538,7 +1495,7 @@ else
       ui.setText(nodes.recoveryCopy, "Open your email to confirm the backup sign-in path.");
     }
 
-    ui.setText(nodes.setupCardTitle, "Review setup");
+    ui.setText(nodes.setupCardTitle, "Open setup");
     ui.setText(nodes.setupCardCopy, "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.");
     ui.setText(nodes.openSetupButton, "Open setup");
     nodes.openSetupButton.dataset.defaultLabel = "Open setup";

@@ -29,7 +29,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             releaseSelection,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Account linking is optional. A claim code appears only if setup needs recovery.",
+            "Account linking is optional. A recovery code appears only if setup needs recovery.",
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains(

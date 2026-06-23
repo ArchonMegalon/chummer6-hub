@@ -4,7 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
     var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
-    static string PublicReleaseUploadText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicReleaseUploadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="recommended-download" id="release-upload-command">
@@ -12,7 +12,7 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac release one-liner</span>
             <h2>Run this in your Mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload access code so unattended runs do not stop after the integrity step.</p>
+            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload access code so unattended runs do not stop during final checks.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -64,7 +64,7 @@
         <p>Expires @expires.</p>
     </div>
     <div class="release-stage__note">
-        The command is preconfigured for preview uploads with unsigned mode enabled.
+        The command is preconfigured for unsigned release uploads.
         Replace <code>CHUMMER_ALLOW_UNSIGNED_PREVIEW=1</code> with a valid <code>CHUMMER_APP_SIGN_IDENTITY</code> when you are ready for signed delivery.
     </div>
 </section>

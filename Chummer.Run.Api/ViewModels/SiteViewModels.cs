@@ -88,6 +88,10 @@ public sealed record ReleaseDisplayViewModel(
     string BuildLabel,
     string PublishedLabel);
 
+public sealed record ReleaseTruthDisplayViewModel(
+    string PublishedDateLabel,
+    string VerifiedDateLabel);
+
 public sealed record PublicAccessPostureViewModel(
     bool GuestInstallAvailable,
     bool AccountRequiredInstallAvailable,
@@ -859,12 +863,12 @@ public sealed record NowPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
     PublicReleaseManifestDto Manifest,
+    ReleaseTruthDisplayViewModel ReleaseTruth,
     PublicSignalLoopSnapshotViewModel SignalLoop,
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
-    string? VerifiedAtLabel = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -902,7 +906,7 @@ public sealed record DownloadsPageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
-    string? VerifiedAtLabel,
+    ReleaseTruthDisplayViewModel ReleaseTruth,
     ReleaseExperienceViewModel ReleaseExperience,
     FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
@@ -1038,7 +1042,7 @@ public sealed record KarmaForgeSubmittedPageViewModel(
 public sealed record StatusPageViewModel(
     SiteChromeViewModel Chrome,
     PublicReleaseManifestDto Manifest,
-    string? VerifiedAtLabel,
+    ReleaseTruthDisplayViewModel ReleaseTruth,
     ReleaseExperienceViewModel ReleaseExperience,
     string ReleaseSummary,
     string CautionSummary,

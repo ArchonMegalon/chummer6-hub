@@ -1,6 +1,6 @@
 @model PublicConciergePageViewModel
 @{
-    static string PublicConciergeText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicConciergeText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     ViewData["Title"] = PublicConciergeText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;

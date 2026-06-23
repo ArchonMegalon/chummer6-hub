@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -121,9 +122,32 @@ public sealed class FleetBridgeService
         using (response)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            var json = string.IsNullOrWhiteSpace(body)
-                ? new JsonObject()
-                : JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
+            if (!TryParseResponseObject(body, out var json, out var parseFailure))
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    var detail = string.IsNullOrWhiteSpace(body) ? parseFailure : body;
+                    if (ShouldMaskAsParticipationUnavailable(response.StatusCode, detail))
+                    {
+                        _logger.LogWarning(
+                            "Masking Fleet bridge non-JSON failure for {Method} {Path} with status {StatusCode}. Detail: {Detail}",
+                            method,
+                            path,
+                            (int)response.StatusCode,
+                            string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+                        throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
+                    }
+
+                    throw new InvalidOperationException($"Fleet bridge request failed ({(int)response.StatusCode}): {detail}");
+                }
+
+                _logger.LogWarning(
+                    "Fleet bridge returned a malformed success payload for {Method} {Path}: {Failure}",
+                    method,
+                    path,
+                    parseFailure);
+                throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -176,4 +200,37 @@ public sealed class FleetBridgeService
         => path.Contains("/device-auth/start", StringComparison.OrdinalIgnoreCase)
             ? DeviceAuthStartTimeout
             : DefaultRequestTimeout;
+
+    private static bool TryParseResponseObject(string? body, out JsonObject json, out string failure)
+    {
+        json = new JsonObject();
+        failure = string.Empty;
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return true;
+        }
+
+        try
+        {
+            var node = JsonNode.Parse(body);
+            if (node is null)
+            {
+                return true;
+            }
+
+            if (node is JsonObject obj)
+            {
+                json = obj;
+                return true;
+            }
+
+            failure = $"expected JSON object but received {node.GetType().Name}";
+            return false;
+        }
+        catch (JsonException ex)
+        {
+            failure = ex.Message;
+            return false;
+        }
+    }
 }

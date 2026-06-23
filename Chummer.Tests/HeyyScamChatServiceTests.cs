@@ -102,6 +102,37 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task IngestIncoming_SendsHertaOrthographyHintsToEaChat()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL"] = "https://code.girschele.com",
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BEARER_TOKEN"] = "token",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_ID"] = "client-id",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_SECRET"] = "client-secret",
+        });
+
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-orthography",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        Assert.Equal("generated_via_ea", draft.Status);
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/chat/completions");
+        using JsonDocument payload = JsonDocument.Parse(request.Body);
+        JsonElement systemPrompt = payload.RootElement.GetProperty("messages")[0].GetProperty("content");
+        string promptText = systemPrompt.GetString() ?? string.Empty;
+        Assert.Contains("Marillenknödel", promptText, StringComparison.Ordinal);
+        Assert.Contains("real umlauts", promptText, StringComparison.Ordinal);
+        Assert.Contains("daß", promptText, StringComparison.Ordinal);
+        Assert.Contains("muß", promptText, StringComparison.Ordinal);
+        Assert.Contains("bißchen", promptText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task IngestIncoming_SecondDraftForgetsThenScrollsBack()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
@@ -859,6 +890,11 @@ public sealed class HeyyScamChatServiceTests
             if (request.Method == HttpMethod.Post && path == "/v1/tools/execute")
             {
                 return Json(HttpStatusCode.OK, """{"target_ref":"ea-delivery-1"}""");
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/v1/chat/completions")
+            {
+                return Json(HttpStatusCode.OK, """{"choices":[{"message":{"content":"Na geh, ich muß erst die Brille suchen, Sabi."}}]}""");
             }
 
             if (request.Method == HttpMethod.Post && path == "/v21.0/1234567890/messages")

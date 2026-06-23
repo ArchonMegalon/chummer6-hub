@@ -11948,17 +11948,17 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "Build and maintain Shadowrun characters without losing the details between sessions.",
+            "A Shadowrun character manager for clean sheets and faster tables.",
             required_texts=(
-                "For Shadowrun",
-                "Stable",
-                "Nightly",
-                "What it does",
                 "Create",
-                "Update",
-                "Review",
-                "Get the app",
-                "Help"),
+                "Track",
+                "Explain",
+                "Run",
+                "Download Chummer",
+                "Windows and Linux.",
+                "Help",
+                "Participate",
+                "Watch promo"),
             forbidden_texts=(
                 "The city is moving.",
                 "Six houses. One moving city.",
@@ -11981,12 +11981,12 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/now",
-            "What works today and what still needs caution",
+            "Use this page when you want the short answer before you install.",
             required_texts=(
-                "Current release",
+                "Current build",
                 "Known issues and install help",
-                "Update path",
-                "Three useful details beyond the landing page"),
+                "Open downloads",
+                "Three things to know first"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
@@ -12036,17 +12036,17 @@ def main() -> int:
         AuditRoute(
             "/artifacts",
             "Detail gallery",
-            required_texts=("Current usable detail surfaces", "Current release build", "Mac release pipeline"),
+            required_texts=("Current pages", "Current release build", "Open saved pages"),
             expects_header_count=1),
         AuditRoute(
             "/participate",
-            "Share feedback, report a problem, or join the beta waitlist",
-            required_texts=("Public ideas and safe bug reports", "Open feedback", "Open shipped updates", "Open support intake"),
+            "Tell us what slows the table down.",
+            required_texts=("Ideas and safe bugs", "Public board", "Roadmap", "Open Help"),
             expects_header_count=1),
         AuditRoute(
             "/help",
             "Get help without guessing",
-            required_texts=("Choose the right path", "Open support intake", "Start with Downloads"),
+            required_texts=("Open downloads", "Open support intake", "Create account"),
             expects_header_count=1),
         AuditRoute(
             "/faq",
@@ -12056,12 +12056,12 @@ def main() -> int:
         AuditRoute(
             "/contact",
             "Open the right support case",
-            required_texts=("Open a first-party support case", "Install or update", "Product bug"),
+            required_texts=("Submit support case", "Create account for tracked support", "Open Devices and access"),
             expects_header_count=1),
         AuditRoute(
             "/privacy",
             "What Chummer stores, and what it does not",
-            required_texts=("Support cases", "Install linkage", "Provider-backed help"),
+            required_texts=("Open support intake", "Install linking", "What stays out"),
             expects_header_count=1),
         AuditRoute(
             "/terms",

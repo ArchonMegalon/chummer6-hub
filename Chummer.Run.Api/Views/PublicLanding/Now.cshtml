@@ -32,13 +32,10 @@
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = Model.VerifiedAtLabel
-        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd");
+    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
+    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
-    static string PublicNowText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicNowText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     string ContextualPreviewHref(string? href)
     {
@@ -111,7 +108,7 @@
 <section class="minimal-section" id="now-details">
     <div class="minimal-section__lead">
         <p class="eyebrow">What matters now</p>
-        <h2>Three things worth knowing</h2>
+        <h2>Three things to know first</h2>
         <p>These cards cover builder results, rule explanations, and saved work after changes.</p>
     </div>
     <div class="minimal-lane-grid">

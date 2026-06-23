@@ -15,21 +15,21 @@
         {
             <article class="role-matrix__cell">
                 <span class="tag">Why it matters</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.Pain)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Pain)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.Payoff))
         {
             <article class="role-matrix__cell">
                 <span class="tag">What it unlocks</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.Payoff)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Payoff)</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
         {
             <article class="role-matrix__cell">
-                <span class="tag">What to look for</span>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.ProofNote)</p>
+                <span class="tag">Keep in mind</span>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.ProofNote)</p>
             </article>
         }
     </div>
@@ -39,13 +39,13 @@
 {
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Useful cues</p>
+            <p class="eyebrow">Helpful cues</p>
             <h2 class="editorial-title">Keep these in view before you decide this is the right page.</h2>
         </div>
         <div class="trust-claim__details">
             @foreach (var item in Model.MicroProof)
             {
-                <span>@PublicFacingCopyHumanizer.Clean(item)</span>
+                <span>@UndetectableHumanizerCopyAdapter.Humanize(item)</span>
             }
         </div>
     </section>
@@ -57,7 +57,7 @@
             <h3>Start from the live surface</h3>
             <p>Use the product action first. The page should move you forward before it sends you to secondary reading.</p>
         </div>
-        <a class="inline-link" href="@Model.PrimaryAction.Href">@PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)</a>
+        <a class="inline-link" href="@Model.PrimaryAction.Href">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
@@ -77,10 +77,10 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Use your account detail view</h3>
-                <p>Open the account detail view when you want the same recap, campaign, and publication history in one place.</p>
+                <h3>Use your account details</h3>
+                <p>Open account details when you want the same recap, campaign, and publication history in one place.</p>
             </div>
-            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account detail view</a>
+            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account details</a>
         </article>
     }
 </section>

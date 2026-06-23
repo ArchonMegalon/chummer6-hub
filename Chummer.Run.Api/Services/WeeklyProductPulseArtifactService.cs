@@ -195,7 +195,7 @@ public sealed class WeeklyProductPulseArtifactService
                 _ => "support closure evidence is partial"
             };
 
-            pulse["summary"] = $"{activeWave} remains the active wave; journey proof is {journeyState}; overall progress is {progressSummary} in '{phaseLabel}'; the longest pole remains {longestPole}; {closureSummary}.";
+            pulse["summary"] = $"{activeWave} remains the active wave; journey status is {journeyState}; overall progress is {progressSummary} in '{phaseLabel}'; the longest pole remains {longestPole}; {closureSummary}.";
             pulse["generated_at"] = SelectLatestGeneratedAt(
                 seed?.GeneratedAt,
                 progressReport?.GeneratedAt,
@@ -478,10 +478,10 @@ public sealed class WeeklyProductPulseArtifactService
     {
         if (statusPlane is null)
         {
-            string fallbackDefaultStatus = seed?.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus ?? "Pilot defaults are not yet governed";
+            string fallbackDefaultStatus = seed?.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus ?? "Pilot defaults are not settled yet";
             string fallbackCanaryStatus = seed?.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus ?? "Canary evidence is still accumulating";
-            bool fallbackCanaryHealthy = string.Equals(fallbackCanaryStatus, "Canary green on all active lanes", StringComparison.Ordinal);
-            bool fallbackHubIsPublicPilot = string.Equals(fallbackDefaultStatus, "Pilot defaults are governed", StringComparison.Ordinal);
+            bool fallbackCanaryHealthy = string.Equals(fallbackCanaryStatus, "Canary green across all active routes", StringComparison.Ordinal);
+            bool fallbackHubIsPublicPilot = string.Equals(fallbackDefaultStatus, "Pilot defaults are settled", StringComparison.Ordinal);
             string fallbackNextDecision = localReleaseProof is null && closureHealth is null
                 ? seed?.SupportingSignals?.ProviderRouteStewardship?.NextDecision
                     ?? ComputeProviderRouteDecision(
@@ -518,15 +518,15 @@ public sealed class WeeklyProductPulseArtifactService
             && publicTargetCount > 0;
 
         string defaultStatus = hubIsPublicPilot
-            ? "Pilot defaults are governed"
+            ? "Pilot defaults are settled"
             : publicTargetCount > 0
-                ? "Pilot defaults still need operator review"
-                : "Pilot defaults are not yet governed";
+                ? "Pilot defaults still need review"
+                : "Pilot defaults are not settled yet";
 
         string canaryStatus = canaryHealthy
-                ? "Canary green on all active lanes"
+                ? "Canary green across all active routes"
                 : degradedServiceCount > 0
-                    ? $"Canary watch on {degradedServiceCount} active lane(s)"
+                    ? $"Canary watch on {degradedServiceCount} active route(s)"
                     : "Canary evidence is still accumulating";
         string? reviewEvidenceGeneratedAt = !string.IsNullOrWhiteSpace(liveStatusPlane.GeneratedAt)
             ? liveStatusPlane.GeneratedAt
@@ -563,23 +563,23 @@ public sealed class WeeklyProductPulseArtifactService
     {
         if (publicTargetCount == 0)
         {
-            return "Hold broad promotion until public route canary coverage exists.";
+            return "Hold the broader rollout until public route coverage exists.";
         }
 
         if (!canaryHealthy)
         {
-            return "Hold broad promotion until route canaries return to green.";
+            return "Hold the broader rollout until route canaries return to green.";
         }
 
         if (!string.Equals(localReleaseProof?.Status, "passed", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hold broad promotion until the public release status is current on the public edge.";
+            return "Hold the broader rollout until the public release status is current.";
         }
 
         if (closureHealth is not null
             && !string.Equals(closureHealth.State, "clear", StringComparison.Ordinal))
         {
-            return "Keep the current pilot default until support closure returns to a clear posture.";
+            return "Keep the current pilot default until support closure is clear again.";
         }
 
         if (!hubIsPublicPilot)
@@ -600,30 +600,30 @@ public sealed class WeeklyProductPulseArtifactService
         if (journeyGates is null && localReleaseProof is null && closureHealth is null)
         {
             return seed?.SupportingSignals?.LaunchReadiness
-                ?? "Launch posture is still waiting on provider-route evidence.";
+                ?? "Launch readiness is still waiting on provider-route evidence.";
         }
 
         int blockedJourneyCount = journeyGates?.Summary?.BlockedCount ?? 0;
         if (blockedJourneyCount > 0)
         {
-            return $"Hold launch expansion pending route-canary validation. {blockedJourneyCount} golden journey(s) remain blocked.";
+            return $"Hold launch expansion while route canaries are still being checked. {blockedJourneyCount} golden journey(s) remain blocked.";
         }
 
         if (!string.Equals(localReleaseProof?.Status, "passed", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hold launch expansion until the public release status is current on the public edge.";
+            return "Hold launch expansion until the public release status is current.";
         }
 
         if (closureHealth is not null
             && !string.Equals(closureHealth.State, "clear", StringComparison.Ordinal))
         {
-            return "Hold launch expansion until support closure returns to a clear posture on the public edge.";
+            return "Hold launch expansion until support closure is clear again.";
         }
 
-        return string.Equals(providerRoute.CanaryStatus, "Canary green on all active lanes", StringComparison.Ordinal)
-            ? "Route-canary validation is green; widen launch only while support fallout remains stable."
+        return string.Equals(providerRoute.CanaryStatus, "Canary green across all active routes", StringComparison.Ordinal)
+            ? "Route canaries are green; widen launch only while support fallout remains stable."
             : seed?.SupportingSignals?.LaunchReadiness
-                ?? "Launch posture is still waiting on provider-route evidence.";
+                ?? "Launch readiness is still waiting on provider-route evidence.";
     }
 
     private static string SelectLatestGeneratedAt(params string?[] candidates)

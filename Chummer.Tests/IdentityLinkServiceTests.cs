@@ -38,6 +38,52 @@ public sealed class IdentityLinkServiceTests
     }
 
     [Fact]
+    public void LinkChannelUsesConfiguredWhatsappDefaults()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            CommunityStore store = new(BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_IDENTITY_LINK_ORCHESTRATOR_BRAIN"] = "Mistral",
+                    ["CHUMMER_IDENTITY_LINK_OFFICIAL_COMPANION_CHANNEL"] = "whatsapp_official_business",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_PURPOSE"] = "support_questions_only",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_OPENING_PROMPT"] = "Bitte stelle zuerst Sicherheitsfragen.",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_NOTE"] = "Use this custom support note."
+                }),
+                NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            IdentityLinkService links = new(store, accounts, BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_IDENTITY_LINK_ORCHESTRATOR_BRAIN"] = "Mistral",
+                    ["CHUMMER_IDENTITY_LINK_OFFICIAL_COMPANION_CHANNEL"] = "whatsapp_official_business",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_PURPOSE"] = "support_questions_only",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_OPENING_PROMPT"] = "Bitte stelle zuerst Sicherheitsfragen.",
+                    ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_NOTE"] = "Use this custom support note."
+                }));
+            accounts.EnsureUserWithStatus("subject.whatsapp.configured", "Configured Runner", "runner2@example.com");
+
+            AccountLinkSummaryDto summary = links.GetSummary("subject.whatsapp.configured");
+            Assert.Equal("Mistral", summary.OrchestratorBrain);
+            Assert.Equal("whatsapp_official_business", summary.OfficialCompanionChannel);
+
+            ChannelLinkDto link = links.LinkChannel(new LinkChannelRequest("subject.whatsapp.configured", "whatsapp_official_business", "+436647916419", true));
+
+            Assert.Equal("support_questions_only", link.Purpose);
+            Assert.Equal("Bitte stelle zuerst Sicherheitsfragen.", link.AiSupportOpeningPrompt);
+            Assert.Contains("Use this custom support note.", link.Note ?? string.Empty);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
     public void LinkChannelWithoutHandleKeepsNonNullDisplayLabel()
     {
         string tempRoot = CreateTempRoot();
@@ -309,13 +355,22 @@ public sealed class IdentityLinkServiceTests
         }
     }
 
-    private static IConfiguration BuildConfiguration(string tempRoot)
+    private static IConfiguration BuildConfiguration(string tempRoot, IReadOnlyDictionary<string, string?>? overrides = null)
     {
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        Dictionary<string, string?> values = new()
+        {
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json")
+        };
+        if (overrides is not null)
+        {
+            foreach ((string key, string? value) in overrides)
             {
-                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json")
-            })
+                values[key] = value;
+            }
+        }
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
             .Build();
     }
 

@@ -114,8 +114,8 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("Rule Ghost summarizes", view, StringComparison.Ordinal);
         Assert.Contains("Rules help", view, StringComparison.Ordinal);
         Assert.Contains("asking what questions you have", view, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("purpose: \"ai_support_only\"", view, StringComparison.Ordinal);
-        Assert.Contains("aiSupportOpeningPrompt", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("purpose: \"ai_support_only\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("aiSupportOpeningPrompt", view, StringComparison.Ordinal);
         Assert.Contains("Link WhatsApp", view, StringComparison.Ordinal);
         Assert.Contains("Table Pulse updates", view, StringComparison.Ordinal);
         Assert.Contains("Black Ledger involvement", view, StringComparison.Ordinal);

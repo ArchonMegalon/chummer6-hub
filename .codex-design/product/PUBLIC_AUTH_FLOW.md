@@ -63,6 +63,16 @@ Forbidden public wording:
 
 `/participate` is the guest-readable account-aware front door.
 
+It should behave like a compact first-party public board, not a long explainer page.
+The intended interaction model is a ProductLift-style public loop under Chummer-owned chrome:
+
+* one clear board entry surface
+* visible public feedback, roadmap, and shipped-closeout lanes
+* compact search, filters, and voting-oriented scanning
+* short route guidance that sends private or account-linked issues to Help
+* no third-party branding in the user-facing shell
+* no oversized prose wall before the board itself
+
 `/home` and `/account` are the signed-in community-ledger shell.
 
 The public/auth split must describe one product story, not parallel intent models.

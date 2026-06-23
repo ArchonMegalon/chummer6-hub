@@ -7935,7 +7935,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
     await expandDetailsBySummary(page, 'Participation', '/account/settings');
     await expectBodyText(page, 'Tell Chummer which lanes matter to you and which updates you actually want to hear about.', '/account/settings');
-    await expectBodyText(page, 'Follow roadmap updates', '/account/settings');
+    await expectBodyText(page, 'Follow upcoming updates', '/account/settings');
     await expectBodyText(page, 'Invite me when the right beta opens', '/account/settings');
     await page.locator('#followHorizons').check();
     await page.locator('#betaInterest').check();

@@ -4,11 +4,8 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
     var release = Model.ReleaseExperience;
-    var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
-    var verifiedLabel = Model.VerifiedAtLabel
-        ?? (Model.Manifest.ProofGeneratedAt ?? Model.Manifest.GeneratedAt ?? Model.Manifest.PublishedAt)
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd");
+    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
+    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -82,7 +79,7 @@
     var stableAndNightlyMatch = stableArtifactIds.Length > 0
         && stableArtifactIds.SequenceEqual(nightlyArtifactIds, StringComparer.OrdinalIgnoreCase);
 
-    static string PublicDownloadText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="minimal-page-hero">

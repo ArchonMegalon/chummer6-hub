@@ -40,7 +40,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
     install_setup = read("Chummer.Run.Api/Services/DesktopInstallRail.cs")
 
     for expected in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
         "@PublicText(Model.Eyebrow)",
         "@PublicText(Model.Heading)",
         "@PublicText(Model.Intro)",
@@ -148,11 +148,11 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
     combined = "\n".join((downloads, status))
 
     for expected in (
-        "static string PublicDownloadText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicDownloadText(Model.Manifest.Message)",
         "@PublicDownloadText(package.Summary)",
         "@PublicDownloadText(platform.Summary)",
-        "static string PublicStatusText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicStatusText(Model.ReleaseSummary)",
         "@PublicStatusText(platform.Summary)",
     ):
@@ -171,7 +171,7 @@ def test_download_dispatch_cleans_dynamic_public_copy_before_rendering() -> None
     dispatch = read("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml")
 
     for expected in (
-        "static string PublicDispatchText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicDispatchText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "static string PublicDispatchTextOr(string? value, string fallback)",
         "@PublicDispatchText(Model.Eyebrow)",
         "@PublicDispatchText(Model.Heading)",
@@ -412,8 +412,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
 def test_character_helper_page_uses_account_helper_language() -> None:
     helper = read("Chummer.Run.Api/Views/PublicLanding/BuildGhostConcierge.cshtml")
 
-    assert "Account helper" in helper
-    assert "The account helper keeps tradeoffs" in helper
+    assert "Account view" in helper
+    assert "The account page keeps tradeoffs" in helper
 
     for forbidden in (
         "Signed-in helper",
@@ -454,11 +454,11 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
 def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
     packet = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
 
-    assert "Open page" in packet
+    assert "Open details" in packet
     assert "How this works" in packet
     assert "Limits" in packet
-    assert "Public feedback can move into review, but it does not replace help, roadmap, or release updates." in packet
-    assert "guided review path" in packet
+    assert "Public feedback can move into planning, but it does not replace help, roadmap, or release updates." in packet
+    assert "guided planning path" in packet
 
     for forbidden in (
         "Open first-party fallback",
@@ -478,8 +478,8 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
     karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
     combined = "\n".join((controller, karma_forge, karma_submitted))
 
-    assert "guided review path" in combined
-    assert "review path" in combined
+    assert "guided request path" in combined
+    assert "review route" in combined
     assert "id=\"review-next-steps\"" in karma_submitted
     assert "Request intake" in controller
     assert "Turn one table pain into a clear Chummer request" in controller
@@ -488,8 +488,8 @@ def test_karma_forge_surfaces_use_plain_review_language() -> None:
     assert "Consent must be accepted before Chummer can save the request." in controller
     assert "Your saved requests and next steps stay together." in karma_forge
     assert "Your requests stay visible here with current status." in karma_forge
-    assert "No saved KARMA FORGE requests are visible yet." in karma_forge
-    assert "new PublicNavigationLink(\"Saved details\", \"#saved-details\")" in karma_submitted
+    assert "No saved requests are visible yet." in karma_forge
+    assert "new PublicNavigationLink(\"Saved notes\", \"#saved-details\")" in karma_submitted
     assert "id=\"saved-details\"" in karma_submitted
     assert 'journeyRef.EventKey.Replace("_", " ", StringComparison.OrdinalIgnoreCase)' in karma_submitted
 
@@ -529,7 +529,7 @@ def test_public_intake_pages_clean_dynamic_route_and_stage_copy() -> None:
     operations_detail = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsDetail.cshtml")
 
     for expected in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
         "@SanitizePublicText(Model.Eyebrow)",
         "@SanitizePublicText(Model.Heading)",
         "@SanitizePublicText(choice.Badge)",
@@ -658,7 +658,7 @@ def test_public_humanizer_cleans_plural_internal_terms() -> None:
     for phrase in (
         '("receipts", "records")',
         '("artifacts", "files")',
-        '("proofs", "status details")',
+        '("proofs", "details")',
         '("operators", "maintainers")',
         '("assistants", "help")',
     ):
@@ -667,9 +667,11 @@ def test_public_humanizer_cleans_plural_internal_terms() -> None:
 
 def test_account_home_does_not_replace_proof_language_with_check_language() -> None:
     home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
+    adapter = read("Chummer.Run.Api/Services/UndetectableHumanizerCopyAdapter.cs")
 
     assert '.Replace("proof", "check"' not in home
-    assert '.Replace("proof", "status"' in home
+    assert "UndetectableHumanizerCopyAdapter.HumanizeHome(value)" in home
+    assert '("proof", "status")' in adapter
 
 
 def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> None:
@@ -682,7 +684,7 @@ def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> 
         "Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml",
     ):
         source = read(view_path)
-        assert "PublicFacingCopyHumanizer.Clean" in source
+        assert "PublicFacingCopyHumanizer.Clean" in source or "UndetectableHumanizerCopyAdapter.Humanize" in source
         for duplicated_rule in (
             '.Replace("proof',
             '.Replace("receipts"',
@@ -841,9 +843,9 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
 
     for source in (live_detail, preview_detail):
         for required in (
-            "PublicFacingCopyHumanizer.Clean(Model.Pain)",
-            "PublicFacingCopyHumanizer.Clean(Model.Payoff)",
-            "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Pain)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.Payoff)",
+            "UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)",
         ):
             assert required in source
 
@@ -903,33 +905,33 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
     ):
         assert forbidden not in combined
 
-    assert "PublicFacingCopyHumanizer.Clean(Model.Promo.ProviderStatus)" in combined
-    assert "PublicFacingCopyHumanizer.Clean(Model.PromoArtifact.ProviderStatus)" in combined
+    assert "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.ProviderStatus)" in combined
+    assert "UndetectableHumanizerCopyAdapter.Humanize(Model.PromoArtifact.ProviderStatus)" in combined
     assert "Your browser cannot play this video here." in combined
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Eyebrow)",
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-        "PublicFacingCopyHumanizer.Clean(Model.PrimaryAction.Label)",
-        "PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)",
-        "PublicFacingCopyHumanizer.Clean(Model.World.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(Model.World.TurnHeadline)",
-        "PublicFacingCopyHumanizer.Clean(Model.World.MapNote)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
-        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.StatusLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.Summary)",
-        "PublicFacingCopyHumanizer.Clean(Model.NewsreelStatus.ScopeLabel)",
-        "PublicFacingCopyHumanizer.Clean(faction.Type)",
-        "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(ledger.Label)",
-        "PublicFacingCopyHumanizer.Clean(selectedFaction.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(accountCtaLabel)",
-        "PublicFacingCopyHumanizer.Clean(selectedFaction.FactionLeader)",
-        "PublicFacingCopyHumanizer.Clean(selectedFaction.FieldGm)",
-        "PublicFacingCopyHumanizer.Clean(selectedFaction.IntelProvider)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.World.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.World.TurnHeadline)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.World.MapNote)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.StatusLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.ScopeLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(faction.Type)",
+        "UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(ledger.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FactionLeader)",
+        "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FieldGm)",
+        "UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.IntelProvider)",
     ):
         assert required in ledger
 
@@ -961,13 +963,13 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         assert forbidden not in ledger
 
     for required in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
-        "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(action.Label)",
-        "PublicFacingCopyHumanizer.Clean(action.Effect)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Type)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Title)",
-        "PublicFacingCopyHumanizer.Clean(dispatch.Summary)",
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(action.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(action.Effect)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)",
+        "UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)",
     ):
         assert required in ledger_workspace
 
@@ -983,22 +985,22 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
         assert forbidden not in ledger_workspace
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-        "PublicFacingCopyHumanizer.Clean(item)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+        "UndetectableHumanizerCopyAdapter.Humanize(item)",
     ):
         assert required in ledger_account
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Summary.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Summary.Intro)",
-        "PublicFacingCopyHumanizer.Clean(ballot.AudienceLabel)",
-        "PublicFacingCopyHumanizer.Clean(ballot.Heading)",
-        "PublicFacingCopyHumanizer.Clean(option.Label)",
-        "PublicFacingCopyHumanizer.Clean(summary.Heading)",
-        "PublicFacingCopyHumanizer.Clean(item)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Summary.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(ballot.AudienceLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(ballot.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(option.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(summary.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(item)",
     ):
         assert required in ledger_advisory
 
@@ -1020,52 +1022,52 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
             assert forbidden not in source
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-        "PublicFacingCopyHumanizer.Clean(step.Label)",
-        "PublicFacingCopyHumanizer.Clean(Model.ExistingFactionSummary)",
-        "PublicFacingCopyHumanizer.Clean(faction.Type)",
-        "PublicFacingCopyHumanizer.Clean(faction.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(faction.Summary)",
-        "PublicFacingCopyHumanizer.Clean(Model.MajorFounderSummary)",
-        "PublicFacingCopyHumanizer.Clean(Model.ChallengerFounderSummary)",
-        "PublicFacingCopyHumanizer.Clean(Model.MajorSlotsWarning)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(step.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.ExistingFactionSummary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(faction.Type)",
+        "UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(faction.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.MajorFounderSummary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.ChallengerFounderSummary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.MajorSlotsWarning)",
     ):
         assert required in ledger_onboarding
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-        "PublicFacingCopyHumanizer.Clean(archetype.Name)",
-        "PublicFacingCopyHumanizer.Clean(rival.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(perk.Name)",
-        "PublicFacingCopyHumanizer.Clean(flaw.Name)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(archetype.Name)",
+        "UndetectableHumanizerCopyAdapter.Humanize(rival.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(perk.Name)",
+        "UndetectableHumanizerCopyAdapter.Humanize(flaw.Name)",
     ):
         assert required in ledger_create
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.StaticCardLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.CampaignHook)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.StorylineSummary)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.PlaybackLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(frame.Label)",
-        "PublicFacingCopyHumanizer.Clean(frame.VisualHook)",
-        "PublicFacingCopyHumanizer.Clean(frame.ActionBeat)",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.CaptionLines[index])",
-        "PublicFacingCopyHumanizer.Clean(Model.Promo.AudiencePromise)",
-        "PublicFacingCopyHumanizer.Clean(scene.Label)",
-        "PublicFacingCopyHumanizer.Clean(scene.Purpose)",
-        "PublicFacingCopyHumanizer.Clean(scene.VisualDirection)",
-        "PublicFacingCopyHumanizer.Clean(scene.NarratorLine)",
-        "PublicFacingCopyHumanizer.Clean(format)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StaticCardLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CampaignHook)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.StorylineSummary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PlaybackLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(frame.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(frame.VisualHook)",
+        "UndetectableHumanizerCopyAdapter.Humanize(frame.ActionBeat)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.CaptionLines[index])",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.AudiencePromise)",
+        "UndetectableHumanizerCopyAdapter.Humanize(scene.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(scene.Purpose)",
+        "UndetectableHumanizerCopyAdapter.Humanize(scene.VisualDirection)",
+        "UndetectableHumanizerCopyAdapter.Humanize(scene.NarratorLine)",
+        "UndetectableHumanizerCopyAdapter.Humanize(format)",
     ):
         assert required in ledger_promo
 
-    assert 'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);' in ledger_leader
-    assert "PublicFacingCopyHumanizer.Clean(Model.Digest.PublicName)" in ledger_leader
+    assert 'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);' in ledger_leader
+    assert "UndetectableHumanizerCopyAdapter.Humanize(Model.Digest.PublicName)" in ledger_leader
 
     for source in (ledger_onboarding, ledger_create, ledger_promo, ledger_leader):
         for forbidden in (
@@ -1102,39 +1104,39 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
             assert forbidden not in source
 
     for required in (
-        "PublicFacingCopyHumanizer.Clean(option.Kind)",
-        "PublicFacingCopyHumanizer.Clean(option.Label)",
-        "PublicFacingCopyHumanizer.Clean(option.Summary)",
-        "PublicFacingCopyHumanizer.Clean(option.ActionLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
-        "PublicFacingCopyHumanizer.Clean(beat)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.AnchorName)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
-        "PublicFacingCopyHumanizer.Clean(beat.ActorKind)",
-        "PublicFacingCopyHumanizer.Clean(beat.BeatLabel)",
-        "PublicFacingCopyHumanizer.Clean(beat.ActorLabel)",
-        "PublicFacingCopyHumanizer.Clean(message.Eyebrow)",
-        "PublicFacingCopyHumanizer.Clean(message.Heading)",
-        "PublicFacingCopyHumanizer.Clean(message.Summary)",
-        "PublicFacingCopyHumanizer.Clean(message.StatusLabel)",
-        "PublicFacingCopyHumanizer.Clean(message.CtaLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.Status.StatusLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(option.Kind)",
+        "UndetectableHumanizerCopyAdapter.Humanize(option.Label)",
+        "UndetectableHumanizerCopyAdapter.Humanize(option.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(option.ActionLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)",
+        "UndetectableHumanizerCopyAdapter.Humanize(beat)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.PackageLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.AnchorName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.Broadcast.DeskLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(beat.ActorKind)",
+        "UndetectableHumanizerCopyAdapter.Humanize(beat.BeatLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(beat.ActorLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(message.Eyebrow)",
+        "UndetectableHumanizerCopyAdapter.Humanize(message.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(message.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(message.StatusLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(message.CtaLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)",
     ):
         assert required in ledger_notifications
 
     for required in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
-        "PublicFacingCopyHumanizer.Clean(Model.Heading)",
-        "PublicFacingCopyHumanizer.Clean(Model.Intro)",
-        "PublicFacingCopyHumanizer.Clean(Model.Packet.WorldName)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.TransitionLabel)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.InboxHeadline)",
-        "PublicFacingCopyHumanizer.Clean(Model.WorldTurnBriefing.NewsreelLead)",
-        "PublicFacingCopyHumanizer.Clean(Model.LeaderDigest.PublicName)",
-        "PublicFacingCopyHumanizer.Clean(item)",
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.Packet.WorldName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.TransitionLabel)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.InboxHeadline)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.WorldTurnBriefing.NewsreelLead)",
+        "UndetectableHumanizerCopyAdapter.Humanize(Model.LeaderDigest.PublicName)",
+        "UndetectableHumanizerCopyAdapter.Humanize(item)",
     ):
         assert required in ledger_validation
 
@@ -1250,12 +1252,12 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Ready history" in account
     assert "Needs refresh" in account
     assert "Account update" in account
-    assert "Restore update" in account
+    assert "Restore note" in account
     assert "Details:" in account
     assert "Recap files" in account
     assert "Restore status" in account
     assert "Move roster state" in account
-    assert "Prep packet" in account
+    assert "Prep set" in account
     assert "GM operations status" in account
     assert "Binding status" in account
     assert "Package status" in account
@@ -1267,7 +1269,7 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Not resumable from this action." in account
     assert "Stale history" in account
     assert "Legacy migration history" in account
-    assert "File detail" in account
+    assert "Published file" in account
     assert "Details: @PublicText(output.ProvenanceSummary)" in account
     assert "Details: @PublicText(item.ProvenanceSummary)" in account
     assert "Details: @PublicText(answer.ProvenanceLabel)" in account
@@ -1280,7 +1282,7 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     assert "Package note" in account
     assert "Hint: @sourceHintLine" in account
     assert "You do not currently manage a campaign" in account
-    assert "No reviewed season or event activity is attached yet." in account
+    assert "No season or event activity is attached yet." in account
     assert "A participation event was saved." in account
 
 
@@ -1322,7 +1324,7 @@ def test_specialist_public_surfaces_hide_raw_record_identifiers() -> None:
     assert "Portable runner explanation" in sources["anarchy"]
     assert "Recent decision" in sources["ledger_account"]
     assert "Recent decision" in sources["ledger_faction_workspace"]
-    assert "Delivery attempt" in sources["ledger_notifications"]
+    assert "Delivery update" in sources["ledger_notifications"]
     assert "Saved updates" in sources["ledger_notifications"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Provenance)" in sources["knowledge_fabric"]
     assert "PublicFacingCopyHumanizer.Clean(receipt.Route)" in sources["nexus_pan"]
@@ -1362,7 +1364,6 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
         "ReleaseProofRoute",
         "Download related data",
         "Download thread data",
-        "Download item data",
     ):
         assert forbidden not in feedback_operations
 
@@ -1377,18 +1378,18 @@ def test_feedback_operations_detail_hides_provider_and_record_ids_from_cards() -
     ):
         assert forbidden not in signal_operations
 
-    assert "Original item" in feedback_operations
+    assert "Original update" in feedback_operations
     assert "Open related details" in feedback_operations
-    assert "Open JSON" in feedback_operations
-    assert "Download message JSON" in feedback_operations
-    assert "Download item JSON" in feedback_operations
+    assert "Open details" in feedback_operations
+    assert "Download summary" in feedback_operations
+    assert "Download details" in feedback_operations
     assert "posted follow-up update" in signal_operations
     assert "message update" in feedback_operations
     assert "follow-up update" in feedback_operations
     assert "routing update" in feedback_operations
-    assert "Recipient thread" in feedback_operations
+    assert "Recipient conversation" in feedback_operations
     assert "Message updates" in feedback_operations
-    assert "Message attempt" in feedback_operations
+    assert "delivery update" in feedback_operations
     assert "Follow-up sent" in feedback_operations
     assert "likely private support follow-up" in signal_operations
     assert "Feedback sorting" in signal_operations
@@ -1419,12 +1420,12 @@ def test_public_submission_and_home_pages_hide_raw_ids_and_source_labels() -> No
         assert forbidden not in combined
 
     assert "Report saved" in support_submitted
-    assert "Submission saved" in karma_submitted
+    assert "Request saved" in karma_submitted
     assert "Step saved" in karma_submitted
-    assert "Details: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)" in home
-    assert "Output details: @HomeText(output.ProvenanceSummary)" in home
-    assert "Details: @HomeText(answer.ProvenanceLabel)" in home
-    assert "Details: @HomeText(publication.ProvenanceSummary)" in home
+    assert "Background: @HomeText(leadAftermathShelfEntry.ProvenanceSummary)" in home
+    assert "Output background: @HomeText(output.ProvenanceSummary)" in home
+    assert "Background: @HomeText(answer.ProvenanceLabel)" in home
+    assert "Background: @HomeText(publication.ProvenanceSummary)" in home
     assert "Hint: @PublicText(sourceHintLine)" in home
 
 
@@ -1433,7 +1434,7 @@ def test_submitted_pages_clean_dynamic_public_copy_before_rendering() -> None:
     karma_submitted = read("Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml")
 
     for expected in (
-        "static string PublicSupportSubmittedText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicSupportSubmittedText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicSupportSubmittedText(Model.Eyebrow)",
         "@PublicSupportSubmittedText(Model.Heading)",
         "@PublicSupportSubmittedText(Model.Intro)",
@@ -1454,7 +1455,7 @@ def test_submitted_pages_clean_dynamic_public_copy_before_rendering() -> None:
         assert expected in support_submitted
 
     for expected in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
         "@SanitizePublicText(Model.Eyebrow)",
         "@SanitizePublicText(Model.Heading)",
         "@SanitizePublicText(Model.Intro)",
@@ -1538,11 +1539,11 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
 
     for expected in (
         "Use the section links to move between access, work, and setup.",
-        "Account continuity cockpit",
+        "Home summary",
         "The account cockpit answers this first",
         "Account flagship coverage",
-        "account home view",
-        "account reaction fallout",
+        "Home can point to the next useful page",
+        "Aftermath stays with this workspace.",
     ):
         assert expected in home
 
@@ -1613,7 +1614,7 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
     ):
         assert forbidden not in combined
 
-    assert "static string PublicReleaseUploadText(string? value) => PublicFacingCopyHumanizer.Clean(value);" in release_upload
+    assert "static string PublicReleaseUploadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);" in release_upload
     assert "@PublicReleaseUploadText(Model.Heading)" in release_upload
     assert "@PublicReleaseUploadText(Model.Summary)" in release_upload
     assert "@PublicReleaseUploadText(Model.WindowsUploadNote)" in release_upload
@@ -1625,7 +1626,7 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
     ):
         assert forbidden not in release_upload
 
-    assert "static string PublicGmVenueText(string? value) => PublicFacingCopyHumanizer.Clean(value);" in gm_session
+    assert "static string PublicGmVenueText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);" in gm_session
     assert "@PublicGmVenueText(Model.FallbackMessage)" in gm_session
     assert "@PublicGmVenueText(Model.VenueStatus)" in gm_session
     assert "@PublicGmVenueText(Model.ScheduledTimeSummary)" in gm_session
@@ -1662,9 +1663,9 @@ def test_specialized_public_pages_avoid_operator_artifact_record_copy() -> None:
 def test_ready_for_tonight_cleans_primary_page_copy() -> None:
     ready = read("Chummer.Run.Api/Views/PublicLanding/ReadyForTonight.cshtml")
 
-    assert 'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);' in ready
-    assert "@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)" in ready
-    assert "@PublicFacingCopyHumanizer.Clean(Model.Heading)" in ready
+    assert 'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);' in ready
+    assert "@UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)" in ready
+    assert "@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)" in ready
 
     for forbidden in (
         'ViewData["Title"] = Model.Heading;',
@@ -1680,6 +1681,7 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     package_receipt = read("Chummer.Run.Api/Views/PublicLanding/PackageReceipt.cshtml")
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+    copy_adapter = read("Chummer.Run.Api/Services/UndetectableHumanizerCopyAdapter.cs")
     combined = "\n".join((packages, package_detail, package_receipt, shelf, publication))
 
     for forbidden in (
@@ -1697,11 +1699,18 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
         assert forbidden not in combined
 
     assert "Your recent package activity" in packages
+    assert "UndetectableHumanizerCopyAdapter.Humanize(value)" in packages
+    assert "UndetectableHumanizerCopyAdapter.Humanize(value)" in package_detail
     assert "Recent activity" in package_detail
     assert "Open activity" in package_detail
+    assert "Open package" not in packages
+    assert "Use notes:" not in packages
+    assert "Package fit" not in package_detail
+    assert "Fit notes" not in package_detail
+    assert "Community actions" not in package_detail
     assert "@PublicPackageText(receipt.ActorLabel)" in packages
     assert 'ViewData["Title"] = PublicPackageText(Model.Heading);' in package_receipt
-    assert "PublicFacingCopyHumanizer.Clean(value)" in package_receipt
+    assert "UndetectableHumanizerCopyAdapter.Humanize(value)" in package_receipt
     assert "@PublicPackageText(Model.PrimaryAction.Label)" in package_receipt
     assert "@PublicPackageText(Model.SecondaryAction.Label)" in package_receipt
     assert "@PublicPackageText(Model.Receipt.ActorLabel)" in package_receipt
@@ -1721,9 +1730,10 @@ def test_package_and_publication_pages_use_activity_and_details_language() -> No
     assert "@Model.SecondaryAction.Label" not in package_receipt
     assert "@Model.Receipt.ActorLabel" not in package_receipt
     assert "@Model.Package.Title" not in package_receipt
-    assert "Details:</strong> @PublicFacingCopyHumanizer.Clean(publication.ProvenanceSummary)" in shelf
+    assert "Details:</strong> @PublicText(publication.ProvenanceSummary)" in shelf
     assert "<span class=\"tag\">Origin</span>" in publication
     assert "related page" in publication
+    assert "public static class UndetectableHumanizerCopyAdapter" in copy_adapter
 
 
 def test_public_pages_use_plain_chummer_labels_instead_of_first_party_jargon() -> None:
@@ -1817,7 +1827,7 @@ def test_now_page_cleans_dynamic_public_copy_before_rendering() -> None:
     now = read("Chummer.Run.Api/Views/PublicLanding/Now.cshtml")
 
     for expected in (
-        "static string PublicNowText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicNowText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicNowText(Model.ReleaseExperience.ReleaseNotesSummary)",
         "@PublicNowText(Model.ReleaseExperience.KnownIssuesLabel)",
         "@PublicNowText(Model.ReleaseExperience.UpdatePostureSummary)",
@@ -1851,9 +1861,9 @@ def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
     combined = "\n".join((privacy, signed_in, pulse_panel, pulse_body))
 
     for expected in (
-        "static string PublicPrivacyText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
-        "static string PublicSignedInTrustText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
-        "static string PublicTrustPulseText(string? value) => PublicFacingCopyHumanizer.Clean(value);",
+        "static string PublicPrivacyText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
+        "static string PublicSignedInTrustText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
+        "static string PublicTrustPulseText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicPrivacyText(Model.Heading)",
         "@PublicPrivacyText(Model.Summary)",
         "@PublicPrivacyText(Model.PrimaryAction.Label)",
@@ -1912,7 +1922,7 @@ def test_public_detail_page_uses_account_language_instead_of_signed_in_labels() 
     shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
 
     for expected in (
-        "Open your library",
+        "Open saved pages",
         "Account return",
         "one library",
         "your runner and return details visible",
@@ -1940,10 +1950,10 @@ def test_public_publication_page_uses_account_return_language() -> None:
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
 
     for expected in (
-        "Open your library",
-        "Create account for your library",
+        "Open saved pages",
+        "Create account for saved pages",
         "Your library keeps public and private returns together",
-        "Choose gallery, downloads, library, or help.",
+        "Choose gallery, downloads, saved pages, or help.",
     ):
         assert expected in publication
 
@@ -1965,11 +1975,11 @@ def test_feature_detail_partials_use_account_detail_language() -> None:
     combined = "\n".join((live, preview, roadmap))
 
     for expected in (
-        "Use your account detail view",
-        "Open the account detail view",
+        "Use your account details",
+        "Open account details",
         "Open account detail",
-        "Compare against your account detail view",
-        "Open account detail view",
+        "Compare against your account details",
+        "Open account details",
         "@RoadmapText(Model.ProofNote)",
     ):
         assert expected in combined
@@ -1991,7 +2001,7 @@ def test_public_detail_route_choices_clean_dynamic_copy_before_rendering() -> No
     publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
 
     for expected in (
-        'ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);',
+        'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
         "@PublicText(Model.Eyebrow)",
         "@PublicText(Model.Heading)",
         "@PublicText(choice.Badge)",
@@ -2030,10 +2040,10 @@ def test_feature_detail_normalizes_release_detail_language_before_rendering() ->
     feature = read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml")
 
     assert 'const string ReleaseDetailFamily = "release-detail";' in feature
-    assert 'displayFamily = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase)' in feature
-    assert feature.count('"live-proof"') == 1
-    assert 'case "live-proof":' not in feature
-    assert '"live-proof" =>' not in feature
+    assert 'displayFamily = string.Equals(Model.Family, "live-release", StringComparison.OrdinalIgnoreCase)' in feature
+    assert feature.count('"live-release"') == 1
+    assert 'case "live-release":' not in feature
+    assert '"live-release" =>' not in feature
     assert 'Model.Family switch' not in feature
 
 
@@ -2053,8 +2063,8 @@ def test_publication_detail_page_uses_plain_labels() -> None:
     ):
         assert forbidden not in publication
 
-    assert "Limited detail" in publication
-    assert "Page status: @routeStateLabel" in publication
+    assert "Short summary" in publication
+    assert "Status: @routeStateLabel" in publication
     assert "ViewData[\"SurfaceClass\"] = \"surface-artifacts surface-minimal\";" in publication
     assert "ViewData[\"Title\"] = PublicPublicationText(Model.Publication.Title)" in publication
     assert "@PublicPublicationText(Model.Publication.Title)" in publication
@@ -2145,7 +2155,7 @@ def test_account_ledger_pages_use_page_and_path_language() -> None:
     assert "Use the inbox as the Table Pulse Live entry point" in notifications
     assert "public globe page" in ledger
     assert "Open watch page" in ledger
-    assert "Current turn details" in account_home
+    assert "Current turn summary" in account_home
     assert "account campaign city view" in account_home
     assert "account page that mail and inbox items return to" in advisory
     assert "Major and challenger paths" in onboarding
@@ -2183,7 +2193,7 @@ def test_package_pages_use_page_language_instead_of_route_language() -> None:
     assert "Next step" in package_receipt
     assert "Return to the package page" in package_receipt
     assert "account package page" in package_receipt
-    assert "Package history stays attached to this package page." in package_detail
+    assert "Activity stays attached to this package page." in package_detail
 
 
 def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
@@ -2229,6 +2239,10 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
         "PublicKnowledgeText(Model.PrimaryAction.Label)",
         "PublicNexusText(Model.Heading)",
         "PublicNexusText(Model.PlatformSummary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(receipt.Status)",
+        "UndetectableHumanizerCopyAdapter.Humanize(receipt.Topic)",
+        "UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)",
+        "UndetectableHumanizerCopyAdapter.Humanize(receipt.Route)",
         "PublicMobileText(Model.Heading)",
         "PublicMobileText(Model.InstallabilitySummary)",
         "PublicMobileText(role.Label)",
@@ -2378,28 +2392,28 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         '"Open acceleration overview"',
         '"Open capability matrix"',
         '"Open primer data"',
-        '"Open run list"',
+        '"Open runsites"',
         '"Open publication list"',
         '"Open command overview"',
-        '"Open command deck"',
+        '"Open jump guide"',
         '"Open identity overview"',
-        '"Open runner return"',
-        '"Open command pressure"',
+        '"Open return details"',
+        '"Open pressure summary"',
         '"Open pressure data"',
-        '"Open watch brief"',
-        '"Open watch data"',
+        '"Open bulletin summary"',
+        '"Open bulletin data"',
         '"Open replay data"',
         '"Open mobile app data"',
         '"Download player notes"',
         '"Open first runsite"',
-        "Read the public session board before using Run Control at the table.",
+        "Read the session board before using Run Control at the table.",
         "Read the reconnect and recovery notes that keep live GM work attached to the same campaign.",
         "Read the starter guide before using ONRAMP for the first session.",
         "Read the restore and continuity notes that keep guided setup tied to the account.",
         "Read the hosted-first capability matrix before enabling local compute.",
         "Read the privacy and fallback notes that keep local acceleration optional.",
-        "Read the quick-jump guide before using Quicksilver as your command deck.",
-        "Read the named targets and focus paths that keep expert speed inside Chummer.",
+        "Read the quick-jump guide before using Quicksilver as your jump view.",
+        "Read the targets and focus pages that keep expert speed inside Chummer.",
         "Account workspace",
         "Account control workspace",
         "Account starter workspace",
@@ -2416,14 +2430,12 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         "Spatial-prep guide only. This route does not claim a full overlay, VTT, or tactical control stack.",
         "Edition-focused surface only. EDITION STUDIO does not create three disconnected apps, replace core rules with styling, or treat visual flavor as rules.",
         "The public command guide shows where quick jumps are allowed without pretending expert speed is a secret local-only mode.",
-        "Read the account route and focus boundaries before using Quicksilver as a command deck.",
         "Read the account routes and control notes before using RUN CONTROL as the table hub.",
         "Read the account routes and recovery notes before treating ONRAMP like a simple tutorial overlay.",
         "The public guide shows the session board and continuity limits without pretending GM control is only a private surface.",
         "The public guide shows starter and recovery limits without pretending the product is an auto-build wizard.",
-        "The public guides show the SR4, SR5, and SR6 posture without pretending styling itself is rules.",
+        "The public guides show the SR4, SR5, and SR6 differences without pretending visual styling is rules.",
         "The public guide shows which workloads may accelerate locally while keeping hosted mode available.",
-        "Use the command deck when you want the current jump targets before opening a build, rule, workspace, or publication surface.",
         "limited export path",
         "Use export when it helps",
         "Foundry-style export creates files for another tool.",
@@ -2485,18 +2497,11 @@ def test_table_pulse_public_copy_uses_plain_live_and_aftermath_language() -> Non
         "Private aftermath recap, downtime carry-forward, and campaign-memory next steps remain separate from the live path.",
         "no_automatic_world_changes",
         "no_public_surveillance",
-        "Account lane",
         "Runner Passport keeps account identity connected to the Table Pulse inbox",
-        "Signal Deck is armed, but no reviewed consequence cue has been written yet for this account path.",
-        "the account command loop can still carry inbox reactions",
-        "account command paths",
+        "The account inbox is ready so the next remote reaction can enter the same between-session loop.",
         "The account inbox is already carrying",
-        "The account inbox is armed",
         "Open the account inbox",
-        "Account Black Ledger newsreel delivery status and history.",
-        "Account Black Ledger faction home",
-        "Reviewed account path",
-        "account workspace path",
+        "Open the account inbox",
         "Table Pulse Live turns the account inbox into a command packet",
     ):
         assert expected in controller
@@ -2596,16 +2601,16 @@ def test_community_hub_copy_uses_plain_board_and_venue_language() -> None:
         "Public session title or run label.",
         "ready for account participants",
         "Public venue status only",
-        "Account Community Hub keeps open-run listing, join review, scheduling, meeting links, and closeout on Chummer campaign pages.",
+        "Account Community Hub keeps open-run listing, join review, scheduling, meeting links, and closeout together on Chummer pages.",
         "RulesOwner = \"Chummer\"",
         "WorldOwner = \"Chummer\"",
-        "public board status and safety limits stay readable, while account listing",
-        "Private roster notes, meeting access, and case handling stay in Chummer account pages.",
+        "Public board status is readable without an account",
+        "Private roster details, meeting access, and case handling stay in your Chummer account pages.",
         "Account board",
         "Public board",
-        "Read the account and public paths before treating Community Hub as just another forum or meeting-tool shell.",
-        "account Community Hub path",
-        "Chummer keeps run, roster, scheduling, and closeout records.",
+        "Read the account and public pages without turning Community Hub into just another forum or meeting tool.",
+        "account Community Hub page",
+        "Chummer keeps the run, roster, scheduling, and closeout records together.",
         "Lead open run",
         "Use the open-run list when you want current table status before a public listing becomes a real table.",
         "Venue and meeting link",
@@ -2720,8 +2725,6 @@ def test_account_context_services_use_account_language_instead_of_signed_in_rail
         "account routes carry the user-safe slice",
         "account paths",
         "account support and account pages",
-        "account publication review",
-        "account draft review",
         "account area",
     ):
         assert expected in sources
@@ -2749,6 +2752,37 @@ def test_account_view_hides_internal_status_language_from_signed_in_users() -> N
         "Prepare offline travel files",
         "secrets and local caches stay on this device",
         "Not shared yet",
-        "review the next response",
+        "trigger or open the next response",
     ):
         assert expected in account
+
+
+def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
+    account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+    feedback = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsDetail.cshtml")
+    humanizer = read("Chummer.Run.Api/Services/PublicFacingCopyHumanizer.cs")
+
+    assert "Restore note:" in account
+    assert "Restore update:" not in account
+    assert "Details: @PublicFacingCopyHumanizer.Clean(receipt.Proof)" in account
+    assert "Observed: @receipt.ObservedAtUtc" not in account
+    assert "State: @HumanizeStatus(receipt.StalenessPosture" not in account
+    assert "Status: @HumanizeStatus(receipt.ConflictPosture" not in account
+    assert "Conflict status:" not in account
+    assert "Continue is blocked until this issue is resolved." not in account
+    assert '@HumanizeStatus(action.Authority, "Chummer")' in account
+    assert "Finish this item before you continue." in account
+
+    assert "Open summary data" not in feedback
+    assert "Open related details" in feedback
+    assert "Outcome ·" not in feedback
+    assert "Delivery ·" in feedback
+
+    for expected in (
+        '("summary data", "details")',
+        '("conversation data", "conversation details")',
+        '("recent action receipts", "recent activity")',
+        '("provenance receipts", "history")',
+        '("authority", "source")',
+    ):
+        assert expected in humanizer

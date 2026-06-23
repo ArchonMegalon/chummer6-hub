@@ -9,12 +9,12 @@
             || Model.BootstrapFeatureCards.Count > 0
             || !string.IsNullOrWhiteSpace(Model.CurrentReleaseSummary));
 
-    static string PublicDispatchText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicDispatchText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PublicDispatchTextOr(string? value, string fallback)
         => string.IsNullOrWhiteSpace(value)
             ? fallback
-            : PublicFacingCopyHumanizer.Clean(value);
+            : UndetectableHumanizerCopyAdapter.Humanize(value);
 
     var routeChoices = new[]
     {
@@ -109,7 +109,7 @@
         {
             <p class="page-copy">@PublicDispatchText(Model.Summary)</p>
             <p class="release-stage__note">@PublicDispatchText(Model.DispatchNote)</p>
-            <p class="release-stage__note">Account linking is optional. A claim code appears only if setup needs recovery.</p>
+            <p class="release-stage__note">Account linking is optional. A recovery code appears only if setup needs recovery.</p>
             <p class="release-stage__note">Support stays with this install.</p>
             <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
         }
@@ -119,7 +119,7 @@
 <section class="editorial-block" id="dispatch-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
-        <h2 class="editorial-title">Finish this install.</h2>
+        <h2 class="editorial-title">Start the install.</h2>
         <p class="editorial-copy">Start the installer. Link this copy later only if you want recovery and support history attached.</p>
     </div>
     <div class="route-choice-grid">

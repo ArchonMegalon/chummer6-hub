@@ -1,6 +1,6 @@
 @model NexusPanContinuityPageViewModel
 @{
-    static string PublicNexusText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicNexusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     ViewData["Title"] = PublicNexusText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
@@ -37,7 +37,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Continuity</p>
         <h2 class="editorial-title">Claimed installs and reconnect paths are visible without leaking private device history.</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.VerdictSummary)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.VerdictSummary)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -84,10 +84,11 @@
     <div class="route-choice-grid">
         @foreach (var receipt in Model.Receipts)
         {
+            var routeLabel = UndetectableHumanizerCopyAdapter.Humanize(receipt.Route);
             <article class="route-choice-card">
-                <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
-                <h3>@PublicFacingCopyHumanizer.Clean(receipt.Topic)</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
+                <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(receipt.Status)</span>
+                <h3>@UndetectableHumanizerCopyAdapter.Humanize(receipt.Topic)</h3>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)</p>
                 <div class="route-choice-card__details">
                     <span>@PublicFacingCopyHumanizer.Clean(receipt.Route)</span>
                 </div>

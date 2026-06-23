@@ -3273,9 +3273,9 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         string fallbackSummary = notice.Kind switch
         {
-            "portable_exchange" => "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
-            "workspace_watchout" => "A previous campaign workspace needs review before you continue. Open the shared campaign view for the safe next step.",
-            _ => "A previous campaign workspace needs review before you continue. Open the workspace lane for the safe next step."
+            "portable_exchange" => "Portable exchange needs attention before you continue. Open the workspace lane for the safe next step.",
+            "workspace_watchout" => "A previous campaign workspace needs attention before you continue. Open the shared campaign view for the safe next step.",
+            _ => "A previous campaign workspace needs attention before you continue. Open the workspace lane for the safe next step."
         };
 
         return notice with

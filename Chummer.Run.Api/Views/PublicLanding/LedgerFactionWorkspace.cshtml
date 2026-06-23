@@ -1,19 +1,19 @@
 @model BlackLedgerFactionWorkspacePageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
 }
 
 <section class="ledger-flagship ledger-flagship--workspace">
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">@PublicFacingCopyHumanizer.Clean(Model.Eyebrow)</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <p class="ledger-flagship__support">The campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
         <div class="trust-claim__details">
             <span>Account page</span>
-            <span>Faction: @PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</span>
+            <span>Faction: @UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)</span>
             <span>Public page stays separate</span>
         </div>
         <div class="stacked-actions">
@@ -42,7 +42,7 @@
             {
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
                     <span class="tag">Tab</span>
-                    <strong>@PublicFacingCopyHumanizer.Clean(tab.Label)</strong>
+                    <strong>@UndetectableHumanizerCopyAdapter.Humanize(tab.Label)</strong>
                 <p>@(tab.Current ? "Current workspace." : "Open this faction workspace section.")</p>
                 </a>
             }
@@ -54,12 +54,12 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Workspace tabs</p>
         <h2 class="editorial-title">Faction management stays signed in.</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.PrivacyNote)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrivacyNote)</p>
     </div>
     <div class="trust-claim__details" aria-label="Faction workspace tabs">
         @foreach (var tab in Model.Tabs)
         {
-            <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{PublicFacingCopyHumanizer.Clean(tab.Label)} (current)" : PublicFacingCopyHumanizer.Clean(tab.Label))</a>
+            <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{UndetectableHumanizerCopyAdapter.Humanize(tab.Label)} (current)" : UndetectableHumanizerCopyAdapter.Humanize(tab.Label))</a>
         }
     </div>
 </section>
@@ -69,29 +69,29 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Connected workspace section</p>
-            <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Heading)</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.Summary)</p>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.Heading)</h2>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.Summary)</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var cue in Model.ConnectedLanePacket.Cues)
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(cue.StatusLabel)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(cue.Label)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(cue.Summary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(cue.StatusLabel)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(cue.Label)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(cue.Summary)</p>
                     <a class="editorial-strip__action" href="@cue.Href">Open</a>
                 </article>
             }
         </div>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ConnectedLanePacket.BoundaryLine)</p>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.BoundaryLine)</p>
     </section>
 }
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Faction state</p>
-        <h2 class="editorial-title">@PublicFacingCopyHumanizer.Clean(Model.Faction.PublicName)</h2>
-        <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.Faction.Type) with account management kept off the public Ledger pages.</p>
+        <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)</h2>
+        <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.Type) with account management kept off the public Ledger pages.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -100,7 +100,7 @@
             <div class="route-choice-card__details">
                 @foreach (var signal in Model.Faction.PublicSignals)
                 {
-                    <span>@PublicFacingCopyHumanizer.Clean(signal)</span>
+                    <span>@UndetectableHumanizerCopyAdapter.Humanize(signal)</span>
                 }
             </div>
         </article>
@@ -156,7 +156,7 @@ else if (string.Equals(Model.CurrentSection, "stewards", StringComparison.Ordina
             <article class="route-choice-card">
                 <span class="tag">Faction leader</span>
                 <h3>@Model.Faction.FactionLeader</h3>
-                <p>Keeps faction-wide pressure readable and brings in a reviewer when needed.</p>
+                <p>Keeps faction-wide pressure readable and brings in another set of eyes when needed.</p>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Field GM</span>
@@ -176,8 +176,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Management</p>
-            <h2 class="editorial-title">Faction management stays reviewable.</h2>
-            <p class="editorial-copy">Spend action points, sponsor package pressure, challenge districts, or publish a clean dispatch. Recent decisions stay easy to review.</p>
+            <h2 class="editorial-title">Faction management stays readable.</h2>
+            <p class="editorial-copy">Spend action points, sponsor package pressure, challenge districts, or publish a clean dispatch. Recent decisions stay easy to scan.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -203,8 +203,8 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 {
                     <article class="route-choice-card">
                         <span class="tag">@action.Cost AP</span>
-                        <h3>@PublicFacingCopyHumanizer.Clean(action.Label)</h3>
-                        <p>@PublicFacingCopyHumanizer.Clean(action.Effect)</p>
+                        <h3>@UndetectableHumanizerCopyAdapter.Humanize(action.Label)</h3>
+                        <p>@UndetectableHumanizerCopyAdapter.Humanize(action.Effect)</p>
                         <form method="post" action="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')/actions">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="actionId" value="@action.ActionId" />
@@ -223,9 +223,9 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 @foreach (var receipt in Model.RecentActionReceipts)
                 {
                     <article class="route-choice-card">
-                        <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.ActionLabel)</span>
-                        <h3>Recent decision</h3>
-                        <p>@PublicFacingCopyHumanizer.Clean(receipt.ResultSummary)</p>
+                        <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(receipt.ActionLabel)</span>
+                        <h3>Latest change</h3>
+                        <p>@UndetectableHumanizerCopyAdapter.Humanize(receipt.ResultSummary)</p>
                         <a class="editorial-strip__action" href="@receipt.Href">Open details</a>
                     </article>
                 }
@@ -246,9 +246,9 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
             @foreach (var dispatch in Model.Dispatches.Take(3))
             {
                 <article class="route-choice-card">
-                    <span class="tag">@PublicFacingCopyHumanizer.Clean(dispatch.Type)</span>
-                    <h3>@PublicFacingCopyHumanizer.Clean(dispatch.Title)</h3>
-                    <p>@PublicFacingCopyHumanizer.Clean(dispatch.Summary)</p>
+                    <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)</span>
+                    <h3>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)</h3>
+                    <p>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)</p>
                     <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                 </article>
             }

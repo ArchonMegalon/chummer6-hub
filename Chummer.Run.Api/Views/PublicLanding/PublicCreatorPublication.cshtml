@@ -8,30 +8,7 @@
     // Keep comparisons narrow until the related page records are current.
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "active" => "Ready",
-            "linked" => "Ready",
-            "pending" => "Pending",
-            "pending_verification" => "Confirmation sent",
-            "verified" => "Confirmed",
-            "approved" => "Approved",
-            "published" => "Published",
-            "self_service" => "Self-service",
-            "review" => "Needs review",
-            "warning" => "Needs attention",
-            "attention" => "Needs attention",
-            "ready" => "Ready",
-            "revoked" => "Revoked",
-            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
-        };
-    }
+        => UndetectableHumanizerCopyAdapter.HumanizeStatusLabel(value, fallback);
 
     static string PublicPublicationText(string? value, string fallback = "")
     {
@@ -40,19 +17,12 @@
             return fallback;
         }
 
-        return PublicFacingCopyHumanizer.Clean(value)
-            .Replace("provenance", "origin", StringComparison.OrdinalIgnoreCase)
-            .Replace("lineage", "history", StringComparison.OrdinalIgnoreCase)
-            .Replace("route", "page", StringComparison.OrdinalIgnoreCase)
-            .Replace("creator" + " concierge", "creator help", StringComparison.OrdinalIgnoreCase)
-            .Replace("testimonial" + " wrapper", "testimonial page", StringComparison.OrdinalIgnoreCase)
-            .Replace("discovery family", "gallery", StringComparison.OrdinalIgnoreCase)
-            .Replace("publication packet", "publication", StringComparison.OrdinalIgnoreCase);
+        return UndetectableHumanizerCopyAdapter.HumanizePublication(value);
     }
 
     string PublicationAvailabilityLabel(bool discoverable)
         => publicationRouteReviewRequired && discoverable
-            ? "Limited detail"
+            ? "Short summary"
             : discoverable
                 ? "Ready now"
                 : "Limited release";
@@ -68,10 +38,10 @@
         ?? Model.BoundedFailureReason
         ?? "No visible publication history is attached to this public page yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open your library" : "Create account for your library";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Create account for saved pages";
     var signedInShelfSummary = Model.Chrome.Authenticated
-        ? "Use your library when you want personal, campaign, creator, and public returns to stay in one calmer place."
-        : "Public discovery works without an account. Sign in only when you want your private library, campaign return, and creator next steps in one place.";
+        ? "Your library keeps public and private returns together in one calmer place."
+        : "Public discovery works without an account. Sign in only when you want your private pages, campaign return, and creator next steps in one library.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
@@ -79,7 +49,7 @@
         new
         {
             Badge = "Gallery",
-            Title = "Stay in the gallery for story, origin, or comparison",
+            Title = "Stay in the gallery for story, background, or comparison",
             Summary = "Use this page when you want the publication itself, not the installer.",
             Href = Model.BackHref,
             Label = "Back to gallery",
@@ -107,13 +77,13 @@
         {
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
-                ? "Your library keeps public and private returns together"
-                : "Create an account only when you want your library too",
+                ? "Your saved pages keep public and private returns together"
+                : "Create an account only when you want saved pages too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
             Details = Model.Chrome.Authenticated
-                ? new[] { "Personal and campaign returns", "Creator next steps", "Same library" }
+                ? new[] { "Personal and campaign returns", "Creator next steps", "One library" }
                 : new[] { "Public first", "Account adds return paths", "Public discovery stays open" }
         },
         new
@@ -147,15 +117,15 @@
         <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
         <strong>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</strong>
         <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
-        <span>Page status: @routeStateLabel</span>
+        <span>Status: @routeStateLabel</span>
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Publication route split">
+<section class="status-decision-strip" aria-label="Publication options">
     <article class="status-decision-strip__card">
         <span class="tag">Gallery</span>
-        <h2>Stay in the gallery for story, origin, or comparison.</h2>
-        <p>Use this page for the publication itself. Downloads, help, and your library keep their own jobs.</p>
+        <h2>Stay in the gallery for story, background, or comparison.</h2>
+        <p>Use this page for the publication itself. Downloads, help, and your saved pages keep their own jobs.</p>
         <a class="button-like button-like--ghost" href="@Model.BackHref">Back to gallery</a>
     </article>
     <article class="status-decision-strip__card">
@@ -175,8 +145,8 @@
 <section class="minimal-section minimal-section--tight">
     <div class="minimal-section__lead">
         <p class="eyebrow">Where next</p>
-        <h2>Choose gallery, downloads, library, or help.</h2>
-        <p>Use this page for the publication itself. Downloads, help, and your library keep their own jobs.</p>
+        <h2>Choose gallery, downloads, saved pages, or help.</h2>
+        <p>Use this page for the publication itself. Downloads, help, and your saved pages keep their own jobs.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -258,7 +228,7 @@
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ModerationSummary))
         {
             <article class="trust-rail">
-                <span class="tag">Moderation</span>
+                <span class="tag">Decision notes</span>
                 <p>@PublicPublicationText(Model.Publication.ModerationSummary)</p>
             </article>
         }
@@ -288,11 +258,11 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next</p>
-    <h2 class="editorial-title">Read this page, then move on.</h2>
+    <h2 class="editorial-title">Move on once this is clear.</h2>
     <p class="editorial-copy">Go back for related work, open Downloads for the app, or open Help for support.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to gallery</a>
-        <a class="cta-link cta-link--secondary" href="/artifacts">Open library</a>
+        <a class="cta-link cta-link--secondary" href="/artifacts">Open saved pages</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>
     <p class="muted-copy">Need private help instead? <a class="inline-link" href="/contact#support-intake">Open support</a>.</p>

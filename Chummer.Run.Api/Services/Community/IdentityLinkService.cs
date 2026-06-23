@@ -1,14 +1,22 @@
 using Chummer.Run.Contracts.Community;
+using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class IdentityLinkService
 {
-    private const string AiSupportOnlyPurpose = "ai_support_only";
-    private const string WhatsappAiSupportOpeningPrompt =
+    private const string DefaultOrchestratorBrain = "EA";
+    private const string DefaultOfficialCompanionChannel = "telegram_official_bot";
+    private const string DefaultWhatsappAiSupportPurpose = "ai_support_only";
+    private const string DefaultWhatsappAiSupportOpeningPrompt =
         "Ask what questions the user has before giving product guidance.";
-    private const string WhatsappAiSupportNote =
+    private const string DefaultWhatsappAiSupportNote =
         "WhatsApp is stored only for support outreach. When support reaches out, it asks what questions the user has before helping. It is not used for account access, recovery, marketing, or public profile display.";
+    private const string OrchestratorBrainConfigKey = "CHUMMER_IDENTITY_LINK_ORCHESTRATOR_BRAIN";
+    private const string OfficialCompanionChannelConfigKey = "CHUMMER_IDENTITY_LINK_OFFICIAL_COMPANION_CHANNEL";
+    private const string WhatsappSupportPurposeConfigKey = "CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_PURPOSE";
+    private const string WhatsappSupportOpeningPromptConfigKey = "CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_OPENING_PROMPT";
+    private const string WhatsappSupportNoteConfigKey = "CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_NOTE";
 
     private static readonly string[] SupportedIdentityProviders =
     {
@@ -33,11 +41,20 @@ public sealed class IdentityLinkService
 
     private readonly CommunityStore _store;
     private readonly AccountService _accounts;
+    private readonly IConfiguration _configuration;
+    private readonly IdentityLinkDefaults _defaults;
 
     public IdentityLinkService(CommunityStore store, AccountService accounts)
+        : this(store, accounts, null)
+    {
+    }
+
+    public IdentityLinkService(CommunityStore store, AccountService accounts, IConfiguration? configuration)
     {
         _store = store;
         _accounts = accounts;
+        _configuration = configuration ?? new ConfigurationBuilder().Build();
+        _defaults = ResolveDefaults(_configuration);
     }
 
     public AccountLinkSummaryDto GetSummary(string subjectId)
@@ -63,8 +80,8 @@ public sealed class IdentityLinkService
                 channels,
                 RecommendedPrimaryAuth(identities),
                 RecoveryPosture(identities),
-                OrchestratorBrain: "EA",
-                OfficialCompanionChannel: "telegram_official_bot",
+                OrchestratorBrain: _defaults.OrchestratorBrain,
+                OfficialCompanionChannel: _defaults.OfficialCompanionChannel,
                 SupportedIdentityProviders,
                 SupportedChannels,
                 FutureCapabilities);
@@ -314,7 +331,7 @@ public sealed class IdentityLinkService
             var note = channelKind switch
             {
                 "telegram_official_bot" => "Telegram companion linking stays pending until the official bot confirms the account handshake.",
-                "whatsapp_official_business" => WhatsappAiSupportNote,
+                "whatsapp_official_business" => _defaults.WhatsappSupportNote,
                 "telegram_user_bot" => "Bring-your-own Telegram bots are intentionally deferred until ownership, verification, and policy controls are stronger.",
                 _ => null
             };
@@ -372,7 +389,7 @@ public sealed class IdentityLinkService
         var purpose = ResolveChannelPurpose(normalizedChannelKind, request.Purpose);
         var aiSupportOpeningPrompt = ResolveAiSupportOpeningPrompt(normalizedChannelKind, request.AiSupportOpeningPrompt);
         var note = normalizedChannelKind == "whatsapp_official_business"
-            ? WhatsappAiSupportNote
+            ? _defaults.WhatsappSupportNote
             : "Channel is now linked.";
 
         lock (_store.Gate)
@@ -481,21 +498,48 @@ public sealed class IdentityLinkService
             Note = null,
         };
 
-    private static string ResolveChannelPurpose(string channelKind, string? requestedPurpose)
+    private static string NormalizeConfiguredValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static IdentityLinkDefaults ResolveDefaults(IConfiguration configuration)
+        => new(
+            OrchestratorBrain: NormalizeConfiguredValue(configuration[OrchestratorBrainConfigKey]).Length > 0
+                ? NormalizeConfiguredValue(configuration[OrchestratorBrainConfigKey])
+                : DefaultOrchestratorBrain,
+            OfficialCompanionChannel: NormalizeConfiguredValue(configuration[OfficialCompanionChannelConfigKey]).Length > 0
+                ? NormalizeConfiguredValue(configuration[OfficialCompanionChannelConfigKey])
+                : DefaultOfficialCompanionChannel,
+            WhatsappSupportPurpose: NormalizeConfiguredValue(configuration[WhatsappSupportPurposeConfigKey]).Length > 0
+                ? NormalizeConfiguredValue(configuration[WhatsappSupportPurposeConfigKey])
+                : DefaultWhatsappAiSupportPurpose,
+            WhatsappSupportOpeningPrompt: NormalizeConfiguredValue(configuration[WhatsappSupportOpeningPromptConfigKey]).Length > 0
+                ? NormalizeConfiguredValue(configuration[WhatsappSupportOpeningPromptConfigKey])
+                : DefaultWhatsappAiSupportOpeningPrompt,
+            WhatsappSupportNote: NormalizeConfiguredValue(configuration[WhatsappSupportNoteConfigKey]).Length > 0
+                ? NormalizeConfiguredValue(configuration[WhatsappSupportNoteConfigKey])
+                : DefaultWhatsappAiSupportNote);
+
+    private string ResolveChannelPurpose(string channelKind, string? requestedPurpose)
     {
         if (string.Equals(channelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase))
         {
-            return AiSupportOnlyPurpose;
+            string requested = NormalizeConfiguredValue(requestedPurpose);
+            return requested.Length > 0
+                ? requested
+                : _defaults.WhatsappSupportPurpose;
         }
 
         return AccountService.NormalizeOptional(requestedPurpose) ?? string.Empty;
     }
 
-    private static string ResolveAiSupportOpeningPrompt(string channelKind, string? requestedPrompt)
+    private string ResolveAiSupportOpeningPrompt(string channelKind, string? requestedPrompt)
     {
         if (string.Equals(channelKind, "whatsapp_official_business", StringComparison.OrdinalIgnoreCase))
         {
-            return AccountService.NormalizeOptional(requestedPrompt) ?? WhatsappAiSupportOpeningPrompt;
+            string requested = NormalizeConfiguredValue(requestedPrompt);
+            return requested.Length > 0
+                ? requested
+                : _defaults.WhatsappSupportOpeningPrompt;
         }
 
         return AccountService.NormalizeOptional(requestedPrompt) ?? string.Empty;
@@ -734,4 +778,11 @@ public sealed class IdentityLinkService
             _ => throw new ArgumentException($"Unsupported channel kind '{normalized}'.")
         };
     }
+
+    private sealed record IdentityLinkDefaults(
+        string OrchestratorBrain,
+        string OfficialCompanionChannel,
+        string WhatsappSupportPurpose,
+        string WhatsappSupportOpeningPrompt,
+        string WhatsappSupportNote);
 }

@@ -31,13 +31,13 @@
 <section class="ledger-flagship ledger-flagship--onboarding">
     <div class="ledger-flagship__copy">
         <p class="eyebrow">Black Ledger onboarding</p>
-        <h1 class="page-title">@PublicFacingCopyHumanizer.Clean(Model.Heading)</h1>
-        <p class="page-copy">@PublicFacingCopyHumanizer.Clean(Model.Intro)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <p class="ledger-flagship__support">Choose on the globe first. The faction should feel like a country with pressure, territory, and visible consequence before you ever hit a form.</p>
         <div class="trust-claim__details" aria-label="Onboarding steps">
             @foreach (var step in Model.Steps)
             {
-                <a class="inline-link" href="@step.Href">@(step.Current ? $"{PublicFacingCopyHumanizer.Clean(step.Label)} (current)" : step.Complete ? $"{PublicFacingCopyHumanizer.Clean(step.Label)} (complete)" : PublicFacingCopyHumanizer.Clean(step.Label))</a>
+                <a class="inline-link" href="@step.Href">@(step.Current ? $"{UndetectableHumanizerCopyAdapter.Humanize(step.Label)} (current)" : step.Complete ? $"{UndetectableHumanizerCopyAdapter.Humanize(step.Label)} (complete)" : UndetectableHumanizerCopyAdapter.Humanize(step.Label))</a>
             }
         </div>
         <div class="stacked-actions">
@@ -98,7 +98,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction selection</p>
             <h2 class="editorial-title">Pick a side on the globe, then commit.</h2>
-            <p class="editorial-copy">@PublicFacingCopyHumanizer.Clean(Model.ExistingFactionSummary)</p>
+            <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ExistingFactionSummary)</p>
         </div>
         <div class="faction-profile-grid">
             @foreach (var faction in Model.ExistingFactions)
@@ -108,8 +108,8 @@
                     <div class="faction-profile-card__hero" style="background-image:url('@backgroundHref(faction.FactionId)')">
                         <img class="faction-profile-card__logo" src="@logoHref(faction.FactionId)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
                         <div class="faction-profile-card__hero-copy">
-                            <span class="tag">@PublicFacingCopyHumanizer.Clean(faction.Type)</span>
-                            <h3>@PublicFacingCopyHumanizer.Clean(faction.PublicName)</h3>
+                            <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(faction.Type)</span>
+                            <h3>@UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)</h3>
                             <p>@introLine(faction.FactionId)</p>
                         </div>
                     </div>
@@ -123,7 +123,7 @@
                             </article>
                         }
                     </div>
-                    <p class="muted-copy">@PublicFacingCopyHumanizer.Clean(faction.Summary)</p>
+                    <p class="muted-copy">@UndetectableHumanizerCopyAdapter.Humanize(faction.Summary)</p>
                     <div class="trust-claim__details">
                         <span>Safety: no private table data</span>
                         <span>Video: Chummer motion</span>
@@ -150,14 +150,14 @@ else if (string.Equals(Model.CurrentStep, "choose-path", StringComparison.Ordina
             <article class="route-choice-card">
                 <span class="tag">Major founder path</span>
                 <h3>Found a Major Faction</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.MajorFounderSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.MajorFounderSummary)</p>
                 <p>Major slots available: @Model.MajorSlotsAvailable</p>
                 <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=major">Found Major Faction</a>
             </article>
             <article class="route-choice-card">
                 <span class="tag">Challenger founder path</span>
                 <h3>Found a Challenger Faction</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(Model.ChallengerFounderSummary)</p>
+                <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.ChallengerFounderSummary)</p>
                 <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=challenger">Found Challenger</a>
             </article>
         </div>
@@ -184,7 +184,7 @@ else
                     <span class="tag">Major slots</span>
                     <h3>@Model.MajorSlotsAvailable available</h3>
                 </div>
-                <p>@(string.IsNullOrWhiteSpace(Model.MajorSlotsWarning) ? "Major and challenger founding paths are both available." : PublicFacingCopyHumanizer.Clean(Model.MajorSlotsWarning))</p>
+                <p>@(string.IsNullOrWhiteSpace(Model.MajorSlotsWarning) ? "Major and challenger founding paths are both available." : UndetectableHumanizerCopyAdapter.Humanize(Model.MajorSlotsWarning))</p>
             </article>
             <article class="gateway-card">
                 <div class="gateway-card__header">

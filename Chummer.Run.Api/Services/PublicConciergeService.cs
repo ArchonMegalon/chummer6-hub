@@ -574,11 +574,11 @@ public sealed class PublicConciergeService
             ("campaign-invite", "open_primer_packet") => BuildInvitePrimerHref("packet", contextId),
             ("campaign-invite", "ask_questions") => "/contact?kind=campaign_invite&title=Need%20campaign%20invite%20help&summary=Need%20invite%20or%20primer%20follow-up#support-intake",
             ("campaign-invite", "session_zero_call") => "/contact?kind=session_zero&title=Request%20session%20zero%20help&summary=Need%20a%20short%20session%20zero%20or%20invite%20briefing#support-intake",
-            ("creator-publication", "how_publishing_works") => "/artifacts#governed-creator-discovery",
+            ("creator-publication", "how_publishing_works") => "/artifacts#public-shared-publications",
             ("creator-publication", "book_consult") => "/contact?kind=creator_consult&title=Need%20creator%20consult&summary=Request%20a%20creator%20consult#support-intake",
             ("creator-publication", "submit_interest") => "/contact?kind=creator_interest&title=Submit%20creator%20interest&summary=Need%20creator%20follow-up#support-intake",
             ("creator-publication", "open_creator_packet") => string.IsNullOrWhiteSpace(contextId)
-                ? "/artifacts#governed-creator-discovery"
+                ? "/artifacts#public-shared-publications"
                 : $"/artifacts/publications/{Uri.EscapeDataString(contextId)}",
             ("testimonials", "video_review") => "/contact?kind=public_note&title=Share%20video%20note&summary=Want%20to%20leave%20a%20moderated%20video%20testimonial#support-intake",
             ("testimonials", "audio_review") => "/contact?kind=public_note&title=Share%20audio%20note&summary=Want%20to%20leave%20a%20moderated%20audio%20testimonial#support-intake",

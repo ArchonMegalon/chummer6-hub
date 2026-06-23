@@ -31,7 +31,7 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("LedgerAdvisory.cshtml", controller, StringComparison.Ordinal);
         string turnReviewView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerWorldTickValidation.cshtml"));
         Assert.Contains("World turn", turnReviewView, StringComparison.Ordinal);
-        Assert.Contains("Download details", turnReviewView, StringComparison.Ordinal);
+        Assert.Contains("Download JSON", turnReviewView, StringComparison.Ordinal);
         Assert.Contains("What changed this turn", turnReviewView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open data", turnReviewView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("What this packet says", turnReviewView, StringComparison.OrdinalIgnoreCase);
@@ -40,11 +40,11 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
         Assert.Contains("Account notifications", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Open notification history", accountView, StringComparison.Ordinal);
-        Assert.Contains("Open turn review", accountView, StringComparison.Ordinal);
-        Assert.Contains("Open turn review", notificationsView, StringComparison.Ordinal);
-        Assert.Contains("Current turn details", accountView, StringComparison.Ordinal);
+        Assert.Contains("Open turn summary", accountView, StringComparison.Ordinal);
+        Assert.Contains("Open turn summary", notificationsView, StringComparison.Ordinal);
+        Assert.Contains("Current turn summary", accountView, StringComparison.Ordinal);
         Assert.DoesNotContain("Current world-turn packet", accountView, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Inbox queue", notificationsView, StringComparison.Ordinal);
+        Assert.Contains("Inbox", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Actual messages, not just status", notificationsView, StringComparison.Ordinal);
         Assert.Contains("pressure, not people", ledgerView, StringComparison.Ordinal);
     }

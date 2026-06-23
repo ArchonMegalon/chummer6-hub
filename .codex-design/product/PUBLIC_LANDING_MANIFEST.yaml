@@ -1625,9 +1625,9 @@ sections:
 registered_overlays:
 - id: follow_horizons
   path: /home
-  title: Follow roadmap updates
-  summary: Track the futures you care about without turning advisory signals into
-    canon.
+  title: Follow upcoming updates
+  summary: Track the areas you care about without mistaking early signals for
+    shipped product.
 - id: beta_interest
   path: /home
   title: Beta interest

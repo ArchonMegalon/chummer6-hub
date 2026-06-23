@@ -1557,6 +1557,66 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var timeoutResult = await timeoutSessions.StartDeviceAuthAsync(timeoutSession.SponsorSessionId, CancellationToken.None);
     Assert(string.Equals(timeoutResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "lane creation timeouts should fall back to waiting_for_slot when the project already has another live participant lane.");
 
+    var malformedFailureBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+            {
+                Content = new StringContent("fleet upstream unavailable")
+            };
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var malformedFailureSessions = new BoostSessionService(store, accounts, groups, malformedFailureBridge, rewards);
+    var malformedFailureSession = malformedFailureSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.parse.failure",
+        ProjectId: "codexea",
+        SubjectLabel: "Parser Failure"));
+    malformedFailureSessions.RecordConsent(malformedFailureSession.SponsorSessionId);
+    var malformedFailureUnavailable = false;
+    try
+    {
+        await malformedFailureSessions.StartDeviceAuthAsync(malformedFailureSession.SponsorSessionId, CancellationToken.None);
+    }
+    catch (ParticipationUnavailableException ex)
+    {
+        malformedFailureUnavailable = ex.Message.Contains("Participation is unavailable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(malformedFailureUnavailable, "plain-text Fleet failures should degrade into participation unavailability instead of leaking JSON parser exceptions.");
+
+    var malformedSuccessBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]")
+            };
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var malformedSuccessSessions = new BoostSessionService(store, accounts, groups, malformedSuccessBridge, rewards);
+    var malformedSuccessSession = malformedSuccessSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.parse.success",
+        ProjectId: "codexea",
+        SubjectLabel: "Parser Success"));
+    malformedSuccessSessions.RecordConsent(malformedSuccessSession.SponsorSessionId);
+    var malformedSuccessUnavailable = false;
+    try
+    {
+        await malformedSuccessSessions.StartDeviceAuthAsync(malformedSuccessSession.SponsorSessionId, CancellationToken.None);
+    }
+    catch (ParticipationUnavailableException ex)
+    {
+        malformedSuccessUnavailable = ex.Message.Contains("Participation is unavailable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(malformedSuccessUnavailable, "non-object Fleet success payloads should fail closed into participation unavailability.");
+
     var outsiderSessionBlocked = false;
     try
     {
@@ -1773,10 +1833,38 @@ async Task VerifyTeableUserProjectionWorkflowAsync()
 
             if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_users/record?", StringComparison.Ordinal))
             {
-                var userId = ExtractUserId(path) ?? string.Empty;
-                return existingRecordIdByUserId.TryGetValue(userId, out var recordId)
-                    ? JsonResponse(new { records = new[] { new { id = recordId } } })
-                    : JsonResponse(new { records = Array.Empty<object>() });
+                if (path.Contains("filterByTql=", StringComparison.Ordinal))
+                {
+                    var userId = ExtractUserId(path) ?? string.Empty;
+                    return existingRecordIdByUserId.TryGetValue(userId, out var filteredRecordId)
+                        ? JsonResponse(new
+                        {
+                            records = new[]
+                            {
+                                new
+                                {
+                                    id = filteredRecordId,
+                                    fields = new Dictionary<string, object?>
+                                    {
+                                        ["User Id"] = userId,
+                                    }
+                                }
+                            }
+                        })
+                        : JsonResponse(new { records = Array.Empty<object>() });
+                }
+
+                var records = existingRecordIdByUserId
+                    .Select(item => new
+                    {
+                        id = item.Value,
+                        fields = new Dictionary<string, object?>
+                        {
+                            ["User Id"] = item.Key,
+                        }
+                    })
+                    .ToArray();
+                return JsonResponse(new { records });
             }
 
             if (request.Method == HttpMethod.Post && path == "/api/table/tbl_users/record")
@@ -2344,7 +2432,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
     Assert(accountSource.Contains("Model.SignedInTrustStatus", StringComparison.Ordinal), "account should project the signed-in trust panel directly on the account surface.");
     Assert(accountSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "account should reuse the shared signed-in trust panel instead of a link-only trust rail.");
-    Assert(accountSource.Contains("Signed-in trust snapshot", StringComparison.Ordinal), "account teams and permissions should give organizers a bounded signed-in trust snapshot on the member-guidance rail.");
+    Assert(accountSource.Contains("current status summary", StringComparison.Ordinal), "account teams and permissions should give organizers a clear current-status summary on the member-guidance rail.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Who can get it now\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current access guidance.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Recommended for this install\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the promoted install path.");
     Assert(accountSource.Contains("<strong>Release checks:</strong>", StringComparison.Ordinal), "account member guidance should label the signed-in release lane with customer-facing release-check language.");
@@ -2394,8 +2482,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("PublicCreatorPublicationHref", StringComparison.Ordinal), "account work should expose a direct public creator-packet route once the owner is looking at a live discoverable publication.");
     Assert(accountSource.Contains("IsDiscoverablePublicCreatorPublication", StringComparison.Ordinal), "account work should gate the public creator-packet route on actual live discoverable publication posture.");
     Assert(accountSource.Contains("Transfer governed roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
-    Assert(accountSource.Contains("Launch governed prep packet", StringComparison.Ordinal), "account work should expose a real governed prep-launch action on the selected campaign card.");
-    Assert(accountSource.Contains("Recent governed prep launches", StringComparison.Ordinal), "account work should keep recent governed prep-launch receipts visible on the selected campaign card.");
+    Assert(accountSource.Contains("Start prep set", StringComparison.Ordinal), "account work should expose a real prep-start action on the selected campaign card.");
+    Assert(accountSource.Contains("Recent prep starts", StringComparison.Ordinal), "account work should keep recent prep-start history visible on the selected campaign card.");
     Assert(accountSource.Contains("Stage travel prefetch", StringComparison.Ordinal), "account work should expose a real claimed-device travel-prefetch action on the selected campaign card.");
     Assert(accountSource.Contains("Recent travel prefetch receipts", StringComparison.Ordinal), "account work should keep staged travel-prefetch receipts visible on the selected campaign card.");
     Assert(accountSource.Contains("Generate aftermath or replay package", StringComparison.Ordinal), "account work should expose a real aftermath or replay packaging action on the selected campaign card.");
@@ -2408,7 +2496,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
-    Assert(downloadDispatchSource.Contains("Account linking is optional.", StringComparison.Ordinal), "download handoff should keep account linking optional and reserve claim codes for recovery fallback.");
+    Assert(downloadDispatchSource.Contains("Account linking is optional.", StringComparison.Ordinal), "download handoff should keep account linking optional and reserve recovery codes for recovery fallback.");
     Assert(downloadDispatchSource.Contains("Support stays with this install.", StringComparison.Ordinal), "download handoff should keep support recovery attached to the same install instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
@@ -2417,30 +2505,30 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.InstallReadinessSummary", StringComparison.Ordinal), "support confirmation should surface the linked-install readiness summary directly from the tracked case.");
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.VerificationSummary", StringComparison.Ordinal), "support confirmation should surface fix-verification guidance directly from the tracked case.");
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.ReleaseProgressSummary", StringComparison.Ordinal), "support confirmation should surface the release-lane summary directly from the tracked case.");
-    Assert(accountSource.Contains("Recent install handoffs", StringComparison.Ordinal), "account access should describe recent downloads as install handoffs instead of raw receipts.");
+    Assert(accountSource.Contains("Recent installs", StringComparison.Ordinal), "account access should describe recent downloads as recent installs instead of raw receipts.");
     Assert(accountSource.Contains("Current install rail", StringComparison.Ordinal), "account access should lead with one current install rail instead of only counts and fallback ledgers.");
     Assert(accountSource.Contains("Recovery codes stay below as a fallback, not the first instruction.", StringComparison.Ordinal), "account access should explicitly demote recovery codes beneath the primary install rail guidance.");
     Assert(accountSource.Contains("This linked install is your default return rail", StringComparison.Ordinal), "account access should present the linked install as the default return rail when claim and support continuity already exist.");
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Recovery mode only", StringComparison.Ordinal), "account access should mark pending claim codes as recovery-only fallback instead of the primary install path.");
     Assert(accountSource.Contains("Do not redeem claim codes in a browser tab.", StringComparison.Ordinal), "account access should steer claim-code use back into in-app recovery instead of browser ritual.");
-    Assert(accountSource.Contains("Entitlement sync receipts", StringComparison.Ordinal), "account access should expose a dedicated entitlement-sync receipt drawer instead of leaving recovery posture buried in the API.");
+    Assert(accountSource.Contains("Account sync history", StringComparison.Ordinal), "account access should expose a dedicated account-sync history drawer instead of leaving recovery posture buried in the API.");
     Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account access should render the entitlement-sync recovery summary instead of hiding it behind raw counts.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account access should render a direct recovery action for the standalone entitlement-sync lead receipt.");
     Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString(\"u\")", StringComparison.Ordinal), "account access should surface the latest entitlement-sync receipt observation timestamp.");
-    Assert(accountSource.Contains("Continue is blocked until this receipt is resolved.", StringComparison.Ordinal), "account access should make blocking entitlement-sync conflicts explicit on the device surface.");
-    Assert(accountSource.Contains("Restore provenance receipts", StringComparison.Ordinal), "account work should keep restore provenance receipt counts visible on the selected workspace card.");
-    Assert(accountSource.Contains("Restore conflict receipts", StringComparison.Ordinal), "account work should keep restore conflict receipt counts visible on the selected workspace card.");
-    Assert(accountSource.Contains("Restore receipt posture", StringComparison.Ordinal), "account work should surface one restore receipt posture summary on the selected workspace card.");
-    Assert(accountSource.Contains("Restore receipt status", StringComparison.Ordinal), "account work should render a restore receipt status summary in the dedicated restore drawer.");
+    Assert(accountSource.Contains("Finish this item before you continue.", StringComparison.Ordinal), "account access should make blocking entitlement-sync conflicts explicit on the device surface.");
+    Assert(accountSource.Contains("Restore history", StringComparison.Ordinal), "account work should keep restore history visible on the selected workspace card.");
+    Assert(accountSource.Contains("Restore conflicts", StringComparison.Ordinal), "account work should keep restore conflicts visible on the selected workspace card.");
+    Assert(accountSource.Contains("Restore status summary", StringComparison.Ordinal), "account work should surface one restore status summary on the selected workspace card.");
+    Assert(accountSource.Contains("Restore status", StringComparison.Ordinal), "account work should render a restore status summary in the dedicated restore drawer.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account work should render the restore receipt recovery summary instead of leaving recoverability implicit.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account work should expose a direct recovery-route action for the lead restore receipt instead of leaving the route as inert text.");
-    Assert(accountSource.Contains("Restore provenance and conflict receipts", StringComparison.Ordinal), "account work should expose a dedicated restore provenance/conflict receipt drawer on the selected workspace card.");
+    Assert(accountSource.Contains("Restore history and conflicts", StringComparison.Ordinal), "account work should expose a dedicated restore history/conflict drawer on the selected workspace card.");
     Assert(accountSource.Contains("From @HumanizeStatus(receipt.Authority, \"Chummer\")", StringComparison.Ordinal), "account work should render restore receipt source instead of hiding which Chummer area issued the continuity note.");
     Assert(accountSource.Contains("@receipt.RecoveryHint", StringComparison.Ordinal), "account work should render the concrete restore recovery hint on provenance receipts.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(recovery.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each provenance recovery receipt.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(receipt.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each conflict receipt.");
-    Assert(accountSource.Contains("Continue is blocked until this receipt is resolved.", StringComparison.Ordinal), "account work should render the blocking-state copy for restore conflict receipts.");
+    Assert(accountSource.Contains("Finish this item before you continue.", StringComparison.Ordinal), "account work should render the blocking-state copy for restore conflict receipts.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
     Assert(accountSource.Contains("Planner coverage", StringComparison.Ordinal), "account build-path details should surface planner-coverage truth instead of leaving follow-through grounding implicit.");
@@ -2464,11 +2552,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ModerationSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication moderation posture directly from the shared projection.");
     Assert(accountSource.Contains("/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish", StringComparison.Ordinal), "account publication detail should keep an explicit publish route on the same governed account rail.");
-    Assert(accountSource.Contains("Resubmit corrected packet", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");
+    Assert(accountSource.Contains("Resubmit corrections", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("Open public publication", StringComparison.Ordinal), "account publication detail should expose the public inspect route alongside private moderation status once the publication is live.");
     Assert(accountSource.Contains("Publication kind", StringComparison.Ordinal), "account publication detail should surface the shared publication kind on the governed detail lane.");
-    Assert(accountSource.Contains("Draft kind", StringComparison.Ordinal), "account publication detail should surface the registry draft kind on the governed detail lane.");
+    Assert(accountSource.Contains("Draft type", StringComparison.Ordinal), "account publication detail should surface the draft type on the governed detail lane.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)", StringComparison.Ordinal), "account publication detail should deep-link live creator packets onto the public inspect route without hiding the private moderation lane.");
     Assert(accountSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication discovery posture instead of compressing it away.");
     Assert(accountSource.Contains("@linkedPublication.TrustSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication trust reasoning instead of dropping it on the detail route.");
@@ -2492,7 +2580,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "account publication list should keep a title-specific route back to the related build follow-through.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(publication.PublicationId)", StringComparison.Ordinal), "account publication list should expose the public creator-packet inspect route alongside private moderation links once the packet is live.");
     Assert(accountSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "account publication list should surface the next creator-publication step directly from the shared projection.");
-    Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
+    Assert(accountSource.Contains("Recent changes", StringComparison.Ordinal), "account work should surface recent changes for the shared campaign view.");
     Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
     Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
@@ -2517,11 +2605,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
     Assert(accountSource.Contains("Publication status", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer publication posture on the operator rail.");
     Assert(accountSource.Contains("@op.ArtifactPublicationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer artifact-publication posture directly from the shared projection.");
-    Assert(accountSource.Contains("Support escalation", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer support-escalation posture on the operator rail.");
+    Assert(accountSource.Contains("Support path", StringComparison.Ordinal), "account teams and permissions should surface a plain-language support path on the organizer rail.");
     Assert(accountSource.Contains("@op.SupportEscalationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer support-escalation posture directly from the shared projection.");
     Assert(accountSource.Contains("<summary>Season &amp; event rail</summary>", StringComparison.Ordinal), "account teams and permissions should give the operator a dedicated auditable season and event rail.");
     Assert(accountSource.Contains("id=\"community-op-events-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season-event rail a stable deep-link target.");
-    Assert(accountSource.Contains("Season board", StringComparison.Ordinal), "account teams and permissions should surface a first-class season board for multi-campaign operators.");
+    Assert(accountSource.Contains("Campaign board", StringComparison.Ordinal), "account teams and permissions should surface a first-class campaign board for multi-campaign organizers.");
     Assert(accountSource.Contains("op.SeasonBoardEntries.Count == 0", StringComparison.Ordinal), "account teams and permissions should surface the season-board campaign count directly from the shared projection.");
     Assert(accountSource.Contains("id=\"community-op-board-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season board a stable deep-link target.");
     Assert(accountSource.Contains("@entry.LatestEventSummary", StringComparison.Ordinal), "account season board should surface the latest governed event summary for each campaign lane.");
@@ -2530,8 +2618,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@entry.CampaignMemorySummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory summary for each campaign lane.");
     Assert(accountSource.Contains("@entry.CampaignMemoryReturnSummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory return cue for each campaign lane.");
     Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
-    Assert(accountSource.Contains("Invite / sponsorship", StringComparison.Ordinal), "account teams and permissions should keep invite and sponsorship posture visible on the same operator surface.");
-    Assert(accountSource.Contains("Sponsor session rail", StringComparison.Ordinal), "account teams and permissions should keep sponsor-session posture visible on the operator summary rail.");
+    Assert(accountSource.Contains("Invites and sponsorship", StringComparison.Ordinal), "account teams and permissions should keep invite and sponsorship posture visible on the same organizer surface.");
+    Assert(accountSource.Contains("Sponsor activity", StringComparison.Ordinal), "account teams and permissions should keep sponsor activity visible on the organizer summary rail.");
     Assert(accountSource.Contains("Invite &amp; sponsorship rail", StringComparison.Ordinal), "account teams and permissions should give operators a dedicated invite and sponsorship rail.");
     Assert(accountSource.Contains("Issue governed join code", StringComparison.Ordinal), "account invite rail should expose a governed join-code issuance flow.");
     Assert(accountSource.Contains("Issue governed boost code", StringComparison.Ordinal), "account invite rail should expose a governed boost-code issuance flow.");
@@ -2546,7 +2634,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Open downloads", StringComparison.Ordinal), "account organizer guidance should link operators to the real member download handoff.");
     Assert(accountSource.Contains("Open help and trust", StringComparison.Ordinal), "account organizer guidance should link operators to the help and trust surfaces.");
     Assert(accountSource.Contains("Open support closure", StringComparison.Ordinal), "account organizer guidance should keep support follow-through on the same account backbone.");
-    Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
+    Assert(accountSource.Contains("Search prep sets", StringComparison.Ordinal), "account work should expose a real prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
@@ -5462,8 +5550,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/auth/google/start?next=%2Fparticipate%2Fcodex", StringComparison.Ordinal)), "participate page should preserve the booster Google handoff.");
-    Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
+    Assert(participateModel!.Lanes.Any(static lane => string.Equals(lane.Label, "Idea", StringComparison.Ordinal) && string.Equals(lane.Href, "#participate-submit", StringComparison.Ordinal)), "participate page should keep the first action on the in-page feedback form.");
+    Assert(!participateModel.Items.Any(static item => item.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
@@ -6050,7 +6138,7 @@ async Task VerifyAiGatewayWorkflowAsync()
         PromptLineage: render.Lineage), CancellationToken.None);
     Assert(invocation.Success, "gateway should execute routed grounded prompts");
     Assert(invocation.Prompt?.Lineage.PromptHash == render.Lineage.PromptHash, "gateway invocations should preserve prompt lineage");
-    Assert(invocation.Decision.SelectedModel == "gpt-5.4", "complex grounded prompts should route to the complex model tier");
+    Assert(invocation.Decision.SelectedModel == "claude-opus-4.1", "complex grounded prompts should route to the configured complex model tier");
 
     var evaluation = evaluations.Add(new EvaluationRequest(
         RequestId: "eval_feedback_01",
@@ -6820,7 +6908,7 @@ void VerifySpiderWorkflow()
     Assert(decision!.DecisionTier == "deep", "spider should escalate through the deep-ingestion tier for elevated signals");
     Assert(decision.DeepAnalysis is not null, "deep-ingestion should attach route and grounding details to the decision");
     Assert(decision.DeepAnalysis!.RouteDecision.Tier == "complex", "deep Spider routing should choose the complex tier");
-    Assert(decision.DeepAnalysis.RouteDecision.SelectedModel == "gpt-5.4", "deep Spider routing should select the complex model");
+    Assert(decision.DeepAnalysis.RouteDecision.SelectedModel == "claude-opus-4.1", "deep Spider routing should select the configured complex model");
     Assert(decision.DeepAnalysis.RouteDecision.ReasoningEffort == "medium", "deep Spider routing should request medium reasoning effort");
     Assert(Math.Abs(decision.DeepAnalysis.RouteDecision.EstimatedCostUsd - 0.0753d) < 0.0001d, "deep Spider routing should advertise the selected cost posture");
     Assert(decision.DeepAnalysis.PromptLineage?.TemplateName == "spider.tactical-card", "deep Spider routing should preserve prompt lineage");

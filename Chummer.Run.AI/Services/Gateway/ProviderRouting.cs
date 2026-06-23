@@ -18,6 +18,7 @@ public interface IProviderRouter
 public sealed class ProviderRouter : IProviderRouter
 {
     private readonly IReadOnlyDictionary<AiProvider, bool> _providerEnabled;
+    private readonly GatewayRoutingTierPolicy _tierPolicy;
 
     public ProviderRouter(IConfiguration configuration)
     {
@@ -32,6 +33,7 @@ public sealed class ProviderRouter : IProviderRouter
             [AiProvider.MarkupGo] = IsEnabled(section, AiProvider.MarkupGo),
             [AiProvider.PeekShot] = IsEnabled(section, AiProvider.PeekShot)
         };
+        _tierPolicy = GatewayRoutingTierPolicy.FromConfiguration(configuration);
     }
 
     public ProviderRouteDecision Resolve(ProviderRouteRequest request)
@@ -118,31 +120,29 @@ public sealed class ProviderRouter : IProviderRouter
             fallbackUsed: true);
     }
 
-    private static ProviderRouteDecision BuildDecision(
+    private ProviderRouteDecision BuildDecision(
         ProviderRouteRequest request,
         AiProvider provider,
         string reason,
         bool fallbackUsed)
     {
-        var tier = request.MaxTokens >= 1200 || request.StructuredOutput ? "complex" : "standard";
-        var selectedModel = tier == "complex" ? "gpt-5.4" : "gpt-5.4-mini";
-        var reasoningEffort = tier == "complex" ? "medium" : "low";
+        var tier = request.MaxTokens >= _tierPolicy.ComplexTokenThreshold || request.StructuredOutput ? "complex" : "standard";
+        var tierPolicy = tier == "complex"
+            ? _tierPolicy.Complex
+            : _tierPolicy.Standard;
         var estimatedCostUsd = tier == "complex"
-            ? 0.0753
-            : Math.Round(Math.Max(0.005, request.MaxTokens / 100000d), 4);
-        var policy = tier == "complex"
-            ? "complex keyword policy"
-            : "default routing policy";
+            ? tierPolicy.EstimatedCostUsd
+            : Math.Round(Math.Max(tierPolicy.EstimatedCostUsdFloor, request.MaxTokens / 100000d), 4);
 
         return new ProviderRouteDecision(
             Provider: provider,
             Reason: reason,
             FallbackUsed: fallbackUsed,
             Tier: tier,
-            SelectedModel: selectedModel,
-            ReasoningEffort: reasoningEffort,
+            SelectedModel: tierPolicy.SelectedModel,
+            ReasoningEffort: tierPolicy.ReasoningEffort,
             EstimatedCostUsd: estimatedCostUsd,
-            Policy: policy);
+            Policy: tierPolicy.Policy);
     }
 
     private bool IsEnabled(AiProvider provider)
@@ -208,6 +208,67 @@ public sealed class ProviderRouter : IProviderRouter
 
         return section.GetValue<bool?>($"{providerKey}:Enabled") ?? defaultEnabled;
     }
+}
+
+internal sealed record GatewayRoutingTierConfig(
+    string SelectedModel,
+    string ReasoningEffort,
+    double EstimatedCostUsd,
+    double EstimatedCostUsdFloor,
+    string Policy);
+
+internal sealed record GatewayRoutingTierPolicy(
+    int ComplexTokenThreshold,
+    GatewayRoutingTierConfig Standard,
+    GatewayRoutingTierConfig Complex)
+{
+    public static GatewayRoutingTierPolicy Default { get; } = new(
+        ComplexTokenThreshold: 1200,
+        Standard: new GatewayRoutingTierConfig(
+            SelectedModel: "gpt-5.5",
+            ReasoningEffort: "low",
+            EstimatedCostUsd: 0.005,
+            EstimatedCostUsdFloor: 0.005,
+            Policy: "default routing policy"),
+        Complex: new GatewayRoutingTierConfig(
+            SelectedModel: "claude-opus-4.1",
+            ReasoningEffort: "medium",
+            EstimatedCostUsd: 0.0753,
+            EstimatedCostUsdFloor: 0.0753,
+            Policy: "complex keyword policy"));
+
+    public static GatewayRoutingTierPolicy FromConfiguration(IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection("AiGateway:Routing");
+        if (!section.Exists())
+        {
+            section = configuration.GetSection("Routing");
+        }
+
+        return new GatewayRoutingTierPolicy(
+            ComplexTokenThreshold: SanitizeThreshold(section.GetValue<int?>("ComplexTokenThreshold"), Default.ComplexTokenThreshold),
+            Standard: ReadTier(section.GetSection("Standard"), Default.Standard),
+            Complex: ReadTier(section.GetSection("Complex"), Default.Complex));
+    }
+
+    private static GatewayRoutingTierConfig ReadTier(IConfigurationSection section, GatewayRoutingTierConfig fallback)
+        => new(
+            SelectedModel: SanitizeText(section["SelectedModel"], fallback.SelectedModel),
+            ReasoningEffort: SanitizeText(section["ReasoningEffort"], fallback.ReasoningEffort),
+            EstimatedCostUsd: SanitizeNonNegative(section.GetValue<double?>("EstimatedCostUsd"), fallback.EstimatedCostUsd),
+            EstimatedCostUsdFloor: SanitizeNonNegative(section.GetValue<double?>("EstimatedCostUsdFloor"), fallback.EstimatedCostUsdFloor),
+            Policy: SanitizeText(section["Policy"], fallback.Policy));
+
+    private static int SanitizeThreshold(int? configuredValue, int fallback)
+        => configuredValue is > 0 ? configuredValue.Value : fallback;
+
+    private static double SanitizeNonNegative(double? configuredValue, double fallback)
+        => configuredValue is >= 0 ? configuredValue.Value : fallback;
+
+    private static string SanitizeText(string? configuredValue, string fallback)
+        => string.IsNullOrWhiteSpace(configuredValue)
+            ? fallback
+            : configuredValue.Trim();
 }
 
 public sealed class MockProviderAdapter : IProviderAdapter

@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model FaqPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-faq surface-minimal";
     var accessPosture = Model.AccessPosture;
@@ -14,10 +14,10 @@
         {
             Badge = "What works today",
             Title = "Check current status first",
-            Summary = "Use this when you want to know what is ready now, what needs care, and what is still coming next.",
+            Summary = "Use this when you want to know what is ready now, what needs care, and what is planned next.",
             Href = "/now",
             Label = "Open what works today",
-            Highlights = new[] { "Ready now", "Needs care", "Coming next" }
+            Highlights = new[] { "Ready now", "Needs care", "Planned next" }
         },
         new
         {
@@ -97,7 +97,7 @@
         return null;
     }
 
-    string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="minimal-page-hero">

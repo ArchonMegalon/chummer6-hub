@@ -123,7 +123,7 @@ public sealed class PublicSignalProjectionService
     private static string ResolveHeading(PublicFeedbackSurfaceDocument surface)
         => NormalizeKey(surface.Role) switch
         {
-            "public_feedback_and_voting" => "Hosted public feedback remains projection-only and first-party-governed.",
+            "public_feedback_and_voting" => "Hosted public feedback remains projection-only and stays anchored to Chummer.",
             "roadmap_projection" => "Hosted roadmap cards stay downstream of Chummer-owned planning truth.",
             "changelog_projection_and_voter_notification" => "Hosted shipped closeout stays downstream of Chummer-owned availability proof.",
             _ => "Hosted public signal stays bounded by Chummer-owned truth."
@@ -151,7 +151,7 @@ public sealed class PublicSignalProjectionService
         string publicPath = RequireText(surface.PublicPath, $"public signal surface '{surface.Key}' public_path");
         string fallbackPath = RequireText(surface.FallbackPath, $"public signal surface '{surface.Key}' fallback_path");
         string truthPosture = HumanizeToken(surface.TruthPosture, "projection only").ToLowerInvariant();
-        return $"Hosted projection may mirror this route, but the posture stays {truthPosture}. The first-party path remains {fallbackPath} whenever the hosted mirror is not promoted, so {publicPath} stays visible and useful.";
+        return $"Hosted projection may mirror this route, but the status stays {truthPosture}. The Chummer path remains {fallbackPath} whenever the hosted mirror is not promoted, so {publicPath} stays visible and useful.";
     }
 
     private static IReadOnlyList<string> ResolveCloseoutRequirements(SignalProjectionDocument document, PublicFeedbackSurfaceDocument surface)

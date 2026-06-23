@@ -1,11 +1,7 @@
 @model FeatureDetailPageViewModel
 @{
     static string RoadmapText(string? value)
-        => PublicFacingCopyHumanizer.Clean(value)
-            .Replace("product threads", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("product thread", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase)
-            .Replace("implementation tranche", "implementation slice", StringComparison.OrdinalIgnoreCase);
+        => UndetectableHumanizerCopyAdapter.HumanizeRoadmap(value);
 }
 
 <section class="role-matrix">
@@ -32,7 +28,7 @@
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
         {
             <article class="role-matrix__cell">
-                <span class="tag">Related live surface</span>
+                <span class="tag">Compare with live page</span>
                 <p>@RoadmapText(Model.ProofNote)</p>
             </article>
         }
@@ -43,13 +39,13 @@
 {
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Useful cues</p>
+            <p class="eyebrow">Helpful cues</p>
             <h2 class="editorial-title">Compare it with the live product before you treat it as ready.</h2>
         </div>
         <div class="trust-claim__details">
             @foreach (var item in Model.MicroProof)
             {
-                <span>@PublicFacingCopyHumanizer.Clean(item)</span>
+                <span>@UndetectableHumanizerCopyAdapter.Humanize(item)</span>
             }
         </div>
     </section>
@@ -58,7 +54,7 @@
 <section class="compact-rail">
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Not live yet</h3>
+            <h3>Still planned</h3>
             <p>This work is still planned. Compare it with the live product before you count on it.</p>
         </div>
         <a class="inline-link" href="/now">Compare with what works today</a>
@@ -81,10 +77,10 @@
     {
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Compare against your account detail view</h3>
-                <p>Use the account detail view to compare this planned work with the same recap and publication history you already have on your account.</p>
+                <h3>Compare against your account details</h3>
+                <p>Use your account details to compare this planned work with the same recap and publication history you already have on your account.</p>
             </div>
-            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account detail view</a>
+            <a class="inline-link" href="/artifacts#signed-in-detail-view">Open account details</a>
         </article>
     }
 </section>

@@ -140,7 +140,7 @@ Updated: 2026-03-30T11:00:07+02:00
 
 - Signed-in account settings and advanced proof are now materially deeper instead of only checking route headings:
   - `scripts/hub-live-audit.py` now treats `/account/settings` and `/account/advanced` as release-blocking signed-in surfaces. It requires the stable privacy/help-policy/account-metadata rows (`Visibility`, `Recovery posture`, `Provider-backed help`, `Open help`, `Read privacy`, `Read terms`, `Contact Chummer`, `Hub account id`, `Primary auth`, `Linked identities`, `Linked channels`, `Follow horizons`) before the broader work-journey audit is allowed to pass.
-  - `scripts/e2e-hub-playwright.cjs` now makes the `/home/setup` wizard materially real by selecting a starter lane, saving the onboarding flow, and only then using `/account/settings` to prove that `Follow roadmap updates` and `Invite me when the right beta opens` can be saved and survive a reload. The browser lane also now verifies the signed-in help/privacy/terms/contact link cluster and the deeper `/account/advanced` metadata rail instead of stopping at surface headings.
+  - `scripts/e2e-hub-playwright.cjs` now makes the `/home/setup` wizard materially real by selecting a starter lane, saving the onboarding flow, and only then using `/account/settings` to prove that `Follow upcoming updates` and `Invite me when the right beta opens` can be saved and survive a reload. The browser lane also now verifies the signed-in help/privacy/terms/contact link cluster and the deeper `/account/advanced` metadata rail instead of stopping at surface headings.
 - Re-verified clean with:
   - `python3 -m py_compile scripts/hub-live-audit.py`
   - `node --check scripts/e2e-hub-playwright.cjs`

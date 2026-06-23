@@ -35,4 +35,86 @@ public sealed class PublicFacingCopyHumanizerTests
         Assert.DoesNotContain("artifact factory", cleaned, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("publication lane", cleaned, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Theory]
+    [InlineData("provider proof ready", "service status ready")]
+    [InlineData("artifact receipt attached", "file record attached")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeHome_AppliesHomePreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeHome(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("Product Governor review", "product decision review")]
+    [InlineData("Icanpreneur through Teable", "guided request path through shared board")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeKarmaForgeIntake_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeKarmaForgeIntake(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("Product Governor packet receipt", "product decision request note")]
+    [InlineData("governed KarmaForgeCandidate", "guided saved request")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeKarmaForgeSubmitted_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeKarmaForgeSubmitted(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("source item record", "original item update")]
+    [InlineData("source details and records", "related details and updates")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeFeedbackOperations_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeFeedbackOperations(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("planned work", "future work")]
+    [InlineData("implementation tranche", "work item")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeRoadmap_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeRoadmap(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("publication packet route", "publication page")]
+    [InlineData("creator concierge provenance", "creator help origin")]
+    public void UndetectableHumanizerCopyAdapter_HumanizePublication_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizePublication(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("provenance records", "history updates")]
+    public void UndetectableHumanizerCopyAdapter_HumanizePackage_AppliesPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizePackage(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
+    [InlineData("pending_verification", "Confirmation sent")]
+    [InlineData("campaign_approved", "Campaign-approved")]
+    [InlineData("review", "Needs attention")]
+    [InlineData("sandbox", "Sandbox")]
+    [InlineData("custom_state", "Custom State")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeStatusLabel_NormalizesSharedStatuses(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeStatusLabel(source);
+
+        Assert.Equal(expected, cleaned);
+    }
 }

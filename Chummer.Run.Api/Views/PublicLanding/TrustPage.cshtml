@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model TrustPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     var helpPage = string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase);
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
@@ -38,7 +38,7 @@
         return resolvedHref;
     }
 
-    string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
     {
@@ -65,7 +65,7 @@
             var sourceSection = index < Model.Sections.Count ? Model.Sections[index] : null;
             policyFacts.Add((
                 Tag: sourceSection?.Eyebrow ?? "Policy",
-                Heading: sourceSection?.Heading ?? "Current boundary",
+                Heading: sourceSection?.Heading ?? "Current summary",
                 Summary: Model.SummaryPoints[index],
                 Href: sourceSection is null ? "#" : $"#{sourceSection.Id}"));
         }
@@ -126,7 +126,7 @@
             Summary: "Guest submissions are allowed. An account keeps the case, recovery state, and later replies in one place.",
             Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
             Label: Model.SupportIntake.AccountSupportLabel,
-            Details: new[] { "Guest allowed", "History in Account", "No outside account" }));
+            Details: new[] { "Guest allowed", "History in Account", "Everything in one place" }));
         contactRouteChoices.Add((
             Id: "install-continuity",
             Badge: "Return to setup",
@@ -136,7 +136,7 @@
             Label: installRouteLabel,
             Details: new[]
             {
-                Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install path",
+                Model.SupportIntake.RecoveryModeOnly ? "Recovery only" : "Normal install path",
                 "Devices & access stays simple",
                 "Account return"
             }));
@@ -198,8 +198,8 @@
 {
     <section class="continuity-band trust-doc-band">
         <div class="continuity-band__copy">
-            <p class="eyebrow">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Boundary summary" : "Rule summary"))</p>
-            <h2 class="editorial-title">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Read the trust boundary first, then the full policy." : "Read the rule boundary first, then the full terms."))</h2>
+            <p class="eyebrow">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Privacy summary" : "Rule summary"))</p>
+            <h2 class="editorial-title">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Read the short privacy summary first, then the full policy." : "Read the short rules summary first, then the full terms."))</h2>
             <p class="editorial-copy">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
                 ? "Start with the short version: the app file stays the same for everyone, and telemetry or diagnostics stay explicit about what they capture."
                 : "Start with the short version: Windows and Linux are public now, macOS is guided support only, and Downloads stays the normal place to get the current build."))</p>

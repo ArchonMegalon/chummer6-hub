@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model FeatureDetailPageViewModel
 @{
-    ViewData["Title"] = PublicFacingCopyHumanizer.Clean(Model.Heading);
+    ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail surface-minimal";
     static string NormalizeDetailRoute(string href)
@@ -22,10 +22,13 @@
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
-    static string PublicText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
     const string ReleaseDetailFamily = "release-detail";
-    var displayFamily = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase)
+    const string PreviewDetailFamily = "preview-detail";
+    var displayFamily = string.Equals(Model.Family, "live-release", StringComparison.OrdinalIgnoreCase)
         ? ReleaseDetailFamily
+        : string.Equals(Model.Family, "preview-detail", StringComparison.OrdinalIgnoreCase)
+            ? PreviewDetailFamily
         : Model.Family;
 
     var routeChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Details)>();
@@ -46,21 +49,21 @@
     {
         "roadmap" => "Open the next page",
         ReleaseDetailFamily => "Open the related page",
-        "preview-concept" => "See what works today",
+        PreviewDetailFamily => "See what works today",
         _ => "Continue"
     };
     var primaryRouteSummary = displayFamily switch
     {
         "roadmap" => $"{Model.PrimaryAction.Label} is the next useful page.",
         ReleaseDetailFamily => $"{Model.PrimaryAction.Label} opens the related page.",
-        "preview-concept" => $"{Model.PrimaryAction.Label} shows what works today.",
+        PreviewDetailFamily => $"{Model.PrimaryAction.Label} shows what works today.",
         _ => $"{Model.PrimaryAction.Label} is the next useful step."
     };
     var primaryRouteDetails = displayFamily switch
     {
         "roadmap" => new[] { "Next page", "Current status", "Help nearby" },
         ReleaseDetailFamily => new[] { "Related page", "Downloads nearby", "Help nearby" },
-        "preview-concept" => new[] { "Live now", "Next page", "Help nearby" },
+        PreviewDetailFamily => new[] { "Live now", "Next page", "Help nearby" },
         _ => new[] { "Feature page", "Next page", "Help nearby" }
     };
 
@@ -78,7 +81,7 @@
             Title: "Open downloads",
             Summary: "Use downloads when you need the current Windows or Linux installer.",
             Details: new[] { "Installer", "Platform choice", "Help nearby" }),
-        "preview-concept" => (
+        PreviewDetailFamily => (
             Href: "/now",
             Label: "Open what works today",
             Title: "See what works today",
@@ -109,16 +112,16 @@
                 Details: new[] { "Roadmap", "Related work", "Current status" }),
             ReleaseDetailFamily => (
                 Href: "/artifacts",
-                Label: "Open library",
-                Title: "Open the library",
-                Summary: "Use the library when you want related items and history together.",
-                Details: new[] { "Library", "Related items", "History" }),
-            "preview-concept" => (
+                Label: "Open related pages",
+                Title: "Open related pages",
+                Summary: "Use related pages when you want nearby items and history together.",
+                Details: new[] { "Related pages", "Nearby items", "History" }),
+            PreviewDetailFamily => (
                 Href: "/artifacts",
-                Label: "Open library",
-                Title: "Open the library",
-                Summary: "Use the library when you want related items and current context together.",
-                Details: new[] { "Library", "Related items", "Current context" }),
+                Label: "Open related pages",
+                Title: "Open related pages",
+                Summary: "Use related pages when you want nearby items and current context together.",
+                Details: new[] { "Related pages", "Nearby items", "Current context" }),
             _ => (
                 Href: "/roadmap",
                 Label: "Open roadmap",
@@ -233,7 +236,7 @@ else
 <section class="editorial-block" id="feature-route-map">
     <div class="editorial-block__lead">
         <p class="eyebrow">Where next</p>
-        <h2 class="editorial-title">Choose the next page.</h2>
+        <h2 class="editorial-title">Choose the next step.</h2>
         <p class="editorial-copy">Open the page that matches the job: install, status, details, or help.</p>
     </div>
     <div class="route-choice-grid">
@@ -279,7 +282,7 @@ else
     case ReleaseDetailFamily:
         @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailLiveProof.cshtml", Model)
         break;
-    case "preview-concept":
+    case PreviewDetailFamily:
         @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml", Model)
         break;
     default:
@@ -289,7 +292,7 @@ else
 
 <section class="release-footnote">
     <p class="eyebrow">Next</p>
-    <h2 class="editorial-title">Read this page, then move on.</h2>
+    <h2 class="editorial-title">Move on once this is clear.</h2>
     <p class="editorial-copy">Take the direct action when it is clear. Open status for the live product, or Help for support.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>

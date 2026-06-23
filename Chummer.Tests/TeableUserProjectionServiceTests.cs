@@ -160,6 +160,62 @@ public sealed class TeableUserProjectionServiceTests
     }
 
     [Fact]
+    public async Task SyncAllUsesConfiguredWhatsappDefaultsWhenWhatsappChannelOmitsPurpose()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_PURPOSE"] = "support_legacy_only",
+            ["CHUMMER_IDENTITY_LINK_WHATSAPP_SUPPORT_OPENING_PROMPT"] = "Bitte zuerst kurz den Kontext geben.",
+        });
+        HubUserDto user = new(
+            UserId: "usr-demo",
+            SubjectId: "subject.demo",
+            DisplayName: "Demo Runner",
+            Handle: "demo-runner",
+            Visibility: "private",
+            Timezone: "Europe/Vienna",
+            CountryCode: "AT",
+            LinkedPrincipals: ["subject.demo"],
+            GroupIds: Array.Empty<string>(),
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:15:00Z"))
+        {
+            Email = "demo@example.com",
+        };
+        SeedUser(fixture.Store, user);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.ChannelLinks.Add(new ChannelLinkDto(
+                ChannelLinkId: "chn-whatsapp-demo",
+                UserId: user.UserId,
+                ChannelKind: "whatsapp_official_business",
+                DisplayLabel: "+436647916419",
+                Status: "ea_linked",
+                OfficialChannel: true,
+                NotificationsEnabled: false,
+                CreatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:20:00Z"),
+                UpdatedAtUtc: DateTimeOffset.Parse("2026-04-12T10:21:00Z"),
+                Note: "Legacy WhatsApp support link")
+            {
+                Purpose = string.Empty,
+                AiSupportOpeningPrompt = string.Empty
+            });
+            fixture.Store.PersistLocked();
+        }
+
+        TeableUserProjectionSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("passed", result.State);
+        LoggedRequest create = Assert.Single(
+            fixture.Handler.Requests,
+            static item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record");
+        using JsonDocument created = JsonDocument.Parse(create.Body);
+        JsonElement fields = created.RootElement.GetProperty("records")[0].GetProperty("fields");
+        Assert.Equal("support_legacy_only", fields.GetProperty("WhatsApp Support Purpose").GetString());
+        Assert.Equal("Bitte zuerst kurz den Kontext geben.", fields.GetProperty("WhatsApp Support Opening Prompt").GetString());
+    }
+
+    [Fact]
     public async Task SyncAllBatchCreatesMissingUsersAfterSingleExistingRecordScan()
     {
         using Fixture fixture = new();

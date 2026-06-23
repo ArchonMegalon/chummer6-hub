@@ -1,6 +1,6 @@
 @model KnowledgeFabricPageViewModel
 @{
-    static string PublicKnowledgeText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicKnowledgeText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     ViewData["Title"] = PublicKnowledgeText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
@@ -35,19 +35,20 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Rule explanations</p>
-        <h2 class="editorial-title">Read the summary and download the details when needed.</h2>
-        <p class="editorial-copy">This page keeps rule answers short: summary, history, and downloadable details. It does not dump book text or pretend to answer everything.</p>
+        <p class="eyebrow">Rules</p>
+        <h2 class="editorial-title">Read the short answer and open more when needed.</h2>
+        <p class="editorial-copy">This page keeps rule answers short: a summary, recent context, and a deeper view when you need it. It does not dump book text or pretend to answer everything.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var receipt in Model.Receipts)
         {
+            var provenance = PublicKnowledgeText(receipt.Provenance);
             <article class="route-choice-card">
-                <span class="tag">@PublicFacingCopyHumanizer.Clean(receipt.Status)</span>
-                <h3>@PublicFacingCopyHumanizer.Clean(receipt.Topic)</h3>
-                <p>@PublicFacingCopyHumanizer.Clean(receipt.Summary)</p>
+                <span class="tag">@PublicKnowledgeText(receipt.Status)</span>
+                <h3>@PublicKnowledgeText(receipt.Topic)</h3>
+                <p>@PublicKnowledgeText(receipt.Summary)</p>
                 <div class="route-choice-card__details">
-                    <span>@PublicFacingCopyHumanizer.Clean(receipt.Provenance)</span>
+                    <span>Based on: @PublicFacingCopyHumanizer.Clean(receipt.Provenance)</span>
                 </div>
                 <a class="editorial-strip__action" href="@receipt.Route">Open details</a>
             </article>

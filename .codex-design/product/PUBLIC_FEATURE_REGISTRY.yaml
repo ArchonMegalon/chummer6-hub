@@ -432,10 +432,10 @@ cards:
     detail_route: /community
     render_mode: external_explainer
     action_label: Open Community Hub
-    detail_primary_href: /community/receipts/open-run-network.json
-    detail_primary_label: Open the open-run board
-    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/FEATURES/community-hub.md
-    fallback_label: Read the feature brief
+    detail_primary_href: /community
+    detail_primary_label: Open the Community Hub page
+    fallback_route: /community/receipts/open-run-network.json
+    fallback_label: Open the open-run board
     external_ok: true
     pain: Finding a table still means juggling community rules, approvals, chats, calendars, and follow-up by hand.
     payoff: Chummer becomes the structured layer above community chats, calendars, and play surfaces instead of another disconnected app.

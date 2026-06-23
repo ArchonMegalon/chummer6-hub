@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-package-receipt";
 
     static string PublicPackageText(string? value)
-        => PublicFacingCopyHumanizer.Clean(value)
+        => UndetectableHumanizerCopyAdapter.Humanize(value)
             .Replace("records", "updates", StringComparison.OrdinalIgnoreCase);
 }
 

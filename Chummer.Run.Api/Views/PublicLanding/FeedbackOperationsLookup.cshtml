@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-participate surface-minimal";
     var lookup = Model.Lookup;
     var results = lookup.Results.ToArray();
-    static string PublicLookupText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicLookupText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="release-footnote route-anchor-target">

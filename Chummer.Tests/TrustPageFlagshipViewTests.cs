@@ -17,13 +17,13 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);
         Assert.Contains("Pick the path", trustView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid--compact", trustView, StringComparison.Ordinal);
-        Assert.Contains("ViewData[\"Title\"] = PublicFacingCopyHumanizer.Clean(Model.Heading);", trustView, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
         Assert.Contains("Use Participate for ideas and safe public bugs", trustView, StringComparison.Ordinal);
-        Assert.Contains("Read the trust boundary first, then the full policy.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Read the rule boundary first, then the full terms.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Read the short privacy summary first, then the full policy.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Read the short rules summary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Details</h2>", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);

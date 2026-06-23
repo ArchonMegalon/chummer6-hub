@@ -1,6 +1,6 @@
 @model MobileProjectionPageViewModel
 @{
-    static string PublicMobileText(string? value) => PublicFacingCopyHumanizer.Clean(value);
+    static string PublicMobileText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     ViewData["Title"] = PublicMobileText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;

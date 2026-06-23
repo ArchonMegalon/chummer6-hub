@@ -67,7 +67,7 @@ public sealed class BlackLedgerFactionTests
         Assert.Contains("faction-storyboard-frame__payoff", promoView, StringComparison.Ordinal);
         Assert.DoesNotContain("Fallback mode:", promoView, StringComparison.Ordinal);
         Assert.DoesNotContain("faction-storyboard-frame__proof", promoView, StringComparison.Ordinal);
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.Promo.RenderPipelineLabel)", promoView, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.Humanize(Model.Promo.RenderPipelineLabel)", promoView, StringComparison.Ordinal);
         Assert.Contains("@foreach (var scene in Model.Promo.ScreenplayScenes)", promoView, StringComparison.Ordinal);
     }
 }

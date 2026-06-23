@@ -81,6 +81,27 @@ Public CTAs should point readers toward:
 * the Chummer6 issue tracker for free baseline feedback
 * the Hub participation page for the guided contribution lane
 
+### `public_board_model`
+
+`/participate` should feel like the public board itself, not a speech about the board.
+
+Required posture:
+
+* first-party Chummer chrome
+* ProductLift-style dense board behavior
+* one-screen orientation before the board content starts
+* immediate access to feedback, roadmap, and shipped closeout lanes
+* short route guidance for private support, account recovery, and logs
+* compact cards, filters, vote signals, and recent movement
+
+Avoid:
+
+* long explainer stacks before the board
+* internal trust/proof/process copy
+* provider badges or third-party hosting language
+* duplicate lane explanations that waste vertical space
+* mixing guided contribution onboarding into the guest board surface
+
 ## Canonical split
 
 ### `chummer6-hub`
