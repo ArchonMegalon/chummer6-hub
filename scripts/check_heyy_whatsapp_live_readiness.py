@@ -24,6 +24,19 @@ HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID",
 )
 
+CHANNEL_MESSAGING_KEYS = (
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_BINDING_ID",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_TELEGRAM_BINDING_ID",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID",
+    "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT",
+)
+
+ALL_KEYS = HEYY_KEYS + CHANNEL_MESSAGING_KEYS
+
 
 def load_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
@@ -160,6 +173,19 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
     if not meta_ready and not ea_ready:
         blockers.append("live_provider_unconfigured")
 
+    channel_messaging_ready = (
+        present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN")
+        and present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID")
+        and (
+            present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID")
+            or present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID")
+            or present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_BINDING_ID")
+        )
+        and base_url_is_real({
+            "CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL": values.get("CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL", "")
+        })
+    )
+
     return {
         "status": "ready" if not blockers else "blocked",
         "blockers": blockers,
@@ -182,6 +208,17 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
             "meta_ready": meta_ready,
             "ea_ready": ea_ready,
         },
+        "channel_messaging": {
+            "ea_base_url_real": base_url_is_real({
+                "CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL": values.get("CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL", "")
+            }),
+            "ea_api_token_present": present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"),
+            "ea_principal_id_present": present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"),
+            "ea_generic_binding_present": present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_BINDING_ID"),
+            "ea_whatsapp_binding_present": present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"),
+            "ea_whatsapp_web_binding_present": present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_WEB_BINDING_ID"),
+            "ready": channel_messaging_ready,
+        },
     }
 
 
@@ -196,7 +233,7 @@ def main() -> int:
 
     env_values = load_env_file(Path(args.env_file))
     container_values = {} if args.skip_container else load_container_env(args.container)
-    effective = {**env_values, **{key: value for key, value in container_values.items() if key in HEYY_KEYS}}
+    effective = {**env_values, **{key: value for key, value in container_values.items() if key in ALL_KEYS}}
     report = build_report(effective, args.recipient)
     report["sources"] = {
         "env_file": str(Path(args.env_file)),

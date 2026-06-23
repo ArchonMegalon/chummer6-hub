@@ -13,6 +13,12 @@ public sealed class ExecutiveAssistantChannelMessagingService
     private const string ConnectorDispatchTool = "connector.dispatch";
     private const string DeliverySendAction = "delivery.send";
     private const string DefaultEaBaseUrl = "http://127.0.0.1:8090";
+    private static readonly string[] NonProductionEaBaseUrlMarkers =
+    [
+        "support-progress-mock",
+        "127.0.0.1",
+        "localhost",
+    ];
 
     private const string TelegramChannelKind = "telegram_official_bot";
     private const string WhatsappChannelKind = "whatsapp_official_business";
@@ -722,7 +728,21 @@ public sealed class ExecutiveAssistantChannelMessagingService
     private bool EaDispatchConfigured(string channelKind)
         => !string.IsNullOrWhiteSpace(ResolveEaApiToken())
             && !string.IsNullOrWhiteSpace(ResolveEaPrincipalId())
-            && !string.IsNullOrWhiteSpace(ResolveEaBindingId(channelKind));
+            && !string.IsNullOrWhiteSpace(ResolveEaBindingId(channelKind))
+            && RealEaBaseUrlConfigured();
+
+    private bool RealEaBaseUrlConfigured()
+    {
+        string? configured = AccountService.NormalizeOptional(_configuration["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"]);
+        if (configured is null)
+        {
+            return false;
+        }
+
+        string normalized = configured.Trim().TrimEnd('/');
+        return NonProductionEaBaseUrlMarkers.All(marker =>
+            !normalized.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
 
     private string ResolveEaBindingId(string channelKind)
         => string.Equals(channelKind, WhatsappChannelKind, StringComparison.OrdinalIgnoreCase)

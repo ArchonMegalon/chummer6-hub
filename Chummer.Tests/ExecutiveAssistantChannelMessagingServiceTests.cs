@@ -226,6 +226,38 @@ public sealed class ExecutiveAssistantChannelMessagingServiceTests
     }
 
     [Fact]
+    public async Task SendMessageAsync_returnsUnconfiguredStatusWhenEaBaseUrlIsMock()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL"] = "http://support-progress-mock:8080",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_PRINCIPAL_ID"] = "principal-runner",
+            ["CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_BINDING_ID"] = "business-binding",
+            ["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"] = "false"
+        });
+
+        const string subjectId = "subject.ea.runner.mock";
+        fixture.Accounts.EnsureUserWithStatus(subjectId, "Runner", "runner@example.com");
+        fixture.Links.LinkChannel(new LinkChannelRequest(subjectId, "whatsapp_official_business", "+43 664 791 6419", true));
+        fixture.Links.LinkChannelToExecutiveAssistant("whatsapp_official_business", new LinkChannelToExecutiveAssistantRequest(subjectId, null));
+
+        ExecutiveAssistantChannelSendResult result = await fixture.Service.SendMessageAsync(
+            subjectId,
+            "whatsapp_official_business",
+            new ExecutiveAssistantChannelSendRequest(
+                MessageText: "testing mock route",
+                CounterpartyHandle: null,
+                ConversationId: null,
+                IdempotencyKey: null),
+            CancellationToken.None);
+
+        Assert.Equal("suppressed_ea_unconfigured", result.Status);
+        Assert.Equal("ea_delivery_unconfigured", result.FailureReason);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+    }
+
+    [Fact]
     public async Task SendMessageAsync_prefersWhatsappWebBindingWhenConfigured()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
