@@ -34,6 +34,11 @@ fi
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
+  case "$artifact_name" in
+    chummer-*-win-*-payload.zip)
+      return 0
+      ;;
+  esac
   if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-*installer.dmg || "$artifact_name" == chummer-*-osx-*installer.pkg ]]; then
     return 1
   fi
@@ -45,6 +50,17 @@ is_public_artifact() {
       ;;
   esac
   return 0
+}
+
+verify_windows_installer_payload_gate() {
+  if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
+    echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
+    exit 1
+  fi
+
+  local -a gate_args=(--files-dir "$FILES_SOURCE" --allow-empty)
+  [[ -f "$MANIFEST_SOURCE" ]] && gate_args+=(--manifest "$MANIFEST_SOURCE")
+  python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${gate_args[@]}"
 }
 
 bundle_manifest_matches_files() {
@@ -95,6 +111,10 @@ for file_path in sorted(files_root.iterdir()):
     if not file_path.is_file():
         continue
     if file_path.name in sidecars:
+        continue
+    if file_path.name.startswith("chummer-") and file_path.name.endswith("-payload.zip"):
+        continue
+    if file_path.name.startswith("chummer-") and file_path.name.endswith("-payload.zip.json"):
         continue
     if file_path.name not in seen:
         failures.append(f"bundle contains extra file not present in manifest: {file_path.name}")
@@ -149,6 +169,8 @@ if [[ "${#artifacts[@]}" -eq 0 ]]; then
   echo "No desktop artifacts found under $FILES_SOURCE" >&2
   exit 1
 fi
+
+verify_windows_installer_payload_gate
 
 sync_source_dir="$(mktemp -d)"
 cleanup() {

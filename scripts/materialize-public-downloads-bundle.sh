@@ -492,6 +492,15 @@ for row in rows:
             file_name = Path(url.split("?", 1)[0].split("#", 1)[0]).name
     if file_name:
         allowed.add(file_name)
+        lowered = file_name.lower()
+        if lowered.endswith("-installer.exe") and "-win-" in lowered:
+            allowed.add(file_name[:-len("-installer.exe")] + "-payload.zip")
+    payload_file_name = str(row.get("payloadFileName") or "").strip()
+    if payload_file_name:
+        allowed.add(payload_file_name)
+    payload_url = str(row.get("payloadDownloadUrl") or "").strip()
+    if payload_url:
+        allowed.add(Path(payload_url.split("?", 1)[0].split("#", 1)[0]).name)
 
 for artifact_path in files_root.glob("chummer-*"):
     if not artifact_path.is_file():
@@ -515,6 +524,16 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
 filter_files_to_manifest_truth "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
+
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
+  echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
+  exit 1
+fi
+
+python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
+  --files-dir "$combined_files_root" \
+  --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" \
+  --allow-empty
 
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then

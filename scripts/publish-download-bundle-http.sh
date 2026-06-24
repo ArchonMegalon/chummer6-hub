@@ -52,6 +52,17 @@ if [[ ! -d "$BUNDLE_DIR/files" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
+  echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
+  exit 1
+fi
+
+python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
+  --files-dir "$BUNDLE_DIR/files" \
+  --manifest "$MANIFEST_PATH" \
+  --manifest "$CANONICAL_MANIFEST_PATH" \
+  --allow-empty
+
 if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
   exit 1

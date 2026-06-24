@@ -32,6 +32,17 @@ if [[ ! -f "$CANONICAL_MANIFEST_SOURCE" ]]; then
     --compat-output "$MANIFEST_SOURCE" >/dev/null
 fi
 
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
+  echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
+  exit 1
+fi
+
+python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
+  --files-dir "$FILES_SOURCE" \
+  --manifest "$MANIFEST_SOURCE" \
+  --manifest "$CANONICAL_MANIFEST_SOURCE" \
+  --allow-empty
+
 if [[ -z "$S3_TARGET_URI" ]]; then
   echo "Set CHUMMER_PORTAL_DOWNLOADS_S3_URI (for example: s3://bucket/path)." >&2
   exit 1
@@ -75,7 +86,8 @@ done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
   -name 'chummer-*-installer.deb' -o \
   -name 'chummer-*-installer.pkg' -o \
   -name 'chummer-*-installer.dmg' -o \
-  -name 'chummer-*-installer.msix' \
+  -name 'chummer-*-installer.msix' -o \
+  -name 'chummer-*-win-*-payload.zip' \
 \) | sort)
 
 copy_target() {
