@@ -102,6 +102,17 @@ public sealed record PublicAccessPostureViewModel(
     string DownloadFaqAnswer,
     string AccountFaqAnswer);
 
+public sealed record BillingMembershipPageViewModel(
+    Chummer.Run.Contracts.Billing.BrilliantDirectoriesBillingPageDto? Page,
+    Chummer.Run.Contracts.Billing.BillingPlanCardDto? FreePlan,
+    Chummer.Run.Contracts.Billing.BillingPlanCardDto? SupporterPlan,
+    string? UserId,
+    string? Email,
+    bool Unavailable,
+    string Heading,
+    string Summary,
+    string ManageMembershipHref);
+
 public sealed record ReleasePlatformAvailabilityViewModel(
     string PlatformId,
     string PlatformLabel,

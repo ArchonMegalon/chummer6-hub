@@ -1,0 +1,182 @@
+@model BillingMembershipPageViewModel
+@{
+    Layout = null;
+    var title = Model.Heading;
+    var free = Model.FreePlan;
+    var supporter = Model.SupporterPlan;
+    var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@title</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0d1016;
+            --surface: #151922;
+            --surface-alt: #1b2130;
+            --border: #2a3345;
+            --text: #f3f5f7;
+            --muted: #b3bcc9;
+            --accent: #9fe8d5;
+            --accent-strong: #8adcc7;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        main {
+            max-width: 58rem;
+            margin: 0 auto;
+            padding: 2rem 1.25rem 3rem;
+        }
+        h1, h2, p { margin: 0; }
+        .stack { display: grid; gap: 1rem; }
+        .hero { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
+        .eyebrow { color: var(--accent); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
+        .summary { color: var(--muted); line-height: 1.55; max-width: 42rem; }
+        .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            display: grid;
+            gap: 0.85rem;
+        }
+        .card--accent { background: var(--surface-alt); }
+        .label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--accent);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        ul { margin: 0; padding-left: 1rem; color: var(--muted); display: grid; gap: 0.45rem; }
+        .note, .field-help { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+        .action-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        a.button, button.button {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 999px;
+            padding: 0.7rem 1rem;
+            font: inherit;
+            cursor: pointer;
+        }
+        button.button--primary { background: var(--accent); color: #071512; border-color: transparent; }
+        button.button--primary:hover { background: var(--accent-strong); }
+        .form-grid { display: grid; gap: 0.85rem; }
+        label { display: grid; gap: 0.4rem; font-size: 0.95rem; }
+        input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #0f141c;
+            color: var(--text);
+            padding: 0.8rem 0.9rem;
+            font: inherit;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.5rem 0.75rem;
+            color: var(--muted);
+            width: fit-content;
+        }
+    </style>
+</head>
+<body>
+<main class="stack">
+    <section class="hero">
+        <p class="eyebrow">Membership</p>
+        <h1>@Model.Heading</h1>
+        <p class="summary">@Model.Summary</p>
+        <div class="pill">Supporter is appreciation, not extra access.</div>
+    </section>
+
+    @if (Model.Unavailable)
+    {
+        <section class="card card--accent">
+            <h2>Try again later</h2>
+            <p class="note">The hosted billing route is not available on this host right now. Product access does not change while this is down.</p>
+            <div class="action-row">
+                <a class="button" href="@Model.ManageMembershipHref">Back to account</a>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="grid">
+            @if (free is not null)
+            {
+                <article class="card">
+                    <span class="label">Free</span>
+                    <h2>@free.Name</h2>
+                    <p class="note">@free.Summary</p>
+                    <ul>
+                        @foreach (var item in free.Included)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                    <div class="action-row">
+                        <a class="button" href="@free.PrimaryAction.Href">@free.PrimaryAction.Label</a>
+                    </div>
+                </article>
+            }
+            @if (supporter is not null)
+            {
+                <article class="card card--accent">
+                    <span class="label">Supporter</span>
+                    <h2>@supporter.Name</h2>
+                    <p class="note">@supporter.Summary</p>
+                    <ul>
+                        @foreach (var item in supporter.Included)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                    <form class="form-grid" method="post" action="/account/billing/supporter">
+                        @if (hasUserId)
+                        {
+                            <input type="hidden" name="userId" value="@Model.UserId">
+                            <div class="pill">Account ID: @Model.UserId</div>
+                        }
+                        else
+                        {
+                            <label>
+                                Account ID
+                                <input type="text" name="userId" value="@Model.UserId" autocomplete="username" placeholder="Required for supporter checkout">
+                            </label>
+                        }
+                        <label>
+                            Email
+                            <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
+                        </label>
+                        <p class="field-help">This opens the external billing checkout. Supporter currently unlocks no extra features beyond Free.</p>
+                        <div class="action-row">
+                            <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
+                            <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
+                        </div>
+                    </form>
+                </article>
+            }
+        </section>
+    }
+</main>
+</body>
+</html>

@@ -49,6 +49,12 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsText).not.toContain('Premium');
   expect(payfunnelsText).not.toContain('Upgrade');
 
+  const brilliantDirectoriesText = await brilliantDirectoriesPage.text();
+  expect(brilliantDirectoriesText).toContain('same product access today');
+  expect(brilliantDirectoriesText).toContain('Supporter');
+  expect(brilliantDirectoriesText).not.toContain('Premium');
+  expect(brilliantDirectoriesText).not.toContain('Upgrade');
+
   const originPayload = await originReceipt.json();
   expect(originPayload.document.slug).toBe('origin-dossier-the-name-she-chose');
   expect(originPayload.document.sourcePath).toBe('products/chummer/horizons/origin-dossier.md');

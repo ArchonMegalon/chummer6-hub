@@ -2,11 +2,12 @@ using System.Net;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Mvc;
+using Chummer.Run.Api.ViewModels;
 
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
-public sealed class BrilliantDirectoriesBillingController : ControllerBase
+public sealed class BrilliantDirectoriesBillingController : Controller
 {
     private readonly BrilliantDirectoriesBillingService _billing;
 
@@ -17,70 +18,17 @@ public sealed class BrilliantDirectoriesBillingController : ControllerBase
 
     [HttpGet("/account/billing")]
     [Produces("text/html")]
-    public ContentResult BillingPage()
+    public IActionResult BillingPage([FromQuery] string? userId = null, [FromQuery] string? email = null)
     {
         try
         {
             var page = _billing.GetPage();
-            var free = page.Plans.Single(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.FreePlanKey, StringComparison.OrdinalIgnoreCase));
-            var supporter = page.Plans.Single(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.SupporterPlanKey, StringComparison.OrdinalIgnoreCase));
-            string html = $$"""
-                <!doctype html>
-                <html lang="en">
-                <head><meta charset="utf-8"><title>{{WebUtility.HtmlEncode(page.Heading)}}</title></head>
-                <body>
-                  <main>
-                    <h1>{{WebUtility.HtmlEncode(page.Heading)}}</h1>
-                    <p>{{WebUtility.HtmlEncode(page.Summary)}}</p>
-                    <section>
-                      <h2>{{WebUtility.HtmlEncode(free.Name)}}</h2>
-                      <p>{{WebUtility.HtmlEncode(free.Summary)}}</p>
-                      <ul>
-                        {{string.Join("", free.Included.Select(item => $"<li>{WebUtility.HtmlEncode(item)}</li>"))}}
-                      </ul>
-                      <p><a href="{{WebUtility.HtmlEncode(free.PrimaryAction.Href)}}">{{WebUtility.HtmlEncode(free.PrimaryAction.Label)}}</a></p>
-                    </section>
-                    <section>
-                      <h2>{{WebUtility.HtmlEncode(supporter.Name)}}</h2>
-                      <p>{{WebUtility.HtmlEncode(supporter.Summary)}}</p>
-                      <ul>
-                        {{string.Join("", supporter.Included.Select(item => $"<li>{WebUtility.HtmlEncode(item)}</li>"))}}
-                      </ul>
-                      <form method="post" action="/account/billing/supporter">
-                        <label>User id <input type="text" name="userId"></label>
-                        <label>Email <input type="email" name="email"></label>
-                        <button type="submit">{{WebUtility.HtmlEncode(supporter.PrimaryAction.Label)}}</button>
-                      </form>
-                    </section>
-                    <p><a href="{{WebUtility.HtmlEncode(page.ManageMembershipHref)}}">Manage billing</a></p>
-                  </main>
-                </body>
-                </html>
-                """;
-            return Content(html, "text/html");
+            return View("~/Views/Billing/Membership.cshtml", BuildViewModel(page, userId, email));
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
         {
-            const string html = """
-                <!doctype html>
-                <html lang="en">
-                <head><meta charset="utf-8"><title>Membership temporarily unavailable</title></head>
-                <body>
-                  <main>
-                    <h1>Membership temporarily unavailable</h1>
-                    <p>Free and Supporter still share the same product access today.</p>
-                    <p>The hosted billing route is not ready on this host yet. Try again later or return to your account.</p>
-                    <p><a href="/account">Back to account</a></p>
-                  </main>
-                </body>
-                </html>
-                """;
-            return new ContentResult
-            {
-                Content = html,
-                ContentType = "text/html",
-                StatusCode = StatusCodes.Status503ServiceUnavailable
-            };
+            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return View("~/Views/Billing/Membership.cshtml", BuildUnavailableViewModel(userId, email));
         }
     }
 
@@ -174,4 +122,38 @@ public sealed class BrilliantDirectoriesBillingController : ControllerBase
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Billing account lookup was not authorized.");
         }
     }
+
+    private static BillingMembershipPageViewModel BuildViewModel(
+        BrilliantDirectoriesBillingPageDto page,
+        string? userId,
+        string? email)
+    {
+        BillingPlanCardDto? free = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.FreePlanKey, StringComparison.OrdinalIgnoreCase));
+        BillingPlanCardDto? supporter = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.SupporterPlanKey, StringComparison.OrdinalIgnoreCase));
+        return new BillingMembershipPageViewModel(
+            Page: page,
+            FreePlan: free,
+            SupporterPlan: supporter,
+            UserId: TrimToNull(userId),
+            Email: TrimToNull(email),
+            Unavailable: false,
+            Heading: page.Heading,
+            Summary: page.Summary,
+            ManageMembershipHref: page.ManageMembershipHref);
+    }
+
+    private static BillingMembershipPageViewModel BuildUnavailableViewModel(string? userId, string? email)
+        => new(
+            Page: null,
+            FreePlan: null,
+            SupporterPlan: null,
+            UserId: TrimToNull(userId),
+            Email: TrimToNull(email),
+            Unavailable: true,
+            Heading: "Membership temporarily unavailable",
+            Summary: "Free and Supporter still share the same product access today. The hosted billing route is not ready on this host yet.",
+            ManageMembershipHref: "/account");
+
+    private static string? TrimToNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

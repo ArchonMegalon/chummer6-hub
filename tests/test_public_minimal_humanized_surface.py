@@ -460,6 +460,20 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
         assert forbidden not in participate
 
 
+def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
+    controller = read("Chummer.Run.Api/Controllers/BrilliantDirectoriesBillingController.cs")
+    billing_view = read("Chummer.Run.Api/Views/Billing/Membership.cshtml")
+
+    assert "ControllerBase" not in controller
+    assert 'return View("~/Views/Billing/Membership.cshtml"' in controller
+    assert "<!doctype html>" not in controller
+    assert "Supporter is appreciation, not extra access." in billing_view
+    assert "Supporter currently unlocks no extra features beyond Free." in billing_view
+    assert "Manage billing" in billing_view
+    assert "Premium" not in billing_view
+    assert "Upgrade" not in billing_view
+
+
 def test_signal_packet_source_uses_plain_public_copy_labels() -> None:
     packet = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
 
