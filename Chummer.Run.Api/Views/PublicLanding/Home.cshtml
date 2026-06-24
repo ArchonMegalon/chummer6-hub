@@ -263,7 +263,7 @@
     var homeContinuitySummary = leadWorkspaceServerPlane?.NextSafeAction.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.NextSafeAction
         ?? (pendingClaims > 0
-            ? "Finish the claim on the device that already has the build, then return here if you need to relink it."
+            ? "Finish setup on the device that already has the build, then return here if you need to reconnect it."
             : claimedInstallations > 0
                 ? "Downloads, support, and saved work stay attached to the same account."
                 : "Use this account if you want installs, support, and saved work tied together from the first launch.");
@@ -274,7 +274,7 @@
             : claimedInstallations > 0
                 ? $"{claimedInstallations} linked install(s) are already attached to this account."
                 : pendingClaims > 0
-                    ? $"{pendingClaims} pending claim(s) are waiting on their original device."
+                    ? $"{pendingClaims} pending setup step(s) are waiting on their original device."
                     : "No install is linked yet.";
     var homeWhatChangedSummary = leadWorkspaceServerPlane?.ChangePackets.FirstOrDefault()?.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.ClosureSummary

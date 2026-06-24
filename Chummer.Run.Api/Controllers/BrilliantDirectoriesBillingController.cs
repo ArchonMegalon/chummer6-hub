@@ -44,7 +44,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         {
             return Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                detail: "Membership billing is temporarily unavailable while the hosted provider route is being configured.");
+                detail: "Membership billing is temporarily unavailable on this host right now.");
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             Email: TrimToNull(email),
             Unavailable: true,
             Heading: "Membership temporarily unavailable",
-            Summary: "Free and Supporter still share the same product access today. The hosted billing route is not ready on this host yet.",
+            Summary: "Free and Supporter still unlock the same product today. Billing is not ready on this host yet.",
             ManageMembershipHref: "/account");
 
     private static string? TrimToNull(string? value)

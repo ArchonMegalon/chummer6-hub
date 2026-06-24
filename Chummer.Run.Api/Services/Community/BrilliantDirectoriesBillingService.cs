@@ -62,7 +62,7 @@ public sealed class BrilliantDirectoriesBillingService
             Provider: options.ProviderName,
             ProviderKey: options.ProviderKey,
             Heading: "Membership",
-            Summary: "Chummer uses an external member billing portal. Free and Supporter share the same product access today.",
+            Summary: "Chummer uses an external billing page. Free and Supporter unlock the same product today.",
             Capabilities: new BillingProviderCapabilitiesDto(
                 options.ProviderKey,
                 BrilliantDirectoriesBillingConstants.SyncMode,
@@ -230,7 +230,7 @@ public sealed class BrilliantDirectoriesBillingService
         catch (InvalidOperationException ex) when (ex is not BrilliantDirectoriesBillingUnavailableException)
         {
             throw new BrilliantDirectoriesBillingUnavailableException(
-                "Membership billing is temporarily unavailable while the hosted provider route is being configured.",
+                "Membership billing is temporarily unavailable on this host right now.",
                 ex);
         }
     }

@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Equal("Brilliant Directories", page.Provider);
         Assert.Equal("brilliant_directories", page.ProviderKey);
-        Assert.Contains("same product access", page.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("same product", page.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.False(page.Capabilities.StoresTenantCredentials);
         Assert.False(page.Capabilities.GrantsPremiumFeatures);
         Assert.Equal("signed_membership_snapshot", page.Capabilities.SyncMode);
@@ -172,13 +173,22 @@ public sealed class BrilliantDirectoriesBillingTests
             })
             .Build();
         BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
-        BrilliantDirectoriesBillingController controller = new(service);
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
 
-        ContentResult result = controller.BillingPage();
+        IActionResult result = controller.BillingPage();
 
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
-        Assert.Contains("temporarily unavailable", result.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Unexpected server error", result.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, controller.Response.StatusCode);
+        BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.True(model.Unavailable);
+        Assert.Contains("temporarily unavailable", model.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

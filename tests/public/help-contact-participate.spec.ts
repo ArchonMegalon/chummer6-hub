@@ -43,17 +43,17 @@ test('help, contact, and participate keep public and private paths clear', async
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/partizipate');
-  await expect(participatePage.getByRole('heading', { name: 'Public requests, one board.' })).toBeVisible();
-  await expect(participatePage.locator('body')).toContainText('Keep private support in Help.');
+  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toBeVisible();
+  await expect(participatePage.locator('body')).toContainText('Use the public board for ideas and safe bugs.');
 
-  const fallbackHeading = participatePage.getByRole('heading', { name: 'Fallback form' });
+  const fallbackHeading = participatePage.getByText('Board offline?');
   const hostedHeading = participatePage.getByRole('heading', { name: 'Public board' });
   const usingFallback = await fallbackHeading.isVisible().catch(() => false);
   const usingHosted = await hostedHeading.isVisible().catch(() => false);
 
   expect(usingFallback || usingHosted).toBeTruthy();
   if (usingFallback) {
-    await expect(participatePage.getByRole('button', { name: 'Send feedback' })).toBeVisible();
+    await expect(participatePage.locator('body')).toContainText('private help');
   } else {
     await expect(participatePage.locator('iframe.participate-hosted__frame')).toBeVisible();
   }

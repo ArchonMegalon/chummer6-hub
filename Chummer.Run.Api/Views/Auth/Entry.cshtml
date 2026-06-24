@@ -40,7 +40,7 @@
         <p class="eyebrow">Account</p>
         <h1 class="hero-brand">CHUMMER</h1>
         <h2 class="hero-headline">@(isInstallLinkReturn ? "Claim your copy" : Model.Heading)</h2>
-        <p class="auth-entry__copy">@(isInstallLinkReturn ? "Use your email or Google account to attach this install to you. The app returns when the claim is done." : Model.SupportLine)</p>
+        <p class="auth-entry__copy">@(isInstallLinkReturn ? "Use your email or Google account to connect this install to you. The app returns when that is done." : Model.SupportLine)</p>
         <div class="auth-value-strip" aria-label="Immediate account value">
             <article class="auth-value-strip__fact">
                 <span>Linked installs</span>
@@ -48,7 +48,7 @@
             </article>
             <article class="auth-value-strip__fact">
                 <span>Devices and access</span>
-                <strong>Relink, reclaim, and recover from one calmer place.</strong>
+                <strong>Reconnect, replace, or recover from one calmer place.</strong>
             </article>
             <article class="auth-value-strip__fact">
                 <span>Support history</span>
@@ -90,7 +90,7 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser finishes the claim."
+                    ? "Keep Chummer open while the browser finishes connecting this copy."
                     : "If the browser cannot return to Chummer, open this page again from the app.")</p>
             }
             <form class="auth-form" method="post" action="/auth/email/start">
@@ -124,7 +124,7 @@
                 <span class="tag">What opens after sign-in</span>
                 <ul>
                     <li>Your home and account pages for return, recovery, and the next step.</li>
-                    <li>Account-linked downloads, claimed copies, and device return.</li>
+                    <li>Account-linked downloads, connected copies, and device return.</li>
                     <li>Support history already on the account.</li>
                 </ul>
             </div>
@@ -132,7 +132,7 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser finishes the claim."
+                    ? "Keep Chummer open while the browser finishes connecting this copy."
                     : "If the browser cannot return to Chummer, open this page again from the app.")</p>
             }
 

@@ -101,7 +101,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         assert forbidden not in combined
 
     for expected in (
-        "Devices and access is where you relink, reclaim, or recover this copy.",
+        "Devices and access is where you reconnect, replace, or recover this copy.",
         "Public feedback should start on the feedback page.",
         "Return to setup",
         "Need to go back to setup?",
@@ -392,13 +392,14 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);" in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
     assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";' in controller
-    assert "participate-shell" not in participate
-    assert "Fallback form" in participate
+    assert "participate-shell" in participate
+    assert "participate-hosted__frame" in participate
+    assert "Fallback form" not in participate
     assert "Join beta waitlist" not in participate
-    assert "participate-quick-form" in participate
-    assert "participate-lanes" not in participate
-    assert "@foreach (var lane in Model.Lanes)" not in participate
-    assert "@lane.ActionLabel" not in participate
+    assert "participate-quick-form" not in participate
+    assert "@foreach (var lane in Model.Lanes)" in participate
+    assert "@lane.ActionLabel" in participate
+    assert "Private help" in participate
     assert "Current themes" not in participate
     assert "Open in a tab" not in participate
     assert "BuildParticipatePageModel(" not in controller

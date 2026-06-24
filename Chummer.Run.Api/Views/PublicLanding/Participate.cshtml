@@ -4,40 +4,52 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate";
 }
-<section class="participate-board">
-    <form class="participate-quick-form" id="participate-submit" method="get" action="/contact">
-        <div class="participate-quick-form__header">
-            <div class="participate-quick-form__lead">
-                <h3>Fallback form</h3>
-                <p>Use this only while the public board is offline.</p>
-            </div>
-            <span class="participate-count">Public post</span>
-        </div>
-        <div class="participate-quick-form__top">
-            <div class="field">
-                <label for="participateTitle">Short title</label>
-                <input id="participateTitle" name="subject" maxlength="120" placeholder="One concrete suggestion or bug report" />
-            </div>
-            <div class="field">
-                <label for="participateKind">Category</label>
-                <select id="participateKind" name="topic">
-                    <option value="">Choose category</option>
-                    <option value="feature">Feature</option>
-                    <option value="bug">Bug</option>
-                    <option value="desktop">Desktop UX</option>
-                    <option value="install">Install or update</option>
-                    <option value="linux">Linux</option>
-                </select>
-            </div>
-        </div>
-        <div class="field">
-            <label for="participateSummary">Details</label>
-            <textarea id="participateSummary" name="message" rows="6" maxlength="1200" placeholder="What happened, what you expected, and why it matters."></textarea>
+<section class="participate-shell">
+    <div class="participate-shell__header">
+        <div class="participate-shell__lead">
+            <h1>Participate</h1>
+            <p>Use the public board for ideas and safe bugs. Use private help for installs, account issues, logs, or anything sensitive.</p>
         </div>
         <div class="participate-actions">
-            <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
-            <button class="button-like button-like--primary" type="submit">Send feedback</button>
-            <a class="button-like button-like--ghost" href="@Model.PrivateHelpHref">Help</a>
+            <a class="button-like button-like--ghost" href="@Model.RoadmapHref">Roadmap</a>
+            <a class="button-like button-like--ghost" href="@Model.ChangelogHref">Recent changes</a>
+            <a class="button-like button-like--primary" href="/contact#support-intake">Private help</a>
         </div>
-    </form>
+    </div>
+
+    <div class="participate-board">
+        <div class="participate-hosted">
+            <div class="participate-hosted__header">
+                <div class="participate-hosted__lead">
+                    <h2>Public board</h2>
+                    <p>Votes and public discussion stay here on a first-party route.</p>
+                </div>
+                <span class="participate-count">Public board</span>
+            </div>
+            <iframe
+                class="participate-hosted__frame"
+                src="@(string.IsNullOrWhiteSpace(Model.HostedBoardHref) ? "/partizipate/board" : Model.HostedBoardHref)"
+                title="Participate board"
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>
+
+        <aside class="participate-items" aria-label="Participate guidance">
+            <h3>Use the right lane</h3>
+            @foreach (var lane in Model.Lanes)
+            {
+                <article class="participate-lane">
+                    <span>@lane.Label</span>
+                    <h3>@lane.Title</h3>
+                    <p>@lane.Summary</p>
+                    <a class="inline-link" href="@lane.Href">@lane.ActionLabel</a>
+                </article>
+            }
+
+            <details class="participate-fallback">
+                <summary>Board offline?</summary>
+                <p>If the board does not load, use <a class="inline-link" href="/contact#support-intake">private help</a> for anything blocked or sensitive, or check the <a class="inline-link" href="@Model.RoadmapHref">roadmap</a> for current movement.</p>
+            </details>
+        </aside>
+    </div>
 </section>

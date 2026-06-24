@@ -1023,7 +1023,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
-        Assert.Contains("Keep Chummer open while the browser finishes the claim.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep Chummer open while the browser finishes connecting this copy.", view, StringComparison.Ordinal);
         Assert.Contains("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("manual open button", view, StringComparison.OrdinalIgnoreCase);
     }

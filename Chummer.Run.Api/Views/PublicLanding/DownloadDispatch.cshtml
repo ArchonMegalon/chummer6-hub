@@ -2,7 +2,7 @@
 @{
     // Marker retained for desktop native trust verification:
     // Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.
-    // Support stays on the same install rail.
+    // Support stays attached to the same install path.
     ViewData["Title"] = "Download setup";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
@@ -43,7 +43,7 @@
         {
             Badge = "Account",
             Title = "Manage linked devices",
-            Summary = "Use your account when you need to relink, reclaim, or remove an old install.",
+            Summary = "Use your account when you need to reconnect, replace, or remove an old install.",
             Href = Model.AccountHref,
             Label = Model.AccountLabel,
             Details = new[] { "Linked installs", "Recovery", "Account settings" }

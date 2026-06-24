@@ -2342,7 +2342,7 @@ public sealed class PublicLandingController : Controller
     private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref)
     {
         string upstreamOrigin = upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/');
-        const string localOrigin = "/partizipate";
+        const string localOrigin = "/partizipate/board";
 
         string rewritten = html.Replace(upstreamOrigin, localOrigin, StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("href=\"/", $"href=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
@@ -2355,7 +2355,7 @@ public sealed class PublicLandingController : Controller
             rewritten = Regex.Replace(
                 rewritten,
                 "<head(.*?)>",
-                "<head$1><base href=\"/partizipate/\" />",
+                "<head$1><base href=\"/partizipate/board/\" />",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline,
                 TimeSpan.FromMilliseconds(250));
         }

@@ -56,9 +56,9 @@
         responseRoutes.Add((
             Badge: "Account return",
             Title: Model.TrackedCaseSummary?.NeedsLinkedInstall == true || Model.TrackedCaseSummary?.NeedsInstallUpdate == true
-                ? "Return to the same install page for relink, update, or reclaim"
+                ? "Return to the same install page for reconnect, update, or replacement"
                 : "Return to the same install page after support",
-            Summary: "The installer or affected copy still handles relink, reclaim, and recovery. This page should send you back to the same setup path.",
+            Summary: "The installer or affected copy still handles reconnecting, replacing, and recovery. This page should send you back to the same setup path.",
             Href: installAction.Href,
             Label: installAction.Label,
             Details: new[] { "Same install page", "Devices & access stays calm", "Same recovery path" }));

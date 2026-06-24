@@ -596,14 +596,14 @@
             ? "Support and account return stay attached to this account"
             : installRailHeading;
     var accountRailSummary = showAccessSection
-        ? "Relink, reclaim, recovery, and active access requests stay here after the installer or app does the real work. Keep the browser step secondary."
+        ? "Reconnect, replacement, recovery, and active access requests stay here after the installer or app does the real work. Keep the browser step secondary."
         : showSupportSection
             ? "Tracked support stays attached to the affected install so release status, closure, and recovery never split across separate surfaces."
             : installRailSummary;
     var accountRailInstallSummary = leadInstallation is not null
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
         : pendingClaims > 0
-            ? $"{pendingClaims} pending claim ticket(s) are still waiting on their original device."
+            ? $"{pendingClaims} pending setup code(s) are still waiting on their original device."
             : "No linked install is attached yet. Open Downloads while signed in to start with the same binary and a calmer return path.";
     var accountRailRecoverySummary = leadPendingClaim is not null
         ? $"{PublicText(leadPendingClaim.ArtifactLabel)} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
@@ -670,7 +670,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Linked install path</span>
                             <strong>@accountRailInstallSummary</strong>
-                            <p>The download stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
+                            <p>The download stays the same for everyone; the account-aware piece is account return, install history, and support history.</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
@@ -680,7 +680,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Recovery reserve</span>
                             <strong>@accountRailRecoverySummary</strong>
-                            <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
+                            <p>Devices &amp; access exists for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
                         </article>
                     </div>
                 </section>
@@ -709,7 +709,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Linked install path</span>
                     <strong>@accountRailInstallSummary</strong>
-                    <p>The download stays the same for everyone; the account-aware piece is account return, claim history, and support history.</p>
+                    <p>The download stays the same for everyone; the account-aware piece is account return, install history, and support history.</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
@@ -719,7 +719,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Recovery reserve</span>
                     <strong>@accountRailRecoverySummary</strong>
-                    <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
+                    <p>Devices &amp; access exists for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
                 </article>
             </div>
         </section>

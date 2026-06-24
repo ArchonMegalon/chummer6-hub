@@ -197,6 +197,40 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
+    public async Task WindowsBootstrapPayloadZipRouteDownloadsDirectlyFromCanonicalInstallerMetadata()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-payload.zip", CancellationToken.None);
+
+        var file = Assert.IsType<PhysicalFileResult>(result);
+        Assert.True(file.EnableRangeProcessing);
+        Assert.Equal("application/octet-stream", file.ContentType);
+        Assert.EndsWith("downloads/files/chummer-avalonia-win-x64-payload.zip", file.FileName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WindowsBootstrapPayloadMetadataRouteDownloadsJsonSidecarFromCanonicalInstallerMetadata()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-payload.zip.json", CancellationToken.None);
+
+        var file = Assert.IsType<PhysicalFileResult>(result);
+        Assert.True(file.EnableRangeProcessing);
+        Assert.Equal("application/json; charset=utf-8", file.ContentType);
+        Assert.EndsWith("downloads/files/chummer-avalonia-win-x64-payload.zip.json", file.FileName, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AccountRequiredMacFilePathRouteStillRedirectsToInstallHandoffLogin()
     {
         using Fixture fixture = new();
@@ -439,6 +473,15 @@ public sealed class DownloadsCompatibilityControllerTests
             Directory.CreateDirectory(proofRoot);
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-osx-x64-installer.dmg"), "mac-preview"u8.ToArray());
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-installer.exe"), "win-preview"u8.ToArray());
+            File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-payload.zip"), "win-payload"u8.ToArray());
+            File.WriteAllText(
+                Path.Combine(filesRoot, "chummer-avalonia-win-x64-payload.zip.json"),
+                """
+                {
+                  "contractName": "chummer6-ui.windows_bootstrap_payload",
+                  "fileName": "chummer-avalonia-win-x64-payload.zip"
+                }
+                """);
             WriteProofInstaller(Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"), "avalonia");
             WriteProofInstaller(Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"), "blazor-desktop");
             File.WriteAllText(
@@ -551,6 +594,8 @@ public sealed class DownloadsCompatibilityControllerTests
                       "platformLabel": "Avalonia Desktop Windows X64 Installer",
                       "fileName": "chummer-avalonia-win-x64-installer.exe",
                       "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                      "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+                      "payloadDownloadUrl": "/downloads/files/chummer-avalonia-win-x64-payload.zip",
                       "sha256": "34f6cb5006019d6c8e19d55c32302efea6aaed7cd63f3770aee7f087f0ee4bf9",
                       "sizeBytes": 51887995,
                       "installAccessClass": "account_required"

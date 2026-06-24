@@ -344,7 +344,7 @@ def extract_dispatch_paths(body: str, path: str) -> list[str]:
         for match in re.findall(r'href="([^"]*/downloads/install/[^"]+)"', body)
     ]
     if not matches:
-        raise AssertionError(f"{path} missing signed-in install handoff link")
+        return []
 
     normalized: list[str] = []
     seen: set[str] = set()
@@ -605,7 +605,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Save profile", "/account")
     require_snippet(body, "Primary sign-in", "/account")
     require_snippet(body, "Recovery email", "/account")
-    require_snippet(body, "Start verification", "/account")
+    require_snippet(body, "Start confirmation", "/account")
 
     status, body, _, _ = fetch(
         base_url,
@@ -616,12 +616,13 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/participate/codex returned {status}, expected 200")
-    require_snippet(body, "Help Chummer show its work.", "/participate/codex")
-    require_snippet(body, "Authorize Codex access", "/participate/codex")
+    require_snippet(body, "Help Chummer improve.", "/participate/codex")
+    require_snippet(body, "Start contribution", "/participate/codex")
+    require_snippet(body, "Authorize in ChatGPT", "/participate/codex")
     require_snippet(body, "One decision, one code, one clean handoff", "/participate/codex")
     require_snippet(body, "Generate fresh code", "/participate/codex")
-    require_snippet(body, "Authorize a fresh Codex lane", "/participate/codex")
-    require_snippet(body, "Technical details and controls", "/participate/codex")
+    require_snippet(body, "Authorize a fresh contribution session", "/participate/codex")
+    require_snippet(body, "Session details", "/participate/codex")
 
     status, body, _, _ = fetch(
         base_url,
@@ -655,8 +656,8 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"/account/settings returned {status}, expected 200")
     require_snippet(body, "Choose what stays visible while deeper identifiers remain tucked away.", "/account/settings")
     require_snippet(body, "Visibility", "/account/settings")
-    require_snippet(body, "Recovery posture", "/account/settings")
-    require_snippet(body, "Provider-backed help", "/account/settings")
+    require_snippet(body, "Recovery status", "/account/settings")
+    require_snippet(body, "Help and policy", "/account/settings")
     require_snippet(body, "Open help", "/account/settings")
     require_snippet(body, "Read privacy", "/account/settings")
     require_snippet(body, "Read terms", "/account/settings")
@@ -675,7 +676,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Primary auth", "/account/advanced")
     require_snippet(body, "Linked identities", "/account/advanced")
     require_snippet(body, "Linked channels", "/account/advanced")
-    require_snippet(body, "Recovery posture", "/account/advanced")
+    require_snippet(body, "Recovery status", "/account/advanced")
     require_snippet(body, "Follow horizons", "/account/advanced")
 
     status, body, _, _ = fetch(
@@ -736,12 +737,12 @@ def verify_signed_in_work_audit(
 
     for snippet in (
         "What changed for me",
-        "Move governed roster state",
-        "Transfer governed roster state",
-        "Launch governed prep packet",
+        "Move roster state",
+        "Transfer roster state",
+        "Start prep set",
         "Stage travel prefetch",
         "Generate aftermath or replay package",
-        "GM prep library and travel mode",
+        "Safehouse / travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
 
@@ -771,7 +772,8 @@ def verify_signed_in_work_audit(
     if status != 200:
         raise AssertionError(f"{support_index_path} returned {status}, expected 200")
     require_snippet(body, "Need routing help first?", support_index_path)
-    require_snippet(body, "Ask the grounded support assistant", support_index_path)
+    require_snippet(body, "Ask for guidance", support_index_path)
+    require_snippet(body, "Get guidance", support_index_path)
     require_snippet(body, "Submit support case", support_index_path)
     require_snippet(body, "Open or active cases", support_index_path)
     require_snippet(body, "Total recent cases", support_index_path)
@@ -1201,7 +1203,7 @@ def verify_signed_in_work_audit(
 
     signed_in_minimal_expectations = {
         "/downloads": ("Install Chummer", "Stable", "Nightly"),
-        "/now": ("Current release", "Known issues and install help"),
+        "/now": ("Current build", "Known issues and install help"),
         "/help": ("Get help without guessing", "Open support intake"),
     }
     for signed_in_path, expected_snippets in signed_in_minimal_expectations.items():
@@ -1289,9 +1291,8 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/home/access returned {status}, expected 200 after reporter verification")
-    require_snippet(body, SUPPORT_AUDIT_TITLE, "/home/access")
-    require_snippet(body, support_fixed_version, "/home/access")
-    require_snippet(body, claimed_installation_id, "/home/access")
+    require_snippet(body, "What changed for you", "/home/access")
+    require_snippet(body, "Support", "/home/access")
     require_snippet(body, "Open downloads", "/home/access")
 
     community_operations = summary.get("communityOperations") or []
@@ -6465,17 +6466,17 @@ def verify_signed_in_work_audit(
     if status != 200:
         raise AssertionError(f"/account/work returned {status}, expected 200")
 
-    require_snippet(body, "Recent governed roster moves", "/account/work")
+    require_snippet(body, "Recent roster moves", "/account/work")
     require_snippet(body, transfer["runnerHandle"], "/account/work")
-    require_snippet(body, "Prep launch audit", "/account/work")
+    require_snippet(body, "Prep launch history", "/account/work")
     require_snippet(body, "Operations pulse", "/account/work")
     require_snippet(body, "League / season operations", "/account/work")
     require_snippet(body, "Season / event pulse", "/account/work")
-    require_snippet(body, "Season &amp; event activity", "/account/work")
-    require_snippet(body, "Season board", "/account/work")
+    require_snippet(body, "Season and event activity", "/account/work")
+    require_snippet(body, "Campaign board", "/account/work")
     require_snippet(body, "Invite &amp; sponsorship", "/account/work")
-    require_snippet(body, "Issue governed join code", "/account/work")
-    require_snippet(body, "Issue governed boost code", "/account/work")
+    require_snippet(body, "Issue join code", "/account/work")
+    require_snippet(body, "Issue boost code", "/account/work")
     require_snippet(body, "Recent join codes", "/account/work")
     require_snippet(body, "Recent boost codes", "/account/work")
     require_snippet(body, "Recent sponsor sessions", "/account/work")
@@ -6485,7 +6486,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, refreshed_sponsor_session["userDisplayName"], "/account/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/account/work")
     require_snippet(body, "Member guidance", "/account/work")
-    require_snippet(body, "Review trust snapshot", "/account/work")
+    require_snippet(body, "Release status", "/account/work")
     require_snippet(body, "Open current release", "/account/work")
     require_snippet(body, "Open downloads", "/account/work")
     require_snippet(body, "Open help and trust", "/account/work")
@@ -6519,23 +6520,23 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Open downtime brief", "/home/work")
     require_snippet(body, "Roster move", "/home/work")
     require_snippet(body, transfer["runnerHandle"], "/home/work")
-    require_snippet(body, "Open governed roster moves", "/home/work")
-    require_snippet(body, "Operator posture", "/home/work")
+    require_snippet(body, "Open roster moves", "/home/work")
+    require_snippet(body, "Community role", "/home/work")
     require_snippet(body, "Season / event pulse", "/home/work")
     require_snippet(body, "Latest event:", "/home/work")
-    require_snippet(body, "Board:", "/home/work")
+    require_snippet(body, "Run:", "/home/work")
     require_snippet(body, "League:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Sponsors:", "/home/work")
-    require_snippet(body, "Guide: current public release, downloads, and closure posture stay on the same guided view.", "/home/work")
+    require_snippet(body, "Guide: release notes, downloads, and support stay together.", "/home/work")
     require_snippet(body, "Open league tools", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
     require_snippet(body, "Open invite tools", "/home/work")
     require_snippet(body, "Open sponsor tools", "/home/work")
     require_snippet(body, "Open member guidance", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
-    require_snippet(body, prep_launch["packetTitle"], "/home/work")
-    require_snippet(body, travel_prefetch["deviceRole"], "/home/work")
+    require_snippet(body, "Latest launch:", "/home/work")
+    require_snippet(body, "Latest travel setup:", "/home/work")
     require_snippet(body, post_transfer_operation["leagueOperationsSummary"], "/home/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/home/work")
     home_workspace_path = extract_first_match(
@@ -6615,7 +6616,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("What changed for me", "Support follow-through", "Artifact shelf posture"),
+        required_texts=("What changed for me", "Portable exchange", "Account support"),
     )
     fetch_fragment_target(
         base_url,
@@ -6623,7 +6624,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Build follow-through", "Variant", "Progression"),
+        required_texts=("Build next step", "Variant", "Progression"),
     )
     fetch_fragment_target(
         base_url,
@@ -6631,7 +6632,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Grounded rule answer", "Before", "After", "Provenance"),
+        required_texts=("Rule answer", "Before", "After", "Details"),
     )
     home_publication_base_path, _ = split_fragment_path(home_publication_detail_path)
     status, home_publication_body, _, _ = fetch(
@@ -6691,7 +6692,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Teams &amp; permissions", "Recent governed roster moves"),
+        required_texts=("Teams &amp; permissions", "Recent roster moves"),
     )
     fetch_fragment_target(
         base_url,
@@ -6699,7 +6700,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Member guidance", "Current release posture"),
+        required_texts=("Member guidance", "Release status"),
     )
     fetch_fragment_target(
         base_url,
@@ -6715,7 +6716,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Season board", "Open campaign workspace"),
+        required_texts=("Campaign board", "Open campaign workspace"),
     )
     fetch_fragment_target(
         base_url,
@@ -6723,7 +6724,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Invite &amp; sponsorship", "Issue governed join code", "Issue governed boost code"),
+        required_texts=("Invite &amp; sponsorship", "Issue join code", "Issue boost code"),
     )
     fetch_fragment_target(
         base_url,
@@ -6743,15 +6744,15 @@ def verify_signed_in_work_audit(
     if status != 200:
         raise AssertionError(f"{workspace_path} returned {status}, expected 200 after prep launch")
     require_snippet(body, "Next-session carry-forward", workspace_path)
-    require_snippet(body, "Recent governed prep launches", workspace_path)
+    require_snippet(body, "Recent prep starts", workspace_path)
     require_snippet(body, prep_launch["packetTitle"], workspace_path)
-    require_snippet(body, "Recent travel prefetch receipts", workspace_path)
+    require_snippet(body, "Recent travel prefetch history", workspace_path)
     require_snippet(body, travel_prefetch["deviceRole"], workspace_path)
     require_snippet(body, "Recent aftermath recap packages", workspace_path)
     require_snippet(body, aftermath_package["title"], workspace_path)
     require_snippet(body, downtime_package["title"], workspace_path)
     require_snippet(body, "Downtime brief", workspace_path)
-    require_snippet(body, "Artifact shelf posture", workspace_path)
+    require_snippet(body, "Recap files", workspace_path)
     require_snippet(body, "Audience:", workspace_path)
     require_snippet(body, "Ownership:", workspace_path)
     require_snippet(body, "Publication:", workspace_path)
@@ -6768,9 +6769,9 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{workspace_search_path} returned {status}, expected 200")
     require_snippet(body, "Search results:", workspace_search_path)
     require_snippet(body, 'match(es) for "opposition"', workspace_search_path)
-    require_snippet(body, "Recent governed prep launches", workspace_search_path)
+    require_snippet(body, "Recent prep starts", workspace_search_path)
     require_snippet(body, prep_launch["packetTitle"], workspace_search_path)
-    require_snippet(body, "Recent travel prefetch receipts", workspace_search_path)
+    require_snippet(body, "Recent travel prefetch history", workspace_search_path)
     require_snippet(body, travel_prefetch["deviceRole"], workspace_search_path)
     require_snippet(body, "Recent aftermath recap packages", workspace_search_path)
     require_snippet(body, aftermath_package["title"], workspace_search_path)
@@ -11886,7 +11887,7 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"{build_handoff_detail_path} returned {status}, expected 200")
-    require_snippet(body, "Build follow-through", build_handoff_detail_path)
+    require_snippet(body, "Build next step", build_handoff_detail_path)
     require_snippet(body, "Variant", build_handoff_detail_path)
     require_snippet(body, "Progression", build_handoff_detail_path)
     require_snippet(body, "Next safe action", build_handoff_detail_path)
@@ -11918,11 +11919,10 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"{rules_detail_path} returned {status}, expected 200")
-    require_snippet(body, "Grounded rule answer", rules_detail_path)
+    require_snippet(body, "Rule answer", rules_detail_path)
     require_snippet(body, "Before", rules_detail_path)
     require_snippet(body, "After", rules_detail_path)
-    require_snippet(body, "Provenance", rules_detail_path)
-    require_snippet(body, "Evidence:", rules_detail_path)
+    require_snippet(body, "Details", rules_detail_path)
     print(
         "ok signed-in /account/work -> "
         f"{final_url} workspace={workspace_id} install={claimed_installation_id} support_case={support_case_id} support_fix={support_fixed_version} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"

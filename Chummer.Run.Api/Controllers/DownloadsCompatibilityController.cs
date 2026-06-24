@@ -284,9 +284,18 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
         var (manifest, artifact) = ResolvePublicManifestArtifactByPath(path);
+        bool matchedBootstrapSidecar = false;
         if (artifact is null)
         {
-            return DownloadAurPackageFile(path);
+            var bootstrapSidecar = ResolveBootstrapPayloadArtifactByPath(path);
+            if (bootstrapSidecar.Artifact is null)
+            {
+                return DownloadAurPackageFile(path);
+            }
+
+            manifest = bootstrapSidecar.Manifest;
+            artifact = bootstrapSidecar.Artifact;
+            matchedBootstrapSidecar = true;
         }
 
         var filePath = _releases.ResolveDownloadFilePath(path);
@@ -352,7 +361,10 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             "No current release status record is attached to the public file-output route.",
             "/downloads/files/{**path}",
             $"/downloads/install/{encodedArtifactId}");
-        return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+        return PhysicalFile(
+            filePath,
+            ResolveDirectFileContentType(Path.GetFileName(filePath), matchedBootstrapSidecar),
+            enableRangeProcessing: true);
     }
 
     private IActionResult DownloadAurPackageFile(string? path)
@@ -596,6 +608,134 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         });
 
         return (rawManifest, artifact);
+    }
+
+    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveBootstrapPayloadArtifactByPath(string? path)
+    {
+        string? normalized = string.IsNullOrWhiteSpace(path)
+            ? null
+            : path.Trim().TrimStart('/');
+        if (normalized is null)
+        {
+            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            return (emptyManifest, null);
+        }
+
+        string targetFile = Path.GetFileName(normalized.Split('?', '#')[0]);
+        if (string.IsNullOrWhiteSpace(targetFile))
+        {
+            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            return (emptyManifest, null);
+        }
+
+        string? installerArtifactId = FindInstallerArtifactIdByBootstrapPayloadFileName(targetFile);
+        if (!string.IsNullOrWhiteSpace(installerArtifactId))
+        {
+            return ResolveManifestArtifact(installerArtifactId);
+        }
+
+        string? inferredInstallerFileName = InferInstallerFileNameFromBootstrapPayloadFileName(targetFile);
+        if (string.IsNullOrWhiteSpace(inferredInstallerFileName))
+        {
+            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            return (emptyManifest, null);
+        }
+
+        return ResolvePublicManifestArtifactByPath(inferredInstallerFileName);
+    }
+
+    private string? FindInstallerArtifactIdByBootstrapPayloadFileName(string targetFile)
+    {
+        string? canonicalManifestJson = _releases.LoadCanonicalManifestJson();
+        if (string.IsNullOrWhiteSpace(canonicalManifestJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(canonicalManifestJson);
+            if (!document.RootElement.TryGetProperty("artifacts", out JsonElement artifacts)
+                || artifacts.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (JsonElement artifact in artifacts.EnumerateArray())
+            {
+                if (artifact.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                string payloadFileName = artifact.TryGetProperty("payloadFileName", out JsonElement payloadFileNameElement)
+                    ? (payloadFileNameElement.GetString() ?? string.Empty).Trim()
+                    : string.Empty;
+                string payloadDownloadUrl = artifact.TryGetProperty("payloadDownloadUrl", out JsonElement payloadDownloadUrlElement)
+                    ? (payloadDownloadUrlElement.GetString() ?? string.Empty).Trim()
+                    : string.Empty;
+                string payloadDownloadFileName = string.IsNullOrWhiteSpace(payloadDownloadUrl)
+                    ? string.Empty
+                    : Path.GetFileName(payloadDownloadUrl.Split('?', '#')[0]);
+
+                bool matchesPayloadZip =
+                    string.Equals(payloadFileName, targetFile, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(payloadDownloadFileName, targetFile, StringComparison.OrdinalIgnoreCase);
+                bool matchesPayloadMetadata =
+                    (!string.IsNullOrWhiteSpace(payloadFileName)
+                        && string.Equals(payloadFileName + ".json", targetFile, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(payloadDownloadFileName)
+                        && string.Equals(payloadDownloadFileName + ".json", targetFile, StringComparison.OrdinalIgnoreCase));
+                if (!matchesPayloadZip && !matchesPayloadMetadata)
+                {
+                    continue;
+                }
+
+                if (!artifact.TryGetProperty("artifactId", out JsonElement artifactIdElement))
+                {
+                    continue;
+                }
+
+                string? artifactId = artifactIdElement.GetString()?.Trim();
+                if (!string.IsNullOrWhiteSpace(artifactId))
+                {
+                    return artifactId;
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogDebug(ex, "Skipping bootstrap payload sidecar resolution after canonical manifest JSON parse failure.");
+        }
+
+        return null;
+    }
+
+    private static string? InferInstallerFileNameFromBootstrapPayloadFileName(string targetFile)
+    {
+        string normalized = targetFile.Trim();
+        if (normalized.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[..^".json".Length];
+        }
+
+        if (!normalized.StartsWith("chummer-", StringComparison.OrdinalIgnoreCase)
+            || !normalized.EndsWith("-payload.zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return normalized[..^"-payload.zip".Length] + "-installer.exe";
+    }
+
+    private static string ResolveDirectFileContentType(string fileName, bool matchedBootstrapSidecar)
+    {
+        if (matchedBootstrapSidecar && fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return "application/json; charset=utf-8";
+        }
+
+        return "application/octet-stream";
     }
 
     private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)
