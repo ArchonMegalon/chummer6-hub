@@ -332,7 +332,7 @@ cards:
     detail_route: /runsites
     render_mode: first_party_prep_lane
     action_label: Open RUNSITE
-    detail_primary_href: /runsites/receipts/prep-network.json
+    detail_primary_href: /runsites/prep-network
     detail_primary_label: Open the prep page
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
     fallback_label: Read the horizon brief
@@ -352,7 +352,7 @@ cards:
     detail_route: /run-control
     render_mode: external_explainer
     action_label: Open RUN CONTROL
-    detail_primary_href: /run-control/receipts/control-network.json
+    detail_primary_href: /run-control/control-network
     detail_primary_label: Open the control page
     fallback_route: /run-control
     fallback_label: Open the public page
@@ -372,7 +372,7 @@ cards:
     detail_route: /onramp
     render_mode: external_explainer
     action_label: Open the first-session guide
-    detail_primary_href: /onramp/receipts/guided-starter.json
+    detail_primary_href: /onramp/guided-starter
     detail_primary_label: Open the starter page
     fallback_route: /onramp
     fallback_label: Open the public page
@@ -392,7 +392,7 @@ cards:
     detail_route: /edition-studio
     render_mode: external_explainer
     action_label: Open EDITION STUDIO
-    detail_primary_href: /edition-studio/receipts/ruleset-heads.json
+    detail_primary_href: /edition-studio/ruleset-heads
     detail_primary_label: Open the ruleset page
     fallback_route: /edition-studio
     fallback_label: Open the public page
@@ -434,7 +434,7 @@ cards:
     action_label: Open Community Hub
     detail_primary_href: /community
     detail_primary_label: Open the Community Hub page
-    fallback_route: /community/receipts/open-run-network.json
+    fallback_route: /community/open-run-network
     fallback_label: Open the open-run board
     external_ok: true
     pain: Finding a table still means juggling community rules, approvals, chats, calendars, and follow-up by hand.
@@ -452,7 +452,7 @@ cards:
     detail_route: /passport
     render_mode: external_explainer
     action_label: Open Runner Passport
-    detail_primary_href: /passport/receipts/identity-network.json
+    detail_primary_href: /passport/identity-network
     detail_primary_label: Open the continuity page
     fallback_route: /passport
     fallback_label: Open the public page
@@ -472,7 +472,7 @@ cards:
     detail_route: /quicksilver
     render_mode: external_explainer
     action_label: Open Quicksilver
-    detail_primary_href: /quicksilver/receipts/command-network.json
+    detail_primary_href: /quicksilver/command-network
     detail_primary_label: Open the command page
     fallback_route: /quicksilver
     fallback_label: Open the public page
@@ -492,7 +492,7 @@ cards:
     detail_route: /anarchy
     render_mode: external_explainer
     action_label: Open Anarchy
-    detail_primary_href: /anarchy/receipts/runtime.json
+    detail_primary_href: /anarchy/runtime
     detail_primary_label: Open the runtime page
     fallback_route: /anarchy
     fallback_label: Open the public page
@@ -532,7 +532,7 @@ cards:
     detail_route: /ghostwire
     render_mode: external_explainer
     action_label: Open GHOSTWIRE
-    detail_primary_href: /ghostwire/receipts/replay-network.json
+    detail_primary_href: /ghostwire/replay-network
     detail_primary_label: Open the replay page
     fallback_route: /ghostwire
     fallback_label: Open the public page
@@ -554,7 +554,7 @@ cards:
     action_label: Open optional acceleration
     detail_primary_href: /local-co-processor
     detail_primary_label: Open LOCAL CO-PROCESSOR
-    fallback_route: /local-co-processor/receipts/optional-acceleration.json
+    fallback_route: /local-co-processor/optional-acceleration
     fallback_label: Open the acceleration details
     external_ok: false
     pain: Some heavy local tasks still need more muscle.
@@ -606,7 +606,7 @@ cards:
     audience: public
     image_family: simulation_bench
     asset_slot: capability_check_rules
-    detail_route: /artifacts/explanation-receipt-trail
+    detail_route: /artifacts/explanation-path
     action_label: See the explanation trail
     detail_primary_href: /now#real-rules-truth
     detail_primary_label: See the explanation
