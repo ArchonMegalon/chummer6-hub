@@ -13,6 +13,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -309,6 +310,9 @@ internal static class InstallLinkingContinuationVerification
                 identity: null!,
                 accounts: null!,
                 installLinking,
+                new AccountDesktopLaunchTicketService(
+                    DataProtectionProvider.Create(Path.Combine(tempRoot, "desktop-launch-tickets")),
+                    configuration),
                 new PublicReleaseManifestService(configuration),
                 supportCases,
                 supportPresentation,

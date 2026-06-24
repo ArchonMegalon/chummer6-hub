@@ -35,9 +35,9 @@ PACKAGE_PROOF = {
 
 REQUIRED_MARKERS = {
     "install_claim_restore_continue": [
-        'downloadDispatchSource.Contains("Automatic account linking is the default path."',
-        'downloadDispatchSource.Contains("Support stays on the same install rail',
-        'accountSource.Contains("Recent install handoffs"',
+        'downloadDispatchSource.Contains("Account linking is optional."',
+        'downloadDispatchSource.Contains("Support stays with this install."',
+        'accountSource.Contains("Recent installs"',
         'accountSource.Contains("Recovery mode only"',
         'accountSource.Contains("Do not redeem claim codes in a browser tab."',
         'installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal))',
@@ -152,7 +152,7 @@ REQUIRED_MARKERS = {
         'workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1',
         'accountSource.Contains("From @HumanizeStatus(receipt.Authority, \\"Chummer\\")"',
         'accountSource.Contains("@receipt.RecoveryHint"',
-        'accountSource.Contains("Continue is blocked until this receipt is resolved."',
+        'accountSource.Contains("Finish this item before you continue."',
         'consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, "heat", StringComparison.Ordinal)',
         'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "governed_consequence_update", StringComparison.Ordinal))',
         'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review heat fallout", StringComparison.Ordinal))',
