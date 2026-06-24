@@ -297,71 +297,52 @@
     @Html.AntiForgeryToken()
 </div>
 
-<section class="home-cockpit-strip" aria-label="Home summary">
-    <div class="home-cockpit-strip__lead">
-        <p class="eyebrow">Home</p>
-        <h2>@homeContinuityHeadline</h2>
-        <p>@homeContinuitySummary</p>
-        <div class="stacked-actions">
-            @if (primaryActionTargetsSetup && showSetupSection)
-            {
-                <button class="button-like button-like--primary" type="button" data-open-onboarding>@PublicText(Model.PrimaryAction.Label)</button>
-            }
-            else
-            {
-                <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
-            }
-            <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
-            <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
-        </div>
-    </div>
-    <div class="home-cockpit-strip__panel">
-        <article class="home-cockpit-strip__fact">
-            <span>Install</span>
-            <strong>@homeRoleSummary</strong>
-            <p>The same download still works for everyone. Use as guest or link this copy later.</p>
-        </article>
-        <article class="home-cockpit-strip__fact">
-            <span>Recent change</span>
-            <strong>@homeWhatChangedSummary</strong>
-            <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
-        </article>
-        <article class="home-cockpit-strip__fact">
-            <span>Support</span>
-            <strong>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].StageLabel : "Calm return path")</strong>
-            <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No support issue is blocking the next install, return, or recovery step right now.")</p>
-        </article>
-        <article class="home-cockpit-strip__fact">
-            <span>Current release</span>
-            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</strong>
-            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</p>
-        </article>
-    </div>
-</section>
-
-@if (showAccessSection)
+@if (!showAccessSection)
 {
-    <section class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
-        <div class="flagship-coverage__lead">
-            <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
-            <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
-            <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
+    <section class="home-cockpit-strip" aria-label="Home summary">
+        <div class="home-cockpit-strip__lead">
+            <p class="eyebrow">Home</p>
+            <h2>@homeContinuityHeadline</h2>
+            <p>@homeContinuitySummary</p>
+            <div class="stacked-actions">
+                @if (primaryActionTargetsSetup && showSetupSection)
+                {
+                    <button class="button-like button-like--primary" type="button" data-open-onboarding>@PublicText(Model.PrimaryAction.Label)</button>
+                }
+                else
+                {
+                    <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
+                }
+                <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+            </div>
         </div>
-        <div class="flagship-coverage__grid">
-            @foreach (var card in Model.FlagshipCoverage.Cards)
-            {
-                <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
-                    <span class="tag">@PublicText(card.Label)</span>
-                    <h3>@PublicText(card.CurrentTitle)</h3>
-                    <p>@PublicText(card.CurrentBody)</p>
-                    <p class="flagship-coverage__phase"><strong>Target:</strong> @PublicText(card.TargetBody)</p>
-                    <a class="inline-link" href="@card.Href">@PublicText(card.ActionLabel)</a>
-                </article>
-            }
+        <div class="home-cockpit-strip__panel">
+            <article class="home-cockpit-strip__fact">
+                <span>Install</span>
+                <strong>@homeRoleSummary</strong>
+                <p>The same download still works for everyone. Use as guest or link this copy later.</p>
+            </article>
+            <article class="home-cockpit-strip__fact">
+                <span>Recent change</span>
+                <strong>@homeWhatChangedSummary</strong>
+                <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
+            </article>
+            <article class="home-cockpit-strip__fact">
+                <span>Support</span>
+                <strong>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].StageLabel : "Calm return path")</strong>
+                <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No support issue is blocking the next install, return, or recovery step right now.")</p>
+            </article>
+            <article class="home-cockpit-strip__fact">
+                <span>Current release</span>
+                <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</strong>
+                <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</p>
+            </article>
         </div>
     </section>
 }
-else
+
+@if (!showAccessSection)
 {
     <section class="editorial-block">
         <details class="details-drawer">

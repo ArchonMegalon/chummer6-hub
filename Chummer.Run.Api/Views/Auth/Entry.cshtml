@@ -48,14 +48,14 @@
             </article>
             <article class="auth-value-strip__fact">
                 <span>Devices and access</span>
-                <strong>Reconnect, replace, or recover from one calmer place.</strong>
+                <strong>Reconnect, replace, or recover from one place.</strong>
             </article>
             <article class="auth-value-strip__fact">
                 <span>Support history</span>
                 <strong>Tracked help stays attached to the same account.</strong>
             </article>
         </div>
-        <p class="auth-entry__trust">@(isInstallLinkReturn ? "The download stays the same. Claiming only connects this copy to your account." : (accessPosture?.AccountValueSummary ?? "The binary stays the same for everyone. The account adds device return and support history when you want them."))</p>
+        <p class="auth-entry__trust">@(isInstallLinkReturn ? "The download stays the same. Claiming only connects this copy to your account." : (accessPosture?.AccountValueSummary ?? "The download stays the same for everyone. An account adds device return and support history when you want them."))</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">
@@ -76,21 +76,21 @@
         {
             <div class="auth-panel__intro">
                 <h3>@(isInstallLinkReturn ? "Claim with email" : "Email first")</h3>
-                <p>@(isInstallLinkReturn ? "Enter the email you want attached to this copy. Google is available if that is how you normally sign in." : "Create the account first, then shape the profile in setup. Email keeps the first step simple; Google stays available if you want the faster return path later.")</p>
+                <p>@(isInstallLinkReturn ? "Enter the email you want attached to this copy. Google is available if that is how you normally sign in." : "Create the account first, then finish setup. Email keeps the first step simple. Google is available too.")</p>
             </div>
             <div class="auth-benefits">
                 <span class="tag">What you get right away</span>
                 <ul>
                     <li>An account that can link downloads, install history, and future device return.</li>
                     <li>A place to keep support history and device return in one account home.</li>
-                    <li>A calmer return path the next time this install, your account, or your support case needs attention.</li>
+                    <li>A simple way back when this install, your account, or your support case needs attention.</li>
                 </ul>
             </div>
             <p class="muted-copy">After you confirm the email, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser finishes connecting this copy."
+                    ? "Keep Chummer open while the browser connects this copy."
                     : "If the browser cannot return to Chummer, open this page again from the app.")</p>
             }
             <form class="auth-form" method="post" action="/auth/email/start">
@@ -118,7 +118,7 @@
         {
             <div class="auth-panel__intro">
                 <h3>@(isInstallLinkReturn ? "Claim with your account" : "Fastest way back in")</h3>
-                <p>@(isInstallLinkReturn ? "Sign in with the account that should own this copy." : "Sign in to reopen your downloads, devices and access, and support history.")</p>
+                <p>@(isInstallLinkReturn ? "Sign in with the account that should own this copy." : "Sign in to reopen downloads, devices and access, and support history.")</p>
             </div>
             <div class="auth-benefits">
                 <span class="tag">What opens after sign-in</span>
@@ -132,7 +132,7 @@
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser finishes connecting this copy."
+                    ? "Keep Chummer open while the browser connects this copy."
                     : "If the browser cannot return to Chummer, open this page again from the app.")</p>
             }
 

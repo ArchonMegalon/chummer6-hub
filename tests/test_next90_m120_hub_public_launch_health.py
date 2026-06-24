@@ -230,7 +230,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             self.copy_sources(temp_root)
             smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
             smoke_text = smoke_path.read_text(encoding="utf-8")
-            fixed_assertion = 'Assert(statusSource.Contains("Open support", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");'
+            fixed_assertion = 'Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");'
             smoke_path.write_text(
                 smoke_text.replace(fixed_assertion, "// status decision surface assertion removed", 1),
                 encoding="utf-8",
@@ -239,7 +239,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Open support", result.stderr)
+        self.assertIn("Open help", result.stderr)
 
     def test_verifier_fails_when_release_proof_duplicates_package_receipt_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-duplicate-") as temp_dir:

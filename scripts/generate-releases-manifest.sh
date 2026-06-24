@@ -640,6 +640,21 @@ for row in rows:
             file_name = Path(url.split("?", 1)[0].split("#", 1)[0]).name
     if file_name:
         allowed.add(file_name)
+        lowered = file_name.lower()
+        if lowered.endswith("-installer.exe") and "-win-" in lowered:
+            payload_name = file_name[:-len("-installer.exe")] + "-payload.zip"
+            allowed.add(payload_name)
+            allowed.add(f"{payload_name}.json")
+    payload_file_name = str(row.get("payloadFileName") or "").strip()
+    if payload_file_name:
+        allowed.add(payload_file_name)
+        allowed.add(f"{payload_file_name}.json")
+    payload_url = str(row.get("payloadDownloadUrl") or "").strip()
+    if payload_url:
+        payload_url_name = Path(payload_url.split("?", 1)[0].split("#", 1)[0]).name
+        if payload_url_name:
+            allowed.add(payload_url_name)
+            allowed.add(f"{payload_url_name}.json")
 
 for artifact_path in files_root.glob("chummer-*"):
     if not artifact_path.is_file():
@@ -674,6 +689,9 @@ is_public_artifact() {
   if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
     return 1
   fi
+  if [[ "$artifact_name" == chummer-*-win-*-payload.zip ]]; then
+    return 0
+  fi
   case "$artifact_name" in
     chummer-*-win-*.zip|chummer-*-win-*.tar.gz|chummer-*-win-*.exe)
       if [[ "$artifact_name" != *-installer.exe ]]; then
@@ -682,6 +700,54 @@ is_public_artifact() {
       ;;
   esac
   return 0
+}
+
+materialize_windows_payload_sidecar_from_manifest() {
+  local manifest_path="${1:-}"
+  local sidecar_path="${2:-}"
+  python3 - "$manifest_path" "$sidecar_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+sidecar_path = Path(sys.argv[2])
+target_name = sidecar_path.name
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+rows = payload.get("artifacts")
+if not isinstance(rows, list):
+    rows = payload.get("downloads")
+if not isinstance(rows, list):
+    rows = []
+
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    payload_file_name = str(row.get("payloadFileName") or "").strip()
+    payload_download_url = str(row.get("payloadDownloadUrl") or "").strip()
+    if not payload_file_name:
+        continue
+    candidates = {f"{payload_file_name}.json"}
+    payload_url_name = Path(payload_download_url.split("?", 1)[0].split("#", 1)[0]).name if payload_download_url else ""
+    if payload_url_name:
+        candidates.add(f"{payload_url_name}.json")
+    if target_name not in candidates:
+        continue
+    sidecar = {
+        "contractName": "chummer6-ui.windows_bootstrap_payload",
+        "fileName": payload_file_name,
+        "installerFileName": str(row.get("fileName") or "").strip(),
+        "downloadUrl": payload_download_url,
+        "sha256": str(row.get("payloadSha256") or "").strip(),
+        "sizeBytes": int(row.get("payloadSizeBytes") or 0),
+    }
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
+    raise SystemExit(0)
+
+raise SystemExit(f"could not derive Windows payload sidecar from manifest truth for {target_name}")
+PY
 }
 
 filtered_downloads_dir="$(mktemp -d)"
@@ -716,7 +782,8 @@ done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( \
   -name "chummer-*.deb" -o \
   -name "chummer-*.pkg" -o \
   -name "chummer-*.dmg" -o \
-  -name "chummer-*.msix" \
+  -name "chummer-*.msix" -o \
+  -name "chummer-*.json" \
 \) | sort)
 
 materialize_args=(
@@ -782,6 +849,18 @@ for artifact in payload.get("artifacts") or []:
     if file_name and file_name not in seen:
         print(file_name)
         seen.add(file_name)
+    payload_file_name = str(artifact.get("payloadFileName") or "").strip()
+    if payload_file_name and payload_file_name not in seen:
+        print(payload_file_name)
+        seen.add(payload_file_name)
+    payload_url_name = Path(str(artifact.get("payloadDownloadUrl") or "").strip()).name
+    if payload_url_name and payload_url_name not in seen:
+        print(payload_url_name)
+        seen.add(payload_url_name)
+    for sidecar_name in (f"{payload_file_name}.json" if payload_file_name else "", f"{payload_url_name}.json" if payload_url_name else ""):
+        if sidecar_name and sidecar_name not in seen:
+            print(sidecar_name)
+            seen.add(sidecar_name)
 PY
 )
 
@@ -814,6 +893,11 @@ else
   portal_artifacts=()
   for file_name in "${promoted_file_names[@]}"; do
     artifact_path="$filtered_downloads_dir/$file_name"
+    if [[ ! -f "$artifact_path" ]]; then
+      if [[ "$file_name" == chummer-*-payload.zip.json ]]; then
+        materialize_windows_payload_sidecar_from_manifest "$CANONICAL_MANIFEST_PATH" "$artifact_path"
+      fi
+    fi
     if [[ ! -f "$artifact_path" ]]; then
       echo "promoted artifact missing from downloads source: $artifact_path" >&2
       exit 1

@@ -43,6 +43,7 @@ class AuditRoute:
     expected_status: int = 200
     expects_header_count: int | None = None
     allows_redirect: bool = False
+    expected_location_contains: str | None = None
 
 
 class HeaderCounter(HTMLParser):
@@ -11956,8 +11957,8 @@ def main() -> int:
                 "Download Chummer",
                 "Windows and Linux.",
                 "Help",
-                "Participate",
-                "Watch promo"),
+                "Status",
+                "Watch 90 sec"),
             forbidden_texts=(
                 "The city is moving.",
                 "Six houses. One moving city.",
@@ -12035,9 +12036,8 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/partizipate",
-            "Public requests, one board.",
-            required_texts=("Vote, add requests", "Public board", "Roadmap", "Help", "Chummer public feedback board"),
-            expects_header_count=1),
+            expected_status=302,
+            expected_location_contains="/auth/google/start?next=%2Fpartizipate"),
         AuditRoute(
             "/help",
             "Get help without guessing",
@@ -12084,9 +12084,18 @@ def main() -> int:
             route.path,
             public_host=args.public_host,
             forwarded_proto=args.forwarded_proto,
+            follow_redirects=not route.allows_redirect and route.expected_location_contains is None and route.expected_status == 200,
         )
         if status != route.expected_status:
             raise AssertionError(f"{route.path} returned {status}, expected {route.expected_status}")
+        if route.expected_location_contains is not None:
+            location = headers.get("location", "")
+            if route.expected_location_contains not in location:
+                raise AssertionError(
+                    f"{route.path} redirected to {location!r}, expected it to contain {route.expected_location_contains!r}"
+                )
+            print(f"ok {route.path} redirects -> {location}")
+            continue
         if route.expected_text and route.expected_text not in body:
             raise AssertionError(f"{route.path} missing expected text: {route.expected_text}")
         for snippet in route.required_texts:

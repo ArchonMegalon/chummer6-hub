@@ -23,13 +23,13 @@
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Return to followed work, guided contribution history, and optional public recognition from one calmer account page.",
+        "participation" => "Return to followed work, contribution history, and optional public recognition from one account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
-        "access" => "Keep linked installs, access rights, and claimed copies in one calmer place.",
+        "access" => "Keep linked installs, access rights, and claimed copies in one place.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
         "advanced" => "Account identifiers and deeper account details stay behind the advanced page.",
-        _ => "Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface."
+        _ => "Keep sign-in, recovery, devices, support, and account preferences in one product settings surface."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
@@ -85,8 +85,8 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current public release, member downloads, and help stay in one calmer account view."
-        : $"{openSupportCases} tracked support case(s), current public release status, and member downloads stay in one calmer account view.";
+        ? "Current public release, member downloads, and help stay in one account view."
+        : $"{openSupportCases} tracked support case(s), current public release status, and member downloads stay in one account view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase)
@@ -98,6 +98,7 @@
     var participationPackageReceipts = (Model.ParticipationPackageReceipts ?? Array.Empty<Chummer.Run.Api.Services.PublicPackageReceipt>()).Take(6).ToArray();
     var participationKarmaSubmissions = (Model.ParticipationKarmaSubmissions ?? Array.Empty<Chummer.Run.Api.Services.KarmaForge.KarmaForgeSubmissionProjection>()).Take(4).ToArray();
     var participationActivityReceipts = (Model.ParticipationActivityReceipts ?? Array.Empty<Chummer.Run.Api.Services.Community.ParticipationOperatorNotificationReceipt>()).Take(6).ToArray();
+    var originDossierPublications = (Model.OriginDossierPublications ?? Array.Empty<Chummer.Run.Api.ViewModels.OriginDossierPublicationViewModel>()).ToArray();
     var participationBadges = ((participationRecognition?.CurrentStatusBadges ?? Array.Empty<Chummer.Run.Contracts.Leaderboards.BadgeDto>())
             .Concat(participationRecognition?.PersistentBadges ?? Array.Empty<Chummer.Run.Contracts.Leaderboards.BadgeDto>()))
         .GroupBy(static badge => badge.Key, StringComparer.OrdinalIgnoreCase)
@@ -591,7 +592,7 @@
     }
 
     var accountRailHeadline = showAccessSection
-        ? "Devices and access remain the calm recovery path"
+        ? "Devices and access stay the main recovery place"
         : showSupportSection
             ? "Support and account return stay attached to this account"
             : installRailHeading;
@@ -604,7 +605,7 @@
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
         : pendingClaims > 0
             ? $"{pendingClaims} pending setup code(s) are still waiting on their original device."
-            : "No linked install is attached yet. Open Downloads while signed in to start with the same binary and a calmer return path.";
+            : "No linked install is attached yet. Open Downloads while signed in to start with the same download and a direct return path.";
     var accountRailRecoverySummary = leadPendingClaim is not null
         ? $"{PublicText(leadPendingClaim.ArtifactLabel)} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
         : "Recovery codes stay in reserve. The default path remains installer or in-app linking on the affected device.";
@@ -665,7 +666,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Primary sign-in</span>
                             <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
-                            <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return path later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
+                            <p>@(emailLink is null ? "Add an email recovery path if you want an easier way back later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Linked install path</span>
@@ -704,7 +705,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Primary sign-in</span>
                     <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
-                    <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return path later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
+                    <p>@(emailLink is null ? "Add an email recovery path if you want an easier way back later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Linked install path</span>
@@ -1180,7 +1181,7 @@
                         <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
                         <a class="button-like button-like--secondary" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                     </div>
-                    <p class="muted-copy">Devices &amp; access is the calmer return path after the installer or app does the real work. Recovery codes stay below as a reserve option, not the first instruction.</p>
+                    <p class="muted-copy">Devices &amp; access is the main recovery path after the installer or app does the real work. Recovery codes stay below as a reserve option, not the first instruction.</p>
                 </article>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -1652,6 +1653,109 @@
                                 <a class="button-like button-like--ghost" href="/account/access">Devices &amp; access</a>
                             </div>
                         </article>
+                    }
+                </section>
+            }
+
+            @if (showWorkSection)
+            {
+                <section class="settings-section" data-account-panel id="origin-dossier-library">
+                    <div class="settings-section__header">
+                        <h2>Origin Dossier library</h2>
+                        <p>Gold Origin Dossiers appear here only after the provider-authored manuscript, Undetectable Humanizer receipt, selected-face scene cover, Audiobookshelf playback verification, and authenticated chummer.run owner link all pass.</p>
+                    </div>
+                    @if (originDossierPublications.Length == 0)
+                    {
+                        <article class="app-action-card">
+                            <span class="tag">Awaiting gold artifact</span>
+                            <h3>No verified Origin Dossier share yet</h3>
+                            <p>The account is ready for a completed Origin Dossier, but no user-owned publication index entry has passed the gold gates yet. No Audiobookshelf link is shown until playback is verified.</p>
+                        </article>
+                    }
+                    else
+                    {
+                        <div class="minimal-three">
+                            @foreach (var publication in originDossierPublications)
+                            {
+                                <article class="app-action-card"
+                                         data-origin-dossier-publication
+                                         data-origin-dossier-gold-ready="@publication.GoldReady.ToString().ToLowerInvariant()"
+                                         data-story-scene-cover-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
+                                         data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
+                                         data-undetectable-humanizer-applied="@publication.UndetectableHumanizerApplied.ToString().ToLowerInvariant()"
+                                         data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
+                                    <span class="tag">@(publication.GoldReady ? "Gold ready" : "Gold gated")</span>
+                                    <h3>@PublicText(publication.Title)</h3>
+                                    <p>@PublicText(publication.RunnerAlias) · @HumanizeStatus(publication.PublicationState, "Awaiting provider manuscript")</p>
+                                    @if (publication.StorySceneCoverUsesSelectedCharacterFace && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl))
+                                    {
+                                        <figure class="product-proof__media">
+                                            <span class="scene-picture">
+                                                <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @PublicText(publication.RunnerAlias)" loading="lazy" />
+                                            </span>
+                                            <figcaption class="muted-copy">Rendered story scene cover verified against the selected character face.</figcaption>
+                                        </figure>
+                                    }
+                                    else
+                                    {
+                                        <p class="muted-copy">Rendered story scene cover is locked until selected-character-face verification passes.</p>
+                                    }
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Provider manuscript</span>
+                                            <strong>@(publication.ProviderAuthoredManuscriptImported ? "Imported" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Humanizer</span>
+                                            <strong>@(publication.UndetectableHumanizerApplied ? "Applied" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Book artifact</span>
+                                            <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Dossier video</span>
+                                            <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Cover identity</span>
+                                            <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>AudiobookshelfPlaybackVerified</span>
+                                            <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Telegram share</span>
+                                            <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
+                                        </div>
+                                    </div>
+                                    @if (publication.MissingGoldRequirements.Count > 0)
+                                    {
+                                        <details class="details-drawer">
+                                            <summary>Missing gold requirements</summary>
+                                            <ul class="muted-copy">
+                                                @foreach (var requirement in publication.MissingGoldRequirements)
+                                                {
+                                                    <li>@PublicText(requirement)</li>
+                                                }
+                                            </ul>
+                                        </details>
+                                    }
+                                    <div class="stacked-actions">
+                                        @if (publication.GoldReady && !string.IsNullOrWhiteSpace(publication.AudiobookshelfShareUrl))
+                                        {
+                                            <a class="button-like button-like--primary" href="@publication.AudiobookshelfShareUrl" target="_blank" rel="noopener">Listen in Audiobookshelf</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
+                                        }
+                                        <a class="button-like button-like--secondary" href="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)">Open authenticated chummer.run edition</a>
+                                    </div>
+                                </article>
+                            }
+                        </div>
                     }
                 </section>
             }
@@ -2978,6 +3082,7 @@
                 }
                 else if (selectedBuildLabHandoff is not null)
                 {
+                    var selectedBuildLabInsights = Model.SelectedBuildLabInsights?.ToArray() ?? [];
                     <article class="app-action-card app-action-card--primary" id="build-handoff-@selectedBuildLabHandoff.HandoffId">
                         <span class="tag">Build next step</span>
                         <h3>@selectedBuildLabHandoff.Title</h3>
@@ -3165,6 +3270,33 @@
                         @if (selectedBuildLabHandoff.Watchouts is { Count: > 0 })
                         {
                             <p><strong>Needs attention:</strong> @string.Join(" ", selectedBuildLabHandoff.Watchouts)</p>
+                        }
+                        @if (selectedBuildLabInsights.Length > 0)
+                        {
+                            <div class="editorial-block" style="margin-top:1.25rem;">
+                                <div class="editorial-block__lead">
+                                    <p class="eyebrow">ALICE boards</p>
+                                    <h4 class="editorial-title" style="font-size:1.05rem;">See the current handoff before you commit.</h4>
+                                    <p class="editorial-copy">These boards help you read the current handoff faster. Chummer still owns the actual compare and apply decision.</p>
+                                </div>
+                                <div class="route-choice-grid">
+                                    @foreach (var insight in selectedBuildLabInsights)
+                                    {
+                                        <article class="route-choice-card">
+                                            <span class="tag">ChartBrick</span>
+                                            <h4>@PublicText(insight.Title)</h4>
+                                            <p>@PublicText(insight.Summary)</p>
+                                            <iframe
+                                                title="@PublicText(insight.Title)"
+                                                src="@insight.EmbedHref"
+                                                loading="lazy"
+                                                referrerpolicy="strict-origin-when-cross-origin"
+                                                style="width:100%;min-height:420px;border:1px solid rgba(255,255,255,.12);border-radius:.85rem;background:rgba(9,14,19,.72);"></iframe>
+                                            <a class="inline-link" href="@insight.OpenHref" target="_blank" rel="noreferrer">@PublicText(insight.ActionLabel)</a>
+                                        </article>
+                                    }
+                                </div>
+                            </div>
                         }
                     </article>
                 }
@@ -4096,7 +4228,7 @@
                     @foreach (var op in Model.CampaignSpine.CommunityOperations)
                     {
                         var inviteSummary = op.RecentJoinCodes.Count == 0 && op.RecentBoostCodes.Count == 0
-                            ? "Issue member and sponsor entry from one calmer account view."
+                            ? "Issue member and sponsor entry from one account view."
                             : $"{op.RecentJoinCodes.Count} join code(s) and {op.RecentBoostCodes.Count} sponsor code(s) stay in one account view.";
                         <details id="community-op-@op.GroupId" class="details-drawer">
                             <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>

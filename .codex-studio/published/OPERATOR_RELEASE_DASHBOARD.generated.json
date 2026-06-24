@@ -1,11 +1,11 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-23T08:52:35Z",
+  "generated_at_utc": "2026-06-24T07:57:38Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
-    "version": "run-258",
-    "published_at": "2026-06-20T08:00:00Z",
+    "version": "run-20260623-102621",
+    "published_at": "2026-06-23T10:26:21Z",
     "channel": "public_stable",
     "rollout_state": "public_stable",
     "supportability_state": "gold_supported",
@@ -53,7 +53,7 @@
       "exists": true,
       "status": "published",
       "verdict": null,
-      "generated_at_utc": "2026-06-20T08:00:00Z",
+      "generated_at_utc": "2026-06-23T10:26:21Z",
       "pass": true
     },
     "external_distribution_mirror_proof": {
@@ -96,6 +96,14 @@
       "generated_at_utc": "2026-06-23T08:52:24Z",
       "pass": true
     },
+    "participate_billing_honesty": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "READY",
+      "generated_at_utc": "2026-06-24T07:57:38.885741Z",
+      "pass": true
+    },
     "release_ready": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
@@ -110,7 +118,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-06-22T13:24:58Z",
+      "generated_at_utc": "2026-06-23T13:14:17Z",
       "pass": false,
       "release_blocking": false
     },

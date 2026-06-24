@@ -103,13 +103,13 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
     'AI generated',
   ];
 
-  const participateResponse = await request.get(`${baseUrl}/partizipate`, { maxRedirects: 0 });
-  expect([302, 303, 307, 308]).toContain(participateResponse.status());
-  const participateLocation = participateResponse.headers()['location'] || '';
-  expect(participateLocation).toContain('/auth/google/start?next=');
-  expect(participateLocation).toContain('%2Fpartizipate');
-  expect(participateLocation).not.toContain('ProductLift');
-  expect(participateLocation).not.toContain('productlift.dev');
+  const participateResponse = await request.get(`${baseUrl}/partizipate`);
+  expect(participateResponse.status()).toBe(200);
+  const participateText = await participateResponse.text();
+  expect(participateText).toContain('Public board');
+  expect(participateText).toContain('Use the right place');
+  expect(participateText).not.toContain('ProductLift');
+  expect(participateText).not.toContain('productlift.dev');
 
   for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });

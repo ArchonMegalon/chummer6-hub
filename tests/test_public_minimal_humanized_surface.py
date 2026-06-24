@@ -390,20 +390,30 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert '[HttpGet("/partizipate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'RedirectPermanent("/partizipate")' in controller
-    assert "return Redirect(BuildParticipateSignInHref());" in controller
     assert 'BuildParticipateSignInHref(string targetPath = "/partizipate")' in controller
-    assert 'return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);' in controller
+    assert '? _chrome.BuildPublicChrome(' in controller
+    assert ': _chrome.BuildAuthenticatedChrome(' in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
-    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";' in controller
+    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";' in controller
+    assert "ResolveParticipateSupporterHref()" in controller
+    assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
+    assert "data-chummer-board-rail" in controller
+    assert "__CHUMMER_SUPPORTER_LINK__" in controller
+    assert "authCandidates" in controller
+    assert "node.remove()" in controller
     assert "participate-shell" in participate
     assert "participate-hosted__frame" in participate
+    assert "participate-supporter-pill" in participate
+    assert "participate-supporter-note" in participate
+    assert "Model.SupporterHref" in participate
     assert "Fallback form" not in participate
     assert "Join beta waitlist" not in participate
     assert "participate-quick-form" not in participate
     assert "@foreach (var lane in Model.Lanes)" in participate
     assert "@lane.ActionLabel" in participate
     assert "Private help" in participate
-    assert "Become a supporter" in participate
+    assert "Support Chummer" in participate
+    assert "Supporter currently unlocks no extra product access." in participate
     assert "Current themes" not in participate
     assert "Open in a tab" not in participate
     assert "BuildParticipatePageModel(" not in controller
@@ -434,9 +444,48 @@ def test_character_helper_page_uses_account_helper_language() -> None:
         assert forbidden not in helper
 
 
+def test_character_helper_chartbrick_insights_are_optional_and_chartbrick_scoped() -> None:
+    service = read("Chummer.Run.Api/Services/KarmaForge/BuildGhostConciergeService.cs")
+    helper = read("Chummer.Run.Api/Views/PublicLanding/BuildGhostConcierge.cshtml")
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+
+    assert "CHUMMER_ALICE_CHARTBRICK_EXPLAIN_EMBED_URL" in service
+    assert "CHUMMER_ALICE_CHARTBRICK_RUNNER_STATS_EMBED_URL" in service
+    assert 'host.EndsWith("chartbrick.com"' in service
+    assert 'string.Equals(uri.Scheme, Uri.UriSchemeHttps' in service
+    assert "projection.Insights.Count > 0" in helper
+    assert 'title="@SanitizePublicCopy(insight.Title)"' in helper
+    assert 'src="@insight.EmbedHref"' in helper
+    assert 'target="_blank" rel="noreferrer"' in helper
+    assert "projection.Insights," in controller
+
+
+def test_signed_in_alice_handoff_uses_chartbrick_runner_insights() -> None:
+    service = read("Chummer.Run.Api/Services/KarmaForge/BuildGhostConciergeService.cs")
+    controller = read("Chummer.Run.Api/Controllers/AccountsController.cs")
+    account_view = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+    viewmodels = read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
+    identity = read("Chummer.Run.Api/Services/HubIdentityClient.cs")
+
+    assert "BuildChartBrickInsightsForHandoff" in service
+    assert 'builder.Replace("{handoffId}"' in service
+    assert 'builder.Replace("{runnerLabel}"' in service
+    assert "_buildGhostConcierge.BuildChartBrickInsightsForHandoff(selectedBuildLabHandoff.HandoffId, selectedBuildLabHandoff.Title)" in controller
+    assert "SelectedBuildLabInsights" in viewmodels
+    assert "ALICE boards" in account_view
+    assert "selectedBuildLabInsights.Length > 0" in account_view
+    assert 'src="@insight.EmbedHref"' in account_view
+    assert 'target="_blank" rel="noreferrer"' in account_view
+    assert 'TryResolveLocalSeededSubject(request, accessToken, out AuthenticatedHubSubject? localSubject)' in identity
+    assert '(_configuration["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] ?? string.Empty).Trim()' in identity
+    assert '(_configuration["CHUMMER_LOCAL_E2E_SUBJECT_ID"] ?? "subject.demo").Trim()' in identity
+    assert 'IPAddress.IsLoopback(remoteIp)' in identity
+
+
 def test_participation_redirect_avoids_public_decision_and_account_explanation_page() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+    layout = read("Chummer.Run.Api/Views/Shared/_Layout.cshtml")
 
     assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
     assert "public async Task<IActionResult> ParticipatePage" in controller
@@ -444,6 +493,8 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert "productlift.dev" not in participate.lower()
     assert '"/partizipate/board"' in controller
     assert '"/partizipate"' in controller
+    assert "suppressHeaderActionsForPublicParticipate" in layout
+    assert 'normalizedCurrentPath is "/participate" or "/partizipate"' in layout
 
     for forbidden in (
         "Account-only programs stay below the fold",
@@ -471,9 +522,14 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
 
     assert "ControllerBase" not in controller
     assert 'return View("~/Views/Billing/Membership.cshtml"' in controller
+    assert 'return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing")}")' in controller
     assert "<!doctype html>" not in controller
+    assert '/auth/google/start?next={Uri.EscapeDataString("/account/billing")}' in controller
     assert "Supporter is appreciation, not extra access." in billing_view
+    assert "MyFirstBook: Free gets 1 book per month. Supporter gets 2." in billing_view
+    assert "Signed-in Chummer accounts go through directly." in billing_view
     assert "Supporter currently unlocks no extra features beyond Free." in billing_view
+    assert '__RequestVerificationToken' in billing_view
     assert "Manage billing" in billing_view
     assert "Premium" not in billing_view
     assert "Upgrade" not in billing_view
@@ -733,6 +789,8 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
     assert "Claim your copy" in entry
     assert "Claim with email" in entry
     assert "Claim with your account" in entry
+    assert "The download stays the same for everyone." in entry
+    assert "Keep Chummer open while the browser connects this copy." in entry
 
     for forbidden in (
         "Campaign OS",
@@ -740,6 +798,11 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
         "preview interest",
         "optional participation state",
         "claim tickets",
+        "one calmer place",
+        "faster return path",
+        "A calmer return path",
+        "The binary stays the same for everyone.",
+        "Keep Chummer open while the browser finishes connecting this copy.",
     ):
         assert forbidden not in entry
 
@@ -844,6 +907,15 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         "@RoadmapText(item.Card.Summary)",
         "@RoadmapText(item.Action.Label)",
         "PublicSurfaceStatus.DisplayLabel(item.Card.Badge)",
+    ):
+        assert required in roadmap
+
+    for required in (
+        '@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))',
+        'id="roadmap-board"',
+        'src="@Model.HostedBoardHref"',
+        'Current work and planned work, one page.',
+        'Use the changelog for shipped changes.',
     ):
         assert required in roadmap
 
@@ -1200,6 +1272,10 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
+    assert "Devices and access stay the main recovery place" in account
+    assert "same download and a direct return path" in account
+    assert "Add an email recovery path if you want an easier way back later." in account
+
     for forbidden in (
         "The artifact stays the same for everyone",
         "Artifact shelf posture",
@@ -1236,6 +1312,11 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "Package posture",
         "Recap and artifact shelf",
         "waiting for governed",
+        "one calmer account page",
+        "one calmer place",
+        "one calmer product settings surface",
+        "one calmer account view",
+        "calmer return path",
         "Record:",
         "Evidence:",
         "Lead:",
@@ -1585,6 +1666,9 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
         "signed-in reaction fallout",
     ):
         assert forbidden not in home
+
+    assert '@if (!showAccessSection)\n{\n    <section class="home-cockpit-strip" aria-label="Home summary">' in home
+    assert '@if (!showAccessSection)\n{\n    <section class="editorial-block">' in home
 
 
 def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
@@ -2102,7 +2186,7 @@ def test_publication_detail_page_uses_plain_labels() -> None:
     assert "@Model.Publication.Title" not in publication
     assert "@Model.Publication.Summary" not in publication
     assert "@Model.TrustPulse.RouteGuardSummary" not in publication
-    assert "Current build" in publication
+    assert "Updated" in publication
     assert "Setup help nearby" in publication
     assert "Public discovery stays open" in publication
     assert "Some desktop work is still open, so this page stays short." in publication
@@ -2830,3 +2914,27 @@ def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
         '("authority", "source")',
     ):
         assert expected in humanizer
+
+
+def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None:
+    auth_controller = read("Chummer.Run.Api/Controllers/AuthController.cs")
+    account_links_controller = read("Chummer.Run.Api/Controllers/AccountLinksController.cs")
+    browser_auth = read("Chummer.Run.Api/Services/HubBrowserAuthService.cs")
+    identity_access = read("Chummer.Run.Identity/Services/IdentityAccessService.cs")
+    email_delivery = read("Chummer.Run.Identity/Services/IdentityEmailDeliveryService.cs")
+
+    assert "ShouldExposeInlinePreviewLink(Request)" in auth_controller
+    assert "!string.IsNullOrWhiteSpace(started.TicketId)" in auth_controller
+    assert "Email delivery is not available on this host right now." in auth_controller
+    assert "ShouldExposeInlinePreviewLink(Request)" in account_links_controller
+    assert "!string.IsNullOrWhiteSpace(started.TicketId)" in account_links_controller
+    assert "public static bool ShouldExposeInlinePreviewLink(HttpRequest request)" in browser_auth
+    assert "IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS" in email_delivery
+    assert 'DeliveryMode: "email_delivery_unavailable"' in email_delivery
+    assert "IsInlinePreviewDelivery(delivery.DeliveryMode) ? ticketId : string.Empty" in identity_access
+    assert "AccessTokenHash" in identity_access
+    assert "RefreshTokenHash" in identity_access
+    assert "TicketHash" in identity_access
+    assert "IDENTITY_EMAILIT_WEBHOOK_SECRET" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")
+    assert "IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")
+    assert "StatusCodes.Status503ServiceUnavailable" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")

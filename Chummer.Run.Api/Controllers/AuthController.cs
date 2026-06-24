@@ -149,17 +149,28 @@ public sealed class AuthController : Controller
                 secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
         }
 
-        var callback = $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(nextPath)}";
+        bool inlinePreviewAllowed = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(started.TicketId)
+            && HubBrowserAuthService.ShouldExposeInlinePreviewLink(Request);
+        string supportLine = inlinePreviewAllowed
+            ? $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}."
+            : string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
+                ? $"Email delivery is not available on this host right now. Chummer did not expose a browser sign-in link. After delivery is restored, sign-in will return you to {nextTarget}."
+                : $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}.";
         var model = new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome("Open your email", "Finish the magic-link step and come back to your account.", "/login"),
             Heading: "Open your email",
-            SupportLine: $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}.",
+            SupportLine: supportLine,
             Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC · next stop: {nextTarget}",
-            PrimaryLabel: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
+            PrimaryLabel: inlinePreviewAllowed
                 ? $"Open the confirmation link for {nextTarget}"
-                : "Return to sign in",
-            PrimaryHref: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
-                ? callback
+                : string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase) && _google.IsConfigured()
+                    ? "Continue with Google"
+                    : "Return to sign in",
+            PrimaryHref: inlinePreviewAllowed
+                ? $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(nextPath)}"
+                : string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase) && _google.IsConfigured()
+                    ? $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"
                 : $"/login?next={Uri.EscapeDataString(nextPath)}",
             SecondaryLabel: "Use a different email",
             SecondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
@@ -167,7 +178,9 @@ public sealed class AuthController : Controller
             Highlights:
             [
                 $"Check {started.Email} for the Chummer sign-in email.",
-                "Open the confirmation link in the same browser when possible.",
+                inlinePreviewAllowed
+                    ? "Open the confirmation link in the same browser when possible."
+                    : "If delivery is not available yet, use Google or try again after email delivery is restored.",
                 $"After confirmation, Chummer sends you back to {nextTarget}."
             ]);
         return View("~/Views/Auth/Message.cshtml", model);

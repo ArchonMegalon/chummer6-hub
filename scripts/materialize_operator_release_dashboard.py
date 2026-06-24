@@ -93,6 +93,8 @@ def build_payload() -> dict[str, Any]:
     design = load_json(design_path)
     copy_path = PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json"
     copy_gate = load_json(copy_path)
+    participate_billing_honesty_path = PUBLISHED_ROOT / "PARTICIPATE_BILLING_HONESTY.generated.json"
+    participate_billing_honesty = load_json(participate_billing_honesty_path)
     release_ready_path = PUBLISHED_ROOT / "RELEASE_READY.generated.json"
     release_ready = load_json(release_ready_path)
     final_gold_path = PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json"
@@ -107,6 +109,7 @@ def build_payload() -> dict[str, Any]:
         "ui_frame_integrity": gate("ui_frame_integrity", ui_frame_path, ui_frame),
         "design_quality_gate": gate("design_quality_gate", design_path, design),
         "public_copy_leak_gate": gate("public_copy_leak_gate", copy_path, copy_gate),
+        "participate_billing_honesty": gate("participate_billing_honesty", participate_billing_honesty_path, participate_billing_honesty),
         "release_ready": gate("release_ready", release_ready_path, release_ready),
         "final_gold_janitor": gate("final_gold_janitor", final_gold_path, final_gold),
         "google_oauth_linking_proof": gate("google_oauth_linking_proof", oauth_path, oauth),

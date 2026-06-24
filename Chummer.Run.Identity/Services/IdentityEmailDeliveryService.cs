@@ -307,8 +307,20 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         }
 
         var previewNote = AnyRealTransportConfigured()
-            ? "Email delivery failed on this host, so the preview callback link is shown directly for recovery."
-            : "Transactional email is not configured in this build, so the callback link is shown directly after submit.";
+            ? "Email delivery failed on this host. Try again later or use another configured sign-in method."
+            : "Transactional email is not configured on this host. Configure email delivery before enabling email sign-in.";
+        if (!AllowUnsafeInlinePreviewLinks())
+        {
+            RecordDeliveryUnavailable(message, previewNote);
+            return new IdentityEmailDeliveryResult(
+                DeliveryMode: "email_delivery_unavailable",
+                PreviewNote: previewNote,
+                Delivered: false);
+        }
+
+        previewNote = AnyRealTransportConfigured()
+            ? "Email delivery failed on this host, so the development preview callback link is available locally."
+            : "Transactional email is not configured on this host, so the development preview callback link is available locally.";
         RecordPreviewFallback(message, previewNote);
         return new IdentityEmailDeliveryResult(
             DeliveryMode: "preview_inline_link",
@@ -461,6 +473,9 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         => !string.IsNullOrWhiteSpace(_configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim())
            || !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]?.Trim());
 
+    private bool AllowUnsafeInlinePreviewLinks()
+        => ResolveBool(_configuration["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"], defaultValue: false);
+
     private void RecordTransportResult(IdentityEmailMessage message, IdentityEmailTransportResult result)
     {
         lock (_mutate)
@@ -505,6 +520,26 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                 TransportKey: "preview",
                 DeliveryMode: "preview_inline_link",
                 Status: "preview",
+                Delivered: false,
+                RecipientEmail: message.RecipientEmail,
+                ProviderMessageId: null,
+                FailureReason: previewNote,
+                OccurredAtUtc: DateTimeOffset.UtcNow));
+            TrimRecentDeliveries();
+            PersistLocked();
+        }
+    }
+
+    private void RecordDeliveryUnavailable(IdentityEmailMessage message, string previewNote)
+    {
+        lock (_mutate)
+        {
+            _recentDeliveries.Add(new EmailDeliveryEventState(
+                DeliveryId: $"dly_{Guid.NewGuid():N}",
+                EmailKind: message.EmailKind,
+                TransportKey: "none",
+                DeliveryMode: "email_delivery_unavailable",
+                Status: "unavailable",
                 Delivered: false,
                 RecipientEmail: message.RecipientEmail,
                 ProviderMessageId: null,

@@ -1,0 +1,145 @@
+@model Chummer.Run.Api.ViewModels.OriginDossierPublicationDetailPageViewModel
+@{
+    ViewData["Title"] = Model.Publication.Title;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-minimal";
+    var publication = Model.Publication;
+    var canShowCover = publication.StorySceneCoverUsesSelectedCharacterFace
+        && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl);
+    var canOpenBook = publication.GoldReady
+        && publication.BookArtifactVerified
+        && !string.IsNullOrWhiteSpace(publication.BookArtifactUrl);
+    var canListen = publication.GoldReady
+        && publication.AudiobookshelfPlaybackVerified
+        && !string.IsNullOrWhiteSpace(publication.AudiobookshelfShareUrl);
+    var canWatch = publication.GoldReady
+        && publication.DossierVideoVerified
+        && !string.IsNullOrWhiteSpace(publication.DossierVideoUrl);
+}
+
+<section class="minimal-page-hero" data-origin-dossier-detail>
+    <div>
+        <p class="minimal-kicker">Private Origin Dossier</p>
+        <h1>@Clean(publication.Title)</h1>
+        <p>@Clean(publication.RunnerAlias) · @Humanize(publication.PublicationState)</p>
+    </div>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-dossier-edition">
+    <div class="product-proof__grid">
+        <article class="app-action-card app-action-card--primary"
+                 data-origin-dossier-gold-ready="@publication.GoldReady.ToString().ToLowerInvariant()"
+                 data-story-scene-cover-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
+                 data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
+                 data-book-artifact-verified="@publication.BookArtifactVerified.ToString().ToLowerInvariant()"
+                 data-dossier-video-verified="@publication.DossierVideoVerified.ToString().ToLowerInvariant()"
+                 data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
+            <span class="tag">@(publication.GoldReady ? "Gold ready" : "Gold gated")</span>
+            <h2>Story scene</h2>
+            @if (canShowCover)
+            {
+                <figure class="product-proof__media">
+                    <span class="scene-picture">
+                        <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @Clean(publication.RunnerAlias)" loading="eager" />
+                    </span>
+                    <figcaption class="muted-copy">Rendered scene cover verified against the selected character face.</figcaption>
+                </figure>
+            }
+            else
+            {
+                <p class="muted-copy">The rendered scene cover stays locked until selected-character-face verification passes.</p>
+            }
+        </article>
+        <article class="app-action-card">
+            <span class="tag">Publication gates</span>
+            <h2>Edition readiness</h2>
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Provider manuscript</span>
+                    <strong>@(publication.ProviderAuthoredManuscriptImported ? "Imported" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Undetectable Humanizer</span>
+                    <strong>@(publication.UndetectableHumanizerApplied ? "Applied" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Book artifact</span>
+                    <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Scene cover identity</span>
+                    <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Audiobookshelf playback</span>
+                    <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Dossier video</span>
+                    <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Telegram share</span>
+                    <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
+                </div>
+            </div>
+            @if (publication.MissingGoldRequirements.Count > 0)
+            {
+                <details class="details-drawer">
+                    <summary>Missing gold requirements</summary>
+                    <ul class="muted-copy">
+                        @foreach (var requirement in publication.MissingGoldRequirements)
+                        {
+                            <li>@Clean(requirement)</li>
+                        }
+                    </ul>
+                </details>
+            }
+        </article>
+    </div>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-dossier-playback">
+    <article class="app-action-card">
+        <span class="tag">Owner links</span>
+        <h2>Read, listen, and watch</h2>
+        <p>These actions unlock only after the verified book, Audiobookshelf playback, rendered cover, dossier video, and share-delivery gates pass for this signed-in account.</p>
+        <div class="minimal-actions" aria-label="Origin Dossier artifact actions">
+            @if (canOpenBook)
+            {
+                <a class="button-like button-like--primary" href="@publication.BookArtifactUrl">Open book edition</a>
+            }
+            else
+            {
+                <span class="button-like button-like--disabled" aria-disabled="true">Book edition locked</span>
+            }
+            @if (canListen)
+            {
+                <a class="button-like button-like--secondary" href="@publication.AudiobookshelfShareUrl" target="_blank" rel="noopener">Listen in Audiobookshelf</a>
+            }
+            else
+            {
+                <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
+            }
+            @if (canWatch)
+            {
+                <a class="button-like button-like--ghost" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch dossier film</a>
+            }
+            else
+            {
+                <span class="button-like button-like--disabled" aria-disabled="true">Dossier film locked</span>
+            }
+            <a class="button-like button-like--ghost" href="@Model.LibraryHref">Back to Origin Dossier library</a>
+        </div>
+    </article>
+</section>
+
+@functions {
+    private static string Clean(string? value)
+        => Chummer.Run.Api.Services.PublicFacingCopyHumanizer.Clean(value);
+
+    private static string Humanize(string? value)
+        => Clean(string.IsNullOrWhiteSpace(value)
+            ? "Awaiting provider manuscript"
+            : value.Replace('_', ' '));
+}

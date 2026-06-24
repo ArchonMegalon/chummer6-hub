@@ -33,7 +33,8 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   await expect(desktop.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');
-  await expect(desktop.locator('.minimal-inline-links')).toContainText('Participate');
+  await expect(desktop.locator('.minimal-inline-links')).not.toContainText('Participate');
+  await expect(desktop.locator('.site-nav')).not.toContainText('Participate');
   const heroBox = await desktop.locator('[data-homepage-section="hero"]').boundingBox();
   if (!heroBox || heroBox.y + heroBox.height > 768) {
     failures.push('homepage: hero still extends below the desktop viewport');

@@ -29,8 +29,8 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 </body>
             """,
             "https://example.invalid/downloads": """
-                <article id="stable"><h2>Current stable build</h2></article>
-                <article id="nightly"><span>Nightly</span></article>
+                <article id="stable"><h2>Current build</h2></article>
+                <article id="nightly"><span>Nightly</span><h2>Newest build</h2></article>
             """,
                 "https://example.invalid/status": """
                 <div class="minimal-status-pill"></div>

@@ -136,6 +136,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("ReceiveProductLiftWebhook", controller, StringComparison.Ordinal);
         Assert.Contains("PublicSignalOperationsService.WebhookSecretHeader", controller, StringComparison.Ordinal);
         Assert.Contains("_signalOperations.RecordWebhook(payload)", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal)", controller, StringComparison.Ordinal);
+        Assert.Contains("FixedTimeEquals(suppliedSecret.Trim(), configuredSecret)", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/feedback/operations\")]", controller, StringComparison.Ordinal);
         Assert.Contains("FeedbackOperationsArtifact()", controller, StringComparison.Ordinal);
         Assert.Contains("_signalOperations.LoadArtifactJson()", controller, StringComparison.Ordinal);
@@ -218,6 +220,8 @@ public sealed class PublicSignalOperationsViewTests
 <body>
   <header>
     <a class="brand-link" href="/">Chummer</a>
+    <a href="https://app.productlift.dev/login">Log in</a>
+    <a href="https://app.productlift.dev/signup">Sign up</a>
   </header>
   <main>
     <a href="/roadmap">Roadmap</a>
@@ -229,13 +233,57 @@ public sealed class PublicSignalOperationsViewTests
 
         string rewritten = (string)method!.Invoke(
             null,
-            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/"])!;
+            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", "/account/billing/supporter/start"])!;
 
         Assert.Contains("<base href=\"/partizipate/board/\" />", rewritten, StringComparison.Ordinal);
         Assert.Contains("href=\"/partizipate/board/roadmap\"", rewritten, StringComparison.Ordinal);
         Assert.Contains("src=\"/partizipate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-failure-patch", rewritten, StringComparison.Ordinal);
+        Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-chummer-board-failure", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Public board temporarily unavailable", rewritten, StringComparison.Ordinal);
+        Assert.Contains("The board hit a loading problem.", rewritten, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
+        Assert.Contains("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Support Chummer", rewritten, StringComparison.Ordinal);
+        Assert.Contains("node.style.display = 'none';", rewritten, StringComparison.Ordinal);
+        Assert.Contains("new MutationObserver", rewritten, StringComparison.Ordinal);
+        Assert.Contains("node.remove()", rewritten, StringComparison.Ordinal);
         Assert.Contains("brand.setAttribute('href', 'https://chummer.run/')", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("support@productlift.dev", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("productlift.dev/login", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("productlift.dev/signup", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("Powered by ProductLift", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("name=\"generator\"", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("brand.setAttribute('target', '_top')", rewritten, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParticipateBoardHtmlRewriteSkipsSupporterLinkWhenBillingUnavailable()
+    {
+        MethodInfo? method = typeof(PublicLandingController).GetMethod(
+            "RewriteParticipateBoardHtml",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        const string html = """
+<!doctype html>
+<html>
+<head><title>Board</title></head>
+<body><main>board</main></body>
+</html>
+""";
+
+        string rewritten = (string)method!.Invoke(
+            null,
+            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", null])!;
+
+        Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Private help", rewritten, StringComparison.Ordinal);
     }
 }

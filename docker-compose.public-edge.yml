@@ -18,6 +18,48 @@ services:
         aliases:
           - support-progress-mock
 
+  chummer-presentation-api:
+    image: chummer-presentation-api:local
+    restart: unless-stopped
+    build:
+      context: /docker/chummercomplete
+      dockerfile: chummer-presentation/Chummer.Api/Dockerfile
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+    environment:
+      CHUMMER_PORTAL_OWNER_SHARED_KEY: ${CHUMMER_PORTAL_OWNER_SHARED_KEY:-public-edge-blazor-owner-shared-key}
+      CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS: ${CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS:-300}
+    cpu_shares: 128
+    cpus: ${CHUMMER_PRESENTATION_API_CPUS:-0.75}
+    networks:
+      public-origin:
+        aliases:
+          - chummer-presentation-api
+
+  chummer-public-blazor:
+    image: chummer-public-blazor:local
+    restart: unless-stopped
+    build:
+      context: /docker/chummercomplete
+      dockerfile: chummer-presentation/Chummer.Blazor/Dockerfile
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+    depends_on:
+      - chummer-presentation-api
+    environment:
+      CHUMMER_API_BASE_URL: http://chummer-presentation-api:8080
+      CHUMMER_BLAZOR_PATH_BASE: /blazor
+      CHUMMER_ANALYTICS_PROVIDER: rybbit
+      CHUMMER_RYBBIT_SITE_ID: ${RYBBIT_CHUMMER_RUN_SITE_ID:-}
+      CHUMMER_RYBBIT_SCRIPT_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_URL:-}
+      CHUMMER_RYBBIT_BASE_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN:-https://app.rybbit.io}
+    cpu_shares: 128
+    cpus: ${CHUMMER_PUBLIC_BLAZOR_CPUS:-0.75}
+    networks:
+      public-origin:
+        aliases:
+          - chummer-public-blazor
+
   chummer-run-identity:
     image: chummer-run-identity:local
     restart: unless-stopped
@@ -70,6 +112,7 @@ services:
     depends_on:
       - chummer-run-identity
       - support-progress-mock
+      - chummer-public-blazor
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -131,6 +174,8 @@ services:
       CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT: ${CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT:-}
       CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID: ${CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID:-hub}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+      CHUMMER_PUBLIC_BLAZOR_PROXY_URL: ${CHUMMER_PUBLIC_BLAZOR_PROXY_URL:-http://chummer-public-blazor:8080/blazor/}
+      CHUMMER_PUBLIC_AVALONIA_PROXY_URL: ${CHUMMER_PUBLIC_AVALONIA_PROXY_URL:-}
       CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
       CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
       CHUMMER_PUBLIC_FINAL_GOLD_JANITOR_FILE: /proofs/FINAL_GOLD_JANITOR.generated.json

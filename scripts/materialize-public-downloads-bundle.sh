@@ -494,13 +494,19 @@ for row in rows:
         allowed.add(file_name)
         lowered = file_name.lower()
         if lowered.endswith("-installer.exe") and "-win-" in lowered:
-            allowed.add(file_name[:-len("-installer.exe")] + "-payload.zip")
+            payload_name = file_name[:-len("-installer.exe")] + "-payload.zip"
+            allowed.add(payload_name)
+            allowed.add(f"{payload_name}.json")
     payload_file_name = str(row.get("payloadFileName") or "").strip()
     if payload_file_name:
         allowed.add(payload_file_name)
+        allowed.add(f"{payload_file_name}.json")
     payload_url = str(row.get("payloadDownloadUrl") or "").strip()
     if payload_url:
-        allowed.add(Path(payload_url.split("?", 1)[0].split("#", 1)[0]).name)
+        payload_url_name = Path(payload_url.split("?", 1)[0].split("#", 1)[0]).name
+        if payload_url_name:
+            allowed.add(payload_url_name)
+            allowed.add(f"{payload_url_name}.json")
 
 for artifact_path in files_root.glob("chummer-*"):
     if not artifact_path.is_file():

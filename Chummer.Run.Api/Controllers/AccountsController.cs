@@ -33,12 +33,14 @@ public sealed class AccountsController : Controller
     private readonly LeaderboardService _leaderboards;
     private readonly PublicPackageCatalogService _packageCatalog;
     private readonly KarmaForgeDiscoveryService _karmaForge;
+    private readonly BuildGhostConciergeService _buildGhostConcierge;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly PublicReleaseManifestService _releases;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
+    private readonly OriginDossierPublicationService _originDossierPublications;
     private readonly ILogger<AccountsController> _logger;
 
     public AccountsController(
@@ -58,12 +60,14 @@ public sealed class AccountsController : Controller
         LeaderboardService leaderboards,
         PublicPackageCatalogService packageCatalog,
         KarmaForgeDiscoveryService karmaForge,
+        BuildGhostConciergeService buildGhostConcierge,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         PublicReleaseManifestService releases,
         ReleaseSelectionService releaseSelection,
         PublicPrivacyBoundaryService privacyBoundaries,
         SignedInTrustStatusService signedInTrustStatus,
+        OriginDossierPublicationService originDossierPublications,
         ILogger<AccountsController> logger)
     {
         _accounts = accounts;
@@ -82,12 +86,14 @@ public sealed class AccountsController : Controller
         _leaderboards = leaderboards;
         _packageCatalog = packageCatalog;
         _karmaForge = karmaForge;
+        _buildGhostConcierge = buildGhostConcierge;
         _chrome = chrome;
         _google = google;
         _releases = releases;
         _releaseSelection = releaseSelection;
         _privacyBoundaries = privacyBoundaries;
         _signedInTrustStatus = signedInTrustStatus;
+        _originDossierPublications = originDossierPublications;
         _logger = logger;
     }
 
@@ -133,6 +139,7 @@ public sealed class AccountsController : Controller
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            var originDossierPublications = _originDossierPublications.ListForAccount(user.UserId, subject.SubjectId);
             EntitlementSyncReceiptProjection entitlementSyncReceipts = _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking);
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
@@ -187,6 +194,9 @@ public sealed class AccountsController : Controller
                 SelectedWorkspacePrepLibraryQuery: prepQuery,
                 SelectedRun: selectedRun,
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
+                SelectedBuildLabInsights: selectedBuildLabHandoff is null
+                    ? Array.Empty<BuildGhostConciergeInsightProjection>()
+                    : _buildGhostConcierge.BuildChartBrickInsightsForHandoff(selectedBuildLabHandoff.HandoffId, selectedBuildLabHandoff.Title),
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,
                 SelectedCreatorPublication: selectedCreatorPublication,
                 SelectedCreatorPublicationDraftDetail: selectedCreatorPublicationRegistry?.DraftDetail,
@@ -198,7 +208,8 @@ public sealed class AccountsController : Controller
                 ParticipationReceipts: participationReceipts,
                 ParticipationPackageReceipts: _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
                 ParticipationKarmaSubmissions: _karmaForge.ListRecentForSubject(subject.SubjectId, 5),
-                ParticipationActivityReceipts: _participationNotifications.ListReceiptsForUser(user.UserId, 6));
+                ParticipationActivityReceipts: _participationNotifications.ListReceiptsForUser(user.UserId, 6),
+                OriginDossierPublications: originDossierPublications);
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -217,6 +228,121 @@ public sealed class AccountsController : Controller
                 PrimaryHref: currentPath,
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
+        }
+    }
+
+    [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OriginDossierDetailPage(
+        [FromRoute] string originDossierProjectId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel? publication = _originDossierPublications.GetForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId);
+            if (publication is null)
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                    Chrome: _chrome.BuildAuthenticatedChrome(
+                        "Origin Dossier unavailable",
+                        "The requested Origin Dossier is not available for this signed-in account.",
+                        currentPath,
+                        user.DisplayName,
+                        user.Email),
+                    Heading: "Origin Dossier is not available",
+                    SupportLine: "This account does not have a verified Origin Dossier publication for that project.",
+                    Notice: "Open your library to see the dossiers that belong to this account.",
+                    PrimaryLabel: "Open Origin Dossier library",
+                    PrimaryHref: "/account/work#origin-dossier-library",
+                    SecondaryLabel: "Return to account",
+                    SecondaryHref: "/account"));
+            }
+
+            var model = new OriginDossierPublicationDetailPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome(
+                    publication.Title,
+                    "Private Origin Dossier edition, cover, and audiobook gate.",
+                    currentPath,
+                    user.DisplayName,
+                    user.Email),
+                Publication: publication,
+                AccountHref: "/account",
+                LibraryHref: "/account/work#origin-dossier-library");
+            return View("~/Views/Accounts/OriginDossier.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier detail page could not confirm the signed-in identity.");
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Origin Dossier unavailable", "Hub could not confirm this Origin Dossier right now.", currentPath),
+                Heading: "Origin Dossier is unavailable right now",
+                SupportLine: "Chummer could not open this private Origin Dossier right now. The dossier and account were not changed.",
+                Notice: null,
+                PrimaryLabel: "Try account again",
+                PrimaryHref: "/account/work#origin-dossier-library",
+                SecondaryLabel: "Return home",
+                SecondaryHref: "/home"));
+        }
+    }
+
+    [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}/{artifactKind}")]
+    public async Task<IActionResult> OriginDossierArtifact(
+        [FromRoute] string originDossierProjectId,
+        [FromRoute] string artifactKind,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}/{Uri.EscapeDataString(artifactKind)}";
+        if (!string.Equals(artifactKind, "book", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "cover", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "video", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            if (string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
+            {
+                string? audiobookshelfShareUrl = _originDossierPublications.GetAudiobookshelfShareForAccount(
+                    user.UserId,
+                    subject.SubjectId,
+                    originDossierProjectId);
+                return string.IsNullOrWhiteSpace(audiobookshelfShareUrl)
+                    ? NotFound()
+                    : Redirect(audiobookshelfShareUrl);
+            }
+
+            OriginDossierPublicationArtifact? artifact = _originDossierPublications.GetArtifactForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId,
+                artifactKind);
+            return artifact is null
+                ? NotFound()
+                : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier artifact route could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
 
@@ -1385,6 +1511,35 @@ public sealed class AccountsController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("me/origin-dossiers/publications")]
+    [ValidateAntiForgeryToken]
+    [ProducesResponseType<OriginDossierPublicationImportResultDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<OriginDossierPublicationImportResultDto>> UpsertOriginDossierPublication(
+        [FromBody] OriginDossierPublicationImportRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("Origin Dossier publication payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel publication = _originDossierPublications.UpsertForAccount(user, subject.SubjectId, request);
+            return Ok(OriginDossierPublicationService.ToImportResult(publication));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: ex.Message);
         }
     }
 

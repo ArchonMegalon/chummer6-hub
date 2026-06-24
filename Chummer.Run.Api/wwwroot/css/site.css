@@ -9063,6 +9063,14 @@ body {
   align-items: end;
 }
 
+.participate-hosted__status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .participate-hosted__lead {
   display: grid;
   gap: 0.3rem;
@@ -9095,6 +9103,27 @@ body {
 .participate-fallback p {
   margin: 0.55rem 0 0;
   color: var(--minimal-muted);
+}
+
+.participate-supporter-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0.28rem 0.72rem;
+  border: 1px solid var(--minimal-line);
+  border-radius: 999px;
+  background: var(--minimal-soft);
+  color: var(--minimal-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.participate-supporter-note {
+  margin: 0;
+  color: var(--minimal-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .participate-quick-form {

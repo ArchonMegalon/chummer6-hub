@@ -36,6 +36,13 @@ const singleLineRules: Array<{ selector: string; minWidth: number; label: string
   { selector: '.editorial-title', minWidth: 1366, label: 'editorial title' },
 ];
 
+const transientNavigationNeedles = [
+  'ERR_NETWORK_CHANGED',
+  'net::ERR_',
+  'Navigation timeout',
+  'Timeout',
+];
+
 type FrameFailure = {
   route: string;
   viewport: string;
@@ -46,6 +53,29 @@ type FrameFailure = {
   frame?: Record<string, number>;
   frameOverflow?: string;
 };
+
+async function gotoWithRetry(page: import('playwright/test').Page, route: string, attempts = 3) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      return response;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const transient = transientNavigationNeedles.some((needle) => message.includes(needle));
+      if (!transient || attempt === attempts) {
+        throw error;
+      }
+
+      await page.waitForTimeout(500 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
 
 test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ browser }) => {
   test.setTimeout(300000);
@@ -79,8 +109,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
         } as unknown as typeof HTMLCanvasElement.prototype.getContext;
       });
 
-      const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      const response = await gotoWithRetry(page, route);
 
       const status = response?.status() ?? 0;
       if (status >= 500) {

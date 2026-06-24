@@ -14,10 +14,10 @@
         {
             Badge = "Status",
             Title = "Check current status first",
-            Summary = "Use this when you want the current build, platform availability, and any release caution in one place.",
+            Summary = "Use this when you want the latest update, platform availability, and current release notes in one place.",
             Href = "/status",
             Label = "Open status",
-            Highlights = new[] { "Current build", "Platforms", "Release caution" }
+            Highlights = new[] { "Updated", "Platforms", "Current notes" }
         },
         new
         {
@@ -26,7 +26,7 @@
             Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package and setup help without making you dig through a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
-            Highlights = new[] { "Latest build", "Setup help", "Current notes" }
+            Highlights = new[] { "Updated", "Setup help", "Current notes" }
         },
         new
         {
@@ -45,7 +45,7 @@
         {
             Badge = "Private help",
             Title = "Use support when the issue needs logs or account detail",
-            Summary = "Install failures, crashes, account issues, and private campaign details belong in support, not in a public search box.",
+            Summary = "Install failures, crashes, account issues, and private campaign details belong in support.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
             Highlights = new[] { "Private reply", "Account optional", "Saved case" }

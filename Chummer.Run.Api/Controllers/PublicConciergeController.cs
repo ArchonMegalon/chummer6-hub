@@ -298,6 +298,10 @@ public sealed class PublicConciergeController : Controller
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: ex.Message);
         }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (ArgumentException ex)
         {
             return BadRequest(ex.Message);

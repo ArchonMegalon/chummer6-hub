@@ -221,9 +221,50 @@ class TokenIdentityStub(AbstractContextManager["TokenIdentityStub"]):
             self._thread.join(timeout=5)
 
 
+class StaticHtmlStub(AbstractContextManager["StaticHtmlStub"]):
+    def __init__(self, *, html: str, content_type: str = "text/html; charset=utf-8") -> None:
+        self.html = html
+        self.content_type = content_type
+        self.port = pick_free_port()
+        self._server: ThreadingHTTPServer | None = None
+        self._thread: threading.Thread | None = None
+
+    @property
+    def base_url(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
+
+    def __enter__(self) -> "StaticHtmlStub":
+        stub = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+            def do_GET(self) -> None:  # noqa: N802
+                body = stub.html.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", stub.content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, name="static-html-stub", daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._server is not None:
+            self._server.shutdown()
+            self._server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+
+
 class LocalHubApp(AbstractContextManager["LocalHubApp"]):
-    def __init__(self, *, identity_base_url: str | None = None) -> None:
+    def __init__(self, *, identity_base_url: str | None = None, extra_env: dict[str, str] | None = None) -> None:
         self.identity_base_url = identity_base_url
+        self.extra_env = dict(extra_env or {})
         self.port = pick_free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen[str] | None = None
@@ -246,6 +287,7 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         env["CHUMMER_PUBLIC_CANON_ROOT"] = str(RUN_SERVICES_ROOT)
         if self.identity_base_url:
             env["IDENTITY_SERVICE_BASE_URL"] = self.identity_base_url
+        env.update(self.extra_env)
 
         command = [
             "dotnet",

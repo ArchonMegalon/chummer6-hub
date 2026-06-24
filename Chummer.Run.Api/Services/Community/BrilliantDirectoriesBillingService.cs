@@ -16,6 +16,8 @@ public sealed class BrilliantDirectoriesBillingUnavailableException : InvalidOpe
 
 public sealed class BrilliantDirectoriesBillingService
 {
+    private const int FreeMyFirstBookMonthlyLimit = 1;
+    private const int SupporterMyFirstBookMonthlyLimit = 2;
     private static readonly BillingMembershipPlanDefinition[] PlanDefinitions =
     [
         new(
@@ -28,7 +30,16 @@ public sealed class BrilliantDirectoriesBillingService
             [
                 "Full current product access",
                 "Account linking and updates",
-                "Same runtime features as supporters today"
+                "Same runtime features as supporters today",
+                "1 MyFirstBook origin book per month"
+            ],
+            ExampleStoryBooks:
+            [
+                new BillingTierExampleStoryDto(
+                    "Origin Dossier: Debt Before Dawn",
+                    "Origin Dossier",
+                    "A decker burns their last clean SIN, takes one bad job, and learns the loadout is not optional anymore.",
+                    "Fits the free tier because it is a single concise canon-safe story book that turns one pressure line into a clean runner origin.")
             ]),
         new(
             BrilliantDirectoriesBillingConstants.SupporterPlanKey,
@@ -40,18 +51,35 @@ public sealed class BrilliantDirectoriesBillingService
             [
                 "Supports Chummer directly",
                 "Same current product access as free users",
-                "No exclusive features today"
+                "No exclusive features today",
+                "2 MyFirstBook origin books per month"
+            ],
+            ExampleStoryBooks:
+            [
+                new BillingTierExampleStoryDto(
+                    "Narrative Origin: The Name She Chose",
+                    "Narrative Origin",
+                    "A runner cuts ties with an old identity after one irreversible extraction and has to become someone sharper to survive.",
+                    "Fits the supporter tier because one premium monthly slot can go to a cleaner chaptered origin instead of a short dossier."),
+                new BillingTierExampleStoryDto(
+                    "Runner Memoir: Becoming Kestrel",
+                    "Runner Memoir",
+                    "A first-person street memoir that opens on the worst mistake, then tracks crew, betrayal, and the choice that made the runner.",
+                    "Fits the supporter tier because the second premium monthly slot can go to a longer voice-driven memoir.")
             ])
     ];
 
     private readonly BrilliantDirectoriesBillingStore _store;
+    private readonly MyFirstBookUsageStore _myFirstBookUsage;
     private readonly IConfiguration _configuration;
 
     public BrilliantDirectoriesBillingService(
         BrilliantDirectoriesBillingStore store,
+        MyFirstBookUsageStore myFirstBookUsage,
         IConfiguration configuration)
     {
         _store = store;
+        _myFirstBookUsage = myFirstBookUsage;
         _configuration = configuration;
     }
 
@@ -63,6 +91,9 @@ public sealed class BrilliantDirectoriesBillingService
             ProviderKey: options.ProviderKey,
             Heading: "Membership",
             Summary: "Chummer uses an external billing page. Free and Supporter unlock the same product today.",
+            MyFirstBookQuotaPolicy: new MyFirstBookQuotaPolicyDto(
+                FreeMonthlyBooks: FreeMyFirstBookMonthlyLimit,
+                SupporterMonthlyBooks: SupporterMyFirstBookMonthlyLimit),
             Capabilities: new BillingProviderCapabilitiesDto(
                 options.ProviderKey,
                 BrilliantDirectoriesBillingConstants.SyncMode,
@@ -75,6 +106,83 @@ public sealed class BrilliantDirectoriesBillingService
                 .Select(plan => ToCard(plan, options))
                 .ToArray(),
             ManageMembershipHref: options.MemberPortalUrl ?? "/account");
+    }
+
+    public MyFirstBookQuotaSnapshotDto GetMyFirstBookQuota(string userId, DateTimeOffset? now = null)
+    {
+        string normalizedUserId = RequireValue(userId, "A user id is required before checking MyFirstBook quota.");
+        DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        DateTimeOffset windowStartUtc = new(effectiveNow.Year, effectiveNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        DateTimeOffset windowEndUtc = windowStartUtc.AddMonths(1);
+
+        BrilliantDirectoriesMemberSnapshotDto? membership = GetAccount(normalizedUserId);
+        bool supporterActive = membership?.SupporterActive == true;
+        string planKey = supporterActive
+            ? BrilliantDirectoriesBillingConstants.SupporterPlanKey
+            : BrilliantDirectoriesBillingConstants.FreePlanKey;
+        string planName = supporterActive
+            ? BrilliantDirectoriesBillingConstants.SupporterPlanName
+            : BrilliantDirectoriesBillingConstants.FreePlanName;
+        int monthlyLimit = supporterActive ? SupporterMyFirstBookMonthlyLimit : FreeMyFirstBookMonthlyLimit;
+
+        int monthlyUsed;
+        lock (_myFirstBookUsage.Gate)
+        {
+            monthlyUsed = _myFirstBookUsage.Entries
+                .Where(item => string.Equals(item.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
+                    && item.WindowStartUtc == windowStartUtc)
+                .Select(static item => item.MonthlyUsed)
+                .FirstOrDefault();
+        }
+
+        return new MyFirstBookQuotaSnapshotDto(
+            UserId: normalizedUserId,
+            PlanKey: planKey,
+            PlanName: planName,
+            SupporterActive: supporterActive,
+            MonthlyLimit: monthlyLimit,
+            MonthlyUsed: monthlyUsed,
+            MonthlyRemaining: Math.Max(0, monthlyLimit - monthlyUsed),
+            WindowStartUtc: windowStartUtc,
+            WindowEndUtc: windowEndUtc);
+    }
+
+    public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null)
+    {
+        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, now);
+        if (snapshot.MonthlyRemaining <= 0)
+        {
+            throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
+        }
+
+        DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        lock (_myFirstBookUsage.Gate)
+        {
+            int existingIndex = _myFirstBookUsage.Entries.FindIndex(item =>
+                string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase)
+                && item.WindowStartUtc == snapshot.WindowStartUtc);
+            MyFirstBookUsageLedgerEntry updated = existingIndex >= 0
+                ? _myFirstBookUsage.Entries[existingIndex] with
+                {
+                    MonthlyUsed = _myFirstBookUsage.Entries[existingIndex].MonthlyUsed + 1,
+                    UpdatedAtUtc = effectiveNow
+                }
+                : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, 1, effectiveNow);
+            if (existingIndex >= 0)
+            {
+                _myFirstBookUsage.Entries[existingIndex] = updated;
+            }
+            else
+            {
+                _myFirstBookUsage.Entries.Add(updated);
+            }
+
+            _myFirstBookUsage.PersistLocked();
+        }
+
+        return new MyFirstBookQuotaConsumeResultDto(
+            Status: "consumed",
+            Quota: GetMyFirstBookQuota(userId, effectiveNow));
     }
 
     public BrilliantDirectoriesCheckoutResponseDto CreateSupporterCheckout(BrilliantDirectoriesCheckoutRequest request)
@@ -145,6 +253,7 @@ public sealed class BrilliantDirectoriesBillingService
             UnlocksProductFeatures: false,
             BrilliantDirectoriesBillingConstants.EntitlementEffect,
             plan.Included,
+            plan.ExampleStoryBooks,
             new BillingPlanActionDto(
                 plan.IsSupporter ? "Become Supporter" : "Keep Free",
                 href,
@@ -340,7 +449,8 @@ internal sealed record BillingMembershipPlanDefinition(
     string Summary,
     bool IsDefault,
     bool IsSupporter,
-    IReadOnlyList<string> Included);
+    IReadOnlyList<string> Included,
+    IReadOnlyList<BillingTierExampleStoryDto> ExampleStoryBooks);
 
 internal sealed record BillingProviderOptions(
     string ProviderName,

@@ -166,6 +166,36 @@ public sealed class PublicConciergeServiceTests
         Assert.Equal("pending_moderation", moderation.Status);
     }
 
+    [Fact]
+    public void RecordWebhook_FailsClosedWhenProviderSecretIsMissing()
+    {
+        using TempRoot temp = new("public-concierge-webhook-missing-secret");
+        IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>());
+
+        PublicConciergeService service = CreateService(configuration);
+        HeaderDictionary headers = new()
+        {
+            ["X-Chummer-Concierge-Webhook-Secret"] = "top-secret"
+        };
+
+        string payload = """
+            {
+              "flow_id": "testimonial_capture",
+              "branch_id": "video_review",
+              "correlation_id": "corr-1",
+              "event_type": "submitted",
+              "status": "received"
+            }
+            """;
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => service.RecordWebhook(
+            "facepop",
+            System.Text.Json.JsonDocument.Parse(payload).RootElement,
+            headers,
+            "127.0.0.1"));
+        Assert.Contains("not configured", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static PublicConciergeService CreateService(IConfiguration configuration, PublicConciergeStore? store = null)
     {
         PublicCanonFileLoader canon = new(configuration);

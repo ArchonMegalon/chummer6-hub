@@ -50,6 +50,10 @@ builder.Services
     .AddHubControlAndSupportContext()
     .AddHubInstallAndOrchestrationAdapters();
 builder.Services.AddSingleton<DesktopAnalyticsBridgeService>();
+builder.Services.AddHttpClient("RybbitProxy", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 var trustedProxies = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_PROXIES"]);
 var trustedIpNetworks = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS"]);
 
@@ -188,6 +192,81 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseHubRequestObservability();
 app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();
+
+HashSet<string> RybbitAllowedRequestHeaders = new(StringComparer.OrdinalIgnoreCase)
+{
+    "Accept",
+    "Accept-Encoding",
+    "Accept-Language",
+    "Cache-Control",
+    "Content-Type",
+    "If-Modified-Since",
+    "If-None-Match",
+    "Origin",
+    "Pragma",
+    "Referer",
+    "Sec-CH-UA",
+    "Sec-CH-UA-Mobile",
+    "Sec-CH-UA-Platform",
+    "Sec-Fetch-Dest",
+    "Sec-Fetch-Mode",
+    "Sec-Fetch-Site",
+    "User-Agent",
+    "X-Requested-With"
+};
+
+HashSet<string> RybbitBlockedRequestHeaders = new(StringComparer.OrdinalIgnoreCase)
+{
+    "Authorization",
+    "Connection",
+    "Content-Length",
+    "Cookie",
+    "Forwarded",
+    "Host",
+    "Keep-Alive",
+    "Proxy-Authorization",
+    "TE",
+    "Trailer",
+    "Transfer-Encoding",
+    "Upgrade",
+    "Via",
+    "X-Forwarded-For",
+    "X-Forwarded-Host",
+    "X-Forwarded-Proto"
+};
+
+HashSet<string> RybbitAllowedResponseHeaders = new(StringComparer.OrdinalIgnoreCase)
+{
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Methods",
+    "Access-Control-Allow-Origin",
+    "Access-Control-Max-Age",
+    "Allow",
+    "Cache-Control",
+    "Content-Encoding",
+    "Content-Language",
+    "Content-Length",
+    "Content-Type",
+    "ETag",
+    "Expires",
+    "Last-Modified",
+    "Vary",
+    "X-Content-Type-Options"
+};
+
+HashSet<string> RybbitBlockedResponseHeaders = new(StringComparer.OrdinalIgnoreCase)
+{
+    "Connection",
+    "Keep-Alive",
+    "Proxy-Authenticate",
+    "Proxy-Authorization",
+    "Set-Cookie",
+    "TE",
+    "Trailer",
+    "Transfer-Encoding",
+    "Upgrade",
+    "Via"
+};
 
 app.MapGet("/api/health", () => Results.Json(new
 {
@@ -384,7 +463,7 @@ static string[] GetCsvValues(string? value)
         : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 
-static async Task ProxyRybbitAsync(HttpContext context)
+async Task ProxyRybbitAsync(HttpContext context)
 {
     string origin = (context.RequestServices.GetRequiredService<IConfiguration>()["RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN"] ?? string.Empty).Trim().TrimEnd('/');
     if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? parsedOrigin)
@@ -397,7 +476,14 @@ static async Task ProxyRybbitAsync(HttpContext context)
     string proxyPath = context.Request.RouteValues.TryGetValue("proxyPath", out object? routeValue)
         ? Convert.ToString(routeValue) ?? string.Empty
         : string.Empty;
-    string targetUrl = $"{parsedOrigin.GetLeftPart(UriPartial.Authority)}/api/{proxyPath}{context.Request.QueryString}";
+    string? normalizedProxyPath = NormalizeRybbitProxyPath(proxyPath);
+    if (normalizedProxyPath is null)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+
+    string targetUrl = $"{parsedOrigin.GetLeftPart(UriPartial.Authority)}/api/{normalizedProxyPath}{context.Request.QueryString}";
 
     using var outbound = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
     if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
@@ -412,7 +498,7 @@ static async Task ProxyRybbitAsync(HttpContext context)
     foreach (var header in context.Request.Headers)
     {
         string key = header.Key;
-        if (string.Equals(key, "Host", StringComparison.OrdinalIgnoreCase))
+        if (!ShouldForwardRybbitRequestHeader(key))
         {
             continue;
         }
@@ -427,22 +513,99 @@ static async Task ProxyRybbitAsync(HttpContext context)
         }
     }
 
-    using var client = new HttpClient();
+    HttpClient client = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient("RybbitProxy");
     using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
     Stream responseStream = await response.Content.ReadAsStreamAsync(context.RequestAborted);
     foreach (var header in response.Headers)
     {
-        context.Response.Headers[header.Key] = header.Value.ToArray()!;
+        if (ShouldForwardRybbitResponseHeader(header.Key))
+        {
+            context.Response.Headers[header.Key] = header.Value.ToArray()!;
+        }
     }
 
     foreach (var header in response.Content.Headers)
     {
-        context.Response.Headers[header.Key] = header.Value.ToArray()!;
+        if (ShouldForwardRybbitResponseHeader(header.Key))
+        {
+            context.Response.Headers[header.Key] = header.Value.ToArray()!;
+        }
     }
 
     context.Response.Headers.Remove("transfer-encoding");
     context.Response.StatusCode = (int)response.StatusCode;
     await responseStream.CopyToAsync(context.Response.Body, context.RequestAborted);
+}
+
+bool ShouldForwardRybbitRequestHeader(string headerName)
+{
+    if (string.IsNullOrWhiteSpace(headerName))
+    {
+        return false;
+    }
+
+    if (RybbitBlockedRequestHeaders.Contains(headerName))
+    {
+        return false;
+    }
+
+    return RybbitAllowedRequestHeaders.Contains(headerName);
+}
+
+static string? NormalizeRybbitProxyPath(string proxyPath)
+{
+    string normalized = (proxyPath ?? string.Empty).Replace('\\', '/').Trim('/');
+    if (string.IsNullOrWhiteSpace(normalized))
+    {
+        return string.Empty;
+    }
+
+    if (normalized.Contains("://", StringComparison.Ordinal))
+    {
+        return null;
+    }
+
+    string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    List<string> escapedSegments = new(segments.Length);
+    foreach (string segment in segments)
+    {
+        string unescapedSegment;
+        try
+        {
+            unescapedSegment = Uri.UnescapeDataString(segment);
+        }
+        catch (UriFormatException)
+        {
+            return null;
+        }
+
+        if (segment.Equals(".", StringComparison.Ordinal)
+            || segment.Equals("..", StringComparison.Ordinal)
+            || unescapedSegment.Equals(".", StringComparison.Ordinal)
+            || unescapedSegment.Equals("..", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        escapedSegments.Add(Uri.EscapeDataString(unescapedSegment));
+    }
+
+    return string.Join("/", escapedSegments);
+}
+
+bool ShouldForwardRybbitResponseHeader(string headerName)
+{
+    if (string.IsNullOrWhiteSpace(headerName))
+    {
+        return false;
+    }
+
+    if (RybbitBlockedResponseHeaders.Contains(headerName))
+    {
+        return false;
+    }
+
+    return RybbitAllowedResponseHeaders.Contains(headerName);
 }
 
 static bool HasHttpsListenerConfiguration(IConfiguration configuration)

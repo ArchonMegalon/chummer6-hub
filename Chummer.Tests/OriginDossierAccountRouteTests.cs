@@ -1,0 +1,389 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using Chummer.Run.Api;
+using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.Community;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class OriginDossierAccountRouteTests
+{
+    [Fact]
+    public async Task OriginDossierDetailPageShowsOnlyTheSignedInOwnersGoldEdition()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-route", fixture.SubjectId);
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.OriginDossierDetailPage("origin-route", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/OriginDossier.cshtml", view.ViewName);
+        OriginDossierPublicationDetailPageViewModel model = Assert.IsType<OriginDossierPublicationDetailPageViewModel>(view.Model);
+        Assert.Equal("origin-route", model.Publication.ProjectId);
+        Assert.True(model.Publication.GoldReady);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfShareUrl);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/cover", model.Publication.StorySceneCoverUrl);
+    }
+
+    [Fact]
+    public async Task OriginDossierArtifactsRequireSignedInOwnerAndRouteListenThroughChummerRun()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        OriginDossierRouteArtifacts artifacts = fixture.ImportGoldPublication("origin-route", fixture.SubjectId);
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult coverResult = await controller.OriginDossierArtifact("origin-route", "cover", CancellationToken.None);
+        PhysicalFileResult cover = Assert.IsType<PhysicalFileResult>(coverResult);
+        Assert.Equal(artifacts.StorySceneCoverPath, cover.FileName);
+        Assert.Equal("image/png", cover.ContentType);
+        Assert.True(cover.EnableRangeProcessing);
+
+        IActionResult listenResult = await controller.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
+        RedirectResult listen = Assert.IsType<RedirectResult>(listenResult);
+        Assert.Equal("https://audio.chummer.run/share/origin-route", listen.Url);
+
+        AccountsController anonymous = fixture.CreateController(authenticated: false);
+        IActionResult anonymousResult = await anonymous.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
+        RedirectResult login = Assert.IsType<RedirectResult>(anonymousResult);
+        Assert.StartsWith("/login?next=", login.Url, StringComparison.Ordinal);
+        Assert.Contains(Uri.EscapeDataString("/account/work/origin-dossiers/origin-route/listen"), login.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OriginDossierArtifactRoutesReturnNotFoundForNonOwnerEvenWhenGoldReady()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-other-owner", "subject.other-owner");
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult coverResult = await controller.OriginDossierArtifact("origin-other-owner", "cover", CancellationToken.None);
+        IActionResult listenResult = await controller.OriginDossierArtifact("origin-other-owner", "listen", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(coverResult);
+        Assert.IsType<NotFoundResult>(listenResult);
+    }
+
+    private sealed class OriginDossierRouteFixture : IDisposable
+    {
+        private const string AccessToken = "origin-route-token";
+        private readonly ServiceProvider _provider;
+
+        private OriginDossierRouteFixture(string root, string subjectId, ServiceProvider provider)
+        {
+            Root = root;
+            SubjectId = subjectId;
+            _provider = provider;
+        }
+
+        public string Root { get; }
+
+        public string SubjectId { get; }
+
+        public static OriginDossierRouteFixture Create()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-route-tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string subjectId = "subject.origin-route";
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                    ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(root, "install-linking.json"),
+                    ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(root, "support.json"),
+                    ["CHUMMER_PUBLIC_CONCIERGE_STORE_PATH"] = Path.Combine(root, "public-concierge.json"),
+                    ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(root, "karma-forge.json"),
+                    ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd-billing.json"),
+                    ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(root, "myfirstbook-usage.json"),
+                    ["CHUMMER_PAYFUNNELS_BILLING_STORE_PATH"] = Path.Combine(root, "payfunnels-billing.json"),
+                    ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = Path.Combine(root, "origin-dossier-publications.json"),
+                    ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] = AccessToken,
+                    ["CHUMMER_LOCAL_E2E_SUBJECT_ID"] = subjectId,
+                    ["CHUMMER_LOCAL_E2E_DISPLAY_NAME"] = "Route Runner",
+                    ["CHUMMER_LOCAL_E2E_EMAIL"] = "route.runner@example.invalid",
+                    ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.test"
+                })
+                .Build();
+
+            ServiceCollection services = new();
+            services.AddSingleton(configuration);
+            services.AddSingleton<IHostEnvironment>(new TestHostEnvironment(root));
+            services.AddLogging();
+            services.AddControllersWithViews();
+            services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(root, "data-protection-keys")));
+            services
+                .AddHubPublicGuideContext()
+                .AddHubAccountsAndCommunityContext()
+                .AddHubCampaignSpineContext()
+                .AddHubControlAndSupportContext()
+                .AddHubInstallAndOrchestrationAdapters();
+            return new OriginDossierRouteFixture(root, subjectId, services.BuildServiceProvider());
+        }
+
+        public AccountsController CreateController(bool authenticated = true)
+        {
+            AccountsController controller = ActivatorUtilities.CreateInstance<AccountsController>(_provider);
+            DefaultHttpContext httpContext = new()
+            {
+                RequestServices = _provider
+            };
+            httpContext.Request.Host = new HostString("localhost");
+            httpContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+            if (authenticated)
+            {
+                httpContext.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken).ToString();
+            }
+
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            };
+            return controller;
+        }
+
+        public OriginDossierRouteArtifacts ImportGoldPublication(string projectId, string subjectId)
+        {
+            OriginDossierRouteArtifacts artifacts = CreateGoldArtifacts(projectId);
+            HubUserDto user = new(
+                UserId: $"user-{subjectId}",
+                SubjectId: subjectId,
+                DisplayName: "Route Runner",
+                Handle: "route-runner",
+                Visibility: "private",
+                Timezone: "UTC",
+                CountryCode: "US",
+                LinkedPrincipals: [subjectId],
+                GroupIds: [],
+                CreatedAtUtc: DateTimeOffset.UtcNow,
+                UpdatedAtUtc: DateTimeOffset.UtcNow);
+            _provider.GetRequiredService<OriginDossierPublicationService>().UpsertForAccount(
+                user,
+                subjectId,
+                new OriginDossierPublicationImportRequest(
+                    ProjectId: projectId,
+                    Title: "Route Runner Origin Dossier",
+                    RunnerAlias: "Route Runner",
+                    PublicationState: "published_for_owner",
+                    BookArtifactUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/book",
+                    AudiobookshelfShareUrl: $"https://audio.chummer.run/share/{projectId}",
+                    DossierVideoUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/video",
+                    StorySceneCoverUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/cover",
+                    ProviderAuthoredManuscriptImported: true,
+                    UndetectableHumanizerApplied: true,
+                    BookArtifactVerified: true,
+                    DossierVideoVerified: true,
+                    StorySceneCoverUsesSelectedCharacterFace: true,
+                    AudiobookshelfPlaybackVerified: true,
+                    TelegramShareDelivered: true,
+                    SourcePacketPath: artifacts.SourcePacketPath,
+                    SourcePacketReceiptPath: artifacts.SourcePacketReceiptPath,
+                    CanonAuditReceiptPath: artifacts.CanonAuditReceiptPath,
+                    ProviderManuscriptPath: artifacts.ProviderManuscriptPath,
+                    ProviderManuscriptReceiptPath: artifacts.ProviderManuscriptReceiptPath,
+                    HumanizerReceiptPath: artifacts.HumanizerReceiptPath,
+                    BookArtifactPath: artifacts.BookArtifactPath,
+                    BookArtifactReceiptPath: artifacts.BookArtifactReceiptPath,
+                    StorySceneCoverPath: artifacts.StorySceneCoverPath,
+                    StorySceneCoverReceiptPath: artifacts.StorySceneCoverReceiptPath,
+                    AudiobookPath: artifacts.AudiobookPath,
+                    AudiobookshelfImportReceiptPath: artifacts.AudiobookshelfImportReceiptPath,
+                    DossierVideoPath: artifacts.DossierVideoPath,
+                    DossierVideoReceiptPath: artifacts.DossierVideoReceiptPath,
+                    TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath));
+            return artifacts;
+        }
+
+        private OriginDossierRouteArtifacts CreateGoldArtifacts(string projectId)
+        {
+            string projectRoot = Path.Combine(Root, projectId);
+            Directory.CreateDirectory(projectRoot);
+            string sourcePacketPath = WriteArtifact(projectRoot, "approved-source-packet.json", """{"runnerAlias":"Route Runner","approvedForExternalProcessing":true}""");
+            string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", "Provider-authored Origin Dossier manuscript.");
+            string bookArtifactPath = WriteArtifact(projectRoot, "book.pdf", "%PDF-1.7\nOrigin Dossier route test book artifact\n");
+            string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG route test story scene cover artifact");
+            string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B route test audiobook artifact");
+            string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 route test dossier film artifact");
+
+            return new OriginDossierRouteArtifacts(
+                SourcePacketPath: sourcePacketPath,
+                SourcePacketReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "approved-source-packet.receipt.json",
+                    "origin_source_packet_approval",
+                    "Chummer",
+                    ["approved_source_packet", "external_processing_consent"],
+                    [sourcePacketPath]),
+                CanonAuditReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "chummer-canon-audit.receipt.json",
+                    "chummer_canon_audit",
+                    "Chummer",
+                    ["canon_audit_passed", "hard_conflicts:0", "privacy_findings:0"],
+                    [sourcePacketPath, providerManuscriptPath]),
+                ProviderManuscriptPath: providerManuscriptPath,
+                ProviderManuscriptReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "provider-manuscript.receipt.json",
+                    "provider_manuscript_import",
+                    "Inkfluence",
+                    artifactPaths: [providerManuscriptPath]),
+                HumanizerReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "undetectable-humanizer.receipt.json",
+                    "undetectable_humanizer_postprocess",
+                    "Undetectable Humanizer",
+                    artifactPaths: [providerManuscriptPath]),
+                BookArtifactPath: bookArtifactPath,
+                BookArtifactReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "book.receipt.json",
+                    "book_artifact_import",
+                    "Inkfluence",
+                    artifactPaths: [bookArtifactPath]),
+                StorySceneCoverPath: storySceneCoverPath,
+                StorySceneCoverReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "story-scene-cover.receipt.json",
+                    "selected_face_scene_render",
+                    "rendered_cover_lane",
+                    [
+                        $"/account/work/origin-dossiers/{projectId}",
+                        $"/account/work/origin-dossiers/{projectId}/cover",
+                        "selected_character_face"
+                    ],
+                    [storySceneCoverPath]),
+                AudiobookPath: audiobookPath,
+                AudiobookshelfImportReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "audiobookshelf-import.receipt.json",
+                    "audiobookshelf_import",
+                    "Audiobookshelf",
+                    ["narrationProvider: Unmixr"],
+                    [audiobookPath]),
+                DossierVideoPath: dossierVideoPath,
+                DossierVideoReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "dossier-film.receipt.json",
+                    "dossier_video_import",
+                    "video_lane",
+                    artifactPaths: [dossierVideoPath]),
+                TelegramShareDeliveryReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "telegram-share.receipt.json",
+                    "telegram_share_delivery",
+                    "EA Telegram",
+                    [
+                        $"/account/work/origin-dossiers/{projectId}",
+                        $"/account/work/origin-dossiers/{projectId}/listen"
+                    ]));
+        }
+
+        public void Dispose()
+        {
+            _provider.Dispose();
+            try
+            {
+                Directory.Delete(Root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        private static string WriteArtifact(string projectRoot, string fileName, string contents)
+        {
+            string path = Path.Combine(projectRoot, fileName);
+            File.WriteAllText(path, contents);
+            return path;
+        }
+
+        private static string WriteReceipt(
+            string projectRoot,
+            string fileName,
+            string operation,
+            string provider,
+            IReadOnlyList<string>? deliveredLinks = null,
+            IReadOnlyList<string>? artifactPaths = null)
+        {
+            string path = Path.Combine(projectRoot, fileName);
+            List<string> receiptLinks = (deliveredLinks ?? []).ToList();
+            if (!string.Equals(provider, "Chummer", StringComparison.OrdinalIgnoreCase))
+            {
+                receiptLinks.Add("operator_verified_live_run");
+                receiptLinks.Add($"provider_receipt_reference:{provider}:{operation}");
+            }
+
+            File.WriteAllText(
+                path,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        operation,
+                        provider,
+                        status = "verified",
+                        completedAtUtc = DateTimeOffset.UtcNow,
+                        deliveredLinks = receiptLinks,
+                        artifactSha256 = (artifactPaths ?? [])
+                            .Select(ComputeSha256)
+                            .ToArray()
+                    },
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
+            return path;
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using FileStream stream = File.OpenRead(path);
+            return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+        }
+    }
+
+    private sealed record OriginDossierRouteArtifacts(
+        string SourcePacketPath,
+        string SourcePacketReceiptPath,
+        string CanonAuditReceiptPath,
+        string ProviderManuscriptPath,
+        string ProviderManuscriptReceiptPath,
+        string HumanizerReceiptPath,
+        string BookArtifactPath,
+        string BookArtifactReceiptPath,
+        string StorySceneCoverPath,
+        string StorySceneCoverReceiptPath,
+        string AudiobookPath,
+        string AudiobookshelfImportReceiptPath,
+        string DossierVideoPath,
+        string DossierVideoReceiptPath,
+        string TelegramShareDeliveryReceiptPath);
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public TestHostEnvironment(string root)
+        {
+            ContentRootPath = root;
+            ContentRootFileProvider = new PhysicalFileProvider(root);
+        }
+
+        public string EnvironmentName { get; set; } = Environments.Development;
+
+        public string ApplicationName { get; set; } = "Chummer.Tests";
+
+        public string ContentRootPath { get; set; }
+
+        public IFileProvider ContentRootFileProvider { get; set; }
+    }
+}

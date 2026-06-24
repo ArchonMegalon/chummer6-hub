@@ -16,82 +16,133 @@
         => UndetectableHumanizerCopyAdapter.HumanizeRoadmap(value);
 }
 
-<section class="minimal-page-hero route-anchor-target roadmap-signal">
-    <div>
-        <p class="eyebrow">Roadmap</p>
-        <h1>What is next</h1>
-        <p>A short view of current work and later ideas. Use the changelog for shipped changes.</p>
-    </div>
-    <div class="minimal-status-pill">
-        <span>Planning surface</span>
-        <strong>Current work</strong>
-        <span>Later ideas</span>
-        <span>Changelog covers shipped work</span>
-    </div>
-</section>
-
-<section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Now</p>
-        <h2 id="roadmap-active-work">Current work</h2>
-        <p>These items are active enough to mention publicly. They are not promises until they reach the changelog.</p>
-    </div>
-
-    @if (milestones.Length == 0)
-    {
-        <article class="minimal-empty">
-            <h3>Milestones are temporarily unavailable</h3>
-            <p>Try the changelog or participate page while this view catches up.</p>
-        </article>
-    }
-    else
-    {
-        <div class="minimal-lane-grid">
-            @foreach (var milestone in milestones)
-            {
-                <article class="minimal-lane-card">
-                    <span class="tag">@RoadmapText(milestone.StatusLabel)</span>
-                    <h3>@RoadmapText(milestone.Title)</h3>
-                    <p>@RoadmapText(milestone.CasualSummary)</p>
-                </article>
-            }
-        </div>
-    }
-</section>
-
-@if (plannedWork.Length > 0)
+@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
 {
-    <section class="minimal-section minimal-section--tight" aria-labelledby="roadmap-planned-work">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Later</p>
-            <h2 id="roadmap-planned-work">Worth watching</h2>
-            <p>A few larger directions stay visible so people know where their feedback belongs.</p>
+    <section class="participate-shell roadmap-shell">
+        <div class="participate-shell__header">
+            <div class="participate-shell__lead">
+                <p class="eyebrow">Roadmap</p>
+                <h1>Roadmap</h1>
+                <p>Current work and planned work, one page.</p>
+                <p>Use the changelog for shipped changes.</p>
+            </div>
+            <div class="participate-actions">
+                <a class="button-like button-like--ghost" href="/partizipate">Participate</a>
+                <a class="button-like button-like--primary" href="/changelog">Open changelog</a>
+            </div>
         </div>
-        <div class="minimal-lane-grid">
-            @foreach (var item in plannedWork)
-            {
-                <article class="minimal-lane-card">
-                    <span class="tag">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
-                    <h3>@RoadmapText(item.Card.Title)</h3>
-                    <p>@RoadmapText(item.Card.Summary)</p>
-                    <div class="minimal-actions">
-                        <a class="button-like button-like--ghost" href="@item.Action.Href">@RoadmapText(item.Action.Label)</a>
+
+        <div class="participate-board">
+            <div class="participate-hosted">
+                <div class="participate-hosted__header">
+                    <div class="participate-hosted__lead">
+                        <h2>Current work</h2>
+                        <p>The hosted roadmap stays on this route.</p>
                     </div>
+                    <div class="participate-hosted__status">
+                        <span class="participate-count">Roadmap</span>
+                    </div>
+                </div>
+                <iframe
+                    id="roadmap-board"
+                    class="participate-hosted__frame"
+                    src="@Model.HostedBoardHref"
+                    title="Roadmap board"
+                    loading="lazy"
+                    referrerpolicy="strict-origin-when-cross-origin"></iframe>
+            </div>
+
+            <aside class="participate-items" aria-label="Roadmap guidance">
+                <h3>Use the right place</h3>
+                <p>Keep the path short.</p>
+                <article class="participate-lane">
+                    <span>Requests</span>
+                    <h3>Use Participate for new demand</h3>
+                    <p>Vote, comment, and keep requests public there.</p>
+                    <a class="inline-link" href="/partizipate">Open participate</a>
                 </article>
-            }
+                <article class="participate-lane">
+                    <span>Shipped</span>
+                    <h3>Use the changelog for released work</h3>
+                    <p>That is the page for finished changes.</p>
+                    <a class="inline-link" href="/changelog">Open changelog</a>
+                </article>
+            </aside>
         </div>
     </section>
 }
+else
+{
+    <section class="minimal-page-hero route-anchor-target roadmap-signal">
+        <div>
+            <p class="eyebrow">Roadmap</p>
+            <h1>What we are working on</h1>
+            <p>A short maintenance note. Use the changelog for shipped changes.</p>
+        </div>
+    </section>
 
-<section class="minimal-section minimal-section--tight">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Next</p>
-        <h2>Read the direction, then move on.</h2>
-        <p>Use Participate for demand, Changelog for shipped changes, or What works today for the current app.</p>
-    </div>
-    <div class="minimal-actions">
-        <a class="button-like button-like--primary" href="/partizipate">Participate</a>
-        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
-        <a class="button-like button-like--ghost" href="/now">What works today</a>
-    </div>
-</section>
+    <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Now</p>
+            <h2 id="roadmap-active-work">Current work</h2>
+            <p>These are the items that are moving right now.</p>
+        </div>
+
+        @if (milestones.Length == 0)
+        {
+            <article class="minimal-empty">
+                <h3>No public note yet</h3>
+                <p>Check the changelog for shipped work.</p>
+            </article>
+        }
+        else
+        {
+            <div class="minimal-lane-grid">
+                @foreach (var milestone in milestones)
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@RoadmapText(milestone.StatusLabel)</span>
+                        <h3>@RoadmapText(milestone.Title)</h3>
+                        <p>@RoadmapText(milestone.CasualSummary)</p>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    @if (plannedWork.Length > 0)
+    {
+        <section class="minimal-section minimal-section--tight" aria-labelledby="roadmap-planned-work">
+            <div class="minimal-section__lead">
+                <p class="eyebrow">Later</p>
+                <h2 id="roadmap-planned-work">Worth watching</h2>
+                <p>These are larger directions, not release promises.</p>
+            </div>
+            <div class="minimal-lane-grid">
+                @foreach (var item in plannedWork)
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
+                        <h3>@RoadmapText(item.Card.Title)</h3>
+                        <p>@RoadmapText(item.Card.Summary)</p>
+                        <div class="minimal-actions">
+                            <a class="button-like button-like--ghost" href="@item.Action.Href">@RoadmapText(item.Action.Label)</a>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Elsewhere</p>
+            <h2>Use the right page for the right thing.</h2>
+            <p>Participate is for requests. Changelog is for shipped work.</p>
+        </div>
+        <div class="minimal-actions">
+            <a class="button-like button-like--primary" href="/partizipate">Participate</a>
+            <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
+        </div>
+    </section>
+}

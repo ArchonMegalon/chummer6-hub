@@ -200,6 +200,24 @@ class PublicDownloadsBundleTests(unittest.TestCase):
                     "materialized Windows installer rows must match the current public-edge guest-readable install posture",
                 )
 
+                payload_file_name = str(windows_installer.get("payloadFileName") or "").strip()
+                payload_download_url = str(windows_installer.get("payloadDownloadUrl") or "").strip()
+                self.assertTrue(payload_file_name, "Windows installer rows should publish payloadFileName")
+                self.assertTrue(payload_download_url, "Windows installer rows should publish payloadDownloadUrl")
+
+                payload_path = output_root / "files" / payload_file_name
+                sidecar_path = output_root / "files" / f"{payload_file_name}.json"
+                self.assertTrue(payload_path.is_file(), f"missing published Windows payload zip: {payload_path}")
+                self.assertTrue(sidecar_path.is_file(), f"missing published Windows payload sidecar: {sidecar_path}")
+
+                sidecar_payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+                self.assertEqual(sidecar_payload.get("contractName"), "chummer6-ui.windows_bootstrap_payload")
+                self.assertEqual(sidecar_payload.get("fileName"), payload_file_name)
+                self.assertEqual(sidecar_payload.get("installerFileName"), str(windows_installer.get("fileName") or ""))
+                self.assertEqual(sidecar_payload.get("downloadUrl"), payload_download_url)
+                self.assertEqual(sidecar_payload.get("sha256"), windows_installer.get("payloadSha256"))
+                self.assertEqual(int(sidecar_payload.get("sizeBytes") or 0), int(windows_installer.get("payloadSizeBytes") or 0))
+
             startup_root = output_root / "startup-smoke"
             receipt_path = startup_root / "startup-smoke-avalonia-linux-x64.receipt.json"
             self.assertTrue(receipt_path.is_file(), f"missing published receipt: {receipt_path}")

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
@@ -636,16 +637,23 @@ public sealed class PublicConciergeService
         string? configuredSecret = _configuration[$"CHUMMER_PUBLIC_CONCIERGE_PROVIDER_{NormalizeEnvToken(provider)}_WEBHOOK_SECRET"];
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return "unsealed";
+            throw new InvalidOperationException("Concierge webhook adapter is not configured.");
         }
 
         string? headerValue = headers[SharedWebhookHeader].FirstOrDefault();
-        if (!string.Equals(configuredSecret.Trim(), headerValue?.Trim(), StringComparison.Ordinal))
+        if (!FixedTimeEquals(headerValue?.Trim() ?? string.Empty, configuredSecret.Trim()))
         {
             throw new UnauthorizedAccessException("Webhook secret mismatch.");
         }
 
         return "verified";
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        ReadOnlySpan<byte> leftBytes = Encoding.UTF8.GetBytes(left);
+        ReadOnlySpan<byte> rightBytes = Encoding.UTF8.GetBytes(right);
+        return leftBytes.Length == rightBytes.Length && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
     private bool IsSurfaceEnabled(string configPrefix)

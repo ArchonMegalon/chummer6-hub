@@ -180,17 +180,17 @@ SOURCE_MARKERS = {
         "IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
-        "Release status",
+        "Current release",
         'data-status-surface="decision-surface"',
         "Open downloads",
-        "Open support",
+        "Open help",
         'aria-label="Status next actions"',
         "Platforms",
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'Assert(statusSource.Contains("data-status-surface=\\"decision-surface\\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");',
         'Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");',
-        'Assert(statusSource.Contains("Open support", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");',
+        'Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         '"package_id": "next90-m120-hub-public-launch-health"',

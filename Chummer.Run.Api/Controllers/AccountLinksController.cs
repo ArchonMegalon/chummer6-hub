@@ -94,6 +94,8 @@ public sealed class AccountLinksController : ControllerBase
             var started = await _browserAuth.StartEmailEntryAsync(normalizedEmail, currentUser.DisplayName, verificationNextPath, cancellationToken);
             var link = _links.LinkEmail(new LinkEmailIdentityRequest(subject.SubjectId, normalizedEmail, MakePrimary: false));
             var previewHref = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(started.TicketId)
+                && HubBrowserAuthService.ShouldExposeInlinePreviewLink(Request)
                 ? $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(verificationNextPath)}"
                 : null;
 

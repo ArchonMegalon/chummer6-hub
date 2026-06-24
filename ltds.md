@@ -6,7 +6,7 @@
 - env_email_key: `CHUMMER_EA_DEFAULT_EMAIL`
 - env_password_key: `CHUMMER_EA_DEFAULT_PASSWORD`
 - env_password_alt_key: `CHUMMER_EA_DEFAULT_PASSWORD_ALT`
-- applies_to: `1min.AI`, `AI Magicx`, `Prompt Architects`, `ChatPlayground AI`, `BrowserAct`, `Browserly`, `ApproveThis`, `Documentation.AI`, `Icanpreneur`, `MetaSurvey`, `NextStep`, `Nonverbia`, `Teable`, `ApiX-Drive`, `FacePop`, `Deftform`, `Lunacal`, `Paperguide`, `Signitic`, `Emailit`, `Vizologi`, `MarkupGo`, `Soundmadeseen`, `Taja`, `vidBoard`, `PeekShot`, `Crezlo Tours`, `Mootion`, `First Book ai`, `AvoMap`, `Unmixr AI`, `Internxt Cloud Storage`, `Invoiless`, `FastestVPN PRO`, `OneAir`, `Headway`, `ClickRank`, `Katteb`, `ProductLift`, `hedy.ai`, `SendFox`, `Flonnect`, `CutMe Short`, `Backona AI`, `Visby`, `Dadan`, `Rybbit`, `NeuronWriter`, `Subscribr`
+- applies_to: `1min.AI`, `AI Magicx`, `Prompt Architects`, `ChatPlayground AI`, `BrowserAct`, `Browserly`, `ApproveThis`, `Documentation.AI`, `Icanpreneur`, `MetaSurvey`, `NextStep`, `Nonverbia`, `Teable`, `ApiX-Drive`, `FacePop`, `Deftform`, `Lunacal`, `Paperguide`, `Signitic`, `Emailit`, `Vizologi`, `MarkupGo`, `Soundmadeseen`, `Taja`, `vidBoard`, `PeekShot`, `Crezlo Tours`, `Mootion`, `First Book ai`, `MyFirstBook`, `Inkfluence AI`, `ChartBrick`, `AvoMap`, `Unmixr AI`, `Internxt Cloud Storage`, `Invoiless`, `FastestVPN PRO`, `OneAir`, `Headway`, `ClickRank`, `Katteb`, `ProductLift`, `hedy.ai`, `SendFox`, `Flonnect`, `CutMe Short`, `Backona AI`, `Visby`, `Dadan`, `Rybbit`, `NeuronWriter`, `Subscribr`
 
 ### blipai.app
 
@@ -15,6 +15,20 @@
 - env_email_key: `CHUMMER_EA_BLIPAI_APP_EMAIL`
 - env_password_key: `CHUMMER_EA_BLIPAI_APP_PASSWORD`
 - mirrors_default: `true`
+
+### chartbrick
+
+- tier: `unlimited`
+- credential_source: local `.env`
+- env_email_key: `CHUMMER_EA_CHARTBRICK_EMAIL`
+- env_password_key: `CHUMMER_EA_CHARTBRICK_PASSWORD`
+- env_explain_embed_url_key: `CHUMMER_ALICE_CHARTBRICK_EXPLAIN_EMBED_URL`
+- env_explain_share_url_key: `CHUMMER_ALICE_CHARTBRICK_EXPLAIN_SHARE_URL`
+- env_runner_stats_embed_url_key: `CHUMMER_ALICE_CHARTBRICK_RUNNER_STATS_EMBED_URL`
+- env_runner_stats_share_url_key: `CHUMMER_ALICE_CHARTBRICK_RUNNER_STATS_SHARE_URL`
+- status: `bounded_alice_explanation_and_runner_statistics_lane`
+- required_boundary: `ChartBrick may visualize Chummer-owned build explanations and runner statistics only; no rules truth, character authority, account truth, or release truth may originate in ChartBrick`
+- mirrors_default: `false`
 
 ### icanpreneur
 
@@ -47,6 +61,23 @@
 - env_password_key: `CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD`
 - mirrors_default: `false`
 - notes: `GM-session video foundry account for campaign/table-pulse media. Separate from official product media account.`
+
+### inkfluence
+
+- tier: `3`
+- credential_source: local `.env`
+- env_email_key: `CHUMMER_EA_INKFLUENCE_EMAIL`
+- env_password_key: `CHUMMER_EA_INKFLUENCE_PASSWORD`
+- env_email_alt_key: `CHUMMER_EA_INKFLUENCE_EMAIL_ALT`
+- env_password_alt_key: `CHUMMER_EA_INKFLUENCE_PASSWORD_ALT`
+- env_email_alt2_key: `CHUMMER_EA_INKFLUENCE_EMAIL_ALT2`
+- env_password_alt2_key: `CHUMMER_EA_INKFLUENCE_PASSWORD_ALT2`
+- env_base_url_key: `CHUMMER_EA_INKFLUENCE_BASE_URL`
+- account_inventory: `3 tracked Tier 3 accounts; default plus 2 alternates available`
+- status: `supporter_only_deluxe_origin_book_finishing_lane`
+- runtime_ready: `false`
+- required_boundary: `Inkfluence may package approved Chummer canon into deluxe memoir, cover, export, and audiobook variants only; it must never own runner history, rules truth, campaign canon, entitlement truth, or publication approval`
+- mirrors_default: `false`
 
 ### prompt_architects
 

@@ -6,7 +6,6 @@
     var releaseAvailabilityLabel = IsReleaseAvailable(Model.Manifest.ProofStatus)
         ? "Available"
         : "Unavailable";
-    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
     var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
@@ -33,9 +32,8 @@
         <p>The build, platforms, and current state in one place.</p>
     </div>
     <div class="minimal-status-pill" aria-label="Current release">
-        <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
-        <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
-        <span>@publishedLabel</span>
+        <span>Updated</span>
+        <strong>@verifiedLabel</strong>
     </div>
 </section>
 
@@ -45,10 +43,6 @@
             <span class="tag">Release</span>
             <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
             <p>@PublicStatusText(Model.ReleaseSummary)</p>
-        </article>
-        <article>
-            <span>Current build</span>
-            <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
         </article>
         <article>
             <span>Updated</span>

@@ -106,6 +106,7 @@ export CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE="$LOCAL_NEXT90_QUEUE
 export CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE="$LOCAL_NEXT90_DESIGN_QUEUE_STAGING_PATH"
 export CHUMMER_UI_PARITY_PROOF_MAX_AGE_SECONDS="${CHUMMER_UI_PARITY_PROOF_MAX_AGE_SECONDS:-315360000}"
 export CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS="${CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS:-$CHUMMER_UI_PARITY_PROOF_MAX_AGE_SECONDS}"
+CHUMMER_COMPLETION_DIR="${CHUMMER_COMPLETION_DIR:-$ROOT_DIR/../_completion/chummer_run_redesign_closure}"
 
 configure_git_safe_directories() {
   local candidate
@@ -166,6 +167,9 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_analytics_hooks.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
+python3 -m pytest "$ROOT_DIR/tests/test_public_minimal_humanized_surface.py" "$ROOT_DIR/tests/test_participate_codex_guest_fallback.py" -q >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_billing_honesty_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_materialize_participate_billing_honesty.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_clickability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_live_public_web_recrawl_gate.py' >/dev/null
@@ -176,11 +180,18 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_live_med
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_table_pulse_scenario_replay_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_final_gold_janitor.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_release_bundle_promotion_shelf_replacement.py' >/dev/null
+python3 "$ROOT_DIR/scripts/materialize_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
+python3 "$ROOT_DIR/scripts/verify_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
 python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_origin_reachability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_shell_clickability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_live_public_web_recrawl.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" \
+CHUMMER_PORTAL_PUBLIC_HOST= \
+CHUMMER_PORTAL_FORWARDED_PROTO= \
+node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null
+run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
@@ -2586,6 +2597,7 @@ python3 -m unittest tests/test_next90_m127_hub_registry_truth_binding.py
 python3 scripts/materialize_next90_m128_hub_privacy_bounded_support_status_proof.py
 python3 scripts/verify_next90_m128_hub_privacy_bounded_support_status.py
 python3 -m unittest tests/test_next90_m128_hub_privacy_bounded_support_status.py
+python3 scripts/materialize_participate_billing_honesty.py --completion-dir "$CHUMMER_COMPLETION_DIR"
 python3 scripts/materialize_next90_m129_hub_reusable_account_flows_proof.py
 python3 scripts/verify_next90_m129_hub_reusable_account_flows.py
 python3 -m unittest tests/test_next90_m129_hub_reusable_account_flows.py

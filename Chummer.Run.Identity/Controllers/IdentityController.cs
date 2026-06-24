@@ -1,6 +1,8 @@
 using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Identity.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Chummer.Run.Identity.Controllers;
@@ -60,16 +62,13 @@ public sealed class IdentityController : ControllerBase
     [HttpPost("email/providers/emailit/webhook")]
     [ProducesResponseType<IdentityEmailWebhookAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<IdentityEmailWebhookAckResponse> ReceiveEmailitWebhook([FromBody] JsonElement payload)
     {
-        var configuredSecret = _configuration["IDENTITY_EMAILIT_WEBHOOK_SECRET"]?.Trim();
-        if (!string.IsNullOrWhiteSpace(configuredSecret))
+        var authorizationFailure = ValidateEmailitWebhookAuthorization();
+        if (authorizationFailure is not null)
         {
-            var suppliedSecret = Request.Headers["X-Emailit-Webhook-Secret"].ToString();
-            if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
-            {
-                return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "emailit webhook secret mismatch.");
-            }
+            return authorizationFailure;
         }
 
         return Ok(_emailDelivery.RecordEmailitWebhook(payload));
@@ -175,4 +174,34 @@ public sealed class IdentityController : ControllerBase
 
         return string.Equals(supplied.ToString(), configuredKey, StringComparison.Ordinal);
     }
+
+    private ObjectResult? ValidateEmailitWebhookAuthorization()
+    {
+        var configuredSecret = _configuration["IDENTITY_EMAILIT_WEBHOOK_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return ResolveBool(_configuration["IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS"], defaultValue: false)
+                ? null
+                : Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "emailit webhook secret is not configured.");
+        }
+
+        var suppliedSecret = Request.Headers["X-Emailit-Webhook-Secret"].ToString();
+        if (string.IsNullOrWhiteSpace(suppliedSecret) || !FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "emailit webhook secret mismatch.");
+        }
+
+        return null;
+    }
+
+    private static bool FixedTimeEquals(string supplied, string expected)
+    {
+        byte[] suppliedBytes = Encoding.UTF8.GetBytes(supplied);
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
+        return suppliedBytes.Length == expectedBytes.Length
+               && CryptographicOperations.FixedTimeEquals(suppliedBytes, expectedBytes);
+    }
+
+    private static bool ResolveBool(string? value, bool defaultValue)
+        => bool.TryParse(value, out var parsed) ? parsed : defaultValue;
 }

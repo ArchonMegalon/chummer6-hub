@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -34,15 +35,15 @@ public sealed class IdentityAccessService : IIdentityAccessService
     {
         public required string SessionId { get; init; }
         public required string SubjectId { get; init; }
-        public required string AccessToken { get; init; }
-        public required string RefreshToken { get; init; }
+        public required string AccessTokenHash { get; init; }
+        public required string RefreshTokenHash { get; init; }
         public required DateTimeOffset IssuedAtUtc { get; init; }
         public required DateTimeOffset ExpiresAtUtc { get; init; }
     }
 
     private sealed class EmailTicketState
     {
-        public required string TicketId { get; init; }
+        public required string TicketHash { get; init; }
         public required string SubjectId { get; init; }
         public required string Email { get; init; }
         public required string DisplayName { get; init; }
@@ -64,32 +65,36 @@ public sealed class IdentityAccessService : IIdentityAccessService
         DateTimeOffset UpdatedAtUtc);
 
     private sealed record IdentitySessionSnapshot(
-        string SessionId,
-        string SubjectId,
-        string AccessToken,
-        string RefreshToken,
-        DateTimeOffset IssuedAtUtc,
-        DateTimeOffset ExpiresAtUtc);
+        string SessionId = "",
+        string SubjectId = "",
+        string? AccessTokenHash = null,
+        string? RefreshTokenHash = null,
+        DateTimeOffset IssuedAtUtc = default,
+        DateTimeOffset ExpiresAtUtc = default,
+        string? AccessToken = null,
+        string? RefreshToken = null);
 
     private sealed record IdentityEmailTicketSnapshot(
-        string TicketId,
-        string SubjectId,
-        string Email,
-        string DisplayName,
-        string? NextPath,
-        DateTimeOffset CreatedAtUtc,
-        DateTimeOffset ExpiresAtUtc);
+        string? TicketHash = null,
+        string SubjectId = "",
+        string Email = "",
+        string DisplayName = "",
+        string? NextPath = null,
+        DateTimeOffset CreatedAtUtc = default,
+        DateTimeOffset ExpiresAtUtc = default,
+        string? TicketId = null);
 
     private readonly Dictionary<string, SubjectState> _subjects = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, SessionState> _sessionsByAccessToken = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, EmailTicketState> _emailTickets = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SessionState> _sessionsByAccessTokenHash = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EmailTicketState> _emailTicketsByHash = new(StringComparer.Ordinal);
     private readonly object _mutate = new();
     private readonly string _storagePath;
     private readonly ILogger<IdentityAccessService> _logger;
     private readonly IIdentityEmailDeliveryService _emailDelivery;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
-        WriteIndented = true
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     public IdentityAccessService()
@@ -144,9 +149,10 @@ public sealed class IdentityAccessService : IIdentityAccessService
         {
             PurgeExpiredTicketsLocked();
             EnsureSubjectLocked(subjectId, displayName, email, new[] { "player" }, now);
+            var ticketId = $"eml_{Guid.NewGuid():N}";
             var ticket = new EmailTicketState
             {
-                TicketId = $"eml_{Guid.NewGuid():N}",
+                TicketHash = HashSecret(ticketId),
                 SubjectId = subjectId,
                 Email = email,
                 DisplayName = displayName,
@@ -154,11 +160,17 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 CreatedAtUtc = now,
                 ExpiresAtUtc = now.AddMinutes(15)
             };
-            _emailTickets[ticket.TicketId] = ticket;
+            _emailTicketsByHash[ticket.TicketHash] = ticket;
             PersistLocked();
-            var delivery = _emailDelivery.DeliverMagicLink(ticket.Email, ticket.DisplayName, ticket.TicketId, ticket.NextPath, ticket.ExpiresAtUtc);
+            var delivery = _emailDelivery.DeliverMagicLink(ticket.Email, ticket.DisplayName, ticketId, ticket.NextPath, ticket.ExpiresAtUtc);
+            if (!delivery.Delivered && !IsInlinePreviewDelivery(delivery.DeliveryMode))
+            {
+                _emailTicketsByHash.Remove(ticket.TicketHash);
+                PersistLocked();
+            }
+
             return new EmailAuthStartResponse(
-                TicketId: ticket.TicketId,
+                TicketId: IsInlinePreviewDelivery(delivery.DeliveryMode) ? ticketId : string.Empty,
                 SubjectId: ticket.SubjectId,
                 Email: ticket.Email,
                 DisplayName: ticket.DisplayName,
@@ -178,15 +190,16 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
 
         var ticketId = NormalizeRequired(request.TicketId);
+        var ticketHash = HashSecret(ticketId);
         lock (_mutate)
         {
             PurgeExpiredTicketsLocked();
-            if (!_emailTickets.TryGetValue(ticketId, out var ticket))
+            if (!_emailTicketsByHash.TryGetValue(ticketHash, out var ticket))
             {
                 throw new KeyNotFoundException($"Unknown or expired email entry ticket '{ticketId}'.");
             }
 
-            _emailTickets.Remove(ticketId);
+            _emailTicketsByHash.Remove(ticketHash);
             var session = IssueSessionLocked(new IdentitySessionIssueRequest(
                 SubjectId: ticket.SubjectId,
                 DisplayName: ticket.DisplayName,
@@ -205,14 +218,15 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
 
         var accessToken = NormalizeRequired(request.AccessToken);
+        var accessTokenHash = HashSecret(accessToken);
         lock (_mutate)
         {
-            if (!_sessionsByAccessToken.TryGetValue(accessToken, out var session))
+            if (!_sessionsByAccessTokenHash.TryGetValue(accessTokenHash, out var session))
             {
                 return new IdentitySessionRevokeResponse(false, null, null, DateTimeOffset.UtcNow);
             }
 
-            _sessionsByAccessToken.Remove(accessToken);
+            _sessionsByAccessTokenHash.Remove(accessTokenHash);
             PersistLocked();
             return new IdentitySessionRevokeResponse(true, session.SessionId, session.SubjectId, DateTimeOffset.UtcNow);
         }
@@ -270,14 +284,15 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
         lock (_mutate)
         {
-            if (!_sessionsByAccessToken.TryGetValue(request.AccessToken, out var session))
+            var accessTokenHash = HashSecret(request.AccessToken);
+            if (!_sessionsByAccessTokenHash.TryGetValue(accessTokenHash, out var session))
             {
                 return new IdentityIntrospectionResponse(false, null, null, null, null);
             }
 
             if (session.ExpiresAtUtc <= DateTimeOffset.UtcNow)
             {
-                _sessionsByAccessToken.Remove(request.AccessToken);
+                _sessionsByAccessTokenHash.Remove(accessTokenHash);
                 PersistLocked();
                 return new IdentityIntrospectionResponse(false, session.SessionId, session.SubjectId, null, session.ExpiresAtUtc);
             }
@@ -310,17 +325,19 @@ public sealed class IdentityAccessService : IIdentityAccessService
             requestedRoles,
             now);
 
+        var accessToken = BuildToken(subject.SubjectId, "access");
+        var refreshToken = BuildToken(subject.SubjectId, "refresh");
         var session = new SessionState
         {
             SessionId = $"sid_{Guid.NewGuid():N}",
             SubjectId = subject.SubjectId,
-            AccessToken = BuildToken(subject.SubjectId, "access"),
-            RefreshToken = BuildToken(subject.SubjectId, "refresh"),
+            AccessTokenHash = HashSecret(accessToken),
+            RefreshTokenHash = HashSecret(refreshToken),
             IssuedAtUtc = now,
             ExpiresAtUtc = now.Add(ttl)
         };
 
-        _sessionsByAccessToken[session.AccessToken] = session;
+        _sessionsByAccessTokenHash[session.AccessTokenHash] = session;
         PersistLocked();
         return new IdentitySessionIssueResponse(
             SessionId: session.SessionId,
@@ -328,8 +345,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
             DisplayName: subject.DisplayName,
             Email: subject.Email,
             Roles: subject.Roles.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase).ToArray(),
-            AccessToken: session.AccessToken,
-            RefreshToken: session.RefreshToken,
+            AccessToken: accessToken,
+            RefreshToken: refreshToken,
             IssuedAtUtc: session.IssuedAtUtc,
             ExpiresAtUtc: session.ExpiresAtUtc);
     }
@@ -397,8 +414,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
             }
 
             _subjects.Clear();
-            _sessionsByAccessToken.Clear();
-            _emailTickets.Clear();
+            _sessionsByAccessTokenHash.Clear();
+            _emailTicketsByHash.Clear();
 
             foreach (var subject in snapshot.Subjects)
             {
@@ -419,12 +436,22 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
             foreach (var session in snapshot.Sessions)
             {
-                _sessionsByAccessToken[session.AccessToken] = new SessionState
+                var accessTokenHash = NormalizeStoredSecretHash(session.AccessTokenHash, session.AccessToken);
+                var refreshTokenHash = NormalizeStoredSecretHash(session.RefreshTokenHash, session.RefreshToken);
+                if (string.IsNullOrWhiteSpace(session.SessionId)
+                    || string.IsNullOrWhiteSpace(session.SubjectId)
+                    || accessTokenHash is null
+                    || refreshTokenHash is null)
+                {
+                    continue;
+                }
+
+                _sessionsByAccessTokenHash[accessTokenHash] = new SessionState
                 {
                     SessionId = session.SessionId,
                     SubjectId = session.SubjectId,
-                    AccessToken = session.AccessToken,
-                    RefreshToken = session.RefreshToken,
+                    AccessTokenHash = accessTokenHash,
+                    RefreshTokenHash = refreshTokenHash,
                     IssuedAtUtc = session.IssuedAtUtc,
                     ExpiresAtUtc = session.ExpiresAtUtc
                 };
@@ -432,9 +459,18 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
             foreach (var ticket in snapshot.EmailTickets)
             {
-                _emailTickets[ticket.TicketId] = new EmailTicketState
+                var ticketHash = NormalizeStoredSecretHash(ticket.TicketHash, ticket.TicketId);
+                if (ticketHash is null
+                    || string.IsNullOrWhiteSpace(ticket.SubjectId)
+                    || string.IsNullOrWhiteSpace(ticket.Email)
+                    || string.IsNullOrWhiteSpace(ticket.DisplayName))
                 {
-                    TicketId = ticket.TicketId,
+                    continue;
+                }
+
+                _emailTicketsByHash[ticketHash] = new EmailTicketState
+                {
+                    TicketHash = ticketHash,
                     SubjectId = ticket.SubjectId,
                     Email = ticket.Email,
                     DisplayName = ticket.DisplayName,
@@ -448,8 +484,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
             _logger.LogInformation(
                 "IdentityAccessService loaded {SubjectCount} subjects, {SessionCount} sessions, and {EmailTicketCount} email tickets from {StoragePath}.",
                 _subjects.Count,
-                _sessionsByAccessToken.Count,
-                _emailTickets.Count,
+                _sessionsByAccessTokenHash.Count,
+                _emailTicketsByHash.Count,
                 _storagePath);
         }
     }
@@ -467,27 +503,27 @@ public sealed class IdentityAccessService : IIdentityAccessService
                     item.Roles.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase).ToArray(),
                     item.UpdatedAtUtc))
                 .ToArray(),
-            Sessions: _sessionsByAccessToken.Values
+            Sessions: _sessionsByAccessTokenHash.Values
                 .OrderBy(static item => item.SubjectId, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static item => item.IssuedAtUtc)
                 .Select(static item => new IdentitySessionSnapshot(
-                    item.SessionId,
-                    item.SubjectId,
-                    item.AccessToken,
-                    item.RefreshToken,
-                    item.IssuedAtUtc,
-                    item.ExpiresAtUtc))
+                    SessionId: item.SessionId,
+                    SubjectId: item.SubjectId,
+                    AccessTokenHash: item.AccessTokenHash,
+                    RefreshTokenHash: item.RefreshTokenHash,
+                    IssuedAtUtc: item.IssuedAtUtc,
+                    ExpiresAtUtc: item.ExpiresAtUtc))
                 .ToArray(),
-            EmailTickets: _emailTickets.Values
+            EmailTickets: _emailTicketsByHash.Values
                 .OrderBy(static item => item.CreatedAtUtc)
                 .Select(static item => new IdentityEmailTicketSnapshot(
-                    item.TicketId,
-                    item.SubjectId,
-                    item.Email,
-                    item.DisplayName,
-                    item.NextPath,
-                    item.CreatedAtUtc,
-                    item.ExpiresAtUtc))
+                    TicketHash: item.TicketHash,
+                    SubjectId: item.SubjectId,
+                    Email: item.Email,
+                    DisplayName: item.DisplayName,
+                    NextPath: item.NextPath,
+                    CreatedAtUtc: item.CreatedAtUtc,
+                    ExpiresAtUtc: item.ExpiresAtUtc))
                 .ToArray());
 
         var tempPath = $"{_storagePath}.tmp";
@@ -497,23 +533,22 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
     private void PurgeExpiredTicketsLocked()
     {
-        var now = DateTimeOffset.UtcNow;
-        var expired = _emailTickets
+        var expired = _emailTicketsByHash
             .Where(static pair => pair.Value.ExpiresAtUtc <= DateTimeOffset.UtcNow)
             .Select(static pair => pair.Key)
             .ToArray();
-        foreach (var ticketId in expired)
+        foreach (var ticketHash in expired)
         {
-            _emailTickets.Remove(ticketId);
+            _emailTicketsByHash.Remove(ticketHash);
         }
 
-        var expiredSessions = _sessionsByAccessToken
+        var expiredSessions = _sessionsByAccessTokenHash
             .Where(static pair => pair.Value.ExpiresAtUtc <= DateTimeOffset.UtcNow)
             .Select(static pair => pair.Key)
             .ToArray();
-        foreach (var accessToken in expiredSessions)
+        foreach (var accessTokenHash in expiredSessions)
         {
-            _sessionsByAccessToken.Remove(accessToken);
+            _sessionsByAccessTokenHash.Remove(accessTokenHash);
         }
 
         if (expired.Length > 0 || expiredSessions.Length > 0)
@@ -524,14 +559,83 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
     private static string ResolveStoragePath(IConfiguration configuration)
     {
-        var configured = configuration["CHUMMER_IDENTITY_STORE_PATH"];
+        var configured = configuration["CHUMMER_IDENTITY_STORE_PATH"]?.Trim();
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return Path.GetFullPath(configured);
         }
 
-        return Path.Combine(Path.GetTempPath(), "chummer-run-identity", "identity-store.json");
+        return Path.Combine(ResolveDefaultStateRoot(configuration), "identity", "identity-store.json");
     }
+
+    private static string ResolveDefaultStateRoot(IConfiguration configuration)
+    {
+        var configuredStateRoot = configuration["CHUMMER_IDENTITY_STATE_ROOT"]?.Trim()
+                                  ?? configuration["CHUMMER_RUNTIME_STATE_ROOT"]?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredStateRoot))
+        {
+            return Path.GetFullPath(configuredStateRoot);
+        }
+
+        var xdgStateHome = Environment.GetEnvironmentVariable("XDG_STATE_HOME");
+        if (!string.IsNullOrWhiteSpace(xdgStateHome))
+        {
+            return Path.Combine(Path.GetFullPath(xdgStateHome), "chummer-run");
+        }
+
+        var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(localData))
+        {
+            return Path.Combine(localData, "Chummer", "Run");
+        }
+
+        return Path.Combine(AppContext.BaseDirectory, ".chummer-state");
+    }
+
+    private static string? NormalizeStoredSecretHash(string? storedHash, string? legacyPlainSecret)
+    {
+        var normalizedHash = NormalizeOptional(storedHash);
+        if (normalizedHash is not null)
+        {
+            if (TryNormalizeSha256Hash(normalizedHash, out var canonicalHash))
+            {
+                return canonicalHash;
+            }
+
+            return HashSecret(normalizedHash);
+        }
+
+        var legacySecret = NormalizeOptional(legacyPlainSecret);
+        return legacySecret is null ? null : HashSecret(legacySecret);
+    }
+
+    private static bool TryNormalizeSha256Hash(string value, out string canonicalHash)
+    {
+        const string prefix = "sha256:";
+        canonicalHash = string.Empty;
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var hex = value[prefix.Length..];
+        if (hex.Length != 64 || hex.Any(static ch => !Uri.IsHexDigit(ch)))
+        {
+            return false;
+        }
+
+        canonicalHash = $"{prefix}{hex.ToLowerInvariant()}";
+        return true;
+    }
+
+    private static string HashSecret(string secret)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(NormalizeRequired(secret)));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
+
+    private static bool IsInlinePreviewDelivery(string deliveryMode)
+        => string.Equals(deliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase);
 
     private static string DeriveDisplayNameFromEmail(string email)
     {

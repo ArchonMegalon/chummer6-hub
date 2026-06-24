@@ -8,12 +8,13 @@
     <div class="participate-shell__header">
         <div class="participate-shell__lead">
             <h1>Participate</h1>
-            <p>Use the public board for ideas and safe bugs. Use private help for installs, account issues, logs, or anything sensitive.</p>
+            <p>Public requests, one board.</p>
+            <p>Tell us what slows the table down.</p>
+            <p>Feedback, roadmap, and current requests stay on this route.</p>
+            <p>Use this page for public requests and safe bug reports. Use Help for anything private, account-linked, or install-specific.</p>
         </div>
         <div class="participate-actions">
             <a class="button-like button-like--ghost" href="@Model.RoadmapHref">Roadmap</a>
-            <a class="button-like button-like--ghost" href="@Model.ChangelogHref">Recent changes</a>
-            <a class="button-like button-like--ghost" href="/account/billing">Become a supporter</a>
             <a class="button-like button-like--primary" href="/contact#support-intake">Private help</a>
         </div>
     </div>
@@ -25,9 +26,16 @@
                     <h2>Public board</h2>
                     <p>Votes and public discussion stay here on a first-party route.</p>
                 </div>
-                <span class="participate-count">Public board</span>
+                <div class="participate-hosted__status">
+                    <span class="participate-count">Public board</span>
+                    @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
+                    {
+                        <a class="participate-supporter-pill" href="@Model.SupporterHref">Support Chummer</a>
+                    }
+                </div>
             </div>
             <iframe
+                id="participate-board"
                 class="participate-hosted__frame"
                 src="@(string.IsNullOrWhiteSpace(Model.HostedBoardHref) ? "/partizipate/board" : Model.HostedBoardHref)"
                 title="Participate board"
@@ -36,7 +44,8 @@
         </div>
 
         <aside class="participate-items" aria-label="Participate guidance">
-            <h3>Use the right lane</h3>
+            <h3>Use the right place</h3>
+            <p>Start with the shortest path.</p>
             @foreach (var lane in Model.Lanes)
             {
                 <article class="participate-lane">
@@ -51,6 +60,13 @@
                 <summary>Board offline?</summary>
                 <p>If the board does not load, use <a class="inline-link" href="/contact#support-intake">private help</a> for anything blocked or sensitive, or check the <a class="inline-link" href="@Model.RoadmapHref">roadmap</a> for current movement.</p>
             </details>
+
+            @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
+            {
+                <p class="participate-supporter-note">
+                    Want to help keep this moving? <a class="inline-link" href="@Model.SupporterHref">Support Chummer</a>. Supporter currently unlocks no extra product access.
+                </p>
+            }
         </aside>
     </div>
 </section>

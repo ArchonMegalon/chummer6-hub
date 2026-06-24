@@ -65,7 +65,7 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
-    public void BuildPublicChromeUsesFlagshipPrimaryNavigationModel()
+    public void BuildPublicChromeHidesParticipateFromGuestPrimaryNavigation()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -79,11 +79,29 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "Participate", "Help"],
+            ["Home", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("/partizipate", chrome.PrimaryNavigation[1].Href);
-        Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
+        Assert.Equal("/help", chrome.PrimaryNavigation[1].Href);
+        Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BuildAuthenticatedChromeKeepsParticipateInPrimaryNavigation()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome("Home", "Flagship shell.", "/home", "Runner", "runner@example.com");
+
+        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Label, "Participate", StringComparison.Ordinal));
+        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -92,6 +110,8 @@ public sealed class HubPageChromeServiceTests
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
 
         Assert.Contains("var visibleHeaderActions = nonBuildHeaderActions", layout, StringComparison.Ordinal);
+        Assert.Contains("suppressHeaderActionsForPublicParticipate", layout, StringComparison.Ordinal);
+        Assert.Contains("normalizedCurrentPath is \"/participate\" or \"/partizipate\"", layout, StringComparison.Ordinal);
         Assert.Contains("routeKey is not \"landing\"", layout, StringComparison.Ordinal);
         Assert.Contains("!normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
         Assert.Contains("@foreach (var action in visibleHeaderActions)", layout, StringComparison.Ordinal);

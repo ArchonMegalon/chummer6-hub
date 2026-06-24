@@ -1,0 +1,86 @@
+import { expect, request as playwrightRequest, test } from 'playwright/test';
+import { writeJsonArtifact } from './ux-artifacts';
+
+const baseUrl = (process.env.BASE_URL?.trim() || 'http://127.0.0.1:8091').replace(/\/+$/, '');
+const identityToken = process.env.CHUMMER_E2E_IDENTITY_TOKEN?.trim() || '';
+const projectId = process.env.CHUMMER_E2E_ORIGIN_DOSSIER_PROJECT_ID?.trim() || 'origin-browser';
+
+test('signed-in owner can see Origin Dossier cover and resolve the Audiobookshelf listen link through chummer.run', async ({ browser }) => {
+  test.setTimeout(90_000);
+  test.skip(!identityToken, 'Origin Dossier authenticated proof needs CHUMMER_E2E_IDENTITY_TOKEN.');
+
+  const parsedBaseUrl = new URL(baseUrl);
+  const context = await browser.newContext();
+  await context.addCookies([
+    {
+      name: 'chummer_hub_access_token',
+      value: identityToken,
+      domain: parsedBaseUrl.hostname,
+      path: '/',
+      httpOnly: false,
+      secure: parsedBaseUrl.protocol === 'https:',
+      sameSite: 'Lax',
+    },
+  ]);
+  const page = await context.newPage();
+
+  await page.goto(`${baseUrl}/account/work#origin-dossier-library`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#origin-dossier-library')).toBeVisible();
+  await expect(page.locator('#origin-dossier-library')).toContainText('Route Runner Origin Dossier');
+  await expect(page.locator('#origin-dossier-library')).toContainText('Gold ready');
+  await expect(page.getByRole('link', { name: 'Listen in Audiobookshelf' })).toHaveAttribute(
+    'href',
+    `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
+  );
+
+  await page.getByRole('link', { name: 'Open authenticated chummer.run edition' }).click();
+  await expect(page).toHaveURL(`${baseUrl}/account/work/origin-dossiers/${projectId}`);
+  await expect(page.locator('[data-origin-dossier-detail]')).toBeVisible();
+  await expect(page.locator('[data-origin-dossier-gold-ready="true"]')).toBeVisible();
+  await expect(page.locator('[data-story-scene-cover-uses-selected-character-face="true"]')).toBeVisible();
+  const coverImage = page.getByAltText('Rendered Origin Dossier story scene cover for Route Runner');
+  await expect(coverImage).toHaveAttribute('src', `${baseUrl}/account/work/origin-dossiers/${projectId}/cover`);
+  await expect(page.getByRole('link', { name: 'Open book edition' })).toHaveAttribute(
+    'href',
+    `${baseUrl}/account/work/origin-dossiers/${projectId}/book`,
+  );
+  await expect(page.getByRole('link', { name: 'Listen in Audiobookshelf' })).toHaveAttribute(
+    'href',
+    `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
+  );
+
+  const cookieHeader = (await context.cookies())
+    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .join('; ');
+  const signedInRequest = await playwrightRequest.newContext({
+    baseURL: baseUrl,
+    extraHTTPHeaders: {
+      Cookie: cookieHeader,
+    },
+  });
+  const cover = await signedInRequest.get(`/account/work/origin-dossiers/${projectId}/cover`, { maxRedirects: 0 });
+  expect(cover.status()).toBe(200);
+  expect(cover.headers()['content-type']).toContain('image/png');
+
+  const listen = await signedInRequest.get(`/account/work/origin-dossiers/${projectId}/listen`, { maxRedirects: 0 });
+  expect([302, 303, 307, 308]).toContain(listen.status());
+  expect(listen.headers()['location']).toBe(`https://audio.chummer.run/share/${projectId}`);
+
+  await signedInRequest.dispose();
+  await context.close();
+
+  writeJsonArtifact('ORIGIN_DOSSIER_AUTHENTICATED_GOLD_E2E.generated.json', {
+    generated_at_utc: new Date().toISOString(),
+    status: 'pass',
+    base_url: baseUrl,
+    project_id: projectId,
+    owner_account_page: `${baseUrl}/account/work#origin-dossier-library`,
+    owner_detail_page: `${baseUrl}/account/work/origin-dossiers/${projectId}`,
+    selected_face_cover_url: `${baseUrl}/account/work/origin-dossiers/${projectId}/cover`,
+    listen_url: `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
+    audiobookshelf_redirect: `https://audio.chummer.run/share/${projectId}`,
+    logged_in_browser_verified: true,
+    selected_face_cover_visible: true,
+    chummer_run_listen_gate_verified: true,
+  });
+});

@@ -2,7 +2,7 @@
 @{
     // Marker retained for desktop native trust verification:
     // Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.
-    // Support stays attached to the same install path.
+    // Support stays on the same install rail.
     ViewData["Title"] = "Download setup";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
@@ -51,11 +51,11 @@
         new
         {
             Badge = "Status",
-            Title = "See the current build",
-            Summary = "Use current release when you want to confirm the published build and platform availability.",
+            Title = "See the latest update",
+            Summary = "Use current release when you want to confirm the latest availability and platform status.",
             Href = "/now",
             Label = "Open current release",
-            Details = new[] { "Current build", "Platform status", "Known limits" }
+            Details = new[] { "Updated", "Platform status", "Known limits" }
         },
         new
         {
@@ -93,7 +93,7 @@
                             {
                                 <p>@PublicDispatchText(Model.BootstrapCommandNote)</p>
                             }
-                            <p><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
+                            <p><strong>Current release</strong><br />@PublicDispatchText(Model.CurrentReleaseSummary).</p>
                             @if (Model.BootstrapFeatureCards.Count > 0)
                             {
                                 <ul class="dispatch-inline-info__list">
@@ -114,7 +114,7 @@
             <p class="release-stage__note">@PublicDispatchText(Model.DispatchNote)</p>
             <p class="release-stage__note">Account linking is optional. A recovery code appears only if setup needs recovery.</p>
             <p class="release-stage__note">Support stays with this install.</p>
-            <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @PublicDispatchText(Model.CurrentReleaseSummary).</p>
+            <p class="release-stage__note"><strong>Current release</strong><br />@PublicDispatchText(Model.CurrentReleaseSummary).</p>
         }
     </div>
 </section>

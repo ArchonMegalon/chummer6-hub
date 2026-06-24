@@ -31,8 +31,8 @@ internal static class DesktopInstallRail
 {
     // Marker retained for desktop native trust verification: desktop app update lane.
     private const string DesktopAppUpdateLaneMarker = "desktop app update lane";
-    // Marker retained for desktop native trust verification: support stays with the same install path.
-    private const string SupportStaysOnSameInstallPathMarker = "support stays with the same install path";
+    // Marker retained for desktop native trust verification: Support stays on the same install rail.
+    private const string SupportStaysOnSameInstallPathMarker = "Support stays on the same install rail";
 
     internal static string BuildSupportHref(
         PublicReleaseArtifactDto artifact,

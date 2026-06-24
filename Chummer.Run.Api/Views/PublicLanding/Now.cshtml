@@ -32,7 +32,6 @@
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var publishedLabel = Model.ReleaseTruth.PublishedDateLabel;
     var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
     static string PublicNowText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
@@ -72,11 +71,8 @@
         }
     </div>
     <div class="minimal-status-pill">
-        <span>Current build</span>
-        <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
-        <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
-        <span>@publishedLabel</span>
-        <span>Updated @verifiedLabel</span>
+        <span>Updated</span>
+        <strong>@verifiedLabel</strong>
     </div>
 </section>
 

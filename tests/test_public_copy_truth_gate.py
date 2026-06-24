@@ -28,8 +28,8 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     spec.loader.exec_module(gate_module)
 
     assert "Tell us what slows the table down." in feedback
-    assert "Public feedback for ideas, friction, and safe bugs. Private or account-linked problems go to Help." in feedback
-    assert "Choose where it should go" in feedback
+    assert "Use this page for public requests and safe bug reports. Use Help for anything private, account-linked, or install-specific." in feedback
+    assert "Use the right place" in feedback
     assert "Start with the shortest path." in feedback
     assert "Public Feedback And Content Registry" not in feedback
     assert "Open the Alice compare bench" not in feedback

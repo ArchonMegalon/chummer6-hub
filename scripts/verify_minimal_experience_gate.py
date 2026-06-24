@@ -91,8 +91,8 @@ def build_payload(
     hero_image_loaded = bool(image_urls) and all(asset_checker(url) for url in image_urls)
     video_sources_load = all(asset_checker(urljoin(f"{normalized_base_url}/", source)) for source in product_video_sources)
     promo_video_link_load = all(asset_checker(urljoin(f"{normalized_base_url}/", link)) for link in product_video_links)
-    stable_visible = 'id="stable"' in downloads_html and "Current stable build" in downloads_html
-    nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_html
+    stable_visible = 'id="stable"' in downloads_html and "Current build" in downloads_html
+    nightly_visible = 'id="nightly"' in downloads_html and "Newest build" in downloads_html
     decision_card_count = count_occurrences(status_html, 'class="minimal-status-pill"')
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
 

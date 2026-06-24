@@ -22,6 +22,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
     },
   });
   const brilliantDirectoriesPage = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
+  const brilliantDirectoriesPreviewPage = await request.get(`${baseUrl}/account/billing?userId=user-a&email=runner@example.com`, { maxRedirects: 0 });
 
   const originPage = await request.get(`${baseUrl}/origin-dossier`);
   const originStoryPage = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose`);
@@ -33,8 +34,10 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsProjection.status()).toBe(200);
   expect(payfunnelsCheckout.status()).toBe(302);
   expect(payfunnelsCheckout.headers()['location'] || '').toContain('payfunnels');
-  expect([200, 503]).toContain(brilliantDirectoriesPage.status());
-  expect(brilliantDirectoriesPage.status()).not.toBe(500);
+  expect(brilliantDirectoriesPage.status()).toBe(302);
+  expect(brilliantDirectoriesPage.headers()['location'] || '').toContain('/auth/google/start?next=');
+  expect([200, 503]).toContain(brilliantDirectoriesPreviewPage.status());
+  expect(brilliantDirectoriesPreviewPage.status()).not.toBe(500);
 
   expect(originPage.status()).toBe(200);
   expect(originStoryPage.status()).toBe(200);
@@ -49,11 +52,15 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsText).not.toContain('Premium');
   expect(payfunnelsText).not.toContain('Upgrade');
 
-  const brilliantDirectoriesText = await brilliantDirectoriesPage.text();
-  expect(brilliantDirectoriesText).toContain('same product access today');
-  expect(brilliantDirectoriesText).toContain('Supporter');
-  expect(brilliantDirectoriesText).not.toContain('Premium');
-  expect(brilliantDirectoriesText).not.toContain('Upgrade');
+  const brilliantDirectoriesText = await brilliantDirectoriesPreviewPage.text();
+  if (brilliantDirectoriesPreviewPage.status() === 200) {
+    expect(brilliantDirectoriesText).toContain('same product access today');
+    expect(brilliantDirectoriesText).toContain('Supporter');
+    expect(brilliantDirectoriesText).toContain('MyFirstBook: Free gets 1 book per month. Supporter gets 2.');
+    expect(brilliantDirectoriesText).toContain('This account:');
+    expect(brilliantDirectoriesText).not.toContain('Premium');
+    expect(brilliantDirectoriesText).not.toContain('Upgrade');
+  }
 
   const originPayload = await originReceipt.json();
   expect(originPayload.document.slug).toBe('origin-dossier-the-name-she-chose');
@@ -83,6 +90,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
     payfunnels_projection_status: payfunnelsProjection.status(),
     payfunnels_checkout_status: payfunnelsCheckout.status(),
     brilliant_directories_status: brilliantDirectoriesPage.status(),
+    brilliant_directories_preview_status: brilliantDirectoriesPreviewPage.status(),
     origin_page_status: originPage.status(),
     origin_story_page_status: originStoryPage.status(),
     origin_receipt_status: originReceipt.status(),

@@ -18,6 +18,7 @@ using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
 using Chummer.Run.AI.Services.Transcription;
 using Chummer.Run.AI.Controllers;
+using Chummer.Run.Identity.Controllers;
 using Chummer.Run.Registry.Controllers;
 using Chummer.Run.Registry.Services;
 using Chummer.Campaign.Contracts;
@@ -401,7 +402,8 @@ void VerifyIdentityWorkflow()
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
+            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
+            ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true"
         })
         .Build();
     var identity = new IdentityAccessService(configuration, loggerFactory.CreateLogger<IdentityAccessService>());
@@ -417,6 +419,13 @@ void VerifyIdentityWorkflow()
     Assert(introspection.Active, "introspection should mark new session active");
     Assert(introspection.Roles?.SequenceEqual(new[] { "gm", "player" }) == true, "introspection should return assigned roles");
 
+    var identityStorePath = Path.Combine(tempRoot, "identity-store.json");
+    var sessionSnapshot = File.ReadAllText(identityStorePath);
+    Assert(sessionSnapshot.Contains("accessTokenHash", StringComparison.Ordinal), "identity persistence should store access-token hashes.");
+    Assert(sessionSnapshot.Contains("refreshTokenHash", StringComparison.Ordinal), "identity persistence should store refresh-token hashes.");
+    Assert(!sessionSnapshot.Contains(issued.AccessToken, StringComparison.Ordinal), "identity persistence must not write raw access tokens to disk.");
+    Assert(!sessionSnapshot.Contains(issued.RefreshToken, StringComparison.Ordinal), "identity persistence must not write raw refresh tokens to disk.");
+
     var updated = identity.SetRoles("runner.demo", new IdentityRoleSetRequest(new[] { "publisher" }));
     Assert(updated.Roles.SequenceEqual(new[] { "publisher" }), "role updates should replace prior role grants");
 
@@ -425,12 +434,30 @@ void VerifyIdentityWorkflow()
         DisplayName: "Runner Demo",
         NextPath: "/home"));
     Assert(emailStart.DeliveryMode == "preview_inline_link", "email-first entry should expose honest preview delivery mode without pretending transactional mail is configured.");
+    Assert(!string.IsNullOrWhiteSpace(emailStart.TicketId), "explicit development preview mode should expose a local-only email ticket.");
+    var ticketSnapshot = File.ReadAllText(identityStorePath);
+    Assert(ticketSnapshot.Contains("ticketHash", StringComparison.Ordinal), "identity persistence should store email-ticket hashes.");
+    Assert(!ticketSnapshot.Contains(emailStart.TicketId, StringComparison.Ordinal), "identity persistence must not write raw email tickets to disk.");
 
     var emailSession = identity.CompleteEmailEntry(new EmailAuthCompleteRequest(emailStart.TicketId));
     Assert(!string.IsNullOrWhiteSpace(emailSession.AccessToken), "email-first entry should complete into a real session.");
 
     var revoked = identity.RevokeSession(new IdentitySessionRevokeRequest(emailSession.AccessToken));
     Assert(revoked.Revoked, "identity service should revoke cookie-backed sessions.");
+
+    var secureConfiguration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "secure-identity-store.json")
+        })
+        .Build();
+    var secureIdentity = new IdentityAccessService(secureConfiguration, loggerFactory.CreateLogger<IdentityAccessService>());
+    var secureStart = secureIdentity.StartEmailEntry(new EmailAuthStartRequest(
+        Email: "secure-runner@example.invalid",
+        DisplayName: "Secure Runner",
+        NextPath: "/home"));
+    Assert(secureStart.DeliveryMode == "email_delivery_unavailable", "email-first entry should not fall back to inline ticket exposure unless unsafe preview mode is explicitly enabled.");
+    Assert(string.IsNullOrWhiteSpace(secureStart.TicketId), "default email-first entry should not expose the login ticket in the API response.");
 }
 
 void VerifyIdentityEmailDeliveryProviders()
@@ -513,6 +540,64 @@ void VerifyIdentityEmailDeliveryProviders()
         Assert(updatedStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.DeliveryMode == "emailit_webhook" && item.Status == "delivered"), "Webhook delivery events should appear in email delivery history.");
         Assert(updatedStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.State == "delivered"), "Webhook delivery events should update recipient state.");
 
+        JsonElement webhookPayload = JsonDocument.Parse("""
+        {
+          "type": "email.delivered",
+          "data": {
+            "id": "email_123",
+            "to": "runner@example.invalid",
+            "created_at": "2026-03-20T10:05:00Z"
+          }
+        }
+        """).RootElement.Clone();
+
+        var missingSecretController = CreateIdentityController(new ConfigurationBuilder().Build(), emailitService, "webhook-missing-secret");
+        var missingSecretResult = missingSecretController.ReceiveEmailitWebhook(webhookPayload);
+        Assert(missingSecretResult.Result is ObjectResult { StatusCode: StatusCodes.Status503ServiceUnavailable }, "Emailit webhook route should fail closed when the webhook secret is not configured.");
+
+        var webhookSecretConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["IDENTITY_EMAILIT_WEBHOOK_SECRET"] = "emailit-webhook-secret"
+            })
+            .Build();
+        var wrongSecretController = CreateIdentityController(webhookSecretConfig, emailitService, "webhook-wrong-secret");
+        wrongSecretController.Request.Headers["X-Emailit-Webhook-Secret"] = "wrong-secret";
+        var wrongSecretResult = wrongSecretController.ReceiveEmailitWebhook(webhookPayload);
+        Assert(wrongSecretResult.Result is ObjectResult { StatusCode: StatusCodes.Status403Forbidden }, "Emailit webhook route should reject mismatched webhook secrets.");
+
+        var correctSecretController = CreateIdentityController(webhookSecretConfig, emailitService, "webhook-correct-secret");
+        correctSecretController.Request.Headers["X-Emailit-Webhook-Secret"] = "emailit-webhook-secret";
+        var correctSecretResult = correctSecretController.ReceiveEmailitWebhook(webhookPayload);
+        Assert(correctSecretResult.Result is OkObjectResult, "Emailit webhook route should accept matching webhook secrets.");
+
+        var unsafeWebhookConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS"] = "true"
+            })
+            .Build();
+        var unsafeWebhookController = CreateIdentityController(unsafeWebhookConfig, emailitService, "webhook-unsafe-preview");
+        var unsafeWebhookResult = unsafeWebhookController.ReceiveEmailitWebhook(webhookPayload);
+        Assert(unsafeWebhookResult.Result is OkObjectResult, "Unsigned Emailit webhooks should only be accepted behind the explicit unsafe development flag.");
+
+        var deliveredIdentityConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "delivered-identity-store.json")
+            })
+            .Build();
+        var deliveredIdentity = new IdentityAccessService(
+            deliveredIdentityConfig,
+            loggerFactory.CreateLogger<IdentityAccessService>(),
+            emailitService);
+        var deliveredStart = deliveredIdentity.StartEmailEntry(new EmailAuthStartRequest(
+            Email: "delivered-runner@example.invalid",
+            DisplayName: "Delivered Runner",
+            NextPath: "/home"));
+        Assert(deliveredStart.DeliveryMode == "emailit_api_magic_link", "delivered email sign-in should report the provider delivery mode.");
+        Assert(string.IsNullOrWhiteSpace(deliveredStart.TicketId), "delivered email sign-in should not expose its bearer ticket in the API response.");
+
         var failingEmailitService = new IdentityEmailDeliveryService(
             emailitConfig,
             loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
@@ -529,7 +614,32 @@ void VerifyIdentityEmailDeliveryProviders()
             expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
 
         Assert(!failed.Delivered, "Emailit delivery failures should not pretend success.");
-        Assert(failed.DeliveryMode == "preview_inline_link", "Emailit delivery failures should fall back to honest preview mode when no SMTP fallback is configured.");
+        Assert(failed.DeliveryMode == "email_delivery_unavailable", "Emailit delivery failures should not fall back to inline ticket exposure by default.");
+
+        var unsafePreviewConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
+                ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
+                ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
+                ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery-preview.json")
+            })
+            .Build();
+        var previewFailingEmailitService = new IdentityEmailDeliveryService(
+            unsafePreviewConfig,
+            loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+            new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+            {
+                Content = new StringContent("{\"error\":\"Domain not verified\"}", Encoding.UTF8, "application/json")
+            })));
+        var previewFailed = previewFailingEmailitService.DeliverMagicLink(
+            email: "runner@example.invalid",
+            displayName: "Runner Demo",
+            ticketId: "ticket-emailit-preview-fail",
+            nextPath: "/home",
+            expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+        Assert(previewFailed.DeliveryMode == "preview_inline_link", "unsafe development preview mode should remain explicit and testable.");
     }
     finally
     {
@@ -537,6 +647,26 @@ void VerifyIdentityEmailDeliveryProviders()
         {
             Directory.Delete(tempRoot, recursive: true);
         }
+    }
+
+    IdentityController CreateIdentityController(IConfiguration configuration, IdentityEmailDeliveryService emailDelivery, string storeName)
+    {
+        var identity = new IdentityAccessService(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, $"{storeName}.json")
+                })
+                .Build(),
+            loggerFactory.CreateLogger<IdentityAccessService>(),
+            emailDelivery);
+        return new IdentityController(identity, emailDelivery, configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
     }
 }
 
@@ -693,6 +823,11 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var accountParticipationBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { detail = "unused" }, HttpStatusCode.OK))), configuration);
     var accountParticipationSessions = new BoostSessionService(store, accounts, groups, accountParticipationBridge, rewards);
     var accountKarmaForge = new KarmaForgeDiscoveryService(new KarmaForgeStore(configuration, loggerFactory.CreateLogger<KarmaForgeStore>()), configuration);
+    var accountAnswerlyPolicy = new AnswerlyRuntimePolicy(configuration);
+    var accountBuildGhostConcierge = new BuildGhostConciergeService(
+        configuration,
+        accountAnswerlyPolicy,
+        new AnswerlyHumanizerAdapter(accountAnswerlyPolicy, new RuleSafeOutputGate()));
     var accountPackageCatalog = new PublicPackageCatalogService();
     var entitlementsController = new EntitlementsController(accounts, identityClient, entitlements, installLinking, rewards, workspaceServerPlane)
     {
@@ -717,12 +852,14 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         leaderboards,
         accountPackageCatalog,
         accountKarmaForge,
+        accountBuildGhostConcierge,
         chrome,
         google,
         releases,
         releaseSelection,
         privacyBoundaries,
         signedInTrustStatus,
+        new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()),
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -2278,6 +2415,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
     Assert(homeSource.Contains("showAccessSection && (!showOnboarding || accessSurfaceReady)", StringComparison.Ordinal), "home access should unlock when the account already has real device or support truth, even if the softer onboarding flag is still incomplete.");
+    Assert(homeSource.Contains("@if (!showAccessSection)\n{\n    <section class=\"home-cockpit-strip\" aria-label=\"Home summary\">", StringComparison.Ordinal), "home access should skip the generic home summary strip instead of rendering it above the return surface.");
+    Assert(homeSource.Contains("@if (!showAccessSection)\n{\n    <section class=\"editorial-block\">", StringComparison.Ordinal), "home access should skip the generic flagship coverage band instead of rendering it above the return surface.");
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
     Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when the starter path can be seeded, instead of hiding the route behind a stale onboarding bit.");
@@ -2739,12 +2878,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
     Assert(shelfSource.Contains("ArtifactViewHref", StringComparison.Ordinal) && shelfSource.Contains("new[] { \"all\", \"personal\", \"campaign\", \"creator\", \"public\" }", StringComparison.Ordinal), "artifacts shelf should expose first-class personal, campaign, creator, and public view filters instead of one blended signed-in overlay.");
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
-    Assert(statusSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "status should reuse the shared public trust pulse instead of inventing a second pulse renderer.");
-    Assert(statusSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "status should reuse the shared signed-in trust panel instead of inventing another install-specific rail.");
     Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");
-    Assert(statusSource.Contains("Caution.", StringComparison.Ordinal), "status should keep the caution inside the one public decision surface.");
+    Assert(statusSource.Contains("Current release", StringComparison.Ordinal), "status should keep the current release posture inside the one public decision surface.");
     Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
-    Assert(statusSource.Contains("Open support", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
+    Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
     Assert(statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should keep platform specifics visible without adding another release drawer.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
@@ -2951,12 +3088,14 @@ async Task VerifyPublicLandingProjectionAsync()
         leaderboards,
         packageCatalog,
         karmaForge,
+        buildGhostConcierge,
         chrome,
         google,
         releases,
         releaseSelection,
         privacyBoundaries,
         signedInTrustStatus,
+        new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()),
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -5657,7 +5796,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, new AccountDesktopLaunchTicketService(DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")), configuration), supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, new AccountDesktopLaunchTicketService(DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")), configuration), supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, buildGhostConcierge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()), loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

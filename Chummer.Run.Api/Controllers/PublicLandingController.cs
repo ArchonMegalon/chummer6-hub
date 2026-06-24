@@ -2131,29 +2131,26 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        if (subject is null)
-        {
-            return Redirect(BuildParticipateSignInHref());
-        }
-
-        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-        if (ResolveProductLiftHostedBoardUri() is not null)
-        {
-            return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
-        }
+        string? supporterHref = ResolveParticipateSupporterHref();
+        string? hostedBoardHref = ResolveProductLiftHostedBoardHref();
 
         var model = new ParticipatePageViewModel(
-            Chrome: _chrome.BuildAuthenticatedChrome(
+            Chrome: subject is null
+                ? _chrome.BuildPublicChrome(
+                    "Participate",
+                    "Public requests, visible bugs, and product signal.",
+                    "/partizipate")
+                : _chrome.BuildAuthenticatedChrome(
                 "Participate",
-                "Public requests, visible bugs, and roadmap signal.",
+                "Public requests, visible bugs, and product signal.",
                 "/partizipate",
-                user.DisplayName,
-                user.Email),
+                string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
+                subject.Email),
             Lanes:
             [
-                new ParticipateLaneViewModel("Idea", "Ask for a change", "Keep product requests short, concrete, and public.", "#participate-board", "Open board"),
-                new ParticipateLaneViewModel("Bug", "Report a visible issue", "Use public posts for safe repro notes only. Move logs, installs, and account detail to Help.", "/contact#support-intake", "Open Help"),
-                new ParticipateLaneViewModel("Roadmap", "See what is moving", "Track what is being explored, what is in progress, and what already shipped.", "/roadmap", "Open roadmap")
+                new ParticipateLaneViewModel("Idea", "Ask for a change", "Keep public requests short, concrete, and easy to vote on.", hostedBoardHref ?? "#participate-board", "Open board"),
+                new ParticipateLaneViewModel("Bug", "Report a visible issue", "Keep public bug reports to safe repro notes. Move logs, installs, and account detail to Help.", "/contact#support-intake", "Open help"),
+                new ParticipateLaneViewModel("Roadmap", "See what is moving", "Use roadmap when you want direction instead of discussion.", "/roadmap", "Open roadmap")
             ],
             Items:
             [
@@ -2164,7 +2161,8 @@ public sealed class PublicLandingController : Controller
             PrivateHelpHref: "/contact#support-intake",
             RoadmapHref: "/roadmap",
             ChangelogHref: "/changelog",
-            HostedBoardHref: ResolveProductLiftHostedBoardHref(),
+            SupporterHref: supporterHref,
+            HostedBoardHref: hostedBoardHref,
             SignalOperations: null);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
@@ -2187,14 +2185,6 @@ public sealed class PublicLandingController : Controller
 
     private async Task<IActionResult> ParticipateBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
     {
-        if (await TryGetOptionalSubjectAsync(cancellationToken) is null)
-        {
-            string authTargetPath = string.IsNullOrWhiteSpace(boardPath)
-                ? "/partizipate"
-                : $"/partizipate/{NormalizeParticipateBoardPath(boardPath)}";
-            return Redirect(BuildParticipateSignInHref(authTargetPath));
-        }
-
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
         {
@@ -2219,7 +2209,7 @@ public sealed class PublicLandingController : Controller
 
             if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
             {
-                string redirected = RewriteParticipateBoardLocation(response.Headers.Location, upstream);
+                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/partizipate", "/partizipate");
                 return Redirect(redirected);
             }
 
@@ -2227,7 +2217,27 @@ public sealed class PublicLandingController : Controller
             if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
             {
                 string html = await response.Content.ReadAsStringAsync(cancellationToken);
-                string rewritten = RewriteParticipateBoardHtml(html, upstream, ResolveParticipateBoardHomeHref());
+                string rewritten = RewriteHostedBoardHtml(
+                    html,
+                    upstream,
+                    ResolveParticipateBoardHomeHref(),
+                    ResolveParticipateSupporterHref(),
+                    localOrigin: "/partizipate/board",
+                    localBaseHref: "/partizipate/board/",
+                    railTitle: "Chummer Participate",
+                    railNavLabel: "Participate actions",
+                    firstLinkHref: "/roadmap",
+                    firstLinkLabel: "Roadmap",
+                    secondLinkHref: "/partizipate",
+                    secondLinkLabel: "Board",
+                    failureTitle: "Public board temporarily unavailable",
+                    failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
+                    failurePrimaryHref: "/roadmap",
+                    failurePrimaryLabel: "Open roadmap",
+                    failureSecondaryHref: "/contact#support-intake",
+                    failureSecondaryLabel: "Open help",
+                    failureReturnHref: "/partizipate",
+                    failureReturnLabel: "Back to participate");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
 
@@ -2261,14 +2271,35 @@ public sealed class PublicLandingController : Controller
     }
 
     private ContentResult ParticipateBoardUnavailable()
+        => HostedBoardUnavailable(
+            "Public board temporarily unavailable",
+            "The hosted feedback board did not respond. The first-party route is still working.",
+            "Use the roadmap for current movement or Help for anything private, account-specific, or install-specific.",
+            "/roadmap",
+            "Open roadmap",
+            "/contact#support-intake",
+            "Open help",
+            "/partizipate",
+            "Back to participate");
+
+    private ContentResult HostedBoardUnavailable(
+        string title,
+        string lead,
+        string summary,
+        string primaryHref,
+        string primaryLabel,
+        string secondaryHref,
+        string secondaryLabel,
+        string returnHref,
+        string returnLabel)
     {
-        const string html = """
+        string html = $$"""
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Public board temporarily unavailable</title>
+  <title>{{title}}</title>
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #11131a; color: #f3f4f7; }
@@ -2281,13 +2312,13 @@ public sealed class PublicLandingController : Controller
 </head>
 <body>
   <main>
-    <h1>Public board temporarily unavailable</h1>
-    <p>The hosted feedback board did not respond. The first-party route is still working.</p>
-    <p>Use the roadmap for current movement or Help for anything private, account-specific, or install-specific.</p>
+    <h1>{{title}}</h1>
+    <p>{{lead}}</p>
+    <p>{{summary}}</p>
     <div class="actions">
-      <a href="/roadmap" target="_top" rel="noopener">Open roadmap</a>
-      <a href="/contact#support-intake" target="_top" rel="noopener">Open help</a>
-      <a href="/partizipate" target="_top" rel="noopener">Back to participate</a>
+      <a href="{{primaryHref}}" target="_top" rel="noopener">{{primaryLabel}}</a>
+      <a href="{{secondaryHref}}" target="_top" rel="noopener">{{secondaryLabel}}</a>
+      <a href="{{returnHref}}" target="_top" rel="noopener">{{returnLabel}}</a>
     </div>
   </main>
 </body>
@@ -2297,7 +2328,7 @@ public sealed class PublicLandingController : Controller
     }
 
     private string? ResolveProductLiftHostedBoardHref()
-        => ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";
+        => ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";
 
     private static string BuildParticipateSignInHref(string targetPath = "/partizipate")
         => $"/auth/google/start?next={Uri.EscapeDataString(string.IsNullOrWhiteSpace(targetPath) ? "/partizipate" : targetPath)}";
@@ -2318,7 +2349,25 @@ public sealed class PublicLandingController : Controller
         string? configured = _configuration["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"]?.Trim();
         if (string.IsNullOrWhiteSpace(configured)
             || !Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri)
-            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            || (uri.Scheme != Uri.UriSchemeHttps
+                && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
+        {
+            return null;
+        }
+
+        return uri;
+    }
+
+    private string? ResolveProductLiftHostedRoadmapHref()
+        => ResolveProductLiftHostedRoadmapUri() is null ? null : "/roadmap/board";
+
+    private Uri? ResolveProductLiftHostedRoadmapUri()
+    {
+        string? configured = _configuration["CHUMMER_PRODUCTLIFT_ROADMAP_URL"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configured)
+            || !Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri)
+            || (uri.Scheme != Uri.UriSchemeHttps
+                && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
         {
             return null;
         }
@@ -2341,27 +2390,49 @@ public sealed class PublicLandingController : Controller
         return builder.Uri;
     }
 
-    private string RewriteParticipateBoardLocation(Uri location, Uri upstream)
+    private static string RewriteHostedBoardLocation(Uri location, Uri upstream, string fallbackPath, string localPrefix)
     {
         Uri absolute = location.IsAbsoluteUri ? location : new Uri(upstream, location);
         if (!Uri.Compare(absolute, upstream, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
         {
-            return "/partizipate";
+            return fallbackPath;
         }
 
         string relative = upstream.MakeRelativeUri(absolute).ToString();
         if (string.IsNullOrWhiteSpace(relative))
         {
-            return "/partizipate";
+            return fallbackPath;
         }
 
-        return $"/partizipate/{relative}";
+        return $"{localPrefix}/{relative}";
     }
 
-    private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref)
+    private string RewriteParticipateBoardLocation(Uri location, Uri upstream)
+        => RewriteHostedBoardLocation(location, upstream, "/partizipate", "/partizipate");
+
+    private static string RewriteHostedBoardHtml(
+        string html,
+        Uri upstream,
+        string publicHomeHref,
+        string? supporterHref,
+        string localOrigin,
+        string localBaseHref,
+        string railTitle,
+        string railNavLabel,
+        string firstLinkHref,
+        string firstLinkLabel,
+        string secondLinkHref,
+        string secondLinkLabel,
+        string failureTitle,
+        string failureSummary,
+        string failurePrimaryHref,
+        string failurePrimaryLabel,
+        string failureSecondaryHref,
+        string failureSecondaryLabel,
+        string failureReturnHref,
+        string failureReturnLabel)
     {
         string upstreamOrigin = upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/');
-        const string localOrigin = "/partizipate/board";
 
         string rewritten = html.Replace(upstreamOrigin, localOrigin, StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("href=\"/", $"href=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
@@ -2374,7 +2445,7 @@ public sealed class PublicLandingController : Controller
             rewritten = Regex.Replace(
                 rewritten,
                 "<head(.*?)>",
-                "<head$1><base href=\"/partizipate/board/\" />",
+                $"<head$1><base href=\"{localBaseHref}\" />",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline,
                 TimeSpan.FromMilliseconds(250));
         }
@@ -2382,6 +2453,51 @@ public sealed class PublicLandingController : Controller
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
             string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);
+            const string boardRail = """
+<style data-chummer-board-rail-style>
+:root { color-scheme: dark; }
+[data-chummer-board-rail] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #11161f;
+  color: #edf2f7;
+  font: 500 14px/1.4 Inter, system-ui, sans-serif;
+}
+[data-chummer-board-rail] nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+[data-chummer-board-rail] a {
+  color: inherit;
+  text-decoration: none;
+}
+[data-chummer-board-rail] a[data-chummer-board-cta] {
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+}
+[data-chummer-board-rail] strong {
+  font-weight: 600;
+}
+</style>
+<div data-chummer-board-rail>
+  <strong>__CHUMMER_RAIL_TITLE__</strong>
+  <nav aria-label="__CHUMMER_RAIL_NAV_LABEL__">
+    <a href="__CHUMMER_PUBLIC_HOME_HREF__" target="_top" rel="noopener">Home</a>
+    <a href="__CHUMMER_FIRST_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_FIRST_LINK_LABEL__</a>
+    <a href="__CHUMMER_SECOND_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_SECOND_LINK_LABEL__</a>
+    __CHUMMER_SUPPORTER_LINK__
+    <a href="/contact#support-intake" target="_top" rel="noopener">Private help</a>
+  </nav>
+</div>
+""";
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
@@ -2411,26 +2527,225 @@ document.addEventListener('DOMContentLoaded', function () {
   brand.setAttribute('href', '__CHUMMER_PUBLIC_HOME_HREF__');
   brand.setAttribute('target', '_top');
   brand.setAttribute('rel', 'noopener');
+
+  const authCandidates = Array.from(document.querySelectorAll('a[href], button, [role="button"]'));
+  authCandidates.forEach(function (node) {
+    const text = ((node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim().toLowerCase();
+    const href = (node.getAttribute('href') || '').trim().toLowerCase();
+    const authLikeText = text === 'log in'
+      || text === 'login'
+      || text === 'sign in'
+      || text === 'signin'
+      || text === 'sign up'
+      || text === 'signup'
+      || text === 'register';
+    const authLikeHref = href.includes('/login')
+      || href.includes('/signup')
+      || href.includes('/register')
+      || href.includes('productlift.dev/login')
+      || href.includes('productlift.dev/signup');
+
+    if (!authLikeText && !authLikeHref) {
+      return;
+    }
+
+    if (node instanceof HTMLElement) {
+      node.remove();
+    }
+  });
 });
 </script>
-""".Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal);
+"""
+                .Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal);
+
+            string supporterLinkMarkup = string.IsNullOrWhiteSpace(supporterHref)
+                ? string.Empty
+                : $"<a href=\"{HtmlEncoder.Default.Encode(supporterHref)}\" target=\"_top\" rel=\"noopener\" data-chummer-board-cta>Support Chummer</a>";
+            string boardRailPatch = boardRail
+                .Replace("__CHUMMER_PUBLIC_HOME_HREF__", publicHomeHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_RAIL_TITLE__", railTitle, StringComparison.Ordinal)
+                .Replace("__CHUMMER_RAIL_NAV_LABEL__", railNavLabel, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FIRST_LINK_HREF__", firstLinkHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FIRST_LINK_LABEL__", firstLinkLabel, StringComparison.Ordinal)
+                .Replace("__CHUMMER_SECOND_LINK_HREF__", secondLinkHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_SECOND_LINK_LABEL__", secondLinkLabel, StringComparison.Ordinal)
+                .Replace("__CHUMMER_SUPPORTER_LINK__", supporterLinkMarkup, StringComparison.Ordinal);
+            string boardFailurePatch = """
+<script data-chummer-board-failure-patch>
+document.addEventListener('DOMContentLoaded', function () {
+  const errorPhrases = [
+    'something went wrong on our side',
+    'could not load posts',
+    'network error while loading tab configuration',
+    'please try again or contact support@productlift.dev'
+  ];
+
+  const ensureFailurePanel = function () {
+    if (document.querySelector('[data-chummer-board-failure]')) {
+      return document.querySelector('[data-chummer-board-failure]');
+    }
+
+    const panel = document.createElement('section');
+    panel.setAttribute('data-chummer-board-failure', 'true');
+    panel.setAttribute('role', 'status');
+    panel.innerHTML = ''
+      + '<style>'
+      + '[data-chummer-board-failure]{margin:1rem; padding:1rem 1rem 1.1rem; border:1px solid rgba(255,255,255,0.08); border-radius:14px; background:#151a21; color:#eef2f6; font:500 14px/1.5 Inter,system-ui,sans-serif;}'
+      + '[data-chummer-board-failure] h2{margin:0 0 0.45rem; font-size:1rem; line-height:1.3; color:#f7fafc;}'
+      + '[data-chummer-board-failure] p{margin:0; color:#cbd5df;}'
+      + '[data-chummer-board-failure] nav{display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.85rem;}'
+      + '[data-chummer-board-failure] a{display:inline-flex; align-items:center; padding:0.5rem 0.8rem; border:1px solid rgba(255,255,255,0.12); border-radius:999px; background:rgba(255,255,255,0.03); color:inherit; text-decoration:none;}'
+      + '</style>'
+      + '<h2>__CHUMMER_FAILURE_TITLE__</h2>'
+      + '<p>__CHUMMER_FAILURE_SUMMARY__</p>'
+      + '<nav aria-label="Board recovery actions">'
+      + '<a href="__CHUMMER_FAILURE_PRIMARY_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_PRIMARY_LABEL__</a>'
+      + '<a href="__CHUMMER_FAILURE_SECONDARY_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_SECONDARY_LABEL__</a>'
+      + '<a href="__CHUMMER_FAILURE_RETURN_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_RETURN_LABEL__</a>'
+      + '</nav>';
+
+    const host = document.querySelector('main') || document.body;
+    if (!host) {
+      return null;
+    }
+
+    host.prepend(panel);
+    return panel;
+  };
+
+  const suppressHostedError = function () {
+    const nodes = Array.from(document.querySelectorAll('main, section, article, div, p, span, h1, h2, h3'));
+    let found = false;
+
+    nodes.forEach(function (node) {
+      const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!text) {
+        return;
+      }
+
+      const matches = errorPhrases.some(function (phrase) {
+        return text.includes(phrase);
+      });
+
+      if (!matches) {
+        return;
+      }
+
+      found = true;
+      if (node instanceof HTMLElement) {
+        node.style.display = 'none';
+      }
+    });
+
+    if (found) {
+      ensureFailurePanel();
+    }
+  };
+
+  suppressHostedError();
+  const observer = new MutationObserver(function () {
+    suppressHostedError();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+});
+</script>
+"""
+                .Replace("__CHUMMER_FAILURE_TITLE__", JavaScriptEncoder.Default.Encode(failureTitle), StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_SUMMARY__", JavaScriptEncoder.Default.Encode(failureSummary), StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_PRIMARY_HREF__", failurePrimaryHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_PRIMARY_LABEL__", JavaScriptEncoder.Default.Encode(failurePrimaryLabel), StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_SECONDARY_HREF__", failureSecondaryHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_SECONDARY_LABEL__", JavaScriptEncoder.Default.Encode(failureSecondaryLabel), StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_RETURN_HREF__", failureReturnHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FAILURE_RETURN_LABEL__", JavaScriptEncoder.Default.Encode(failureReturnLabel), StringComparison.Ordinal);
 
             if (rewritten.Contains("</head>", StringComparison.OrdinalIgnoreCase))
             {
                 rewritten = Regex.Replace(
                     rewritten,
                     "</head>",
-                    $"{homeLinkPatch}</head>",
+                    $"{homeLinkPatch}{boardFailurePatch}</head>",
                     RegexOptions.IgnoreCase,
                     TimeSpan.FromMilliseconds(250));
             }
             else
             {
-                rewritten = homeLinkPatch + rewritten;
+                rewritten = homeLinkPatch + boardFailurePatch + rewritten;
+            }
+
+            if (rewritten.Contains("<body", StringComparison.OrdinalIgnoreCase))
+            {
+                rewritten = Regex.Replace(
+                    rewritten,
+                    "<body(.*?)>",
+                    $"<body$1>{boardRailPatch}",
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                    TimeSpan.FromMilliseconds(250));
+            }
+            else
+            {
+                rewritten = boardRailPatch + rewritten;
             }
         }
 
+        rewritten = Regex.Replace(
+            rewritten,
+            "<!--.*?ProductLift.*?-->",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+        rewritten = Regex.Replace(
+            rewritten,
+            "<meta[^>]+name=\"generator\"[^>]*>",
+            string.Empty,
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(250));
+        rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
+
         return rewritten;
+    }
+
+    private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref, string? supporterHref)
+        => RewriteHostedBoardHtml(
+            html,
+            upstream,
+            publicHomeHref,
+            supporterHref,
+            localOrigin: "/partizipate/board",
+            localBaseHref: "/partizipate/board/",
+            railTitle: "Chummer Participate",
+            railNavLabel: "Participate actions",
+            firstLinkHref: "/roadmap",
+            firstLinkLabel: "Roadmap",
+            secondLinkHref: "/partizipate",
+            secondLinkLabel: "Board",
+            failureTitle: "Public board temporarily unavailable",
+            failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
+            failurePrimaryHref: "/roadmap",
+            failurePrimaryLabel: "Open roadmap",
+            failureSecondaryHref: "/contact#support-intake",
+            failureSecondaryLabel: "Open help",
+            failureReturnHref: "/partizipate",
+            failureReturnLabel: "Back to participate");
+
+    private string? ResolveParticipateSupporterHref()
+    {
+        BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();
+        if (billing is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            _ = billing.GetPage();
+            return "/account/billing/supporter/start";
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException)
+        {
+            return null;
+        }
     }
 
     private void CopySafeProxyHeaders(HttpResponseMessage response)
@@ -2495,6 +2810,7 @@ document.addEventListener('DOMContentLoaded', function () {
             projection.AnswerlyResponsibilities,
             projection.ChummerResponsibilities,
             projection.CompareArtifacts,
+            projection.Insights,
             projection.ClientReportHref,
             projection.PublicFeedbackHref,
             projection.Actions,
@@ -4315,7 +4631,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.WebhookSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift webhook secret mismatch.");
         }
@@ -4434,7 +4750,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
@@ -4456,7 +4772,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
@@ -4479,7 +4795,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.EmailitWebhookSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "emailit webhook secret mismatch.");
         }
@@ -4509,7 +4825,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.EaDeliveryWebhookSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "ea delivery webhook secret mismatch.");
         }
@@ -4539,7 +4855,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
-        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
             return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
@@ -4566,14 +4882,113 @@ document.addEventListener('DOMContentLoaded', function () {
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
         var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
+        string? hostedBoardHref = ResolveProductLiftHostedRoadmapHref();
         var model = new RoadmapPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "Milestone-backed public direction, current readiness, and the next honest routes.", currentPath, cancellationToken),
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, currentPath),
             Milestones: BuildRoadmapMilestones(),
             SignalLoop: signalLoop,
+            HostedBoardHref: hostedBoardHref,
             SignalProjection: signalProjection,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience));
         return View("~/Views/PublicLanding/Roadmap.cshtml", model);
+    }
+
+    [HttpGet("/roadmap/board")]
+    [HttpGet("/roadmap/board/{**boardPath}")]
+    public async Task<IActionResult> RoadmapBoardProxy(string? boardPath, CancellationToken cancellationToken)
+        => await RoadmapBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+
+    private async Task<IActionResult> RoadmapBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
+    {
+        Uri? upstream = ResolveProductLiftHostedRoadmapUri();
+        if (upstream is null)
+        {
+            return NotFound();
+        }
+
+        string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
+        Uri target = string.IsNullOrWhiteSpace(relativePath)
+            ? AppendQueryString(upstream, Request.QueryString.Value)
+            : AppendQueryString(new Uri(upstream, relativePath), Request.QueryString.Value);
+
+        try
+        {
+            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
+            outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToString());
+            outbound.Headers.TryAddWithoutValidation("Accept", Request.Headers.Accept.ToArray());
+            outbound.Headers.TryAddWithoutValidation("Accept-Language", Request.Headers.AcceptLanguage.ToArray());
+            outbound.Headers.Referrer = upstream;
+
+            using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
+            {
+                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/roadmap", "/roadmap/board");
+                return Redirect(redirected);
+            }
+
+            string mediaType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                string rewritten = RewriteHostedBoardHtml(
+                    html,
+                    upstream,
+                    ResolveParticipateBoardHomeHref(),
+                    supporterHref: null,
+                    localOrigin: "/roadmap/board",
+                    localBaseHref: "/roadmap/board/",
+                    railTitle: "Chummer Roadmap",
+                    railNavLabel: "Roadmap actions",
+                    firstLinkHref: "/partizipate",
+                    firstLinkLabel: "Participate",
+                    secondLinkHref: "/changelog",
+                    secondLinkLabel: "Changelog",
+                    failureTitle: "Roadmap temporarily unavailable",
+                    failureSummary: "The hosted roadmap did not respond. Use the changelog for shipped work or Participate for new requests.",
+                    failurePrimaryHref: "/changelog",
+                    failurePrimaryLabel: "Open changelog",
+                    failureSecondaryHref: "/partizipate",
+                    failureSecondaryLabel: "Participate",
+                    failureReturnHref: "/roadmap",
+                    failureReturnLabel: "Back to roadmap");
+                return Content(rewritten, "text/html; charset=utf-8");
+            }
+
+            Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            CopySafeProxyHeaders(response);
+            return File(stream, mediaType);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Roadmap board proxy could not reach upstream roadmap.");
+            return HostedBoardUnavailable(
+                "Roadmap temporarily unavailable",
+                "The hosted roadmap did not respond. The first-party route is still working.",
+                "Use the changelog for shipped work or Participate for new requests.",
+                "/changelog",
+                "Open changelog",
+                "/partizipate",
+                "Participate",
+                "/roadmap",
+                "Back to roadmap");
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Roadmap board proxy timed out.");
+            return HostedBoardUnavailable(
+                "Roadmap temporarily unavailable",
+                "The hosted roadmap did not respond. The first-party route is still working.",
+                "Use the changelog for shipped work or Participate for new requests.",
+                "/changelog",
+                "Open changelog",
+                "/partizipate",
+                "Participate",
+                "/roadmap",
+                "Back to roadmap");
+        }
     }
 
     [HttpGet("/changelog")]
@@ -10337,7 +10752,7 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         PublicTrustPulseSnapshot? pulse)
     {
-        string published = $"Released {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        string updated = $"Updated {BuildLiveVerificationLabel(manifest)}.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
 
         bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
@@ -10346,10 +10761,10 @@ Boundary:
             || checksPassing
             || pulse?.ParityClaimsReviewRequired == false)
         {
-            return $"{releaseExperience.Display.ChannelLabel}. {releaseExperience.Display.BuildLabel}. {published}";
+            return updated;
         }
 
-        return $"{releaseExperience.Display.ChannelLabel}. {releaseExperience.Display.BuildLabel}. {published} Open status and support before wider rollouts.";
+        return $"{updated} Open status and support before wider rollouts.";
     }
 
     private static string BuildPublicStatusReleaseSummary(

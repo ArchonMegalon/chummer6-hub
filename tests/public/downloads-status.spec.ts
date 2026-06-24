@@ -27,8 +27,8 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const downloadsMain = downloadsPage.locator('#main');
   await expect(downloadsPage.getByRole('heading', { name: 'Install Chummer' })).toBeVisible();
   await expect(downloadsPage.locator('body')).toContainText('Windows and Linux installers.');
-  await expect(downloadsPage.getByRole('heading', { name: 'Current stable build' })).toBeVisible();
-  await expect(downloadsPage.getByRole('heading', { name: 'Latest published build' })).toBeVisible();
+  await expect(downloadsPage.getByRole('heading', { name: 'Current build' })).toBeVisible();
+  await expect(downloadsPage.getByRole('heading', { name: 'Newest build' })).toBeVisible();
   await expect(downloadsMain.getByRole('link', { name: 'Help' })).toBeVisible();
   await expect(downloadsMain.getByRole('link', { name: 'Status' })).toBeVisible();
   await downloadsPage.close();

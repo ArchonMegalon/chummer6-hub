@@ -10,11 +10,12 @@ public sealed class SignedInShellContinuityViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
         string view = File.ReadAllText(viewPath);
 
+        Assert.Contains("@if (!showAccessSection)", view, StringComparison.Ordinal);
         Assert.Contains("home-cockpit-strip", view, StringComparison.Ordinal);
         Assert.Contains("Home summary", view, StringComparison.Ordinal);
         Assert.Contains("Recent change", view, StringComparison.Ordinal);
         Assert.Contains("Use as guest or link this copy later.", view, StringComparison.Ordinal);
-        Assert.Contains("Keep the whole product in view, not just the current install.", view, StringComparison.Ordinal);
+        Assert.Contains("Everything you need in one place.", view, StringComparison.Ordinal);
         Assert.Contains("Workspace", view, StringComparison.Ordinal);
         Assert.Contains("Build, explain, and next step", view, StringComparison.Ordinal);
     }
@@ -78,6 +79,57 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("/account/open/example/", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Recent workspaces", view, StringComparison.Ordinal);
         Assert.DoesNotContain(">Workspace<", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccountViewPublishesOriginDossierGoldLibraryBehindVerifiedArtifactGates()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("id=\"origin-dossier-library\"", view, StringComparison.Ordinal);
+        Assert.Contains("Origin Dossier library", view, StringComparison.Ordinal);
+        Assert.Contains("Undetectable Humanizer receipt", view, StringComparison.Ordinal);
+        Assert.Contains("data-story-scene-cover-uses-selected-character-face", view, StringComparison.Ordinal);
+        Assert.Contains("data-audiobookshelf-playback-verified", view, StringComparison.Ordinal);
+        Assert.Contains("data-undetectable-humanizer-applied", view, StringComparison.Ordinal);
+        Assert.Contains("data-telegram-share-delivered", view, StringComparison.Ordinal);
+        Assert.Contains("Book artifact", view, StringComparison.Ordinal);
+        Assert.Contains("Dossier video", view, StringComparison.Ordinal);
+        Assert.Contains("Telegram share", view, StringComparison.Ordinal);
+        Assert.Contains("Listen in Audiobookshelf", view, StringComparison.Ordinal);
+        Assert.Contains("Audiobookshelf share locked", view, StringComparison.Ordinal);
+        Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccountControllerAndViewPublishAuthenticatedOriginDossierDetailSurface()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string detailViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "OriginDossier.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string viewModels = File.ReadAllText(viewModelPath);
+        string detailView = File.ReadAllText(detailViewPath);
+
+        Assert.Contains("[HttpGet(\"/account/work/origin-dossiers/{originDossierProjectId}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"me/origin-dossiers/publications\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("_originDossierPublications.GetForAccount", controller, StringComparison.Ordinal);
+        Assert.Contains("_originDossierPublications.UpsertForAccount", controller, StringComparison.Ordinal);
+        Assert.Contains("OriginDossierPublicationImportRequest", controller, StringComparison.Ordinal);
+        Assert.Contains("OriginDossierPublicationDetailPageViewModel", viewModels, StringComparison.Ordinal);
+        Assert.Contains("data-origin-dossier-detail", detailView, StringComparison.Ordinal);
+        Assert.Contains("data-story-scene-cover-uses-selected-character-face", detailView, StringComparison.Ordinal);
+        Assert.Contains("data-audiobookshelf-playback-verified", detailView, StringComparison.Ordinal);
+        Assert.Contains("data-book-artifact-verified", detailView, StringComparison.Ordinal);
+        Assert.Contains("data-dossier-video-verified", detailView, StringComparison.Ordinal);
+        Assert.Contains("data-telegram-share-delivered", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open book edition", detailView, StringComparison.Ordinal);
+        Assert.Contains("Listen in Audiobookshelf", detailView, StringComparison.Ordinal);
+        Assert.Contains("Watch dossier film", detailView, StringComparison.Ordinal);
+        Assert.Contains("Book edition locked", detailView, StringComparison.Ordinal);
+        Assert.Contains("Dossier film locked", detailView, StringComparison.Ordinal);
     }
 
     [Fact]

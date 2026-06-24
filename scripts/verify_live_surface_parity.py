@@ -21,10 +21,12 @@ SURFACES = [
     {
         "path": "/",
         "required_texts": [
-            "A Shadowrun character manager for building, updating, and bringing clean sheets to the table.",
+            "A Shadowrun character manager for clean sheets and faster tables.",
             "Download Chummer",
             "Windows and Linux.",
-            "What it does",
+            "Help",
+            "Status",
+            "Watch 90 sec",
         ],
         "forbidden_texts": [
             "Next move",
@@ -45,8 +47,12 @@ SURFACES = [
         "required_texts": [
             "Install Chummer",
             "Windows and Linux installers.",
+            "Current build",
+            "Newest build",
             "Nightly",
             "Stable",
+            "Use this when you want the latest Windows or Linux build.",
+            "Help",
         ],
         "forbidden_texts": [
             "Need account return?",
@@ -56,6 +62,9 @@ SURFACES = [
             "account-assisted install paths",
             "Link this copy from the first launch",
             "guided installer",
+            "Current stable build",
+            "Latest published build",
+            "Use this when you want the newest Windows or Linux release.",
             "Get started",
             "Flagship routes",
             "Signals and horizons",
@@ -66,11 +75,12 @@ SURFACES = [
     {
         "path": "/status",
         "required_texts": [
-            "Release status",
-            "The build currently available from Chummer.",
+            "Current release",
+            "The build, platforms, and current state in one place.",
             "Release",
             "Open downloads",
-            "Open support",
+            "Open help",
+            "Platforms",
         ],
         "forbidden_texts": [
             "Release and next step.",
@@ -90,6 +100,36 @@ SURFACES = [
             "Signals and horizons",
             "Trust and support",
             "Account and quick actions",
+        ],
+    },
+    {
+        "path": "/partizipate",
+        "required_texts": [
+            "Participate",
+            "Public board",
+            "Tell us what slows the table down.",
+            "Use the right place",
+            "Support Chummer",
+        ],
+        "forbidden_texts": [
+            "ProductLift",
+            "Log in",
+            "Sign up",
+            "Sign in",
+            "Authorize Codex access.",
+            "OpenAI account in ChatGPT",
+        ],
+    },
+    {
+        "path": "/partizipate/board",
+        "required_texts": [
+            "Public board",
+        ],
+        "forbidden_texts": [
+            "/auth/google/start?next=",
+            "accounts.google.com",
+            "Log in",
+            "Sign up",
         ],
     },
     {
@@ -154,17 +194,61 @@ def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def fetch(url: str) -> tuple[int | None, str, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "chummer-live-surface-parity/1"})
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            body = response.read().decode("utf-8", errors="replace")
-            return int(response.status), body, response.geturl()
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        return int(exc.code), body, exc.geturl()
-    except Exception as exc:  # pragma: no cover
-        return None, str(exc), url
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _same_origin(left: str, right: str) -> bool:
+    left_parts = urllib.parse.urlparse(left)
+    right_parts = urllib.parse.urlparse(right)
+    return (
+        left_parts.scheme.lower(),
+        left_parts.netloc.lower(),
+    ) == (
+        right_parts.scheme.lower(),
+        right_parts.netloc.lower(),
+    )
+
+
+def fetch(url: str, base_url: str) -> tuple[int | None, str, str, str | None, list[str]]:
+    opener = urllib.request.build_opener(NoRedirectHandler())
+    redirect_chain: list[str] = []
+    current_url = url
+
+    for _ in range(5):
+        request = urllib.request.Request(current_url, headers={"User-Agent": "chummer-live-surface-parity/1"})
+        try:
+            with opener.open(request, timeout=30) as response:
+                body = response.read().decode("utf-8", errors="replace")
+                location = response.headers.get("Location")
+                if location and 300 <= int(response.status) < 400:
+                    target = urllib.parse.urljoin(current_url, location)
+                    redirect_chain.append(target)
+                    if not _same_origin(target, base_url):
+                        return int(response.status), body, current_url, location, redirect_chain
+
+                    current_url = target
+                    continue
+
+                return int(response.status), body, response.geturl(), location, redirect_chain
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            location = exc.headers.get("Location")
+            if location and 300 <= int(exc.code) < 400:
+                target = urllib.parse.urljoin(current_url, location)
+                redirect_chain.append(target)
+                if not _same_origin(target, base_url):
+                    return int(exc.code), body, current_url, location, redirect_chain
+
+                current_url = target
+                continue
+
+            return int(exc.code), body, exc.geturl(), location, redirect_chain
+        except Exception as exc:  # pragma: no cover
+            return None, str(exc), current_url, None, redirect_chain
+
+    return None, "redirect loop exceeded", current_url, None, redirect_chain
 
 
 def flatten_text(html: str) -> str:
@@ -175,18 +259,34 @@ def flatten_text(html: str) -> str:
 
 def verify(base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
+    base_origin = urllib.parse.urlparse(base)
     results: list[dict[str, Any]] = []
     failures: list[str] = []
 
     for surface in SURFACES:
         path = str(surface["path"])
         url = urllib.parse.urljoin(f"{base}/", path.lstrip("/"))
-        status_code, body, final_url = fetch(url)
+        status_code, body, final_url, redirect_location, redirect_chain = fetch(url, base)
         flattened = flatten_text(body) if status_code == 200 else body
         missing = [token for token in surface.get("required_texts", []) if token not in flattened]
         forbidden = [token for token in surface.get("forbidden_texts", []) if token in flattened]
         final_url_prefix = str(surface.get("required_final_url_prefix") or "")
         final_url_matches = True
+        cross_origin_redirect = False
+        redirect_target_url = None
+
+        if redirect_location:
+            redirect_target_url = urllib.parse.urljoin(url, redirect_location)
+            redirect_origin = urllib.parse.urlparse(redirect_target_url)
+            cross_origin_redirect = (
+                bool(redirect_origin.scheme)
+                and bool(redirect_origin.netloc)
+                and (
+                    redirect_origin.scheme.lower() != base_origin.scheme.lower()
+                    or redirect_origin.netloc.lower() != base_origin.netloc.lower()
+                )
+            )
+
         if final_url_prefix:
             final_path = urllib.parse.urlparse(final_url).path or "/"
             final_url_matches = final_path.startswith(final_url_prefix)
@@ -195,6 +295,10 @@ def verify(base_url: str) -> dict[str, Any]:
 
         if status_code != 200:
             failures.append(f"{path}: expected 200, got {status_code}")
+        if redirect_location:
+            failures.append(f"{path}: redirected to {redirect_target_url or redirect_location}")
+        if cross_origin_redirect:
+            failures.append(f"{path}: redirected off-origin to {redirect_target_url}")
         if missing:
             failures.append(f"{path}: missing required text: {', '.join(missing)}")
         if forbidden:
@@ -205,7 +309,11 @@ def verify(base_url: str) -> dict[str, Any]:
                 "path": path,
                 "url": url,
                 "final_url": final_url,
+                "redirect_location": redirect_location,
+                "redirect_target_url": redirect_target_url,
+                "cross_origin_redirect": cross_origin_redirect,
                 "status_code": status_code,
+                "redirect_chain": redirect_chain,
                 "required_texts": surface.get("required_texts", []),
                 "missing_required_texts": missing,
                 "forbidden_texts": surface.get("forbidden_texts", []),

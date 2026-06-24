@@ -1,0 +1,36 @@
+{
+  "generated_at_utc": "2026-06-24T07:57:38.885741Z",
+  "status": "pass",
+  "verdict": "READY",
+  "completion_dir": "/docker/chummercomplete/chummer.run-services/.codex-studio/published",
+  "required_receipts": [
+    "PARTICIPATE_BILLING_AUTH_E2E.generated.json",
+    "PARTICIPATE_BILLING_UNAVAILABLE_E2E.generated.json"
+  ],
+  "failures": [],
+  "results": {
+    "billing_available": {
+      "generated_at_utc": "2026-06-24T07:57:26.255Z",
+      "status": "pass",
+      "base_url": "http://127.0.0.1:55455",
+      "guest_billing_status": 302,
+      "guest_billing_location": "/auth/google/start?next=%2Faccount%2Fbilling",
+      "guest_participate_status": 302,
+      "guest_participate_location": "/auth/google/start?next=%2Fpartizipate",
+      "signed_in_supporter_checkout_status": 302,
+      "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?external_user=usr-ada4b067cd84&email=runner%40example.com&membership_plan=supporter",
+      "signed_in_participate_proxy_verified": true,
+      "signed_in_identity_token_present": true,
+      "first_party_sign_in_redirect": true
+    },
+    "billing_unavailable": {
+      "generated_at_utc": "2026-06-24T07:57:37.953Z",
+      "status": "pass",
+      "base_url": "http://127.0.0.1:36505",
+      "board_sentinel": "board sentinel",
+      "supporter_link_count": 0,
+      "supporter_copy_visible": false,
+      "billing_state": "unavailable"
+    }
+  }
+}

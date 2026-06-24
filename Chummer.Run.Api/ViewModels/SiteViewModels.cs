@@ -106,8 +106,11 @@ public sealed record BillingMembershipPageViewModel(
     Chummer.Run.Contracts.Billing.BrilliantDirectoriesBillingPageDto? Page,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? FreePlan,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? SupporterPlan,
+    Chummer.Run.Contracts.Billing.MyFirstBookQuotaSnapshotDto? CurrentMyFirstBookQuota,
     string? UserId,
     string? Email,
+    string? SignedInLabel,
+    bool UsingSignedInAccount,
     bool Unavailable,
     string Heading,
     string Summary,
@@ -906,6 +909,7 @@ public sealed record RoadmapPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Horizons,
     IReadOnlyList<ProgramMilestoneSummaryViewModel> Milestones,
     PublicSignalLoopSnapshotViewModel SignalLoop,
+    string? HostedBoardHref = null,
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null);
 
@@ -961,6 +965,7 @@ public sealed record ParticipatePageViewModel(
     string PrivateHelpHref,
     string RoadmapHref,
     string ChangelogHref,
+    string? SupporterHref = null,
     string? HostedBoardHref = null,
     PublicSignalOperationsPacketViewModel? SignalOperations = null);
 
@@ -2140,6 +2145,33 @@ public sealed record SupportCaseTimelineHighlightViewModel(
     string Summary,
     string OccurredLabel);
 
+public sealed record OriginDossierPublicationViewModel(
+    string ProjectId,
+    string Title,
+    string RunnerAlias,
+    string PublicationState,
+    string? ChummerRunOwnerUrl,
+    string? BookArtifactUrl,
+    string? AudiobookshelfShareUrl,
+    string? DossierVideoUrl,
+    string? StorySceneCoverUrl,
+    bool ProviderAuthoredManuscriptImported,
+    bool UndetectableHumanizerApplied,
+    bool BookArtifactVerified,
+    bool DossierVideoVerified,
+    bool StorySceneCoverUsesSelectedCharacterFace,
+    bool AudiobookshelfPlaybackVerified,
+    bool TelegramShareDelivered,
+    bool RequiresAuthenticatedChummerRunUser,
+    bool GoldReady,
+    IReadOnlyList<string> MissingGoldRequirements);
+
+public sealed record OriginDossierPublicationDetailPageViewModel(
+    SiteChromeViewModel Chrome,
+    OriginDossierPublicationViewModel Publication,
+    string AccountHref,
+    string LibraryHref);
+
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
     string CurrentSection,
@@ -2163,6 +2195,7 @@ public sealed record AccountPageViewModel(
     string? SelectedWorkspacePrepLibraryQuery = null,
     RunProjection? SelectedRun = null,
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
+    IReadOnlyList<BuildGhostConciergeInsightProjection>? SelectedBuildLabInsights = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,
     CreatorPublicationProjection? SelectedCreatorPublication = null,
     HubDraftDetailProjection? SelectedCreatorPublicationDraftDetail = null,
@@ -2174,7 +2207,8 @@ public sealed record AccountPageViewModel(
     IReadOnlyList<ContributionReceiptDto>? ParticipationReceipts = null,
     IReadOnlyList<PublicPackageReceipt>? ParticipationPackageReceipts = null,
     IReadOnlyList<KarmaForgeSubmissionProjection>? ParticipationKarmaSubmissions = null,
-    IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationActivityReceipts = null);
+    IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationActivityReceipts = null,
+    IReadOnlyList<OriginDossierPublicationViewModel>? OriginDossierPublications = null);
 
 public sealed record AccountDesktopLaunchPageViewModel(
     SiteChromeViewModel Chrome,

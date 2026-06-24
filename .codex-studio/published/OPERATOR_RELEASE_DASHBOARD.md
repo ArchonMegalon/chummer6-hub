@@ -1,9 +1,9 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-23T08:52:35Z
-- Version: `run-258`
+- Generated: 2026-06-24T07:57:38Z
+- Version: `run-20260623-102621`
 - Channel: `public_stable`
-- Published: `2026-06-20T08:00:00Z`
+- Published: `2026-06-23T10:26:21Z`
 - Supportability: `gold_supported`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 
@@ -17,6 +17,7 @@
 - PASS `external_distribution_mirror_proof`: `pass`
 - INFO `final_gold_janitor`: `fail` (operator context, not release-blocking)
 - PASS `google_oauth_linking_proof`: `pass` (operator context, not release-blocking)
+- PASS `participate_billing_honesty`: `pass`
 - PASS `public_copy_leak_gate`: `pass`
 - PASS `release_channel`: `published`
 - PASS `release_ready`: `pass` (operator context, not release-blocking)

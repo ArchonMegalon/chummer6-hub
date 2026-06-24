@@ -39,7 +39,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("href: /partizipate", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("First-party route", participateView, StringComparison.Ordinal);
+        Assert.Contains("Votes and public discussion stay here on a first-party route.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("The board stays here. Open a separate tab only if your browser blocks the embed.", participateView, StringComparison.Ordinal);
 
@@ -53,5 +53,25 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("href: /partizipate", siblingNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", siblingNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", siblingNavigation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RoadmapRouteCanUseHostedProductLiftBoardWithoutLeavingFirstPartyChrome()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string roadmapView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml"));
+
+        Assert.Contains("ResolveProductLiftHostedRoadmapHref()", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolveProductLiftHostedRoadmapUri()", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/board\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("RoadmapBoardProxy", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer Roadmap", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("src=\"@Model.HostedBoardHref\"", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current work and planned work, one page.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Use the changelog for shipped changes.", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("planning surface", roadmapView, StringComparison.OrdinalIgnoreCase);
     }
 }

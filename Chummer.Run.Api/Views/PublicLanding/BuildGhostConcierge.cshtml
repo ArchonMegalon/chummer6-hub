@@ -130,6 +130,34 @@
     </div>
 </section>
 
+@if (projection.Insights.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Visual explanation</p>
+            <h2 class="editorial-title">See the shape before you commit to the path.</h2>
+            <p class="editorial-copy">These boards can make a recommendation easier to scan. They do not replace Chummer, and they do not decide what gets applied.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var insight in projection.Insights)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Chart</span>
+                    <h3>@SanitizePublicCopy(insight.Title)</h3>
+                    <p>@SanitizePublicCopy(insight.Summary)</p>
+                    <iframe
+                        title="@SanitizePublicCopy(insight.Title)"
+                        src="@insight.EmbedHref"
+                        loading="lazy"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        style="width:100%;min-height:420px;border:1px solid rgba(255,255,255,.12);border-radius:.85rem;background:rgba(9,14,19,.72);"></iframe>
+                    <a class="editorial-strip__action" href="@insight.OpenHref" target="_blank" rel="noreferrer">@SanitizePublicCopy(insight.ActionLabel)</a>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 @if (Model.SignedInBench is not null)
 {
     var signedInBench = Model.SignedInBench;

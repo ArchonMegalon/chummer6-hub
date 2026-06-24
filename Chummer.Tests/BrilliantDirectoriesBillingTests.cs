@@ -1,10 +1,14 @@
+using System.Net.Http.Headers;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Billing;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -21,6 +25,8 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Equal("Brilliant Directories", page.Provider);
         Assert.Equal("brilliant_directories", page.ProviderKey);
         Assert.Contains("same product", page.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, page.MyFirstBookQuotaPolicy.FreeMonthlyBooks);
+        Assert.Equal(2, page.MyFirstBookQuotaPolicy.SupporterMonthlyBooks);
         Assert.False(page.Capabilities.StoresTenantCredentials);
         Assert.False(page.Capabilities.GrantsPremiumFeatures);
         Assert.Equal("signed_membership_snapshot", page.Capabilities.SyncMode);
@@ -34,7 +40,176 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.True(supporter.IsSupporter);
         Assert.False(supporter.UnlocksProductFeatures);
         Assert.Equal("supporter_membership_marker", supporter.EntitlementEffect);
+        Assert.Contains("1 MyFirstBook origin book per month", free.Included);
+        Assert.Contains("2 MyFirstBook origin books per month", supporter.Included);
         Assert.Contains("do not unlock extra features yet", supporter.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(free.ExampleStoryBooks);
+        Assert.Equal("Origin Dossier", free.ExampleStoryBooks[0].Edition);
+        Assert.Contains("Debt Before Dawn", free.ExampleStoryBooks[0].Title, StringComparison.Ordinal);
+        Assert.Equal(2, supporter.ExampleStoryBooks.Count);
+        Assert.Contains("Narrative Origin", supporter.ExampleStoryBooks[0].Edition, StringComparison.Ordinal);
+        Assert.Contains("Runner Memoir", supporter.ExampleStoryBooks[1].Edition, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MyFirstBookQuotaDefaultsToFreeAllowance()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+
+        MyFirstBookQuotaSnapshotDto quota = service.GetMyFirstBookQuota("user-free", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("free", quota.PlanKey);
+        Assert.Equal(1, quota.MonthlyLimit);
+        Assert.Equal(0, quota.MonthlyUsed);
+        Assert.Equal(1, quota.MonthlyRemaining);
+    }
+
+    [Fact]
+    public void MyFirstBookQuotaUsesSupporterAllowanceAndFailsClosedAfterSecondBook()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "user-a",
+                MemberId: "bd-42",
+                Email: "runner@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        DateTimeOffset now = new(2026, 6, 24, 12, 0, 0, TimeSpan.Zero);
+        MyFirstBookQuotaConsumeResultDto first = service.ConsumeMyFirstBookQuota("user-a", now);
+        MyFirstBookQuotaConsumeResultDto second = service.ConsumeMyFirstBookQuota("user-a", now);
+
+        Assert.Equal(1, first.Quota.MonthlyRemaining);
+        Assert.Equal(0, second.Quota.MonthlyRemaining);
+        Assert.Equal(2, second.Quota.MonthlyUsed);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            service.ConsumeMyFirstBookQuota("user-a", now));
+        Assert.Contains("Monthly MyFirstBook allowance is exhausted", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BillingPagePreviewCarriesCurrentMyFirstBookQuota()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "user-a",
+                MemberId: "bd-42",
+                Email: "runner@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+        service.ConsumeMyFirstBookQuota("user-a", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.NotNull(model.CurrentMyFirstBookQuota);
+        Assert.Equal(2, model.CurrentMyFirstBookQuota!.MonthlyLimit);
+        Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyUsed);
+        Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyRemaining);
+        Assert.NotNull(model.FreePlan);
+        Assert.NotNull(model.SupporterPlan);
+        Assert.Single(model.FreePlan!.ExampleStoryBooks);
+        Assert.Equal(2, model.SupporterPlan!.ExampleStoryBooks.Count);
+        Assert.Contains("Origin Dossier", model.FreePlan.ExampleStoryBooks[0].Edition, StringComparison.Ordinal);
+        Assert.Contains("Runner Memoir", model.SupporterPlan.ExampleStoryBooks[1].Edition, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MyFirstBookQuotaApiReturns429WhenLimitIsExhausted()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service);
+
+        service.ConsumeMyFirstBookQuota("user-a", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> result = controller.ConsumeMyFirstBookQuota("user-a");
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task SignedInMyFirstBookQuotaEndpointReturnsCurrentUserQuota()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
+
+        ActionResult<MyFirstBookQuotaSnapshotDto> result = await controller.MyFirstBookQuotaForCurrentUser();
+
+        MyFirstBookQuotaSnapshotDto quota = Assert.IsType<MyFirstBookQuotaSnapshotDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(user.UserId, quota.UserId);
+        Assert.Equal("free", quota.PlanKey);
+        Assert.Equal(1, quota.MonthlyLimit);
+        Assert.Equal(1, quota.MonthlyRemaining);
+    }
+
+    [Fact]
+    public async Task SignedInMyFirstBookConsumeEndpointUsesCurrentUserAllowance()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: user.UserId,
+                MemberId: "bd-42",
+                Email: "runner@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> first = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
+        ActionResult<MyFirstBookQuotaConsumeResultDto> second = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
+        ActionResult<MyFirstBookQuotaConsumeResultDto> third = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
+
+        MyFirstBookQuotaConsumeResultDto firstPayload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(Assert.IsType<OkObjectResult>(first.Result).Value);
+        MyFirstBookQuotaConsumeResultDto secondPayload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(Assert.IsType<OkObjectResult>(second.Result).Value);
+        ObjectResult thirdProblem = Assert.IsType<ObjectResult>(third.Result);
+
+        Assert.Equal(1, firstPayload.Quota.MonthlyRemaining);
+        Assert.Equal(0, secondPayload.Quota.MonthlyRemaining);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, thirdProblem.StatusCode);
+    }
+
+    [Fact]
+    public async Task SignedInMyFirstBookEndpointsReturnUnauthorizedWhenNoSessionExists()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<MyFirstBookQuotaSnapshotDto> quota = await controller.MyFirstBookQuotaForCurrentUser();
+        ActionResult<MyFirstBookQuotaConsumeResultDto> consume = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(quota.Result).StatusCode);
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(consume.Result).StatusCode);
     }
 
     [Fact]
@@ -154,7 +329,7 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
             })
             .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
 
         BrilliantDirectoriesBillingUnavailableException ex = Assert.Throws<BrilliantDirectoriesBillingUnavailableException>(() =>
             service.CreateSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", null)));
@@ -163,16 +338,9 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public void BillingPageReturnsServiceUnavailableInsteadOfThrowingWhenConfigurationIsMissing()
+    public async Task BillingPageWithoutAttachedUserRedirectsToFirstPartySignIn()
     {
-        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
-            })
-            .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
         {
             ControllerContext = new ControllerContext
@@ -181,7 +349,32 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        IActionResult result = controller.BillingPage();
+        IActionResult result = await controller.BillingPage();
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+    }
+
+    [Fact]
+    public async Task BillingPageReturnsServiceUnavailableInsteadOfThrowingWhenConfigurationIsMissing()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+            })
+            .Build();
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, controller.Response.StatusCode);
@@ -201,7 +394,7 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
             })
             .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
         BrilliantDirectoriesBillingController controller = new(service);
 
         ActionResult<BrilliantDirectoriesBillingPageDto> result = controller.BillingProjection();
@@ -211,7 +404,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public void SupporterCheckoutFormReturnsServiceUnavailableWhenConfigurationIsMissing()
+    public async Task SupporterCheckoutFormReturnsServiceUnavailableWhenConfigurationIsMissing()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
         IConfiguration configuration = new ConfigurationBuilder()
@@ -220,13 +413,49 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
             })
             .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
         BrilliantDirectoriesBillingController controller = new(service);
 
-        IActionResult result = controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
+        IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
 
         ObjectResult problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task SupporterCheckoutWithoutAttachedUserRedirectsToFirstPartySignIn()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("", "runner@example.com"));
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+    }
+
+    [Fact]
+    public async Task DirectSupporterCheckoutWithoutAttachedUserRedirectsToFirstPartySignIn()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.StartSupporterCheckoutDirect();
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling%2Fsupporter%2Fstart", redirect.Url);
     }
 
     [Fact]
@@ -239,7 +468,7 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
             })
             .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
         BrilliantDirectoriesBillingController controller = new(service);
 
         ActionResult<BrilliantDirectoriesCheckoutResponseDto> result = controller.StartSupporterCheckoutApi(
@@ -296,7 +525,7 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
             })
             .Build();
-        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), configuration);
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
 
         BrilliantDirectoriesBillingUnavailableException ex = Assert.Throws<BrilliantDirectoriesBillingUnavailableException>(() =>
             service.CreateSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", null)));
@@ -318,10 +547,57 @@ public sealed class BrilliantDirectoriesBillingTests
                 ["BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER"] = "contact",
                 ["BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER"] = "membership_plan",
                 ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
-                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json"),
+                ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(root, "myfirstbook.json")
             })
             .Build();
         BrilliantDirectoriesBillingStore store = new(configuration);
-        return new BrilliantDirectoriesBillingService(store, configuration);
+        MyFirstBookUsageStore usageStore = new(configuration);
+        return new BrilliantDirectoriesBillingService(store, usageStore, configuration);
+    }
+
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User) CreateAuthenticatedController(
+        BrilliantDirectoriesBillingService service,
+        string email)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.test"
+            })
+            .Build();
+        CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+        AccountService accounts = new(communityStore);
+        HubIdentitySubjectCache cache = new();
+        const string accessToken = "test-access-token";
+        cache.Set(
+            "https://identity.example.test",
+            accessToken,
+            new AuthenticatedHubSubject(
+                SubjectId: "sub-auth",
+                DisplayName: "Runner",
+                Email: email,
+                Roles: Array.Empty<string>(),
+                AccessToken: accessToken),
+            TimeSpan.FromMinutes(5));
+        HubIdentityClient identity = new(new HttpClient(), configuration, NullLogger<HubIdentityClient>.Instance, cache);
+
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken).ToString();
+
+        accounts.EnsureUser("sub-auth", "Runner", email);
+        HubUserDto? ensured = accounts.GetBySubject("sub-auth");
+        Assert.NotNull(ensured);
+        BrilliantDirectoriesBillingController controller = new(service, identity, accounts)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+
+        return (controller, ensured!);
     }
 }

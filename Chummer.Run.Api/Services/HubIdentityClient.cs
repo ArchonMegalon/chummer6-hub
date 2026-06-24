@@ -107,6 +107,11 @@ public sealed class HubIdentityClient
     public async Task<AuthenticatedHubSubject> RequireSubjectAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         var accessToken = ExtractBearerToken(request);
+        if (TryResolveLocalSeededSubject(request, accessToken, out AuthenticatedHubSubject? localSubject))
+        {
+            return localSubject!;
+        }
+
         if (_subjectCache.TryGet(BaseUrl, accessToken, out AuthenticatedHubSubject? cachedSubject))
         {
             return cachedSubject!;
@@ -279,6 +284,72 @@ public sealed class HubIdentityClient
 
         throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
     }
+
+    private bool TryResolveLocalSeededSubject(HttpRequest request, string accessToken, out AuthenticatedHubSubject? subject)
+    {
+        subject = null;
+        if (!IsLoopbackRequest(request))
+        {
+            return false;
+        }
+
+        string configuredToken = (_configuration["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(configuredToken)
+            || !string.Equals(configuredToken, accessToken, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string subjectId = (_configuration["CHUMMER_LOCAL_E2E_SUBJECT_ID"] ?? "subject.demo").Trim();
+        if (string.IsNullOrWhiteSpace(subjectId))
+        {
+            subjectId = "subject.demo";
+        }
+
+        string? displayName = TrimToNull(_configuration["CHUMMER_LOCAL_E2E_DISPLAY_NAME"]) ?? "Runner Demo";
+        string? email = TrimToNull(_configuration["CHUMMER_LOCAL_E2E_EMAIL"]) ?? "runner@example.invalid";
+        IReadOnlyList<string> roles = ParseRoles(_configuration["CHUMMER_LOCAL_E2E_ROLES"]);
+
+        subject = new AuthenticatedHubSubject(
+            subjectId,
+            displayName,
+            email,
+            roles,
+            accessToken);
+        return true;
+    }
+
+    private static bool IsLoopbackRequest(HttpRequest request)
+    {
+        if (request.HttpContext.Connection.RemoteIpAddress is { } remoteIp && IPAddress.IsLoopback(remoteIp))
+        {
+            return true;
+        }
+
+        string host = request.Host.Host?.Trim() ?? string.Empty;
+        return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<string> ParseRoles(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return ["player"];
+        }
+
+        string[] roles = configured
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static role => !string.IsNullOrWhiteSpace(role))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return roles.Length == 0 ? ["player"] : roles;
+    }
+
+    private static string? TrimToNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {

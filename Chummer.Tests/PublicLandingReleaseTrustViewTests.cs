@@ -12,8 +12,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Install Chummer", view, StringComparison.Ordinal);
         Assert.Contains("Windows and Linux installers.", view, StringComparison.Ordinal);
-        Assert.Contains("Current stable build", view, StringComparison.Ordinal);
-        Assert.Contains("Latest published build", view, StringComparison.Ordinal);
+        Assert.Contains("Current build", view, StringComparison.Ordinal);
+        Assert.Contains("Newest build", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
@@ -91,7 +91,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the newest Windows or Linux release.", view, StringComparison.Ordinal);
+        Assert.Contains("Use this when you want the latest Windows or Linux build.", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
@@ -124,7 +124,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Pick another installer", view, StringComparison.Ordinal);
         Assert.Contains("Manage linked devices", view, StringComparison.Ordinal);
-        Assert.Contains("See the current build", view, StringComparison.Ordinal);
+        Assert.Contains("See the latest update", view, StringComparison.Ordinal);
         Assert.Contains("Get help when setup stalls", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
         Assert.Contains("Current release", view, StringComparison.Ordinal);
@@ -343,7 +343,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the newest Windows or Linux release.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Use this when you want the latest Windows or Linux build.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);
@@ -998,7 +998,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("auth-value-strip", view, StringComparison.Ordinal);
         Assert.Contains("Linked installs", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access", view, StringComparison.Ordinal);
-        Assert.Contains("The binary stays the same for everyone.", view, StringComparison.Ordinal);
+        Assert.Contains("The download stays the same for everyone.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1023,7 +1023,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
-        Assert.Contains("Keep Chummer open while the browser finishes connecting this copy.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep Chummer open while the browser connects this copy.", view, StringComparison.Ordinal);
         Assert.Contains("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("manual open button", view, StringComparison.OrdinalIgnoreCase);
     }

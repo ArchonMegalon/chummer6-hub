@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -167,6 +168,33 @@ public sealed class HubBrowserAuthService
         return trimmed.StartsWith("/", StringComparison.Ordinal) && !trimmed.StartsWith("//", StringComparison.Ordinal)
             ? trimmed
             : fallback;
+    }
+
+    public static bool ShouldExposeInlinePreviewLink(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.Host.Host is { Length: > 0 } host
+            && (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        IPAddress? remote = request.HttpContext.Connection.RemoteIpAddress;
+        IPAddress? local = request.HttpContext.Connection.LocalIpAddress;
+        if (remote is null)
+        {
+            return false;
+        }
+
+        if (IPAddress.IsLoopback(remote))
+        {
+            return true;
+        }
+
+        return local is not null && remote.Equals(local);
     }
 
     private static bool ShouldUseSecureCookies(HttpRequest request)

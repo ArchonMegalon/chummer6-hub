@@ -1,10 +1,14 @@
 @model BillingMembershipPageViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     Layout = null;
     var title = Model.Heading;
     var free = Model.FreePlan;
     var supporter = Model.SupporterPlan;
     var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
+    var usingSignedInAccount = Model.UsingSignedInAccount && hasUserId;
+    var quota = Model.CurrentMyFirstBookQuota;
+    var antiForgery = Antiforgery.GetAndStoreTokens(Context);
 }
 <!doctype html>
 <html lang="en">
@@ -63,6 +67,17 @@
         ul { margin: 0; padding-left: 1rem; color: var(--muted); display: grid; gap: 0.45rem; }
         .note, .field-help { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
         .action-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        .story-examples { display: grid; gap: 0.75rem; }
+        .story-example {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.85rem;
+            background: rgba(255,255,255,0.02);
+            display: grid;
+            gap: 0.35rem;
+        }
+        .story-example h3 { font-size: 1rem; }
+        .story-meta { color: var(--accent); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
         a.button, button.button {
             appearance: none;
             border: 1px solid var(--border);
@@ -106,6 +121,15 @@
         <h1>@Model.Heading</h1>
         <p class="summary">@Model.Summary</p>
         <div class="pill">Supporter is appreciation, not extra access.</div>
+        <div class="pill">MyFirstBook: Free gets 1 book per month. Supporter gets 2.</div>
+        @if (usingSignedInAccount)
+        {
+            <div class="pill">Signed in as @(string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel)</div>
+        }
+        @if (quota is not null)
+        {
+            <div class="pill">This account: @quota.MonthlyUsed / @quota.MonthlyLimit MyFirstBook books used this month</div>
+        }
     </section>
 
     @if (Model.Unavailable)
@@ -133,6 +157,20 @@
                             <li>@item</li>
                         }
                     </ul>
+                    @if (free.ExampleStoryBooks.Count > 0)
+                    {
+                        <div class="story-examples">
+                            @foreach (var example in free.ExampleStoryBooks)
+                            {
+                                <article class="story-example">
+                                    <p class="story-meta">@example.Edition</p>
+                                    <h3>@example.Title</h3>
+                                    <p class="note">@example.StoryHook</p>
+                                    <p class="field-help">@example.WhyItFits</p>
+                                </article>
+                            }
+                        </div>
+                    }
                     <div class="action-row">
                         <a class="button" href="@free.PrimaryAction.Href">@free.PrimaryAction.Label</a>
                     </div>
@@ -150,11 +188,26 @@
                             <li>@item</li>
                         }
                     </ul>
+                    @if (supporter.ExampleStoryBooks.Count > 0)
+                    {
+                        <div class="story-examples">
+                            @foreach (var example in supporter.ExampleStoryBooks)
+                            {
+                                <article class="story-example">
+                                    <p class="story-meta">@example.Edition</p>
+                                    <h3>@example.Title</h3>
+                                    <p class="note">@example.StoryHook</p>
+                                    <p class="field-help">@example.WhyItFits</p>
+                                </article>
+                            }
+                        </div>
+                    }
                     <form class="form-grid" method="post" action="/account/billing/supporter">
+                        <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
                         @if (hasUserId)
                         {
                             <input type="hidden" name="userId" value="@Model.UserId">
-                            <div class="pill">Account ID: @Model.UserId</div>
+                            <div class="pill">Account attached: @Model.UserId</div>
                         }
                         else
                         {
@@ -167,7 +220,7 @@
                             Email
                             <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
                         </label>
-                        <p class="field-help">This opens the external billing checkout. Supporter currently unlocks no extra features beyond Free.</p>
+                        <p class="field-help">This opens the external billing checkout. Signed-in Chummer accounts go through directly. Supporter currently unlocks no extra features beyond Free.</p>
                         <div class="action-row">
                             <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
                             <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>

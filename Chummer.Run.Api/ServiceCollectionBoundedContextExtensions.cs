@@ -77,7 +77,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
         services.AddSingleton<BrilliantDirectoriesBillingStore>();
+        services.AddSingleton<MyFirstBookUsageStore>();
         services.AddSingleton<BrilliantDirectoriesBillingService>();
+        services.AddSingleton<OriginDossierPublicationService>();
         services.AddSingleton<PayFunnelsBillingStore>();
         services.AddSingleton<PayFunnelsBillingService>();
         services.AddSingleton<LeaderboardService>();

@@ -25,9 +25,9 @@ const checks = [
     url: `${baseUrl}/`,
     assert: text =>
       text.includes('Chummer') &&
-      text.includes('Stable') &&
-      text.includes('Nightly') &&
-      text.includes('What it does') &&
+      text.includes('Download Chummer') &&
+      text.includes('Windows and Linux.') &&
+      text.includes('Watch 90 sec') &&
       requiredLandingLinks.every(link => text.includes(link))
   },
   {
@@ -35,8 +35,8 @@ const checks = [
     assert: text =>
       text.includes('Install Chummer')
       && text.includes('Windows and Linux installers.')
-      && text.includes('Current stable build')
-      && text.includes('Latest published build')
+      && text.includes('Current build')
+      && text.includes('Newest build')
       && text.includes('Windows')
       && text.includes('Linux')
   },
@@ -57,12 +57,22 @@ const checks = [
       && text.includes('Product bug')
   },
   {
+    url: `${baseUrl}/partizipate`,
+    assert: text =>
+      text.includes('Participate')
+      && text.includes('Tell us what slows the table down.')
+      && text.includes('Public board')
+      && !text.includes('ProductLift')
+  },
+  {
     url: `${baseUrl}/what-is-chummer`,
     assert: text => text.includes('What Is Chummer?')
   },
   {
     url: `${baseUrl}/artifacts`,
-    assert: text => text.includes('Artifacts')
+    assert: text =>
+      text.includes('Detail gallery')
+      && text.includes('Use this page for dossiers, recaps, and release details.')
   },
   {
     url: `${baseUrl}/faq`,
@@ -103,7 +113,7 @@ const checks = [
     assert: (text, response) =>
       /\/status\/?$/.test(response.url)
       && text.includes('Current release')
-      && text.includes('Checks passed')
+      && text.includes('Updated')
   }
 ];
 

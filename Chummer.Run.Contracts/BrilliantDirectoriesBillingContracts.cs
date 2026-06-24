@@ -19,6 +19,12 @@ public sealed record BillingPlanActionDto(
     string Href,
     string Method);
 
+public sealed record BillingTierExampleStoryDto(
+    string Title,
+    string Edition,
+    string StoryHook,
+    string WhyItFits);
+
 public sealed record BillingPlanCardDto(
     string PlanKey,
     string Name,
@@ -28,6 +34,7 @@ public sealed record BillingPlanCardDto(
     bool UnlocksProductFeatures,
     string EntitlementEffect,
     IReadOnlyList<string> Included,
+    IReadOnlyList<BillingTierExampleStoryDto> ExampleStoryBooks,
     BillingPlanActionDto PrimaryAction);
 
 public sealed record BillingProviderCapabilitiesDto(
@@ -39,11 +46,31 @@ public sealed record BillingProviderCapabilitiesDto(
     IReadOnlyList<string> SupportedPlanKeys,
     IReadOnlyList<string> SupportedMembershipStatuses);
 
+public sealed record MyFirstBookQuotaPolicyDto(
+    int FreeMonthlyBooks,
+    int SupporterMonthlyBooks);
+
+public sealed record MyFirstBookQuotaSnapshotDto(
+    string UserId,
+    string PlanKey,
+    string PlanName,
+    bool SupporterActive,
+    int MonthlyLimit,
+    int MonthlyUsed,
+    int MonthlyRemaining,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc);
+
+public sealed record MyFirstBookQuotaConsumeResultDto(
+    string Status,
+    MyFirstBookQuotaSnapshotDto Quota);
+
 public sealed record BrilliantDirectoriesBillingPageDto(
     string Provider,
     string ProviderKey,
     string Heading,
     string Summary,
+    MyFirstBookQuotaPolicyDto MyFirstBookQuotaPolicy,
     BillingProviderCapabilitiesDto Capabilities,
     IReadOnlyList<BillingPlanCardDto> Plans,
     string ManageMembershipHref);

@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -70,6 +71,58 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn('MapPost("/api/desktop-analytics/track"', source)
         self.assertIn("DesktopAnalyticsBridgeService", source)
         self.assertIn("Desktop analytics validation failed.", source)
+
+    def test_rybbit_proxy_uses_request_and_response_header_allowlists(self) -> None:
+        source = PROGRAM_PATH.read_text(encoding="utf-8")
+        self.assertIn("ShouldForwardRybbitRequestHeader", source)
+        self.assertIn("ShouldForwardRybbitResponseHeader", source)
+        self.assertIn('HashSet<string> RybbitAllowedRequestHeaders', source)
+        self.assertIn('HashSet<string> RybbitAllowedResponseHeaders', source)
+        self.assertIn('"Cookie"', source)
+        self.assertIn('"Authorization"', source)
+        self.assertIn('"Set-Cookie"', source)
+        self.assertIn('builder.Services.AddHttpClient("RybbitProxy"', source)
+        self.assertIn('CreateClient("RybbitProxy")', source)
+        self.assertNotIn("using var client = new HttpClient();", source)
+
+        allowed_request_headers = self._read_csharp_string_set(source, "RybbitAllowedRequestHeaders")
+        blocked_request_headers = self._read_csharp_string_set(source, "RybbitBlockedRequestHeaders")
+        allowed_response_headers = self._read_csharp_string_set(source, "RybbitAllowedResponseHeaders")
+        blocked_response_headers = self._read_csharp_string_set(source, "RybbitBlockedResponseHeaders")
+
+        self.assertNotIn("Cookie", allowed_request_headers)
+        self.assertNotIn("Authorization", allowed_request_headers)
+        self.assertNotIn("Proxy-Authorization", allowed_request_headers)
+        self.assertNotIn("X-Forwarded-For", allowed_request_headers)
+        self.assertNotIn("Forwarded", allowed_request_headers)
+        self.assertIn("Cookie", blocked_request_headers)
+        self.assertIn("Authorization", blocked_request_headers)
+        self.assertIn("Proxy-Authorization", blocked_request_headers)
+        self.assertIn("X-Forwarded-For", blocked_request_headers)
+        self.assertIn("Forwarded", blocked_request_headers)
+
+        self.assertNotIn("Set-Cookie", allowed_response_headers)
+        self.assertNotIn("Proxy-Authenticate", allowed_response_headers)
+        self.assertIn("Set-Cookie", blocked_response_headers)
+        self.assertIn("Proxy-Authenticate", blocked_response_headers)
+        self.assertIn("return RybbitAllowedRequestHeaders.Contains(headerName);", source)
+        self.assertIn("return RybbitAllowedResponseHeaders.Contains(headerName);", source)
+        self.assertIn("NormalizeRybbitProxyPath(proxyPath)", source)
+        self.assertIn("catch (UriFormatException)", source)
+        self.assertIn("escapedSegments.Add(Uri.EscapeDataString(unescapedSegment));", source)
+        self.assertIn('normalized.Contains("://", StringComparison.Ordinal)', source)
+        self.assertIn('segment.Equals("..", StringComparison.Ordinal)', source)
+
+    @staticmethod
+    def _read_csharp_string_set(source: str, set_name: str) -> set[str]:
+        match = re.search(
+            rf"HashSet<string>\s+{re.escape(set_name)}\s*=\s*new\([^)]*\)\s*\{{(?P<body>.*?)\}};",
+            source,
+            flags=re.DOTALL,
+        )
+        if not match:
+            raise AssertionError(f"missing C# string set: {set_name}")
+        return set(re.findall(r'"([^"]+)"', match.group("body")))
 
     def test_desktop_analytics_bridge_requires_dedicated_desktop_site_id_and_restricts_http_to_local_hosts(self) -> None:
         source = (REPO_ROOT / "Chummer.Run.Api" / "Services" / "DesktopAnalyticsBridgeService.cs").read_text(encoding="utf-8")
