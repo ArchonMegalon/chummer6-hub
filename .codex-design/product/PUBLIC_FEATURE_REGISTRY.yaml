@@ -599,17 +599,17 @@ cards:
     status_chips: Clone and pin refs|Codesign and notarize|Publish and check live release
   - id: artifact_rules_explanation
     bucket: featured_artifacts
-    title: Explanation trail
-    summary: The explanation view shows how Chummer explains a result instead of hiding the path.
-    href: /now#real-rules-truth
+    title: Rules explanation
+    summary: See the calculation behind a result when the sheet changes.
+    href: /rules/explanations
     badge: Available today
     audience: public
     image_family: simulation_bench
     asset_slot: capability_check_rules
-    detail_route: /artifacts/explanation-path
-    action_label: See the explanation trail
-    detail_primary_href: /now#real-rules-truth
-    detail_primary_label: See the explanation
+    detail_route: /rules/explanations
+    action_label: Open rules explanation
+    detail_primary_href: /rules/explanations
+    detail_primary_label: Open rules explanation
   - id: artifact_runsite_pack
     bucket: featured_artifacts
     title: Runsite pack

@@ -12,6 +12,7 @@ PUBLIC_LANDING_CONTROLLER_PATH = REPO_ROOT / "Chummer.Run.Api" / "Controllers" /
 KNOWLEDGE_FABRIC_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "KnowledgeFabricService.cs"
 NEXUS_PAN_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "NexusPanContinuityService.cs"
 PUBLIC_LANDING_MANIFEST_PATH = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MANIFEST.yaml"
+PUBLIC_FEATURE_REGISTRY_PATH = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_FEATURE_REGISTRY.yaml"
 
 
 class PublicShellAnalyticsHooksTests(unittest.TestCase):
@@ -122,6 +123,7 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         knowledge = KNOWLEDGE_FABRIC_SERVICE_PATH.read_text(encoding="utf-8")
         nexus = NEXUS_PAN_SERVICE_PATH.read_text(encoding="utf-8")
         manifest = PUBLIC_LANDING_MANIFEST_PATH.read_text(encoding="utf-8")
+        registry = PUBLIC_FEATURE_REGISTRY_PATH.read_text(encoding="utf-8")
 
         for alias in [
             '[HttpGet("/rules/explanations")]',
@@ -192,6 +194,9 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
             "/living-world/watch_package_posture.md",
         ]:
             self.assertIn(clean_path, controller + "\n" + knowledge + "\n" + nexus)
+
+        self.assertIn("detail_route: /rules/explanations", registry)
+        self.assertNotIn("/artifacts/explanation-path", registry)
 
         for public_route in [
             "/jackpoint/briefing-network",
