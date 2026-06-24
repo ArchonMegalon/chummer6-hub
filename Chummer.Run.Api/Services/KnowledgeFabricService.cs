@@ -12,7 +12,7 @@ public sealed class KnowledgeFabricService
             Topic: "SR5 initiative explain",
             Summary: "Shows the bounded modifier trail for initiative posture without copying official sourcebook text.",
             Provenance: "Chummer rules runtime + public-safe explain summary",
-            Route: "/rules/receipts/kf_explain_initiative_sr5.json",
+            Route: "/rules/explanations/kf_explain_initiative_sr5.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "knowledge_fabric",
@@ -26,7 +26,7 @@ public sealed class KnowledgeFabricService
             Topic: "Armor stack provenance",
             Summary: "Names where the answer came from and where the public-safe boundary stops.",
             Provenance: "Capability receipt + provenance label",
-            Route: "/rules/receipts/kf_provenance_armor_stack.json",
+            Route: "/rules/explanations/kf_provenance_armor_stack.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "knowledge_fabric",
@@ -40,7 +40,7 @@ public sealed class KnowledgeFabricService
             Topic: "House-rule boundary",
             Summary: "Shows how Chummer distinguishes canon-facing runtime truth from a table-local amendment package.",
             Provenance: "Package posture + explain receipt",
-            Route: "/rules/receipts/kf_house_rule_boundary.json",
+            Route: "/rules/explanations/kf_house_rule_boundary.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "knowledge_fabric",

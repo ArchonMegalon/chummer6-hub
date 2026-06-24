@@ -13,7 +13,7 @@ public sealed class NexusPanContinuityService
             ReceiptId: "nexus_claimed_install_posture",
             Topic: "Claimed install posture",
             Summary: "Shows how claimed installs stay tied to Chummer account truth instead of drifting into screenshots or loose docs.",
-            Route: "/play/continuity/receipts/nexus_claimed_install_posture.json",
+            Route: "/play/continuity/history/nexus_claimed_install_posture.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "nexus_pan",
@@ -26,7 +26,7 @@ public sealed class NexusPanContinuityService
             ReceiptId: "nexus_reconnect_handoff",
             Topic: "Reconnect handoff",
             Summary: "Names the next-safe-action handoff when mobile continuity and browser return paths need to survive device drift.",
-            Route: "/play/continuity/receipts/nexus_reconnect_handoff.json",
+            Route: "/play/continuity/history/nexus_reconnect_handoff.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "nexus_pan",
@@ -39,7 +39,7 @@ public sealed class NexusPanContinuityService
             ReceiptId: "nexus_runboard_boundary",
             Topic: "Runboard continuity boundary",
             Summary: "Keeps the public lane honest about what it previews and what still belongs on signed-in workspace rails.",
-            Route: "/play/continuity/receipts/nexus_runboard_boundary.json",
+            Route: "/play/continuity/history/nexus_runboard_boundary.json",
             Status: "live",
             Envelope: ReceiptEnvelopeFactory.Runtime(
                 receiptKind: "nexus_pan",
@@ -159,7 +159,7 @@ public sealed class NexusPanContinuityService
             summary = "Mobile and PWA continuity keeps claimed installs, reconnect posture, and next-safe-action rails visible without pretending the public lane is a private device console.",
             install_route = "/downloads",
             continuity_route = "/play/continuity",
-            receipt_index_route = "/play/continuity/receipts",
+            receipt_index_route = "/play/continuity/history",
             claimed_installations = summary.ActiveInstallationCount,
             active_grants = summary.ActiveGrantCount,
             pending_claims = summary.PendingClaimCount,

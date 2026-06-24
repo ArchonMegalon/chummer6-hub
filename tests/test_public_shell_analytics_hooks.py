@@ -8,6 +8,9 @@ LAYOUT_PATH = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_Layout.csht
 ENV_EXAMPLE_PATH = REPO_ROOT / ".env.example"
 PUBLIC_EDGE_COMPOSE_PATH = REPO_ROOT / "docker-compose.public-edge.yml"
 PROGRAM_PATH = REPO_ROOT / "Chummer.Run.Api" / "Program.cs"
+PUBLIC_LANDING_CONTROLLER_PATH = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
+KNOWLEDGE_FABRIC_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "KnowledgeFabricService.cs"
+NEXUS_PAN_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "NexusPanContinuityService.cs"
 
 
 class PublicShellAnalyticsHooksTests(unittest.TestCase):
@@ -112,6 +115,81 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn("escapedSegments.Add(Uri.EscapeDataString(unescapedSegment));", source)
         self.assertIn('normalized.Contains("://", StringComparison.Ordinal)', source)
         self.assertIn('segment.Equals("..", StringComparison.Ordinal)', source)
+
+    def test_public_horizon_actions_use_clean_detail_aliases(self) -> None:
+        controller = PUBLIC_LANDING_CONTROLLER_PATH.read_text(encoding="utf-8")
+        knowledge = KNOWLEDGE_FABRIC_SERVICE_PATH.read_text(encoding="utf-8")
+        nexus = NEXUS_PAN_SERVICE_PATH.read_text(encoding="utf-8")
+
+        for alias in [
+            '[HttpGet("/rules/explanations")]',
+            '[HttpGet("/rules/explanations/{receiptId}.json")]',
+            '[HttpGet("/play/continuity/history")]',
+            '[HttpGet("/play/continuity/history/{receiptId}.json")]',
+            '[HttpGet("/runsites/prep-network")]',
+            '[HttpGet("/run-control/control-network")]',
+            '[HttpGet("/passport/identity-network")]',
+            '[HttpGet("/passport/{receiptId}.md")]',
+            '[HttpGet("/signal-deck/{receiptId}.md")]',
+            '[HttpGet("/living-world/{receiptId}.md")]',
+        ]:
+            self.assertIn(alias, controller)
+
+        for legacy_route in [
+            '[HttpGet("/rules/receipts")]',
+            '[HttpGet("/play/continuity/receipts")]',
+            '[HttpGet("/runsites/receipts/prep-network.json")]',
+            '[HttpGet("/run-control/receipts/control-network.json")]',
+            '[HttpGet("/passport/receipts/identity-network.json")]',
+            '[HttpGet("/signal-deck/receipts/{receiptId}.md")]',
+            '[HttpGet("/living-world/receipts/{receiptId}.md")]',
+        ]:
+            self.assertIn(legacy_route, controller)
+
+        visible_controller_lines = [
+            line for line in controller.splitlines()
+            if "new TrustPageActionViewModel(" in line
+            or "Href:" in line
+            or "ExplainReceiptHref =" in line
+            or "MarkdownHref =" in line
+            or "JsonHref =" in line
+        ]
+        visible_text = "\n".join(visible_controller_lines)
+        service_visible_text = "\n".join(
+            line for line in (knowledge + "\n" + nexus).splitlines()
+            if "Route:" in line or "receipt_index_route" in line
+        )
+
+        for old_path in [
+            "/rules/receipts",
+            "/play/continuity/receipts",
+            "/jackpoint/receipts/briefing-network.json",
+            "/runsites/receipts/prep-network.json",
+            "/onramp/receipts/guided-starter.json",
+            "/edition-studio/receipts/ruleset-heads.json",
+            "/local-co-processor/receipts/optional-acceleration.json",
+            "/run-control/receipts/control-network.json",
+            "/quicksilver/receipts/command-network.json",
+            "/community/receipts/open-run-network.json",
+            "/creator/receipts/publication-network.json",
+            "/passport/receipts/runner_return_posture",
+            "/signal-deck/receipts/pressure_posture",
+            "/living-world/receipts/watch_package_posture",
+        ]:
+            self.assertNotIn(old_path, visible_text)
+            self.assertNotIn(old_path, service_visible_text)
+
+        for clean_path in [
+            "/rules/explanations",
+            "/play/continuity/history",
+            "/jackpoint/briefing-network",
+            "/runsites/prep-network",
+            "/run-control/control-network",
+            "/passport/runner_return_posture.md",
+            "/signal-deck/pressure_posture.md",
+            "/living-world/watch_package_posture.md",
+        ]:
+            self.assertIn(clean_path, controller + "\n" + knowledge + "\n" + nexus)
 
     @staticmethod
     def _read_csharp_string_set(source: str, set_name: str) -> set[str]:

@@ -1321,11 +1321,13 @@ public sealed class PublicLandingController : Controller
     public IActionResult AnarchyExportJson()
         => Content(_waveEightHorizons.BuildAnarchyExportJson(), "application/json");
 
+    [HttpGet("/anarchy/explain")]
     [HttpGet("/anarchy/receipts/explain.json")]
     [Produces("application/json")]
     public IActionResult AnarchyExplainReceiptJson()
         => Content(_waveEightHorizons.BuildAnarchyExplainJson(), "application/json");
 
+    [HttpGet("/anarchy/runtime")]
     [HttpGet("/anarchy/receipts/runtime.json")]
     [Produces("application/json")]
     public IActionResult AnarchyRuntimeReceiptJson()
@@ -1347,7 +1349,7 @@ public sealed class PublicLandingController : Controller
             ExportLane = new
             {
                 ExportJsonHref = "/anarchy/export/runner.json",
-                ExplainReceiptHref = "/anarchy/receipts/explain.json",
+                ExplainReceiptHref = "/anarchy/explain",
                 ExplainReceiptId = explain.ReceiptId
             },
             PublicProfile = new
@@ -2962,11 +2964,13 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult KnowledgeAliasPage()
         => Redirect("/rules");
 
+    [HttpGet("/rules/explanations")]
     [HttpGet("/rules/receipts")]
     [Produces("application/json")]
     public IActionResult KnowledgeFabricReceiptIndex()
         => Content(_knowledgeFabric.BuildIndexJson(), "application/json");
 
+    [HttpGet("/rules/explanations/{receiptId}.json")]
     [HttpGet("/rules/receipts/{receiptId}.json")]
     [Produces("application/json")]
     public IActionResult KnowledgeFabricReceiptJson([FromRoute] string receiptId)
@@ -2981,11 +2985,13 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult NexusPanRoadmapAlias()
         => Redirect("/play/continuity");
 
+    [HttpGet("/play/continuity/history")]
     [HttpGet("/play/continuity/receipts")]
     [Produces("application/json")]
     public IActionResult NexusPanReceiptIndex()
         => Content(_nexusPan.BuildIndexJson(), "application/json");
 
+    [HttpGet("/play/continuity/history/{receiptId}.json")]
     [HttpGet("/play/continuity/receipts/{receiptId}.json")]
     [Produces("application/json")]
     public IActionResult NexusPanReceiptJson([FromRoute] string receiptId)
@@ -3161,6 +3167,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> JackpointPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildJackpointPageModel(cancellationToken));
 
+    [HttpGet("/jackpoint/briefing-network")]
     [HttpGet("/jackpoint/receipts/briefing-network.json")]
     [Produces("application/json")]
     public IActionResult JackpointReceiptJson()
@@ -3222,6 +3229,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> RunsitePreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunsitePageModel(cancellationToken));
 
+    [HttpGet("/runsites/prep-network")]
     [HttpGet("/runsites/receipts/prep-network.json")]
     [Produces("application/json")]
     public IActionResult RunsiteReceiptJson()
@@ -3281,6 +3289,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> OnrampPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildOnrampPageModel(cancellationToken));
 
+    [HttpGet("/onramp/guided-starter")]
     [HttpGet("/onramp/receipts/guided-starter.json")]
     [Produces("application/json")]
     public async Task<IActionResult> OnrampReceiptJson(CancellationToken cancellationToken)
@@ -3319,6 +3328,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> EditionStudioPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildEditionStudioPageModel(cancellationToken));
 
+    [HttpGet("/edition-studio/ruleset-heads")]
     [HttpGet("/edition-studio/receipts/ruleset-heads.json")]
     [Produces("application/json")]
     public async Task<IActionResult> EditionStudioReceiptJson(CancellationToken cancellationToken)
@@ -3357,6 +3367,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> LocalCoProcessorPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildLocalCoProcessorPageModel(cancellationToken));
 
+    [HttpGet("/local-co-processor/optional-acceleration")]
     [HttpGet("/local-co-processor/receipts/optional-acceleration.json")]
     [Produces("application/json")]
     public async Task<IActionResult> LocalCoProcessorReceiptJson(CancellationToken cancellationToken)
@@ -3395,6 +3406,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> RunControlPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunControlPageModel(cancellationToken));
 
+    [HttpGet("/run-control/control-network")]
     [HttpGet("/run-control/receipts/control-network.json")]
     [Produces("application/json")]
     public async Task<IActionResult> RunControlReceiptJson(CancellationToken cancellationToken)
@@ -3562,6 +3574,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult QuicksilverRoadmapAlias()
         => Redirect("/quicksilver");
 
+    [HttpGet("/quicksilver/command-network")]
     [HttpGet("/quicksilver/receipts/command-network.json")]
     [Produces("application/json")]
     public async Task<IActionResult> QuicksilverCommandNetworkReceiptJson(CancellationToken cancellationToken)
@@ -3604,6 +3617,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult GhostwireRoadmapAlias()
         => Redirect("/ghostwire");
 
+    [HttpGet("/ghostwire/replay-network")]
     [HttpGet("/ghostwire/receipts/replay-network.json")]
     [Produces("application/json")]
     public IActionResult GhostwireReplayNetworkReceiptJson()
@@ -3682,6 +3696,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> RunnerPassportPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunnerPassportPageModel(cancellationToken));
 
+    [HttpGet("/passport/identity-network")]
     [HttpGet("/passport/receipts/identity-network.json")]
     [Produces("application/json")]
     public IActionResult RunnerPassportIdentityNetworkReceiptJson()
@@ -3693,12 +3708,12 @@ document.addEventListener('DOMContentLoaded', function () {
             Status = "shipped_mvp",
             PublicBoard = new
             {
-                RunnerReturnMarkdownHref = "/passport/receipts/runner_return_posture.md",
-                RunnerReturnJsonHref = "/passport/receipts/runner_return_posture.json",
-                CrossTableBoundaryMarkdownHref = "/passport/receipts/cross_table_identity_boundary.md",
-                CrossTableBoundaryJsonHref = "/passport/receipts/cross_table_identity_boundary.json",
-                PrivacySafeParticipationMarkdownHref = "/passport/receipts/privacy_safe_participation_proof.md",
-                PrivacySafeParticipationJsonHref = "/passport/receipts/privacy_safe_participation_proof.json",
+                RunnerReturnMarkdownHref = "/passport/runner_return_posture.md",
+                RunnerReturnJsonHref = "/passport/runner_return_posture.json",
+                CrossTableBoundaryMarkdownHref = "/passport/cross_table_identity_boundary.md",
+                CrossTableBoundaryJsonHref = "/passport/cross_table_identity_boundary.json",
+                PrivacySafeParticipationMarkdownHref = "/passport/privacy_safe_participation_proof.md",
+                PrivacySafeParticipationJsonHref = "/passport/privacy_safe_participation_proof.json",
                 ActiveInstallationCount = summary.ActiveInstallationCount,
                 OpenRunCount = summary.OpenRunCount,
                 PendingJoinCount = summary.PendingJoinCount,
@@ -3744,6 +3759,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult CommunityOpenRunPacketJson([FromRoute] string packetId)
         => Content(_communityCreatorHorizons.BuildCommunityJson(packetId), "application/json");
 
+    [HttpGet("/community/open-run-network")]
     [HttpGet("/community/receipts/open-run-network.json")]
     [Produces("application/json")]
     public IActionResult CommunityHubReceiptJson()
@@ -3797,6 +3813,7 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult CreatorPacketJson([FromRoute] string packetId)
         => Content(_communityCreatorHorizons.BuildCreatorJson(packetId), "application/json");
 
+    [HttpGet("/creator/publication-network")]
     [HttpGet("/creator/receipts/publication-network.json")]
     [Produces("application/json")]
     public IActionResult CreatorOsReceiptJson()
@@ -3834,31 +3851,37 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    [HttpGet("/passport/{receiptId}.md")]
     [HttpGet("/passport/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult PassportReceiptMarkdown([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildPassportMarkdown(receiptId), "text/markdown");
 
+    [HttpGet("/passport/{receiptId}.json")]
     [HttpGet("/passport/receipts/{receiptId}.json")]
     [Produces("application/json")]
     public IActionResult PassportReceiptJson([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildPassportJson(receiptId), "application/json");
 
+    [HttpGet("/signal-deck/{receiptId}.md")]
     [HttpGet("/signal-deck/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult SignalDeckReceiptMarkdown([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildSignalDeckMarkdown(receiptId), "text/markdown");
 
+    [HttpGet("/signal-deck/{receiptId}.json")]
     [HttpGet("/signal-deck/receipts/{receiptId}.json")]
     [Produces("application/json")]
     public IActionResult SignalDeckReceiptJson([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildSignalDeckJson(receiptId), "application/json");
 
+    [HttpGet("/living-world/{receiptId}.md")]
     [HttpGet("/living-world/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult LivingWorldReceiptMarkdown([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildLivingWorldMarkdown(receiptId), "text/markdown");
 
+    [HttpGet("/living-world/{receiptId}.json")]
     [HttpGet("/living-world/receipts/{receiptId}.json")]
     [Produces("application/json")]
     public IActionResult LivingWorldReceiptJson([FromRoute] string receiptId)
@@ -5976,7 +5999,7 @@ document.addEventListener('DOMContentLoaded', function () {
             Receipts: _knowledgeFabric.ListReceipts()
                 .Select(receipt => new KnowledgeFabricReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Provenance, receipt.Route, receipt.Status))
                 .ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open explanation index", "/rules/receipts", "primary"),
+            PrimaryAction: new TrustPageActionViewModel("Open explanations", "/rules/explanations", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open current release", "/now#real-rules-truth", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open packages", "/packages", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -6066,7 +6089,7 @@ document.addEventListener('DOMContentLoaded', function () {
             Receipts: _nexusPan.ListReceipts()
                 .Select(receipt => new NexusPanReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Route, receipt.Status))
                 .ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open continuity index", "/play/continuity/receipts", "primary"),
+            PrimaryAction: new TrustPageActionViewModel("Open continuity history", "/play/continuity/history", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open mobile app data", "/mobile/pwa.json", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -6088,7 +6111,7 @@ document.addEventListener('DOMContentLoaded', function () {
             summaryPoints: ["Dossier cards", "Mission briefs", "Account publication workspace"],
             documents: briefings,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for JACKPOINT" : "Open JACKPOINT", subject is null ? "/login?next=%2Faccount%2Fjackpoint" : "/account/jackpoint", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open briefing list", "/jackpoint/receipts/briefing-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open briefing list", "/jackpoint/briefing-network", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open first briefing", briefings[0].MarkdownRoute, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildJackpointConnectedLanePacket(subject));
@@ -6109,7 +6132,7 @@ document.addEventListener('DOMContentLoaded', function () {
             summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
             documents: packs,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUNSITE" : "Open RUNSITE", subject is null ? "/login?next=%2Faccount%2Frunsites" : "/account/runsites", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open prep overview", "/runsites/receipts/prep-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open prep overview", "/runsites/prep-network", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open first runsite", packs[0].MarkdownRoute, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildRunsiteConnectedLanePacket(subject));
@@ -6145,7 +6168,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ["Reconnect behavior", "Runboard continuity", "Recovery notes"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUN CONTROL" : "Open RUN CONTROL", subject is null ? "/login?next=%2Faccount%2Frun-control" : "/account/run-control", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open control overview", "/run-control/receipts/control-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open control overview", "/run-control/control-network", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open session board", "/run-control/packets/session_board.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildRunControlConnectedLanePacket(subject, BuildRunControlReceipt(subject)));
@@ -6181,7 +6204,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ["Restore status", "Claimed devices", "Conflict summaries", "Recovery notes"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for ONRAMP" : "Open ONRAMP", subject is null ? "/login?next=%2Faccount%2Fonramp" : "/account/onramp", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open starter overview", "/onramp/receipts/guided-starter.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open starter overview", "/onramp/guided-starter", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open starter guide", "/onramp/packets/starter_lane.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildOnrampConnectedLanePacket(subject, BuildOnrampReceipt(subject)));
@@ -6224,7 +6247,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ["Campaign-approved path", "Modern pace", "Account edition focus"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for EDITION STUDIO" : "Open EDITION STUDIO", subject is null ? "/login?next=%2Faccount%2Fedition-studio" : "/account/edition-studio", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open edition overview", "/edition-studio/receipts/ruleset-heads.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open edition overview", "/edition-studio/ruleset-heads", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open SR5 guide", "/edition-studio/packets/sr5_head.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildEditionStudioConnectedLanePacket(subject, BuildEditionStudioReceipt(subject)));
@@ -6260,7 +6283,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ["No local rules owner", "No mandatory runtime", "Fallback available", "Privacy notes"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for LOCAL CO-PROCESSOR" : "Open LOCAL CO-PROCESSOR", subject is null ? "/login?next=%2Faccount%2Flocal-co-processor" : "/account/local-co-processor", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open acceleration overview", "/local-co-processor/receipts/optional-acceleration.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open acceleration overview", "/local-co-processor/optional-acceleration", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open capability matrix", "/local-co-processor/packets/capability_matrix.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildLocalCoProcessorConnectedLanePacket(subject, BuildLocalCoProcessorReceipt(subject)));
@@ -6303,7 +6326,7 @@ document.addEventListener('DOMContentLoaded', function () {
             documents: _communityCreatorHorizons.ListCommunityDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Community Hub" : "Open Community Hub", subject is null ? "/login?next=%2Faccount%2Fcommunity" : "/account/community", "primary"),
             secondaryAction: new TrustPageActionViewModel("See the public board", "/community/open-runs/open_run_board.md", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open details", "/community/receipts/open-run-network.json", "ghost"),
+            tertiaryAction: new TrustPageActionViewModel("Open details", "/community/open-run-network", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildCommunityHubConnectedLanePacket(subject, summary));
     }
@@ -6328,7 +6351,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ],
             documents: _communityCreatorHorizons.ListCreatorDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Creator OS" : "Open Creator OS", subject is null ? "/login?next=%2Faccount%2Fcreator" : "/account/creator", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open publication list", "/creator/receipts/publication-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open publication list", "/creator/publication-network", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open publication board", "/creator/packets/publication_board.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildCreatorOsConnectedLanePacket(subject, summary));
@@ -6370,7 +6393,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ["Focus routes", "API deck", "Account-owned history"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Quicksilver" : "Open Quicksilver", subject is null ? "/login?next=%2Faccount%2Fquicksilver" : "/account/quicksilver", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open command overview", "/quicksilver/receipts/command-network.json", "secondary"),
+            secondaryAction: new TrustPageActionViewModel("Open command overview", "/quicksilver/command-network", "secondary"),
             tertiaryAction: new TrustPageActionViewModel("Open jump guide", "/quicksilver/packets/command_deck.md", "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildQuicksilverConnectedLanePacket(subject, receipt));
@@ -6412,8 +6435,8 @@ document.addEventListener('DOMContentLoaded', function () {
             ],
             Documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             PrimaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Runner Passport" : "Open Runner Passport", subject is null ? "/login?next=%2Faccount%2Fpassport" : "/account/passport", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open identity overview", "/passport/receipts/identity-network.json", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open return details", "/passport/receipts/runner_return_posture.md", "ghost"),
+            SecondaryAction: new TrustPageActionViewModel("Open identity overview", "/passport/identity-network", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open return details", "/passport/runner_return_posture.md", "ghost"),
             ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, _blackLedgerBriefings.BuildWorldTurnBriefing(1)),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -6458,8 +6481,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) on the return path" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListSignalDeckDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open pressure summary", "/signal-deck/receipts/pressure_posture.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open pressure data", "/signal-deck/receipts/pressure_posture.json", "secondary"),
+            PrimaryAction: new TrustPageActionViewModel("Open pressure summary", "/signal-deck/pressure_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open pressure data", "/signal-deck/pressure_posture.json", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open Table Pulse Live inbox", "/account/ledger/notifications", "ghost"),
             ConnectedLanePacket: BuildSignalDeckConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -6505,8 +6528,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) queued" : "Aftermath path ready"
             ],
             Documents: _communityCreatorHorizons.ListLivingWorldDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open bulletin summary", "/living-world/receipts/watch_package_posture.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open bulletin data", "/living-world/receipts/watch_package_posture.json", "secondary"),
+            PrimaryAction: new TrustPageActionViewModel("Open bulletin summary", "/living-world/watch_package_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open bulletin data", "/living-world/watch_package_posture.json", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open current bulletin", worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1", "ghost"),
             ConnectedLanePacket: BuildLivingWorldConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -6597,7 +6620,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Details",
                     Summary: "Read the account and public pages without turning Community Hub into just another forum or meeting tool.",
-                    Href: "/community/receipts/open-run-network.json",
+                    Href: "/community/open-run-network",
                     StatusLabel: "Current")
             ];
 
@@ -6676,7 +6699,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Publication details",
                     Summary: "Read the account and public publication paths before treating Creator OS as an external creator page.",
-                    Href: "/creator/receipts/publication-network.json",
+                    Href: "/creator/publication-network",
                     StatusLabel: "Current")
             ];
 
@@ -6755,7 +6778,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Command details",
                     Summary: "Read the account and focus boundaries before using Quicksilver as a jump view.",
-                    Href: "/quicksilver/receipts/command-network.json",
+                    Href: "/quicksilver/command-network",
                     StatusLabel: "Current")
             ];
 
@@ -6815,7 +6838,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Briefing details",
                     Summary: "Read the account and publication paths before treating JACKPOINT like a generic export page.",
-                    Href: "/jackpoint/receipts/briefing-network.json",
+                    Href: "/jackpoint/briefing-network",
                     StatusLabel: "Current")
             ];
 
@@ -6893,7 +6916,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Prep details",
                     Summary: "Inspect the workspace, run, and prep-library pages before treating RUNSITE like a static map gallery.",
-                    Href: "/runsites/receipts/prep-network.json",
+                    Href: "/runsites/prep-network",
                     StatusLabel: "Current")
             ];
 
@@ -6974,7 +6997,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Control details",
                     Summary: "Read the account routes and control notes before using RUN CONTROL as the table hub.",
-                    Href: "/run-control/receipts/control-network.json",
+                    Href: "/run-control/control-network",
                     StatusLabel: "Current")
             ];
 
@@ -7035,7 +7058,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Starter details",
                     Summary: "Read the account routes and recovery notes before treating ONRAMP like a simple tutorial overlay.",
-                    Href: "/onramp/receipts/guided-starter.json",
+                    Href: "/onramp/guided-starter",
                     StatusLabel: "Details")
             ];
 
@@ -7095,7 +7118,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Ruleset details",
                     Summary: "Read the account routes and edition focus before treating EDITION STUDIO like decorative skinning.",
-                    Href: "/edition-studio/receipts/ruleset-heads.json",
+                    Href: "/edition-studio/ruleset-heads",
                     StatusLabel: "Details")
             ];
 
@@ -7156,7 +7179,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Acceleration details",
                     Summary: "Read the account routes and policy notes before treating optional acceleration like a hidden requirement.",
-                    Href: "/local-co-processor/receipts/optional-acceleration.json",
+                    Href: "/local-co-processor/optional-acceleration",
                     StatusLabel: "Details")
             ];
 
@@ -14532,7 +14555,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Trust status",
                 Summary: $"Passport is live with {runnerPassportSummary.ActiveInstallationCount} claimed install(s), {runnerPassportSummary.OpenRunCount} open run(s), and {runnerPassportSummary.ParticipationNotificationCount} participation record(s) in Chummer.",
-                Href: "/passport/receipts/runner_return_posture.md",
+                Href: "/passport/runner_return_posture.md",
                 StatusLabel: "Public-safe"),
             new(
                 Label: "Table Pulse Live inbox",
@@ -14617,7 +14640,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Public records",
                 Summary: $"Signal Deck records currently summarize {signalDeckSummary.ActiveInstallationCount} active install(s), {signalDeckSummary.OpenRunCount} open run(s), and {signalDeckSummary.ParticipationNotificationCount} participation record(s) in Chummer.",
-                Href: "/signal-deck/receipts/pressure_posture.md",
+                Href: "/signal-deck/pressure_posture.md",
                 StatusLabel: "Details")
         ];
 
