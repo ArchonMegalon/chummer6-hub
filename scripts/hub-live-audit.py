@@ -11996,7 +11996,7 @@ def main() -> int:
                 "Windows and Linux installers.",
                 "Nightly",
                 "Stable",
-                "Build run-",
+                "Updated",
                 "Windows",
                 "Linux",
                 "macOS",
@@ -12007,7 +12007,7 @@ def main() -> int:
             "/status",
             "Current release",
             required_texts=(
-                "Build run-",
+                "Updated",
                 "Stable",
                 "Released",
                 "Open downloads",
@@ -12165,7 +12165,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Build run-", "Release", "Downloads", "Help"):
+    for snippet in ("Updated", "Release", "Downloads", "Help"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 
