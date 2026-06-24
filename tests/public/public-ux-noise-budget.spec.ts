@@ -104,13 +104,14 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   ];
 
   const participateResponse = await request.get(`${baseUrl}/partizipate`, { maxRedirects: 0 });
-  expect(participateResponse.status()).toBe(200);
-  const participateText = await participateResponse.text();
-  expect(participateText).toContain('Participate');
-  expect(participateText).not.toContain('ProductLift');
-  expect(participateText).not.toContain('productlift.dev');
+  expect([302, 303, 307, 308]).toContain(participateResponse.status());
+  const participateLocation = participateResponse.headers()['location'] || '';
+  expect(participateLocation).toContain('/auth/google/start?next=');
+  expect(participateLocation).toContain('%2Fpartizipate');
+  expect(participateLocation).not.toContain('ProductLift');
+  expect(participateLocation).not.toContain('productlift.dev');
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/partizipate', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
     const pageSource = await page.content();
@@ -142,7 +143,6 @@ test('core public pages stay inside a minimal interaction budget', async ({ page
     { path: '/downloads', maxWords: 140, maxLinks: 8, maxButtons: 6, maxSections: 4 },
     { path: '/status', maxWords: 110, maxLinks: 5, maxButtons: 3, maxSections: 3 },
     { path: '/help', maxWords: 450, maxLinks: 16, maxButtons: 3, maxSections: 3 },
-    { path: '/partizipate', maxWords: 280, maxLinks: 12, maxButtons: 5, maxSections: 3 },
     { path: '/contact', maxWords: 430, maxLinks: 14, maxButtons: 6, maxSections: 4 },
     { path: '/roadmap', maxWords: 420, maxLinks: 12, maxButtons: 6, maxSections: 3 },
     { path: '/what-is-chummer', maxWords: 130, maxLinks: 4, maxButtons: 3, maxSections: 3 },
@@ -214,7 +214,7 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   const sitemapText = await sitemapResponse.text();
   expect(sitemapText).not.toContain('/ledger');
   expect(sitemapText).not.toContain('/alice');
-  expect(sitemapText).toContain('/partizipate');
+  expect(sitemapText).not.toContain('/partizipate');
 
   const robotsResponse = await request.get(`${baseUrl}/robots.txt?public-route-guard=1`);
   expect(robotsResponse.ok()).toBeTruthy();

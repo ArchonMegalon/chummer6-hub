@@ -30,6 +30,12 @@ public sealed class HubPageChromeService
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
+        var guestPrimaryNavigation = nav.Primary
+            .Where(link => !string.Equals(NormalizeRoute(link.Href), "/partizipate", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var guestPublicSignalNavigation = nav.PublicSignal
+            .Where(link => !string.Equals(NormalizeRoute(link.Href), "/feedback", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
         var normalizedCurrentPath = NormalizeRoute(currentPath);
         var downloadsSurface = normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase);
         var publicPrimaryCta = downloadsSurface ? null : ResolvePublicPrimaryCta(surface, currentPath);
@@ -75,7 +81,7 @@ public sealed class HubPageChromeService
             Title: PublicFacingCopyHumanizer.Clean(title),
             Description: PublicFacingCopyHumanizer.Clean(description),
             CurrentPath: currentPath,
-            PrimaryNavigation: nav.Primary,
+            PrimaryNavigation: guestPrimaryNavigation,
             SecondaryNavigation: nav.Secondary,
             UtilityNavigation: nav.Utility,
             HeaderActions: actions.ToArray(),
@@ -84,7 +90,7 @@ public sealed class HubPageChromeService
             SignedInLabel: null,
             FooterCanonicalSource: surface.FooterCanonicalSource,
             FooterGeneratedNote: surface.FooterGeneratedNote,
-            PublicSignalNavigation: nav.PublicSignal);
+            PublicSignalNavigation: guestPublicSignalNavigation);
     }
 
     private static string BuildContextualSignInHref(string normalizedCurrentPath, string fallbackHref)

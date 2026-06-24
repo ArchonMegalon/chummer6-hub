@@ -350,6 +350,7 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     assert "Get the app" not in landing
     assert "minimal-inline-links" in landing
     assert 'data-homepage-section="help"' not in landing
+    assert '@if (Model.Chrome.Authenticated)' in landing
     assert 'href="/partizipate"' in landing
     assert ".minimal-video" in site_css
     assert "aspect-ratio: 16 / 9;" in site_css
@@ -389,7 +390,9 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert '[HttpGet("/partizipate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'RedirectPermanent("/partizipate")' in controller
-    assert "return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);" in controller
+    assert "return Redirect(BuildParticipateSignInHref());" in controller
+    assert 'BuildParticipateSignInHref(string targetPath = "/partizipate")' in controller
+    assert 'return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);' in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
     assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";' in controller
     assert "participate-shell" in participate
@@ -400,6 +403,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "@foreach (var lane in Model.Lanes)" in participate
     assert "@lane.ActionLabel" in participate
     assert "Private help" in participate
+    assert "Become a supporter" in participate
     assert "Current themes" not in participate
     assert "Open in a tab" not in participate
     assert "BuildParticipatePageModel(" not in controller

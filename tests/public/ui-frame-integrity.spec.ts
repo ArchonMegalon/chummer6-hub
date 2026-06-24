@@ -11,7 +11,6 @@ const routes = [
   '/ledger',
   '/ledger/map',
   '/packages',
-  '/partizipate',
   '/feedback',
   '/login?next=%2Faccount%2Faccess',
   '/account/access/install-link?installationId=ins-ui-gate&headId=avalonia&applicationVersion=run-20260612-121055&releaseChannel=docker&platform=windows&arch=x64&installLinkMode=browser_callback&installLinkTransport=grant_callback&installLinkCallbackUri=chummer%3A%2F%2Finstall-link',

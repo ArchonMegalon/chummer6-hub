@@ -17,7 +17,10 @@
         <p class="minimal-meta">Windows and Linux.</p>
         <p class="minimal-inline-links">
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
-            <a href="/partizipate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+            @if (Model.Chrome.Authenticated)
+            {
+                <a href="/partizipate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+            }
             <a href="/status" data-analytics-event="homepage_open_status" data-analytics-surface="minimal_home" data-analytics-label="Status">Status</a>
         </p>
     </div>

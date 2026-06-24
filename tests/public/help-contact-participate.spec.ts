@@ -14,19 +14,21 @@ test('help, contact, and participate keep public and private paths clear', async
 
   const helpResponse = await request.get(`${baseUrl}/help`);
   const contactResponse = await request.get(`${baseUrl}/contact`);
-  const participateResponse = await request.get(`${baseUrl}/partizipate`);
+  const participateResponse = await request.get(`${baseUrl}/partizipate`, { maxRedirects: 0 });
 
   expect(helpResponse.status()).toBe(200);
   expect(contactResponse.status()).toBe(200);
-  expect(participateResponse.status()).toBe(200);
+  expect([302, 303, 307, 308]).toContain(participateResponse.status());
 
   const helpRobots = helpResponse.headers()['x-robots-tag'] || '';
   const contactRobots = contactResponse.headers()['x-robots-tag'] || '';
   const participateRobots = participateResponse.headers()['x-robots-tag'] || '';
+  const participateLocation = participateResponse.headers()['location'] || '';
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateRobots).toContain('index');
+  expect(participateLocation).toContain('/auth/google/start?next=');
+  expect(participateLocation).toContain('%2Fpartizipate');
 
   const helpPage = await openPublicPage(browser, '/help');
   await expect(helpPage.getByRole('heading', { name: 'Get help without guessing' })).toBeVisible();
@@ -42,23 +44,6 @@ test('help, contact, and participate keep public and private paths clear', async
   await expect(contactPage.getByRole('link', { name: 'Open support intake' })).toBeVisible();
   await contactPage.close();
 
-  const participatePage = await openPublicPage(browser, '/partizipate');
-  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toBeVisible();
-  await expect(participatePage.locator('body')).toContainText('Use the public board for ideas and safe bugs.');
-
-  const fallbackHeading = participatePage.getByText('Board offline?');
-  const hostedHeading = participatePage.getByRole('heading', { name: 'Public board' });
-  const usingFallback = await fallbackHeading.isVisible().catch(() => false);
-  const usingHosted = await hostedHeading.isVisible().catch(() => false);
-
-  expect(usingFallback || usingHosted).toBeTruthy();
-  if (usingFallback) {
-    await expect(participatePage.locator('body')).toContainText('private help');
-  } else {
-    await expect(participatePage.locator('iframe.participate-hosted__frame')).toBeVisible();
-  }
-  await participatePage.close();
-
   writeJsonArtifact('HELP_CONTACT_PARTICIPATE_E2E.generated.json', {
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
@@ -69,6 +54,7 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: usingFallback ? 'fallback_form' : 'hosted_board',
+    participate_redirect_location: participateLocation,
+    participate_mode: 'auth_gate',
   });
 });

@@ -2130,17 +2130,25 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            return Redirect(BuildParticipateSignInHref());
+        }
+
+        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         if (ResolveProductLiftHostedBoardUri() is not null)
         {
             return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
         }
 
         var model = new ParticipatePageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+            Chrome: _chrome.BuildAuthenticatedChrome(
                 "Participate",
                 "Public requests, visible bugs, and roadmap signal.",
                 "/partizipate",
-                cancellationToken),
+                user.DisplayName,
+                user.Email),
             Lanes:
             [
                 new ParticipateLaneViewModel("Idea", "Ask for a change", "Keep product requests short, concrete, and public.", "#participate-board", "Open board"),
@@ -2179,6 +2187,14 @@ public sealed class PublicLandingController : Controller
 
     private async Task<IActionResult> ParticipateBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
     {
+        if (await TryGetOptionalSubjectAsync(cancellationToken) is null)
+        {
+            string authTargetPath = string.IsNullOrWhiteSpace(boardPath)
+                ? "/partizipate"
+                : $"/partizipate/{NormalizeParticipateBoardPath(boardPath)}";
+            return Redirect(BuildParticipateSignInHref(authTargetPath));
+        }
+
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
         {
@@ -2282,6 +2298,9 @@ public sealed class PublicLandingController : Controller
 
     private string? ResolveProductLiftHostedBoardHref()
         => ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";
+
+    private static string BuildParticipateSignInHref(string targetPath = "/partizipate")
+        => $"/auth/google/start?next={Uri.EscapeDataString(string.IsNullOrWhiteSpace(targetPath) ? "/partizipate" : targetPath)}";
 
     private string ResolveParticipateBoardHomeHref()
     {

@@ -41,12 +41,6 @@ const supportingSurfaces = [
     requiredText: ['Get help without guessing', 'Pick the problem'],
   },
   {
-    id: 'participate',
-    route: '/partizipate',
-    screenshotPrefix: 'participate',
-    requiredText: ['Public requests, one board.', 'Send feedback', 'Roadmap'],
-  },
-  {
     id: 'contact',
     route: '/contact',
     screenshotPrefix: 'contact',
@@ -76,7 +70,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     await expect(page.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(page.locator('.minimal-inline-links')).toContainText('Help');
-    await expect(page.locator('.minimal-inline-links')).toContainText('Participate');
+    await expect(page.locator('.minimal-inline-links')).not.toContainText('Participate');
     await expect(page.locator('.minimal-inline-links')).toContainText('Status');
     await expect(footer).toBeVisible();
 
