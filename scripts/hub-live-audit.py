@@ -12034,8 +12034,10 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/partizipate",
-            expected_status=302,
-            expected_location_contains="/auth/google/start?next=%2Fpartizipate"),
+            "Participate",
+            required_texts=("Public board", "Roadmap", "Private help"),
+            forbidden_texts=("productlift.dev",),
+            expects_header_count=1),
         AuditRoute(
             "/help",
             "Get help without guessing",
