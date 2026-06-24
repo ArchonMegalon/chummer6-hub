@@ -11,6 +11,7 @@ PROGRAM_PATH = REPO_ROOT / "Chummer.Run.Api" / "Program.cs"
 PUBLIC_LANDING_CONTROLLER_PATH = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 KNOWLEDGE_FABRIC_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "KnowledgeFabricService.cs"
 NEXUS_PAN_SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "NexusPanContinuityService.cs"
+PUBLIC_LANDING_MANIFEST_PATH = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MANIFEST.yaml"
 
 
 class PublicShellAnalyticsHooksTests(unittest.TestCase):
@@ -120,6 +121,7 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         controller = PUBLIC_LANDING_CONTROLLER_PATH.read_text(encoding="utf-8")
         knowledge = KNOWLEDGE_FABRIC_SERVICE_PATH.read_text(encoding="utf-8")
         nexus = NEXUS_PAN_SERVICE_PATH.read_text(encoding="utf-8")
+        manifest = PUBLIC_LANDING_MANIFEST_PATH.read_text(encoding="utf-8")
 
         for alias in [
             '[HttpGet("/rules/explanations")]',
@@ -190,6 +192,30 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
             "/living-world/watch_package_posture.md",
         ]:
             self.assertIn(clean_path, controller + "\n" + knowledge + "\n" + nexus)
+
+        for public_route in [
+            "/jackpoint/briefing-network",
+            "/runsites/prep-network",
+            "/run-control/control-network",
+            "/onramp/guided-starter",
+            "/edition-studio/ruleset-heads",
+            "/passport/identity-network",
+            "/quicksilver/command-network",
+            "/ghostwire/replay-network",
+            "/anarchy/runtime",
+            "/local-co-processor/optional-acceleration",
+        ]:
+            self.assertIn(f"- path: {public_route}", manifest)
+
+        for stale_manifest_route in [
+            "/jackpoint/receipts/briefing-network.json",
+            "/runsites/receipts/prep-network.json",
+            "/run-control/receipts/control-network.json",
+            "/passport/receipts/identity-network.json",
+            "/anarchy/receipts/runtime.json",
+            "/local-co-processor/receipts/optional-acceleration.json",
+        ]:
+            self.assertNotIn(f"- path: {stale_manifest_route}", manifest)
 
     @staticmethod
     def _read_csharp_string_set(source: str, set_name: str) -> set[str]:
