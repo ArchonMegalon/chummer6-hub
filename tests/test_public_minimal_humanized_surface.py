@@ -389,14 +389,12 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert '[HttpGet("/partizipate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'RedirectPermanent("/partizipate")' in controller
+    assert "return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);" in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
-    assert 'return ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";' in controller
-    assert "participate-shell" in participate
-    assert "Public requests, one board." in participate
-    assert "Feedback, roadmap, and shipped follow-through stay on this route." in participate
-    assert "First-party route" in participate
+    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";' in controller
+    assert "participate-shell" not in participate
+    assert "Fallback form" in participate
     assert "Join beta waitlist" not in participate
-    assert "vote, add requests, and track what is moving" in participate.lower()
     assert "participate-quick-form" in participate
     assert "participate-lanes" not in participate
     assert "@foreach (var lane in Model.Lanes)" not in participate
@@ -440,6 +438,7 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert "ResolveProductLiftFeedbackUrl()" not in controller
     assert "productlift.dev" not in participate.lower()
     assert '"/partizipate/board"' in controller
+    assert '"/partizipate"' in controller
 
     for forbidden in (
         "Account-only programs stay below the fold",

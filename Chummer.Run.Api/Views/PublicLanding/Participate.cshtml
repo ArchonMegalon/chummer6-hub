@@ -4,88 +4,40 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate";
 }
-
-<section class="minimal-page-hero participate-hero">
-    <div class="participate-hero__copy">
-        <p class="minimal-kicker">Participate</p>
-        <h1>Public requests, one board.</h1>
-        <p>Vote, add requests, and track what is moving. Keep private support in Help.</p>
-    </div>
-    <div class="minimal-status-pill participate-hero__status" aria-label="Participate summary">
-        <span>Public board</span>
-        <strong>@(string.IsNullOrWhiteSpace(Model.HostedBoardHref) ? "Fallback form" : "First-party route")</strong>
-        <span>Private help separate</span>
-    </div>
-</section>
-
-<section class="participate-shell">
-    @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
-    {
-        <div class="participate-hosted" id="participate-board">
-            <div class="participate-hosted__header">
-                <div class="participate-hosted__lead">
-                    <h3>Public board</h3>
-                    <p>Feedback, roadmap, and current requests stay on this route.</p>
-                </div>
-                <div class="participate-actions">
-                    <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
-                    <a class="button-like button-like--ghost" href="@Model.PrivateHelpHref">Help</a>
-                </div>
+<section class="participate-board">
+    <form class="participate-quick-form" id="participate-submit" method="get" action="/contact">
+        <div class="participate-quick-form__header">
+            <div class="participate-quick-form__lead">
+                <h3>Fallback form</h3>
+                <p>Use this only while the public board is offline.</p>
             </div>
-            <iframe
-                class="participate-hosted__frame"
-                src="@Model.HostedBoardHref"
-                title="Chummer public feedback board"
-                loading="lazy"
-                referrerpolicy="strict-origin-when-cross-origin"></iframe>
-            <details class="participate-fallback">
-                <summary>If the board does not load here</summary>
-                <p>Open the board view directly. Use Help when the next step needs logs, account detail, or anything private.</p>
-                <div class="participate-actions">
-                    <a class="button-like button-like--ghost" href="@Model.HostedBoardHref" target="_blank" rel="noreferrer">Open board view</a>
-                    <a class="button-like button-like--ghost" href="@Model.PrivateHelpHref">Open help</a>
-                </div>
-            </details>
+            <span class="participate-count">Public post</span>
         </div>
-    }
-    else
-    {
-        <div class="participate-board">
-            <form class="participate-quick-form" id="participate-submit" method="get" action="/contact">
-                <div class="participate-quick-form__header">
-                    <div class="participate-quick-form__lead">
-                        <h3>Fallback form</h3>
-                        <p>Use this only while the public board is offline.</p>
-                    </div>
-                    <span class="participate-count">Public post</span>
-                </div>
-                <div class="participate-quick-form__top">
-                    <div class="field">
-                        <label for="participateTitle">Short title</label>
-                        <input id="participateTitle" name="subject" maxlength="120" placeholder="One concrete suggestion or bug report" />
-                    </div>
-                    <div class="field">
-                        <label for="participateKind">Category</label>
-                        <select id="participateKind" name="topic">
-                            <option value="">Choose category</option>
-                            <option value="feature">Feature</option>
-                            <option value="bug">Bug</option>
-                            <option value="desktop">Desktop UX</option>
-                            <option value="install">Install or update</option>
-                            <option value="linux">Linux</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="field">
-                    <label for="participateSummary">Details</label>
-                    <textarea id="participateSummary" name="message" rows="6" maxlength="1200" placeholder="What happened, what you expected, and why it matters."></textarea>
-                </div>
-                <div class="participate-actions">
-                    <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
-                    <button class="button-like button-like--primary" type="submit">Send feedback</button>
-                    <a class="button-like button-like--ghost" href="@Model.PrivateHelpHref">Help</a>
-                </div>
-            </form>
+        <div class="participate-quick-form__top">
+            <div class="field">
+                <label for="participateTitle">Short title</label>
+                <input id="participateTitle" name="subject" maxlength="120" placeholder="One concrete suggestion or bug report" />
+            </div>
+            <div class="field">
+                <label for="participateKind">Category</label>
+                <select id="participateKind" name="topic">
+                    <option value="">Choose category</option>
+                    <option value="feature">Feature</option>
+                    <option value="bug">Bug</option>
+                    <option value="desktop">Desktop UX</option>
+                    <option value="install">Install or update</option>
+                    <option value="linux">Linux</option>
+                </select>
+            </div>
         </div>
-    }
+        <div class="field">
+            <label for="participateSummary">Details</label>
+            <textarea id="participateSummary" name="message" rows="6" maxlength="1200" placeholder="What happened, what you expected, and why it matters."></textarea>
+        </div>
+        <div class="participate-actions">
+            <a class="button-like" href="@Model.RoadmapHref">Roadmap</a>
+            <button class="button-like button-like--primary" type="submit">Send feedback</button>
+            <a class="button-like button-like--ghost" href="@Model.PrivateHelpHref">Help</a>
+        </div>
+    </form>
 </section>

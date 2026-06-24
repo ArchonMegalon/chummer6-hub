@@ -129,7 +129,7 @@ PY
 }
 
 if [[ -z "$PORTAL_MANIFEST_PATH" ]]; then
-  if [[ "$(realpath "$DEPLOY_DIR")" == "$(realpath "$REPO_ROOT/Docker/Downloads")" ]]; then
+  if [[ "$(realpath -m "$DEPLOY_DIR")" == "$(realpath -m "$REPO_ROOT/Docker/Downloads")" ]]; then
     PORTAL_MANIFEST_PATH="$REPO_ROOT/Chummer.Portal/downloads/releases.json"
   else
     PORTAL_MANIFEST_PATH="$DEPLOY_DIR/releases.json"
@@ -159,8 +159,10 @@ done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
   \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o \
      -name "chummer-avalonia-*.tar.gz" -o -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
      -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
+     -name "chummer-avalonia-*-payload.zip" -o \
      -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
      -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
+     -name "chummer-blazor-desktop-*-payload.zip" -o \
      -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
      -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
   | sort)
@@ -264,12 +266,14 @@ sync_live_downloads_mirror_dir() {
     \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
        -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
        -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
+       -name "chummer-avalonia-*-payload.zip" -o \
        -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
        -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
+       -name "chummer-blazor-desktop-*-payload.zip" -o \
        -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
        -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" -o \
        -name "chummer-6-*.exe" -o -name "chummer-6-*.zip" -o -name "chummer-6-*.tar.gz" -o -name "chummer-6-*-installer.exe" -o \
-       -name "chummer-6-*-installer.deb" -o -name "chummer-6-*-installer.pkg" -o -name "chummer-6-*-installer.dmg" -o \
+       -name "chummer-6-*-payload.zip" -o -name "chummer-6-*-installer.deb" -o -name "chummer-6-*-installer.pkg" -o -name "chummer-6-*-installer.dmg" -o \
        -name "chummer-6-*-installer.msix" \) \
     -delete
 
@@ -384,26 +388,41 @@ seen = set()
 for artifact in payload.get("artifacts") or []:
     if not isinstance(artifact, dict):
         continue
-    file_name = str(artifact.get("fileName") or "").strip()
-    if not file_name:
-        file_name = Path(str(artifact.get("downloadUrl") or "").strip()).name
-    if file_name and file_name not in seen:
-        print(file_name)
-        seen.add(file_name)
+    candidates = [
+        str(artifact.get("fileName") or "").strip(),
+        Path(str(artifact.get("downloadUrl") or "").strip()).name,
+        str(artifact.get("payloadFileName") or "").strip(),
+        Path(str(artifact.get("payloadDownloadUrl") or "").strip()).name,
+    ]
+    for file_name in candidates:
+        if file_name and file_name not in seen:
+            print(file_name)
+            seen.add(file_name)
 PY
 )
+
+for file_name in "${promoted_file_names[@]}"; do
+  if [[ "$file_name" == chummer-*-win-*-installer.exe ]]; then
+    payload_name="${file_name%-installer.exe}-payload.zip"
+    if [[ -f "$sync_source_dir/$payload_name" ]]; then
+      promoted_file_names+=("$payload_name")
+    fi
+  fi
+done
 
 mkdir -p "$DEPLOY_DIR/files"
 find "$DEPLOY_DIR/files" -maxdepth 1 -type f \
   \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
      -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
      -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
+     -name "chummer-avalonia-*-payload.zip" -o \
      -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
      -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
+     -name "chummer-blazor-desktop-*-payload.zip" -o \
      -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
      -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" -o \
      -name "chummer-6-*.exe" -o -name "chummer-6-*.zip" -o -name "chummer-6-*.tar.gz" -o -name "chummer-6-*-installer.exe" -o \
-     -name "chummer-6-*-installer.deb" -o \
+     -name "chummer-6-*-payload.zip" -o -name "chummer-6-*-installer.deb" -o \
      -name "chummer-6-*-installer.pkg" -o -name "chummer-6-*-installer.dmg" -o \
      -name "chummer-6-*-installer.msix" \) \
   -delete

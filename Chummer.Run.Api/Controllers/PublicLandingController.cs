@@ -2130,6 +2130,11 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
+        if (ResolveProductLiftHostedBoardUri() is not null)
+        {
+            return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
+        }
+
         var model = new ParticipatePageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 "Participate",
@@ -2156,9 +2161,23 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
+    [HttpGet("/partizipate/{**boardPath}")]
+    public async Task<IActionResult> ParticipateBoardProxyAlias(string? boardPath, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(boardPath))
+        {
+            return await ParticipatePage(cancellationToken).ConfigureAwait(false);
+        }
+
+        return await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+    }
+
     [HttpGet("/partizipate/board")]
     [HttpGet("/partizipate/board/{**boardPath}")]
     public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)
+        => await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+
+    private async Task<IActionResult> ParticipateBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
     {
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
@@ -2212,6 +2231,19 @@ public sealed class PublicLandingController : Controller
         }
     }
 
+    private static string NormalizeParticipateBoardPath(string? boardPath)
+    {
+        string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
+        if (relativePath.StartsWith("board/", StringComparison.OrdinalIgnoreCase))
+        {
+            return relativePath["board/".Length..];
+        }
+
+        return string.Equals(relativePath, "board", StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : relativePath;
+    }
+
     private ContentResult ParticipateBoardUnavailable()
     {
         const string html = """
@@ -2249,9 +2281,7 @@ public sealed class PublicLandingController : Controller
     }
 
     private string? ResolveProductLiftHostedBoardHref()
-    {
-        return ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";
-    }
+        => ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate";
 
     private string ResolveParticipateBoardHomeHref()
     {
@@ -2303,16 +2333,16 @@ public sealed class PublicLandingController : Controller
         string relative = upstream.MakeRelativeUri(absolute).ToString();
         if (string.IsNullOrWhiteSpace(relative))
         {
-            return "/partizipate/board";
+            return "/partizipate";
         }
 
-        return $"/partizipate/board/{relative}";
+        return $"/partizipate/{relative}";
     }
 
     private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref)
     {
         string upstreamOrigin = upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/');
-        const string localOrigin = "/partizipate/board";
+        const string localOrigin = "/partizipate";
 
         string rewritten = html.Replace(upstreamOrigin, localOrigin, StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("href=\"/", $"href=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
@@ -2325,7 +2355,7 @@ public sealed class PublicLandingController : Controller
             rewritten = Regex.Replace(
                 rewritten,
                 "<head(.*?)>",
-                "<head$1><base href=\"/partizipate/board/\" />",
+                "<head$1><base href=\"/partizipate/\" />",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline,
                 TimeSpan.FromMilliseconds(250));
         }
@@ -2350,7 +2380,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const text = (anchor.textContent || '').trim().toLowerCase();
     const hasBrandText = text === 'chummer' || text === 'productlift' || text.includes('feedback') || text.includes('roadmap');
     const hasLogo = !!anchor.querySelector('img, svg');
-    const pointsToRoot = href === '/' || href === '/partizipate/board' || href === '/partizipate/board/' || /^https:\/\/[^/]+\/?$/.test(href);
+    const pointsToRoot = href === '/' || href === '/partizipate' || href === '/partizipate/' || href === '/partizipate/board' || href === '/partizipate/board/' || /^https:\/\/[^/]+\/?$/.test(href);
 
     return pointsToRoot && (hasBrandText || hasLogo);
   });
