@@ -199,6 +199,7 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertNotIn("/artifacts/explanation-path", registry)
 
         for public_route in [
+            "/rules/explanations",
             "/jackpoint/briefing-network",
             "/runsites/prep-network",
             "/run-control/control-network",

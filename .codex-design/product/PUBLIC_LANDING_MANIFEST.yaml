@@ -304,6 +304,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party rules explainability surface only
+- path: /rules/explanations
+  title: Rules explanation
+  audience: public
+  purpose: product_surface_detail
+  requires_auth: false
+  guest_fallback: /rules/explanations
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party rules explanation detail only
 - path: /jackpoint
   title: JACKPOINT
   audience: public
