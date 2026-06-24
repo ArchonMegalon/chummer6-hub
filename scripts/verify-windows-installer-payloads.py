@@ -28,6 +28,7 @@ DEFAULT_LAUNCH_EXECUTABLES = {
 class ManifestRow:
     file_name: str
     payload_file_name: str
+    payload_download_url: str
     payload_sha256: str
     payload_size_bytes: int | None
     installer_mode: str
@@ -103,6 +104,7 @@ def read_manifest_rows(manifest_paths: list[Path]) -> dict[str, ManifestRow]:
                 rows[file_name] = ManifestRow(
                     file_name=file_name,
                     payload_file_name=str(item.get("payloadFileName") or "").strip(),
+                    payload_download_url=str(item.get("payloadDownloadUrl") or "").strip(),
                     payload_sha256=str(item.get("payloadSha256") or "").strip().lower(),
                     payload_size_bytes=try_int(item.get("payloadSizeBytes")),
                     installer_mode=str(item.get("installerMode") or "").strip().lower(),
@@ -218,6 +220,66 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
     return failures
 
 
+def validate_bootstrap_sidecar_metadata(
+    installer_path: Path,
+    candidate: PayloadCandidate,
+    manifest_row: ManifestRow | None,
+) -> list[str]:
+    if candidate.mode != "bootstrap":
+        return []
+
+    sidecar_path = Path(candidate.source + ".json")
+    if not sidecar_path.is_file():
+        return [f"bootstrap payload sidecar metadata is missing: {sidecar_path.name}"]
+
+    try:
+        payload = json.loads(sidecar_path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        return [f"bootstrap payload sidecar metadata is invalid JSON: {sidecar_path.name}: {exc}"]
+
+    if not isinstance(payload, dict):
+        return [f"bootstrap payload sidecar metadata is not a JSON object: {sidecar_path.name}"]
+
+    failures: list[str] = []
+    expected_file_name = Path(candidate.source).name
+    if str(payload.get("contractName") or "").strip() != "chummer6-ui.windows_bootstrap_payload":
+        failures.append("bootstrap payload sidecar metadata has unexpected contractName")
+    if str(payload.get("fileName") or "").strip() != expected_file_name:
+        failures.append(
+            f"bootstrap payload sidecar metadata fileName does not match payload: expected {expected_file_name}"
+        )
+    if str(payload.get("installerFileName") or "").strip() != installer_path.name:
+        failures.append(
+            f"bootstrap payload sidecar metadata installerFileName does not match installer: expected {installer_path.name}"
+        )
+
+    observed_sha256 = sha256_bytes(candidate.data)
+    if str(payload.get("sha256") or "").strip().lower() != observed_sha256:
+        failures.append("bootstrap payload sidecar metadata sha256 does not match payload bytes")
+
+    observed_size = len(candidate.data)
+    try:
+        metadata_size = int(payload.get("sizeBytes"))
+    except (TypeError, ValueError):
+        metadata_size = None
+    if metadata_size != observed_size:
+        failures.append(
+            f"bootstrap payload sidecar metadata sizeBytes does not match payload size {observed_size}"
+        )
+
+    if manifest_row is not None:
+        if manifest_row.payload_file_name and manifest_row.payload_file_name != str(payload.get("fileName") or "").strip():
+            failures.append("bootstrap payload sidecar metadata fileName does not match manifest payloadFileName")
+        if manifest_row.payload_download_url and manifest_row.payload_download_url != str(payload.get("downloadUrl") or "").strip():
+            failures.append("bootstrap payload sidecar metadata downloadUrl does not match manifest payloadDownloadUrl")
+        if manifest_row.payload_sha256 and manifest_row.payload_sha256 != str(payload.get("sha256") or "").strip().lower():
+            failures.append("bootstrap payload sidecar metadata sha256 does not match manifest payloadSha256")
+        if manifest_row.payload_size_bytes is not None and manifest_row.payload_size_bytes != metadata_size:
+            failures.append("bootstrap payload sidecar metadata sizeBytes does not match manifest payloadSizeBytes")
+
+    return failures
+
+
 def parse_heads_json_base64(value: str) -> list[str]:
     if not value.strip():
         return []
@@ -297,6 +359,7 @@ def verify_installer(
         ]
 
     failures.extend(validate_manifest_payload_metadata(candidate, manifest_row))
+    failures.extend(validate_bootstrap_sidecar_metadata(installer_path, candidate, manifest_row))
     failures.extend(
         validate_zip_payload(
             installer_path.name,
