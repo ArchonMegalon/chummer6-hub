@@ -11953,10 +11953,6 @@ def main() -> int:
             "/",
             "A Shadowrun character manager for clean sheets and faster tables.",
             required_texts=(
-                "Create",
-                "Track",
-                "Explain",
-                "Run",
                 "Download Chummer",
                 "Windows and Linux.",
                 "Help",
@@ -12008,19 +12004,15 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/status",
-            "Release status",
+            "Current release",
             required_texts=(
                 "Build run-",
                 "Stable",
                 "Released",
-                "Last updated",
-                "Available",
                 "Open downloads",
-                "Open support",
-                "Help",
-                "Windows",
-                "Linux",
-                "macOS"),
+                "Open help",
+                "Changes",
+                "Release live."),
             forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
             expects_header_count=1),
         AuditRoute(
@@ -12043,8 +12035,8 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/partizipate",
-            "Tell us what slows the table down.",
-            required_texts=("Ideas and safe bugs", "Public board", "Roadmap", "Open Help"),
+            "Public requests, one board.",
+            required_texts=("Vote, add requests", "Public board", "Roadmap", "Help", "Chummer public feedback board"),
             expects_header_count=1),
         AuditRoute(
             "/help",

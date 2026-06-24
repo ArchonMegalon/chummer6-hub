@@ -214,12 +214,16 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   const sitemapText = await sitemapResponse.text();
   expect(sitemapText).not.toContain('/ledger');
   expect(sitemapText).not.toContain('/alice');
+  expect(sitemapText).toContain('/partizipate');
 
   const robotsResponse = await request.get(`${baseUrl}/robots.txt?public-route-guard=1`);
   expect(robotsResponse.ok()).toBeTruthy();
   const robotsText = await robotsResponse.text();
-  for (const path of ['/alice', '/ledger', '/participate', '/participate/', '/partizipate', '/partizipate/', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
+  for (const path of ['/alice', '/ledger', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
     expect(robotsText).toContain(`Disallow: ${path}`);
+  }
+  for (const path of ['/participate', '/participate/', '/partizipate', '/partizipate/']) {
+    expect(robotsText).not.toContain(`Disallow: ${path}`);
   }
 });
 

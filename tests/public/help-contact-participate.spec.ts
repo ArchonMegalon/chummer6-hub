@@ -26,7 +26,7 @@ test('help, contact, and participate keep public and private paths clear', async
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateRobots).toContain('noindex');
+  expect(participateRobots).toContain('index');
 
   const helpPage = await openPublicPage(browser, '/help');
   await expect(helpPage.getByRole('heading', { name: 'Get help without guessing' })).toBeVisible();

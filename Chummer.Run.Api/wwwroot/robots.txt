@@ -10,10 +10,6 @@ Disallow: /support/private/
 Disallow: /alice
 Disallow: /ledger
 Disallow: /ledger/
-Disallow: /participate
-Disallow: /participate/
-Disallow: /partizipate
-Disallow: /partizipate/
 Disallow: /table-pulse
 Disallow: /quicksilver
 Disallow: /local-co-processor

@@ -7,6 +7,7 @@ const routes = [
   { path: '/', schemaType: 'SoftwareApplication' },
   { path: '/downloads', schemaType: 'SoftwareApplication' },
   { path: '/what-is-chummer', schemaType: 'SoftwareApplication' },
+  { path: '/partizipate', schemaType: 'WebPage' },
   { path: '/status', schemaType: 'WebPage' },
   { path: '/help', schemaType: 'WebPage' },
 ] as const;
