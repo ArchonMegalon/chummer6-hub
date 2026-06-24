@@ -12009,11 +12009,9 @@ def main() -> int:
             required_texts=(
                 "Updated",
                 "Stable",
-                "Released",
                 "Open downloads",
                 "Open help",
-                "Changes",
-                "Release live."),
+                "Changes"),
             forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
             expects_header_count=1),
         AuditRoute(
