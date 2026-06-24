@@ -405,7 +405,7 @@ public sealed class PublicReleaseManifestServiceTests
                     ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
                     ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
                     ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer",
-                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 available as a public download so installs, updates, and recovery stay easy to follow."
+                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
                 }
             },
             ["desktopTupleCoverage"] = new Dictionary<string, object?>
@@ -439,8 +439,8 @@ public sealed class PublicReleaseManifestServiceTests
 
         Assert.Equal("account_required", artifact.GetProperty("installAccessClass").GetString());
         Assert.Equal("account_required", surface.GetProperty("installAccessClass").GetString());
-        Assert.Contains("linked download", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("public download", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("entitlement-backed", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("guest-readable", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -493,7 +493,7 @@ public sealed class PublicReleaseManifestServiceTests
                     ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
                     ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
                     ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer",
-                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 available as a public download so installs, updates, and recovery stay easy to follow."
+                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
                 },
                 new Dictionary<string, object?>
                 {
@@ -514,7 +514,7 @@ public sealed class PublicReleaseManifestServiceTests
                     ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
                     ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
                     ["publicInstallRoute"] = "/downloads/install/blazor-desktop-linux-x64-installer",
-                    ["rationale"] = "public_stable keeps fallback tuple blazor-desktop:linux:linux-x64 retained as a public download for recovery while the main download stays focused."
+                    ["rationale"] = "public_stable keeps fallback tuple blazor-desktop:linux:linux-x64 retained with guest-readable install guidance so recovery participation and reward refs stay governed."
                 }
             }
         });
@@ -529,8 +529,8 @@ public sealed class PublicReleaseManifestServiceTests
 
         Assert.Equal("account_required", surfaces[0].GetProperty("installAccessClass").GetString());
         Assert.Equal("open_public", surfaces[1].GetProperty("installAccessClass").GetString());
-        Assert.Contains("linked download", surfaces[0].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("public download", surfaces[1].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("entitlement-backed", surfaces[0].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("guest-readable", surfaces[1].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -583,7 +583,7 @@ public sealed class PublicReleaseManifestServiceTests
                     ["rewardPublicationRef"] = "reward-publication:binding:preview:run-20260617-061500:avalonia:windows:win-x64",
                     ["publicationBindingId"] = "binding:preview:run-20260617-061500:avalonia:windows:win-x64",
                     ["publicInstallRoute"] = "/downloads/install/avalonia-win-x64-installer",
-                    ["rationale"] = "preview keeps avalonia:windows:win-x64 visible as a public download while this preview is still settling."
+                    ["rationale"] = "preview keeps preview tuple avalonia:windows:win-x64 on guest-readable install guidance so desktop can explain claim, participation, and reward posture before wider publication."
                 }
             }
         });
@@ -596,8 +596,8 @@ public sealed class PublicReleaseManifestServiceTests
 
         Assert.Equal("open_public", artifact.GetProperty("installAccessClass").GetString());
         Assert.Equal("open_public", surface.GetProperty("installAccessClass").GetString());
-        Assert.Contains("public download", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("linked download", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("guest-readable", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("entitlement-backed", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

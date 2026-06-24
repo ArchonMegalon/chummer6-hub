@@ -1119,6 +1119,7 @@ public sealed class PublicReleaseManifestService
             }
 
             rationale = rationale
+                .Replace("guest-readable", "entitlement-backed", StringComparison.OrdinalIgnoreCase)
                 .Replace("available as a public download", "available as a linked download", StringComparison.OrdinalIgnoreCase)
                 .Replace("retained as a public download", "retained as a linked download", StringComparison.OrdinalIgnoreCase)
                 .Replace("listed as a public download", "listed as a linked download", StringComparison.OrdinalIgnoreCase)
@@ -1914,19 +1915,19 @@ public sealed class PublicReleaseManifestService
         string routeRole = NormalizeToken(GetJsonString(routeRow["routeRole"]));
         string publicationState = ArtifactPublicationState(routeRow);
         string installPosture = string.Equals(installAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-            ? "a linked download"
-            : "a public download";
+            ? "entitlement-backed"
+            : "guest-readable";
 
         return publicationState switch
         {
             "published" =>
-                $"{channelId} keeps {tupleId} available as {installPosture} so installs, updates, and recovery stay easy to follow.",
+                $"{channelId} keeps {tupleId} {installPosture} so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals.",
             "retained" =>
-                $"{channelId} keeps {(string.IsNullOrWhiteSpace(routeRole) ? "desktop" : routeRole)} tuple {tupleId} retained as {installPosture} for recovery while the main download stays focused.",
+                $"{channelId} keeps {(string.IsNullOrWhiteSpace(routeRole) ? "desktop" : routeRole)} tuple {tupleId} retained with {installPosture} install guidance so recovery participation and reward refs stay governed.",
             "revoked" =>
-                $"{channelId} keeps revoked tuple {tupleId} listed as {installPosture} for recovery context without reopening the download.",
+                $"{channelId} keeps revoked tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward recovery without reopening installs.",
             _ =>
-                $"{channelId} keeps preview tuple {tupleId} visible as {installPosture} while this preview is still settling."
+                $"{channelId} keeps preview tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward posture before wider publication."
         };
     }
 
