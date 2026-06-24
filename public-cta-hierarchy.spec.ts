@@ -27,6 +27,8 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
   expect(downloads).toContain('Stable');
   expect(downloads).toContain('data-release-lane="nightly"');
   expect(downloads).toContain('data-release-lane="stable"');
-  expect(downloads).toContain('Choose Stable or Nightly. Windows, Linux, and Arch-compatible Linux options are published here.');
+  expect(downloads).toContain('Install Chummer');
+  expect(downloads).toContain('Windows and Linux installers.');
+  expect(downloads).toContain('Arch Linux');
   expect(downloads).not.toContain('Create account to install</a>');
 });

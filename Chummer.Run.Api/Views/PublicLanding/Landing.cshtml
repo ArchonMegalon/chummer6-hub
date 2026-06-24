@@ -21,10 +21,20 @@
             <a href="/status" data-analytics-event="homepage_open_status" data-analytics-surface="minimal_home" data-analytics-label="Status">Status</a>
         </p>
     </div>
-    <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/chummer6-flagship-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Open promo video" aria-label="Open promo video" title="Open promo video">
-        <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" loading="eager" decoding="async" />
-        <span class="minimal-hero__visual-badge">Watch promo</span>
-    </a>
+    <aside class="minimal-hero__visual minimal-hero__visual--preview" aria-label="Browser preview concept" data-homepage-preview="chummer6-here">
+        <p class="minimal-hero__preview-kicker">Preview test</p>
+        <h2>Chummer6 here</h2>
+        <p class="minimal-hero__preview-copy">A browser-first head could live here later. It would be a different UI from the real Chummer6 desktop app, used as a functionality preview rather than the main shipped workbench.</p>
+        <ul class="minimal-hero__preview-points">
+            <li>same core product direction</li>
+            <li>lighter web-facing shell</li>
+            <li>preview-only posture for now</li>
+        </ul>
+        <div class="minimal-actions minimal-actions--preview">
+            <a class="button-like button-like--ghost" href="/downloads" data-analytics-event="homepage_preview_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Use the desktop build">Use the desktop build</a>
+            <a class="button-like button-like--ghost" href="/status" data-analytics-event="homepage_preview_open_status" data-analytics-surface="minimal_home" data-analytics-label="Track preview status">Track preview status</a>
+        </div>
+    </aside>
 </section>
 
 @if (Model.Chrome.Authenticated)

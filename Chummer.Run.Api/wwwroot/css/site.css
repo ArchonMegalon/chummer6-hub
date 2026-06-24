@@ -8355,6 +8355,54 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.minimal-hero__visual--preview {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  padding: 1rem;
+  min-height: 176px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--minimal-panel) 92%, transparent), color-mix(in srgb, var(--minimal-soft) 88%, transparent)),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--minimal-accent) 12%, transparent), transparent 48%);
+}
+
+.minimal-hero__preview-kicker {
+  margin: 0;
+  color: var(--minimal-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.minimal-hero__visual--preview h2 {
+  margin: 0;
+  color: var(--minimal-ink);
+  font-size: clamp(1.1rem, 1.7vw, 1.45rem);
+  line-height: 1.06;
+}
+
+.minimal-hero__preview-copy {
+  margin: 0;
+  color: var(--minimal-muted);
+  font-size: 0.88rem;
+  line-height: 1.42;
+}
+
+.minimal-hero__preview-points {
+  display: grid;
+  gap: 0.22rem;
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--minimal-muted);
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.minimal-actions--preview {
+  margin-top: 0.1rem;
+}
+
 .minimal-section {
   padding: clamp(1rem, 2vw, 1.45rem) 0;
 }
@@ -8507,6 +8555,14 @@ body {
   max-height: 210px;
   border-color: color-mix(in srgb, var(--minimal-line) 62%, transparent);
   opacity: 0.98;
+}
+
+.route-landing .minimal-hero__visual--preview {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 360px;
+  min-height: 210px;
+  border-color: color-mix(in srgb, var(--minimal-line) 62%, transparent);
 }
 
 .route-landing .minimal-hero__visual-badge {
