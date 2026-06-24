@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-22T13:24:58Z",
+  "generated_at_utc": "2026-06-23T13:14:17Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,7 +14,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-22T13:06:36Z",
+      "generated_at_utc": "2026-06-23T13:12:20Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -511,7 +511,7 @@
       "generated_at_utc": "2026-06-21T17:07:46Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "desktop_native_model_depth": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESKTOP_NATIVE_MODEL_DEPTH.generated.json",
@@ -543,11 +543,11 @@
     "public_route_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "exists": true,
-      "status": "pass",
+      "status": "fail",
       "generated_at_utc": "2026-06-22T12:57:26.387543Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true,
+      "pass": false,
       "summary": {
         "route_count": 165,
         "passed_count": 165,
@@ -569,10 +569,10 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:38:49Z",
+      "generated_at_utc": "2026-06-22T13:59:07Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "icanpreneur_discovery_lane": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/ICANPRENEUR_DISCOVERY_LANE.generated.json",
@@ -581,7 +581,7 @@
       "generated_at_utc": "2026-06-21T17:40:39Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "ltd_optimization_stack": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
@@ -590,7 +590,7 @@
       "generated_at_utc": "2026-06-21T17:13:36Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "external_distribution_mirror_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
@@ -617,7 +617,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-22T04:51:43Z",
+      "generated_at_utc": "2026-06-23T08:52:24Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -626,7 +626,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-21T17:23:45Z",
+      "generated_at_utc": "2026-06-23T08:52:01Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -638,7 +638,7 @@
       "generated_at_utc": "2026-06-21T18:13:26Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true,
+      "pass": false,
       "failures": [],
       "nextActions": [],
       "startupReceipt": {
@@ -671,25 +671,25 @@
       "generated_at_utc": "2026-06-22T12:53:33Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "operator_release_dashboard": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-19T23:41:30Z",
+      "generated_at_utc": "2026-06-23T08:52:35Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
         "version": "run-258",
-        "published_at": "2026-06-19T19:53:33Z",
-        "channel": "preview",
-        "rollout_state": "coverage_incomplete",
-        "supportability_state": "review_required",
-        "known_issue_summary": "Release checks are missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+        "published_at": "2026-06-20T08:00:00Z",
+        "channel": "public_stable",
+        "rollout_state": "public_stable",
+        "supportability_state": "gold_supported",
+        "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
       }
     },
     "release_ready": {
@@ -814,11 +814,15 @@
     }
   ],
   "failures": [
+    "provider_proof_discoverability stale",
     "black_ledger_live_media_proof stale",
     "table_pulse_scenario_replay stale",
-    "live_surface_parity stale",
+    "public_route_proof stale",
+    "icanpreneur_discovery_lane stale",
+    "ltd_optimization_stack stale",
     "external_distribution_mirror_proof stale",
-    "operator_release_dashboard stale",
+    "windows_installer_visual_audit stale",
+    "ui_layout_exit_gate stale",
     "release_ready stale"
   ]
 }

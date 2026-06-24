@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.horizon_video_audio_exit_gate.v1",
-  "generated_at_utc": "2026-06-22T14:56:47Z",
+  "generated_at_utc": "2026-06-24T01:14:21Z",
   "status": "fail",
   "manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/horizon-video-manifest.json",
   "rebuild_receipt": "/docker/chummercomplete/_completion/public_video_audio_unmixr/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",

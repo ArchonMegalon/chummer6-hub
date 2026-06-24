@@ -73,7 +73,7 @@ public sealed class TeableKarmaForgeReviewBoardSyncWorker : BackgroundService
     }
 
     private bool IsEnabled()
-        => ParseBool(_configuration["CHUMMER_TEABLE_KARMA_FORGE_RECONCILE_ENABLED"], defaultValue: true);
+        => ParseBool(_configuration["CHUMMER_TEABLE_KARMA_FORGE_RECONCILE_ENABLED"], defaultValue: false);
 
     private TimeSpan ResolveDurationMinutes(string key, TimeSpan fallback)
     {

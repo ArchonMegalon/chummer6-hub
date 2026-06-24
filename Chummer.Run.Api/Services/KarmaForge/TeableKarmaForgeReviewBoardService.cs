@@ -69,6 +69,8 @@ public sealed record TeableKarmaForgeReviewBoardSyncResult(
 
 public sealed class TeableKarmaForgeReviewBoardService
 {
+    private const string HttpTimeoutSecondsConfigKey = "CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS";
+    private static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(15);
     private const string DefaultApiBaseUrl = "https://app.teable.ai/api";
     private const string DefaultTableName = "Karma Forge Review Board";
     private const string DefaultDbTableName = "karma_forge_review_board";
@@ -561,7 +563,7 @@ public sealed class TeableKarmaForgeReviewBoardService
 
     private TeableOptions ResolveOptions()
     {
-        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_KARMA_FORGE_ENABLED"], defaultValue: true);
+        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_KARMA_FORGE_ENABLED"], defaultValue: false);
         string apiKey = Normalize(_configuration["CHUMMER_TEABLE_KARMA_FORGE_API_KEY"])
             ?? Normalize(_configuration["CHUMMER_TEABLE_USERS_API_KEY"])
             ?? Normalize(_configuration["TEABLE_API_KEY"])
@@ -597,14 +599,25 @@ public sealed class TeableKarmaForgeReviewBoardService
             request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         }
 
-        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
-        string content = await response.Content.ReadAsStringAsync(cancellationToken);
+        using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ResolveHttpTimeout());
+
+        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, timeoutCts.Token);
+        string content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"teable_http_{(int)response.StatusCode}:{Truncate(content, 240)}");
         }
 
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
+    }
+
+    private TimeSpan ResolveHttpTimeout()
+    {
+        string? raw = Normalize(_configuration[HttpTimeoutSecondsConfigKey]);
+        return int.TryParse(raw, out int seconds) && seconds >= 1
+            ? TimeSpan.FromSeconds(seconds)
+            : DefaultHttpTimeout;
     }
 
     private void SetSyncAttempt(DateTimeOffset occurredAtUtc)

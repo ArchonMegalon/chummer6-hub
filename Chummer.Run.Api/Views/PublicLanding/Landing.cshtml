@@ -11,19 +11,14 @@
     <div class="minimal-hero__copy">
         <h1>Chummer</h1>
         <p class="minimal-hero__lead">A Shadowrun character manager for clean sheets and faster tables.</p>
-        <ul class="minimal-hero__points" aria-label="What Chummer does">
-            <li>Create</li>
-            <li>Track</li>
-            <li>Explain</li>
-            <li>Run</li>
-        </ul>
-        <div class="minimal-actions" aria-label="Main downloads">
-            <a class="button-like button-like--primary" href="/downloads" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
+        <div class="minimal-actions" aria-label="Main download">
+            <a class="button-like button-like--primary" href="/downloads" title="Download Chummer" aria-label="Download Chummer" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
         </div>
         <p class="minimal-meta">Windows and Linux.</p>
         <p class="minimal-inline-links">
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
-            <a href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+            <a href="/partizipate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+            <a href="/status" data-analytics-event="homepage_open_status" data-analytics-surface="minimal_home" data-analytics-label="Status">Status</a>
         </p>
     </div>
     <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/chummer6-flagship-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Open promo video" aria-label="Open promo video" title="Open promo video">
@@ -34,6 +29,27 @@
 
 @if (Model.Chrome.Authenticated)
 {
+    @if (Model.OpenRail is { Items.Count: > 0 })
+    {
+        <section class="minimal-section minimal-section--support" data-homepage-section="open-rail">
+            <div class="minimal-section__lead">
+                <h2>@Model.OpenRail.Heading</h2>
+                <p>@Model.OpenRail.Summary</p>
+            </div>
+            <div class="minimal-facts" role="list" aria-label="Open in Chummer">
+                @foreach (var item in Model.OpenRail.Items)
+                {
+                    <article role="listitem">
+                        <strong>@item.Label</strong>
+                        <p>@item.Summary</p>
+                        <p class="minimal-meta">@item.Kind</p>
+                        <a class="button-like button-like--ghost" href="@item.Href">Open</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
     <section class="minimal-section minimal-section--support" data-homepage-section="starter-lane">
         <div class="minimal-section__lead">
             <h2>Next session</h2>

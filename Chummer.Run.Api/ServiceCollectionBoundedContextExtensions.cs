@@ -76,6 +76,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ReusableAccountFlowService>();
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
+        services.AddSingleton<BrilliantDirectoriesBillingStore>();
+        services.AddSingleton<BrilliantDirectoriesBillingService>();
         services.AddSingleton<PayFunnelsBillingStore>();
         services.AddSingleton<PayFunnelsBillingService>();
         services.AddSingleton<LeaderboardService>();
@@ -148,6 +150,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<InstallLinkingService>();
         services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
         services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
+        services.AddSingleton<AccountDesktopLaunchTicketService>();
         services.AddSingleton<PersonalizedInstallScriptService>();
         services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();

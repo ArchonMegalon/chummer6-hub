@@ -9,7 +9,11 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = ResolveHubContentRoot()
+});
 builder.AddHubApiRuntimeGuardrails();
 builder.AddHubRequestObservability();
 var enableHttpsRedirection = builder.Configuration.GetValue("CHUMMER_ENABLE_HTTPS_REDIRECTION", true);
@@ -327,6 +331,48 @@ static bool IsIndexablePublicPath(PathString path)
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
 {
     return path.Equals("/artifacts/mac-codex-release-pipeline/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
+}
+
+static string ResolveHubContentRoot()
+{
+    string currentDirectory = Directory.GetCurrentDirectory();
+    if (Directory.Exists(Path.Combine(currentDirectory, "wwwroot")))
+    {
+        return currentDirectory;
+    }
+
+    string baseDirectory = AppContext.BaseDirectory;
+    string? candidate = TryFindHubProjectRoot(baseDirectory);
+    if (!string.IsNullOrWhiteSpace(candidate))
+    {
+        return candidate;
+    }
+
+    candidate = TryFindHubProjectRoot(currentDirectory);
+    if (!string.IsNullOrWhiteSpace(candidate))
+    {
+        return candidate;
+    }
+
+    return currentDirectory;
+}
+
+static string? TryFindHubProjectRoot(string startPath)
+{
+    var directory = new DirectoryInfo(Path.GetFullPath(startPath));
+    while (directory is not null)
+    {
+        string wwwrootPath = Path.Combine(directory.FullName, "wwwroot");
+        string projectFilePath = Path.Combine(directory.FullName, "Chummer.Run.Api.csproj");
+        if (Directory.Exists(wwwrootPath) && File.Exists(projectFilePath))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    return null;
 }
 
 static string[] GetCsvValues(string? value)

@@ -87,11 +87,14 @@ def fetch(
     request_headers: dict[str, str] | None = None,
     max_retries: int = 6,
     retry_delay_seconds: float = 1.0,
+    request_timeout_seconds: float = 20.0,
 ) -> tuple[int, str, dict[str, str], str]:
     if max_retries < 0:
         raise ValueError("max_retries cannot be negative")
     if retry_delay_seconds < 0:
         raise ValueError("retry_delay_seconds cannot be negative")
+    if request_timeout_seconds <= 0:
+        raise ValueError("request_timeout_seconds must be positive")
 
     attempt = 0
     while True:
@@ -107,7 +110,7 @@ def fetch(
         request = Request(url, headers=headers, data=body, method=method)
         opener = build_opener() if follow_redirects else build_opener(NoRedirectHandler())
         try:
-            with opener.open(request, timeout=20) as response:
+            with opener.open(request, timeout=request_timeout_seconds) as response:
                 status = response.status
                 body_text = response.read().decode("utf-8", errors="replace")
                 response_headers = {key.lower(): value for key, value in response.headers.items()}
@@ -687,7 +690,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Welcome back", "/home")
     require_snippet(body, "Use the current release", "/home")
     require_snippet(body, "Keep this copy connected", "/home")
-    require_snippet(body, "Open what works today", "/home")
+    require_snippet(body, "Open current release", "/home")
 
     status, body, _, _ = fetch(
         base_url,
@@ -717,7 +720,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "What changed for you", "/home/access")
     require_snippet(body, "Release and device state", "/home/access")
     require_snippet(body, "Open Devices &amp; access", "/home/access")
-    require_snippet(body, "Open what works today", "/home/access")
+    require_snippet(body, "Open current release", "/home/access")
 
     workspace_id = workspaces[0]["workspaceId"]
     workspace_path = f"/account/work/workspaces/{workspace_id}"
@@ -12039,7 +12042,7 @@ def main() -> int:
             required_texts=("Current pages", "Current release build", "Open saved pages"),
             expects_header_count=1),
         AuditRoute(
-            "/participate",
+            "/partizipate",
             "Tell us what slows the table down.",
             required_texts=("Ideas and safe bugs", "Public board", "Roadmap", "Open Help"),
             expects_header_count=1),

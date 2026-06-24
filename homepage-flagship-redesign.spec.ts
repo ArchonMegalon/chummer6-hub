@@ -13,9 +13,7 @@ test('landing implements the product-first homepage structure', async () => {
   expect(view).toContain('Stable</a>');
   expect(view).toContain('Nightly</a>');
   expect(view).toContain('data-homepage-section="hero"');
-  expect(view).toContain('data-homepage-section="workflow"');
-  expect(view).toContain('data-homepage-section="downloads"');
-  expect(view).toContain('data-homepage-section="help"');
+  expect(view).toContain('Status</a>');
   expect(view).toContain('minimal-hero__visual--screenshot');
   expect(view).not.toContain('The city is moving.');
   expect(view).not.toContain('Open Black Ledger');

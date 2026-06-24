@@ -36,14 +36,14 @@ HTML_ROUTES = [
     "/changelog",
     "/help",
     "/contact",
-    "/participate",
+    "/partizipate",
     "/karma-forge",
     "/participate/karma-forge",
     "/participate/karma-forge/submitted/sample-submission-id",
     "/contact/submitted/sample-case-id",
 ]
 ALLOWED_EXTERNAL_REDIRECT_ROUTES = {
-    "/participate",
+    "/partizipate",
     "/feedback",
     "/help/feedback",
 }

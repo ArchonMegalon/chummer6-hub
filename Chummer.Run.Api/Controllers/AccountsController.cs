@@ -23,6 +23,7 @@ public sealed class AccountsController : Controller
     private readonly UserExperienceService _experience;
     private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly InstallLinkingService _installLinking;
+    private readonly AccountDesktopLaunchTicketService _desktopLaunchTickets;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly CampaignSpineService _campaignSpine;
@@ -47,6 +48,7 @@ public sealed class AccountsController : Controller
         UserExperienceService experience,
         ParticipationOperatorNotificationService participationNotifications,
         InstallLinkingService installLinking,
+        AccountDesktopLaunchTicketService desktopLaunchTickets,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         CampaignSpineService campaignSpine,
@@ -70,6 +72,7 @@ public sealed class AccountsController : Controller
         _experience = experience;
         _participationNotifications = participationNotifications;
         _installLinking = installLinking;
+        _desktopLaunchTickets = desktopLaunchTickets;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _campaignSpine = campaignSpine;
@@ -365,6 +368,92 @@ public sealed class AccountsController : Controller
             entryId: null,
             publicationId: publicationId,
             prepQuery: null);
+    }
+
+    [HttpGet("/account/open/character/{dossierId}")]
+    [HttpGet("/account/open/campaign/{campaignId}")]
+    [HttpGet("/account/open/group/{groupId}")]
+    [HttpGet("/account/open/example/{exampleId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenInChummer(
+        [FromRoute] string? dossierId,
+        [FromRoute] string? campaignId,
+        [FromRoute] string? groupId,
+        [FromRoute] string? exampleId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = BuildAccountOpenCurrentPath(dossierId, campaignId, groupId, exampleId);
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            bool hasLinkedDesktop = (installLinking.ClaimedInstallations?.Count ?? 0) > 0
+                || (installLinking.ActiveGrants?.Count ?? 0) > 0
+                || installLinking.PendingClaimTickets.Count > 0;
+            if (!hasLinkedDesktop)
+            {
+                return Redirect("/downloads");
+            }
+
+            string launchKind;
+            string resourceId;
+            string heading;
+            string summary;
+            if (!string.IsNullOrWhiteSpace(dossierId))
+            {
+                launchKind = "character";
+                resourceId = dossierId;
+                heading = "Open character in Chummer";
+                summary = "This account already has a linked desktop copy, so the next step belongs in the app.";
+            }
+            else if (!string.IsNullOrWhiteSpace(campaignId))
+            {
+                launchKind = "campaign";
+                resourceId = campaignId;
+                heading = "Open campaign in Chummer";
+                summary = "Return to the desktop app for the real campaign flow instead of staying in the browser.";
+            }
+            else if (!string.IsNullOrWhiteSpace(groupId))
+            {
+                launchKind = "group";
+                resourceId = groupId;
+                heading = "Open group in Chummer";
+                summary = "Use the linked desktop copy for the actual group and campaign work.";
+            }
+            else if (!string.IsNullOrWhiteSpace(exampleId))
+            {
+                launchKind = "example-character";
+                resourceId = exampleId;
+                heading = "Open example character in Chummer";
+                summary = "Start from an archetype inside the app, then turn it into your own runner.";
+            }
+            else
+            {
+                return Redirect("/account/work");
+            }
+
+            var ticket = _desktopLaunchTickets.Issue(launchKind, resourceId, user.UserId, subject.SubjectId);
+            string launchUri = $"chummer://open?ticket={Uri.EscapeDataString(ticket.Ticket)}&kind={Uri.EscapeDataString(launchKind)}&id={Uri.EscapeDataString(resourceId)}";
+            return View("~/Views/Accounts/OpenInChummer.cshtml", new AccountDesktopLaunchPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome(heading, summary, currentPath, user.DisplayName, user.Email),
+                Heading: heading,
+                Summary: summary,
+                LaunchUri: launchUri,
+                PrimaryLabel: "Open in Chummer",
+                PrimaryHref: "/downloads",
+                SecondaryLabel: "Open downloads",
+                SecondaryHref: "/account/work",
+                Notes: new[]
+                {
+                    "If the app does not answer, use downloads or devices and access instead of repeating the same dead click.",
+                    "This browser page is only the launch bridge. The real editing flow stays in the desktop app."
+                }));
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
     }
 
     [HttpGet("/account/creator")]
@@ -1153,6 +1242,35 @@ public sealed class AccountsController : Controller
         return selectedSection == "profile"
             ? "/account"
             : $"/account/{selectedSection}";
+    }
+
+    private static string BuildAccountOpenCurrentPath(
+        string? dossierId,
+        string? campaignId,
+        string? groupId,
+        string? exampleId)
+    {
+        if (!string.IsNullOrWhiteSpace(dossierId))
+        {
+            return $"/account/open/character/{Uri.EscapeDataString(dossierId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(campaignId))
+        {
+            return $"/account/open/campaign/{Uri.EscapeDataString(campaignId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(groupId))
+        {
+            return $"/account/open/group/{Uri.EscapeDataString(groupId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(exampleId))
+        {
+            return $"/account/open/example/{Uri.EscapeDataString(exampleId)}";
+        }
+
+        return "/account/work";
     }
 
     private static TItem? FindById<TItem>(

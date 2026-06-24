@@ -11,6 +11,7 @@ public sealed record HeyyScamChatIngestRequest(
     [StringLength(160)] string? Source = null);
 
 public sealed record HeyyScamChatDraftResponse(
+    string DraftId,
     string ConversationId,
     string Mode,
     bool ManualApprovalRequired,
@@ -58,7 +59,8 @@ public sealed record HeyyScamChatApproveDraftRequest(
     [StringLength(160)] string? Recipient = null,
     bool ConfirmManualApproval = false,
     bool DryRun = true,
-    [StringLength(160)] string? IdempotencyKey = null);
+    [StringLength(160)] string? IdempotencyKey = null,
+    [StringLength(128)] string? DraftId = null);
 
 public sealed record HeyyScamChatApprovalResponse(
     string ApprovalId,

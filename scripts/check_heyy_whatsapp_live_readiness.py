@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_PATH = ROOT / ".env"
 DEFAULT_CONTAINER = "chummer6-hub-chummer-portal-1"
+DEFAULT_INTERNAL_API_BASE_URL = "http://127.0.0.1:8091"
+DEFAULT_INTERNAL_API_TIMEOUT_SECONDS = 10.0
 
 HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED",
@@ -22,6 +26,21 @@ HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID",
     "CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID",
     "CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID",
+    "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BASE_URL",
+    "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BEARER_TOKEN",
+    "CHUMMER_HEYY_SCAM_CHAT_EA_CF_ACCESS_CLIENT_ID",
+    "CHUMMER_HEYY_SCAM_CHAT_EA_CF_ACCESS_CLIENT_SECRET",
+    "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL",
+    "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BEARER_TOKEN",
+    "ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_ID",
+    "ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_SECRET",
+    "CODEXLIZ_OLLAMA_HOST",
+    "CODEXLIZ_CF_ACCESS_CLIENT_ID",
+    "CODEXLIZ_CF_ACCESS_CLIENT_SECRET",
+    "CHUMMER_HEYY_SCAM_CHAT_EA_MODEL",
+    "ANSWERLY_OPENAI_COMPAT_MODEL_ID",
+    "CHUMMER_HEYY_SCAM_CHAT_INTERNAL_TOKEN",
+    "FLEET_INTERNAL_API_TOKEN",
 )
 
 CHANNEL_MESSAGING_KEYS = (
@@ -95,6 +114,85 @@ def base_url_is_real(values: dict[str, str]) -> bool:
     return not any(marker in base_url for marker in ("support-progress-mock", "127.0.0.1", "localhost"))
 
 
+def normalize_value(values: dict[str, str], key: str) -> str | None:
+    value = str(values.get(key) or "").strip()
+    return value or None
+
+
+def chat_auth_configured(values: dict[str, str]) -> bool:
+    bearer = normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BEARER_TOKEN") or normalize_value(
+        values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BEARER_TOKEN"
+    )
+    if bearer:
+        return True
+
+    client_id = (
+        normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CF_ACCESS_CLIENT_ID")
+        or normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_ID")
+        or normalize_value(values, "CODEXLIZ_CF_ACCESS_CLIENT_ID")
+    )
+    client_secret = (
+        normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CF_ACCESS_CLIENT_SECRET")
+        or normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_SECRET")
+        or normalize_value(values, "CODEXLIZ_CF_ACCESS_CLIENT_SECRET")
+    )
+    return bool(client_id and client_secret)
+
+
+def answerly_verification_state(values: dict[str, str]) -> str:
+    state = str(values.get("ANSWERLY_PROVIDER_VERIFICATION_STATE") or "").strip().lower()
+    if state in {"verified_full_adapter", "verified_widget_only", "rejected"}:
+        return state
+    return "unverified"
+
+
+def answerly_local_compat_ready(values: dict[str, str]) -> bool:
+    return (
+        enabled(values, "ANSWERLY_ENABLED")
+        and enabled(values, "ANSWERLY_SUPPORT_ENABLED")
+        and enabled(values, "ANSWERLY_OPENAI_COMPAT_ENABLED")
+        and answerly_verification_state(values) == "verified_full_adapter"
+        and present(values, "ANSWERLY_OPENAI_COMPAT_API_TOKEN")
+    )
+
+
+def resolve_chat_base_url(values: dict[str, str]) -> str | None:
+    explicit_heyy = normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BASE_URL")
+    if explicit_heyy:
+        return explicit_heyy
+
+    answerly = normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL")
+    if answerly and chat_auth_configured(values):
+        return answerly
+
+    return normalize_value(values, "CODEXLIZ_OLLAMA_HOST")
+
+
+def raw_chat_route_candidate(values: dict[str, str]) -> str:
+    if normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BASE_URL"):
+        return "heyy_chat_base_url"
+    if normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL"):
+        return "answerly_upstream"
+    if normalize_value(values, "CODEXLIZ_OLLAMA_HOST"):
+        return "codexliz_ollama"
+    return "unconfigured"
+
+
+def draft_generation_blocking_reason(values: dict[str, str]) -> str | None:
+    if resolve_chat_base_url(values):
+        return None
+
+    if normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL") and not chat_auth_configured(values):
+        return "answerly_upstream_auth_missing"
+
+    if not answerly_local_compat_ready(values):
+        if answerly_verification_state(values) != "verified_full_adapter":
+            return "answerly_local_compat_unverified"
+        return "answerly_local_compat_disabled"
+
+    return "no_chat_route_configured"
+
+
 def inspect_ea_db_binding() -> dict[str, Any]:
     query = (
         "select binding_id, principal_id, connector_name, status, "
@@ -148,7 +246,47 @@ def inspect_ea_db_binding() -> dict[str, Any]:
     return {"available": True, "bindings": bindings}
 
 
-def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any]:
+def internal_api_token(values: dict[str, str]) -> str:
+    return str(
+        values.get("CHUMMER_HEYY_SCAM_CHAT_INTERNAL_TOKEN")
+        or values.get("FLEET_INTERNAL_API_TOKEN")
+        or ""
+    ).strip()
+
+
+def probe_internal_api(api_base_url: str, token: str) -> dict[str, Any]:
+    request = urllib.request.Request(
+        f"{api_base_url.rstrip('/')}/api/internal/heyy/scam-chat/conversations?take=1",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=DEFAULT_INTERNAL_API_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8") or "[]")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "unreachable",
+            "reason": f"http_{exc.code}",
+            "detail": detail[:300],
+        }
+    except Exception as exc:
+        return {
+            "status": "unreachable",
+            "reason": exc.__class__.__name__,
+            "detail": str(exc)[:300],
+        }
+
+    return {
+        "status": "reachable",
+        "conversation_count": len(payload) if isinstance(payload, list) else None,
+    }
+
+
+def build_report(values: dict[str, str], recipient: str | None, internal_api: dict[str, Any]) -> dict[str, Any]:
     recipient_digits = normalize_phone(recipient)
     meta_ready = (
         enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED")
@@ -165,6 +303,11 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
         )
         and base_url_is_real(values)
     )
+    chat_base_url = resolve_chat_base_url(values)
+    draft_generation_ready = bool(chat_base_url)
+    raw_chat_candidate = raw_chat_route_candidate(values)
+    draft_blocking_reason = draft_generation_blocking_reason(values)
+    local_answerly_ready = answerly_local_compat_ready(values)
     blockers: list[str] = []
     if not enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"):
         blockers.append("whatsapp_disabled")
@@ -172,6 +315,12 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
         blockers.append("recipient_invalid")
     if not meta_ready and not ea_ready:
         blockers.append("live_provider_unconfigured")
+    if internal_api.get("status") != "reachable":
+        blockers.append("internal_api_unreachable")
+    if not draft_generation_ready:
+        blockers.append("draft_generation_unconfigured")
+        if draft_blocking_reason:
+            blockers.append(draft_blocking_reason)
 
     channel_messaging_ready = (
         present(values, "CHUMMER_EA_CHANNEL_MESSAGING_EA_API_TOKEN")
@@ -208,6 +357,41 @@ def build_report(values: dict[str, str], recipient: str | None) -> dict[str, Any
             "meta_ready": meta_ready,
             "ea_ready": ea_ready,
         },
+        "drafting": {
+            "chat_base_url_present": bool(chat_base_url),
+            "configured_chat_base_url_present": raw_chat_candidate != "unconfigured",
+            "chat_auth_configured": chat_auth_configured(values),
+            "chat_route": (
+                "heyy_chat_base_url"
+                if normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_CHAT_BASE_URL")
+                else "answerly_upstream"
+                if (
+                    normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL")
+                    and chat_auth_configured(values)
+                )
+                else "codexliz_ollama"
+                if normalize_value(values, "CODEXLIZ_OLLAMA_HOST")
+                else "unconfigured"
+            ),
+            "chat_route_candidate": raw_chat_candidate,
+            "model_present": bool(
+                normalize_value(values, "CHUMMER_HEYY_SCAM_CHAT_EA_MODEL")
+                or normalize_value(values, "ANSWERLY_OPENAI_COMPAT_MODEL_ID")
+            ),
+            "blocking_reason": draft_blocking_reason,
+            "answerly_upstream_base_url_present": bool(
+                normalize_value(values, "ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL")
+            ),
+            "answerly_local_compat_enabled": (
+                enabled(values, "ANSWERLY_ENABLED")
+                and enabled(values, "ANSWERLY_SUPPORT_ENABLED")
+                and enabled(values, "ANSWERLY_OPENAI_COMPAT_ENABLED")
+            ),
+            "answerly_local_compat_ready": local_answerly_ready,
+            "answerly_verification_state": answerly_verification_state(values),
+            "ready": draft_generation_ready,
+        },
+        "internal_api": internal_api,
         "channel_messaging": {
             "ea_base_url_real": base_url_is_real({
                 "CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL": values.get("CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL", "")
@@ -229,17 +413,25 @@ def main() -> int:
     parser.add_argument("--recipient", default="")
     parser.add_argument("--skip-container", action="store_true")
     parser.add_argument("--include-ea-db", action="store_true")
+    parser.add_argument("--internal-api-base-url", default=DEFAULT_INTERNAL_API_BASE_URL)
     args = parser.parse_args()
 
     env_values = load_env_file(Path(args.env_file))
     container_values = {} if args.skip_container else load_container_env(args.container)
     effective = {**env_values, **{key: value for key, value in container_values.items() if key in ALL_KEYS}}
-    report = build_report(effective, args.recipient)
+    token = internal_api_token(effective)
+    internal_api = (
+        {"status": "unreachable", "reason": "internal_api_token_missing", "detail": ""}
+        if not token
+        else probe_internal_api(args.internal_api_base_url, token)
+    )
+    report = build_report(effective, args.recipient, internal_api)
     report["sources"] = {
         "env_file": str(Path(args.env_file)),
         "env_file_present": Path(args.env_file).exists(),
         "container": None if args.skip_container else args.container,
         "container_env_present": bool(container_values),
+        "internal_api_base_url": args.internal_api_base_url,
     }
     if args.include_ea_db:
         report["ea_db"] = inspect_ea_db_binding()

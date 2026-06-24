@@ -74,6 +74,23 @@ public sealed class HubApiGuardrailPolicyTests
     }
 
     [Fact]
+    public void HeyyScamChatInternalRoutesUseExtendedTimeoutBudget()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/internal/heyy/scam-chat/messages";
+        HubApiGuardrailOptions options = new()
+        {
+            DefaultRequestTimeout = TimeSpan.FromSeconds(30),
+            ExtendedRequestTimeout = TimeSpan.FromMinutes(3)
+        };
+
+        TimeSpan timeout = HubApiGuardrailPolicy.ResolveTimeout(context.Request, options);
+
+        Assert.Equal(TimeSpan.FromMinutes(3), timeout);
+    }
+
+    [Fact]
     public void RuntimeGuardrailsRaiseMultipartAndRequestCapsForReleaseBundles()
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder();

@@ -83,16 +83,20 @@ Public CTAs should point readers toward:
 
 ### `public_board_model`
 
-`/participate` should feel like the public board itself, not a speech about the board.
+`/partizipate` should feel like the public board itself, not a speech about the board.
+It is ProductLift-backed signal, roadmap, and closeout data rendered as a Chummer-owned surface.
+The hosted board is served through the local `/partizipate/board` proxy so the public URL stays on `chummer.run`.
 
 Required posture:
 
 * first-party Chummer chrome
-* ProductLift-style dense board behavior
+* ProductLift-style dense board behavior without exposing ProductLift as the product brand
+* minimal dark presentation: compact columns, restrained borders, legible status chips, no oversized marketing hero
 * one-screen orientation before the board content starts
 * immediate access to feedback, roadmap, and shipped closeout lanes
 * short route guidance for private support, account recovery, and logs
 * compact cards, filters, vote signals, and recent movement
+* first-party fallback copy when ProductLift data is delayed or unavailable
 
 Avoid:
 

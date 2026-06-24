@@ -644,7 +644,19 @@ public sealed record LandingPageViewModel(
     BlackLedgerWorldPreviewViewModel? BlackLedgerWorld = null,
     BlackLedgerDispatchViewModel? LatestBlackLedgerDispatch = null,
     AccountCampaignSummary? CampaignSpine = null,
+    LandingOpenRailViewModel? OpenRail = null,
     PublicAccessPostureViewModel? AccessPosture = null);
+
+public sealed record LandingOpenRailViewModel(
+    string Heading,
+    string Summary,
+    IReadOnlyList<LandingOpenRailItemViewModel> Items);
+
+public sealed record LandingOpenRailItemViewModel(
+    string Label,
+    string Summary,
+    string Href,
+    string Kind);
 
 public sealed record BlackLedgerHubPageViewModel(
     SiteChromeViewModel Chrome,
@@ -938,6 +950,7 @@ public sealed record ParticipatePageViewModel(
     string PrivateHelpHref,
     string RoadmapHref,
     string ChangelogHref,
+    string? HostedBoardHref = null,
     PublicSignalOperationsPacketViewModel? SignalOperations = null);
 
 public sealed record ParticipateLaneViewModel(
@@ -2151,6 +2164,17 @@ public sealed record AccountPageViewModel(
     IReadOnlyList<PublicPackageReceipt>? ParticipationPackageReceipts = null,
     IReadOnlyList<KarmaForgeSubmissionProjection>? ParticipationKarmaSubmissions = null,
     IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationActivityReceipts = null);
+
+public sealed record AccountDesktopLaunchPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Summary,
+    string LaunchUri,
+    string PrimaryLabel,
+    string PrimaryHref,
+    string SecondaryLabel,
+    string SecondaryHref,
+    IReadOnlyList<string>? Notes = null);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,

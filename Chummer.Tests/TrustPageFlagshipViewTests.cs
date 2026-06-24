@@ -12,8 +12,8 @@ public sealed class TrustPageFlagshipViewTests
 
         Assert.Contains("Pick the problem", trustView, StringComparison.Ordinal);
         Assert.Contains("Each card starts with the best first step. Use the second link only if needed.", trustView, StringComparison.Ordinal);
-        Assert.Contains("minimal-help-card__details", trustView, StringComparison.Ordinal);
-        Assert.Contains("Quick notes", trustView, StringComparison.Ordinal);
+        Assert.Contains("minimal-help-card__list", trustView, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Quick notes\"", trustView, StringComparison.Ordinal);
         Assert.Contains("If that does not fit:", trustView, StringComparison.Ordinal);
         Assert.Contains("Pick the path", trustView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid--compact", trustView, StringComparison.Ordinal);

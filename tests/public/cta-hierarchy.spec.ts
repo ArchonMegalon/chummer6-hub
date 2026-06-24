@@ -66,7 +66,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '# Homepage Simplification Changelog',
       '',
       '- Hero keeps one primary CTA: `Download Chummer`.',
-      '- Homepage remains compact: hero, workflow, and no repeated support block or download strip.',
+      '- Homepage remains compact: one hero and no repeated support block or download strip.',
       '- Release posture stays off the first screen and lives on Status instead.',
       '- Support paths stay inline in the hero instead of competing as a second CTA block.',
     ].join('\n'),

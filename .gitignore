@@ -11,6 +11,10 @@
 !.env.example
 cloudflared.env
 cloudflared.env.*
+.state/
+/build-*.tar.gz
+/build-*.zip
+/nightly_build.zip
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

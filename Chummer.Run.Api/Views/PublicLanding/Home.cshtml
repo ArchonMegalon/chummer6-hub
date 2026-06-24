@@ -333,8 +333,8 @@
         </article>
         <article class="home-cockpit-strip__fact">
             <span>Current release</span>
-            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open what works today for the latest availability.")</strong>
-            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open what works today for the latest notes.")</p>
+            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</strong>
+            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</p>
         </article>
     </div>
 </section>
@@ -420,7 +420,7 @@ else
                     <span class="tag">Current release</span>
                     <h2>Use the current release</h2>
                     <p>See what changed, what is working today, and whether now is the right moment to install or update.</p>
-                    <a class="button-like button-like--secondary" href="/now">Open what works today</a>
+                    <a class="button-like button-like--secondary" href="/now">Open current release</a>
                 </article>
                 <article class="app-action-card">
                     <span class="tag">Devices &amp; access</span>
@@ -450,7 +450,7 @@ else
                                                     <h3>No urgent follow-up</h3>
                                                     <p>There is no urgent support update, setup step, or restore conflict right now.</p>
                                                 </div>
-                                                <a class="inline-link" href="/now">See what works today</a>
+                                                <a class="inline-link" href="/now">Open current release</a>
                                             </article>
                                         }
                                         else
@@ -507,7 +507,7 @@ else
                                                     <h3>Use the current release</h3>
                                                     <p>See what changed, what is working today, and whether this is the right moment to install or update.</p>
                                                 </div>
-                                                <a class="inline-link" href="/now">Open what works today</a>
+                                                <a class="inline-link" href="/now">Open current release</a>
                                             </article>
                                             <article class="app-rail__item">
                                                 <span class="tag">Device state</span>
@@ -518,7 +518,7 @@ else
                                                 <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                             </article>
                                         </div>
-                                        <p class="muted-copy">Need current release status before you install or return? <a class="inline-link" href="/now">Open what works today</a>.</p>
+                                        <p class="muted-copy">Need current release status before you install or return? <a class="inline-link" href="/now">Open current release</a>.</p>
                                     </details>
                                 </div>
                 </div>
@@ -1004,9 +1004,9 @@ else
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
                                                                 <span> Guide: release notes, downloads, and support stay together.</span>
-                                                                <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open what works today for the latest availability.")</span>
-                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open what works today for the latest fix status.")</span>
-                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open what works today for the latest notes.")</span>
+                                                                <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</span>
+                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open current release for the latest fix status.")</span>
+                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>

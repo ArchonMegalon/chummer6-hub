@@ -53,7 +53,7 @@
     {
         "install-update" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
         "sign-in-recovery" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
-        "product-bug" => new TrustPageActionViewModel("See what works today", "/now", "ghost"),
+        "product-bug" => new TrustPageActionViewModel("Open status", "/status", "ghost"),
         "product-question" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
         _ => null
     };
@@ -108,13 +108,13 @@
             Badge: "Participate",
             Title: "Use Participate for ideas and safe public bugs",
             Summary: "Feature requests and safe public UX bugs belong there. Logs, account issues, and private campaign detail do not.",
-            Href: "/feedback",
-            Label: "Open feedback",
+            Href: "/partizipate",
+            Label: "Open participate",
             Details: new[] { "Public page", "Votes show demand", "No private logs" }));
         contactRouteChoices.Add((
             Id: "right-lane",
             Badge: "Private support",
-            Title: "Use the support form when the issue needs logs or account detail",
+            Title: "Use support when the issue needs logs or account detail",
             Summary: "Use this for crashes, install recovery, broken behavior, or anything that should stay private.",
             Href: "#support-intake",
             Label: "Open support intake",
@@ -226,7 +226,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Pick the problem</h2>
-            <p>Each card starts with the best first step. Use the second link only if needed.</p>
+            <p>Each card starts with the best first step.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -238,20 +238,17 @@
                     <p>@PublicText(choice.Summary)</p>
                     @if (choice.Details.Length > 0)
                     {
-                        <details class="minimal-help-card__details">
-                            <summary>Quick notes</summary>
-                            <ul>
-                                @foreach (var item in choice.Details)
-                                {
-                                    <li>@PublicText(item)</li>
-                                }
-                            </ul>
-                        </details>
+                        <ul class="minimal-help-card__list" aria-label="Quick notes">
+                            @foreach (var item in choice.Details)
+                            {
+                                <li>@PublicText(item)</li>
+                            }
+                        </ul>
                     }
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
                     @if (fallbackAction is not null)
                     {
-                        <p class="muted-copy">If that does not fit: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
+                        <p class="muted-copy">Or: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
                     }
                 </article>
             }

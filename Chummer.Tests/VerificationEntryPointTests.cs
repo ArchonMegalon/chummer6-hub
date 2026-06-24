@@ -3394,6 +3394,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("HubRequestObservabilityVerification.RunAsync", verificationProgram, StringComparison.Ordinal);
         Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
         Assert.Contains("Response.OnStarting", middleware, StringComparison.Ordinal);
+        Assert.Contains("Hub request started: {Method} {Path} ({CorrelationId}).", middleware, StringComparison.Ordinal);
+        Assert.Contains("Hub request completed: {Method} {Path} -> {StatusCode} in {ElapsedMs} ms ({CorrelationId}).", middleware, StringComparison.Ordinal);
         Assert.Contains("IDENTITY_ENABLE_HTTPS_REDIRECTION", identityProgram, StringComparison.Ordinal);
         Assert.Contains("HasHttpsListenerConfiguration", identityProgram, StringComparison.Ordinal);
         Assert.Contains("HTTPS_PORTS", identityProgram, StringComparison.Ordinal);
@@ -3558,7 +3560,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("href=\"/downloads\"", landingView, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", landingView, StringComparison.Ordinal);
-        Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/partizipate\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("Get the app", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);

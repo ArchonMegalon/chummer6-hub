@@ -57,6 +57,7 @@ public sealed class InstallLinkingController : ControllerBase
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly InstallLinkingService _installLinking;
+    private readonly AccountDesktopLaunchTicketService _desktopLaunchTickets;
     private readonly PublicReleaseManifestService _releases;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
@@ -69,6 +70,7 @@ public sealed class InstallLinkingController : ControllerBase
         HubIdentityClient identity,
         AccountService accounts,
         InstallLinkingService installLinking,
+        AccountDesktopLaunchTicketService desktopLaunchTickets,
         PublicReleaseManifestService releases,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
@@ -78,6 +80,7 @@ public sealed class InstallLinkingController : ControllerBase
         _identity = identity;
         _accounts = accounts;
         _installLinking = installLinking;
+        _desktopLaunchTickets = desktopLaunchTickets;
         _releases = releases;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
@@ -158,6 +161,38 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+    }
+
+    [HttpPost("desktop-launch/exchange")]
+    [ProducesResponseType<DesktopAccountLaunchExchangeResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<DesktopAccountLaunchExchangeResponseDto> ExchangeDesktopLaunch([FromBody] DesktopAccountLaunchExchangeRequestDto? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("desktop launch payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown.");
+        }
+
+        if (!_desktopLaunchTickets.TryValidate(request.Ticket, out AccountDesktopLaunchTicketClaims? claims) || claims is null)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "desktop launch ticket is invalid.");
+        }
+
+        if (!MatchesDesktopLaunchIdentity(installation, claims))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "desktop launch ticket does not belong to this linked install.");
+        }
+
+        return Ok(new DesktopAccountLaunchExchangeResponseDto(
+            Kind: claims.Kind,
+            ResourceId: claims.ResourceId,
+            IssuedAtUtc: claims.IssuedAtUtc,
+            ExpiresAtUtc: claims.ExpiresAtUtc));
     }
 
     [HttpGet("/account/access/install-link")]
@@ -263,6 +298,15 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+    }
+
+    private static bool MatchesDesktopLaunchIdentity(ClaimedInstallationDto installation, AccountDesktopLaunchTicketClaims claims)
+    {
+        bool userMatches = !string.IsNullOrWhiteSpace(claims.UserId)
+            && string.Equals(installation.UserId, claims.UserId, StringComparison.OrdinalIgnoreCase);
+        bool subjectMatches = !string.IsNullOrWhiteSpace(claims.SubjectId)
+            && string.Equals(installation.SubjectId, claims.SubjectId, StringComparison.OrdinalIgnoreCase);
+        return userMatches || subjectMatches;
     }
 
     private static ContentResult BuildBrowserInstallLinkStatusPage(

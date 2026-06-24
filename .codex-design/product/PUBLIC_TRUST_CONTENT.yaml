@@ -42,11 +42,11 @@ trust_pages:
       - id: product-bug
         eyebrow: "Product bug"
         heading: "Send bugs through Contact"
-        body: "Use Contact for install trouble, product bugs, and practical feedback. Public issue threads are optional."
+        body: "Use Contact for install trouble, product bugs, and practical feedback. Public feedback is optional."
         bullets:
           - "Use Contact for install trouble, product bugs, or UX friction."
           - "Use Account > Support if you want your support history saved in one place."
-          - "Choose a public issue thread only when the bug should be public."
+          - "Use public feedback only when the bug should stay public."
       - id: product-question
         eyebrow: "Product question or UX confusion"
         heading: "Ask Chummer first"
@@ -119,7 +119,7 @@ trust_pages:
       - id: account-support
         eyebrow: "Account and support"
         heading: "Sign-in is simple, and support starts with Chummer"
-        body: "Sign-in keeps your access, devices, and support history together. Help and Contact are the normal first stops before any public issue thread."
+        body: "Sign-in keeps your access, devices, and support history together. Help and Contact are the normal first stops before any public feedback thread."
       - id: delivery
         eyebrow: "Delivery"
         heading: "Use the current public download first; advanced packages only when necessary"
@@ -154,9 +154,9 @@ trust_pages:
         heading: "Create an account when you want support history inside Chummer"
         body: "You can submit help here without another account. Create a Chummer account if you want to see your support history later in one place."
       - id: public-issues
-        eyebrow: "Public issue threads"
-        heading: "Use public issue threads only when the report should be public"
-        body: "Most people should start with Help or Contact. A public issue thread is only for technical reports you want discussed in public."
+        eyebrow: "Public feedback"
+        heading: "Use public feedback only when the report should be public"
+        body: "Most people should start with Help or Contact. Public feedback is only for technical reports you want discussed in public."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"

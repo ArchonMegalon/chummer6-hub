@@ -772,7 +772,7 @@ public sealed class CodexParticipationController : Controller
     private static object BuildContributionActions()
         => new
         {
-            explainHref = "/participate",
+            explainHref = "/partizipate",
             homeHref = "/home",
             accountHref = "/account"
         };

@@ -79,9 +79,12 @@ public sealed class ParticipationOperatorNotificationService
             return new ParticipationIntentResolution("karma_forge", "/participate/karma-forge");
         }
 
-        if (normalized.StartsWith("/participate", StringComparison.OrdinalIgnoreCase))
+        if (normalized.StartsWith("/participate", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("/partizipate", StringComparison.OrdinalIgnoreCase))
         {
-            return new ParticipationIntentResolution("guided_contribution", normalized.StartsWith("/participate/codex", StringComparison.OrdinalIgnoreCase) ? "/participate/codex" : "/participate");
+            return new ParticipationIntentResolution(
+                "guided_contribution",
+                normalized.StartsWith("/participate/codex", StringComparison.OrdinalIgnoreCase) ? "/participate/codex" : "/partizipate");
         }
 
         if (normalized.StartsWith("/feedback", StringComparison.OrdinalIgnoreCase))
@@ -240,7 +243,34 @@ public sealed class ParticipationOperatorNotificationService
                 .FirstOrDefault(receipt => string.Equals(receipt.EventKey, eventKey, StringComparison.OrdinalIgnoreCase));
             if (existing is not null)
             {
-                return existing;
+                if (!CanRetryExistingReceipt(existing))
+                {
+                    return existing;
+                }
+
+                pendingReceipt = existing with
+                {
+                    Status = "pending",
+                    AttemptedAtUtc = now,
+                    Summary = "The participant event is queued for the internal operator notification bridge.",
+                    FailureReason = null,
+                    Envelope = ReceiptEnvelopeFactory.Runtime(
+                        receiptKind: "participation_operator_notification",
+                        ownerScope: "community.participation",
+                        exposureClass: ReceiptExposureClasses.Internal,
+                        evidenceRef: existing.EventKey,
+                        reviewState: "pending"),
+                };
+
+                int existingIndex = _store.ParticipationNotificationReceipts.FindIndex(item =>
+                    string.Equals(item.ReceiptId, existing.ReceiptId, StringComparison.OrdinalIgnoreCase));
+                if (existingIndex >= 0)
+                {
+                    _store.ParticipationNotificationReceipts[existingIndex] = pendingReceipt;
+                    _store.PersistLocked();
+                }
+
+                goto DispatchPendingReceipt;
             }
 
             bool isFirstParticipationEvent = !_store.ParticipationNotificationReceipts.Any(receipt =>
@@ -290,6 +320,7 @@ public sealed class ParticipationOperatorNotificationService
             _store.PersistLocked();
         }
 
+DispatchPendingReceipt:
         try
         {
             if (!NotificationsEnabled())
@@ -486,6 +517,12 @@ public sealed class ParticipationOperatorNotificationService
 
     private bool NotificationsEnabled()
         => !string.Equals((_configuration[NotificationsEnabledConfigKey] ?? "true").Trim(), "false", StringComparison.OrdinalIgnoreCase);
+
+    private static bool CanRetryExistingReceipt(ParticipationOperatorNotificationReceipt receipt)
+        => receipt.Status is "failed_delivery"
+            or "suppressed_recipient_missing"
+            or "suppressed_adapter_unconfigured"
+            or "suppressed_disabled";
 
     private bool EaDispatchConfigured(string notifyChannel)
         => !string.IsNullOrWhiteSpace(ResolveEaApiToken())

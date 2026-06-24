@@ -40,10 +40,12 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal("draft_only", draft.Mode);
         Assert.True(draft.ManualApprovalRequired);
         Assert.False(draft.AutoSendAllowed);
+        Assert.False(string.IsNullOrWhiteSpace(draft.DraftId));
         Assert.Equal("empathetic_slow_typing_old_lady", draft.PersonaId);
         Assert.True(draft.MinimumDelaySeconds >= 240);
         Assert.Contains("Sabi", draft.DraftText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Brille", draft.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Josef", draft.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Display", draft.DraftText, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("family_emergency_new_number", draft.Enrichment.ScamPattern);
         Assert.Contains(draft.Enrichment.RiskSignals, static item => item.Contains("new-number", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(draft.Enrichment.ForbiddenActions, static item => item.Contains("Do not send money", StringComparison.OrdinalIgnoreCase));
@@ -125,11 +127,103 @@ public sealed class HeyyScamChatServiceTests
         using JsonDocument payload = JsonDocument.Parse(request.Body);
         JsonElement systemPrompt = payload.RootElement.GetProperty("messages")[0].GetProperty("content");
         string promptText = systemPrompt.GetString() ?? string.Empty;
+        Assert.Equal(96, payload.RootElement.GetProperty("max_tokens").GetInt32());
         Assert.Contains("Marillenknödel", promptText, StringComparison.Ordinal);
         Assert.Contains("real umlauts", promptText, StringComparison.Ordinal);
         Assert.Contains("daß", promptText, StringComparison.Ordinal);
         Assert.Contains("muß", promptText, StringComparison.Ordinal);
         Assert.Contains("bißchen", promptText, StringComparison.Ordinal);
+        Assert.Contains("Josef's old phone", promptText, StringComparison.Ordinal);
+        Assert.Contains("small broken display", promptText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IngestIncoming_RetriesWithCompatibleUpstreamModelWhenDefaultAliasIsMissing()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL"] = "https://code.girschele.com",
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BEARER_TOKEN"] = "token",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_ID"] = "client-id",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_SECRET"] = "client-secret",
+        });
+        fixture.Handler.OverrideResponse = (request, body) =>
+        {
+            string path = request.RequestUri?.PathAndQuery ?? string.Empty;
+            if (request.Method == HttpMethod.Post && path == "/v1/chat/completions")
+            {
+                using JsonDocument payload = JsonDocument.Parse(body);
+                string model = payload.RootElement.GetProperty("model").GetString() ?? string.Empty;
+                if (string.Equals(model, "answerly-support-assistant", StringComparison.Ordinal))
+                {
+                    return FakeHandler.Json(HttpStatusCode.NotFound, """{"error":{"message":"model 'answerly-support-assistant' not found","type":"not_found_error"}}""");
+                }
+
+                if (string.Equals(model, "qwen3.5:latest", StringComparison.Ordinal))
+                {
+                    return FakeHandler.Json(HttpStatusCode.OK, """{"choices":[{"message":{"content":"Na geh, Sabi, ich tipp so langsam auf dem kleinen Display."}}]}""");
+                }
+            }
+
+            if (request.Method == HttpMethod.Get && path == "/v1/models")
+            {
+                return FakeHandler.Json(HttpStatusCode.OK, """{"data":[{"id":"qwen3-vl:32b"},{"id":"qwen3.5:latest"},{"id":"qwen3-coder-next:latest"}]}""");
+            }
+
+            return null;
+        };
+
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-compatible-model",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        Assert.Equal("generated_via_ea", draft.Status);
+        LoggedRequest[] chatRequests = fixture.Handler.Requests.Where(static item => item.Path == "/v1/chat/completions").ToArray();
+        Assert.Equal(2, chatRequests.Length);
+        using JsonDocument first = JsonDocument.Parse(chatRequests[0].Body);
+        using JsonDocument second = JsonDocument.Parse(chatRequests[1].Body);
+        Assert.Equal("answerly-support-assistant", first.RootElement.GetProperty("model").GetString());
+        Assert.Equal("qwen3.5:latest", second.RootElement.GetProperty("model").GetString());
+        Assert.Contains(fixture.Handler.Requests, static item => item.Method == HttpMethod.Get && item.Path == "/v1/models");
+    }
+
+    [Fact]
+    public async Task IngestIncoming_FallsBackWhenUpstreamDraftFailsQualityGate()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BASE_URL"] = "https://code.girschele.com",
+            ["ANSWERLY_OPENAI_COMPAT_EA_UPSTREAM_BEARER_TOKEN"] = "token",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_ID"] = "client-id",
+            ["ANSWERLY_OPENAI_COMPAT_EA_CF_ACCESS_CLIENT_SECRET"] = "client-secret",
+        });
+        fixture.Handler.OverrideResponse = (request, body) =>
+        {
+            string path = request.RequestUri?.PathAndQuery ?? string.Empty;
+            if (request.Method == HttpMethod.Post && path == "/v1/chat/completions")
+            {
+                return FakeHandler.Json(HttpStatusCode.OK, """{"choices":[{"message":{"content":"Guten Morgen, mein Kind... Josef's altes Handy hat zwar nur ein bißchen Risse, aber ich muß erst meine Gläser suchen, und dann war da noch das Kastl links von der Garderobe, und Bine war sonst immer so gründlich, ach ja, Sabi, Marillenknödel, Nachbar Peppi, und überhaupt"}}]}""");
+            }
+
+            return null;
+        };
+
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-quality-gate",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        Assert.Equal("generated_fallback_after_quality_gate", draft.Status);
+        Assert.Equal("quality_gate_rejected", draft.FailureReason);
+        Assert.Contains("Josef", draft.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Guten Morgen, mein Kind", draft.DraftText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,7 +261,7 @@ public sealed class HeyyScamChatServiceTests
         {
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-approve",
@@ -181,7 +275,8 @@ public sealed class HeyyScamChatServiceTests
                 OperatorId: "tibor",
                 DeliveryMode: "manual_copy",
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("manual_copy_ready", approval.Status);
@@ -208,7 +303,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-dry-run",
@@ -223,12 +318,84 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: true),
+                DryRun: true,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("dry_run_whatsapp_approved_ready", approval.Status);
         Assert.Equal("whatsapp_approved", approval.DeliveryMode);
         Assert.Empty(fixture.Handler.Requests);
+    }
+
+    [Fact]
+    public async Task ApproveDraftRejectsImplicitLatestDraftWhenDraftReferenceIsMissing()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+        });
+
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-missing-draft-ref",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-missing-draft-ref",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "manual_copy",
+                ConfirmManualApproval: true,
+                DryRun: false),
+            CancellationToken.None);
+
+        Assert.Equal("rejected_draft_reference_required", approval.Status);
+        Assert.Equal("draft_id_required", approval.FailureReason);
+        Assert.Equal(draft.DraftId, approval.DraftId);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+    }
+
+    [Fact]
+    public async Task ApproveDraftRejectsStaleDraftIdAfterConversationMovesOn()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+        });
+
+        HeyyScamChatDraftResponse first = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-stale-draft",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+        HeyyScamChatDraftResponse second = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-stale-draft",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: "Warum antwortest du nicht? Das ist dringend."),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-stale-draft",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "manual_copy",
+                ConfirmManualApproval: true,
+                DryRun: false,
+                DraftId: first.DraftId),
+            CancellationToken.None);
+
+        Assert.Equal("rejected_stale_draft", approval.Status);
+        Assert.Equal("draft_superseded", approval.FailureReason);
+        Assert.Equal(first.DraftId, approval.DraftId);
+        Assert.NotEqual(first.DraftId, second.DraftId);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
     }
 
     [Fact]
@@ -244,7 +411,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-legacy-lists",
@@ -259,7 +426,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ScammerFixturePhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("suppressed_whatsapp_recipient_invalid", approval.Status);
@@ -282,7 +450,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-blocked-list",
@@ -297,7 +465,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ScammerFixturePhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("suppressed_whatsapp_recipient_invalid", approval.Status);
@@ -316,7 +485,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
             ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-sent",
@@ -331,7 +500,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("sent_whatsapp_approved", approval.Status);
@@ -364,7 +534,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-route-ea",
@@ -379,7 +549,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("sent_whatsapp_approved", approval.Status);
@@ -402,7 +573,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-route-fallback",
@@ -417,7 +588,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("sent_whatsapp_approved", approval.Status);
@@ -436,7 +608,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
             ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-unconfigured",
@@ -451,7 +623,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("suppressed_whatsapp_delivery_unconfigured", approval.Status);
@@ -470,7 +643,7 @@ public sealed class HeyyScamChatServiceTests
             ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
             ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
         });
-        await fixture.Service.IngestIncomingAsync(
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
             new HeyyScamChatIngestRequest(
                 Channel: "heyy",
                 ConversationId: "conv-whatsapp-meta",
@@ -485,7 +658,8 @@ public sealed class HeyyScamChatServiceTests
                 DeliveryMode: "whatsapp_approved",
                 Recipient: ConsentingTestPhone,
                 ConfirmManualApproval: true,
-                DryRun: false),
+                DryRun: false,
+                DraftId: draft.DraftId),
             CancellationToken.None);
 
         Assert.Equal("sent_whatsapp_approved", approval.Status);
@@ -533,6 +707,9 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal("real_sms_delivery_unconfigured", summary.FailureReason);
         Assert.Equal("[phone-redacted:*6419]", summary.RecipientMasked);
         Assert.Contains("Operator summary for", summary.Content, StringComparison.Ordinal);
+        Assert.Contains("family emergency new number", summary.Content, StringComparison.Ordinal);
+        Assert.Contains("Main risk signals:", summary.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Recent context:", summary.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Body.Contains("\"channel\":\"sms\"", StringComparison.Ordinal));
     }
 
@@ -611,6 +788,60 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task FiveIncomingTurnsOnlyCreateOperatorSummaryForHertaByDefault()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_PERSONA_ID"] = "other_assistant",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
+        });
+
+        for (int i = 1; i <= 5; i++)
+        {
+            await fixture.Service.IngestIncomingAsync(
+                new HeyyScamChatIngestRequest(
+                    Channel: "heyy",
+                    ConversationId: "conv-other-persona-summary",
+                    CounterpartyHandle: AlternateFixturePhone,
+                    MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
+                CancellationToken.None);
+        }
+
+        HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-other-persona-summary");
+        Assert.NotNull(conversation);
+        Assert.Equal("other_assistant", conversation.PersonaId);
+        Assert.Empty(conversation.OperatorSummaries);
+    }
+
+    [Fact]
+    public async Task OperatorSummaryPersonaAllowlistCanEnableNonDefaultPersona()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_PERSONA_ID"] = "other_assistant",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_PERSONA_IDS"] = "other_assistant",
+            ["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TURNS"] = "5",
+        });
+
+        for (int i = 1; i <= 5; i++)
+        {
+            await fixture.Service.IngestIncomingAsync(
+                new HeyyScamChatIngestRequest(
+                    Channel: "heyy",
+                    ConversationId: "conv-other-persona-summary-allowed",
+                    CounterpartyHandle: AlternateFixturePhone,
+                    MessageText: i == 1 ? ScamMessage : $"Mama bitte antworte, Runde {i}."),
+                CancellationToken.None);
+        }
+
+        HeyyScamChatConversationResponse? conversation = fixture.Service.GetConversation("conv-other-persona-summary-allowed");
+        Assert.NotNull(conversation);
+        HeyyScamChatOperatorSummaryResponse summary = Assert.Single(conversation.OperatorSummaries);
+        Assert.Equal("suppressed_sms_recipient_missing", summary.Status);
+        Assert.Contains("other_assistant", summary.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task DigestDispatchSendsDailyEmailThroughEaAndDoesNotDuplicate()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
@@ -639,6 +870,9 @@ public sealed class HeyyScamChatServiceTests
         Assert.Equal(first.DigestId, second.DigestId);
         Assert.Equal("ea-delivery-1", first.DeliveryRef);
         Assert.Contains(ScammerFixturePhone, first.Content, StringComparison.Ordinal);
+        Assert.Contains("Summary: family emergency new number; sender is pushing", first.Content, StringComparison.Ordinal);
+        Assert.Contains("Recommended next action:", first.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("- 11:00 UTC incoming:", first.Content, StringComparison.Ordinal);
         LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
         Assert.Contains("\"channel\":\"email\"", request.Body, StringComparison.Ordinal);
         Assert.Contains("\"recipient\":\"operator@example.com\"", request.Body, StringComparison.Ordinal);
@@ -677,8 +911,10 @@ public sealed class HeyyScamChatServiceTests
         Assert.Contains("\"Conversation Id\":\"conv-teable\"", create.Body, StringComparison.Ordinal);
         Assert.Contains("436765550423", create.Body, StringComparison.Ordinal);
         Assert.Contains("family_emergency_new_number", create.Body, StringComparison.Ordinal);
+        Assert.Contains("\"Latest Draft Id\":\"heyydraft_", create.Body, StringComparison.Ordinal);
         Assert.Contains("Manual Approval Required", create.Body, StringComparison.Ordinal);
         Assert.Contains("Latest Draft", create.Body, StringComparison.Ordinal);
+        Assert.Contains("Latest Draft Status", create.Body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -880,12 +1116,19 @@ public sealed class HeyyScamChatServiceTests
         private readonly HashSet<string> _fields = new(StringComparer.OrdinalIgnoreCase);
 
         public List<LoggedRequest> Requests { get; } = [];
+        public Func<HttpRequestMessage, string, HttpResponseMessage?>? OverrideResponse { get; set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             string path = request.RequestUri?.PathAndQuery ?? string.Empty;
             string body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
             Requests.Add(new LoggedRequest(request.Method, path, body));
+
+            HttpResponseMessage? overrideResponse = OverrideResponse?.Invoke(request, body);
+            if (overrideResponse is not null)
+            {
+                return overrideResponse;
+            }
 
             if (request.Method == HttpMethod.Post && path == "/v1/tools/execute")
             {
@@ -943,7 +1186,7 @@ public sealed class HeyyScamChatServiceTests
             return Json(HttpStatusCode.NotFound, $$"""{"path":{{JsonSerializer.Serialize(path)}}}""");
         }
 
-        private static HttpResponseMessage Json(HttpStatusCode statusCode, string payload)
+        internal static HttpResponseMessage Json(HttpStatusCode statusCode, string payload)
             => new(statusCode)
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")

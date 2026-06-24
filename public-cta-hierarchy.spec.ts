@@ -16,10 +16,11 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
   expect(manifest).toContain('- label: Create account');
   expect(manifest).toContain('product_proof_primary_label: Download Chummer');
 
-  expect(landing).toContain('Stable</a>');
-  expect(landing).toContain('Nightly</a>');
-  expect(landing).toContain('Get the app');
-  expect(landing).toContain('Need help?');
+  expect(landing).toContain('>Download Chummer</a>');
+  expect(landing).not.toContain('Stable</a>');
+  expect(landing).not.toContain('Nightly</a>');
+  expect(landing).toContain('Windows and Linux.');
+  expect(landing).toContain('Participate');
   expect(landing).not.toContain('Open Black Ledger');
 
   expect(downloads).toContain('Nightly');

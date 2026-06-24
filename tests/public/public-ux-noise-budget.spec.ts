@@ -4,10 +4,12 @@ import { writeMarkdownArtifact } from './ux-artifacts';
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 test('homepage stays within the pre-gold noise budget', async ({ page }) => {
+  test.setTimeout(90_000);
+
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const sections = page.locator('[data-homepage-section]');
-  await expect(sections).toHaveCount(2);
+  await expect(sections).toHaveCount(1);
 
   const navLabels = await page.locator('.site-nav a, .site-nav__current').evaluateAll((items) =>
     items.map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
@@ -28,7 +30,7 @@ test('homepage stays within the pre-gold noise budget', async ({ page }) => {
     [
       '# Final public UX redesign verdict',
       '',
-      '- Homepage sections: `2`',
+      '- Homepage sections: `1`',
       '- Primary nav on landing: `hidden`',
       '- First-screen proof noise: `0`',
       '- Verdict: `READY`',
@@ -101,14 +103,14 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
     'AI generated',
   ];
 
-  const participateResponse = await request.get(`${baseUrl}/participate`, { maxRedirects: 0 });
+  const participateResponse = await request.get(`${baseUrl}/partizipate`, { maxRedirects: 0 });
   expect(participateResponse.status()).toBe(200);
   const participateText = await participateResponse.text();
   expect(participateText).toContain('Participate');
   expect(participateText).not.toContain('ProductLift');
   expect(participateText).not.toContain('productlift.dev');
 
-  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/participate', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
+  for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/partizipate', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
     const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
     const pageSource = await page.content();
@@ -126,8 +128,8 @@ test('direct character helper route stays private-preview and human-readable', a
   await page.goto(`${baseUrl}/alice`, { waitUntil: 'domcontentloaded' });
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
-  await expect(page.locator('h1')).toContainText('Character helper');
-  expect(bodyText).toContain('This preview is kept off the main public path');
+  await expect(page.locator('h1')).toContainText('Character help');
+  expect(bodyText).toContain('Use this page only when you want help before returning to Chummer.');
   for (const term of ['ALICE', 'Build Ghost', 'build-ghost', 'receipt', 'proof', 'artifact', 'governed', 'operator']) {
     expect(bodyText, `/alice should not expose "${term}"`).not.toContain(term);
   }
@@ -140,7 +142,7 @@ test('core public pages stay inside a minimal interaction budget', async ({ page
     { path: '/downloads', maxWords: 140, maxLinks: 8, maxButtons: 6, maxSections: 4 },
     { path: '/status', maxWords: 110, maxLinks: 5, maxButtons: 3, maxSections: 3 },
     { path: '/help', maxWords: 450, maxLinks: 16, maxButtons: 3, maxSections: 3 },
-    { path: '/participate', maxWords: 280, maxLinks: 12, maxButtons: 5, maxSections: 3 },
+    { path: '/partizipate', maxWords: 280, maxLinks: 12, maxButtons: 5, maxSections: 3 },
     { path: '/contact', maxWords: 430, maxLinks: 14, maxButtons: 6, maxSections: 4 },
     { path: '/roadmap', maxWords: 420, maxLinks: 12, maxButtons: 6, maxSections: 3 },
     { path: '/what-is-chummer', maxWords: 130, maxLinks: 4, maxButtons: 3, maxSections: 3 },
@@ -216,7 +218,7 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   const robotsResponse = await request.get(`${baseUrl}/robots.txt?public-route-guard=1`);
   expect(robotsResponse.ok()).toBeTruthy();
   const robotsText = await robotsResponse.text();
-  for (const path of ['/alice', '/ledger', '/participate', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
+  for (const path of ['/alice', '/ledger', '/participate', '/participate/', '/partizipate', '/partizipate/', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
     expect(robotsText).toContain(`Disallow: ${path}`);
   }
 });

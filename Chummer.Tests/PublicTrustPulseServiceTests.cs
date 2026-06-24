@@ -47,6 +47,16 @@ public sealed class PublicTrustPulseServiceTests
     }
 
     [Fact]
+    public void LoadSnapshotReturnsNullWhenWeeklyPulseArtifactIsMissing()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.Null(snapshot);
+    }
+
+    [Fact]
     public void LoadSnapshotComputesProgressTrendFromHistory()
     {
         using var fixture = new PublicTrustPulseFixture();

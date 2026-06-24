@@ -52,7 +52,8 @@ public static class HubApiGuardrailPolicy
 
     public static bool IsExtendedTimeoutPath(PathString path)
         => IsMultipartSupportPath(path)
-           || IsFileTransferPath(path);
+           || IsFileTransferPath(path)
+           || path.StartsWithSegments("/api/internal/heyy/scam-chat", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsReleaseBundleUploadPath(PathString path)
         => path.StartsWithSegments("/api/internal/releases/bundles", StringComparison.OrdinalIgnoreCase)

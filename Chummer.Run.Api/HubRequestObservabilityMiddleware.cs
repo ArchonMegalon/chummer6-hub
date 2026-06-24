@@ -62,7 +62,11 @@ public sealed class HubRequestObservabilityMiddleware
 
         HubRequestObservability.RequestsStarted.Add(1, tags);
         long startedTimestamp = Stopwatch.GetTimestamp();
-        _logger.LogInformation("Hub request started.");
+        _logger.LogInformation(
+            "Hub request started: {Method} {Path} ({CorrelationId}).",
+            context.Request.Method,
+            context.Request.Path.Value ?? "/",
+            correlationId);
 
         try
         {
@@ -79,7 +83,13 @@ public sealed class HubRequestObservabilityMiddleware
                 elapsedMs,
                 [.. tags, new KeyValuePair<string, object?>("http.status_code", statusCode)]);
 
-            _logger.LogInformation("Hub request completed in {ElapsedMs} ms with status {StatusCode}.", elapsedMs, context.Response.StatusCode);
+            _logger.LogInformation(
+                "Hub request completed: {Method} {Path} -> {StatusCode} in {ElapsedMs} ms ({CorrelationId}).",
+                context.Request.Method,
+                context.Request.Path.Value ?? "/",
+                context.Response.StatusCode,
+                elapsedMs,
+                correlationId);
         }
     }
 

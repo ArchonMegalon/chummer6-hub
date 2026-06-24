@@ -3,6 +3,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Microsoft.AspNetCore.DataProtection;
 using Chummer.Run.Api.Services.Support;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -315,10 +316,12 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
             InstallStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallStore, Configuration);
             Workspaces = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(Configuration));
+            IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             Controller = new InstallLinkingController(
                 identity: new HubIdentityClient(new HttpClient(), Configuration),
                 accounts: new AccountService(new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance)),
                 installLinking: InstallLinking,
+                desktopLaunchTickets: new AccountDesktopLaunchTicketService(dataProtection, Configuration),
                 releases: new PublicReleaseManifestService(Configuration),
                 supportCases: null!,
                 supportPresentation: new SupportCasePresentationService(),

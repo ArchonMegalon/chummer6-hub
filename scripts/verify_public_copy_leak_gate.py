@@ -6,6 +6,7 @@ import html
 import json
 import re
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from html.parser import HTMLParser
@@ -30,7 +31,7 @@ DEFAULT_ROUTES = [
     "/ledger",
     "/ledger/map",
     "/packages",
-    "/participate",
+    "/partizipate",
     "/feedback",
     "/artifacts",
     "/what-is-chummer",
@@ -269,10 +270,32 @@ def normalize_base_url(base_url: str) -> str:
     return base_url.rstrip("/")
 
 
+def get_with_retry(
+    session: requests.Session,
+    url: str,
+    *,
+    timeout: int,
+    allow_redirects: bool,
+    attempts: int = 3,
+    retry_delay_seconds: float = 0.75,
+) -> requests.Response:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return session.get(url, timeout=timeout, allow_redirects=allow_redirects)
+        except Exception as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+            time.sleep(retry_delay_seconds)
+    assert last_error is not None
+    raise last_error
+
+
 def verify_route(session: requests.Session, base_url: str, route: str) -> RouteResult:
     url = urljoin(f"{base_url}/", route.lstrip("/"))
     try:
-        response = session.get(url, timeout=10, allow_redirects=False)
+        response = get_with_retry(session, url, timeout=10, allow_redirects=False)
     except Exception as exc:
         return RouteResult(route, url, None, False, [], is_minimal_public_route(route), [], str(exc))
 
@@ -302,7 +325,7 @@ def verify_route(session: requests.Session, base_url: str, route: str) -> RouteR
 
         if redirect_url:
             try:
-                response = session.get(redirect_url, timeout=10, allow_redirects=False)
+                response = get_with_retry(session, redirect_url, timeout=10, allow_redirects=False)
             except Exception as exc:
                 return RouteResult(route, url, None, False, [], is_minimal_public_route(route), [], str(exc), redirect_url)
         else:

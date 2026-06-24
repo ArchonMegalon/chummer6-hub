@@ -367,7 +367,7 @@ public sealed class PublicPackageCatalogService
                     "This page shows compatibility and status; it does not replace rules review."
                 ],
                 "The current release status view already points to the explanation path and current rules state.",
-                "Open what works today",
+                "Open current release",
                 "/now",
                 "Account package tracking keeps follows and votes attached to the same signed-in return path.",
                 "Treat this package as current rules coverage, not as a blanket parity claim."),

@@ -30,9 +30,6 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (!heroImageLoaded) {
     failures.push('homepage: hero image did not load');
   }
-  await expect(desktop.locator('.minimal-hero__points')).toContainText('Create');
-  await expect(desktop.locator('.minimal-hero__points')).toContainText('Track');
-  await expect(desktop.locator('.minimal-hero__points')).toContainText('Review');
   await expect(desktop.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');

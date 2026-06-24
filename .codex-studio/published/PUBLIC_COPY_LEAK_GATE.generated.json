@@ -1,16 +1,14 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-23T07:18:21Z",
+  "generated_at_utc": "2026-06-23T08:52:24Z",
   "base_url": "https://chummer.run",
-  "status": "fail",
+  "status": "pass",
   "summary": {
     "route_count": 16,
-    "failed_route_count": 1,
+    "failed_route_count": 0,
     "forbidden_pattern_count": 67,
     "minimal_route_forbidden_pattern_count": 26,
-    "failed_routes": [
-      "/"
-    ]
+    "failed_routes": []
   },
   "forbidden_patterns": [
     "\\bchummer-api\\b",
@@ -113,12 +111,12 @@
     {
       "route": "/",
       "url": "https://chummer.run/",
-      "status_code": null,
-      "success": false,
+      "status_code": 200,
+      "success": true,
       "forbidden_hits": [],
       "minimal_route": true,
       "minimal_forbidden_hits": [],
-      "detail": "HTTPSConnectionPool(host='chummer.run', port=443): Read timed out. (read timeout=10)",
+      "detail": null,
       "redirect_url": null,
       "redirect_external": false
     },

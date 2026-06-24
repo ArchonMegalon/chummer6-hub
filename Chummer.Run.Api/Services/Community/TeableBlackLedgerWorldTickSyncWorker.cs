@@ -73,7 +73,7 @@ public sealed class TeableBlackLedgerWorldTickSyncWorker : BackgroundService
     }
 
     private bool IsEnabled()
-        => ParseBool(_configuration["CHUMMER_TEABLE_BLACK_LEDGER_RECONCILE_ENABLED"], defaultValue: true);
+        => ParseBool(_configuration["CHUMMER_TEABLE_BLACK_LEDGER_RECONCILE_ENABLED"], defaultValue: false);
 
     private TimeSpan ResolveDurationMinutes(string key, TimeSpan fallback)
     {

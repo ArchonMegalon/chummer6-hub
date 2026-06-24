@@ -49,14 +49,14 @@
     {
         "roadmap" => "Open the next page",
         ReleaseDetailFamily => "Open the related page",
-        PreviewDetailFamily => "See what works today",
+        PreviewDetailFamily => "Open current release",
         _ => "Continue"
     };
     var primaryRouteSummary = displayFamily switch
     {
         "roadmap" => $"{Model.PrimaryAction.Label} is the next useful page.",
         ReleaseDetailFamily => $"{Model.PrimaryAction.Label} opens the related page.",
-        PreviewDetailFamily => $"{Model.PrimaryAction.Label} shows what works today.",
+        PreviewDetailFamily => $"{Model.PrimaryAction.Label} shows the current release.",
         _ => $"{Model.PrimaryAction.Label} is the next useful step."
     };
     var primaryRouteDetails = displayFamily switch
@@ -71,8 +71,8 @@
     {
         "roadmap" => (
             Href: "/now",
-            Label: "Open what works today",
-            Title: "See what works today",
+            Label: "Open current release",
+            Title: "Open current release",
             Summary: "Use the current status page for the live product.",
             Details: new[] { "Current status", "Downloads", "Known limits" }),
         ReleaseDetailFamily => (
@@ -83,14 +83,14 @@
             Details: new[] { "Installer", "Platform choice", "Help nearby" }),
         PreviewDetailFamily => (
             Href: "/now",
-            Label: "Open what works today",
-            Title: "See what works today",
+            Label: "Open current release",
+            Title: "Open current release",
             Summary: "Use the current status page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
-            Label: "Open what works today",
-            Title: "See what works today",
+            Label: "Open current release",
+            Title: "Open current release",
             Summary: "Use the current status page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" })
     };

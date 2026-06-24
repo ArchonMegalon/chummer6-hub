@@ -11,16 +11,16 @@ public sealed class RoadmapMilestoneProjectionViewTests
         string source = File.ReadAllText(viewPath);
 
         Assert.Contains("roadmap-signal", source, StringComparison.Ordinal);
-        Assert.Contains("roadmap-signal-grid", source, StringComparison.Ordinal);
-        Assert.Contains("Feedback, planning, shipped updates, and private help stay on different pages.", source, StringComparison.Ordinal);
-        Assert.Contains("Votes inform demand", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("roadmap-signal-grid", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback, planning, shipped updates, and private help stay on different pages.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Votes inform demand", source, StringComparison.Ordinal);
         Assert.Contains("Open changelog", source, StringComparison.Ordinal);
         Assert.Contains("Model.Milestones", source, StringComparison.Ordinal);
         Assert.Contains("roadmap-milestones", source, StringComparison.Ordinal);
-        Assert.Contains("Difficulty:", source, StringComparison.Ordinal);
-        Assert.Contains("Claimed:", source, StringComparison.Ordinal);
-        Assert.Contains("Dependencies:", source, StringComparison.Ordinal);
-        Assert.Contains("milestone-drawer__tease", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Difficulty:", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Claimed:", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dependencies:", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("milestone-drawer__tease", source, StringComparison.Ordinal);
     }
 
     [Fact]

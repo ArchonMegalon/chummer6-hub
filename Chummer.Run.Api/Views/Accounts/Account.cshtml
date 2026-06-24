@@ -211,6 +211,29 @@
         : selectedRun.LatestContinuity is not null
             ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same workspace path instead of splitting into a separate Table Pulse Aftermath story."
             : "This run is ready to bind the next reaction, carry-forward detail, and aftermath package on the shared command path.";
+    var launcherDossiers = Model.CampaignSpine.Dossiers
+        .OrderByDescending(static item => item.UpdatedAtUtc)
+        .Take(4)
+        .ToArray();
+    var launcherCampaigns = Model.CampaignSpine.Workspaces
+        .Take(4)
+        .ToArray();
+    var launcherGroups = Model.CampaignSpine.CommunityOperations
+        .Take(3)
+        .ToArray();
+    var hasLauncherItems = launcherDossiers.Length > 0 || launcherCampaigns.Length > 0 || launcherGroups.Length > 0;
+    var hasLinkedDesktop = linkedInstallations.Count > 0 || activeGrants.Count > 0 || pendingClaimTickets.Length > 0;
+    var launcherPrimaryHref = hasLinkedDesktop ? string.Empty : "/downloads";
+    var launcherPrimaryLabel = hasLinkedDesktop ? "Open in Chummer" : "Install Chummer";
+    var launcherSecondaryHref = hasLinkedDesktop ? "/account/access" : "/account/access";
+    var launcherSecondaryLabel = hasLinkedDesktop ? "Devices & access" : "Finish setup";
+    var exampleLaunchers = new[]
+    {
+        new { Id = "street-samurai", Label = "Street Samurai", Summary = "Cybered frontline build with straightforward combat pressure.", Archetype = "Combat" },
+        new { Id = "decker", Label = "Decker", Summary = "Matrix intrusion starter with gear, logic, and host-first pressure.", Archetype = "Matrix" },
+        new { Id = "combat-mage", Label = "Combat Mage", Summary = "Awakened caster with direct action and obvious spell tradeoffs.", Archetype = "Magic" },
+        new { Id = "face", Label = "Face", Summary = "Social operator focused on negotiation, cover, and team access.", Archetype = "Social" }
+    };
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
@@ -425,6 +448,10 @@
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
     static string WorkspacePrepLibrarySearchHref(string workspaceId, string query) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={Uri.EscapeDataString(query)}";
     static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
+    static string AccountOpenCharacterHref(string dossierId) => $"/account/open/character/{Uri.EscapeDataString(dossierId)}";
+    static string AccountOpenCampaignHref(string campaignId) => $"/account/open/campaign/{Uri.EscapeDataString(campaignId)}";
+    static string AccountOpenGroupHref(string groupId) => $"/account/open/group/{Uri.EscapeDataString(groupId)}";
+    static string AccountOpenExampleHref(string exampleId) => $"/account/open/example/{Uri.EscapeDataString(exampleId)}";
     static bool IsDiscoverablePublicCreatorPublication(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
         => publication is not null
             && publication.Discoverable
@@ -648,7 +675,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
                             <strong>@accountRailSupportSummary</strong>
-                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
+                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release for the latest notes.")</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Recovery reserve</span>
@@ -687,7 +714,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
                     <strong>@accountRailSupportSummary</strong>
-                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
+                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release for the latest notes.")</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Recovery reserve</span>
@@ -1503,6 +1530,131 @@
             @if (showWorkSection || showSettingsSection)
             {
             <div class="stacked-copy">
+
+            @if (showWorkSection)
+            {
+                <section class="settings-section" data-account-panel id="open-in-chummer">
+                    <div class="settings-section__header">
+                        <h2>Open in Chummer</h2>
+                        <p>Continue with a saved character or group in the desktop app. If this account is still empty, start from an example archetype instead.</p>
+                    </div>
+                    @if (hasLauncherItems)
+                    {
+                        <div class="minimal-three">
+                            <article>
+                                <h3>Recent characters</h3>
+                                <p>Open a known runner instead of starting from a blank sheet.</p>
+                                @if (launcherDossiers.Length == 0)
+                                {
+                                    <p class="muted-copy">No saved characters yet.</p>
+                                }
+                                else
+                                {
+                                    <div class="settings-summary-list">
+                                        @foreach (var dossier in launcherDossiers)
+                                        {
+                                            <div class="settings-summary-row">
+                                                <span>
+                                                    <strong>@dossier.DisplayName</strong>
+                                                    <span class="muted-copy">@dossier.RunnerHandle · @RuleEnvironmentLifecycleLabel(dossier.RuleEnvironment)</span>
+                                                </span>
+                                                <strong>@dossier.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd")</strong>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="stacked-actions">
+                                        @foreach (var dossier in launcherDossiers)
+                                        {
+                                            <a class="button-like button-like--primary" href="@(hasLinkedDesktop ? AccountOpenCharacterHref(dossier.DossierId) : "/downloads")">@(hasLinkedDesktop ? $"Open {dossier.DisplayName}" : "Install Chummer first")</a>
+                                        }
+                                    </div>
+                                }
+                            </article>
+                            <article>
+                                <h3>Groups and campaigns</h3>
+                                <p>Jump back into the campaign return path without digging through the whole account page.</p>
+                                @if (launcherGroups.Length == 0 && launcherCampaigns.Length == 0)
+                                {
+                                    <p class="muted-copy">No saved group or campaign path yet.</p>
+                                }
+                                else
+                                {
+                                    <div class="settings-summary-list">
+                                        @foreach (var campaign in launcherCampaigns)
+                                        {
+                                            <div class="settings-summary-row">
+                                                <span>
+                                                    <strong>@campaign.CampaignName</strong>
+                                                    <span class="muted-copy">@campaign.ReturnSummary</span>
+                                                </span>
+                                                <strong>@(campaign.Runs.Count == 0 ? "Ready" : $"{campaign.Runs.Count} run(s)")</strong>
+                                            </div>
+                                        }
+                                        @foreach (var group in launcherGroups)
+                                        {
+                                            <div class="settings-summary-row">
+                                                <span>
+                                                    <strong>@group.GroupName</strong>
+                                                    <span class="muted-copy">@group.CampaignReturnSummary</span>
+                                                </span>
+                                                <strong>@group.MemberCount member(s)</strong>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="stacked-actions">
+                                        @foreach (var campaign in launcherCampaigns)
+                                        {
+                                            <a class="button-like button-like--secondary" href="@(hasLinkedDesktop ? AccountOpenCampaignHref(campaign.CampaignId) : "/downloads")">@(hasLinkedDesktop ? $"Open {campaign.CampaignName}" : "Install Chummer first")</a>
+                                        }
+                                        @foreach (var group in launcherGroups)
+                                        {
+                                            <a class="button-like button-like--ghost" href="@(hasLinkedDesktop ? AccountOpenGroupHref(group.GroupId) : "/downloads")">@(hasLinkedDesktop ? $"Open {group.GroupName}" : "Install Chummer first")</a>
+                                        }
+                                    </div>
+                                }
+                            </article>
+                            <article>
+                                <h3>@(hasLinkedDesktop ? "Fallback" : "Onboarding")</h3>
+                                <p>@(hasLinkedDesktop
+                                    ? "If the desktop app does not answer, stay on this account path and reopen from the browser or devices page."
+                                    : "This account does not have a linked desktop copy yet, so clicks should take you into install and claim first.")</p>
+                                <div class="stacked-actions">
+                                    <a class="button-like button-like--secondary" href="@launcherSecondaryHref">@launcherSecondaryLabel</a>
+                                    <a class="button-like button-like--ghost" href="/account/work">Open work on the web</a>
+                                    <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+                                </div>
+                            </article>
+                        </div>
+                    }
+                    else
+                    {
+                        <article class="app-action-card app-action-card--primary">
+                            <span class="tag">Example characters</span>
+                            <h3>No saved characters yet</h3>
+                            <p>Start with an archetype that already behaves like a real runner, then make it your own in Chummer.</p>
+                            <div class="settings-summary-list">
+                                @foreach (var example in exampleLaunchers)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>
+                                            <strong>@example.Label</strong>
+                                            <span class="muted-copy">@example.Summary</span>
+                                        </span>
+                                        <strong>@example.Archetype</strong>
+                                    </div>
+                                }
+                            </div>
+                            <div class="stacked-actions">
+                                @foreach (var example in exampleLaunchers)
+                                {
+                                    <a class="button-like button-like--primary" href="@(hasLinkedDesktop ? AccountOpenExampleHref(example.Id) : "/downloads")">@(hasLinkedDesktop ? $"Open {example.Label}" : "Install Chummer first")</a>
+                                }
+                                <a class="button-like button-like--ghost" href="/account/access">Devices &amp; access</a>
+                            </div>
+                        </article>
+                    }
+                </section>
+            }
 
             @if (showWorkSection && !showCampaignSection && !showTeamsSection)
             {
@@ -4261,12 +4413,12 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Now</span>
                                         <div class="app-rail__copy">
-                                            <h3>What works today</h3>
+                                            <h3>Current release</h3>
                                             <p>What is fixed, who can get it now, and what still needs care stays on this same account page before you guide the rest of the table.</p>
-                                            <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open what works today for the latest availability.")</p>
-                                            <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open what works today for the current install path.")</p>
-                                            <p class="muted-copy"><strong>Release status:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release checks", "Open what works today for the latest status.")</p>
-                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open what works today for the latest notes.")</p>
+                                            <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open current release for the latest availability.")</p>
+                                            <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open current release for the current install path.")</p>
+                                            <p class="muted-copy"><strong>Release status:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release checks", "Open current release for the latest status.")</p>
+                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release for the latest notes.")</p>
                                         </div>
                                         <a class="inline-link" href="#signed-in-trust-status">Open current status</a>
                                     </article>

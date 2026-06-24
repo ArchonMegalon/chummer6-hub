@@ -25,7 +25,7 @@ FORBIDDEN_PHRASES = [
 
 ROUTES = [
     "/feedback",
-    "/participate",
+    "/partizipate",
 ]
 
 

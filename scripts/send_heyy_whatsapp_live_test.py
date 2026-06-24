@@ -15,6 +15,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_PATH = ROOT / ".env"
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8091"
+DEFAULT_TIMEOUT_SECONDS = 45.0
 DEFAULT_MESSAGE = (
     "Mei, da bin ich jetzt aber froh, das ist nur ein WhatsApp-Test. "
     "Ich tipp langsam, aber es kommt an. Liebe Gruesse!"
@@ -75,7 +76,25 @@ def post_json(url: str, token: str, payload: dict[str, Any]) -> dict[str, Any]:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+            response_body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        response_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"http_{exc.code}:{response_body[:1000]}") from exc
+    return json.loads(response_body)
+
+
+def get_json(url: str, token: str) -> dict[str, Any] | list[Any]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
             response_body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         response_body = exc.read().decode("utf-8", errors="replace")
@@ -106,6 +125,15 @@ def scrub_response(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key in allowed}
 
 
+def probe_internal_api(base_url: str, token: str) -> dict[str, Any]:
+    payload = get_json(f"{base_url.rstrip('/')}/api/internal/heyy/scam-chat/conversations?take=1", token)
+    conversation_count = len(payload) if isinstance(payload, list) else None
+    return {
+        "status": "reachable",
+        "conversationCount": conversation_count,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Send a single Heyy old-lady WhatsApp test message after live-readiness checks pass."
@@ -118,6 +146,11 @@ def main() -> int:
     parser.add_argument("--operator-id", default="operator")
     parser.add_argument("--dry-run", action="store_true", help="Exercise approval flow without requiring provider readiness.")
     parser.add_argument("--include-ea-db", action="store_true")
+    parser.add_argument(
+        "--allow-fallback-draft",
+        action="store_true",
+        help="Allow fallback-only draft generation instead of requiring the live EA chat draft lane.",
+    )
     args = parser.parse_args()
 
     env = load_env_file(Path(args.env_file))
@@ -144,28 +177,107 @@ def main() -> int:
 
     conversation_id = args.conversation_id.strip() or f"heyy-wa-live-test-{int(time.time())}"
     base_url = args.api_base_url.rstrip("/")
-    ingest = post_json(
-        f"{base_url}/api/internal/heyy/scam-chat/messages",
-        token,
-        {
-            "channel": "heyy",
-            "conversationId": conversation_id,
-            "counterpartyHandle": "consenting-test-fixture",
-            "messageText": "Create one short old-lady WhatsApp integration test message. No links, no banking data.",
-        },
-    )
-    approval = post_json(
-        f"{base_url}/api/internal/heyy/scam-chat/conversations/{conversation_id}/approve",
-        token,
-        {
-            "operatorId": args.operator_id,
-            "deliveryMode": "whatsapp_approved",
-            "recipient": args.recipient,
-            "approvedText": args.message,
-            "confirmManualApproval": True,
-            "dryRun": bool(args.dry_run),
-        },
-    )
+    try:
+        internal_api = probe_internal_api(base_url, token)
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "status": "blocked",
+                    "stage": "internal_api_probe",
+                    "recipientMasked": mask_phone(args.recipient),
+                    "failureReason": f"{exc.__class__.__name__}:{str(exc)[:500]}",
+                    "apiBaseUrl": base_url,
+                    "readiness": readiness,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
+
+    try:
+        ingest = post_json(
+            f"{base_url}/api/internal/heyy/scam-chat/messages",
+            token,
+            {
+                "channel": "heyy",
+                "conversationId": conversation_id,
+                "counterpartyHandle": "consenting-test-fixture",
+                "messageText": "Create one short old-lady WhatsApp integration test message. No links, no banking data.",
+            },
+        )
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "stage": "ingest",
+                    "recipientMasked": mask_phone(args.recipient),
+                    "failureReason": f"{exc.__class__.__name__}:{str(exc)[:500]}",
+                    "apiBaseUrl": base_url,
+                    "internalApi": internal_api,
+                    "readiness": readiness,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
+
+    conversation = scrub_response(ingest)
+    conversation_status = str(conversation.get("status") or "")
+    if not args.allow_fallback_draft and not conversation_status.startswith("generated_via_ea"):
+        print(
+            json.dumps(
+                {
+                    "status": "blocked",
+                    "stage": "draft_generation",
+                    "recipientMasked": mask_phone(args.recipient),
+                    "failureReason": conversation.get("failureReason") or conversation_status or "draft_generation_unavailable",
+                    "apiBaseUrl": base_url,
+                    "internalApi": internal_api,
+                    "conversation": conversation,
+                    "readiness": readiness,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
+
+    try:
+        approval = post_json(
+            f"{base_url}/api/internal/heyy/scam-chat/conversations/{conversation_id}/approve",
+            token,
+            {
+                "operatorId": args.operator_id,
+                "deliveryMode": "whatsapp_approved",
+                "recipient": args.recipient,
+                "approvedText": args.message,
+                "confirmManualApproval": True,
+                "dryRun": bool(args.dry_run),
+                "draftId": conversation.get("draftId"),
+            },
+        )
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "stage": "approval",
+                    "recipientMasked": mask_phone(args.recipient),
+                    "failureReason": f"{exc.__class__.__name__}:{str(exc)[:500]}",
+                    "apiBaseUrl": base_url,
+                    "internalApi": internal_api,
+                    "conversation": conversation,
+                    "readiness": readiness,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
 
     print(
         json.dumps(
@@ -175,7 +287,8 @@ def main() -> int:
                 "dryRun": approval.get("dryRun"),
                 "deliveryRef": approval.get("deliveryRef"),
                 "failureReason": approval.get("failureReason"),
-                "conversation": scrub_response(ingest),
+                "internalApi": internal_api,
+                "conversation": conversation,
                 "approval": scrub_response(approval),
             },
             indent=2,

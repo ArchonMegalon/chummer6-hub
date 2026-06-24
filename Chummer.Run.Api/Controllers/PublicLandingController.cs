@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
@@ -23,6 +24,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.WebUtilities;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -86,9 +90,11 @@ public sealed class PublicLandingController : Controller
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
     private readonly WindowsProofInstallerService _windowsProofInstallers;
     private readonly AurPackageCatalogService _aurPackages;
+    private readonly IHttpClientFactory? _httpClientFactory;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
 
+    [ActivatorUtilitiesConstructor]
     public PublicLandingController(
         PublicLandingService landing,
         FlipLinkDocumentPortalService flipLinkDocumentPortal,
@@ -139,6 +145,7 @@ public sealed class PublicLandingController : Controller
         ReleaseUploadTicketService releaseUploadTickets,
         WindowsProofInstallerService windowsProofInstallers,
         AurPackageCatalogService aurPackages,
+        IHttpClientFactory httpClientFactory,
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger)
     {
@@ -195,8 +202,117 @@ public sealed class PublicLandingController : Controller
         _releaseUploadTickets = releaseUploadTickets;
         _windowsProofInstallers = windowsProofInstallers;
         _aurPackages = aurPackages;
+        _httpClientFactory = httpClientFactory;
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
+    }
+
+    public PublicLandingController(
+        PublicLandingService landing,
+        FlipLinkDocumentPortalService flipLinkDocumentPortal,
+        PublicFlagshipCoverageService flagshipCoverage,
+        PublicReleaseManifestService releases,
+        CampaignOsLocalProofService campaignOsProof,
+        ReleaseSelectionService releaseSelection,
+        PublicActionResolver actions,
+        AccountService accounts,
+        HubIdentityClient identity,
+        IdentityLinkService links,
+        UserExperienceService experience,
+        ParticipationOperatorNotificationService participationNotifications,
+        InstallLinkingService installLinking,
+        CampaignSpineService campaignSpine,
+        CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        ReadyForTonightService readyForTonight,
+        KnowledgeFabricService knowledgeFabric,
+        NexusPanContinuityService nexusPan,
+        MediaArtifactHorizonsService mediaHorizons,
+        CommunityCreatorHorizonsService communityCreatorHorizons,
+        WaveEightHorizonsService waveEightHorizons,
+        KarmaForgeDiscoveryService karmaForge,
+        BuildGhostConciergeService buildGhostConcierge,
+        BlackLedgerPublicStatsService blackLedgerStats,
+        BlackLedgerDispatchService blackLedgerDispatches,
+        BlackLedgerTickNewsNotificationService blackLedgerTickNews,
+        BlackLedgerFactionOnboardingService blackLedgerFactions,
+        BlackLedgerAdvisoryService blackLedgerAdvisories,
+        BlackLedgerWorldTickBriefingService blackLedgerBriefings,
+        BeHumanEventAdapterPostureService beHumanEventAdapterPosture,
+        GmSessionVenueService gmSessionVenues,
+        AnarchyPreviewService anarchyPreview,
+        PublicPackageCatalogService packageCatalog,
+        PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
+        HubPageChromeService chrome,
+        PublicTrustContentService trustContent,
+        PublicPrivacyBoundaryService privacyBoundaries,
+        PublicSignalProjectionService signalProjection,
+        PublicSignalOperationsService signalOperations,
+        PublicTrustPulseService trustPulse,
+        SignedInTrustStatusService signedInTrustStatus,
+        SupportCaseService supportCases,
+        SupportCasePresentationService supportPresentation,
+        IConfiguration configuration,
+        InstallBootstrapTicketService installBootstrapTickets,
+        PersonalizedInstallScriptService personalizedInstallScripts,
+        ReleaseUploadTicketService releaseUploadTickets,
+        WindowsProofInstallerService windowsProofInstallers,
+        AurPackageCatalogService aurPackages,
+        IWebHostEnvironment webHostEnvironment,
+        ILogger<PublicLandingController> logger)
+        : this(
+            landing,
+            flipLinkDocumentPortal,
+            flagshipCoverage,
+            releases,
+            campaignOsProof,
+            releaseSelection,
+            actions,
+            accounts,
+            identity,
+            links,
+            experience,
+            participationNotifications,
+            installLinking,
+            campaignSpine,
+            workspaceServerPlane,
+            readyForTonight,
+            knowledgeFabric,
+            nexusPan,
+            mediaHorizons,
+            communityCreatorHorizons,
+            waveEightHorizons,
+            karmaForge,
+            buildGhostConcierge,
+            blackLedgerStats,
+            blackLedgerDispatches,
+            blackLedgerTickNews,
+            blackLedgerFactions,
+            blackLedgerAdvisories,
+            blackLedgerBriefings,
+            beHumanEventAdapterPosture,
+            gmSessionVenues,
+            anarchyPreview,
+            packageCatalog,
+            publicCreatorDiscovery,
+            chrome,
+            trustContent,
+            privacyBoundaries,
+            signalProjection,
+            signalOperations,
+            trustPulse,
+            signedInTrustStatus,
+            supportCases,
+            supportPresentation,
+            configuration,
+            installBootstrapTickets,
+            personalizedInstallScripts,
+            releaseUploadTickets,
+            windowsProofInstallers,
+            aurPackages,
+            httpClientFactory: null!,
+            webHostEnvironment,
+            logger)
+    {
     }
 
     [HttpGet("/")]
@@ -212,13 +328,14 @@ public sealed class PublicLandingController : Controller
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
             ?? surface.HeroCtas.Skip(1).FirstOrDefault()
-            ?? new PublicLandingActionDto("See what works today", "/now", "secondary");
+            ?? new PublicLandingActionDto("Open current release", "/now", "secondary");
         var primaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase))
             ?? surface.HeroCtas.FirstOrDefault()
             ?? _releaseSelection.BuildPublicPrimaryAction(
                 manifest,
                 Request.Headers.UserAgent.ToString(),
                 authenticated);
+        var campaignSpine = await BuildLandingCampaignSpineAsync(cancellationToken);
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character manager for Shadowrun.", "/", cancellationToken),
             Surface: surface,
@@ -240,7 +357,8 @@ public sealed class PublicLandingController : Controller
             BlackLedgerStats: _blackLedgerStats.ListHomepageStats(),
             BlackLedgerWorld: _blackLedgerStats.LoadWorldPreview(),
             LatestBlackLedgerDispatch: _blackLedgerDispatches.ListPublishedDispatches().FirstOrDefault(),
-            CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken),
+            CampaignSpine: campaignSpine,
+            OpenRail: await BuildLandingOpenRailAsync(campaignSpine, cancellationToken),
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
@@ -2005,66 +2123,294 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/participate")]
+    public IActionResult ParticipateAliasPage()
+        => RedirectPermanent("/partizipate");
+
+    [HttpGet("/partizipate")]
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        PublicSignalOperationsPacketViewModel? signalOperations = BuildOptionalSignalOperationsPacket();
         var model = new ParticipatePageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 "Participate",
-                "Send ideas, rough edges, and table friction to Chummer without leaving the site.",
-                "/participate",
+                "Public requests, visible bugs, and roadmap signal.",
+                "/partizipate",
                 cancellationToken),
-            Lanes: new[]
-            {
-                new ParticipateLaneViewModel(
-                    "Idea",
-                    "Suggest something useful",
-                    "Use this for product ideas, workflow gaps, or small improvements that would make Chummer easier to use.",
-                    "#participate-submit",
-                    "Add an idea"),
-                new ParticipateLaneViewModel(
-                    "Bug",
-                    "Report a public bug",
-                    "Use this for safe public bugs. Send logs, account details, and private campaign material through Help instead.",
-                    "/contact#support-intake",
-                    "Open help"),
-                new ParticipateLaneViewModel(
-                    "Roadmap",
-                    "See what is being considered",
-                    "Roadmap is planning, changelog is shipped work, and Participate is the place to say what should change.",
-                    "/roadmap",
-                    "Open roadmap")
-            },
-            Items: new[]
-            {
-                new ParticipateItemViewModel(
-                    8,
-                    "Import existing Chummer5A characters",
-                    "Bring established characters forward without rebuilding every detail by hand.",
-                    "Gathering votes"),
-                new ParticipateItemViewModel(
-                    7,
-                    "Readable dark mode everywhere",
-                    "Keep text, inputs, popups, and menus legible in late-session desktop and web use.",
-                    "In progress"),
-                new ParticipateItemViewModel(
-                    5,
-                    "Clear update progress",
-                    "Show what is happening during startup updates so users do not launch a second copy.",
-                    "In progress"),
-                new ParticipateItemViewModel(
-                    3,
-                    "AUR package for Arch-based Linux",
-                    "Make the Linux install path fit Arch-based desktops instead of relying on converted packages.",
-                    "Gathering votes")
-            },
+            Lanes:
+            [
+                new ParticipateLaneViewModel("Idea", "Ask for a change", "Keep product requests short, concrete, and public.", "#participate-board", "Open board"),
+                new ParticipateLaneViewModel("Bug", "Report a visible issue", "Use public posts for safe repro notes only. Move logs, installs, and account detail to Help.", "/contact#support-intake", "Open Help"),
+                new ParticipateLaneViewModel("Roadmap", "See what is moving", "Track what is being explored, what is in progress, and what already shipped.", "/roadmap", "Open roadmap")
+            ],
+            Items:
+            [
+                new ParticipateItemViewModel(41, "Readable dark mode across every dialog", "Keep dark theme text, inputs, and selection surfaces readable without hover hacks.", "In progress"),
+                new ParticipateItemViewModel(28, "Smaller and clearer installer flow", "Trim installer noise, show progress earlier, and keep update handoff obvious.", "Planned"),
+                new ParticipateItemViewModel(19, "Origin dossier before final character build", "Show the story artifact first, then continue into the finished build workflow.", "Research")
+            ],
             PrivateHelpHref: "/contact#support-intake",
             RoadmapHref: "/roadmap",
             ChangelogHref: "/changelog",
-            SignalOperations: signalOperations);
-
+            HostedBoardHref: ResolveProductLiftHostedBoardHref(),
+            SignalOperations: null);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
+    }
+
+    [HttpGet("/partizipate/board")]
+    [HttpGet("/partizipate/board/{**boardPath}")]
+    public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)
+    {
+        Uri? upstream = ResolveProductLiftHostedBoardUri();
+        if (upstream is null)
+        {
+            return NotFound();
+        }
+
+        string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
+        Uri target = string.IsNullOrWhiteSpace(relativePath)
+            ? AppendQueryString(upstream, Request.QueryString.Value)
+            : AppendQueryString(new Uri(upstream, relativePath), Request.QueryString.Value);
+
+        try
+        {
+            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
+            outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToString());
+            outbound.Headers.TryAddWithoutValidation("Accept", Request.Headers.Accept.ToArray());
+            outbound.Headers.TryAddWithoutValidation("Accept-Language", Request.Headers.AcceptLanguage.ToArray());
+            outbound.Headers.Referrer = upstream;
+
+            using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
+            {
+                string redirected = RewriteParticipateBoardLocation(response.Headers.Location, upstream);
+                return Redirect(redirected);
+            }
+
+            string mediaType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                string rewritten = RewriteParticipateBoardHtml(html, upstream, ResolveParticipateBoardHomeHref());
+                return Content(rewritten, "text/html; charset=utf-8");
+            }
+
+            Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            CopySafeProxyHeaders(response);
+            return File(stream, mediaType);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Participate board proxy could not reach upstream board.");
+            return ParticipateBoardUnavailable();
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Participate board proxy timed out.");
+            return ParticipateBoardUnavailable();
+        }
+    }
+
+    private ContentResult ParticipateBoardUnavailable()
+    {
+        const string html = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Public board temporarily unavailable</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #11131a; color: #f3f4f7; }
+    main { max-width: 44rem; margin: 0 auto; padding: 2rem 1.25rem; }
+    h1 { font-size: 1.4rem; margin: 0 0 0.75rem; }
+    p { line-height: 1.55; color: #cfd5df; margin: 0 0 1rem; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+    a { color: inherit; text-decoration: none; border: 1px solid #2c3340; padding: 0.7rem 0.95rem; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Public board temporarily unavailable</h1>
+    <p>The hosted feedback board did not respond. The first-party route is still working.</p>
+    <p>Use the roadmap for current movement or Help for anything private, account-specific, or install-specific.</p>
+    <div class="actions">
+      <a href="/roadmap" target="_top" rel="noopener">Open roadmap</a>
+      <a href="/contact#support-intake" target="_top" rel="noopener">Open help</a>
+      <a href="/partizipate" target="_top" rel="noopener">Back to participate</a>
+    </div>
+  </main>
+</body>
+</html>
+""";
+        return Content(html, "text/html; charset=utf-8");
+    }
+
+    private string? ResolveProductLiftHostedBoardHref()
+    {
+        return ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";
+    }
+
+    private string ResolveParticipateBoardHomeHref()
+    {
+        string configured = (_configuration["CHUMMER_PUBLIC_BASE_URL"] ?? "https://chummer.run").Trim();
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri))
+        {
+            return "https://chummer.run/";
+        }
+
+        return $"{uri.GetLeftPart(UriPartial.Authority).TrimEnd('/')}/";
+    }
+
+    private Uri? ResolveProductLiftHostedBoardUri()
+    {
+        string? configured = _configuration["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configured)
+            || !Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return uri;
+    }
+
+    private static Uri AppendQueryString(Uri baseUri, string? queryString)
+    {
+        if (string.IsNullOrWhiteSpace(queryString))
+        {
+            return baseUri;
+        }
+
+        string raw = queryString.StartsWith('?') ? queryString : $"?{queryString}";
+        var builder = new UriBuilder(baseUri)
+        {
+            Query = raw.TrimStart('?')
+        };
+        return builder.Uri;
+    }
+
+    private string RewriteParticipateBoardLocation(Uri location, Uri upstream)
+    {
+        Uri absolute = location.IsAbsoluteUri ? location : new Uri(upstream, location);
+        if (!Uri.Compare(absolute, upstream, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            return "/partizipate";
+        }
+
+        string relative = upstream.MakeRelativeUri(absolute).ToString();
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return "/partizipate/board";
+        }
+
+        return $"/partizipate/board/{relative}";
+    }
+
+    private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref)
+    {
+        string upstreamOrigin = upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+        const string localOrigin = "/partizipate/board";
+
+        string rewritten = html.Replace(upstreamOrigin, localOrigin, StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("href=\"/", $"href=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("src=\"/", $"src=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("action=\"/", $"action=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("content=\"/", $"content=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+
+        if (!rewritten.Contains("<base ", StringComparison.OrdinalIgnoreCase))
+        {
+            rewritten = Regex.Replace(
+                rewritten,
+                "<head(.*?)>",
+                "<head$1><base href=\"/partizipate/board/\" />",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                TimeSpan.FromMilliseconds(250));
+        }
+
+        if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
+        {
+            string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);
+            string homeLinkPatch = """
+<script data-chummer-home-link-patch>
+document.addEventListener('DOMContentLoaded', function () {
+  const candidates = Array.from(document.querySelectorAll('header a[href], nav a[href], [class*="header"] a[href], [class*="brand"] a[href], [class*="logo"] a[href]'));
+  const brand = candidates.find(function (anchor) {
+    if (!(anchor instanceof HTMLAnchorElement)) {
+      return false;
+    }
+
+    const href = (anchor.getAttribute('href') || '').trim();
+    if (!href) {
+      return false;
+    }
+
+    const text = (anchor.textContent || '').trim().toLowerCase();
+    const hasBrandText = text === 'chummer' || text === 'productlift' || text.includes('feedback') || text.includes('roadmap');
+    const hasLogo = !!anchor.querySelector('img, svg');
+    const pointsToRoot = href === '/' || href === '/partizipate/board' || href === '/partizipate/board/' || /^https:\/\/[^/]+\/?$/.test(href);
+
+    return pointsToRoot && (hasBrandText || hasLogo);
+  });
+
+  if (!brand) {
+    return;
+  }
+
+  brand.setAttribute('href', '__CHUMMER_PUBLIC_HOME_HREF__');
+  brand.setAttribute('target', '_top');
+  brand.setAttribute('rel', 'noopener');
+});
+</script>
+""".Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal);
+
+            if (rewritten.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+            {
+                rewritten = Regex.Replace(
+                    rewritten,
+                    "</head>",
+                    $"{homeLinkPatch}</head>",
+                    RegexOptions.IgnoreCase,
+                    TimeSpan.FromMilliseconds(250));
+            }
+            else
+            {
+                rewritten = homeLinkPatch + rewritten;
+            }
+        }
+
+        return rewritten;
+    }
+
+    private void CopySafeProxyHeaders(HttpResponseMessage response)
+    {
+        foreach (var header in response.Headers)
+        {
+            if (string.Equals(header.Key, "transfer-encoding", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "location", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "content-security-policy", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "x-frame-options", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Response.Headers[header.Key] = header.Value.ToArray();
+        }
+
+        foreach (var header in response.Content.Headers)
+        {
+            if (string.Equals(header.Key, "content-security-policy", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "x-frame-options", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Response.Headers[header.Key] = header.Value.ToArray();
+        }
+
+        Response.Headers.Remove("transfer-encoding");
     }
 
     [HttpGet("/participate/build-ghosts")]
@@ -2374,6 +2720,71 @@ public sealed class PublicLandingController : Controller
                 "no_public_surveillance"
             }
         });
+
+    [HttpGet("/origin-dossier")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OriginDossierPage(CancellationToken cancellationToken)
+    {
+        TrustPageViewModel model = await BuildHorizonPreviewPageModel(
+            pageId: "origin-dossier",
+            title: "Origin Dossier",
+            description: "Story-first runner canon, bounded media, and no silent mechanics mutation.",
+            currentPath: "/origin-dossier",
+            eyebrow: "Runner origin",
+            heading: "Origin Dossier",
+            intro: "Origin Dossier turns an approved runner backstory into a readable story packet before it becomes a video, audiobook, or later ALICE context. The story stays first. The sheet stays authoritative.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "origin_story_first",
+                    "Story first",
+                    "What the player sees first",
+                    "The first artifact should be a readable story packet the player and GM can approve together before the run continues into later media or follow-up help.",
+                    [
+                        "Readable story packet before later media.",
+                        "Approved canon stays separate from mechanics.",
+                        "Player and GM can review the same text."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "origin_bundle",
+                    "Next",
+                    "Where the story can continue",
+                    "Once the story is approved, the same source can continue into a bounded media bundle without turning narration, portraits, or video into character authority.",
+                    [
+                        "PDF booklet.",
+                        "Narrated overview and later audiobook lane.",
+                        "Portrait, scene, and video packet lineage."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "origin_boundary",
+                    "Boundary",
+                    "What this lane does not get to do",
+                    "Origin Dossier can shape presentation and later context, but it does not get to smuggle in ware, qualities, availability exceptions, or other mechanics changes.",
+                    [
+                        "No silent sheet edits.",
+                        "No automatic legality claims.",
+                        "No media provider becomes mechanics authority."
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open the story booklet", "/docs/origin-dossier-the-name-she-chose", "primary"),
+                new TrustPageActionViewModel("Watch the narrated overview", "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4", "secondary"),
+                new TrustPageActionViewModel("Download the booklet PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
+            ],
+            cancellationToken: cancellationToken,
+            summaryPoints:
+            [
+                "Story before media",
+                "Approved canon stays bounded",
+                "The sheet remains authoritative"
+            ]);
+        return View("~/Views/PublicLanding/TrustPage.cshtml", model);
+    }
+
+    [HttpGet("/roadmap/origin-dossier")]
+    public IActionResult OriginDossierRoadmapAlias()
+        => Redirect("/origin-dossier");
 
     [HttpGet("/mobile/pwa.json")]
     [Produces("application/json")]
@@ -2732,7 +3143,7 @@ public sealed class PublicLandingController : Controller
             actions:
             [
                 new TrustPageActionViewModel("Open community hub", "/community", "primary"),
-                new TrustPageActionViewModel("Open participate", "/participate", "secondary"),
+                new TrustPageActionViewModel("Open participate", "/partizipate", "secondary"),
                 new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -3834,11 +4245,11 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/feedback")]
     [Produces("text/html")]
     public IActionResult FeedbackPage()
-        => Redirect("/participate");
+        => Redirect("/partizipate");
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
-        => Redirect("/participate");
+        => Redirect("/partizipate");
 
     [HttpPost("/feedback/providers/productlift/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
@@ -5102,7 +5513,7 @@ public sealed class PublicLandingController : Controller
                 .Select(receipt => new KnowledgeFabricReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Provenance, receipt.Route, receipt.Status))
                 .ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open explanation index", "/rules/receipts", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("See what works today", "/now#real-rules-truth", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Open current release", "/now#real-rules-truth", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open packages", "/packages", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -7739,7 +8150,7 @@ Boundary:
             "Current release",
             "Stay on the current release",
             "Open the current release, your linked devices, and what changed before you spend attention on optional contribution work.",
-            "See what works today",
+            "Open current release",
             "/now",
             "primary");
     }
@@ -8490,6 +8901,135 @@ Boundary:
         return _campaignSpine.GetAccountSummary(user, installLinking);
     }
 
+    private async Task<LandingOpenRailViewModel?> BuildLandingOpenRailAsync(
+        AccountCampaignSummary? campaignSpine,
+        CancellationToken cancellationToken)
+    {
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/", cancellationToken);
+        if (subject is null)
+        {
+            return null;
+        }
+
+        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        bool hasLinkedDesktop = (installLinking.ClaimedInstallations?.Count ?? 0) > 0
+            || (installLinking.ActiveGrants?.Count ?? 0) > 0
+            || installLinking.PendingClaimTickets.Count > 0;
+
+        IReadOnlyList<LandingOpenRailItemViewModel> items = BuildLandingOpenRailItems(campaignSpine, hasLinkedDesktop);
+        if (items.Count == 0)
+        {
+            return null;
+        }
+
+        string summary = hasLinkedDesktop
+            ? "Open your current runner, current campaign, or a starter example in the app."
+            : "Pick what you want to open. If this account has not linked a desktop copy yet, the click will continue into install and account linking.";
+
+        return new LandingOpenRailViewModel(
+            Heading: "Open in Chummer",
+            Summary: summary,
+            Items: items);
+    }
+
+    private static IReadOnlyList<LandingOpenRailItemViewModel> BuildLandingOpenRailItems(
+        AccountCampaignSummary? campaignSpine,
+        bool hasLinkedDesktop)
+    {
+        List<LandingOpenRailItemViewModel> items = new(capacity: 4);
+
+        if (campaignSpine is not null)
+        {
+            foreach (var dossier in campaignSpine.Dossiers
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .Take(3))
+            {
+                items.Add(new LandingOpenRailItemViewModel(
+                    Label: dossier.DisplayName,
+                    Summary: string.IsNullOrWhiteSpace(dossier.LatestContinuity?.Summary)
+                        ? "Open this runner in the desktop app."
+                        : dossier.LatestContinuity!.Summary,
+                    Href: $"/account/open/character/{Uri.EscapeDataString(dossier.DossierId)}",
+                    Kind: "Character"));
+            }
+
+            if (items.Count == 0)
+            {
+                foreach (var workspace in campaignSpine.Workspaces
+                    .OrderByDescending(static item => ResolveLandingWorkspaceFreshnessUtc(item))
+                    .Take(2))
+                {
+                    items.Add(new LandingOpenRailItemViewModel(
+                        Label: workspace.CampaignName,
+                        Summary: workspace.ReturnSummary,
+                        Href: $"/account/open/campaign/{Uri.EscapeDataString(workspace.CampaignId)}",
+                        Kind: "Campaign"));
+                }
+            }
+        }
+
+        if (items.Count == 0)
+        {
+            items.AddRange(GetLandingExampleOpenRailItems());
+        }
+
+        if (!hasLinkedDesktop)
+        {
+            items = items
+                .Select(static item => item with
+                {
+                    Summary = $"{item.Summary} Install and account linking continue automatically when no linked desktop copy is available."
+                })
+                .ToList();
+        }
+
+        return items;
+    }
+
+    private static DateTimeOffset ResolveLandingWorkspaceFreshnessUtc(CampaignWorkspaceProjection workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        return new[] { workspace.LatestContinuity?.CapturedAtUtc, workspace.NextSessionCarryForward?.UpdatedAtUtc }
+            .Concat((workspace.Runs ?? Array.Empty<RunProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>()).Select(static item => (DateTimeOffset?)item.TransferredAtUtc))
+            .Concat((workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>()).Select(static item => (DateTimeOffset?)item.LaunchedAtUtc))
+            .Concat((workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>()).Select(static item => (DateTimeOffset?)item.StagedAtUtc))
+            .Concat((workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Select(static item => (DateTimeOffset?)item.GeneratedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.MinValue)
+            .Max();
+    }
+
+    private static IReadOnlyList<LandingOpenRailItemViewModel> GetLandingExampleOpenRailItems()
+        =>
+        [
+            new(
+                Label: "Street Samurai",
+                Summary: "Cybered frontline runner with straightforward combat pressure.",
+                Href: "/account/open/example/street-samurai",
+                Kind: "Example"),
+            new(
+                Label: "Decker",
+                Summary: "Matrix intrusion starter with logic, gear, and host-first momentum.",
+                Href: "/account/open/example/decker",
+                Kind: "Example"),
+            new(
+                Label: "Combat Mage",
+                Summary: "Awakened caster with direct action and visible spell tradeoffs.",
+                Href: "/account/open/example/combat-mage",
+                Kind: "Example"),
+            new(
+                Label: "Face",
+                Summary: "Social operator focused on negotiation, cover, and team access.",
+                Href: "/account/open/example/face",
+                Kind: "Example")
+        ];
+
     private BuildGhostConciergeTeaserViewModel BuildBuildGhostConciergeTeaser()
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
@@ -8711,7 +9251,8 @@ Boundary:
 
     private async Task<TrustPageViewModel> BuildDocumentPortalHomePageModel(CancellationToken cancellationToken)
     {
-        var firstDocument = _flipLinkDocumentPortal.ListPublicDocuments().First();
+        var documents = _flipLinkDocumentPortal.ListPublicDocuments();
+        var firstDocument = documents.First();
         return await BuildHorizonPreviewPageModel(
             pageId: "document-portal",
             title: "Document Portal",
@@ -8719,19 +9260,15 @@ Boundary:
             currentPath: "/docs",
             eyebrow: "Document library",
             heading: "Document Portal",
-            intro: "Start with the Chummer6 Quickstart Guide. Read it on Chummer, open the optional viewer, or download the PDF.",
+            intro: "Start with a Chummer-owned guide or story packet. Read it on Chummer, open the optional viewer boundary, or download the PDF.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "document_portal_featured",
-                    "Featured",
-                    "Start with one safe document",
-                    "The first publication scope is intentionally narrow: one original Chummer guide, one named page, and one explicit boundary before broader dossier or campaign packet rollout.",
-                    [
-                        firstDocument.Title,
-                        "Original Chummer content only",
-                        "No sourcebook prose or private campaign data"
-                    ]),
+                    "Available now",
+                    "Open a guide or story packet",
+                    "The portal stays intentionally narrow: original Chummer-authored documents only, on named first-party routes, with a clear fallback before broader campaign packet rollout.",
+                    documents.Select(static item => item.Title).ToArray()),
                 new TrustPageSectionViewModel(
                     "document_portal_boundary",
                     "Boundary",
@@ -8755,7 +9292,7 @@ Boundary:
             actions:
             [
                 new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{firstDocument.Slug}", "primary"),
-                new TrustPageActionViewModel("Quickstart category", $"/docs/category/{firstDocument.Category}", "secondary"),
+                new TrustPageActionViewModel("Open Origin Dossier booklet", "/docs/origin-dossier-the-name-she-chose", "secondary"),
                 new TrustPageActionViewModel("Read publication boundary", $"/docs/embed/{firstDocument.Slug}", "ghost"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{firstDocument.Slug}/download.pdf", "ghost")
             ],
@@ -8771,28 +9308,28 @@ Boundary:
     private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartCategoryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-quickstart-category",
-            title: "Quickstart documents",
-            description: "Beginner-safe Chummer guides and starter documents on clear public document pages.",
+            title: $"{document.Category} documents",
+            description: "Chummer-owned documents on named public routes with PDF fallback.",
             currentPath: $"/docs/category/{document.Category}",
             eyebrow: "Document category",
-            heading: "Quickstart documents",
-            intro: "Quickstart documents are the first category in the Document Portal: newcomer-safe, original Chummer-authored, and suitable for public release without leaking private campaign state or copied rulebook prose.",
+            heading: $"{document.Category} documents",
+            intro: "Each category in the Document Portal stays first-party, original, and safe to open without leaking private campaign state or copied rulebook prose.",
             sections:
             [
                 new TrustPageSectionViewModel(
-                    "quickstart_documents_current",
+                    "category_documents_current",
                     "Current document",
                     "The first document on this rail",
-                    "The Chummer6 Quickstart Guide is the first route publication because it can explain install, orientation, and first safe actions without depending on sourcebook excerpts.",
+                    "This category page keeps one named route per document so readers can open the packet directly instead of hunting through a separate shelf first.",
                     [
                         document.Title,
-                        "Install and orientation focus",
-                        "Safe first publication route"
+                        "First-party document route",
+                        "Reader view available"
                     ])
             ],
             actions:
             [
-                new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{document.Slug}", "primary"),
+                new TrustPageActionViewModel($"Open {document.Title}", $"/docs/{document.Slug}", "primary"),
                 new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
@@ -8802,54 +9339,54 @@ Boundary:
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-quickstart-guide",
             title: document.Title,
-            description: "Original Chummer quickstart guide with a simple viewer fallback.",
+            description: "Original Chummer document with a simple viewer fallback.",
             currentPath: $"/docs/{document.Slug}",
             eyebrow: "Chummer-owned guide",
             heading: document.Title,
-            intro: "Open the Chummer quickstart as a flipbook or PDF. The Chummer page stays available even if the external viewer is unavailable.",
+            intro: "Open this Chummer document as a first-party page or PDF. The Chummer route stays available even if the external viewer is unavailable.",
             sections:
             [
                 new TrustPageSectionViewModel(
-                    "quickstart_scope",
+                    "document_scope",
                     "Scope",
-                    "What this guide is for",
-                    "Use the Quickstart Guide to orient a new player without pushing them into a sourcebook PDF, a sprawling docs pile, or private campaign notes.",
-                    [
-                        "Install posture",
-                        "First safe actions",
-                        "Clear Chummer orientation"
-                    ]),
+                    "What this document is for",
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? "Use this booklet to review the approved story packet before later media, audiobook, or assistant follow-up tries to build on it."
+                        : "Use the Quickstart Guide to orient a new player without pushing them into a sourcebook PDF, a sprawling docs pile, or private campaign notes.",
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? ["Readable story first", "Approved canon boundary", "Later media stays downstream"]
+                        : ["Install posture", "First safe actions", "Clear Chummer orientation"]),
                 new TrustPageSectionViewModel(
-                    "quickstart_boundary",
+                    "document_boundary",
                     "Boundary",
-                    "What this guide must not become",
-                    "This guide must stay original and current in Chummer. It must not host copied rulebook prose, private runner sheets, GM-only lore, or account-only records.",
+                    "What this document must not become",
+                    "This document must stay original and current in Chummer. It must not host copied rulebook prose, private runner sheets, GM-only lore, or account-only records.",
                     [
                         "No sourcebook prose",
                         "No private campaign data",
                         "No release shortcuts"
                     ]),
                 new TrustPageSectionViewModel(
-                    "quickstart_publication_posture",
+                    "document_publication_posture",
                     "Availability",
-                    "Current service state",
-                    "The Chummer page and fallback PDF are live now. The external FlipLink viewer remains optional.",
+                    "How to read it",
+                    "The Chummer page and fallback PDF are live now. A reader view can stay optional without changing the basic path.",
                     [
                         "Chummer page is current",
                         "PDF fallback is current",
-                        "External viewer remains optional"
+                        "Reader view remains optional"
                     ])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Open Document Portal", "/docs", "primary"),
-                new TrustPageActionViewModel("Open embed boundary", $"/docs/embed/{document.Slug}", "secondary"),
+                new TrustPageActionViewModel("Open reader view", $"/docs/embed/{document.Slug}", "secondary"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
             [
-                "Original Chummer-authored guide",
+                "Original Chummer-authored document",
                 "First-party route published",
                 "External viewer optional",
                 "Fallback PDF is current"
@@ -8858,19 +9395,19 @@ Boundary:
     private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-embed-boundary",
-            title: "Quickstart embed boundary",
+            title: "Quickstart reader view",
             description: "Viewer fallback for the Chummer6 Quickstart Guide.",
             currentPath: $"/docs/embed/{document.Slug}",
-            eyebrow: "Viewer boundary",
-            heading: "Quickstart embed boundary",
-            intro: "Open the quickstart in the embedded viewer. The Chummer page and PDF fallback stay available even when the external viewer is unavailable.",
+            eyebrow: "Reader view",
+            heading: "Quickstart reader view",
+            intro: "Open the quickstart in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "embed_boundary_contract",
                     "Contract",
-                    "What the viewer layer may do",
-                    "The viewer may present the guide, but the Chummer page and PDF remain the reliable fallback.",
+                    "What the reader may do",
+                    "The reader may present the guide, but the Chummer page and PDF remain the reliable fallback.",
                     [
                         "Presentation only",
                         "Analytics are engagement-only",
@@ -8878,13 +9415,13 @@ Boundary:
                     ]),
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",
-                    "Current state",
+                    "Fallback",
                     "Why the fallback stays visible",
-                    "The external viewer remains optional. Chummer keeps the page and PDF available even when the embedded flipbook is unavailable.",
+                    "The reader remains optional. Chummer keeps the page and PDF available even when the embedded view is unavailable.",
                     [
                         "Chummer route remains current",
                         "Fallback PDF remains current",
-                        "External embed remains optional"
+                        "Reader view remains optional"
                     ])
             ],
             actions:

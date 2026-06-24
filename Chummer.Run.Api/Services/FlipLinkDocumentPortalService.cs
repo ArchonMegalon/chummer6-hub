@@ -7,15 +7,37 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class FlipLinkDocumentPortalService
 {
-    private const string QuickstartDocumentId = "chummer6_quickstart_guide";
-    private const string QuickstartSlug = "chummer6-quickstart";
-    private const string QuickstartCategory = "quickstart";
-    private const string QuickstartRelativeGuidePath = "public-guides/chummer6-quickstart.md";
-    private const string QuickstartSourceRepo = "chummer6-design";
-    private const string QuickstartSourcePath = "products/chummer/public-guides/chummer6-quickstart.md";
-    private const string QuickstartVersion = "2026.06-first-lane";
-    private const string QuickstartPdfFileName = "chummer6-quickstart-guide.pdf";
-    private static readonly DateTimeOffset QuickstartCreatedAtUtc = new(2026, 6, 6, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DocumentDefinition Quickstart = new(
+        Id: "chummer6_quickstart_guide",
+        Slug: "chummer6-quickstart",
+        Category: "quickstart",
+        RelativeGuidePath: "public-guides/chummer6-quickstart.md",
+        SourceRepo: "chummer6-design",
+        SourcePath: "products/chummer/public-guides/chummer6-quickstart.md",
+        Version: "2026.06-first-lane",
+        PdfFileName: "chummer6-quickstart-guide.pdf",
+        Title: "Chummer6 Quickstart Guide",
+        Audience: "new_players_and_operators",
+        CreatedAtUtc: new DateTimeOffset(2026, 6, 6, 0, 0, 0, TimeSpan.Zero));
+
+    private static readonly DocumentDefinition OriginDossier = new(
+        Id: "origin_dossier_name_she_chose",
+        Slug: "origin-dossier-the-name-she-chose",
+        Category: "origin-dossier",
+        RelativeGuidePath: "horizons/origin-dossier.md",
+        SourceRepo: "chummer6-design",
+        SourcePath: "products/chummer/horizons/origin-dossier.md",
+        Version: "2026.06-story-first-lane",
+        PdfFileName: "origin-dossier-the-name-she-chose.pdf",
+        Title: "Origin Dossier: The Name She Chose",
+        Audience: "players_and_gms",
+        CreatedAtUtc: new DateTimeOffset(2026, 6, 19, 0, 0, 0, TimeSpan.Zero));
+
+    private static readonly IReadOnlyList<DocumentDefinition> PublicDocuments =
+    [
+        Quickstart,
+        OriginDossier
+    ];
 
     private readonly string _productRoot;
 
@@ -25,28 +47,28 @@ public sealed class FlipLinkDocumentPortalService
     }
 
     public IReadOnlyList<ChummerDocument> ListPublicDocuments()
-        => [BuildQuickstartDocument()];
+        => PublicDocuments.Select(BuildDocument).ToArray();
 
     public IReadOnlyList<ChummerDocument> ListCategoryDocuments(string category)
-        => string.Equals(category?.Trim(), QuickstartCategory, StringComparison.OrdinalIgnoreCase)
-            ? [BuildQuickstartDocument()]
-            : [];
+        => PublicDocuments
+            .Where(item => string.Equals(item.Category, category?.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(BuildDocument)
+            .ToArray();
 
     public ChummerDocument? TryGetPublicDocument(string slug)
-        => string.Equals(slug?.Trim(), QuickstartSlug, StringComparison.OrdinalIgnoreCase)
-            ? BuildQuickstartDocument()
-            : null;
+        => TryFindDefinitionBySlug(slug) is { } definition ? BuildDocument(definition) : null;
 
     public FlipLinkPublication? TryGetPublication(string documentId)
     {
-        if (!string.Equals(documentId?.Trim(), QuickstartDocumentId, StringComparison.OrdinalIgnoreCase))
+        DocumentDefinition? definition = TryFindDefinitionById(documentId);
+        if (definition is null)
         {
             return null;
         }
 
         return new FlipLinkPublication(
-            Id: "fliplink_chummer6_quickstart_candidate",
-            ChummerDocumentId: QuickstartDocumentId,
+            Id: $"fliplink_{definition.Id}_candidate",
+            ChummerDocumentId: definition.Id,
             Provider: "FlipLink.me",
             ProviderPublicationId: string.Empty,
             FlipLinkUrl: string.Empty,
@@ -58,25 +80,25 @@ public sealed class FlipLinkDocumentPortalService
             AnalyticsEnabled: false,
             PublicationStatus: FlipLinkPublicationStatuses.Unpublished,
             CreatedByUserId: "operator_managed_publication_lane",
-            CreatedAtUtc: QuickstartCreatedAtUtc);
+            CreatedAtUtc: definition.CreatedAtUtc);
     }
 
     public FlipLinkPublicationReceipt? TryBuildPublicationReceipt(string slug)
     {
-        var document = TryGetPublicDocument(slug);
+        ChummerDocument? document = TryGetPublicDocument(slug);
         if (document is null)
         {
             return null;
         }
 
-        var publication = TryGetPublication(document.Id);
+        FlipLinkPublication? publication = TryGetPublication(document.Id);
         if (publication is null)
         {
             return null;
         }
 
         return new FlipLinkPublicationReceipt(
-            Id: "fliplink_chummer6_quickstart_publication_receipt",
+            Id: $"fliplink_{document.Id}_publication_receipt",
             PublicationId: publication.Id,
             DocumentId: document.Id,
             PdfSha256: document.PdfSha256,
@@ -85,60 +107,61 @@ public sealed class FlipLinkDocumentPortalService
             AccessPolicy: document.AccessPolicy,
             ProviderUrl: publication.FlipLinkUrl,
             EmbedRoute: $"/docs/embed/{document.Slug}",
-            CreatedAtUtc: QuickstartCreatedAtUtc);
+            CreatedAtUtc: document.CreatedAtUtc);
     }
 
     public DocumentPortalPdfArtifact? TryBuildPdfArtifact(string slug)
     {
-        if (!string.Equals(slug?.Trim(), QuickstartSlug, StringComparison.OrdinalIgnoreCase))
+        DocumentDefinition? definition = TryFindDefinitionBySlug(slug);
+        if (definition is null)
         {
             return null;
         }
 
-        string sourceFullPath = Path.Combine(_productRoot, "public-guides", "chummer6-quickstart.md");
+        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
         if (!File.Exists(sourceFullPath))
         {
             return null;
         }
 
-        var lines = BuildPdfLines("Chummer6 Quickstart Guide", File.ReadAllText(sourceFullPath));
+        IReadOnlyList<string> lines = BuildPdfLines(definition.Title, File.ReadAllText(sourceFullPath));
         byte[] bytes = MinimalPdfDocumentRenderer.Render(lines);
         return new DocumentPortalPdfArtifact(
-            FileName: QuickstartPdfFileName,
+            FileName: definition.PdfFileName,
             Bytes: bytes,
             Sha256: ComputeSha256(bytes),
             ContentType: "application/pdf");
     }
 
-    private ChummerDocument BuildQuickstartDocument()
+    private ChummerDocument BuildDocument(DocumentDefinition definition)
     {
-        string sourceFullPath = Path.Combine(_productRoot, "public-guides", "chummer6-quickstart.md");
+        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
         string sourceHash = ComputeFileSha256(sourceFullPath);
-        var pdfArtifact = TryBuildPdfArtifact(QuickstartSlug);
+        DocumentPortalPdfArtifact? pdfArtifact = TryBuildPdfArtifact(definition.Slug);
 
         return new ChummerDocument(
-            Id: QuickstartDocumentId,
-            Slug: QuickstartSlug,
-            Title: "Chummer6 Quickstart Guide",
-            Category: QuickstartCategory,
-            SourceRepo: QuickstartSourceRepo,
-            SourcePath: QuickstartSourcePath,
+            Id: definition.Id,
+            Slug: definition.Slug,
+            Title: definition.Title,
+            Category: definition.Category,
+            SourceRepo: definition.SourceRepo,
+            SourcePath: definition.SourcePath,
             SourceHash: sourceHash,
-            PdfArtifactPath: $"/docs/{QuickstartSlug}/download.pdf",
+            PdfArtifactPath: $"/docs/{definition.Slug}/download.pdf",
             PdfSha256: pdfArtifact?.Sha256 ?? string.Empty,
             PublicClassification: ChummerDocumentClassifications.Public,
-            Audience: "new_players_and_operators",
+            Audience: definition.Audience,
             AccessPolicy: "public",
-            FlipLinkPublicationId: "fliplink_chummer6_quickstart_candidate",
+            FlipLinkPublicationId: $"fliplink_{definition.Id}_candidate",
             FlipLinkUrl: string.Empty,
             FlipLinkEmbedCodeHash: string.Empty,
             AnalyticsEnabled: false,
             LeadCaptureEnabled: false,
             PasswordProtected: false,
-            Version: QuickstartVersion,
+            Version: definition.Version,
             Status: ChummerDocumentStatuses.Published,
-            CreatedAtUtc: QuickstartCreatedAtUtc,
-            PublishedAtUtc: QuickstartCreatedAtUtc);
+            CreatedAtUtc: definition.CreatedAtUtc,
+            PublishedAtUtc: definition.CreatedAtUtc);
     }
 
     private static string ResolveProductRoot(IConfiguration configuration)
@@ -148,19 +171,19 @@ public sealed class FlipLinkDocumentPortalService
         {
             string absoluteRoot = Path.GetFullPath(configuredRoot);
             string rootedProductPath = Path.Combine(absoluteRoot, "products", "chummer");
-            if (File.Exists(Path.Combine(rootedProductPath, "public-guides", "chummer6-quickstart.md")))
+            if (File.Exists(Path.Combine(rootedProductPath, Quickstart.RelativeGuidePath)))
             {
                 return rootedProductPath;
             }
 
             string siblingProductPath = Path.GetFullPath(Path.Combine(absoluteRoot, "..", "chummer-design", "products", "chummer"));
-            if (File.Exists(Path.Combine(siblingProductPath, "public-guides", "chummer6-quickstart.md")))
+            if (File.Exists(Path.Combine(siblingProductPath, Quickstart.RelativeGuidePath)))
             {
                 return siblingProductPath;
             }
 
             string mirroredProductPath = Path.Combine(absoluteRoot, ".codex-design", "product");
-            if (File.Exists(Path.Combine(mirroredProductPath, "public-guides", "chummer6-quickstart.md")))
+            if (File.Exists(Path.Combine(mirroredProductPath, Quickstart.RelativeGuidePath)))
             {
                 return mirroredProductPath;
             }
@@ -189,7 +212,7 @@ public sealed class FlipLinkDocumentPortalService
     {
         foreach (string candidate in BuildProductRootCandidates(rootCandidate))
         {
-            if (File.Exists(Path.Combine(candidate, QuickstartRelativeGuidePath)))
+            if (File.Exists(Path.Combine(candidate, Quickstart.RelativeGuidePath)))
             {
                 productRoot = candidate;
                 return true;
@@ -248,6 +271,12 @@ public sealed class FlipLinkDocumentPortalService
 
         return builder.ToString();
     }
+
+    private static DocumentDefinition? TryFindDefinitionBySlug(string? slug)
+        => PublicDocuments.FirstOrDefault(item => string.Equals(item.Slug, slug?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static DocumentDefinition? TryFindDefinitionById(string? documentId)
+        => PublicDocuments.FirstOrDefault(item => string.Equals(item.Id, documentId?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     private static IReadOnlyList<string> BuildPdfLines(string title, string markdown)
     {
@@ -334,6 +363,19 @@ public sealed class FlipLinkDocumentPortalService
         byte[] Bytes,
         string Sha256,
         string ContentType);
+
+    private sealed record DocumentDefinition(
+        string Id,
+        string Slug,
+        string Category,
+        string RelativeGuidePath,
+        string SourceRepo,
+        string SourcePath,
+        string Version,
+        string PdfFileName,
+        string Title,
+        string Audience,
+        DateTimeOffset CreatedAtUtc);
 
     private static class MinimalPdfDocumentRenderer
     {
@@ -426,7 +468,10 @@ public sealed class FlipLinkDocumentPortalService
             return builder.ToString();
         }
 
-        private static string EscapePdfText(string line)
-            => line.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
+        private static string EscapePdfText(string value)
+            => value
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("(", "\\(", StringComparison.Ordinal)
+                .Replace(")", "\\)", StringComparison.Ordinal);
     }
 }

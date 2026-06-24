@@ -25,7 +25,7 @@ test('public homepage stays readable across flagship responsive viewports', asyn
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.minimal-hero h1')).toContainText('Chummer');
     await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Stable');
-    await expect(page.locator('[data-homepage-section="workflow"]')).toContainText('Create');
+    await expect(page.locator('[data-homepage-section="hero"]')).toContainText('Nightly');
 
     const overflow = await page.evaluate(() => {
       const root = document.documentElement;

@@ -26,7 +26,7 @@ const supportingSurfaces = [
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Release status', 'The build currently available from Chummer.', 'Open downloads', 'Open support'],
+    requiredText: ['Current release', 'The build, platforms, and current state in one place.', 'Open downloads', 'Open help'],
   },
   {
     id: 'ledger-map',
@@ -42,9 +42,9 @@ const supportingSurfaces = [
   },
   {
     id: 'participate',
-    route: '/participate',
+    route: '/partizipate',
     screenshotPrefix: 'participate',
-    requiredText: ['Tell us what slows the table down.', 'Send feedback', 'Current themes'],
+    requiredText: ['Public requests, one board.', 'Send feedback', 'Roadmap'],
   },
   {
     id: 'contact',
@@ -71,14 +71,13 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     const navLinks = page.locator('.site-nav a, .site-nav__current');
 
     await expect(heroTitle).toContainText('Chummer');
-    await expect(primaryCta).toContainText('Download Chummer');
-    await expect(page.locator('.minimal-hero__points')).toContainText('Create');
-    await expect(page.locator('.minimal-hero__points')).toContainText('Track');
-    await expect(page.locator('.minimal-hero__points')).toContainText('Review');
+    await expect(primaryCta).toHaveAttribute('aria-label', 'Download Chummer');
+    await expect(page.locator('.minimal-meta')).toContainText('Windows and Linux.');
     await expect(page.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(page.locator('.minimal-inline-links')).toContainText('Help');
     await expect(page.locator('.minimal-inline-links')).toContainText('Participate');
+    await expect(page.locator('.minimal-inline-links')).toContainText('Status');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {

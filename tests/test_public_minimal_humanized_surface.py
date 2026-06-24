@@ -28,8 +28,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
     assert 'Pick the problem' in trust_page
-    assert 'minimal-help-card__details' in trust_page
-    assert 'Quick notes' in trust_page
+    assert 'minimal-help-card__list' in trust_page
+    assert 'aria-label="Quick notes"' in trust_page
     assert 'route-choice-grid--compact' in trust_page
     assert 'other routes below' not in trust_page
 
@@ -350,7 +350,7 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     assert "Get the app" not in landing
     assert "minimal-inline-links" in landing
     assert 'data-homepage-section="help"' not in landing
-    assert 'href="/participate"' in landing
+    assert 'href="/partizipate"' in landing
     assert ".minimal-video" in site_css
     assert "aspect-ratio: 16 / 9;" in site_css
 
@@ -386,14 +386,23 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "DefaultProductLiftFeedbackUrl" not in controller
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
+    assert '[HttpGet("/partizipate/board")]' in controller
+    assert "ParticipateBoardProxy" in controller
+    assert 'RedirectPermanent("/partizipate")' in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
+    assert 'return ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";' in controller
     assert "participate-shell" in participate
-    assert "tell us what slows the table down" in participate.lower()
+    assert "Public requests, one board." in participate
+    assert "Feedback, roadmap, and shipped follow-through stay on this route." in participate
+    assert "First-party route" in participate
+    assert "Join beta waitlist" not in participate
+    assert "vote, add requests, and track what is moving" in participate.lower()
     assert "participate-quick-form" in participate
-    assert "participate-lanes" in participate
-    assert "@foreach (var lane in Model.Lanes)" in participate
-    assert "@lane.ActionLabel" in participate
-    assert "Current themes" in participate
+    assert "participate-lanes" not in participate
+    assert "@foreach (var lane in Model.Lanes)" not in participate
+    assert "@lane.ActionLabel" not in participate
+    assert "Current themes" not in participate
+    assert "Open in a tab" not in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
@@ -430,6 +439,7 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert "ResolveProductLiftFeedbackUrl()" not in controller
     assert "productlift.dev" not in participate.lower()
+    assert '"/partizipate/board"' in controller
 
     for forbidden in (
         "Account-only programs stay below the fold",
@@ -2749,12 +2759,28 @@ def test_account_view_hides_internal_status_language_from_signed_in_users() -> N
         "Assign contribution work and track progress.",
         "No account sync history is attached",
         "No account sync problems are active",
+        "Open in Chummer",
+        "Recent characters",
+        "Groups and campaigns",
+        "Example characters",
+        "This account does not have a linked desktop copy yet, so clicks should take you into install and claim first.",
+        "/account/open/character/",
+        "/account/open/campaign/",
+        "/account/open/group/",
+        "/account/open/example/",
+        "Install Chummer first",
         "Prepare offline travel files",
         "secrets and local caches stay on this device",
         "Not shared yet",
         "trigger or open the next response",
     ):
         assert expected in account
+
+    for forbidden in (
+        "Recent workspaces",
+        "Example workspaces",
+    ):
+        assert forbidden not in account
 
 
 def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:

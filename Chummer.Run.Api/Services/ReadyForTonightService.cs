@@ -81,10 +81,10 @@ public sealed class ReadyForTonightService
             FixNowActions:
             [
                 new ReadyAction("Download organizer packet", "/ready/packet/organizer.md", "primary"),
-                new ReadyAction("Open participate", "/participate", "secondary"),
+                new ReadyAction("Open participate", "/partizipate", "secondary"),
                 new ReadyAction("Open continuity", "/play/continuity", "ghost")
             ],
-            NextBestScreen: "/participate",
+            NextBestScreen: "/partizipate",
             ProofReceipts:
             [
                 "/ready/packet/organizer.json",

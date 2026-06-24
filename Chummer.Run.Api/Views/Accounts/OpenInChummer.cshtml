@@ -1,0 +1,47 @@
+@model Chummer.Run.Api.ViewModels.AccountDesktopLaunchPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-minimal";
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="minimal-kicker">Account</p>
+        <h1>@Model.Heading</h1>
+        <p>@Model.Summary</p>
+    </div>
+</section>
+
+<section class="minimal-section minimal-section--tight">
+    @if (Model.Notes is { Count: > 0 })
+    {
+        <div class="minimal-facts">
+            @foreach (var note in Model.Notes)
+            {
+                <article>
+                    <p>@note</p>
+                </article>
+            }
+        </div>
+    }
+    <div class="minimal-actions" aria-label="Launch actions">
+        <a class="button-like button-like--primary" href="@Model.LaunchUri" id="launch-in-chummer">@Model.PrimaryLabel</a>
+        <a class="button-like button-like--secondary" href="@Model.PrimaryHref">@Model.SecondaryLabel</a>
+        <a class="button-like button-like--ghost" href="@Model.SecondaryHref">Open account</a>
+    </div>
+</section>
+
+<script>
+  (() => {
+    const launchHref = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LaunchUri));
+    const launchLink = document.getElementById('launch-in-chummer');
+    if (!launchHref || !launchLink) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      window.location.href = launchHref;
+    }, 120);
+  })();
+</script>

@@ -121,14 +121,11 @@ else
                     }
                 }
             </div>
-            <details class="minimal-details">
-                <summary>Details</summary>
-                <dl>
-                    <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
-                    <div><dt>Released</dt><dd>@publishedLabel</dd></div>
-                    <div><dt>Updated</dt><dd>@verifiedLabel</dd></div>
-                </dl>
-            </details>
+            <dl class="minimal-inline-facts" aria-label="Stable build details">
+                <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
+                <div><dt>Released</dt><dd>@publishedLabel</dd></div>
+                <div><dt>Updated</dt><dd>@verifiedLabel</dd></div>
+            </dl>
         </article>
 
         <article class="minimal-lane-card" id="nightly">
@@ -151,14 +148,11 @@ else
                     }
                 }
             </div>
-            <details class="minimal-details">
-                <summary>Details</summary>
-                <dl>
-                    <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
-                    <div><dt>Released</dt><dd>@publishedLabel</dd></div>
-                    <div><dt>Updated</dt><dd>@verifiedLabel</dd></div>
-                </dl>
-            </details>
+            <dl class="minimal-inline-facts" aria-label="Nightly build details">
+                <div><dt>Build</dt><dd>@Model.Manifest.Version</dd></div>
+                <div><dt>Released</dt><dd>@publishedLabel</dd></div>
+                <div><dt>Updated</dt><dd>@verifiedLabel</dd></div>
+            </dl>
         </article>
     </section>
 

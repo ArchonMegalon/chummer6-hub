@@ -32,14 +32,14 @@ public sealed class PublicTrustPulseService
 
     public PublicTrustPulseSnapshot? LoadSnapshot()
     {
-        string pulseJson = _weeklyPulse.LoadWeeklyPulseJson();
-        if (string.IsNullOrWhiteSpace(pulseJson))
-        {
-            return null;
-        }
-
         try
         {
+            string pulseJson = _weeklyPulse.LoadWeeklyPulseJson();
+            if (string.IsNullOrWhiteSpace(pulseJson))
+            {
+                return null;
+            }
+
             var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
             var payload = JsonSerializer.Deserialize<WeeklyProductPulsePayload>(pulseJson, options);
             if (payload is null
@@ -152,6 +152,11 @@ public sealed class PublicTrustPulseService
                 FlagshipReadinessReason: readinessReason,
                 MissingDesktopClientCoverage: readiness?.MissingDesktopClientCoverage == true,
                 ParityClaimsReviewRequired: parityClaimsReviewRequired);
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogDebug(ex, "Skipping public trust pulse because the weekly pulse artifact is not present on this host.");
+            return null;
         }
         catch (Exception ex)
         {

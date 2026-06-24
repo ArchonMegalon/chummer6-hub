@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from json import JSONDecodeError
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,13 @@ def utc_now() -> str:
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except JSONDecodeError as exc:
+        raise ValueError(f"invalid json at {path}: {exc.msg}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected object json at {path}")
+    return payload
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -55,6 +62,14 @@ def copy_if_present(source: Path, target: Path) -> bool:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, target)
     return True
+
+
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def materialize_magicfit() -> dict[str, Any]:
@@ -92,14 +107,23 @@ def materialize_black_ledger() -> dict[str, Any]:
 
     source_payload = load_json(source_receipt)
     copied: list[str] = []
+    missing: list[str] = []
     target_receipt = target_root / source_receipt.name
     shutil.copyfile(source_receipt, target_receipt)
     copied.append(str(target_receipt))
 
     screenshots: list[dict[str, str]] = []
-    for shot in source_payload.get("screenshots", []):
-        source_path = Path(shot.get("screenshotPath", ""))
+    for index, shot in enumerate(source_payload.get("screenshots", [])):
+        source_path_raw = str(shot.get("screenshotPath", "")).strip()
+        if not source_path_raw:
+            missing.append(f"screenshots[{index}].screenshotPath")
+            continue
+        source_path = Path(source_path_raw)
         if not source_path.is_file():
+            missing.append(str(source_path))
+            continue
+        if not is_relative_to(source_path, RUN_SERVICES_PUBLISHED_ROOT):
+            missing.append(f"outside_published_root:{source_path}")
             continue
         relative_dir = Path(shot.get("viewport", "unknown"))
         target_path = target_root / "live_media" / relative_dir / source_path.name
@@ -120,9 +144,11 @@ def materialize_black_ledger() -> dict[str, Any]:
         mirrored_payload["screenshots"] = screenshots
     write_json(target_receipt, mirrored_payload)
     return {
-        "status": "pass",
+        "status": "pass"
+        if source_payload.get("status") == "pass" and not missing
+        else "fail",
         "copied_paths": copied,
-        "missing_paths": [],
+        "missing_paths": missing,
     }
 
 
@@ -147,7 +173,7 @@ def materialize_table_pulse() -> dict[str, Any]:
     covered_steps = dict(legacy_payload.get("covered_steps") or {})
     required_steps = list(legacy_payload.get("required_steps") or [])
     scenario_ids = {scenario.get("id"): scenario.get("result") for scenario in live_payload.get("scenarios", [])}
-    if not covered_steps:
+    if not legacy_source.is_file():
         covered_steps = {
             "opt-in-policy": scenario_ids.get("table_pulse_remote_reaction_gm_adjudication") == "pass",
             "remote-notification": scenario_ids.get("pwa_subscription_delivery_click") == "pass",
@@ -163,6 +189,13 @@ def materialize_table_pulse() -> dict[str, Any]:
     if live_payload.get("status") != "pass":
         status = "fail"
         failures.append("live scenario receipt is not pass")
+    if legacy_source.is_file():
+        if not required_steps:
+            status = "fail"
+            failures.append("legacy replay receipt is missing required_steps")
+        if not covered_steps:
+            status = "fail"
+            failures.append("legacy replay receipt is missing covered_steps")
     for step in required_steps:
         if not covered_steps.get(step):
             status = "fail"

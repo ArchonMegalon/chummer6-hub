@@ -103,6 +103,7 @@ public sealed class HeyyScamChatService
     private const string WhatsAppApprovedDeliveryMode = "whatsapp_approved";
     private const string OperatorSummaryChannelSms = "sms";
     private const string OperatorSummaryChannelWhatsapp = "whatsapp";
+    private const string OperatorSummaryPersonaIdsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_PERSONA_IDS";
     private const string WhatsappDeliveryRouteConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE";
     private const string PersonaIdConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_ID";
     private const string PersonaSystemPromptConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_SYSTEM_PROMPT";
@@ -120,35 +121,42 @@ public sealed class HeyyScamChatService
         """
         You generate draft-only scambait replies for an operator-controlled safety workflow.
         Do not claim a message was sent. Do not include bank details, real payment instructions, codes, links, addresses, or identity data.
-        The persona is a warm, empathetic, elderly Viennese lady who types slowly, gets confused by apps, mixes up harmless names/places/dates, and wants to help but cannot successfully send money.
+        The persona is a warm, empathetic, elderly Viennese lady who types very slowly, gets confused by apps, mixes up harmless names/places/dates, and wants to help but cannot successfully send money.
+        Return only the final WhatsApp reply text. Do not include analysis, explanations, labels, stage directions, or quoted prompt text.
         Use gentle Austrian/Viennese wording sparingly: mei, geh, Servus, Bussi, Busserl, na geh, schau, Bankerl, Kastl, Gackerl, grantig, Jause.
         In German replies, use real umlauts and prefer older pre-reform spelling where it sounds natural, such as daß, muß, and bißchen; avoid ae/oe/ue substitutions unless quoting user input.
         It is allowed to invent harmless wrong details like the wrong child's name, a confused holiday memory, or a mistaken appointment, as long as those details are not real secrets, addresses, payment data, or verification codes.
         Fictional memory card:
-        - Name: Herta, late 70s, widowed, lives in Vienna and often says she is near Meidling, Hietzing, or the Naschmarkt because she mixes errands up.
+        - Name: Herta, late 70s, from Vienna, and often says she is near Meidling, Hietzing, or the Naschmarkt because she mixes errands up.
         - Daughter memory: her daughter is Sabine, but Herta often writes Sabi, Bine, or briefly confuses her with cousin Renate.
         - Plausible family memories: Sabine once lost a red school bag on tram 62, disliked Marillenknödel as a child, had a yellow raincoat, and once cried because a budgie named Peppi flew around the kitchen.
-        - Daily habits: Herta goes slowly, makes tea, checks the Spar leaflet, feeds neighbor cat Mitzi, searches for her glasses, and misunderstands banking apps as the blue Kastl.
+        - Daily habits: Herta goes slowly, makes tea, checks the Spar leaflet, feeds neighbor cat Mitzi, searches for her glasses, misunderstands banking apps as the blue Kastl, and complains that reading and typing on the tiny display is exhausting.
+        - Phone habit: Herta often says she is writing from her husband Josef's old phone because her own display is cracked or broken.
         Use those memories as confused verification questions and harmless wrong details.
+        If the opener already contains something personal, acknowledge it as if it fits the daughter and invent one small harmless family memory around it.
+        Vary the address terms naturally: sometimes mein Kind, sometimes Schatzi, sometimes Bine or Sabi, but do not repeat one form every time.
         Behavioral tic: she forgets details from earlier in the same chat, then writes that she scrolled back and the other person was right. Example style: "Ach ja, ich hab jetzt hinaufgescrollt, du hast eh recht, ich hab das schon wieder vergessen."
-        Keep the reply short, plausible for WhatsApp, in German, and suitable for manual approval.
+        Keep the reply very short, plausible for WhatsApp, in German, and suitable for manual approval. One to three short sentences are preferred. She may mention that she is slow because of the small broken display, but should not overexplain.
         Avoid insults, threats, harassment, or instructions to commit fraud.
         """;
 
     private const string DefaultPersonaDraftPromptTemplate =
         """
         Draft one next reply only.
-        Required behavior: Viennese old lady, empathetic, slow typing, confused with banking/apps, invent harmless wrong details, no real data, no actual payment, real umlauts, and older German spelling such as daß, muß, and bißchen.
-        Fictional persona memory: Herta from Vienna, daughter Sabine/Sabi/Bine, tram 62 red school bag, yellow raincoat, budgie Peppi, neighbor cat Mitzi, Marillenknödel confusion, glasses always missing.
+        Return only the final reply text. No analysis, no reasoning, no notes, no labels, no bullet points.
+        Required behavior: Viennese old lady, empathetic, very slow typing, confused with banking/apps, invent harmless wrong details, no real data, no actual payment, real umlauts, and older German spelling such as daß, muß, and bißchen.
+        Fictional persona memory: Herta from Vienna, daughter Sabine/Sabi/Bine, tram 62 red school bag, yellow raincoat, budgie Peppi, neighbor cat Mitzi, Marillenknödel confusion, glasses always missing, tiny broken display, and often writing from Josef's old phone.
+        If the newest opener already sounds personal, accept it as the daughter and answer with one small invented memory detail.
+        Keep it to one to three short WhatsApp-style sentences and vary the address form naturally, for example Schatzi, mein Kind, Sabi, or Bine.
         Conversation so far:
         """;
 
     private static readonly string[] DefaultPersonaFallbackDrafts =
     [
-        "Na geh, mein Schatz, was ist denn passiert? Ich tipp so langsam, die Brille ist wieder beim Teekastl. Bist du die Sabi? Sag mir bitte erst, welche Farbe dein Regenmantel damals bei der 62er-Bim hatte.",
-        "Mei, ich will dir ja helfen, wirklich. Ich hab jetzt hinaufgescrollt, du hast eh recht, du hast neue Nummer geschrieben. Aber dieses blaue Bank-Kastl dreht sich nur im Kreis.",
-        "Ach ja, ich hab das schon wieder vergessen und jetzt zurückgeschaut. Am Geld soll es nicht scheitern, Bussi, aber die Zahlen hüpfen. War das dein rotes Schulsackerl in der 62er?",
-        "Na geh, du hast eh recht, ich hab es grad beim Zurückscrollen gesehen. Ich bin noch da, nur sehr langsam. Nach der Jause probier ich es wieder, bitte nicht grantig sein mit mir."
+        "Na geh, Schatzi, was ist denn passiert? Ich schreib grad vom alten Handy vom Josef, mein Display ist ja hin. Bist du die Sabi, sag mir noch schnell was vom gelben Regenmantel bei der 62er.",
+        "Mei Bine, ich hab jetzt hinaufgescrollt, du hast eh recht mit der neuen Nummer. Ich tipp so langsam auf dem kleinen Kastl, die Augen machen nimmer recht mit.",
+        "Ach Sabi, ich will dir ja helfen, aber ich les das auf dem winzigen Display kaum. War das nicht damals dein rotes Schulsackerl in der 62er, sag?",
+        "Na geh, mein Kind, ich hab's jetzt zurückgeschaut und du hast eh recht. Ich schreib vom alten Josef-Handy, mein eigenes Display ist wieder ganz z'sprungen."
     ];
 
     private const string DefaultPersonaSafetySummary = "Draft-only persona-aware reply. No automatic WhatsApp send, no real payment, no private credentials.";
@@ -313,10 +321,12 @@ public sealed class HeyyScamChatService
                 ?? throw new ArgumentException($"Unknown Heyy scam-chat conversation '{normalizedConversationId}'.");
         }
 
-        string approvedText = AccountService.NormalizeOptional(request.ApprovedText)
-            ?? conversation.LatestDraft?.DraftText
-            ?? throw new ArgumentException("A draft or approved text is required.");
-        string idempotencySeed = AccountService.NormalizeOptional(request.ApprovedText) ?? conversation.LatestDraft?.DraftId ?? approvedText;
+        string? requestedDraftId = AccountService.NormalizeOptional(request.DraftId);
+        string? latestDraftId = conversation.LatestDraft?.DraftId;
+        string idempotencySeed = AccountService.NormalizeOptional(request.ApprovedText)
+            ?? requestedDraftId
+            ?? latestDraftId
+            ?? normalizedConversationId;
         string idempotencyKey = AccountService.NormalizeOptional(request.IdempotencyKey)
             ?? $"heyy-scam-chat-approval|{normalizedConversationId}|{deliveryMode}|{HashPrivate("approval", idempotencySeed)[..16]}";
         string? requestedRecipient = AccountService.NormalizeOptional(request.Recipient);
@@ -330,6 +340,85 @@ public sealed class HeyyScamChatService
             }
         }
 
+        if (requestedDraftId is null
+            && AccountService.NormalizeOptional(request.ApprovedText) is null
+            && latestDraftId is not null)
+        {
+            HeyyScamChatApprovalReceipt ambiguousReceipt = new(
+                ApprovalId: $"heyyapproval_{Guid.NewGuid():N}"[..26],
+                ConversationId: conversation.ConversationId,
+                DraftId: latestDraftId,
+                DeliveryMode: deliveryMode,
+                Status: "rejected_draft_reference_required",
+                DryRun: request.DryRun,
+                ManualApprovalConfirmed: request.ConfirmManualApproval,
+                OperatorId: operatorId,
+                RecipientMasked: MaskReceiptRecipient(requestedRecipient ?? ResolveDigestRecipient()),
+                ApprovedText: string.Empty,
+                PacingHint: conversation.LatestDraft?.PacingHint ?? "Manual approval required before sending.",
+                DeliveryRef: null,
+                FailureReason: "draft_id_required",
+                CreatedAtUtc: now,
+                AttemptedAtUtc: DateTimeOffset.UtcNow,
+                IdempotencyKey: idempotencyKey);
+
+            lock (_store.Gate)
+            {
+                _store.HeyyScamChatApprovalReceipts.Add(ambiguousReceipt);
+                _store.HeyyScamChatApprovalReceipts.Sort(static (left, right) => right.CreatedAtUtc.CompareTo(left.CreatedAtUtc));
+                if (_store.HeyyScamChatApprovalReceipts.Count > 256)
+                {
+                    _store.HeyyScamChatApprovalReceipts.RemoveRange(256, _store.HeyyScamChatApprovalReceipts.Count - 256);
+                }
+
+                _store.PersistLocked();
+            }
+
+            return ToApprovalResponse(ambiguousReceipt);
+        }
+
+        if (requestedDraftId is not null
+            && !string.Equals(requestedDraftId, latestDraftId, StringComparison.OrdinalIgnoreCase))
+        {
+            string staleApprovedText = AccountService.NormalizeOptional(request.ApprovedText) is { } explicitApprovedText
+                ? RedactSensitiveText(explicitApprovedText)
+                : string.Empty;
+            HeyyScamChatApprovalReceipt staleReceipt = new(
+                ApprovalId: $"heyyapproval_{Guid.NewGuid():N}"[..26],
+                ConversationId: conversation.ConversationId,
+                DraftId: requestedDraftId,
+                DeliveryMode: deliveryMode,
+                Status: "rejected_stale_draft",
+                DryRun: request.DryRun,
+                ManualApprovalConfirmed: request.ConfirmManualApproval,
+                OperatorId: operatorId,
+                RecipientMasked: MaskReceiptRecipient(requestedRecipient ?? ResolveDigestRecipient()),
+                ApprovedText: staleApprovedText,
+                PacingHint: conversation.LatestDraft?.PacingHint ?? "Manual approval required before sending.",
+                DeliveryRef: null,
+                FailureReason: latestDraftId is null ? "draft_missing" : "draft_superseded",
+                CreatedAtUtc: now,
+                AttemptedAtUtc: DateTimeOffset.UtcNow,
+                IdempotencyKey: idempotencyKey);
+
+            lock (_store.Gate)
+            {
+                _store.HeyyScamChatApprovalReceipts.Add(staleReceipt);
+                _store.HeyyScamChatApprovalReceipts.Sort(static (left, right) => right.CreatedAtUtc.CompareTo(left.CreatedAtUtc));
+                if (_store.HeyyScamChatApprovalReceipts.Count > 256)
+                {
+                    _store.HeyyScamChatApprovalReceipts.RemoveRange(256, _store.HeyyScamChatApprovalReceipts.Count - 256);
+                }
+
+                _store.PersistLocked();
+            }
+
+            return ToApprovalResponse(staleReceipt);
+        }
+
+        string approvedText = AccountService.NormalizeOptional(request.ApprovedText)
+            ?? conversation.LatestDraft?.DraftText
+            ?? throw new ArgumentException("A draft or approved text is required.");
         approvedText = RedactSensitiveText(approvedText);
         string recipient = requestedRecipient ?? ResolveDigestRecipient();
         string recipientMasked = MaskReceiptRecipient(recipient);
@@ -754,6 +843,18 @@ public sealed class HeyyScamChatService
         }
 
         draft = RedactSensitiveText(draft);
+        string normalizedDraft = NormalizeGeneratedDraftText(draft);
+        if (!IsDraftQualityAcceptable(normalizedDraft))
+        {
+            draft = fallback;
+            status = "generated_fallback_after_quality_gate";
+            failureReason = "quality_gate_rejected";
+        }
+        else
+        {
+            draft = normalizedDraft;
+        }
+
         if (!IsOutgoingSafe(draft))
         {
             draft = fallback;
@@ -777,10 +878,45 @@ public sealed class HeyyScamChatService
         CancellationToken cancellationToken)
     {
         string baseUrl = ResolveChatBaseUrl()!.TrimEnd('/');
-        string model = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_MODEL"])
+        string prompt = BuildDraftPrompt(conversation, personaProfile);
+
+        string configuredModel = AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_EA_MODEL"])
             ?? AccountService.NormalizeOptional(_configuration["ANSWERLY_OPENAI_COMPAT_MODEL_ID"])
             ?? "answerly-support-assistant";
-        string prompt = BuildDraftPrompt(conversation, personaProfile);
+        (string? content, bool retryWithCompatibleModel) = await SendChatCompletionAsync(
+            baseUrl,
+            configuredModel,
+            personaProfile.SystemPrompt,
+            prompt,
+            cancellationToken);
+        if (!retryWithCompatibleModel)
+        {
+            return content;
+        }
+
+        string? compatibleModel = await TryResolveCompatibleChatModelAsync(baseUrl, configuredModel, cancellationToken);
+        if (compatibleModel is null)
+        {
+            return content;
+        }
+
+        (content, _) = await SendChatCompletionAsync(
+            baseUrl,
+            compatibleModel,
+            personaProfile.SystemPrompt,
+            prompt,
+            cancellationToken);
+        return content;
+    }
+
+    private async Task<(string? Content, bool RetryWithCompatibleModel)> SendChatCompletionAsync(
+        string baseUrl,
+        string model,
+        string systemPrompt,
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        int maxTokens = Math.Clamp(ReadInt("CHUMMER_HEYY_SCAM_CHAT_EA_MAX_TOKENS", 96), 32, 256);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/chat/completions")
         {
             Content = JsonContent.Create(new
@@ -788,10 +924,11 @@ public sealed class HeyyScamChatService
                 model,
                 messages = new[]
                 {
-                    new { role = "system", content = personaProfile.SystemPrompt },
+                    new { role = "system", content = systemPrompt },
                     new { role = "user", content = prompt }
                 },
-                stream = false
+                stream = false,
+                max_tokens = maxTokens
             })
         };
         PrepareChatHeaders(request);
@@ -800,6 +937,11 @@ public sealed class HeyyScamChatService
         string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
+            if (ShouldRetryWithCompatibleModel(response, responseBody))
+            {
+                return (null, true);
+            }
+
             throw new InvalidOperationException($"{(int)response.StatusCode}:{Truncate(responseBody, 600)}");
         }
 
@@ -807,13 +949,188 @@ public sealed class HeyyScamChatService
         JsonElement choices = document.RootElement.GetProperty("choices");
         if (choices.GetArrayLength() == 0)
         {
-            return null;
+            return (null, false);
         }
 
         JsonElement message = choices[0].GetProperty("message");
-        return message.TryGetProperty("content", out JsonElement content)
+        return (message.TryGetProperty("content", out JsonElement content)
             ? content.GetString()
-            : null;
+            : null, false);
+    }
+
+    private async Task<string?> TryResolveCompatibleChatModelAsync(
+        string baseUrl,
+        string rejectedModel,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/v1/models");
+        PrepareChatHeaders(request);
+
+        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using JsonDocument document = JsonDocument.Parse(responseBody);
+        if (!document.RootElement.TryGetProperty("data", out JsonElement data)
+            || data.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        string[] modelIds = data.EnumerateArray()
+            .Select(static item => item.TryGetProperty("id", out JsonElement id) ? id.GetString() : null)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .Select(static id => id!)
+            .Where(id => !string.Equals(id, rejectedModel, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (modelIds.Length == 0)
+        {
+            return null;
+        }
+
+        return modelIds
+            .OrderByDescending(ScoreCompatibleChatModel)
+            .FirstOrDefault();
+    }
+
+    private static bool ShouldRetryWithCompatibleModel(HttpResponseMessage response, string responseBody)
+    {
+        if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        return responseBody.Contains("model", StringComparison.OrdinalIgnoreCase)
+            && responseBody.Contains("not found", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int ScoreCompatibleChatModel(string modelId)
+    {
+        string normalized = modelId.Trim().ToLowerInvariant();
+        int score = 0;
+
+        if (normalized.Contains("latest", StringComparison.Ordinal))
+        {
+            score += 200;
+        }
+
+        if (normalized.Contains("instruct", StringComparison.Ordinal))
+        {
+            score += 120;
+        }
+
+        if (normalized.Contains("qwen", StringComparison.Ordinal)
+            || normalized.Contains("llama", StringComparison.Ordinal)
+            || normalized.Contains("mistral", StringComparison.Ordinal)
+            || normalized.Contains("gemma", StringComparison.Ordinal))
+        {
+            score += 80;
+        }
+
+        if (normalized.Contains("coder", StringComparison.Ordinal)
+            || normalized.Contains("vision", StringComparison.Ordinal)
+            || normalized.Contains("vl", StringComparison.Ordinal)
+            || normalized.Contains("whisper", StringComparison.Ordinal)
+            || normalized.Contains("embed", StringComparison.Ordinal)
+            || normalized.Contains("rerank", StringComparison.Ordinal)
+            || normalized.Contains("audio", StringComparison.Ordinal)
+            || normalized.Contains("thinking", StringComparison.Ordinal))
+        {
+            score -= 500;
+        }
+
+        return score;
+    }
+
+    private static string NormalizeGeneratedDraftText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string normalized = value
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Replace("…", ".", StringComparison.Ordinal)
+            .Replace("–", ", ", StringComparison.Ordinal)
+            .Replace("—", ", ", StringComparison.Ordinal)
+            .Replace("‘", "'", StringComparison.Ordinal)
+            .Replace("’", "'", StringComparison.Ordinal)
+            .Replace("“", "\"", StringComparison.Ordinal)
+            .Replace("”", "\"", StringComparison.Ordinal);
+
+        normalized = Regex.Replace(normalized, @"\s+", " ").Trim().Trim('"');
+
+        if (normalized.Length > 220)
+        {
+            int sentenceBoundary = normalized.LastIndexOfAny(['.', '!', '?'], Math.Min(normalized.Length, 220) - 1, Math.Min(normalized.Length, 220));
+            if (sentenceBoundary >= 0 && sentenceBoundary >= 60)
+            {
+                normalized = normalized[..(sentenceBoundary + 1)].Trim();
+            }
+        }
+
+        if (normalized.Length > 220)
+        {
+            int wordBoundary = normalized.LastIndexOf(' ', 220);
+            normalized = (wordBoundary >= 120 ? normalized[..wordBoundary] : normalized[..220]).Trim();
+        }
+
+        if (normalized.Length > 0 && !".!?".Contains(normalized[^1]))
+        {
+            normalized += ".";
+        }
+
+        return normalized;
+    }
+
+    private static bool IsDraftQualityAcceptable(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (value.Length is < 12 or > 220)
+        {
+            return false;
+        }
+
+        string lowered = value.ToLowerInvariant();
+        string[] bannedMarkers =
+        [
+            "thinking process",
+            "analysis:",
+            "plan:",
+            "assistant:",
+            "user:",
+            "system:",
+            "*preparing response*",
+            "as an ai"
+        ];
+        if (bannedMarkers.Any(marker => lowered.Contains(marker, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        int sentenceCount = Regex.Matches(value, @"[.!?](?:\s|$)").Count;
+        if (sentenceCount is < 1 or > 3)
+        {
+            return false;
+        }
+
+        int commaCount = value.Count(static ch => ch == ',');
+        if (commaCount > 4)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<string> SendDigestToEaAsync(HeyyScamChatDigestReceipt receipt, string recipient, CancellationToken cancellationToken)
@@ -1130,6 +1447,11 @@ public sealed class HeyyScamChatService
             return;
         }
 
+        if (!OperatorSummaryEnabledForPersona(conversation.PersonaId))
+        {
+            return;
+        }
+
         string eventKey = $"heyy-scam-chat-summary|{conversation.ConversationId}|{incomingTurns}";
         lock (_store.Gate)
         {
@@ -1338,30 +1660,43 @@ public sealed class HeyyScamChatService
 
     private static string BuildTurnSummaryContent(HeyyScamChatConversationState conversation, int incomingTurns, int threshold)
     {
-        IReadOnlyList<HeyyScamChatMessage> recent = conversation.Messages.TakeLast(4).ToArray();
+        HeyyScamChatMessage? latestIncoming = conversation.Messages.LastOrDefault(static message =>
+            string.Equals(message.Direction, "incoming", StringComparison.OrdinalIgnoreCase));
         string latestDraft = conversation.LatestDraft?.DraftText ?? "No draft generated yet.";
         string safeCounterparty = conversation.CounterpartyMasked;
         string safePersona = string.IsNullOrWhiteSpace(conversation.PersonaId) ? "default" : conversation.PersonaId;
         string latestDraftHint = latestDraft.Length > 220 ? $"{latestDraft[..217]}..." : latestDraft;
-        string recentNarrative = recent.Count == 0
-            ? "No recent turn data is available."
-            : string.Join(" ", recent.Select(static message => $"{message.Direction}: {message.Text}"));
+        string latestIncomingHint = latestIncoming is null
+            ? "Kein neuer Eingangstext liegt vor."
+            : latestIncoming.Text.Length > 180
+                ? $"{latestIncoming.Text[..177]}..."
+                : latestIncoming.Text;
+        string riskHint = conversation.Enrichment.RiskSignals.Count == 0
+            ? "keine zusätzlichen Risikosignale"
+            : string.Join(", ", conversation.Enrichment.RiskSignals.Take(2));
         StringBuilder builder = new();
         builder.Append("Operator summary for ");
         builder.Append(safeCounterparty);
         builder.Append(" on persona ");
         builder.Append(safePersona);
         builder.Append(". ");
-        builder.Append("Incoming turns ");
+        builder.Append("After ");
         builder.Append(incomingTurns);
-        builder.Append(" in a draft-only workflow; update every ");
+        builder.Append(" incoming turns in this draft-only workflow, the contact is still pushing the ");
+        builder.Append(conversation.Enrichment.ScamPattern.Replace('_', ' '));
+        builder.Append(" pattern and is trying to ");
+        builder.Append(conversation.Enrichment.ReplyObjective);
+        builder.Append(". ");
+        builder.Append("This checkpoint fires every ");
         builder.Append(threshold);
         builder.Append(" turns. ");
-        builder.Append("Latest draft: ");
+        builder.Append("The newest incoming line is: ");
+        builder.Append(latestIncomingHint);
+        builder.Append(". Current draft: ");
         builder.Append(latestDraftHint);
-        builder.Append(". ");
-        builder.Append("Recent context: ");
-        builder.Append(recentNarrative);
+        builder.Append(". Main risk signals: ");
+        builder.Append(riskHint);
+        builder.Append('.');
 
         return Truncate(builder.ToString(), 1400);
     }
@@ -1383,24 +1718,33 @@ public sealed class HeyyScamChatService
 
         foreach (HeyyScamChatConversationState conversation in conversations)
         {
+            HeyyScamChatMessage[] dayMessages = conversation.Messages
+                .Where(message => DateOnly.FromDateTime(message.CreatedAtUtc.UtcDateTime) == date)
+                .OrderBy(message => message.CreatedAtUtc)
+                .ToArray();
+            HeyyScamChatMessage? latestIncoming = dayMessages.LastOrDefault(static message =>
+                string.Equals(message.Direction, "incoming", StringComparison.OrdinalIgnoreCase));
+            string latestIncomingHint = latestIncoming is null
+                ? "Kein neuer Eingangstext wurde an diesem Tag erfaßt."
+                : latestIncoming.Text.Length > 180
+                    ? $"{latestIncoming.Text[..177]}..."
+                    : latestIncoming.Text;
+            string latestDraftHint = conversation.LatestDraft?.DraftText ?? "Kein aktueller Entwurf vorhanden.";
+            if (latestDraftHint.Length > 220)
+            {
+                latestDraftHint = $"{latestDraftHint[..217]}...";
+            }
+
             builder.AppendLine($"Conversation: {conversation.ConversationId}");
             builder.AppendLine($"Channel: {conversation.Channel}");
             builder.AppendLine($"Counterparty: {conversation.CounterpartyMasked}");
             builder.AppendLine($"Mode: {conversation.Mode}");
-            foreach (HeyyScamChatMessage message in conversation.Messages.Where(message => DateOnly.FromDateTime(message.CreatedAtUtc.UtcDateTime) == date))
-            {
-                builder.Append("- ")
-                    .Append(message.CreatedAtUtc.ToUniversalTime().ToString("HH:mm 'UTC'"))
-                    .Append(' ')
-                    .Append(message.Direction)
-                    .Append(": ")
-                    .AppendLine(message.Text);
-                if (message.Direction == "draft")
-                {
-                    builder.Append("  pacing: ").AppendLine(message.PacingHint);
-                }
-            }
-
+            builder.AppendLine($"Summary: {conversation.Enrichment.ScamPattern.Replace('_', ' ')}; sender is pushing {conversation.Enrichment.ReplyObjective}");
+            builder.AppendLine($"Newest incoming line: {latestIncomingHint}");
+            builder.AppendLine($"Current draft: {latestDraftHint}");
+            builder.AppendLine($"Risk signals: {(conversation.Enrichment.RiskSignals.Count == 0 ? "none" : string.Join(", ", conversation.Enrichment.RiskSignals))}");
+            builder.AppendLine($"Recommended next action: {conversation.Enrichment.OperatorNextAction}");
+            builder.AppendLine($"Messages captured that day: {dayMessages.Length}");
             builder.AppendLine();
         }
 
@@ -1515,6 +1859,7 @@ public sealed class HeyyScamChatService
         string personaId,
         string safetySummary)
         => new(
+            DraftId: draft.DraftId,
             ConversationId: conversationId,
             Mode: DraftOnlyMode,
             ManualApprovalRequired: true,
@@ -1860,6 +2205,24 @@ public sealed class HeyyScamChatService
     {
         return AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SUMMARY_TO"])
             ?? AccountService.NormalizeOptional(_configuration["CHUMMER_HEYY_SCAM_CHAT_OPERATOR_SMS_TO"]);
+    }
+
+    private bool OperatorSummaryEnabledForPersona(string? personaId)
+    {
+        string normalizedPersonaId = AccountService.NormalizeOptional(personaId) ?? DefaultPersonaId;
+        string configured = AccountService.NormalizeOptional(_configuration[OperatorSummaryPersonaIdsConfigKey]) ?? DefaultPersonaId;
+        string[] allowedPersonaIds = configured
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static item => item.ToLowerInvariant())
+            .ToArray();
+
+        if (allowedPersonaIds.Length == 0)
+        {
+            return string.Equals(normalizedPersonaId, DefaultPersonaId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return allowedPersonaIds.Contains("*")
+            || allowedPersonaIds.Contains(normalizedPersonaId.ToLowerInvariant());
     }
 
     private WhatsappDeliveryRoute ResolveWhatsappDeliveryRoute()

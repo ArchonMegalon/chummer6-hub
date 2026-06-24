@@ -198,7 +198,7 @@
             <div class="stacked-actions">
                 <a id="unavailableHomeLink" class="button-like button-like--primary" href="/home">Back to home</a>
                 <a id="unavailableAccountLink" class="button-like button-like--ghost" href="/account">Open account</a>
-                <a id="unavailableExplainLink" class="inline-link" href="/participate">How it works</a>
+                <a id="unavailableExplainLink" class="inline-link" href="/partizipate">How it works</a>
             </div>
         </div>
 
@@ -389,7 +389,7 @@ function normalizeParticipationError(error) {
       badge: null,
       details: null,
       actions: {
-        explainHref: "/participate",
+        explainHref: "/partizipate",
         homeHref: "/home",
         accountHref: "/account"
       }
@@ -458,7 +458,7 @@ function syncAuthorization(auth, status) {
 function syncUnavailableActions(actions) {
   nodes.unavailableHomeLink.href = actions.homeHref || "/home";
   nodes.unavailableAccountLink.href = actions.accountHref || "/account";
-  nodes.unavailableExplainLink.href = actions.explainHref || "/participate";
+  nodes.unavailableExplainLink.href = actions.explainHref || "/partizipate";
 }
 
 function syncBadge(phase, badge) {

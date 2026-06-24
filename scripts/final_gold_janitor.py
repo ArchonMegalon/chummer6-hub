@@ -20,6 +20,7 @@ UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
+MATERIALIZER_TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_FINAL_GOLD_MATERIALIZER_TIMEOUT_SECONDS", "180"))
 FRESHNESS_REQUIRED_GATES = {
     "live_public_web_recrawl",
     "rule_authority_minimum_coverage",
@@ -74,6 +75,12 @@ MATERIALIZERS = [
         "--seed-receipts",
         "--base-url",
         DEFAULT_BASE_URL,
+        "--request-timeout-seconds",
+        "2",
+        "--max-retries",
+        "0",
+        "--retry-delay-seconds",
+        "0.1",
         "--manifest",
         ".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml",
         "--output",
@@ -135,20 +142,37 @@ def generated_at_is_fresh(value: str, max_age_hours: int) -> bool:
 def run_materializers() -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for command in MATERIALIZERS:
-        completed = subprocess.run(
-            command,
-            cwd=RUN_SERVICES_ROOT,
-            capture_output=True,
-            text=True,
-        )
-        results.append(
-            {
-                "command": " ".join(command),
-                "returncode": completed.returncode,
-                "stdout": completed.stdout.strip(),
-                "stderr": completed.stderr.strip(),
-            }
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=RUN_SERVICES_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=MATERIALIZER_TIMEOUT_SECONDS,
+            )
+            results.append(
+                {
+                    "command": " ".join(command),
+                    "returncode": completed.returncode,
+                    "stdout": completed.stdout.strip(),
+                    "stderr": completed.stderr.strip(),
+                    "timed_out": False,
+                    "timeout_seconds": MATERIALIZER_TIMEOUT_SECONDS,
+                }
+            )
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            stderr = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            results.append(
+                {
+                    "command": " ".join(command),
+                    "returncode": 124,
+                    "stdout": stdout.strip(),
+                    "stderr": stderr.strip(),
+                    "timed_out": True,
+                    "timeout_seconds": MATERIALIZER_TIMEOUT_SECONDS,
+                }
+            )
     return results
 
 

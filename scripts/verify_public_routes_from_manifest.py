@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import importlib.util
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass
@@ -34,6 +36,10 @@ PLACEHOLDER_SAMPLE_LOOKUP = {
     "submission_id": "sample-submission-id",
 }
 ROUTE_LIST_KEYS = ("public_routes", "auth_routes", "registered_routes")
+DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_REQUEST_TIMEOUT_SECONDS", "8"))
+DEFAULT_MAX_RETRIES = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_RETRIES", "1"))
+DEFAULT_RETRY_DELAY_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_RETRY_DELAY_SECONDS", "0.5"))
+DEFAULT_MAX_WORKERS = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_WORKERS", "12"))
 
 
 @dataclass
@@ -90,6 +96,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--seed-receipts",
         action="store_true",
         help="Allow seeded sample receipt routes to satisfy strict positive proof for parameterized receipt pages.")
+    parser.add_argument(
+        "--request-timeout-seconds",
+        type=float,
+        default=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        help="Per-request timeout when probing live public routes.")
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=DEFAULT_MAX_RETRIES,
+        help="Maximum retry count forwarded to the shared live fetch helper.")
+    parser.add_argument(
+        "--retry-delay-seconds",
+        type=float,
+        default=DEFAULT_RETRY_DELAY_SECONDS,
+        help="Base retry delay forwarded to the shared live fetch helper.")
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=DEFAULT_MAX_WORKERS,
+        help="Maximum worker count for parallel live route verification.")
     return parser.parse_args(argv)
 
 
@@ -180,6 +206,9 @@ def verify_route(
     forwarded_proto: str | None,
     strict_positive: bool,
     seed_receipts: bool,
+    request_timeout_seconds: float,
+    max_retries: int,
+    retry_delay_seconds: float,
 ) -> RouteResult:
     path = str(route.get("path") or "")
     audience = str(route.get("audience") or "")
@@ -295,7 +324,10 @@ def verify_route(
                 resolved_request_path,
                 public_host=public_host or None,
                 forwarded_proto=forwarded_proto or None,
-                follow_redirects=True)
+                follow_redirects=True,
+                request_timeout_seconds=request_timeout_seconds,
+                max_retries=max_retries,
+                retry_delay_seconds=retry_delay_seconds)
             redirect_location = headers.get("location")
             positive_proof = status in CONTROLLER_CONTRACT_OK_STATUSES
             if strict_positive:
@@ -357,10 +389,13 @@ def verify_route(
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-            resolved_request_path,
-            public_host=public_host or None,
-            forwarded_proto=forwarded_proto or None,
-            follow_redirects=False)
+                resolved_request_path,
+                public_host=public_host or None,
+                forwarded_proto=forwarded_proto or None,
+                follow_redirects=False,
+                request_timeout_seconds=request_timeout_seconds,
+                max_retries=max_retries,
+                retry_delay_seconds=retry_delay_seconds)
             redirect_location = headers.get("location")
             success = status in REDIRECT_STATUSES and normalize_target(redirect_location) == normalize_target(resolved_guest_fallback)
             detail = (
@@ -405,10 +440,13 @@ def verify_route(
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-            resolved_request_path,
-            public_host=public_host or None,
-            forwarded_proto=forwarded_proto or None,
-            follow_redirects=False)
+                resolved_request_path,
+                public_host=public_host or None,
+                forwarded_proto=forwarded_proto or None,
+                follow_redirects=False,
+                request_timeout_seconds=request_timeout_seconds,
+                max_retries=max_retries,
+                retry_delay_seconds=retry_delay_seconds)
             redirect_location = headers.get("location")
             success = status in AUTH_OPERATION_OK_STATUSES
             detail = f"expected auth-operation status in {sorted(AUTH_OPERATION_OK_STATUSES)}, got {status}"
@@ -453,7 +491,10 @@ def verify_route(
             resolved_request_path,
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
-            follow_redirects=True)
+            follow_redirects=True,
+            request_timeout_seconds=request_timeout_seconds,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds)
         redirect_location = headers.get("location")
         missing_texts = [snippet for snippet in required_texts if snippet not in body]
         final_url_ok = (
@@ -511,6 +552,9 @@ def verify_negative_path(
     *,
     public_host: str | None,
     forwarded_proto: str | None,
+    request_timeout_seconds: float,
+    max_retries: int,
+    retry_delay_seconds: float,
 ) -> NegativePathResult | None:
     verification_mode = str(route.get("verification_mode") or "").strip()
     path = str(route.get("path") or "")
@@ -526,6 +570,9 @@ def verify_negative_path(
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
             follow_redirects=True,
+            request_timeout_seconds=request_timeout_seconds,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
         )
     except Exception as exc:
         return NegativePathResult(
@@ -612,37 +659,49 @@ def build_report(
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.max_workers <= 0:
+        raise SystemExit("--max-workers must be positive")
     manifest_path = Path(args.manifest).resolve()
     manifest, manifest_routes = read_manifest(manifest_path)
     hub_live_audit = load_hub_live_audit_module()
+    active_routes = [route for route in manifest_routes if bool(route.get("must_exist", True))]
 
-    results = [
-        verify_route(
+    def route_task(route: dict[str, Any]) -> RouteResult:
+        return verify_route(
             hub_live_audit.fetch,
             args.base_url,
             route,
             public_host=args.public_host,
             forwarded_proto=args.forwarded_proto,
             strict_positive=bool(args.strict_positive),
-            seed_receipts=bool(args.seed_receipts))
-        for route in manifest_routes
-        if bool(route.get("must_exist", True))
-    ]
-    negative_paths = [
-        negative
-        for negative in (
-            verify_negative_path(
-                hub_live_audit.fetch,
-                args.base_url,
-                route,
-                public_host=args.public_host,
-                forwarded_proto=args.forwarded_proto,
-            )
-            for route in manifest_routes
-            if bool(route.get("must_exist", True))
+            seed_receipts=bool(args.seed_receipts),
+            request_timeout_seconds=args.request_timeout_seconds,
+            max_retries=args.max_retries,
+            retry_delay_seconds=args.retry_delay_seconds,
         )
-        if negative is not None
-    ]
+
+    def negative_task(route: dict[str, Any]) -> NegativePathResult | None:
+        return verify_negative_path(
+            hub_live_audit.fetch,
+            args.base_url,
+            route,
+            public_host=args.public_host,
+            forwarded_proto=args.forwarded_proto,
+            request_timeout_seconds=args.request_timeout_seconds,
+            max_retries=args.max_retries,
+            retry_delay_seconds=args.retry_delay_seconds,
+        )
+
+    if args.max_workers == 1:
+        results = [route_task(route) for route in active_routes]
+        negative_paths = [negative for negative in (negative_task(route) for route in active_routes) if negative is not None]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+            route_futures = [executor.submit(route_task, route) for route in active_routes]
+            negative_futures = [executor.submit(negative_task, route) for route in active_routes]
+            results = [future.result() for future in route_futures]
+            negative_paths = [negative for negative in (future.result() for future in negative_futures) if negative is not None]
+
     report = build_report(manifest, manifest_path, args, results, negative_paths)
     report_text = json.dumps(report, indent=2) + "\n"
 

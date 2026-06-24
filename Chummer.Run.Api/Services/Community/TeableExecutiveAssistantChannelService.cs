@@ -62,6 +62,8 @@ public sealed record TeableExecutiveAssistantChannelSyncResult(
 
 public sealed class TeableExecutiveAssistantChannelService
 {
+    private const string HttpTimeoutSecondsConfigKey = "CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS";
+    private static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(15);
     private const string DefaultApiBaseUrl = "https://app.teable.ai/api";
     private const string DefaultTableName = "Executive Assistant Channel Conversations";
     private const string DefaultDbTableName = "executive_assistant_channel_conversations";
@@ -583,7 +585,7 @@ public sealed class TeableExecutiveAssistantChannelService
 
     private TeableOptions ResolveOptions()
     {
-        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"], defaultValue: true);
+        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"], defaultValue: false);
         string apiKey = Normalize(_configuration["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_API_KEY"])
             ?? Normalize(_configuration["TEABLE_API_KEY"])
             ?? string.Empty;
@@ -607,14 +609,23 @@ public sealed class TeableExecutiveAssistantChannelService
             request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         }
 
-        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
-        string content = await response.Content.ReadAsStringAsync(cancellationToken);
+        using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ResolveHttpTimeout());
+
+        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, timeoutCts.Token);
+        string content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"teable_http_{(int)response.StatusCode}:{Truncate(content, 240)}");
         }
 
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
+    }
+
+    private TimeSpan ResolveHttpTimeout()
+    {
+        string? raw = Normalize(_configuration[HttpTimeoutSecondsConfigKey]);
+        return int.TryParse(raw, out int seconds) && seconds >= 1 ? TimeSpan.FromSeconds(seconds) : DefaultHttpTimeout;
     }
 
     private void SetSyncAttempt(DateTimeOffset occurredAtUtc)
@@ -796,7 +807,7 @@ public sealed class TeableExecutiveAssistantChannelSyncWorker : BackgroundServic
     }
 
     private bool IsEnabled()
-        => ParseBool(_configuration["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"], defaultValue: true);
+        => ParseBool(_configuration["CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED"], defaultValue: false);
 
     private TimeSpan ResolveDurationSeconds(string key, TimeSpan defaultValue)
         => int.TryParse(_configuration[key], out int seconds) && seconds >= 0 ? TimeSpan.FromSeconds(seconds) : defaultValue;

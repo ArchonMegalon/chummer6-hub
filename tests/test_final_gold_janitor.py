@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -42,6 +43,35 @@ class FinalGoldJanitorTests(unittest.TestCase):
         design_index = commands.index("python3 scripts/materialize_design_quality_gate.py")
 
         self.assertLess(minimal_index, design_index)
+
+    def test_public_route_materializer_uses_bounded_live_probe_settings(self) -> None:
+        module = load_module()
+        public_route_command = next(
+            command for command in module.MATERIALIZERS
+            if "scripts/verify_public_routes_from_manifest.py" in " ".join(command)
+        )
+
+        command_text = " ".join(public_route_command)
+        self.assertIn("--request-timeout-seconds 2", command_text)
+        self.assertIn("--max-retries 0", command_text)
+        self.assertIn("--retry-delay-seconds 0.1", command_text)
+
+    def test_run_materializers_records_timeout_instead_of_hanging(self) -> None:
+        module = load_module()
+        timeout = module.MATERIALIZER_TIMEOUT_SECONDS
+        timeout_error = subprocess.TimeoutExpired(cmd=["python3", "slow.py"], timeout=timeout, output="partial out", stderr="partial err")
+
+        with mock.patch.object(module, "MATERIALIZERS", [["python3", "slow.py"]]), mock.patch.object(module.subprocess, "run", side_effect=timeout_error):
+            results = module.run_materializers()
+
+        self.assertEqual(1, len(results))
+        result = results[0]
+        self.assertEqual("python3 slow.py", result["command"])
+        self.assertEqual(124, result["returncode"])
+        self.assertTrue(result["timed_out"])
+        self.assertEqual(timeout, result["timeout_seconds"])
+        self.assertEqual("partial out", result["stdout"])
+        self.assertEqual("partial err", result["stderr"])
 
     def test_payload_uses_current_v20_root(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):

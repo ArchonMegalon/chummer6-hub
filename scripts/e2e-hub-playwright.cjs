@@ -354,17 +354,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
-  await gotoAndAssert(page, pageErrors, '/participate', async () => {
-    await expectVisible(page, 'text=Share feedback, report a problem, or join the beta waitlist');
-    await expectVisible(page, 'text=Open feedback');
-    await expectVisible(page, 'text=Report a problem');
-    await expectVisible(page, 'text=Join beta waitlist');
-    await expectBodyText(page, 'Start with public feedback for ideas and safe public bugs. Use Contact when the issue needs private follow-up. Join the beta waitlist when you want updates and account-backed return.', '/participate');
-    await expectBodyText(page, 'Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.', '/participate');
-    assert.equal(await readFirstHref(page, 'a.button-like--primary[href="/feedback"]', '/participate public feedback handoff'), '/feedback');
-    assert.equal(await readFirstHref(page, 'a.button-like--secondary[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
-    assert.equal(await readFirstHref(page, 'a.button-like--ghost[href="/signup?next=%2Faccount%2Fparticipation"]', '/participate beta waitlist handoff'), '/signup?next=%2Faccount%2Fparticipation');
-    await assertNoBannedCopy(page, '/participate');
+  await gotoAndAssert(page, pageErrors, '/partizipate', async () => {
+    await expectVisible(page, 'text=Participate');
+    await expectVisible(page, 'text=Follow the public board.');
+    await expectVisible(page, 'text=Vote, add requests, and track what is moving. Keep private support in Help.');
+    await expectVisible(page, 'text=Public board');
+    await expectVisible(page, 'text=Roadmap');
+    await expectVisible(page, 'text=Help');
+    await assertNoBannedCopy(page, '/partizipate');
   });
 
   await gotoAndAssert(page, pageErrors, '/faq', async () => {
@@ -600,7 +597,6 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expandDetailsBySummary(page, 'Release and device state', '/home/access');
     await expectBodyText(page, 'Open current release', '/home/access');
     await expectBodyText(page, 'Open Devices & access', '/home/access');
-    await expectBodyText(page, 'Open what works today', '/home/access');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Need product proof before you act?'), false, '/home/access should use the calmer proof follow-through note.');
   });

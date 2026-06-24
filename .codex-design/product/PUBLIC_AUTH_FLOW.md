@@ -56,22 +56,24 @@ Forbidden public wording:
 * guest access to `/home` must redirect or fall back to `/login?next=/home`
 * guest access to `/account` must redirect or fall back to `/login?next=/account`
 * guest access to `/participate/codex` must redirect or fall back to `/login?next=/participate/codex`
-* `/participate` remains the public explainer and must not require sign-in
-* guest-visible participation CTAs should prefer `/participate` first; the deep `/participate/codex` lane is a later step, not the first public landing target
+* `/partizipate` remains the public explainer and must not require sign-in
+* guest-visible participation CTAs should prefer `/partizipate` first; the deep `/participate/codex` lane is a later step, not the first public landing target
 
 ## Account-aware front-door rule
 
-`/participate` is the guest-readable account-aware front door.
+`/partizipate` is the guest-readable account-aware front door.
 
 It should behave like a compact first-party public board, not a long explainer page.
-The intended interaction model is a ProductLift-style public loop under Chummer-owned chrome:
+The intended interaction model is ProductLift-backed feedback, roadmap, and closeout data under Chummer-owned chrome:
 
 * one clear board entry surface
 * visible public feedback, roadmap, and shipped-closeout lanes
 * compact search, filters, and voting-oriented scanning
 * short route guidance that sends private or account-linked issues to Help
+* minimal dark presentation that looks like part of `chummer.run`
 * no third-party branding in the user-facing shell
 * no oversized prose wall before the board itself
+* first-party fallback states if ProductLift data is unavailable
 
 `/home` and `/account` are the signed-in community-ledger shell.
 

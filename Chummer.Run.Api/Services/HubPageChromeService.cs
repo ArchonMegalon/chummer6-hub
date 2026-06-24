@@ -90,7 +90,8 @@ public sealed class HubPageChromeService
     private static string BuildContextualSignInHref(string normalizedCurrentPath, string fallbackHref)
     {
         if (normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
-            || normalizedCurrentPath.StartsWith("/participate", StringComparison.OrdinalIgnoreCase))
+            || normalizedCurrentPath.StartsWith("/participate", StringComparison.OrdinalIgnoreCase)
+            || normalizedCurrentPath.StartsWith("/partizipate", StringComparison.OrdinalIgnoreCase))
         {
             return $"/auth/google/start?next={Uri.EscapeDataString(normalizedCurrentPath)}";
         }

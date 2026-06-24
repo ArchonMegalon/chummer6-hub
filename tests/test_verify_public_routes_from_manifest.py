@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -13,6 +15,15 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_public_routes_from_manifest.py"
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("verify_public_routes_from_manifest", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class _RouteFixtureHandler(BaseHTTPRequestHandler):
@@ -240,6 +251,60 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
             [route["mode"] for route in report["routes"]],
             ["controller_contract", "controller_contract"],
         )
+
+    def test_verifier_passes_bounded_fetch_settings_to_shared_fetch_helper(self) -> None:
+        module = load_module()
+        captured: dict[str, object] = {}
+
+        def fake_fetch(base_url, path, **kwargs):
+            captured["base_url"] = base_url
+            captured["path"] = path
+            captured["kwargs"] = kwargs
+            return 200, "public", {}, f"{base_url}{path}"
+
+        route = {
+            "path": "/public",
+            "audience": "public",
+            "purpose": "proof_shelf",
+            "requires_auth": False,
+            "guest_fallback": "/public",
+            "must_exist": True,
+        }
+
+        result = module.verify_route(
+            fake_fetch,
+            "https://example.invalid",
+            route,
+            public_host=None,
+            forwarded_proto=None,
+            strict_positive=False,
+            seed_receipts=False,
+            request_timeout_seconds=7.5,
+            max_retries=0,
+            retry_delay_seconds=0.25,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual("/public", captured["path"])
+        self.assertEqual(7.5, captured["kwargs"]["request_timeout_seconds"])
+        self.assertEqual(0, captured["kwargs"]["max_retries"])
+        self.assertEqual(0.25, captured["kwargs"]["retry_delay_seconds"])
+
+    def test_parse_args_accepts_bounded_worker_configuration(self) -> None:
+        module = load_module()
+
+        args = module.parse_args([
+            "--base-url", "https://example.invalid",
+            "--max-workers", "4",
+            "--request-timeout-seconds", "3",
+            "--max-retries", "0",
+            "--retry-delay-seconds", "0.1",
+        ])
+
+        self.assertEqual(4, args.max_workers)
+        self.assertEqual(3.0, args.request_timeout_seconds)
+        self.assertEqual(0, args.max_retries)
+        self.assertEqual(0.1, args.retry_delay_seconds)
 
     def test_verifier_requires_seed_receipts_for_strict_positive_parameterized_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

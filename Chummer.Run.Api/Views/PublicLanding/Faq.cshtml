@@ -12,12 +12,12 @@
     {
         new
         {
-            Badge = "What works today",
+            Badge = "Status",
             Title = "Check current status first",
-            Summary = "Use this when you want to know what is ready now, what needs care, and what is planned next.",
-            Href = "/now",
-            Label = "Open what works today",
-            Highlights = new[] { "Ready now", "Needs care", "Planned next" }
+            Summary = "Use this when you want the current build, platform availability, and any release caution in one place.",
+            Href = "/status",
+            Label = "Open status",
+            Highlights = new[] { "Current build", "Platforms", "Release caution" }
         },
         new
         {
@@ -26,7 +26,7 @@
             Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package and setup help without making you dig through a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
-            Highlights = new[] { "Latest build", "Setup help", "Known issues" }
+            Highlights = new[] { "Latest build", "Setup help", "Current notes" }
         },
         new
         {
@@ -91,7 +91,7 @@
 
         if (combined.Contains("trust", StringComparison.Ordinal) || combined.Contains("use chummer right now", StringComparison.Ordinal))
         {
-            return new TrustPageActionViewModel("See what works today", "/now", "secondary");
+            return new TrustPageActionViewModel("Open status", "/status", "secondary");
         }
 
         return null;

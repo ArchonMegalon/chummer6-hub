@@ -127,12 +127,12 @@ def test_participation_external_redirect_fails_because_participate_is_first_part
 
     class FakeSession:
         def get(self, url: str, timeout: int, allow_redirects: bool):
-            assert url == "https://chummer.run/participate"
+            assert url == "https://chummer.run/partizipate"
             assert timeout == 10
             assert allow_redirects is False
             return FakeResponse()
 
-    result = module.verify_route(FakeSession(), "https://chummer.run", "/participate")
+    result = module.verify_route(FakeSession(), "https://chummer.run", "/partizipate")
 
     assert result.success is False
     assert result.redirect_external is True
@@ -159,6 +159,32 @@ def test_unapproved_external_redirect_fails_public_copy_gate():
     assert result.success is False
     assert result.redirect_external is True
     assert result.detail == "route redirects outside Chummer from an unapproved public path"
+
+
+def test_verify_route_retries_transient_transport_failure():
+    module = load_module()
+
+    class FakeResponse:
+        status_code = 200
+        text = "<main>Build and maintain Shadowrun characters.</main>"
+        headers = {}
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get(self, url: str, timeout: int, allow_redirects: bool):
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("timed out once")
+            return FakeResponse()
+
+    session = FakeSession()
+    result = module.verify_route(session, "https://chummer.run", "/")
+
+    assert session.calls == 2
+    assert result.success is True
+    assert result.detail is None
 
 
 def test_provider_scanner_uses_visible_html_text_not_script_or_href_details():

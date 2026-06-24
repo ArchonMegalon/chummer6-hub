@@ -30,27 +30,6 @@
     </div>
 </section>
 
-<section class="status-decision-strip roadmap-signal-grid" aria-label="Roadmap route split">
-    <article class="status-decision-strip__card">
-        <span class="tag">Participate</span>
-        <h2>Votes inform demand.</h2>
-        <p>Feedback, planning, shipped updates, and private help stay on different pages.</p>
-        <a class="button-like button-like--ghost" href="/participate">Participate</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag">Shipped</span>
-        <h2>Use changelog for live changes.</h2>
-        <p>Recent requests at a glance. The changelog owns what is already in the app or public routes.</p>
-        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag tag--amber">Help</span>
-        <h2>Use Help for setup, account, or bug problems.</h2>
-        <p>Leave this page when the next step needs support instead of planning context.</p>
-        <a class="button-like button-like--ghost" href="/help">Open help</a>
-    </article>
-</section>
-
 <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
     <div class="minimal-section__lead">
         <p class="eyebrow">Now</p>
@@ -74,29 +53,6 @@
                     <span class="tag">@RoadmapText(milestone.StatusLabel)</span>
                     <h3>@RoadmapText(milestone.Title)</h3>
                     <p>@RoadmapText(milestone.CasualSummary)</p>
-                    <dl class="roadmap-milestone-facts milestone-drawer__tease">
-                        <div>
-                            <dt>Difficulty:</dt>
-                            <dd>@RoadmapText(milestone.DifficultyLabel) · @RoadmapText(milestone.DifficultySummary)</dd>
-                        </div>
-                        <div>
-                            <dt>Claimed:</dt>
-                            <dd>@(milestone.Claimed ? RoadmapText(milestone.ClaimedLabel) : "No") · @RoadmapText(milestone.ClaimedSummary)</dd>
-                        </div>
-                        <div>
-                            <dt>Dependencies:</dt>
-                            <dd>
-                                @if (milestone.Dependencies.Count == 0)
-                                {
-                                    <span>@RoadmapText(milestone.DependencySummary)</span>
-                                }
-                                else
-                                {
-                                    <span>@string.Join(", ", milestone.Dependencies.Select(static dependency => $"{dependency.Title} ({dependency.StatusLabel})"))</span>
-                                }
-                            </dd>
-                        </div>
-                    </dl>
                 </article>
             }
         </div>
@@ -134,7 +90,7 @@
         <p>Use Participate for demand, Changelog for shipped changes, or What works today for the current app.</p>
     </div>
     <div class="minimal-actions">
-        <a class="button-like button-like--primary" href="/participate">Participate</a>
+        <a class="button-like button-like--primary" href="/partizipate">Participate</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
         <a class="button-like button-like--ghost" href="/now">What works today</a>
     </div>

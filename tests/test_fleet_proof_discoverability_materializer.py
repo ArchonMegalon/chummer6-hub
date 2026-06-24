@@ -95,6 +95,196 @@ class FleetProofDiscoverabilityMaterializerTests(unittest.TestCase):
             payload = json.loads((fleet_root / "table_pulse" / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "pass")
 
+    def test_fails_when_black_ledger_receipt_is_not_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fleet_root = root / "fleet"
+            published_root = root / "published"
+            magicfit_root = root / "magicfit_provider"
+
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").parent.mkdir(parents=True, exist_ok=True)
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").write_text("ok\n", encoding="utf-8")
+            (magicfit_root / "MAGICFIT_PROVIDER_VERIFICATION.generated.json").write_text(
+                json.dumps({"status": "verified"}, indent=2),
+                encoding="utf-8",
+            )
+            (published_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json").parent.mkdir(parents=True, exist_ok=True)
+            (published_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json").write_text(
+                json.dumps({"status": "fail", "screenshots": []}, indent=2),
+                encoding="utf-8",
+            )
+            (published_root / "PWA_TABLE_PULSE_SCENARIO_RECEIPTS.generated.json").write_text(
+                json.dumps({"status": "pass", "scenarios": [], "private_campaign_data_captured": False}, indent=2),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_RUN_SERVICES_PUBLISHED_ROOT"] = str(published_root)
+            env["CHUMMER_FLEET_COMPLETION_ROOT"] = str(fleet_root)
+            env["CHUMMER_MAGICFIT_PROVIDER_ROOT"] = str(magicfit_root)
+            completed = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+
+    def test_fails_when_black_ledger_screenshot_escapes_published_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fleet_root = root / "fleet"
+            published_root = root / "published"
+            magicfit_root = root / "magicfit_provider"
+            legacy_root = root / "legacy"
+            outside_screenshot = root / "outside.png"
+
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").parent.mkdir(parents=True, exist_ok=True)
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").write_text("ok\n", encoding="utf-8")
+            (magicfit_root / "MAGICFIT_PROVIDER_VERIFICATION.generated.json").write_text(
+                json.dumps({"status": "verified"}, indent=2),
+                encoding="utf-8",
+            )
+            outside_screenshot.write_bytes(b"png")
+            (published_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json").parent.mkdir(parents=True, exist_ok=True)
+            (published_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "screenshots": [
+                            {
+                                "route": "/ledger/map",
+                                "viewport": "desktop",
+                                "screenshotPath": str(outside_screenshot),
+                            }
+                        ],
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (published_root / "PWA_TABLE_PULSE_SCENARIO_RECEIPTS.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "scenarios": [
+                            {"id": "pwa_subscription_delivery_click", "result": "pass"},
+                            {"id": "table_pulse_remote_reaction_gm_adjudication", "result": "pass"},
+                        ],
+                        "private_campaign_data_captured": False,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (legacy_root / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").parent.mkdir(parents=True, exist_ok=True)
+            (legacy_root / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "required_steps": ["remote-notification", "gm-adjudication"],
+                        "covered_steps": {"remote-notification": True, "gm-adjudication": True},
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_RUN_SERVICES_PUBLISHED_ROOT"] = str(published_root)
+            env["CHUMMER_FLEET_COMPLETION_ROOT"] = str(fleet_root)
+            env["CHUMMER_MAGICFIT_PROVIDER_ROOT"] = str(magicfit_root)
+            env["CHUMMER_LEGACY_REAUDIT_ROOT"] = str(legacy_root)
+            completed = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            summary = json.loads(
+                (fleet_root / "DISCOVERABILITY_MIRROR_SUMMARY.generated.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary["mirrors"]["black_ledger"]["status"], "fail")
+            self.assertIn("outside_published_root", summary["mirrors"]["black_ledger"]["missing_paths"][0])
+
+    def test_fails_when_legacy_table_pulse_receipt_is_malformed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fleet_root = root / "fleet"
+            published_root = root / "published"
+            magicfit_root = root / "magicfit_provider"
+            legacy_root = root / "legacy"
+
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").parent.mkdir(parents=True, exist_ok=True)
+            (magicfit_root / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md").write_text("ok\n", encoding="utf-8")
+            (magicfit_root / "MAGICFIT_PROVIDER_VERIFICATION.generated.json").write_text(
+                json.dumps({"status": "verified"}, indent=2),
+                encoding="utf-8",
+            )
+            screenshot = published_root / "shots" / "ledger-map.png"
+            screenshot.parent.mkdir(parents=True, exist_ok=True)
+            screenshot.write_bytes(b"png")
+            (published_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "screenshots": [
+                            {
+                                "route": "/ledger/map",
+                                "viewport": "desktop",
+                                "screenshotPath": str(screenshot),
+                            }
+                        ],
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (published_root / "PWA_TABLE_PULSE_SCENARIO_RECEIPTS.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "scenarios": [
+                            {"id": "pwa_subscription_delivery_click", "result": "pass"},
+                            {"id": "table_pulse_remote_reaction_gm_adjudication", "result": "pass"},
+                        ],
+                        "private_campaign_data_captured": False,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            (legacy_root / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").parent.mkdir(parents=True, exist_ok=True)
+            (legacy_root / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").write_text(
+                json.dumps({"status": "pass", "required_steps": []}, indent=2),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_RUN_SERVICES_PUBLISHED_ROOT"] = str(published_root)
+            env["CHUMMER_FLEET_COMPLETION_ROOT"] = str(fleet_root)
+            env["CHUMMER_MAGICFIT_PROVIDER_ROOT"] = str(magicfit_root)
+            env["CHUMMER_LEGACY_REAUDIT_ROOT"] = str(legacy_root)
+            completed = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            payload = json.loads(
+                (fleet_root / "table_pulse" / "TABLE_PULSE_SCENARIO_REPLAY.generated.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["status"], "fail")
+            self.assertIn("legacy replay receipt is missing required_steps", payload["failures"])
+
 
 if __name__ == "__main__":
     unittest.main()

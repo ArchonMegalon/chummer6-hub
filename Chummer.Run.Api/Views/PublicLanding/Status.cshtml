@@ -29,8 +29,8 @@
 
 <section class="minimal-page-hero">
     <div>
-        <h1>Release status</h1>
-        <p>The build currently available from Chummer.</p>
+        <h1>Current release</h1>
+        <p>The build, platforms, and current state in one place.</p>
     </div>
     <div class="minimal-status-pill" aria-label="Current release">
         <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
@@ -47,21 +47,21 @@
             <p>@PublicStatusText(Model.ReleaseSummary)</p>
         </article>
         <article>
-            <span>Build</span>
+            <span>Current build</span>
             <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
         </article>
         <article>
-            <span>Last updated</span>
+            <span>Last checked</span>
             <strong>@verifiedLabel</strong>
         </article>
         <article>
-            <span>Status</span>
+            <span>Available now</span>
             <strong>@releaseAvailabilityLabel</strong>
         </article>
     </div>
     <div class="minimal-actions" aria-label="Status next actions">
         <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Open downloads</a>
-        <a class="button-like button-like--secondary" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Support">Open support</a>
+        <a class="button-like button-like--secondary" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Open help</a>
         <a class="button-like button-like--ghost" href="/changelog" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Changes">Changes</a>
     </div>
 </section>

@@ -355,6 +355,134 @@ public sealed class ParticipantNotificationTests
         }
     }
 
+    [Fact]
+    public async Task ParticipantNotification_RetriesFailedDeliveryWithSameReceiptAfterRuntimeRecovers()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var firstRequests = new List<CapturedRequest>();
+            using var firstHttp = new HttpClient(new CapturingHandler(firstRequests, HttpStatusCode.InternalServerError, """{"error":"nope"}"""));
+            IConfiguration configuration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO"] = "ops@chummer.run",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserEnsureResult ensured = accounts.EnsureUserWithStatus("subject.email.retry", "Runner Prime", "runner@example.com");
+
+            ParticipationOperatorNotificationService firstService = new(firstHttp, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+            ParticipationOperatorNotificationReceipt? first = await firstService.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/karma-forge",
+                authProviderFamily: "email",
+                accountCreated: ensured.Created,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(first);
+            Assert.Equal("failed_delivery", first!.Status);
+            Assert.Single(firstRequests);
+
+            var secondRequests = new List<CapturedRequest>();
+            using var secondHttp = new HttpClient(new CapturingHandler(secondRequests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-2"}"""));
+            ParticipationOperatorNotificationService secondService = new(secondHttp, store, configuration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? second = await secondService.NotifyAccountOpenedIfNeededAsync(
+                ensured.User,
+                ensured.User.Email,
+                "/participate/karma-forge",
+                authProviderFamily: "email",
+                accountCreated: true,
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(second);
+            Assert.Equal(first.ReceiptId, second!.ReceiptId);
+            Assert.Equal("sent", second.Status);
+            Assert.Equal("ea-delivery-2", second.DeliveryRef);
+            Assert.Single(secondRequests);
+            Assert.Single(secondService.ListReceiptsForUser(ensured.User.UserId));
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task ParticipantNotification_RetriesSuppressedMissingRecipientAfterRecipientIsConfigured()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var initialRequests = new List<CapturedRequest>();
+            using var initialHttp = new HttpClient(new CapturingHandler(initialRequests, HttpStatusCode.OK, """{"target_ref":"unused"}"""));
+            IConfiguration initialConfiguration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            CommunityStore store = new(initialConfiguration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            HubUserDto user = accounts.EnsureUserWithStatus("subject.email.recipient.retry", "Runner Prime", "runner@example.com").User;
+
+            ParticipationOperatorNotificationService firstService = new(initialHttp, store, initialConfiguration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+            ParticipationOperatorNotificationReceipt? first = await firstService.NotifyFirstActionIfNeededAsync(
+                user,
+                user.Email,
+                intentKind: "package",
+                entryRoute: "/packages/desktop-preview/vote",
+                authProviderFamily: "email",
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(first);
+            Assert.Equal("suppressed_recipient_missing", first!.Status);
+            Assert.Empty(initialRequests);
+
+            var recoveredRequests = new List<CapturedRequest>();
+            using var recoveredHttp = new HttpClient(new CapturingHandler(recoveredRequests, HttpStatusCode.OK, """{"target_ref":"ea-delivery-3"}"""));
+            IConfiguration recoveredConfiguration = BuildConfiguration(
+                tempRoot,
+                new Dictionary<string, string?>
+                {
+                    ["CHUMMER_OPERATOR_PARTICIPATION_NOTIFY_TO"] = "ops@chummer.run",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_API_TOKEN"] = "ea-token",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_PRINCIPAL_ID"] = "principal-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BINDING_ID"] = "binding-1",
+                    ["CHUMMER_OPERATOR_PARTICIPATION_EA_BASE_URL"] = "https://ea.test",
+                });
+            ParticipationOperatorNotificationService secondService = new(recoveredHttp, store, recoveredConfiguration, NullLogger<ParticipationOperatorNotificationService>.Instance);
+
+            ParticipationOperatorNotificationReceipt? second = await secondService.NotifyFirstActionIfNeededAsync(
+                user,
+                user.Email,
+                intentKind: "package",
+                entryRoute: "/packages/desktop-preview/vote",
+                authProviderFamily: "email",
+                cancellationToken: CancellationToken.None);
+
+            Assert.NotNull(second);
+            Assert.Equal(first.ReceiptId, second!.ReceiptId);
+            Assert.Equal("sent", second.Status);
+            Assert.Equal("ea-delivery-3", second.DeliveryRef);
+            Assert.Single(recoveredRequests);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
     private static IConfiguration BuildConfiguration(string tempRoot, IReadOnlyDictionary<string, string?> extra)
     {
         Dictionary<string, string?> values = new(extra, StringComparer.OrdinalIgnoreCase)

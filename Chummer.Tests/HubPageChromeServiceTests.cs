@@ -58,10 +58,10 @@ public sealed class HubPageChromeServiceTests
 
         var service = CreateService(configuration);
 
-        var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/participate");
+        var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/partizipate");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
-        Assert.Equal("/auth/google/start?next=%2Fparticipate", signIn.Href);
+        Assert.Equal("/auth/google/start?next=%2Fpartizipate", signIn.Href);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class HubPageChromeServiceTests
             ["Home", "Participate", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("/participate", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/partizipate", chrome.PrimaryNavigation[1].Href);
         Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
     }
 

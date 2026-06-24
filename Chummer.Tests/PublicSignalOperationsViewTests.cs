@@ -1,4 +1,6 @@
 using Xunit;
+using Chummer.Run.Api.Controllers;
+using System.Reflection;
 
 namespace Chummer.Tests;
 
@@ -14,7 +16,7 @@ public sealed class PublicSignalOperationsViewTests
         string participateView = File.ReadAllText(participateViewPath);
 
         Assert.Contains("participate-shell", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-quick-form", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-hosted__frame", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);
@@ -51,16 +53,15 @@ public sealed class PublicSignalOperationsViewTests
 
         Assert.Contains("@model PublicSignalOperationsDetailPageViewModel", detailView, StringComparison.Ordinal);
         Assert.Contains("surface-participate surface-minimal", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download page data", detailView, StringComparison.Ordinal);
-        Assert.Contains("Download overview", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download details", detailView, StringComparison.Ordinal);
+        Assert.Contains("Download summary", detailView, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Overview\"", detailView, StringComparison.Ordinal);
         Assert.Contains("Activity", detailView, StringComparison.Ordinal);
-        Assert.Contains("Starting point", detailView, StringComparison.Ordinal);
+        Assert.Contains("Original update", detailView, StringComparison.Ordinal);
         Assert.Contains("Saved views", detailView, StringComparison.Ordinal);
         Assert.Contains("Current view", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open page data", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open conversation", detailView, StringComparison.Ordinal);
-        Assert.Contains("Open conversation data", detailView, StringComparison.Ordinal);
+        Assert.Contains("Open details", detailView, StringComparison.Ordinal);
+        Assert.Contains("The first update anchors this page.", detailView, StringComparison.Ordinal);
         Assert.Contains("Open related details", detailView, StringComparison.Ordinal);
         Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("sourceReceipt.HotFilterLabel", detailView, StringComparison.Ordinal);
@@ -122,7 +123,15 @@ public sealed class PublicSignalOperationsViewTests
 
         Assert.Contains("private readonly PublicSignalOperationsService _signalOperations;", controller, StringComparison.Ordinal);
         Assert.Contains("BuildOptionalSignalOperationsPacket()", controller, StringComparison.Ordinal);
-        Assert.Contains("SignalOperations: signalOperations", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolveProductLiftHostedBoardUri()", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolveParticipateBoardHomeHref()", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/partizipate/board\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("ParticipateBoardProxy", controller, StringComparison.Ordinal);
+        Assert.Contains("RewriteParticipateBoardHtml", controller, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-home-link-patch", controller, StringComparison.Ordinal);
+        Assert.Contains("brand.setAttribute('href', '__CHUMMER_PUBLIC_HOME_HREF__')", controller, StringComparison.Ordinal);
+        Assert.Contains("brand.setAttribute('target', '_top')", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/feedback/providers/productlift/webhook\")]", controller, StringComparison.Ordinal);
         Assert.Contains("ReceiveProductLiftWebhook", controller, StringComparison.Ordinal);
         Assert.Contains("PublicSignalOperationsService.WebhookSecretHeader", controller, StringComparison.Ordinal);
@@ -191,5 +200,42 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("PublicSignalReconcileRunReceiptViewModel", viewModels, StringComparison.Ordinal);
         Assert.Contains("services.AddSingleton<PublicSignalOperationsService>();", serviceCollection, StringComparison.Ordinal);
         Assert.Contains("services.AddHostedService<PublicSignalRetryExpiryWorker>();", serviceCollection, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParticipateBoardHtmlRewriteInjectsHomeLinkPatchAndKeepsBoardLocal()
+    {
+        MethodInfo? method = typeof(PublicLandingController).GetMethod(
+            "RewriteParticipateBoardHtml",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        const string html = """
+<!doctype html>
+<html>
+<head><title>Board</title></head>
+<body>
+  <header>
+    <a class="brand-link" href="/">Chummer</a>
+  </header>
+  <main>
+    <a href="/roadmap">Roadmap</a>
+    <img src="/assets/poster.png" alt="Poster" />
+  </main>
+</body>
+</html>
+""";
+
+        string rewritten = (string)method!.Invoke(
+            null,
+            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/"])!;
+
+        Assert.Contains("<base href=\"/partizipate/board/\" />", rewritten, StringComparison.Ordinal);
+        Assert.Contains("href=\"/partizipate/board/roadmap\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("src=\"/partizipate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
+        Assert.Contains("brand.setAttribute('href', 'https://chummer.run/')", rewritten, StringComparison.Ordinal);
+        Assert.Contains("brand.setAttribute('target', '_top')", rewritten, StringComparison.Ordinal);
     }
 }

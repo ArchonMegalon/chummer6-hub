@@ -145,6 +145,7 @@ public sealed class PrivacyBoundedSupportStatusService
     {
         string route = feedbackPacket?.DestinationRoute ?? "/feedback";
         if (string.Equals(route, "/participate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(route, "/partizipate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
             || string.Equals(route, "/participate?productlift=feedback#productlift-feedback", StringComparison.OrdinalIgnoreCase))
         {
             route = "/feedback";
@@ -176,7 +177,7 @@ public sealed class PrivacyBoundedSupportStatusService
             Actions:
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback", route, "Review the first-party feedback path."),
-                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/participate", "Inspect the broader public feedback intake."),
+                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/partizipate", "Inspect the broader public feedback intake."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Escalate private or account-linked feedback through first-party support.")
             ],
             EmittedAtUtc: now,

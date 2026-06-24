@@ -228,7 +228,7 @@ program_phases:
     - chummer6-design
     status: complete
     exit:
-    - "`chummer.run` exposes `/`, `/what-is-chummer`, `/now`, `/horizons`, `/downloads`, `/participate`, `/status`, and `/artifacts` from design-owned landing truth."
+    - "`chummer.run` exposes `/`, `/what-is-chummer`, `/now`, `/horizons`, `/downloads`, `/partizipate`, `/status`, and `/artifacts` from design-owned landing truth."
     - Public CTA routing does not depend on repo-local improvised feature maps.
     - Landing copy does not mention provider or LTD names.
   - id: J2

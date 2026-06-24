@@ -20,7 +20,7 @@ ROUTE_REQUIREMENTS = {
         "Private logs and account issues belong in Help, not public feedback.",
         "Create account for follow-up",
     ],
-    "/participate": [
+    "/partizipate": [
         "Follow an item to hear when it changes.",
         "Join beta waitlist",
         "Open support intake",

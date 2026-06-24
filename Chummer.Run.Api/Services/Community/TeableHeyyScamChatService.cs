@@ -34,7 +34,10 @@ public sealed record TeableHeyyScamChatRow(
     IReadOnlyList<string> ForbiddenActions,
     int SuggestedDelaySeconds,
     string Transcript,
+    string LatestDraftId,
     string LatestDraft,
+    string LatestDraftStatus,
+    string LatestDraftFailureReason,
     string LatestPacingHint,
     bool ManualApprovalRequired,
     bool AutoSendAllowed,
@@ -68,6 +71,8 @@ public sealed record TeableHeyyScamChatSyncResult(
 
 public sealed class TeableHeyyScamChatService
 {
+    private const string HttpTimeoutSecondsConfigKey = "CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS";
+    private static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(15);
     private const string DefaultApiBaseUrl = "https://app.teable.ai/api";
     private const string DefaultTableName = "Heyy Scam Chat Conversations";
     private const string DefaultDbTableName = "heyy_scam_chat_conversations";
@@ -126,7 +131,10 @@ public sealed class TeableHeyyScamChatService
         new("Forbidden Actions", "longText", Description: "Actions the bot and operator flow must not perform."),
         new("Suggested Delay Seconds", "singleLineText", Description: "Persona-configured slow typing delay suggestion."),
         new("Transcript", "longText", Description: "Conversation transcript according to configured redaction policy."),
+        new("Latest Draft Id", "singleLineText", Description: "Stable id of the latest manual-approval draft."),
         new("Latest Draft", "longText", Description: "Latest manual-approval draft."),
+        new("Latest Draft Status", "singleLineText", Description: "Whether the latest draft came from EA or fallback generation."),
+        new("Latest Draft Failure Reason", "longText", Description: "Failure reason for fallback or blocked draft generation when present."),
         new("Latest Pacing Hint", "longText", Description: "How slowly to reply if manually approved."),
         new("Manual Approval Required", "singleLineText", Description: "Always true for this lane."),
         new("Auto Send Allowed", "singleLineText", Description: "Always false for this lane."),
@@ -492,7 +500,10 @@ public sealed class TeableHeyyScamChatService
             ["Forbidden Actions"] = string.Join('\n', row.ForbiddenActions),
             ["Suggested Delay Seconds"] = row.SuggestedDelaySeconds.ToString(),
             ["Transcript"] = row.Transcript,
+            ["Latest Draft Id"] = row.LatestDraftId,
             ["Latest Draft"] = row.LatestDraft,
+            ["Latest Draft Status"] = row.LatestDraftStatus,
+            ["Latest Draft Failure Reason"] = row.LatestDraftFailureReason,
             ["Latest Pacing Hint"] = row.LatestPacingHint,
             ["Manual Approval Required"] = row.ManualApprovalRequired ? "true" : "false",
             ["Auto Send Allowed"] = row.AutoSendAllowed ? "true" : "false",
@@ -516,7 +527,15 @@ public sealed class TeableHeyyScamChatService
     {
         string sourceVersion = conversation.UpdatedAtUtc.ToString("O");
         string transcript = BuildTranscript(conversation);
-        string sourceHash = HashProjection(string.Join("|", conversation.ConversationId, sourceVersion, transcript, conversation.LatestDraft?.DraftText ?? string.Empty));
+        string sourceHash = HashProjection(string.Join(
+            "|",
+            conversation.ConversationId,
+            sourceVersion,
+            transcript,
+            conversation.LatestDraft?.DraftId ?? string.Empty,
+            conversation.LatestDraft?.Status ?? string.Empty,
+            conversation.LatestDraft?.FailureReason ?? string.Empty,
+            conversation.LatestDraft?.DraftText ?? string.Empty));
         return new TeableHeyyScamChatRow(
             ProjectionId: $"heyy-scam-chat:{conversation.ConversationId}",
             ProjectionKind: ProjectionKind,
@@ -544,7 +563,10 @@ public sealed class TeableHeyyScamChatService
             ForbiddenActions: conversation.Enrichment.ForbiddenActions,
             SuggestedDelaySeconds: conversation.Enrichment.SuggestedDelaySeconds,
             Transcript: transcript,
+            LatestDraftId: conversation.LatestDraft?.DraftId ?? string.Empty,
             LatestDraft: conversation.LatestDraft?.DraftText ?? string.Empty,
+            LatestDraftStatus: conversation.LatestDraft?.Status ?? string.Empty,
+            LatestDraftFailureReason: conversation.LatestDraft?.FailureReason ?? string.Empty,
             LatestPacingHint: conversation.LatestDraft?.PacingHint ?? string.Empty,
             ManualApprovalRequired: true,
             AutoSendAllowed: false,
@@ -573,7 +595,7 @@ public sealed class TeableHeyyScamChatService
 
     private TeableOptions ResolveOptions()
     {
-        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED"], defaultValue: true);
+        bool enabled = ParseBool(_configuration["CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED"], defaultValue: false);
         string apiKey = Normalize(_configuration["CHUMMER_TEABLE_HEYY_SCAM_CHAT_API_KEY"])
             ?? Normalize(_configuration["TEABLE_API_KEY"])
             ?? string.Empty;
@@ -597,14 +619,23 @@ public sealed class TeableHeyyScamChatService
             request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         }
 
-        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
-        string content = await response.Content.ReadAsStringAsync(cancellationToken);
+        using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ResolveHttpTimeout());
+
+        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, timeoutCts.Token);
+        string content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"teable_http_{(int)response.StatusCode}:{Truncate(content, 240)}");
         }
 
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
+    }
+
+    private TimeSpan ResolveHttpTimeout()
+    {
+        string? raw = Normalize(_configuration[HttpTimeoutSecondsConfigKey]);
+        return int.TryParse(raw, out int seconds) && seconds >= 1 ? TimeSpan.FromSeconds(seconds) : DefaultHttpTimeout;
     }
 
     private void SetSyncAttempt(DateTimeOffset occurredAtUtc)
@@ -799,7 +830,7 @@ public sealed class TeableHeyyScamChatSyncWorker : BackgroundService
     }
 
     private bool IsEnabled()
-        => ParseBool(_configuration["CHUMMER_TEABLE_HEYY_SCAM_CHAT_RECONCILE_ENABLED"], defaultValue: true);
+        => ParseBool(_configuration["CHUMMER_TEABLE_HEYY_SCAM_CHAT_RECONCILE_ENABLED"], defaultValue: false);
 
     private TimeSpan ResolveDurationMinutes(string key, TimeSpan fallback)
     {

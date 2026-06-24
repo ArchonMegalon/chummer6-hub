@@ -55,7 +55,9 @@
             "/now" => string.Equals(normalizedCurrentPath, "/now", StringComparison.OrdinalIgnoreCase),
             "/horizons" => normalizedCurrentPath is "/horizons" or "/roadmap" || normalizedCurrentPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase),
             "/artifacts" => normalizedCurrentPath is "/artifacts" || normalizedCurrentPath.StartsWith("/artifacts/", StringComparison.OrdinalIgnoreCase),
-            "/participate" => normalizedCurrentPath is "/participate" || normalizedCurrentPath.StartsWith("/participate/", StringComparison.OrdinalIgnoreCase),
+            "/participate" => normalizedCurrentPath is "/participate" or "/partizipate"
+                || normalizedCurrentPath.StartsWith("/participate/", StringComparison.OrdinalIgnoreCase)
+                || normalizedCurrentPath.StartsWith("/partizipate/", StringComparison.OrdinalIgnoreCase),
             "/status" => string.Equals(normalizedCurrentPath, "/status", StringComparison.OrdinalIgnoreCase),
             "/help" => string.Equals(normalizedCurrentPath, "/help", StringComparison.OrdinalIgnoreCase),
             "/faq" => string.Equals(normalizedCurrentPath, "/faq", StringComparison.OrdinalIgnoreCase),

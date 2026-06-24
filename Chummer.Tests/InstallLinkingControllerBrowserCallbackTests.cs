@@ -11,6 +11,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -315,6 +316,62 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.DoesNotContain("app handoff", page.Content, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Desktop_launch_exchange_accepts_valid_ticket_for_matching_claimed_install()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-launch-valid", fixture.User.UserId, fixture.SubjectId);
+        AccountDesktopLaunchTicketIssueResult issued = fixture.DesktopLaunchTickets.Issue("character", "dossier-7", fixture.User.UserId, fixture.SubjectId);
+
+        ActionResult<DesktopAccountLaunchExchangeResponseDto> result = fixture.Controller.ExchangeDesktopLaunch(
+            new DesktopAccountLaunchExchangeRequestDto(
+                InstallationId: "ins-launch-valid",
+                AccessToken: grant.AccessToken,
+                Ticket: issued.Ticket));
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        DesktopAccountLaunchExchangeResponseDto payload = Assert.IsType<DesktopAccountLaunchExchangeResponseDto>(ok.Value);
+        Assert.Equal("character", payload.Kind);
+        Assert.Equal("dossier-7", payload.ResourceId);
+    }
+
+    [Fact]
+    public void Desktop_launch_exchange_rejects_ticket_for_another_identity()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-launch-mismatch", fixture.User.UserId, fixture.SubjectId);
+        AccountDesktopLaunchTicketIssueResult issued = fixture.DesktopLaunchTickets.Issue("group", "group-4", userId: "someone-else", subjectId: "subject.someone-else");
+
+        ActionResult<DesktopAccountLaunchExchangeResponseDto> result = fixture.Controller.ExchangeDesktopLaunch(
+            new DesktopAccountLaunchExchangeRequestDto(
+                InstallationId: "ins-launch-mismatch",
+                AccessToken: grant.AccessToken,
+                Ticket: issued.Ticket));
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, problem.StatusCode);
+        ProblemDetails details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("desktop launch ticket does not belong to this linked install.", details.Detail);
+    }
+
+    [Fact]
+    public void Desktop_launch_exchange_rejects_invalid_ticket()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-launch-invalid", fixture.User.UserId, fixture.SubjectId);
+
+        ActionResult<DesktopAccountLaunchExchangeResponseDto> result = fixture.Controller.ExchangeDesktopLaunch(
+            new DesktopAccountLaunchExchangeRequestDto(
+                InstallationId: "ins-launch-invalid",
+                AccessToken: grant.AccessToken,
+                Ticket: "not-a-real-ticket"));
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        ProblemDetails details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("desktop launch ticket is invalid.", details.Detail);
+    }
+
     private static bool TryExtractPrimaryHref(string content, out string href)
     {
         const string classMarker = "class=\"button-like button-like--primary\"";
@@ -425,16 +482,20 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(communityStore);
             InstallLinkingStore installLinkingStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+            AccountDesktopLaunchTicketService desktopLaunchTickets = new(dataProtection, configuration);
 
             Identity = identity;
             Accounts = accounts;
             Store = installLinkingStore;
             InstallLinking = new InstallLinkingService(installLinkingStore, configuration);
             Releases = new PublicReleaseManifestService(configuration);
+            DesktopLaunchTickets = desktopLaunchTickets;
             Controller = new InstallLinkingController(
                 identity,
                 accounts,
                 InstallLinking,
+                desktopLaunchTickets,
                 Releases,
                 supportCases: null!,
                 supportPresentation: new SupportCasePresentationService(),
@@ -458,9 +519,50 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         public PublicReleaseManifestService Releases { get; }
 
+        public AccountDesktopLaunchTicketService DesktopLaunchTickets { get; }
+
         public InstallLinkingController Controller { get; }
 
         public Chummer.Run.Contracts.Community.HubUserDto User { get; private set; } = null!;
+
+        public InstallationGrantDto SeedClaimedInstall(string installationId, string userId, string? subjectId)
+        {
+            lock (Store.Gate)
+            {
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                InstallationGrantDto grant = new(
+                    GrantId: $"grant-{installationId}",
+                    InstallationId: installationId,
+                    Status: InstallationGrantStates.Active,
+                    AccessToken: $"access-{installationId}",
+                    IssuedAtUtc: now.AddMinutes(-5),
+                    ExpiresAtUtc: now.AddHours(8),
+                    UserId: userId,
+                    SubjectId: subjectId);
+                ClaimedInstallationDto installation = new(
+                    InstallationId: installationId,
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Channel: "preview",
+                    Version: "6.0.1-preview",
+                    InstallAccessClass: InstallAccessClasses.AccountRequired,
+                    Status: ClaimedInstallationStates.Active,
+                    CreatedAtUtc: now.AddHours(-1),
+                    UpdatedAtUtc: now,
+                    UserId: userId,
+                    SubjectId: subjectId,
+                    PublicKey: "public-key",
+                    ClaimTicketId: $"ticket-{installationId}",
+                    HeadId: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    HostLabel: "Test host",
+                    GrantId: grant.GrantId);
+                Store.InstallationsById[installationId] = installation;
+                Store.GrantsById[grant.GrantId] = grant;
+                Store.PersistLocked();
+                return grant;
+            }
+        }
 
         public void Dispose()
         {

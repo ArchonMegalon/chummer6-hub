@@ -280,7 +280,7 @@ public sealed class PublicConciergeService
                 Intro: "Read the current notes first. If an update fails, send the platform, build, and error.",
                 EntrySurfaceLabel: "now",
                 EntryRoute: "/now",
-                ReturnActionLabel: "Back to what works today",
+                ReturnActionLabel: "Back to current release",
                 SecondaryActionLabel: "Open changelog",
                 SecondaryActionHref: "/changelog"),
             "contact" => new ConciergeSurfaceDefinition(

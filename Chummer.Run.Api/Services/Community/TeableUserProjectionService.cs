@@ -54,6 +54,8 @@ public sealed record TeableUserProjectionSyncResult(
 
 public sealed class TeableUserProjectionService
 {
+    private const string HttpTimeoutSecondsConfigKey = "CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS";
+    private static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(15);
     private const string DefaultApiBaseUrl = "https://app.teable.ai/api";
     private const string DefaultTableName = "Chummer Run Users";
     private const string DefaultDbTableName = "chummer_run_users";
@@ -677,14 +679,25 @@ public sealed class TeableUserProjectionService
             request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         }
 
-        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
-        string content = await response.Content.ReadAsStringAsync(cancellationToken);
+        using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ResolveHttpTimeout());
+
+        using HttpResponseMessage response = await _httpClientFactory.CreateClient().SendAsync(request, timeoutCts.Token);
+        string content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"teable_http_{(int)response.StatusCode}:{Truncate(content, 240)}");
         }
 
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
+    }
+
+    private TimeSpan ResolveHttpTimeout()
+    {
+        string? raw = Normalize(_configuration[HttpTimeoutSecondsConfigKey]);
+        return int.TryParse(raw, out int seconds) && seconds >= 1
+            ? TimeSpan.FromSeconds(seconds)
+            : DefaultHttpTimeout;
     }
 
     private void SetSyncAttempt(DateTimeOffset occurredAtUtc)

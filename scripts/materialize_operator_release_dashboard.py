@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 ROOT = Path("/docker/chummercomplete")
@@ -31,6 +32,18 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def is_pass(payload: dict[str, Any]) -> bool:
     return str(payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
+
+
+def normalize_base_url(value: object) -> str:
+    return str(value or "").strip().rstrip("/")
+
+
+def public_safe_base_url(value: object) -> str | None:
+    base_url = normalize_base_url(value)
+    parsed = urlparse(base_url)
+    if parsed.scheme == "https" and parsed.netloc.lower() == "chummer.run":
+        return base_url
+    return None
 
 
 def customer_safe_release_text(value: object) -> str:
@@ -72,6 +85,8 @@ def build_payload() -> dict[str, Any]:
     mirror = load_json(mirror_path)
     ruleset_path = PUBLISHED_ROOT / "RULESET_READINESS.generated.json"
     ruleset = load_json(ruleset_path)
+    public_route_proof_path = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
+    public_route_proof = load_json(public_route_proof_path)
     ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"
     ui_frame = load_json(ui_frame_path)
     design_path = PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json"
@@ -114,6 +129,7 @@ def build_payload() -> dict[str, Any]:
         for provider, data in (mirror.get("providers") or {}).items()
         if isinstance(data, dict)
     }
+    frame_base_url = public_safe_base_url(ui_frame.get("base_url")) or public_safe_base_url(public_route_proof.get("base_url"))
     rulesets = {
         ruleset_name: {
             "status": data.get("status"),
@@ -145,7 +161,7 @@ def build_payload() -> dict[str, Any]:
         },
         "rulesets": rulesets,
         "ui": {
-            "frame_base_url": ui_frame.get("base_url"),
+            "frame_base_url": frame_base_url,
             "frame_checked_pages": frame_summary.get("checked_pages"),
             "frame_failure_count": frame_summary.get("failure_count"),
             "design_verdict": design.get("verdict"),

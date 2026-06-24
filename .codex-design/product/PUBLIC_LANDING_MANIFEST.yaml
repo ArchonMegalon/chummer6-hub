@@ -12,7 +12,7 @@ hero_ctas:
 - label: Download Chummer
   href: /downloads
   emphasis: primary
-- label: See what works today
+- label: Open current release
   href: /now
   emphasis: secondary
 guest_shell_actions:
@@ -241,15 +241,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: public progress report only
-- path: /participate
+- path: /partizipate
   title: Participate
   audience: public
-  purpose: help_and_booster_entry
+  purpose: first_party_public_board
   requires_auth: false
-  guest_fallback: /participate
+  guest_fallback: /partizipate
   must_exist: true
   placeholder_allowed: false
-  placeholder_requirements: public explainer only
+  placeholder_requirements: ProductLift-backed feedback, roadmap, and shipped-closeout board rendered in first-party Chummer chrome with compact dark presentation, visible filters/vote signals, private-support routing to Help, and no third-party brand feel
 - path: /feedback
   title: Feedback
   audience: public

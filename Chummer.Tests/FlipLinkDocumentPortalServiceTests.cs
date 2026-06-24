@@ -114,4 +114,53 @@ public sealed class FlipLinkDocumentPortalServiceTests
             Environment.CurrentDirectory = originalDirectory;
         }
     }
+
+    [Fact]
+    public void OriginDossierDocumentIsPublishedAsAFirstPartyStoryPacket()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new FlipLinkDocumentPortalService(configuration);
+
+        ChummerDocument? document = service.TryGetPublicDocument("origin-dossier-the-name-she-chose");
+
+        Assert.NotNull(document);
+        Assert.Equal("origin_dossier_name_she_chose", document!.Id);
+        Assert.Equal("origin-dossier", document.Category);
+        Assert.Equal("products/chummer/horizons/origin-dossier.md", document.SourcePath);
+        Assert.Equal("Origin Dossier: The Name She Chose", document.Title);
+        Assert.Equal("/docs/origin-dossier-the-name-she-chose/download.pdf", document.PdfArtifactPath);
+        Assert.False(string.IsNullOrWhiteSpace(document.PdfSha256));
+        Assert.Equal(64, document.PdfSha256.Length);
+        Assert.Equal(ChummerDocumentStatuses.Published, document.Status);
+    }
+
+    [Fact]
+    public void OriginDossierPublicationKeepsViewerOptionalAndReceiptFirstParty()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new FlipLinkDocumentPortalService(configuration);
+
+        var document = service.TryGetPublicDocument("origin-dossier-the-name-she-chose");
+        var publication = service.TryGetPublication(document!.Id);
+        var receipt = service.TryBuildPublicationReceipt("origin-dossier-the-name-she-chose");
+
+        Assert.NotNull(publication);
+        Assert.NotNull(receipt);
+        Assert.Equal("FlipLink.me", publication!.Provider);
+        Assert.Equal(FlipLinkPublicationStatuses.Unpublished, publication.PublicationStatus);
+        Assert.Equal("/docs/embed/origin-dossier-the-name-she-chose", receipt!.EmbedRoute);
+        Assert.Equal(document.PdfSha256, receipt.PdfSha256);
+    }
 }

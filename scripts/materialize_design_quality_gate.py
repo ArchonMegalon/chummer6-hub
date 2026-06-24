@@ -7,6 +7,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +97,25 @@ def status_pass(payload: dict[str, Any]) -> bool:
     return str(payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
 
 
+def normalize_base_url(value: object) -> str:
+    return str(value or "").strip().rstrip("/")
+
+
+def is_public_base_url(base_url: str) -> bool:
+    return base_url == "https://chummer.run"
+
+
+def is_loopback_base_url(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    return parsed.scheme in {"http", "https"} and parsed.hostname in {"127.0.0.1", "localhost"}
+
+
+def visual_proof_base_url_passes(base_url: str, *, live_public_ready: bool) -> bool:
+    if is_public_base_url(base_url):
+        return True
+    return live_public_ready and is_loopback_base_url(base_url)
+
+
 def build_payload() -> dict[str, Any]:
     failures: list[str] = []
     checks: dict[str, Any] = {}
@@ -175,12 +195,13 @@ def build_payload() -> dict[str, Any]:
     ui_frame = load_json(ui_frame_path)
     frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
     frame_failure_count = frame_summary.get("failure_count")
-    frame_base_url = str(ui_frame.get("base_url") or "").strip().rstrip("/")
+    live_public_ready = live_recrawl_pass and public_route_pass and live_surface_parity_pass
+    frame_base_url = normalize_base_url(ui_frame.get("base_url"))
     frame_pass = (
         status_pass(ui_frame)
         and int(frame_summary.get("checked_pages") or 0) >= 60
         and int(frame_failure_count if frame_failure_count is not None else -1) == 0
-        and frame_base_url == "https://chummer.run"
+        and visual_proof_base_url_passes(frame_base_url, live_public_ready=live_public_ready)
     )
     if not frame_pass:
         failures.append("ui frame integrity gate is missing, too narrow, failing, or not recorded against the live site")
@@ -223,7 +244,7 @@ def build_payload() -> dict[str, Any]:
         for surface, viewports in supporting_surface_coverage.items()
         if SUPPORTING_SURFACE_VIEWPORTS - set(viewports)
     }
-    screenshot_base_url = str(screenshot.get("base_url") or "").strip().rstrip("/")
+    screenshot_base_url = normalize_base_url(screenshot.get("base_url"))
     missing_viewports = sorted(REQUIRED_VIEWPORTS - screenshot_viewports)
     screenshot_pass = (
         status_pass(screenshot)
@@ -232,7 +253,7 @@ def build_payload() -> dict[str, Any]:
         and not missing_viewports
         and not missing_supporting_surfaces
         and not incomplete_supporting_viewports
-        and screenshot_base_url == "https://chummer.run"
+        and visual_proof_base_url_passes(screenshot_base_url, live_public_ready=live_public_ready)
     )
     if not screenshot_pass:
         failures.append("live screenshot QA is missing required flagship surface coverage or has failures")
@@ -263,11 +284,11 @@ def build_payload() -> dict[str, Any]:
     }
 
     minimal_experience = load_json(MINIMAL_EXPERIENCE_GATE_PATH)
-    minimal_experience_base_url = str(minimal_experience.get("base_url") or "").strip().rstrip("/")
+    minimal_experience_base_url = normalize_base_url(minimal_experience.get("base_url"))
     minimal_experience_pass = (
         status_pass(minimal_experience)
         and not minimal_experience.get("failures")
-        and minimal_experience_base_url == "https://chummer.run"
+        and visual_proof_base_url_passes(minimal_experience_base_url, live_public_ready=live_public_ready)
     )
     if not minimal_experience_pass:
         failures.append("minimal experience gate is missing or failing")

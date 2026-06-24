@@ -400,7 +400,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
-        Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
+        Assert.Equal("/partizipate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
         Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
         Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
         Assert.Contains("Short intake", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
@@ -418,7 +418,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
-        Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
+        Assert.Equal("/partizipate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
         Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
         Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
         Assert.Contains("/account/alice/open", payload.RootElement.GetProperty("Actions").EnumerateArray().Select(item => item.GetProperty("Href").GetString()), StringComparer.Ordinal);
