@@ -258,6 +258,8 @@ Required evidence:
 - `FineTuning.ai` — Tier 4, future seam. Role: audio wardrobe and bounded sonic cue support. Target: recap or publication companion media, not first-wave product proof. Dependencies: provider adapter and first smoke run. Verify: media-factory receipt. Touches: future creator/publication surfaces.
 - `ICanpreneur` — Tier 4, future seam. Role: internal "Venture Johnson" triage support for which public requests deserve investment. Target: operator decision packets downstream of ProductLift and support clusters. Dependencies: signal ingestion and bounded internal workflow. Verify: decision packet evidence. Touches: internal design triage, not public promise.
 
+RunSite refinement from the newest LTD inventory: use the spatial stack as a route-first premiere loop instead of a vendor-demo gallery. `Crezlo Tours`, `AvoMap`, and `PeekShot` stay the direct spatial/tour/preview lanes; `Subscribr` drafts approved-source orientation scripts and hooks; `Rafter` and `Pixefy` provide auxiliary live-site, accessibility, responsive screenshot, and visual QA evidence; `ClickRank` and `NeuronWriter` audit crawl, metadata, schema, internal links, and source-packet SEO; `Rybbit` measures sanitized public route, CTA, and tour-entry events. Public copy should sell "walk the job before the team walks into it" and must not expose provider names as user-facing product promises.
+
 ## 12. ProductLift Implementation Package
 
 Public entry points:
