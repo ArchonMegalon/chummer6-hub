@@ -340,7 +340,7 @@ cards:
     pain: Spatial prep is tedious and scattered.
     payoff: The venue becomes a visible, inspectable run surface.
     status_note: "RUNSITE now has a named prep page, public packs, and a signed-in prep bench instead of staying a static file tease."
-    status_chips: Prep page|Named prep bench|Workspace and run support
+    status_chips: Prep page|Named prep bench|Inspectable tour sibling|Run bench support
   - id: feature_run_control
     bucket: coming_next
     title: RUN CONTROL
