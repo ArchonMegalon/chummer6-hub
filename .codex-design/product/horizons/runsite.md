@@ -56,7 +56,7 @@ RUNSITE should present each strong pack as a spatial premiere, not a static down
 * Explorable sibling second: the pack can expose a tour or route-visualization companion when the media manifest and publication links are verified.
 * Host layer third: a short orientation clip or narration can sell the space before play, but it must always point back to the route and tour truth.
 * QA and confidence fourth: responsive screenshots, accessibility checks, crawl health, metadata, and public visibility reviews support the route without becoming product truth.
-* Analytics last: public engagement can be measured through sanitized route, CTA, and tour-entry events only; no campaign text, player data, route secrets, or private workspace identifiers are analytics payload.
+* Analytics last: public engagement can be measured through sanitized route, CTA, and tour-entry events only; no campaign text, player data, route secrets, or private runner identifiers are analytics payload.
 
 The current LTD inventory supports this without inventing a new public provider promise:
 
