@@ -39,7 +39,7 @@ RUNSITE is for briefing, planning, and spatial understanding before things go lo
 
 RUNSITE is now a shipped first-party prep lane.
 The public rail exposes real runsite packs on markdown and JSON routes plus a named receipt at `/runsites/receipts/prep-network.json`.
-The signed-in rail is no longer generic workspace spillover; it has a named bench at `/account/runsites`, a named redirect lane at `/account/runsites/open`, and workspace detail routes at `/account/runsites/{workspaceId}`.
+The signed-in rail is no longer generic account spillover; it has a named bench at `/account/runsites`, a named redirect lane at `/account/runsites/open`, and prep detail routes at `/account/runsites/{workspaceId}`.
 Typed prep and run APIs are first-class too:
 
 * `/api/v1/campaign-spine/me/workspace-digests`
@@ -71,4 +71,4 @@ Public RunSite copy must describe the user value as "walk the job before the tea
 ## Boundary
 
 RUNSITE is a prep and orientation lane.
-It does not claim tactical authority, live-map truth, or VTT replacement status. Route overlays, tours, and host clips stay subordinate to first-party workspace and run truth.
+It does not claim tactical authority, live-map truth, or VTT replacement status. Route overlays, tours, and host clips stay subordinate to first-party prep and run truth.
