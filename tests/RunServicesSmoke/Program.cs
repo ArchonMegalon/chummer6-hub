@@ -705,6 +705,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         experience,
         participationNotifications,
         installLinking,
+        new AccountDesktopLaunchTicketService(
+            DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")),
+            configuration),
         supportCases,
         supportPresentation,
         campaignSpine,
@@ -2936,6 +2939,9 @@ async Task VerifyPublicLandingProjectionAsync()
         experience,
         participationNotifications,
         installLinking,
+        new AccountDesktopLaunchTicketService(
+            DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")),
+            configuration),
         supportCases,
         supportPresentation,
         campaignSpine,
@@ -5651,7 +5657,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, new AccountDesktopLaunchTicketService(DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")), configuration), supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
