@@ -5998,6 +5998,10 @@ body.shell-authenticated {
   padding: 20px 0 0;
   display: flex;
   justify-content: flex-start;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .surface-auth.surface-minimal .site-brand {
@@ -6097,7 +6101,7 @@ body.shell-authenticated {
 .surface-auth.surface-minimal .privacy-note {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
-  font-family: inherit;
+  font-family: var(--font-family-base);
   font-size: 0.94rem;
   line-height: 1.45;
 }
