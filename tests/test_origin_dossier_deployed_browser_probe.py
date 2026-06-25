@@ -39,10 +39,11 @@ def write_import_request(
 
 
 class FakeResponse:
-    def __init__(self, status_code: int, headers: dict[str, str] | None = None, text: str = "") -> None:
+    def __init__(self, status_code: int, headers: dict[str, str] | None = None, text: str = "", content: bytes | None = None) -> None:
         self.status_code = status_code
         self.headers = headers or {}
         self.text = text
+        self.content = content if content is not None else text.encode("utf-8")
 
 
 class FakeSession:
@@ -55,18 +56,20 @@ class FakeSession:
         self.has_cookie = True
 
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if "audiobookshelf.girschele.com/audiobookshelf/share/" in url:
+            return FakeResponse(200, {"content-type": "text/html; charset=utf-8"}, "<main>Audiobookshelf share</main>")
         if not self.has_cookie and not self.headers.get("Authorization", "").startswith("Bearer "):
             return FakeResponse(302, {"location": "/login?next=%2Faccount%2Fwork"})
         if url.endswith("/cover"):
-            return FakeResponse(200, {"content-type": "image/jpeg"})
+            return FakeResponse(200, {"content-type": "image/jpeg"}, content=b"\xff\xd8cover-bytes")
         if url.endswith("/book"):
-            return FakeResponse(200, {"content-type": "application/epub+zip"})
+            return FakeResponse(200, {"content-type": "application/epub+zip"}, content=b"PK\x03\x04ebook-bytes")
         if url.endswith("/read"):
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/book"})
         if url.endswith("/listen"):
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/audio"})
         if url.endswith("/video"):
-            return FakeResponse(200, {"content-type": "video/mp4"})
+            return FakeResponse(200, {"content-type": "video/mp4"}, content=b"\x00\x00\x00\x18ftypmp42movie-bytes")
         return FakeResponse(
             200,
             {"content-type": "text/html"},
@@ -93,6 +96,20 @@ class BrokenOwnerVideoSession(FakeSession):
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         if (self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer ")) and url.endswith("/video"):
             return FakeResponse(500, {"content-type": "text/plain"})
+        return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
+class EmptyOwnerVideoSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if (self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer ")) and url.endswith("/video"):
+            return FakeResponse(200, {"content-type": "video/mp4"}, content=b"")
+        return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
+class BrokenAudiobookshelfShareSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if "audiobookshelf.girschele.com/audiobookshelf/share/audio" in url:
+            return FakeResponse(503, {"content-type": "text/plain"}, "temporarily unavailable")
         return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
 
 
@@ -192,7 +209,15 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["chummer_run_listen_gate_verified"] is True
     assert result["audiobook_share_url_trusted"] is True
     assert result["dossier_share_url_trusted"] is True
+    assert result["audiobook_share_reachable"] is True
+    assert result["dossier_share_reachable"] is True
     assert result["watch_gate_verified"] is True
+    assert result["watch_artifact_nonempty"] is True
+    assert result["cover_artifact_nonempty"] is True
+    assert result["book_artifact_nonempty"] is True
+    assert result["response_body_sizes"]["watch"] > 0
+    assert result["response_body_sizes"]["cover"] > 0
+    assert result["response_body_sizes"]["book"] > 0
     assert result["owner_playback_e2e_verified"] is True
     assert result["local_fixture_artifacts"] is False
     assert result["all_private_routes_login_protected"] is True
@@ -224,9 +249,32 @@ def test_deployed_probe_blocks_untrusted_audiobookshelf_share_even_if_redirect_m
     assert "audiobook_share_url_trusted" in result["progress"]["blockedChecks"]
     assert result["audiobook_share_url_trusted"] is False
     assert result["dossier_share_url_trusted"] is True
+    assert result["audiobook_share_reachable"] is False
+    assert result["dossier_share_reachable"] is True
     assert result["owner_playback_e2e_verified"] is False
     assert "audiobook_share_url_trusted" in result["blockers"]
     assert "owner_playback_e2e_verified" in result["blockers"]
+    assert "secret-session" not in serialized
+
+
+def test_deployed_probe_blocks_when_audiobookshelf_share_page_is_unreachable(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", BrokenAudiobookshelfShareSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["audiobook_share_url_trusted"] is True
+    assert result["audiobook_share_reachable"] is False
+    assert result["dossier_share_reachable"] is True
+    assert result["owner_playback_e2e_verified"] is False
+    assert "audiobook_share_reachable" in result["blockers"]
+    assert "audiobook_share_reachable" in result["progress"]["blockedChecks"]
+    assert result["http_statuses"]["audiobook_share"] == 503
     assert "secret-session" not in serialized
 
 
@@ -268,6 +316,26 @@ def test_deployed_probe_blocks_when_owner_playback_route_fails_even_if_tabs_rend
     assert result["owner_playback_e2e_verified"] is False
     assert "watch_gate_verified" in result["blockers"]
     assert "owner_playback_e2e_verified" in result["blockers"]
+    assert "secret-session" not in serialized
+
+
+def test_deployed_probe_blocks_when_owner_video_body_is_empty(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", EmptyOwnerVideoSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["watch_gate_verified"] is True
+    assert result["watch_artifact_nonempty"] is False
+    assert result["owner_playback_e2e_verified"] is False
+    assert result["response_body_sizes"]["watch"] == 0
+    assert "watch_artifact_nonempty" in result["blockers"]
+    assert "watch_artifact_nonempty" in result["progress"]["blockedChecks"]
     assert "secret-session" not in serialized
 
 

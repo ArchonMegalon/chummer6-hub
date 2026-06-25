@@ -51,8 +51,13 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
             "watch_gate_verified": deployed_pass,
             "cover_route_verified": deployed_pass,
             "book_route_verified": deployed_pass,
+            "watch_artifact_nonempty": deployed_pass,
+            "cover_artifact_nonempty": deployed_pass,
+            "book_artifact_nonempty": deployed_pass,
             "audiobook_share_url_trusted": deployed_pass,
             "dossier_share_url_trusted": deployed_pass,
+            "audiobook_share_reachable": deployed_pass,
+            "dossier_share_reachable": deployed_pass,
             "owner_playback_e2e_verified": deployed_pass,
             "unauthenticated_detail_redirect_verified": True,
             "unauthenticated_read_redirect_verified": True,
@@ -214,6 +219,28 @@ def test_handoff_blocks_if_deployed_probe_status_passes_with_untrusted_audiobook
     assert "deployed_browser_probe_flag_missing:audiobook_share_url_trusted" in result["blockers"]
     assert result["currentEvidence"]["deployedProbeMissingRequiredFlags"] == ["audiobook_share_url_trusted"]
     assert result["currentEvidence"]["deployedProbeRequiredFlags"]["audiobook_share_url_trusted"] is False
+    assert "super-secret-owner-token" not in serialized
+
+
+def test_handoff_blocks_if_deployed_probe_status_passes_with_empty_movie_artifact(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    seed_handoff_inputs(tmp_path, deployed_status="pass", gold_status="pass")
+    probe_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-chummer-browser-probe.receipt.json"
+    probe = json.loads(probe_path.read_text(encoding="utf-8"))
+    probe["watch_artifact_nonempty"] = False
+    probe["blocking_reason"] = "watch_artifact_nonempty"
+    probe["progress"]["blockedChecks"] = ["watch_artifact_nonempty"]
+    write_json(probe_path, probe)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "super-secret-owner-token")
+
+    output = tmp_path / "handoff.json"
+    result = module.materialize(tmp_path, output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert "deployed_browser_probe_flag_missing:watch_artifact_nonempty" in result["blockers"]
+    assert result["currentEvidence"]["deployedProbeMissingRequiredFlags"] == ["watch_artifact_nonempty"]
+    assert result["currentEvidence"]["deployedProbeRequiredFlags"]["watch_artifact_nonempty"] is False
     assert "super-secret-owner-token" not in serialized
 
 

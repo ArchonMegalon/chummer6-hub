@@ -1,16 +1,20 @@
 {
-  "generated_at_utc": "2026-06-20T19:57:45Z",
+  "generated_at_utc": "2026-06-25T14:31:08Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
   "title": "Chummer6 Product Spine Promo",
   "render_mode": "magicfit_refined_deepdive_montage_with_spoken_narration",
   "source_claim": "12 curated MagicFit-rendered refined deep-dive clips retitled around the product spine and simplified Horizon taxonomy",
   "visual_source": "MagicFit scene clips only",
-  "narration_provider": "edge-tts",
-  "voice": "en-GB-ThomasNeural",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "b628bee3-2c2d-4ed1-ac5b-f94ca2eaab0a",
   "scene_count": 12,
-  "duration_seconds": 89.542,
-  "continuous_audio_track": "spoken_narration_plus_low_music_bed",
+  "duration_seconds": 90.0,
+  "visual_scene_count": 12,
+  "continuous_audio_track": "spoken_unmixr_narration_only_no_synthetic_music_bed",
+  "synthetic_music_bed_enabled": false,
+  "magicfit_claim_allowed": true,
+  "magicfit_final_visual_render_claim": true,
   "scene_narration": [
     {
       "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4",
@@ -98,20 +102,18 @@
         "codec_name": "h264",
         "codec_type": "video",
         "width": 1280,
-        "height": 720,
-        "bit_rate": "2726496"
+        "height": 720
       },
       {
         "codec_name": "aac",
         "codec_type": "audio",
         "sample_rate": "96000",
-        "channels": 1,
-        "bit_rate": "199241"
+        "channels": 1
       }
     ],
     "format": {
-      "duration": "89.542000",
-      "size": "32829954"
+      "duration": "89.583333",
+      "size": "32513654"
     }
   },
   "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
@@ -194,13 +196,5 @@
       "caption": "One product spine: build, run, remember, publish.",
       "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     }
-  ],
-  "public_mp4": "/media/promo/every-wonder-horizon-promo.mp4?v=20260620-audio2",
-  "output_audio_duration_seconds": 0.0,
-  "size_bytes": 32829954,
-  "has_audio": true,
-  "has_video": true,
-  "audio_mean_volume_db": -18.1,
-  "audio_max_volume_db": -0.6,
-  "audio_quality_status": "pass"
+  ]
 }

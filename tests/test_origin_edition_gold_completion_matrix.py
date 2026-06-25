@@ -477,8 +477,13 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             "read_gate_verified": deployed_pass,
             "chummer_run_listen_gate_verified": deployed_pass,
             "watch_gate_verified": deployed_pass,
+            "watch_artifact_nonempty": deployed_pass,
             "audiobook_share_url_trusted": deployed_pass,
             "dossier_share_url_trusted": deployed_pass,
+            "audiobook_share_reachable": deployed_pass,
+            "dossier_share_reachable": deployed_pass,
+            "cover_artifact_nonempty": deployed_pass,
+            "book_artifact_nonempty": deployed_pass,
             "owner_playback_e2e_verified": deployed_pass,
             "unauthenticated_detail_redirect_verified": True,
             "unauthenticated_read_redirect_verified": True,
@@ -642,6 +647,42 @@ def test_completion_matrix_blocks_when_deployed_audiobook_share_is_untrusted(tmp
     assert result["goalCompletionClaimAllowed"] is False
     assert "deployed_user_login_read_listen_watch" in result["blockedRows"]
     assert deployed_row["flags"]["audiobook_share_url_trusted"] is False
+
+
+def test_completion_matrix_blocks_when_deployed_audiobook_share_is_unreachable(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    probe_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-chummer-browser-probe.receipt.json"
+    probe = json.loads(probe_path.read_text(encoding="utf-8"))
+    probe["audiobook_share_reachable"] = False
+    probe["blockers"] = ["audiobook_share_reachable"]
+    write_json(probe_path, probe)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    deployed_row = next(row for row in result["rows"] if row["id"] == "deployed_user_login_read_listen_watch")
+
+    assert result["status"] == "blocked"
+    assert result["goalCompletionClaimAllowed"] is False
+    assert "deployed_user_login_read_listen_watch" in result["blockedRows"]
+    assert deployed_row["flags"]["audiobook_share_reachable"] is False
+
+
+def test_completion_matrix_blocks_when_deployed_movie_body_is_empty(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    probe_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-chummer-browser-probe.receipt.json"
+    probe = json.loads(probe_path.read_text(encoding="utf-8"))
+    probe["watch_artifact_nonempty"] = False
+    probe["blockers"] = ["watch_artifact_nonempty"]
+    write_json(probe_path, probe)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    deployed_row = next(row for row in result["rows"] if row["id"] == "deployed_user_login_read_listen_watch")
+
+    assert result["status"] == "blocked"
+    assert result["goalCompletionClaimAllowed"] is False
+    assert "deployed_user_login_read_listen_watch" in result["blockedRows"]
+    assert deployed_row["flags"]["watch_artifact_nonempty"] is False
 
 
 def test_completion_matrix_blocks_artifacts_outside_required_origin_branches(tmp_path: Path) -> None:

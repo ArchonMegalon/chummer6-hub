@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tempfile
+import wave
+import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
@@ -26,6 +29,10 @@ MIN_TAIL_SILENCE_SECONDS = 0.0
 MAX_TAIL_SILENCE_SECONDS = MAX_EDGE_SILENCE_SECONDS
 VIDEO_FADE_OUT_SECONDS = 0.0
 VIDEO_FADE_CONTRACT = "ea.public_video_audio_gate.v1"
+MAX_HIGHBAND_P95_RATIO = 0.18
+MAX_HIGHBAND_P99_RATIO = 0.28
+HIGHBAND_START_HZ = 5500.0
+HIGHBAND_END_HZ = 7600.0
 ALICE_VOICE_POLICY = "mixed_female_or_male_policy_with_fallback"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 ALICE_VOICE_GENDER = "female"
@@ -83,6 +90,74 @@ def _parse_silence_report(value: str) -> tuple[float, float]:
             last_end = end_time
             last_start = None
     return max_silence, tail_silence
+
+
+def _audio_tone_metrics(path: Path) -> dict[str, object]:
+    try:
+        import numpy as np
+    except Exception as exc:  # pragma: no cover - dependency failure is still reported by the gate.
+        return {"status": "unknown", "reason": f"numpy_unavailable:{exc}"}
+
+    with tempfile.TemporaryDirectory(prefix="chummer-audio-gate-") as temp_dir:
+        wav_path = Path(temp_dir) / "audio.wav"
+        _run_command(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-nostats",
+                "-y",
+                "-i",
+                str(path),
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                str(wav_path),
+            ]
+        )
+        with wave.open(str(wav_path), "rb") as wav:
+            sample_rate = wav.getframerate()
+            frames = wav.getnframes()
+            samples = np.frombuffer(wav.readframes(frames), dtype=np.int16).astype(np.float32) / 32768.0
+
+    if samples.size < 4096:
+        return {"status": "unknown", "reason": "audio_too_short_for_tone_probe"}
+
+    window_size = 4096
+    hop = 2048
+    frequencies = np.fft.rfftfreq(window_size, 1.0 / sample_rate)
+    full_band = (frequencies >= 80.0) & (frequencies <= HIGHBAND_END_HZ)
+    high_band = (frequencies >= HIGHBAND_START_HZ) & (frequencies <= HIGHBAND_END_HZ)
+    high_ratios: list[float] = []
+    peak_frequencies: list[float] = []
+    for offset in range(0, samples.size - window_size, hop):
+        frame = samples[offset : offset + window_size]
+        rms = float(np.sqrt(np.mean(frame * frame)))
+        if rms < 0.003:
+            continue
+        spectrum = np.abs(np.fft.rfft(frame * np.hanning(window_size))) ** 2
+        total_energy = float(spectrum[full_band].sum() + 1e-12)
+        high_energy = float(spectrum[high_band].sum())
+        high_ratios.append(high_energy / total_energy)
+        if high_energy > 0:
+            high_values = spectrum[high_band]
+            high_freqs = frequencies[high_band]
+            peak_frequencies.append(float(high_freqs[int(np.argmax(high_values))]))
+
+    if not high_ratios:
+        return {"status": "unknown", "reason": "no_voiced_frames_for_tone_probe"}
+
+    p95 = float(np.percentile(high_ratios, 95))
+    p99 = float(np.percentile(high_ratios, 99))
+    return {
+        "status": "pass" if p95 <= MAX_HIGHBAND_P95_RATIO and p99 <= MAX_HIGHBAND_P99_RATIO else "fail",
+        "highband_p95_ratio": round(p95, 6),
+        "highband_p99_ratio": round(p99, 6),
+        "highband_hz": [HIGHBAND_START_HZ, HIGHBAND_END_HZ],
+        "dominant_highband_peak_hz": round(float(np.median(peak_frequencies)), 1) if peak_frequencies else None,
+        "voiced_frame_count": len(high_ratios),
+    }
 
 
 def probe(path: Path) -> dict[str, Any]:
@@ -173,6 +248,18 @@ def audio_quality(path: Path, allow_clean_speech_pauses: bool = False) -> dict[s
         except Exception as exc:
             reasons.append(f"audio_silence_probe_failed:{exc}")
 
+    try:
+        tone_metrics = _audio_tone_metrics(path)
+        if tone_metrics.get("status") == "fail":
+            reasons.append(
+                "narrowband_beep_suspected:"
+                f"highband_p95={tone_metrics.get('highband_p95_ratio')}:"
+                f"highband_p99={tone_metrics.get('highband_p99_ratio')}"
+            )
+    except Exception as exc:
+        tone_metrics = {"status": "fail", "reason": f"audio_tone_probe_failed:{exc}"}
+        reasons.append(str(tone_metrics["reason"]))
+
     return {
         "status": "pass" if not reasons else "fail",
         "reasons": reasons,
@@ -182,6 +269,7 @@ def audio_quality(path: Path, allow_clean_speech_pauses: bool = False) -> dict[s
         "tail_silence_seconds": float(tail_silence_seconds),
         "mean_volume_db": mean_volume,
         "max_volume_db": max_volume,
+        "tone_metrics": tone_metrics,
     }
 
 
@@ -195,8 +283,27 @@ def retirement_receipt() -> dict[str, object]:
 
 
 def main() -> int:
-    print(json.dumps(retirement_receipt(), sort_keys=True))
-    return 0
+    parser = argparse.ArgumentParser(description="Gate public video audio for volume, silence, and narrowband beep artifacts.")
+    parser.add_argument("media", nargs="*", type=Path)
+    parser.add_argument("--allow-clean-speech-pauses", action="store_true")
+    args = parser.parse_args()
+    if not args.media:
+        print(json.dumps(retirement_receipt(), sort_keys=True))
+        return 0
+    results = [
+        {
+            "path": str(path),
+            "quality": audio_quality(path, allow_clean_speech_pauses=args.allow_clean_speech_pauses),
+        }
+        for path in args.media
+    ]
+    payload = {
+        "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "status": "pass" if all(item["quality"]["status"] == "pass" for item in results) else "fail",
+        "media": results,
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

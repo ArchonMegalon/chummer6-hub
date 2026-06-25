@@ -41,8 +41,13 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "watch_gate_verified": passed,
         "cover_route_verified": passed,
         "book_route_verified": passed,
+        "watch_artifact_nonempty": passed,
+        "cover_artifact_nonempty": passed,
+        "book_artifact_nonempty": passed,
         "audiobook_share_url_trusted": passed,
         "dossier_share_url_trusted": passed,
+        "audiobook_share_reachable": passed,
+        "dossier_share_reachable": passed,
         "owner_playback_e2e_verified": passed,
         "unauthenticated_detail_redirect_verified": True,
         "unauthenticated_read_redirect_verified": True,
@@ -151,6 +156,19 @@ def test_verifier_rejects_pass_probe_with_missing_owner_playback_flag(tmp_path: 
     assert ok is False
     assert "pass_flag_not_true:owner_playback_e2e_verified" in issues
     assert "pass_probe_owner_playback_not_verified" in issues
+
+
+def test_verifier_rejects_pass_probe_with_empty_owner_video_artifact(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["watch_artifact_nonempty"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "pass_flag_not_true:watch_artifact_nonempty" in issues
 
 
 def test_verifier_rejects_missing_normalized_status_contract(tmp_path: Path) -> None:

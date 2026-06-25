@@ -119,6 +119,19 @@ def header(response: requests.Response | None, name: str) -> str:
     return response.headers.get(name, "") if response is not None else ""
 
 
+def body_size(response: requests.Response | None) -> int:
+    if response is None:
+        return 0
+    return len(response.content or b"")
+
+
+def share_reachable(response: requests.Response | None) -> bool:
+    if status(response) != 200:
+        return False
+    content_type = header(response, "content-type").lower()
+    return body_size(response) > 0 and any(token in content_type for token in ("text/html", "application/xhtml", "application/json"))
+
+
 def materialize(
     evidence_root: Path,
     base_url: str,
@@ -159,6 +172,9 @@ def materialize(
     anonymous_book = get(anonymous, book_url)
     anonymous_cover = get(anonymous, cover_url)
     anonymous_video = get(anonymous, watch_url)
+    share_session = requests.Session()
+    audiobook_share = get(share_session, share_url) if share_url else None
+    dossier_share = get(share_session, dossier_share_url) if dossier_share_url else None
 
     def login_redirect(response: requests.Response | None) -> bool:
         return status(response) in {302, 303, 307, 308} and "/login?next=" in header(response, "location")
@@ -202,9 +218,14 @@ def materialize(
     canon_tab = 'href="#origin-edition-canon-audit"' in detail_text
     read_gate = status(read) in {302, 303, 307, 308} and header(read, "location") == dossier_share_url
     listen_gate = status(listen) in {302, 303, 307, 308} and header(listen, "location") == share_url
+    audiobook_share_reachable = share_reachable(audiobook_share)
+    dossier_share_reachable = share_reachable(dossier_share)
     watch_gate = status(video) == 200 and "video/mp4" in header(video, "content-type")
     cover_gate = status(cover) == 200 and "image/" in header(cover, "content-type")
     book_gate = status(book) == 200 and "epub" in header(book, "content-type").lower()
+    watch_artifact_nonempty = watch_gate and body_size(video) > 0
+    cover_artifact_nonempty = cover_gate and body_size(cover) > 0
+    book_artifact_nonempty = book_gate and body_size(book) > 0
     owner_playback_e2e = all(
         [
             logged_in,
@@ -218,8 +239,13 @@ def materialize(
             watch_gate,
             cover_gate,
             book_gate,
+            watch_artifact_nonempty,
+            cover_artifact_nonempty,
+            book_artifact_nonempty,
             audiobook_share_url_trusted,
             dossier_share_url_trusted,
+            audiobook_share_reachable,
+            dossier_share_reachable,
             all_private_routes_login_protected,
         ]
     )
@@ -245,8 +271,13 @@ def materialize(
         "watch_gate_verified": watch_gate,
         "cover_route_verified": cover_gate,
         "book_route_verified": book_gate,
+        "watch_artifact_nonempty": watch_artifact_nonempty,
+        "cover_artifact_nonempty": cover_artifact_nonempty,
+        "book_artifact_nonempty": book_artifact_nonempty,
         "audiobook_share_url_trusted": audiobook_share_url_trusted,
         "dossier_share_url_trusted": dossier_share_url_trusted,
+        "audiobook_share_reachable": audiobook_share_reachable,
+        "dossier_share_reachable": dossier_share_reachable,
         "owner_playback_e2e_verified": owner_playback_e2e,
         "unauthenticated_detail_redirect_verified": anon_detail_redirect,
         "unauthenticated_read_redirect_verified": anon_read_redirect,
@@ -308,12 +339,21 @@ def materialize(
             "anonymous_book": status(anonymous_book),
             "anonymous_cover": status(anonymous_cover),
             "anonymous_video": status(anonymous_video),
+            "audiobook_share": status(audiobook_share),
+            "dossier_share": status(dossier_share),
             "owner_detail": status(detail),
             "cover": status(cover),
             "book": status(book),
             "read": status(read),
             "listen": status(listen),
             "watch": status(video),
+        },
+        "response_body_sizes": {
+            "cover": body_size(cover),
+            "book": body_size(book),
+            "watch": body_size(video),
+            "audiobook_share": body_size(audiobook_share),
+            "dossier_share": body_size(dossier_share),
         },
         "url_hashes": {
             "owner": sha256_text(owner_url),

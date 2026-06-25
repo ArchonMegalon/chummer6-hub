@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -117,6 +118,15 @@ def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
     )
 
 
+def synthetic_music_bed_enabled() -> bool:
+    return (os.environ.get("CHUMMER_PROMO_ENABLE_SYNTHETIC_MUSIC_BED") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def narration_filter(target_vo_len: float) -> str:
     fade_in = 0.10
     fade_out = 0.24 if target_vo_len <= 4.2 else 0.28
@@ -147,7 +157,8 @@ def render_narration_files(reel: Reel, work: Path) -> tuple[list[Path], str]:
     outputs: list[Path] = []
     for index, scene in enumerate(reel.scenes):
         output = narration_dir / f"{index + 1:02}.mp3"
-        render_short_tts(scene.narration, output, profile=_reel_profile(reel, scene))
+        if not output.is_file() or output.stat().st_size <= 0 or os.environ.get("CHUMMER_PROMO_FORCE_TTS") == "1":
+            render_short_tts(scene.narration, output, profile=_reel_profile(reel, scene))
         outputs.append(output)
     return outputs, provider
 
@@ -161,7 +172,8 @@ def render_continuous_voiceover(reel: Reel, work: Path) -> tuple[Path, str]:
     narration_dir.mkdir(parents=True, exist_ok=True)
     script = " ".join(scene.narration for scene in reel.scenes)
     output = narration_dir / "continuous.mp3"
-    render_short_tts(script, output, profile=_reel_profile(reel))
+    if not output.is_file() or output.stat().st_size <= 0 or os.environ.get("CHUMMER_PROMO_FORCE_TTS") == "1":
+        render_short_tts(script, output, profile=_reel_profile(reel))
     return output, provider_token(_reel_profile(reel), style="continuous")
 
 
@@ -180,10 +192,17 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
         f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,"
         "highpass=f=72,lowpass=f=9000,"
         "acompressor=threshold=-23dB:ratio=1.9:attack=22:release=260:makeup=1.7,alimiter=limit=0.88,loudnorm=I=-16:LRA=9:TP=-1.5[vo0]",
-        cinematic_bed_filter(target_len, mode="continuous"),
         f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.10[vo]",
-        f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
     ]
+    if synthetic_music_bed_enabled():
+        filters.extend(
+            [
+                cinematic_bed_filter(target_len, mode="continuous"),
+                "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
+            ]
+        )
+    else:
+        filters.append("[vo]alimiter=limit=0.92[a]")
     run(
         "ffmpeg",
         "-y",
@@ -214,9 +233,12 @@ def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
     else:
         filters.append(f"[0:a]atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
     filters.append(narration_filter(target_vo_len))
-    filters.append(cinematic_bed_filter(scene_len, mode="scene"))
     filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.11[vo]")
-    filters.append(f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]")
+    if synthetic_music_bed_enabled():
+        filters.append(cinematic_bed_filter(scene_len, mode="scene"))
+        filters.append("[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]")
+    else:
+        filters.append("[vo]alimiter=limit=0.92[a]")
     run(
         "ffmpeg",
         "-y",
@@ -417,7 +439,12 @@ def build_reel(reel: Reel) -> dict[str, Any]:
         "scene_count": len(reel.scenes),
         "duration_seconds": sum(scene.duration for scene in reel.scenes),
         "visual_scene_count": len(reel.scenes),
-        "continuous_audio_track": "spoken_narration_plus_low_music_bed",
+        "continuous_audio_track": (
+            "spoken_narration_plus_low_music_bed"
+            if synthetic_music_bed_enabled()
+            else "spoken_unmixr_narration_only_no_synthetic_music_bed"
+        ),
+        "synthetic_music_bed_enabled": synthetic_music_bed_enabled(),
         "magicfit_claim_allowed": True,
         "magicfit_final_visual_render_claim": True,
         "scene_narration": [
