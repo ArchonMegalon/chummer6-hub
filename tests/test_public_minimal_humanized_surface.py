@@ -787,12 +787,16 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
     entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
 
     assert "Claim your copy" in entry
-    assert "Claim with email" in entry
-    assert "Claim with your account" in entry
+    assert "Email me a link" in entry
+    assert "Use Google" in entry
     assert "The download stays the same for everyone." in entry
+    assert "The download does not need an account." in entry
     assert "Keep Chummer open while the browser connects this copy." in entry
 
     for forbidden in (
+        "Create account",
+        "Send magic link",
+        "Continue with Google",
         "Campaign OS",
         "roadmap follows",
         "preview interest",

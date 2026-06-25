@@ -1,6 +1,6 @@
 @model AuthPageViewModel
 @{
-    ViewData["Title"] = Model.Heading;
+    ViewData["Title"] = "Claim your copy";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-auth surface-minimal";
     var accessPosture = Model.AccessPosture;
@@ -38,20 +38,9 @@
 <section class="auth-entry" aria-labelledby="auth-title">
     <div class="auth-entry__panel auth-panel auth-panel--entry">
         <div class="auth-panel__intro auth-panel__intro--masthead">
-            <p class="eyebrow">Account</p>
-            <h1 id="auth-title">@(isInstallLinkReturn ? "Claim your copy" : Model.CreateAccount ? "Create account" : "Sign in")</h1>
-            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google. We send one link. You can download Chummer without an account.")</p>
-        </div>
-
-        <div class="auth-panel__mode-row">
-            @if (Model.CreateAccount)
-            {
-                <a class="action-pill action-pill--ghost" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Sign in</a>
-            }
-            else
-            {
-                <a class="action-pill action-pill--ghost" href="/signup?next=@Uri.EscapeDataString(Model.NextPath)">Create account</a>
-            }
+            <p class="eyebrow">Chummer</p>
+            <h1 id="auth-title">Claim your copy</h1>
+            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google if you want Chummer to remember you. The download does not need an account.")</p>
         </div>
 
         @if (Model.CreateAccount)
@@ -59,11 +48,11 @@
             @if (isInstallLinkReturn)
             {
                 <div class="auth-panel__intro">
-                    <h2>Claim with email</h2>
-                    <p>Use the email that should own this install.</p>
+                    <h2>Email</h2>
+                    <p>Use the address that should own this install.</p>
                 </div>
             }
-            <p class="muted-copy">After you confirm the email, you return to @nextTarget.</p>
+            <p class="muted-copy">After the link opens, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
@@ -77,13 +66,13 @@
                     <label for="email">Email</label>
                     <input id="email" name="email" type="email" placeholder="runner@example.com" required />
                 </div>
-                <button class="button-like button-like--primary" type="submit">@(isInstallLinkReturn ? "Claim with email" : "Continue with email")</button>
+                <button class="button-like button-like--primary" type="submit">Email me a link</button>
             </form>
 
             <div class="auth-divider"><span>or</span></div>
             @if (Model.GoogleAvailable)
             {
-                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Use Google</a>
             }
             else
             {
@@ -96,8 +85,8 @@
             @if (isInstallLinkReturn)
             {
                 <div class="auth-panel__intro">
-                    <h2>Claim with your account</h2>
-                    <p>Use the account that should own this install.</p>
+                    <h2>Email</h2>
+                    <p>Use the address that should own this install.</p>
                 </div>
             }
             @if (isInstallLinkReturn)
@@ -114,13 +103,13 @@
                     <label for="email">Email</label>
                     <input id="email" name="email" type="email" placeholder="runner@example.com" required />
                 </div>
-                <button class="button-like button-like--primary auth-panel__primary" type="submit">Send magic link</button>
+                <button class="button-like button-like--primary auth-panel__primary" type="submit">Email me a link</button>
             </form>
 
             <div class="auth-divider"><span>or</span></div>
             @if (Model.GoogleAvailable)
             {
-                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Use Google</a>
             }
             else
             {
@@ -128,6 +117,6 @@
                 <p class="muted-copy">@Model.GoogleUnavailableReason</p>
             }
         }
-        <p class="privacy-note">Accounts are optional unless a private page or install claim needs one.</p>
+        <p class="privacy-note">No account is needed to download Chummer. Claiming only helps with linked installs, recovery, and private pages.</p>
     </div>
 </section>
