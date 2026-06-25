@@ -2128,7 +2128,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
+        => await ParticipatePage(cancellationToken).ConfigureAwait(false);
 
     [HttpGet("/participate")]
     [Produces("text/html")]

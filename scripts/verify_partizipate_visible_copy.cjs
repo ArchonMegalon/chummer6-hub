@@ -25,7 +25,6 @@ const forbidden = [
   /\bSign up\b/i,
   /\bSign in\b/i,
   /Chummer Participate/i,
-  /Requests, votes, and shipped work\./i,
   /\bGathering votes\b/i,
   /\bAdd Feature or Bug\b/i,
   /\bShort title of your feedback/i,
@@ -37,9 +36,10 @@ const forbidden = [
 
 const requiredHtml = [
   '<title>Participate - Chummer.run</title>',
-  'content="Short requests, clear bugs, useful ideas."',
-  'data-chummer-board-skin',
-  'data-chummer-home-link-patch',
+  '<h1>Participate</h1>',
+  'Requests, votes, and shipped work.',
+  'id="participate-board"',
+  'src="/participate/board"',
 ];
 
 function extractVisibleText(html) {
