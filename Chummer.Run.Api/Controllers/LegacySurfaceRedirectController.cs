@@ -31,6 +31,14 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     public async Task<IActionResult> Workbench(string? path, CancellationToken cancellationToken)
         => await ProxyBrowserSurfaceAsync(_blazorUpstream, "/blazor", path, cancellationToken).ConfigureAwait(false);
 
+    [HttpGet("/app")]
+    [HttpGet("/app/{**path}")]
+    public async Task<IActionResult> App(string? path, CancellationToken cancellationToken)
+    {
+        Uri? appUpstream = _blazorUpstream is null ? null : new Uri(_blazorUpstream, "app/");
+        return await ProxyBrowserSurfaceAsync(appUpstream, "/app", path, cancellationToken).ConfigureAwait(false);
+    }
+
     [HttpGet("/avalonia")]
     [HttpGet("/avalonia/{**path}")]
     public async Task<IActionResult> Avalonia(string? path, CancellationToken cancellationToken)

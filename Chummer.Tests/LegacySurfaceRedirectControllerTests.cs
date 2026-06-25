@@ -54,6 +54,22 @@ public sealed class LegacySurfaceRedirectControllerTests
         Assert.Contains("href=\"/status\"", content.Content, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task AppRouteProxiesToBlazorCharacterRoster()
+    {
+        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><body>roster</body></html>")
+        });
+        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(handler)));
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?command=character_roster");
+
+        IActionResult result = await controller.App(path: null, CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.Equal("https://browser.example/blazor/app/?command=character_roster", handler.RequestUri?.ToString());
+    }
+
     private static LegacySurfaceRedirectController CreateBrowserController(IHttpClientFactory factory)
     {
         var configuration = new ConfigurationBuilder()
@@ -82,6 +98,17 @@ public sealed class LegacySurfaceRedirectControllerTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(response);
+    }
+
+    private sealed class RecordingHandler(HttpResponseMessage response) : HttpMessageHandler
+    {
+        public Uri? RequestUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUri = request.RequestUri;
+            return Task.FromResult(response);
+        }
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler
