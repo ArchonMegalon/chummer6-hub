@@ -48,10 +48,20 @@ REQUIRED_FINAL_BUNDLE_SURFACES = (
 FORBIDDEN_RECEIPT_SECRET_MARKERS = (
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
+    "Cookie:",
     "secret-token",
     "owner-session-token",
     "secret-session",
+    "secret-bearer-session",
     "super-secret",
+    "rangersofB5",
+    "api:",
+    "api.telegram.org/bot",
+    "TELEGRAM_BOT_TOKEN=",
+    "EA_TELEGRAM_BOT_TOKEN=",
+    "UNMIXR_API_KEY=",
+    "audiobookshelf_api_token=",
+    "telegram_bot_token=",
 )
 APPROVED_AUDIO_PROVIDERS = {
     "unmixr": "Unmixr",
@@ -261,10 +271,15 @@ def tokens(payload: dict[str, Any]) -> set[str]:
     return {string(value) for value in values}
 
 
-def canon_authority_row(source_receipt_path: Path, canon_receipt_path: Path) -> dict[str, Any]:
+def canon_authority_row(source_packet_path: Path, source_receipt_path: Path, canon_receipt_path: Path) -> dict[str, Any]:
     flags = {
+        "source_packet_present": source_packet_path.is_file(),
         "source_receipt_present": source_receipt_path.is_file(),
         "canon_receipt_present": canon_receipt_path.is_file(),
+        "contract_is_approved_sample_runner_canon": False,
+        "external_processing_consented_in_packet": False,
+        "chummer_owns_facts": False,
+        "prohibits_provider_created_canon": False,
         "source_packet_approved": False,
         "external_processing_consented": False,
         "source_privacy_review_passed": False,
@@ -277,18 +292,28 @@ def canon_authority_row(source_receipt_path: Path, canon_receipt_path: Path) -> 
     row: dict[str, Any] = {
         "id": "chummer_canon_authority_verified",
         "label": "Chummer owns canon and no provider-created facts entered runner canon",
+        "sourcePacketPath": source_packet_path.as_posix(),
         "sourceReceiptPath": source_receipt_path.as_posix(),
         "canonReceiptPath": canon_receipt_path.as_posix(),
         "flags": flags,
     }
+    source_packet = read_json(source_packet_path) if source_packet_path.is_file() else {}
     source_payload = read_json(source_receipt_path) if source_receipt_path.is_file() else {}
     canon_payload = read_json(canon_receipt_path) if canon_receipt_path.is_file() else {}
     source_tokens = tokens(source_payload)
     canon_tokens = tokens(canon_payload)
+    prohibited = source_packet.get("prohibitedInventions") if isinstance(source_packet.get("prohibitedInventions"), list) else []
+    prohibited_text = "\n".join(string(item) for item in prohibited)
+    if source_packet_path.is_file():
+        row["sourcePacketSha256"] = sha256_file(source_packet_path)
     if source_receipt_path.is_file():
         row["sourceReceiptSha256"] = sha256_file(source_receipt_path)
     if canon_receipt_path.is_file():
         row["canonReceiptSha256"] = sha256_file(canon_receipt_path)
+    flags["contract_is_approved_sample_runner_canon"] = string(source_packet.get("contractName")) == "chummer.origin_dossier.approved_sample_runner_canon.v1"
+    flags["external_processing_consented_in_packet"] = source_packet.get("externalProcessingConsent") is True
+    flags["chummer_owns_facts"] = string(source_packet.get("canonOwnsFacts")) == "Chummer"
+    flags["prohibits_provider_created_canon"] = "Do not make provider-created facts canonical." in prohibited_text
     flags["source_packet_approved"] = "approved_source_packet" in source_tokens and is_pass(source_payload)
     flags["external_processing_consented"] = "external_processing_consent" in source_tokens
     flags["source_privacy_review_passed"] = "privacy_review_passed" in source_tokens
@@ -309,7 +334,7 @@ def canon_authority_row(source_receipt_path: Path, canon_receipt_path: Path) -> 
     failed = [key for key, passed in flags.items() if not passed]
     row["failedFlags"] = failed
     row["status"] = "proved" if not failed else "blocked"
-    row["evidence"] = "chummer_source_packet_and_canon_audit_tokens"
+    row["evidence"] = "chummer_source_packet_structure_and_canon_audit_receipts"
     return row
 
 
@@ -1021,7 +1046,11 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
     rows: list[dict[str, Any]] = [
         receipt_row("approved_canon_packet_receipt", "Approved sample runner canon/source packet receipt", evidence_root / "source-packet-approval.receipt.json"),
         bool_row("approved_canon_packet_file", "Approved sample runner canon packet file exists", artifact_exists(live_import_path, request.get("sourcePacketPath")), string(request.get("sourcePacketPath"))),
-        canon_authority_row(evidence_root / "source-packet-approval.receipt.json", evidence_root / "canon-privacy-audit.receipt.json"),
+        canon_authority_row(
+            Path(string(request.get("sourcePacketPath"))) if string(request.get("sourcePacketPath")).startswith("/") else live_import_path.parent / string(request.get("sourcePacketPath") or "approved-sample-runner-canon.json"),
+            Path(string(request.get("sourcePacketReceiptPath"))) if string(request.get("sourcePacketReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("sourcePacketReceiptPath") or "source-packet-approval.receipt.json"),
+            Path(string(request.get("canonAuditReceiptPath"))) if string(request.get("canonAuditReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("canonAuditReceiptPath") or "canon-privacy-audit.receipt.json"),
+        ),
         source_packet_integrity_row(live_import_path, request, live_evidence),
         receipt_row("story_generation_receipt", "Provider/story manuscript import receipt", evidence_root / "provider-manuscript-import.receipt.json"),
         bool_row("provider_manuscript_file", "Provider manuscript file exists", artifact_exists(live_import_path, request.get("providerManuscriptPath")), string(request.get("providerManuscriptPath"))),

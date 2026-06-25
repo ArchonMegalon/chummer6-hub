@@ -819,6 +819,42 @@ def test_completion_matrix_blocks_when_provider_created_facts_guard_missing(tmp_
     assert "no_provider_created_facts_entered_canon" in row["failedFlags"]
 
 
+def test_completion_matrix_blocks_when_canon_authority_packet_does_not_assign_chummer_fact_ownership(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    source_path = tmp_path / "approved-sample-runner-canon.json"
+    source_packet = json.loads(source_path.read_text(encoding="utf-8"))
+    source_packet["canonOwnsFacts"] = "Provider"
+    write_json(source_path, source_packet)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "chummer_canon_authority_verified")
+
+    assert result["status"] == "blocked"
+    assert "chummer_canon_authority_verified" in result["blockedRows"]
+    assert row["flags"]["chummer_owns_facts"] is False
+    assert "chummer_owns_facts" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_canon_authority_packet_allows_provider_created_canon(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    source_path = tmp_path / "approved-sample-runner-canon.json"
+    source_packet = json.loads(source_path.read_text(encoding="utf-8"))
+    source_packet["prohibitedInventions"] = [
+        item for item in source_packet["prohibitedInventions"] if item != "Do not make provider-created facts canonical."
+    ]
+    write_json(source_path, source_packet)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "chummer_canon_authority_verified")
+
+    assert result["status"] == "blocked"
+    assert "chummer_canon_authority_verified" in result["blockedRows"]
+    assert row["flags"]["prohibits_provider_created_canon"] is False
+    assert "prohibits_provider_created_canon" in row["failedFlags"]
+
+
 def test_completion_matrix_blocks_when_final_bundle_surface_is_blocked(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -851,6 +887,57 @@ def test_completion_matrix_blocks_when_generated_receipt_exposes_secret_marker(t
     assert row["status"] == "blocked"
     assert row["flags"]["receipt_secret_marker_scan_clean"] is False
     assert row["receiptFindings"] != []
+
+
+def test_completion_matrix_blocks_when_generated_receipt_exposes_provider_or_transport_secret_marker(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    write_json(
+        tmp_path / "leaky-transport-receipt.generated.json",
+        {
+            "debug": "Cookie: synthetic-session",
+            "provider": "https://api.telegram.org/botREDACTED/sendMessage",
+            "operator_note": "api: synthetic-token",
+        },
+    )
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "secret_hygiene_verified")
+
+    assert result["status"] == "blocked"
+    assert "secret_hygiene_verified" in result["blockedRows"]
+    assert row["status"] == "blocked"
+    assert row["flags"]["receipt_secret_marker_scan_clean"] is False
+    markers = {finding["marker"] for finding in row["receiptFindings"]}
+    assert "Cookie:" in markers
+    assert "api.telegram.org/bot" in markers
+    assert "api:" in markers
+
+
+def test_completion_matrix_allows_safe_env_key_names_but_blocks_value_assignments(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    write_json(
+        tmp_path / "safe-env-key-reference.generated.json",
+        {"requiredEnv": ["UNMIXR_API_KEY", "EA_TELEGRAM_BOT_TOKEN"]},
+    )
+
+    safe_result = module.materialize(tmp_path, tmp_path / "safe-matrix.json")
+    safe_row = next(item for item in safe_result["rows"] if item["id"] == "secret_hygiene_verified")
+
+    assert safe_row["status"] == "proved"
+
+    write_json(
+        tmp_path / "leaky-env-assignment.generated.json",
+        {"debug": "UNMIXR_API_KEY=synthetic-token"},
+    )
+    blocked_result = module.materialize(tmp_path, tmp_path / "blocked-matrix.json")
+    blocked_row = next(item for item in blocked_result["rows"] if item["id"] == "secret_hygiene_verified")
+
+    assert blocked_result["status"] == "blocked"
+    assert blocked_row["status"] == "blocked"
+    markers = {finding["marker"] for finding in blocked_row["receiptFindings"]}
+    assert "UNMIXR_API_KEY=" in markers
 
 
 def test_completion_matrix_blocks_when_provider_direct_publish_signal_is_present(tmp_path: Path) -> None:

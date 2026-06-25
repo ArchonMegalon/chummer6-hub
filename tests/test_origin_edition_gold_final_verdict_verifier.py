@@ -113,12 +113,19 @@ def test_verifier_rejects_ready_text_for_blocked_proof(tmp_path: Path) -> None:
 def test_verifier_rejects_secret_marker_in_verdict(tmp_path: Path) -> None:
     module = load_module()
     verdict, proof_chain, coverage = seed(tmp_path, ready=False)
-    verdict.write_text(verdict.read_text(encoding="utf-8") + "\nBearer leaked\n", encoding="utf-8")
+    verdict.write_text(
+        verdict.read_text(encoding="utf-8")
+        + "\nBearer leaked\napi.telegram.org/bot123\nsecret-session\nUNMIXR_API_KEY=leaked\n",
+        encoding="utf-8",
+    )
 
     ok, issues = module.verify(verdict, proof_chain, coverage)
 
     assert ok is False
     assert "forbidden_secret_marker:Bearer " in issues
+    assert "forbidden_secret_marker:api.telegram.org/bot" in issues
+    assert "forbidden_secret_marker:secret-session" in issues
+    assert "forbidden_secret_marker:UNMIXR_API_KEY=" in issues
 
 
 def test_verifier_rejects_missing_next_action_from_verdict(tmp_path: Path) -> None:

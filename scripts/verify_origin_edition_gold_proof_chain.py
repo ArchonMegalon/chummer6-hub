@@ -23,9 +23,20 @@ EXPECTED_STAGE_NAMES = [
 FORBIDDEN_VALUE_MARKERS = [
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
+    "Cookie:",
     "secret-token",
     "owner-session-token",
+    "secret-session",
+    "secret-bearer-session",
     "super-secret",
+    "rangersofB5",
+    "api:",
+    "api.telegram.org/bot",
+    "TELEGRAM_BOT_TOKEN=",
+    "EA_TELEGRAM_BOT_TOKEN=",
+    "UNMIXR_API_KEY=",
+    "audiobookshelf_api_token=",
+    "telegram_bot_token=",
 ]
 
 
@@ -65,6 +76,21 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
     stage_names = [stage.get("name") for stage in stages if isinstance(stage, dict)]
     if stage_names != EXPECTED_STAGE_NAMES:
         issues.append(f"stage_order_mismatch:{stage_names}")
+    computed_blocked_stages = [
+        str(stage.get("name") or "")
+        for stage in stages
+        if isinstance(stage, dict) and str(stage.get("status") or "").lower() != "pass"
+    ]
+    top_level_blocked_stages = payload.get("blockedStages") if isinstance(payload.get("blockedStages"), list) else []
+    progress_blocked_stages = progress.get("blockedStages") if isinstance(progress.get("blockedStages"), list) else []
+    if isinstance(progress.get("totalStages"), int) and progress.get("totalStages") != len(EXPECTED_STAGE_NAMES):
+        issues.append("progress_total_stages_mismatch")
+    if isinstance(progress.get("passedStages"), int) and progress.get("passedStages") != len(EXPECTED_STAGE_NAMES) - len(computed_blocked_stages):
+        issues.append("progress_passed_stages_mismatch")
+    if top_level_blocked_stages != computed_blocked_stages:
+        issues.append("blocked_stages_do_not_match_stage_statuses")
+    if progress_blocked_stages != top_level_blocked_stages:
+        issues.append("progress_blocked_stages_do_not_match_top_level")
     for stage in stages:
         if not isinstance(stage, dict):
             continue

@@ -155,7 +155,7 @@ def test_verifier_require_gold_rejects_pass_chain_with_non_pass_stage(tmp_path: 
 def test_verifier_rejects_secret_marker_in_receipt(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["debug"] = "Bearer secret-token"
+    payload["debug"] = "Bearer secret-token Cookie: api.telegram.org/bot123 UNMIXR_API_KEY=leaked"
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -163,6 +163,48 @@ def test_verifier_rejects_secret_marker_in_receipt(tmp_path: Path) -> None:
     assert ok is False
     assert "forbidden_secret_marker:Bearer " in issues
     assert "forbidden_secret_marker:secret-token" in issues
+    assert "forbidden_secret_marker:Cookie:" in issues
+    assert "forbidden_secret_marker:api.telegram.org/bot" in issues
+    assert "forbidden_secret_marker:UNMIXR_API_KEY=" in issues
+
+
+def test_verifier_rejects_blocked_stage_rollup_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="blocked")
+    payload["blockedStages"] = ["deployed_browser_probe"]
+    payload["progress"]["blockedStages"] = ["deployed_browser_probe"]
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "blocked_stages_do_not_match_stage_statuses" in issues
+
+
+def test_verifier_rejects_progress_blocked_stage_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="blocked")
+    payload["progress"]["blockedStages"] = ["deployed_browser_probe"]
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "progress_blocked_stages_do_not_match_top_level" in issues
+
+
+def test_verifier_rejects_progress_stage_counts_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="blocked")
+    payload["progress"]["totalStages"] = 5
+    payload["progress"]["passedStages"] = 6
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "progress_total_stages_mismatch" in issues
+    assert "progress_passed_stages_mismatch" in issues
 
 
 def test_verifier_rejects_missing_normalized_chain_status(tmp_path: Path) -> None:
