@@ -31,6 +31,10 @@ def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
         {
             "status": "pass" if ready else "blocked",
             "goalCompletionClaimAllowed": ready,
+            "next_action": "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
+            if ready
+            else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+            "blocking_reason": "" if ready else "stage:deployed_browser_probe,requirement:deployed_owner_read_listen_watch_canon",
             "privacy": {
                 "deploymentPerformed": False,
                 "envValuesExposed": False,
@@ -55,6 +59,12 @@ def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
                 f"Goal completion claim allowed: `{'true' if ready else 'false'}`",
                 "## Blocked Requirements",
                 "- None." if ready else "- `deployed_owner_read_listen_watch_canon`",
+                "## Required Next Action",
+                "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
+                if ready
+                else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+                "## Proof Progress",
+                "- Blocking reason: ``" if ready else "- Blocking reason: `stage:deployed_browser_probe,requirement:deployed_owner_read_listen_watch_canon`",
                 "## Privacy And Release Boundary",
                 "- `rawCredentialExposed`: `false`",
                 "- `rawSessionTokenExposed`: `false`",
@@ -109,3 +119,18 @@ def test_verifier_rejects_secret_marker_in_verdict(tmp_path: Path) -> None:
 
     assert ok is False
     assert "forbidden_secret_marker:Bearer " in issues
+
+
+def test_verifier_rejects_missing_next_action_from_verdict(tmp_path: Path) -> None:
+    module = load_module()
+    verdict, proof_chain, coverage = seed(tmp_path, ready=False)
+    text = verdict.read_text(encoding="utf-8").replace(
+        "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+        "",
+    )
+    verdict.write_text(text, encoding="utf-8")
+
+    ok, issues = module.verify(verdict, proof_chain, coverage)
+
+    assert ok is False
+    assert "next_action_missing" in issues

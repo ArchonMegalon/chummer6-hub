@@ -29,6 +29,15 @@ def seed_artifacts(root: Path, *, ready: bool) -> None:
             "contractName": "chummer.origin_edition.gold_proof_chain.v1",
             "status": "pass" if ready else "blocked",
             "goalCompletionClaimAllowed": ready,
+            "next_action": "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
+            if ready
+            else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+            "blocking_reason": "" if ready else "stage:deployed_browser_probe,requirement:deployed_owner_read_listen_watch_canon",
+            "progress": {
+                "passedStages": 6 if ready else 2,
+                "totalStages": 6,
+                "blockedStages": [] if ready else ["deployed_browser_probe", "gold_gap_audit", "completion_matrix", "requirement_coverage"],
+            },
             "namespace": "origin.chummer.run/Varga/Mira/Kestrel",
             "privacy": {
                 "deploymentPerformed": False,
@@ -71,6 +80,9 @@ def seed_artifacts_without_namespace(root: Path) -> None:
             "contractName": "chummer.origin_edition.gold_proof_chain.v1",
             "status": "blocked",
             "goalCompletionClaimAllowed": False,
+            "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+            "blocking_reason": "stage:deployed_browser_probe",
+            "progress": {"passedStages": 0, "totalStages": 6, "blockedStages": ["deployed_browser_probe"]},
             "privacy": {
                 "deploymentPerformed": False,
                 "envValuesExposed": False,
@@ -106,8 +118,9 @@ def test_final_verdict_blocks_until_deployed_owner_requirement_is_proved(tmp_pat
     assert "Verdict: `ORIGIN_EDITION_GOLD_BLOCKED`" in text
     assert "Goal completion claim allowed: `false`" in text
     assert "`deployed_owner_read_listen_watch_canon`" in text
-    assert "short-lived real owner session token" in text
-    assert "Do not claim completion" in text
+    assert "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN" in text
+    assert "stage:deployed_browser_probe" in text
+    assert "Passed stages: `2` / `6`" in text
 
 
 def test_final_verdict_passes_when_proof_chain_and_coverage_pass(tmp_path: Path) -> None:
@@ -121,6 +134,7 @@ def test_final_verdict_passes_when_proof_chain_and_coverage_pass(tmp_path: Path)
     assert result["finalVerdict"] == "ORIGIN_EDITION_GOLD_READY"
     assert result["goalCompletionClaimAllowed"] is True
     assert result["blockedRequirements"] == []
+    assert result["nextAction"] == "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
     assert "Verdict: `ORIGIN_EDITION_GOLD_READY`" in text
     assert "- None." in text
 
