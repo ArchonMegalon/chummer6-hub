@@ -1409,14 +1409,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     [Fact]
     public void Auth_entry_avoids_internal_install_link_language()
     {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs"));
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
         string visibleText = ExtractVisibleText(view);
 
         Assert.DoesNotContain("handoff", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("callback", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("manual open", visibleText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Claiming only connects this copy to your account.", visibleText, StringComparison.Ordinal);
-        Assert.Contains("Keep this copy attached to your account.", visibleText, StringComparison.Ordinal);
+        Assert.Contains("Claiming only connects this copy to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
     }
 
     private static readonly string[] ForbiddenVisibleMarkers =

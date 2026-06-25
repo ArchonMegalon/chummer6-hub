@@ -1001,11 +1001,18 @@ public sealed class PublicLandingReleaseTrustViewTests
     [Fact]
     public void AuthEntryViewShowsConcreteContinuityValueBeforeProviderChoice()
     {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Use your email to continue.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("Claiming only connects this copy to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"Claim your copy\"", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"Open Chummer\"", controller, StringComparison.Ordinal);
+        Assert.Contains("<h1 id=\"auth-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"auth-panel__hint\">@Model.SupportLine</p>", view, StringComparison.Ordinal);
         Assert.Contains("<label for=\"email\" class=\"field-label\">Email</label>", view, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"runner@example.com\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("auth-value-strip", view, StringComparison.Ordinal);
@@ -1029,11 +1036,13 @@ public sealed class PublicLandingReleaseTrustViewTests
     [Fact]
     public void AuthEntryViewTreatsLoopbackInstallReturnsAsInBrowserFinishInsteadOfProtocolLaunch()
     {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Use your email to continue.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Keep Chummer open while the browser connects this copy.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);
