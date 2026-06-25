@@ -442,7 +442,6 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
             Meta: new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["purpose"] = "magic_link",
-                ["ticket_id"] = ticketId,
                 ["next_path"] = string.IsNullOrWhiteSpace(nextPath) ? "/home" : nextPath.Trim()
             });
     }
@@ -698,13 +697,9 @@ If you did not request this, you can ignore this email.
 
     private static string BuildIdempotencyKey(string ticketId)
     {
-        var sanitized = new string(ticketId.Where(static ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_').ToArray());
-        if (string.IsNullOrWhiteSpace(sanitized))
-        {
-            sanitized = Guid.NewGuid().ToString("N");
-        }
-
-        return $"email_magic_link_{sanitized[..Math.Min(sanitized.Length, 220)]}";
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(ticketId ?? string.Empty));
+        string digest = Convert.ToHexString(hash[..16]).ToLowerInvariant();
+        return $"email_magic_link_{digest}";
     }
 
     private static string? ExtractProviderMessageId(string responseBody)

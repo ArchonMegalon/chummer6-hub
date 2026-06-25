@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Identity.Services;
@@ -20,6 +21,7 @@ public sealed class IdentityEmailDeliveryServiceTests
         try
         {
             HttpRequestMessage? capturedRequest = null;
+            string? capturedBody = null;
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -37,6 +39,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 new HttpClient(new StubHttpMessageHandler(request =>
                 {
                     capturedRequest = request;
+                    capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
                     return new HttpResponseMessage(HttpStatusCode.Accepted)
                     {
                         Content = new StringContent("{\"data\":{\"id\":\"email_123\"}}", Encoding.UTF8, "application/json")
@@ -55,9 +58,17 @@ public sealed class IdentityEmailDeliveryServiceTests
             Assert.True(capturedRequest!.Headers.TryGetValues("Idempotency-Key", out IEnumerable<string>? values));
 
             string idempotencyKey = Assert.Single(values!);
-            Assert.Equal("email_magic_link_ticket-emailit-123", idempotencyKey);
+            Assert.StartsWith("email_magic_link_", idempotencyKey, StringComparison.Ordinal);
+            Assert.DoesNotContain("ticket-emailit-123", idempotencyKey, StringComparison.Ordinal);
             Assert.DoesNotContain(":", idempotencyKey, StringComparison.Ordinal);
             Assert.Matches(new Regex("^[A-Za-z0-9_-]+$"), idempotencyKey);
+
+            Assert.NotNull(capturedBody);
+            using JsonDocument json = JsonDocument.Parse(capturedBody!);
+            JsonElement meta = json.RootElement.GetProperty("meta");
+            Assert.False(meta.TryGetProperty("ticket_id", out _));
+            Assert.Equal("magic_link", meta.GetProperty("purpose").GetString());
+            Assert.Equal("/home", meta.GetProperty("next_path").GetString());
         }
         finally
         {
