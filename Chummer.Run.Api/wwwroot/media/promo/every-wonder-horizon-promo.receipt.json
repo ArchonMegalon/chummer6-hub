@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-25T14:38:39Z",
+  "generated_at_utc": "2026-06-25T15:37:41Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
   "title": "Chummer6 Product Spine Promo",
@@ -196,58 +196,5 @@
       "caption": "One product spine: build, run, remember, publish.",
       "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     }
-  ],
-  "audio_repair": {
-    "status": "repaired",
-    "reason": "narrowband_highband_beep_artifact_detected_in_previous_public_audio",
-    "method": "cached_unmixr_narration_rebuild_without_synthetic_music_bed_then_audio_only_anti_whistle_remux",
-    "obsolete_generators_removed": [
-      "scripts/rebuild_public_video_audio_unmixr.py",
-      "scripts/rebuild_promo_audio_continuous.py",
-      "scripts/build_chummer6_flagship_promo.py"
-    ],
-    "quality_gate": "scripts/public_video_audio_quality.py --allow-clean-speech-pauses",
-    "mp4_quality": {
-      "audio_duration_seconds": 89.583333,
-      "max_silence_seconds": 0.0,
-      "max_volume_db": -2.1,
-      "mean_volume_db": -18.1,
-      "media_duration_seconds": 89.583333,
-      "reasons": [],
-      "status": "pass",
-      "tail_silence_seconds": 0.0,
-      "tone_metrics": {
-        "dominant_highband_peak_hz": 6080.1,
-        "highband_hz": [
-          5500.0,
-          7600.0
-        ],
-        "highband_p95_ratio": 0.047115,
-        "highband_p99_ratio": 0.138906,
-        "status": "pass",
-        "voiced_frame_count": 592
-      }
-    },
-    "webm_quality": {
-      "audio_duration_seconds": 89.589,
-      "max_silence_seconds": 0.0,
-      "max_volume_db": -1.8,
-      "mean_volume_db": -18.0,
-      "media_duration_seconds": 89.589,
-      "reasons": [],
-      "status": "pass",
-      "tail_silence_seconds": 0.0,
-      "tone_metrics": {
-        "dominant_highband_peak_hz": 6132.8,
-        "highband_hz": [
-          5500.0,
-          7600.0
-        ],
-        "highband_p95_ratio": 0.042097,
-        "highband_p99_ratio": 0.128915,
-        "status": "pass",
-        "voiced_frame_count": 592
-      }
-    }
-  }
+  ]
 }

@@ -1,76 +1,205 @@
 {
-  "generated_at_utc": "2026-06-25T15:03:22Z",
-  "status": "published",
   "asset_id": "chummer6-flagship-promo",
+  "audio_policy": "fresh_unmixr_rebuild_no_openvoice_tts_no_legacy_beep_track",
   "compatibility_alias_for": "every-wonder-horizon-promo",
-  "title": "Chummer6 Overview Promo",
-  "reason": "Compatibility URL retained for existing external embeds; media bytes are the clean every-wonder promo with verified clean audio.",
-  "audio_policy": "clean_replacement_audio_no_legacy_beep_track",
-  "source_receipt": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.receipt.json",
-  "source_audio_repair": {
-    "status": "repaired",
-    "reason": "narrowband_highband_beep_artifact_detected_in_previous_public_audio",
-    "method": "cached_unmixr_narration_rebuild_without_synthetic_music_bed_then_audio_only_anti_whistle_remux",
-    "obsolete_generators_removed": [
-      "scripts/rebuild_public_video_audio_unmixr.py",
-      "scripts/rebuild_promo_audio_continuous.py",
-      "scripts/build_chummer6_flagship_promo.py"
-    ],
-    "quality_gate": "scripts/public_video_audio_quality.py --allow-clean-speech-pauses",
-    "mp4_quality": {
-      "audio_duration_seconds": 89.583333,
-      "max_silence_seconds": 0.0,
-      "max_volume_db": -2.1,
-      "mean_volume_db": -18.1,
-      "media_duration_seconds": 89.583333,
-      "reasons": [],
-      "status": "pass",
-      "tail_silence_seconds": 0.0,
-      "tone_metrics": {
-        "dominant_highband_peak_hz": 6080.1,
-        "highband_hz": [
-          5500.0,
-          7600.0
-        ],
-        "highband_p95_ratio": 0.047115,
-        "highband_p99_ratio": 0.138906,
-        "status": "pass",
-        "voiced_frame_count": 592
-      }
+  "continuous_audio_track": "spoken_unmixr_narration_only_no_synthetic_music_bed",
+  "duration_seconds": 90.0,
+  "generated_at_utc": "2026-06-25T15:38:07Z",
+  "legacy_broken_asset_reused": false,
+  "magicfit_claim_allowed": true,
+  "magicfit_final_visual_render_claim": true,
+  "mp4_probe": {
+    "format": {
+      "duration": "89.583333",
+      "size": "32506719"
     },
-    "webm_quality": {
-      "audio_duration_seconds": 89.589,
-      "max_silence_seconds": 0.0,
-      "max_volume_db": -1.8,
-      "mean_volume_db": -18.0,
-      "media_duration_seconds": 89.589,
-      "reasons": [],
-      "status": "pass",
-      "tail_silence_seconds": 0.0,
-      "tone_metrics": {
-        "dominant_highband_peak_hz": 6132.8,
-        "highband_hz": [
-          5500.0,
-          7600.0
-        ],
-        "highband_p95_ratio": 0.042097,
-        "highband_p99_ratio": 0.128915,
-        "status": "pass",
-        "voiced_frame_count": 592
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "height": 720,
+        "width": 1280
+      },
+      {
+        "channels": 1,
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "96000"
       }
+    ]
+  },
+  "narration_provider": "unmixr-short-tts",
+  "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
+  "production_scenes": [
+    {
+      "caption": "The product starts with one table, not a shelf of labels.",
+      "duration_seconds": 7.0,
+      "id": "opener_product_spine",
+      "narration": "Chummer6 should feel like one table that keeps its memory: runners, rules, scenes, people, and consequences in reach."
+    },
+    {
+      "caption": "NEXUS-PAN is campaign continuity for device drift.",
+      "duration_seconds": 7.0,
+      "id": "nexus_pan_core_continuity",
+      "narration": "NEXUS-PAN belongs in the product story. Its job is calm reconnects, visible conflicts, and a clean handoff across devices."
+    },
+    {
+      "caption": "ALICE belongs in the base workbench.",
+      "duration_seconds": 7.0,
+      "id": "alice_base_workbench",
+      "narration": "ALICE is normal product help: build advice, explainable tradeoffs, role fit, survivability, legality, and cost."
+    },
+    {
+      "caption": "KARMA FORGE is governed rule evolution.",
+      "duration_seconds": 7.0,
+      "id": "karma_forge_future_rules",
+      "narration": "KARMA FORGE is the rules-evolution expansion bet: house rules with impact preview, history, review, and rollback before the table commits."
+    },
+    {
+      "caption": "JACKPOINT is campaign memory.",
+      "duration_seconds": 8.0,
+      "id": "jackpoint_campaign_memory",
+      "narration": "JACKPOINT is easier to understand as campaign memory: sourced dossiers, briefings, recaps, and player-safe handouts."
+    },
+    {
+      "caption": "RUNSITE is a specialized play mode.",
+      "duration_seconds": 8.0,
+      "id": "runsite_specialized_play_mode",
+      "narration": "RUNSITE opens mission spaces before the run starts: routes, hotspots, layers, and GM-only context without becoming the whole product."
+    },
+    {
+      "caption": "RUNBOOK PRESS belongs to publish and share.",
+      "duration_seconds": 8.0,
+      "id": "runbook_press_publish_share",
+      "narration": "RUNBOOK PRESS turns approved campaign material into structured guides, season books, and handoff-ready exports."
+    },
+    {
+      "caption": "TABLE PULSE is campaign operations.",
+      "duration_seconds": 8.0,
+      "id": "table_pulse_campaign_operations",
+      "narration": "TABLE PULSE keeps pressure bounded: live heat, remote packets, opt-outs, private aftermath, and GM approval."
+    },
+    {
+      "caption": "BLACK LEDGER is the living-city expansion bet.",
+      "duration_seconds": 8.0,
+      "id": "black_ledger_living_city",
+      "narration": "BLACK LEDGER stays the big living-world bet. Factions move, districts heat up, and new jobs emerge from what happened."
+    },
+    {
+      "caption": "Newsreels turn consequences into table fuel.",
+      "duration_seconds": 7.0,
+      "id": "black_ledger_newsroom",
+      "narration": "Newsroom clips turn fallout into rumor, pressure, jokes, and hooks the GM can bring back to the table."
+    },
+    {
+      "caption": "COMMUNITY HUB is the open-run lane.",
+      "duration_seconds": 7.0,
+      "id": "community_hub_open_run_lane",
+      "narration": "COMMUNITY HUB helps players find tables, pass preflight, schedule cleanly, and close the loop."
+    },
+    {
+      "caption": "One product spine: build, run, remember, publish.",
+      "duration_seconds": 8.0,
+      "id": "finale_product_spine",
+      "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     }
-  },
+  ],
+  "proof_constraints": [
+    "Core product areas and expansion bets are separated in captions, narration, and receipt.",
+    "The public asset uses existing MagicFit-rendered source clips rebuilt with new narration and captions.",
+    "The receipt must not claim all listed surfaces are current shipped features."
+  ],
+  "provider_claim": "magicfit_source_clips_rebuilt_with_new_audio",
   "public_files": {
+    "captions": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt",
     "mp4": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
-    "webm": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
     "poster": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo-poster.png",
-    "captions": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt"
+    "webm": "Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm"
   },
-  "replacement_public_files": {
-    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.mp4",
-    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.webm",
-    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo-poster.png",
-    "captions": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.vtt"
-  },
-  "legacy_broken_asset_reused": false
+  "reason": "Compatibility URL retained for existing external embeds; media bytes were freshly rebuilt with the repo Unmixr TTS path and no OpenVoice TTS runtime.",
+  "render_mode": "magicfit_refined_deepdive_montage_with_spoken_narration",
+  "scene_count": 12,
+  "scene_narration": [
+    {
+      "caption": "The product starts with one table, not a shelf of labels.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4",
+      "duration_seconds": 7.0,
+      "narration": "Chummer6 should feel like one table that keeps its memory: runners, rules, scenes, people, and consequences in reach."
+    },
+    {
+      "caption": "NEXUS-PAN is campaign continuity for device drift.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/nexus_pan_90s_deepdive/nexus_pan_08_rejoin_cleanly.mp4",
+      "duration_seconds": 7.0,
+      "narration": "NEXUS-PAN belongs in the product story. Its job is calm reconnects, visible conflicts, and a clean handoff across devices."
+    },
+    {
+      "caption": "ALICE belongs in the base workbench.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/alice_90s_deepdive/alice_02_variant_compare.mp4",
+      "duration_seconds": 7.0,
+      "narration": "ALICE is normal product help: build advice, explainable tradeoffs, role fit, survivability, legality, and cost."
+    },
+    {
+      "caption": "KARMA FORGE is governed rule evolution.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/karma_forge_90s_deepdive/karma_forge_03_impact_preview.mp4",
+      "duration_seconds": 7.0,
+      "narration": "KARMA FORGE is the rules-evolution expansion bet: house rules with impact preview, history, review, and rollback before the table commits."
+    },
+    {
+      "caption": "JACKPOINT is campaign memory.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/jackpoint_90s_deepdive/jackpoint_04_dossier_build.mp4",
+      "duration_seconds": 8.0,
+      "narration": "JACKPOINT is easier to understand as campaign memory: sourced dossiers, briefings, recaps, and player-safe handouts."
+    },
+    {
+      "caption": "RUNSITE is a specialized play mode.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/runsite_90s_deepdive/runsite_02_site_unfolds.mp4",
+      "duration_seconds": 8.0,
+      "narration": "RUNSITE opens mission spaces before the run starts: routes, hotspots, layers, and GM-only context without becoming the whole product."
+    },
+    {
+      "caption": "RUNBOOK PRESS belongs to publish and share.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/runbook_press_90s_deepdive/runbook_press_03_book_structure.mp4",
+      "duration_seconds": 8.0,
+      "narration": "RUNBOOK PRESS turns approved campaign material into structured guides, season books, and handoff-ready exports."
+    },
+    {
+      "caption": "TABLE PULSE is campaign operations.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/table_pulse_90s_deepdive/table_pulse_04_remote_packet.mp4",
+      "duration_seconds": 8.0,
+      "narration": "TABLE PULSE keeps pressure bounded: live heat, remote packets, opt-outs, private aftermath, and GM approval."
+    },
+    {
+      "caption": "BLACK LEDGER is the living-city expansion bet.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/black_ledger_epic_90s/black_ledger_epic_02_the_globe_wakes.mp4",
+      "duration_seconds": 8.0,
+      "narration": "BLACK LEDGER stays the big living-world bet. Factions move, districts heat up, and new jobs emerge from what happened."
+    },
+    {
+      "caption": "Newsreels turn consequences into table fuel.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/black_ledger_90s_deepdive/black_ledger_07_newsroom.mp4",
+      "duration_seconds": 7.0,
+      "narration": "Newsroom clips turn fallout into rumor, pressure, jokes, and hooks the GM can bring back to the table."
+    },
+    {
+      "caption": "COMMUNITY HUB is the open-run lane.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/community_hub_90s_deepdive/community_hub_02_open_run_board.mp4",
+      "duration_seconds": 7.0,
+      "narration": "COMMUNITY HUB helps players find tables, pass preflight, schedule cleanly, and close the loop."
+    },
+    {
+      "caption": "One product spine: build, run, remember, publish.",
+      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/community_hub_90s_deepdive/community_hub_10_community_hero.mp4",
+      "duration_seconds": 8.0,
+      "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
+    }
+  ],
+  "source_claim": "12 curated MagicFit-rendered refined deep-dive clips retitled around the product spine and simplified Horizon taxonomy",
+  "source_receipt": "Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.receipt.json",
+  "status": "published",
+  "synthetic_music_bed_enabled": false,
+  "title": "Chummer6 Overview Promo",
+  "visual_scene_count": 12,
+  "visual_source": "MagicFit scene clips only",
+  "voice": "b628bee3-2c2d-4ed1-ac5b-f94ca2eaab0a"
 }
