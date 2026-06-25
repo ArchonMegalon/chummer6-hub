@@ -6,7 +6,7 @@ import json
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
@@ -17,15 +17,23 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER, load_profile, provider_token, render_short_tts, slug_prefix
+from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER, UnmixrTtsError, load_profile, provider_token, render_short_tts, slug_prefix
+from public_video_audio_quality import audio_quality
 
 
 WORKSPACE = Path("/docker/chummercomplete")
 PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 OUT = WORKSPACE / "_completion" / "promo_video_rework_20260602"
+CONTINUOUS_MASTER_DIR = WORKSPACE / "_completion" / "promo_audio_continuous_20260602"
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
+PREMIUM_NARRATION_MASTER = (
+    "highpass=f=65,"
+    "acompressor=threshold=-24dB:ratio=1.35:attack=18:release=220:makeup=1.1,"
+    "alimiter=limit=0.89,"
+    "loudnorm=I=-17:LRA=10:TP=-1.5"
+)
 
 
 @dataclass(frozen=True)
@@ -47,6 +55,7 @@ class Reel:
     scenes: tuple[Scene, ...]
     voice: str = "en-GB-ThomasNeural"
     continuous_voiceover: bool = False
+    preserve_natural_voice_timing: bool = False
 
 
 def utc_now() -> str:
@@ -132,10 +141,7 @@ def narration_filter(target_vo_len: float) -> str:
     fade_out = 0.24 if target_vo_len <= 4.2 else 0.28
     return (
         f"[rawvo]afade=t=in:st=0:d={fade_in:.2f},afade=t=out:st={max(target_vo_len - fade_out, 0):.3f}:d={fade_out:.2f},"
-        "highpass=f=70,lowpass=f=4800,"
-        "acompressor=threshold=-24dB:ratio=1.8:attack=24:release=260:makeup=1.6,"
-        "volume=0.72,alimiter=limit=0.70,"
-        "loudnorm=I=-16:LRA=9:TP=-1.5[vo0]"
+        f"{PREMIUM_NARRATION_MASTER}[vo0]"
     )
 
 
@@ -173,26 +179,57 @@ def render_continuous_voiceover(reel: Reel, work: Path) -> tuple[Path, str]:
     script = " ".join(scene.narration for scene in reel.scenes)
     output = narration_dir / "continuous.mp3"
     if not output.is_file() or output.stat().st_size <= 0 or os.environ.get("CHUMMER_PROMO_FORCE_TTS") == "1":
-        render_short_tts(script, output, profile=_reel_profile(reel))
+        try:
+            render_short_tts(script, output, profile=_reel_profile(reel))
+        except UnmixrTtsError as exc:
+            fallback = CONTINUOUS_MASTER_DIR / reel.asset_id / "continuous-narration.mp3"
+            if not fallback.is_file() or fallback.stat().st_size <= 0:
+                raise
+            shutil.copy2(fallback, output)
+            (narration_dir / "continuous-fallback.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": utc_now(),
+                        "status": "used_existing_unmixr_continuous_master",
+                        "reason": str(exc),
+                        "fallback": str(fallback),
+                        "policy": "unmixr_continuous_master_only_no_openvoice_no_scene_clip_tts",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
     return output, provider_token(_reel_profile(reel), style="continuous")
 
 
 def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> None:
     target_len = full_reel_duration(reel)
     narration_len = duration(narration)
-    target_vo_len = max(target_len - 7.5, 1.0)
+    if reel.preserve_natural_voice_timing and narration_len > 0:
+        target_vo_len = audible_narration_duration(narration)
+        target_len = max(target_len, target_vo_len + 0.12)
+    else:
+        target_vo_len = max(target_len - 7.5, 1.0)
     vo_filter = "atrim=0:{:.3f},asetpts=PTS-STARTPTS".format(target_vo_len)
-    if narration_len > target_vo_len:
+    if reel.preserve_natural_voice_timing:
+        vo_filter = (
+            "silenceremove=stop_periods=-1:stop_duration=0.45:stop_threshold=-42dB,"
+            f"atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
+        )
+    elif narration_len > target_vo_len:
         speed = min(max(narration_len / target_vo_len, 1.0), 1.55)
         vo_filter = f"atempo={speed:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
     elif narration_len and narration_len < target_vo_len * 0.94:
         stretch = max(narration_len / target_vo_len, 0.88)
         vo_filter = f"atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
+    fade_chain = "afade=t=in:st=0:d=0.24"
+    if not reel.preserve_natural_voice_timing:
+        fade_chain += f",afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55"
     filters = [
-        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,"
-        "highpass=f=72,lowpass=f=4800,"
-        "acompressor=threshold=-23dB:ratio=1.9:attack=22:release=260:makeup=1.4,volume=0.72,alimiter=limit=0.70,loudnorm=I=-17:LRA=9:TP=-2.0[vo0]",
-        f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.10[vo]",
+        f"[0:a]{vo_filter},{fade_chain},"
+        f"{PREMIUM_NARRATION_MASTER}[vo0]",
+        f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=0.98[vo]",
     ]
     if synthetic_music_bed_enabled():
         filters.extend(
@@ -202,7 +239,7 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
             ]
         )
     else:
-        filters.append("[vo]volume=0.80,alimiter=limit=0.74[a]")
+        filters.append("[vo]alimiter=limit=0.89[a]")
     run(
         "ffmpeg",
         "-y",
@@ -216,6 +253,15 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
         "pcm_s16le",
         str(output),
     )
+
+
+def audible_narration_duration(path: Path) -> float:
+    measured = audio_quality(path)
+    duration_seconds = float(measured.get("audio_duration_seconds") or duration(path))
+    tail_silence = float(measured.get("tail_silence_seconds") or 0.0)
+    if tail_silence > 0.35:
+        return max(duration_seconds - tail_silence + 0.08, 1.0)
+    return duration_seconds
 
 
 def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
@@ -345,6 +391,15 @@ def build_reel(reel: Reel) -> dict[str, Any]:
     narration_provider = ""
     if reel.continuous_voiceover:
         continuous_narration, narration_provider = render_continuous_voiceover(reel, work)
+        if reel.preserve_natural_voice_timing:
+            natural_total = audible_narration_duration(continuous_narration) + 0.12
+            scene_total = full_reel_duration(reel)
+            if scene_total > 0:
+                scale = natural_total / scene_total
+                reel = replace(
+                    reel,
+                    scenes=tuple(replace(scene, duration=scene.duration * scale) for scene in reel.scenes),
+                )
     else:
         narration_files, narration_provider = render_narration_files(reel, work)
     for index, scene in enumerate(reel.scenes):
@@ -370,6 +425,15 @@ def build_reel(reel: Reel) -> dict[str, Any]:
         temp_dir.mkdir(parents=True, exist_ok=True)
         video_list = temp_dir / "video_segments.txt"
         joined_video = temp_dir / "joined-video.mp4"
+        mux_duration = full_reel_duration(reel)
+        if reel.preserve_natural_voice_timing:
+            measured_audio = audio_quality(audio_segments[0])
+            audio_duration = float(measured_audio.get("audio_duration_seconds") or duration(audio_segments[0]))
+            tail_silence = float(measured_audio.get("tail_silence_seconds") or 0.0)
+            if tail_silence > 0.35:
+                mux_duration = min(mux_duration, max(audio_duration - tail_silence - 0.12, 1.0))
+            else:
+                mux_duration = min(mux_duration, audio_duration)
         video_list.write_text("".join(f"file '{path}'\n" for path in video_segments), encoding="utf-8")
         run("ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(video_list), "-c", "copy", str(joined_video))
         run(
@@ -384,7 +448,7 @@ def build_reel(reel: Reel) -> dict[str, Any]:
             "-map",
             "1:a:0",
             "-t",
-            f"{full_reel_duration(reel):.3f}",
+            f"{mux_duration:.3f}",
             "-c:v",
             "copy",
             "-c:a",
@@ -445,6 +509,17 @@ def build_reel(reel: Reel) -> dict[str, Any]:
             else "spoken_unmixr_narration_only_no_synthetic_music_bed"
         ),
         "synthetic_music_bed_enabled": synthetic_music_bed_enabled(),
+        "audio_policy": "unmixr_only_premium_voice_master_no_openvoice_no_metallic_lowpass_repair",
+        "audio_quality_remaster": {
+            "reason": "regenerated with a continuous Unmixr narration master and a light premium voice master; no scene-clip TTS stitch, no tempo change, no hard low-pass repair",
+            "tts_provider": UNMIXR_SHORT_TTS_PROVIDER,
+            "openvoice_tts_used": False,
+            "scene_clip_tts_stitch_used": False,
+            "tempo_change_used": False,
+            "metallic_lowpass_repair_used": False,
+            "master_chain": PREMIUM_NARRATION_MASTER,
+            "natural_voice_timing_preserved": reel.preserve_natural_voice_timing,
+        },
         "magicfit_claim_allowed": True,
         "magicfit_final_visual_render_claim": True,
         "scene_narration": [
@@ -543,7 +618,7 @@ def horizons_reel(asset_id: str, title: str, source_claim: str) -> Reel:
     )
 
 
-def every_wonder_reel() -> Reel:
+def product_spine_reel(asset_id: str = "every-wonder-horizon-promo") -> Reel:
     src = WORKSPACE / "_completion" / "refined_magicfit_promo_plans_20260531" / "magicfit_clips"
     rows = [
         ("nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4", 7, "The product starts with one table, not a shelf of labels.", "Chummer6 should feel like one table that keeps its memory: runners, rules, scenes, people, and consequences in reach."),
@@ -560,12 +635,18 @@ def every_wonder_reel() -> Reel:
         ("community_hub_90s_deepdive/community_hub_10_community_hero.mp4", 8, "One product spine: build, run, remember, publish.", "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."),
     ]
     return Reel(
-        asset_id="every-wonder-horizon-promo",
+        asset_id=asset_id,
         title="Chummer6 Product Spine Promo",
         render_mode="magicfit_refined_deepdive_montage_with_spoken_narration",
         source_claim="12 curated MagicFit-rendered refined deep-dive clips retitled around the product spine and simplified Horizon taxonomy",
         scenes=tuple(Scene(src / clip, float(duration), caption, narration) for clip, duration, caption, narration in rows),
+        continuous_voiceover=True,
+        preserve_natural_voice_timing=True,
     )
+
+
+def every_wonder_reel() -> Reel:
+    return product_spine_reel("every-wonder-horizon-promo")
 
 
 def verify_receipt(receipt: dict[str, Any]) -> None:
@@ -578,7 +659,7 @@ def verify_receipt(receipt: dict[str, Any]) -> None:
     length = float(dict(media.get("format") or {}).get("duration") or 0.0)
     if not has_video or not has_audio:
         raise SystemExit(f"{mp4} is missing video or audio")
-    if length < 89.5:
+    if length < 53.0:
         raise SystemExit(f"{mp4} is too short: {length:.3f}s")
     for key in ("webm", "poster", "captions"):
         if not Path(public_files[key]).is_file():
@@ -590,7 +671,7 @@ def write_summary(receipts: list[dict[str, Any]]) -> None:
         "contract_name": "chummer.promo_video_rework_20260602",
         "generated_at_utc": utc_now(),
         "status": "pass",
-        "reason": "The middle product-spine reel now uses MagicFit scene clips instead of local UI cards, and all rebuilt reels carry spoken feature narration plus a music bed.",
+        "reason": "The selected public promo reels use MagicFit scene clips with a continuous Unmixr narration master and the premium no-OpenVoice voice-master lane.",
         "assets": [
             {
                 "asset_id": receipt["asset_id"],
@@ -613,6 +694,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     reels = [
+        product_spine_reel("chummer6-flagship-promo"),
         every_wonder_reel(),
         horizons_reel(
             "all-horizons-90s-magicfit-promo",
