@@ -51,6 +51,22 @@ def env_key_present(path: Path, key: str) -> bool:
     return False
 
 
+def source_metadata(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {
+            "present": False,
+            "sha256": "",
+            "sizeBytes": 0,
+            "valuesStoredInReceipt": False,
+        }
+    return {
+        "present": True,
+        "sha256": sha256_file(path),
+        "sizeBytes": path.stat().st_size,
+        "valuesStoredInReceipt": False,
+    }
+
+
 def contains_all(text: str, needles: list[str]) -> bool:
     return all(needle in text for needle in needles)
 
@@ -231,10 +247,16 @@ def materialize(
     ea_env = ea_root / ".env"
     ltds = ea_root / "LTDs.md"
     ltd_text = read_text(ltds) if ltds.is_file() else ""
+    ea_env_text = read_text(ea_env) if ea_env.is_file() else ""
     inventory = {
         "runsiteEnvInspected": local_env.is_file(),
         "eaEnvInspected": ea_env.is_file(),
         "ltdInventoryInspected": ltds.is_file(),
+        "sourceFiles": {
+            "runsiteEnv": source_metadata(local_env),
+            "eaEnv": source_metadata(ea_env),
+            "ltdInventory": source_metadata(ltds),
+        },
         "rybbitRunKeysPresent": {
             key: env_key_present(local_env, key)
             for key in [
@@ -245,10 +267,10 @@ def materialize(
             ]
         },
         "newestProviderInventorySignals": {
-            "crezloTours": "Crezlo Tours" in ltd_text and "EA_CREZLO_LOGIN_EMAIL" in read_text(ea_env) if ea_env.is_file() else False,
-            "pano2vr": "Pano2VR" in ltd_text and "PANO2VR_LICENSE_KEY" in read_text(ea_env) if ea_env.is_file() else False,
+            "crezloTours": "Crezlo Tours" in ltd_text and "EA_CREZLO_LOGIN_EMAIL" in ea_env_text,
+            "pano2vr": "Pano2VR" in ltd_text and "PANO2VR_LICENSE_KEY" in ea_env_text,
             "unmixr": "Unmixr AI" in ltd_text and env_key_present(ea_env, "UNMIXR_API_KEY"),
-            "youbooks": "YouBooks" in ltd_text and "YOUBOOKS_ACCOUNT_EMAILS" in read_text(ea_env) if ea_env.is_file() else False,
+            "youbooks": "YouBooks" in ltd_text and "YOUBOOKS_ACCOUNT_EMAILS" in ea_env_text,
             "firstBook": "First Book ai" in ltd_text,
             "inkfluence": env_key_present(local_env, "CHUMMER_EA_INKFLUENCE_BASE_URL"),
         },
