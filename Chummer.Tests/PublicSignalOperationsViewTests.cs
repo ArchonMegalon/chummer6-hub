@@ -250,11 +250,11 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-board-failure", rewritten, StringComparison.Ordinal);
-        Assert.Contains("Public board temporarily unavailable", rewritten, StringComparison.Ordinal);
-        Assert.Contains("The board hit a loading problem.", rewritten, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
-        Assert.Contains("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
-        Assert.Contains("Support Chummer", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Participate is not loading", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Try again shortly.", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);
         Assert.Contains("node.style.display = 'none';", rewritten, StringComparison.Ordinal);
         Assert.Contains("new MutationObserver", rewritten, StringComparison.Ordinal);
         Assert.Contains("removeHostedAuth", rewritten, StringComparison.Ordinal);
@@ -262,8 +262,14 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("node.remove()", rewritten, StringComparison.Ordinal);
         Assert.Contains("brand.setAttribute('href', 'https://chummer.run/')", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("support@productlift.dev", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">ProductLift<", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Chummer</a>", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("productlift.dev/login", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev/signup", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Log in</a>", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Sign up</a>", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("menubar_login", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("menubar_signup", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Powered by ProductLift", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("name=\"generator\"", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("brand.setAttribute('target', '_top')", rewritten, StringComparison.Ordinal);
@@ -292,6 +298,6 @@ public sealed class PublicSignalOperationsViewTests
 
         Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);
-        Assert.Contains("Private help", rewritten, StringComparison.Ordinal);
+        Assert.DoesNotContain("Requests, votes, and shipped work.", rewritten, StringComparison.Ordinal);
     }
 }

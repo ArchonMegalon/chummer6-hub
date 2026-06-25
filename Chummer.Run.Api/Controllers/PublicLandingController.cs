@@ -2552,61 +2552,6 @@ public sealed class PublicLandingController : Controller
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
             string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);
-            const string boardRail = """
-<style data-chummer-board-rail-style>
-:root { color-scheme: dark; }
-[data-chummer-board-rail] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem 0.75rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.62rem 0.78rem;
-  border-bottom: 1px solid rgba(238,232,222,0.12);
-  background: #151310;
-  color: #f2ede5;
-  font: 500 14px/1.4 Inter, system-ui, sans-serif;
-}
-[data-chummer-board-rail] nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-}
-[data-chummer-board-rail] a {
-  color: inherit;
-  text-decoration: none;
-}
-[data-chummer-board-rail] a[data-chummer-board-cta] {
-  padding: 0.38rem 0.62rem;
-  border-radius: 999px;
-  border: 1px solid rgba(238,232,222,0.16);
-  background: rgba(238,232,222,0.06);
-}
-[data-chummer-board-rail] strong {
-  font-weight: 600;
-}
-[data-chummer-board-rail] small {
-  display: block;
-  margin-top: 0.08rem;
-  color: #cfc7ba;
-  font-size: 12px;
-  font-weight: 500;
-}
-</style>
-<div data-chummer-board-rail>
-  <span>
-    <strong>__CHUMMER_RAIL_TITLE__</strong>
-    <small>Requests, votes, and shipped work.</small>
-  </span>
-  <nav aria-label="__CHUMMER_RAIL_NAV_LABEL__">
-    <a href="__CHUMMER_PUBLIC_HOME_HREF__" target="_top" rel="noopener">Home</a>
-    <a href="__CHUMMER_FIRST_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_FIRST_LINK_LABEL__</a>
-    <a href="__CHUMMER_SECOND_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_SECOND_LINK_LABEL__</a>
-    __CHUMMER_SUPPORTER_LINK__
-    <a href="/contact#support-intake" target="_top" rel="noopener">Support</a>
-  </nav>
-</div>
-""";
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
@@ -2673,18 +2618,6 @@ document.addEventListener('DOMContentLoaded', function () {
 """
                 .Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal);
 
-            string supporterLinkMarkup = string.IsNullOrWhiteSpace(supporterHref)
-                ? string.Empty
-                : $"<a href=\"{HtmlEncoder.Default.Encode(supporterHref)}\" target=\"_top\" rel=\"noopener\" data-chummer-board-cta>Support Chummer</a>";
-            string boardRailPatch = boardRail
-                .Replace("__CHUMMER_PUBLIC_HOME_HREF__", publicHomeHref, StringComparison.Ordinal)
-                .Replace("__CHUMMER_RAIL_TITLE__", railTitle, StringComparison.Ordinal)
-                .Replace("__CHUMMER_RAIL_NAV_LABEL__", railNavLabel, StringComparison.Ordinal)
-                .Replace("__CHUMMER_FIRST_LINK_HREF__", firstLinkHref, StringComparison.Ordinal)
-                .Replace("__CHUMMER_FIRST_LINK_LABEL__", firstLinkLabel, StringComparison.Ordinal)
-                .Replace("__CHUMMER_SECOND_LINK_HREF__", secondLinkHref, StringComparison.Ordinal)
-                .Replace("__CHUMMER_SECOND_LINK_LABEL__", secondLinkLabel, StringComparison.Ordinal)
-                .Replace("__CHUMMER_SUPPORTER_LINK__", supporterLinkMarkup, StringComparison.Ordinal);
             string boardFailurePatch = """
 <script data-chummer-board-failure-patch>
 document.addEventListener('DOMContentLoaded', function () {
@@ -2786,20 +2719,6 @@ document.addEventListener('DOMContentLoaded', function () {
             else
             {
                 rewritten = homeLinkPatch + boardFailurePatch + rewritten;
-            }
-
-            if (rewritten.Contains("<body", StringComparison.OrdinalIgnoreCase))
-            {
-                rewritten = Regex.Replace(
-                    rewritten,
-                    "<body(.*?)>",
-                    $"<body$1>{boardRailPatch}",
-                    RegexOptions.IgnoreCase | RegexOptions.Singleline,
-                    TimeSpan.FromMilliseconds(250));
-            }
-            else
-            {
-                rewritten = boardRailPatch + rewritten;
             }
         }
 

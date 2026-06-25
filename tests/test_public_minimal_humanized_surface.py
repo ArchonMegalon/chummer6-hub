@@ -421,8 +421,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
-    assert "data-chummer-board-rail" in controller
-    assert "__CHUMMER_SUPPORTER_LINK__" in controller
+    assert "data-chummer-home-link-patch" in controller
+    assert "data-chummer-board-failure-patch" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller
     assert "participate-shell" in participate

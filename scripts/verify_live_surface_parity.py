@@ -122,10 +122,8 @@ SURFACES = [
     {
         "path": "/partizipate",
         "required_texts": [
-            "Participate",
-            "Requests, votes, and shipped work.",
-            "Roadmap",
-            "Support",
+            "Chummer.run",
+            "What do you want to see next?",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -139,10 +137,7 @@ SURFACES = [
     {
         "path": "/participate/board",
         "required_texts": [
-            "Chummer Participate",
-            "Requests, votes, and shipped work.",
-            "Roadmap",
-            "Support",
+            "Chummer.run",
             "What do you want to see next?",
         ],
         "forbidden_texts": [

@@ -57,7 +57,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             )
             return
 
-        if self.path in {"/participate", "/partizipate"}:
+        if self.path == "/participate":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
@@ -68,13 +68,24 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if self.path == "/partizipate":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                b"<html><body>"
+                b"Chummer.run What do you want to see next?"
+                b"</body></html>"
+            )
+            return
+
         if self.path == "/participate/board":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Chummer Participate Requests, votes, and shipped work. Roadmap Support "
+                b"Chummer.run "
                 b"What do you want to see next?"
                 b"</body></html>"
             )
@@ -150,7 +161,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Ctrl K", board_surface["forbidden_texts"])
         self.assertIn("×", board_surface["forbidden_texts"])
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
-        self.assertIn("Requests, votes, and shipped work.", board_surface["required_texts"])
+        self.assertIn("What do you want to see next?", board_surface["required_texts"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()
