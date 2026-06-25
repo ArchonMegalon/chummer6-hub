@@ -199,6 +199,60 @@ public sealed class IdentityEmailDeliveryServiceTests
         }
     }
 
+    [Fact]
+    public void IdentityStorePersistsOnlyHashedEmailTicketsAndSessionTokens()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string storePath = Path.Combine(tempRoot, "identity-store.json");
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ASPNETCORE_ENVIRONMENT"] = "Development",
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "http://localhost:5101",
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = storePath
+                })
+                .Build();
+            var delivery = new InlinePreviewDelivery();
+            var access = new IdentityAccessService(
+                configuration,
+                NullLogger<IdentityAccessService>.Instance,
+                delivery);
+
+            EmailAuthStartResponse emailStart = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+
+            Assert.StartsWith("eml_", emailStart.TicketId, StringComparison.Ordinal);
+            string pendingTicketStore = File.ReadAllText(storePath);
+            Assert.Contains("\"ticketHash\"", pendingTicketStore, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"ticketId\"", pendingTicketStore, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(emailStart.TicketId, pendingTicketStore, StringComparison.Ordinal);
+
+            IdentitySessionIssueResponse session = access.CompleteEmailEntry(new EmailAuthCompleteRequest(emailStart.TicketId));
+            string completedStore = File.ReadAllText(storePath);
+
+            Assert.Contains("\"accessTokenHash\"", completedStore, StringComparison.Ordinal);
+            Assert.Contains("\"refreshTokenHash\"", completedStore, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"accessToken\"", completedStore, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("\"refreshToken\"", completedStore, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(session.AccessToken, completedStore, StringComparison.Ordinal);
+            Assert.DoesNotContain(session.RefreshToken, completedStore, StringComparison.Ordinal);
+            Assert.DoesNotContain(emailStart.TicketId, completedStore, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
@@ -210,5 +264,32 @@ public sealed class IdentityEmailDeliveryServiceTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(_handler(request));
+    }
+
+    private sealed class InlinePreviewDelivery : IIdentityEmailDeliveryService
+    {
+        public IdentityEmailDeliveryStatusResponse GetStatus() =>
+            new(
+                RecentDeliveries: Array.Empty<IdentityEmailDeliveryEventResponse>(),
+                Recipients: Array.Empty<IdentityEmailRecipientStateResponse>(),
+                GeneratedAtUtc: DateTimeOffset.UtcNow);
+
+        public IdentityEmailDeliveryResult DeliverMagicLink(
+            string email,
+            string displayName,
+            string ticketId,
+            string? nextPath,
+            DateTimeOffset expiresAtUtc) =>
+            new(
+                DeliveryMode: "preview_inline_link",
+                PreviewNote: "development preview callback link",
+                Delivered: false);
+
+        public IdentityEmailWebhookAckResponse RecordEmailitWebhook(System.Text.Json.JsonElement payload) =>
+            new(
+                Provider: "test",
+                Status: "accepted",
+                RecordedEvents: 0,
+                ReceivedAtUtc: DateTimeOffset.UtcNow);
     }
 }
