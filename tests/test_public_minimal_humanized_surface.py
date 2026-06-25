@@ -99,8 +99,13 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Case type",
         "One-line summary",
         "Need to go back to setup?",
+        "Pick the problem",
+        "Open support intake",
+        "Support cases stay separate from public feedback.",
+        "Create an account only when you want tracked support or recovery.",
     ):
         assert forbidden not in trust_page
+        assert forbidden not in public_trust_content
 
     combined = "\n".join((trust_page, controller, install_setup, public_trust_content))
     for forbidden in (
@@ -121,6 +126,10 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Contact Chummer",
         "Public ideas and private help.",
         "Create account for saved history",
+        "Choose the closest problem",
+        "Open private help",
+        "Private help stays separate from public feedback.",
+        "Create an account only when you want saved help history or recovery.",
     ):
         assert expected in combined
 
