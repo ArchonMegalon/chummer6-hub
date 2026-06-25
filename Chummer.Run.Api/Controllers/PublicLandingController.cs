@@ -321,7 +321,8 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        bool hasAuthCookie = Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName);
+        var authenticated = hasAuthCookie && await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
@@ -335,15 +336,16 @@ public sealed class PublicLandingController : Controller
                 manifest,
                 Request.Headers.UserAgent.ToString(),
                 authenticated);
-        var campaignSpine = await BuildLandingCampaignSpineAsync(cancellationToken);
         var model = new LandingPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character manager for Shadowrun.", "/", cancellationToken),
+            Chrome: hasAuthCookie
+                ? await BuildPublicOrAuthenticatedChromeAsync("Chummer", "Desktop character manager for Shadowrun.", "/", cancellationToken)
+                : BuildContextualPublicChrome("Chummer", "Desktop character manager for Shadowrun.", "/"),
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            TrustPulse: null,
+            SignedInStatus: null,
             PrimaryHeroAction: primaryHeroAction,
             SecondaryHeroAction: secondaryHeroAction,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
@@ -353,12 +355,12 @@ public sealed class PublicLandingController : Controller
             PreviewItems: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
-            FlagshipCoverage: _flagshipCoverage.LoadStrip(),
-            BlackLedgerStats: _blackLedgerStats.ListHomepageStats(),
-            BlackLedgerWorld: _blackLedgerStats.LoadWorldPreview(),
-            LatestBlackLedgerDispatch: _blackLedgerDispatches.ListPublishedDispatches().FirstOrDefault(),
-            CampaignSpine: campaignSpine,
-            OpenRail: await BuildLandingOpenRailAsync(campaignSpine, cancellationToken),
+            FlagshipCoverage: new FlagshipCoverageStripViewModel(string.Empty, string.Empty, string.Empty, Array.Empty<FlagshipCoverageCardViewModel>()),
+            BlackLedgerStats: Array.Empty<BlackLedgerPublicStatViewModel>(),
+            BlackLedgerWorld: null,
+            LatestBlackLedgerDispatch: null,
+            CampaignSpine: null,
+            OpenRail: null,
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }

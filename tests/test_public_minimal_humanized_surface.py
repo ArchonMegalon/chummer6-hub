@@ -3050,3 +3050,29 @@ def test_login_view_is_minimal_auth_surface() -> None:
         "box-shadow:",
     ):
         assert forbidden not in auth_compact
+
+
+def test_minimal_landing_does_not_build_signed_in_or_campaign_surfaces_for_guests() -> None:
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    start = controller.index('public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)')
+    end = controller.index('[HttpGet("/what-is-chummer")]', start)
+    action = controller[start:end]
+
+    assert "hasAuthCookie" in action
+    assert 'Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName)' in action
+    assert "hasAuthCookie && await TryIsAuthenticatedAsync(cancellationToken)" in action
+    assert "TrustPulse: null" in action
+    assert "SignedInStatus: null" in action
+    assert "CampaignSpine: null" in action
+    assert "OpenRail: null" in action
+
+    for forbidden in (
+        "BuildLandingCampaignSpineAsync",
+        "BuildSignedInTrustStatusPanelAsync",
+        "BuildPublicTrustPulsePanel",
+        "_blackLedgerStats.ListHomepageStats",
+        "_blackLedgerStats.LoadWorldPreview",
+        "_blackLedgerDispatches.ListPublishedDispatches",
+        "BuildLandingOpenRailAsync",
+    ):
+        assert forbidden not in action
