@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
 HUB_EDGE_PROJECT_NAME="${CHUMMER_HUB_EDGE_PROJECT_NAME:-chummer6-hub}"
 HUB_PLAYWRIGHT_PROJECT_NAME="${CHUMMER_HUB_PLAYWRIGHT_COMPOSE_PROJECT_NAME:-chummer6-hub-playwright}"
@@ -8,8 +10,12 @@ HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_PUBLIC_HOST="${CHUMMER_HUB_PUBLIC_HOST:-chummer.run}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
+PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
+PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT="${CHUMMER_HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT:-scripts/cleanup_synthetic_support_cases.py}"
+
+cd "$ROOT_DIR"
 
 if [[ -n "${CHUMMER_HUB_PLAYWRIGHT:-}" ]]; then
   RUN_HUB_PLAYWRIGHT="$CHUMMER_HUB_PLAYWRIGHT"
@@ -90,6 +96,14 @@ resolve_hub_proof_base_url() {
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
+  if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "FALSE" ]]; then
+    gate_args=(--repo-root "$ROOT_DIR")
+    if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
+      gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
+    fi
+    python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
+  fi
+
   compose_up_log="$(mktemp)"
   set +e
   docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"

@@ -14,6 +14,8 @@ HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
 HUB_ENV_FILE="${CHUMMER_HUB_ENV_FILE:-}"
+PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
+PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 
 if [[ -z "$HUB_ENV_FILE" ]]; then
   if [[ -f "$ROOT_DIR/.env" ]]; then
@@ -53,6 +55,13 @@ fi
 if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_CLOSEOUT_BUILD" == "TRUE" ]]; then
   echo
   echo "== rebuild local public edge =="
+  if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "FALSE" ]]; then
+    gate_args=(--repo-root "$ROOT_DIR")
+    if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
+      gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
+    fi
+    python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
+  fi
   docker compose "${compose_args[@]}" up -d --build --remove-orphans chummer-run-identity chummer-portal
 fi
 

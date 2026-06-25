@@ -81,3 +81,19 @@ def test_wrong_expected_head_fails() -> None:
 
     assert receipt["status"] == "fail"
     assert any(finding["id"] == "wrong_head" for finding in receipt["findings"])
+
+
+def test_public_edge_rebuild_scripts_call_source_gate() -> None:
+    script_paths = [
+        ROOT / "scripts" / "e2e-hub.sh",
+        ROOT / "scripts" / "migration-loop.sh",
+        ROOT / "scripts" / "ai" / "hub_closeout.sh",
+    ]
+
+    for script_path in script_paths:
+        script = script_path.read_text(encoding="utf-8")
+        assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
+        assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+        assert "scripts/verify_public_edge_deploy_source.py" in script
+        assert "--expected-head" in script
+        assert "docker compose" in script
