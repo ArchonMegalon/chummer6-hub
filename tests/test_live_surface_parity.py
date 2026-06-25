@@ -39,8 +39,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Install Chummer Current public installer: Windows. Current build Newest build Nightly Stable "
-                b"Use this when you want the newest promoted build. Help"
+                b"Downloads Nightly Stable Build from source Download script"
                 b"</body></html>"
             )
             return

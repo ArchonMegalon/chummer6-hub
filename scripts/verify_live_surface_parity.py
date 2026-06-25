@@ -45,16 +45,16 @@ SURFACES = [
     {
         "path": "/downloads",
         "required_texts": [
-            "Install Chummer",
-            "Current public installer",
-            "Current build",
-            "Newest build",
+            "Downloads",
             "Nightly",
             "Stable",
-            "Use this when you want the newest promoted build.",
-            "Help",
+            "Build from source",
+            "Download script",
         ],
         "forbidden_texts": [
+            "Advanced download options",
+            "Release notes",
+            "Build run",
             "Need account return?",
             "Current notes.",
             "Install questions?",
