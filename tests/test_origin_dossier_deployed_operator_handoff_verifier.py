@@ -22,11 +22,11 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
+    module = load_module()
     pass_state = status == "pass"
     blockers = [] if pass_state else ["missing_deployed_identity_token"]
     required_flags = {
-        "logged_in_browser_verified": pass_state,
-        "owner_playback_e2e_verified": pass_state,
+        flag: pass_state for flag in module.REQUIRED_DEPLOYED_PROBE_FLAGS
     }
     return {
         "contractName": "chummer.origin_edition.deployed_operator_handoff.v1",
@@ -145,6 +145,19 @@ def test_verifier_rejects_ready_handoff_without_missing_token_blocker(tmp_path: 
 
     assert ok is False
     assert "ready_handoff_missing_identity_token_blocker" in issues
+
+
+def test_verifier_rejects_handoff_with_stale_required_probe_flag_set(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "handoff.json"
+    payload = handoff_payload(status="pass")
+    payload["currentEvidence"]["deployedProbeRequiredFlags"].pop("watch_artifact_nonempty")
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert any(issue.startswith("deployed_probe_required_flags_missing:") for issue in issues)
 
 
 def test_verifier_rejects_missing_deployed_probe_status_propagation(tmp_path: Path) -> None:
