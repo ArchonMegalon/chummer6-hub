@@ -485,3 +485,97 @@ test('public UI elements are not cut off by their frames outside intentional scr
 
   expect(failures, failures.map((failure) => `${failure.viewport} ${failure.route} ${failure.selector}: ${failure.reason} (${failure.text})`).join('\n')).toEqual([]);
 });
+
+test('login stays compact and does not reintroduce the old visual hero', async ({ browser }) => {
+  test.setTimeout(90000);
+  const failures: Array<string> = [];
+  const checked: Array<Record<string, unknown>> = [];
+
+  for (const viewport of [
+    { name: 'phone-390', width: 390, height: 844 },
+    { name: 'desktop-1366', width: 1366, height: 768 },
+  ]) {
+    const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: viewport.width, height: viewport.height } });
+    await page.route('**/*', async (requestRoute) => {
+      const resourceType = requestRoute.request().resourceType();
+      if (resourceType === 'media') {
+        await requestRoute.abort();
+        return;
+      }
+
+      await requestRoute.continue();
+    });
+
+    const response = await gotoWithRetry(page, '/login?next=%2Faccount%2Faccess');
+    expect(response?.status() ?? 0).toBeLessThan(500);
+
+    const panel = page.locator('.auth-panel--entry').first();
+    await expect(panel).toBeVisible();
+    await expect(page.locator('body')).toContainText('Sign in');
+    await expect(page.locator('body')).toContainText('Use your email to continue.');
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>('.auth-panel--entry');
+      const entry = document.querySelector<HTMLElement>('.auth-entry');
+      const header = document.querySelector<HTMLElement>('[data-site-header]');
+      const footer = document.querySelector<HTMLElement>('.site-footer');
+      const visualCount = document.querySelectorAll('.auth-visual, .auth-entry__story--visual, picture, img').length;
+      const compactSheet = Array.from(document.styleSheets).some((sheet) => String(sheet.href || '').includes('/css/auth-compact.css'));
+      const panelRect = panel?.getBoundingClientRect();
+      const entryRect = entry?.getBoundingClientRect();
+      const headerVisible = header ? getComputedStyle(header).display !== 'none' : false;
+      const footerVisible = footer ? getComputedStyle(footer).display !== 'none' : false;
+
+      return {
+        visualCount,
+        compactSheet,
+        headerVisible,
+        footerVisible,
+        documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        panelWidth: panelRect?.width ?? 0,
+        panelHeight: panelRect?.height ?? 0,
+        entryWidth: entryRect?.width ?? 0,
+        entryHeight: entryRect?.height ?? 0,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    if (!metrics.compactSheet) {
+      failures.push(`${viewport.name}: auth-compact stylesheet was not loaded`);
+    }
+    if (metrics.visualCount !== 0) {
+      failures.push(`${viewport.name}: login rendered ${metrics.visualCount} image/visual hero node(s)`);
+    }
+    if (metrics.headerVisible || metrics.footerVisible) {
+      failures.push(`${viewport.name}: login chrome should stay hidden for the compact sign-in surface`);
+    }
+    if (metrics.documentOverflowX > 1) {
+      failures.push(`${viewport.name}: login has ${Math.round(metrics.documentOverflowX)}px horizontal overflow`);
+    }
+    if (metrics.entryWidth > Math.min(360, metrics.viewportWidth)) {
+      failures.push(`${viewport.name}: login entry is wider than the compact limit (${Math.round(metrics.entryWidth)}px)`);
+    }
+    if (metrics.entryHeight > metrics.viewportHeight - 24) {
+      failures.push(`${viewport.name}: login entry does not fit in one viewport (${Math.round(metrics.entryHeight)}px of ${metrics.viewportHeight}px)`);
+    }
+    if (metrics.panelHeight > metrics.viewportHeight - 24) {
+      failures.push(`${viewport.name}: login panel does not fit in one viewport (${Math.round(metrics.panelHeight)}px of ${metrics.viewportHeight}px)`);
+    }
+
+    checked.push({ viewport: viewport.name, ...metrics });
+    await page.close().catch(() => {});
+  }
+
+  writeJsonArtifact('LOGIN_COMPACT_FRAME.generated.json', {
+    generated_at_utc: new Date().toISOString(),
+    base_url: baseUrl,
+    status: failures.length === 0 ? 'pass' : 'fail',
+    checked,
+    failures,
+  });
+
+  expect(failures).toEqual([]);
+});
