@@ -11,8 +11,10 @@ public sealed class FeedbackOperatingLoopViewTests
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string partizipateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string controller = File.ReadAllText(controllerPath);
         string participateView = File.ReadAllText(participateViewPath);
+        string partizipateView = File.ReadAllText(partizipateViewPath);
 
         Assert.False(File.Exists(feedbackViewPath));
         Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
@@ -20,13 +22,16 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
         Assert.Contains("id=\"participate-board\"", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
+        Assert.Contains("partizipate-board", partizipateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("iframe", partizipateView, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

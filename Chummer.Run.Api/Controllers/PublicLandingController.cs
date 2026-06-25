@@ -2128,12 +2128,10 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(
-            string.Empty,
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+    {
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken).ConfigureAwait(false);
+        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
+    }
 
     [HttpGet("/participate")]
     [Produces("text/html")]
@@ -2174,6 +2172,227 @@ public sealed class PublicLandingController : Controller
             HostedBoardHref: hostedBoardHref,
             SignalOperations: null);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
+    }
+
+    private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken).ConfigureAwait(false);
+        ParticipateItemViewModel[] fallbackItems =
+        [
+            new(8, "Mobile companion app for dice rolling", "Quick access for rolling dice pools and checking modifiers at the table.", "Open"),
+            new(7, "Import characters from Chummer5A", "Bring existing .chum5 characters forward without rebuilding them by hand.", "Open"),
+            new(5, "Shared initiative tracker", "A table view for GM and players when combat starts moving fast.", "Open")
+        ];
+
+        IReadOnlyList<FirstPartyParticipatePostViewModel> posts = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
+        bool loadedFromBoard = posts.Count > 0;
+
+        return new FirstPartyParticipateBoardViewModel(
+            Chrome: subject is null
+                ? _chrome.BuildPublicChrome(
+                    "Participate",
+                    "Public requests and visible bugs.",
+                    "/partizipate")
+                : _chrome.BuildAuthenticatedChrome(
+                    "Participate",
+                    "Public requests and visible bugs.",
+                    "/partizipate",
+                    string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
+                    subject.Email),
+            Heading: "Participate",
+            Summary: "Short requests, clear bugs, useful ideas.",
+            StatusLabel: loadedFromBoard ? "Live board" : "Board snapshot unavailable",
+            Posts: posts,
+            FallbackItems: fallbackItems,
+            RoadmapHref: "/roadmap",
+            SupportHref: "/contact#support-intake",
+            RetryHref: "/partizipate",
+            LoadedFromBoard: loadedFromBoard);
+    }
+
+    private async Task<IReadOnlyList<FirstPartyParticipatePostViewModel>> TryFetchFirstPartyParticipatePostsAsync(CancellationToken cancellationToken)
+    {
+        Uri? upstream = ResolveProductLiftHostedBoardUri();
+        if (upstream is null)
+        {
+            return [];
+        }
+
+        Uri upstreamOrigin = new($"{upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/')}/");
+        Uri target = new(upstreamOrigin, "http_api/posts?tab=feedback");
+
+        try
+        {
+            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
+            outbound.Headers.TryAddWithoutValidation("Accept", "application/json");
+            outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToString());
+
+            using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return [];
+            }
+
+            string mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            if (!mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            {
+                return [];
+            }
+
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (!document.RootElement.TryGetProperty("data", out JsonElement data) || data.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            List<FirstPartyParticipatePostViewModel> posts = [];
+            foreach (JsonElement item in data.EnumerateArray())
+            {
+                if (posts.Count >= 12)
+                {
+                    break;
+                }
+
+                string title = ReadJsonString(item, "title");
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                posts.Add(new FirstPartyParticipatePostViewModel(
+                    Id: ReadJsonString(item, "id"),
+                    Title: CleanParticipateCopy(title),
+                    Summary: CleanParticipateCopy(FirstNonEmptyParticipateValue(
+                        ReadJsonString(item, "description_short"),
+                        ReadJsonString(item, "excerpt"),
+                        StripHtml(ReadJsonString(item, "description")))),
+                    Score: ReadJsonInt(item, "votes_count"),
+                    CommentCount: ReadJsonInt(item, "comments_count"),
+                    Status: CleanParticipateStatus(ReadNestedJsonString(item, "status", "name")),
+                    Category: CleanParticipateCategory(ReadNestedJsonString(item, "category", "name")),
+                    UpdatedLabel: FormatParticipateUpdatedLabel(ReadJsonString(item, "updated_at"))));
+            }
+
+            return posts;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Participate first-party board could not fetch public board posts.");
+            return [];
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Participate first-party board received invalid public board JSON.");
+            return [];
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Participate first-party board timed out while fetching posts.");
+            return [];
+        }
+    }
+
+    private static string ReadJsonString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return string.Empty;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()?.Trim() ?? string.Empty,
+            JsonValueKind.Number => value.GetRawText(),
+            _ => string.Empty
+        };
+    }
+
+    private static int ReadJsonInt(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return 0;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number))
+        {
+            return Math.Max(0, number);
+        }
+
+        return value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out number)
+            ? Math.Max(0, number)
+            : 0;
+    }
+
+    private static string ReadNestedJsonString(JsonElement element, string objectPropertyName, string nestedPropertyName)
+    {
+        if (!element.TryGetProperty(objectPropertyName, out JsonElement nested) || nested.ValueKind != JsonValueKind.Object)
+        {
+            return string.Empty;
+        }
+
+        return ReadJsonString(nested, nestedPropertyName);
+    }
+
+    private static string FirstNonEmptyParticipateValue(params string[] values)
+        => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private static string StripHtml(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string withoutTags = Regex.Replace(value, "<.*?>", " ", RegexOptions.Singleline, TimeSpan.FromMilliseconds(250));
+        return System.Net.WebUtility.HtmlDecode(withoutTags).Trim();
+    }
+
+    private static string CleanParticipateCopy(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string cleaned = value
+            .Replace("AI-powered", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("AI powered", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("AI-generated", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("AI generated", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("Automatically generate", "Create", StringComparison.OrdinalIgnoreCase)
+            .Replace("automatically generate", "create", StringComparison.Ordinal);
+
+        cleaned = Regex.Replace(cleaned, @"\s{2,}", " ", RegexOptions.None, TimeSpan.FromMilliseconds(250)).Trim();
+        return cleaned.Length <= 220 ? cleaned : $"{cleaned[..217].TrimEnd()}...";
+    }
+
+    private static string CleanParticipateStatus(string value)
+    {
+        string cleaned = CleanParticipateCopy(value);
+        return string.Equals(cleaned, "Gathering votes", StringComparison.OrdinalIgnoreCase)
+            ? "Open"
+            : (string.IsNullOrWhiteSpace(cleaned) ? "Open" : cleaned);
+    }
+
+    private static string CleanParticipateCategory(string value)
+    {
+        string cleaned = CleanParticipateCopy(value);
+        return string.Equals(cleaned, "Feature", StringComparison.OrdinalIgnoreCase)
+            ? "Idea"
+            : (string.IsNullOrWhiteSpace(cleaned) ? "Request" : cleaned);
+    }
+
+    private static string FormatParticipateUpdatedLabel(string raw)
+    {
+        if (!DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset updated))
+        {
+            return "Updated";
+        }
+
+        return $"Updated {updated.UtcDateTime:yyyy-MM-dd}";
     }
 
     [HttpGet("/partizipate/{**boardPath}")]

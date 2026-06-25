@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services;
+using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -80,19 +82,24 @@ public sealed class PublicLandingParticipateProxyTests
     [Fact]
     public async Task PartizipateAliasRendersHostedBoardDirectlyAtTypoUrl()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        string html = content.Content ?? string.Empty;
-        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-board-skin", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("id=\"participate-board\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Participate is not loading", html, StringComparison.Ordinal);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.LoadedFromBoard);
+        Assert.Equal("Participate", model.Heading);
+        Assert.Equal("Live board", model.StatusLabel);
+        FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
+        Assert.Equal("Mobile companion app for dice rolling", post.Title);
+        Assert.Equal("Open", post.Status);
+        Assert.Equal("Request", post.Category);
+        Assert.DoesNotContain("AI-powered", post.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -130,9 +137,19 @@ public sealed class PublicLandingParticipateProxyTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://ideas.example.test/feedback",
-                ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run"
+                ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
             })
             .Build();
+        var canon = new PublicCanonFileLoader(configuration);
+        var chrome = new HubPageChromeService(
+            new PublicLandingService(canon, new PublicActionResolver()),
+            new PublicNavigationService(canon, new PublicRouteCatalogService(canon)),
+            new PublicReleaseManifestService(configuration),
+            new ReleaseSelectionService(canon),
+            new HttpContextAccessor());
+        var services = new ServiceCollection();
+        services.AddControllersWithViews();
         return new PublicLandingController(
             landing: null!,
             flipLinkDocumentPortal: null!,
@@ -142,7 +159,7 @@ public sealed class PublicLandingParticipateProxyTests
             releaseSelection: null!,
             actions: null!,
             accounts: null!,
-            identity: null!,
+            identity: new HubIdentityClient(new HttpClient(), configuration, NullLogger<HubIdentityClient>.Instance),
             links: null!,
             experience: null!,
             participationNotifications: null!,
@@ -168,7 +185,7 @@ public sealed class PublicLandingParticipateProxyTests
             anarchyPreview: null!,
             packageCatalog: null!,
             publicCreatorDiscovery: null!,
-            chrome: null!,
+            chrome: chrome,
             trustContent: null!,
             privacyBoundaries: null!,
             signalProjection: null!,
@@ -191,7 +208,7 @@ public sealed class PublicLandingParticipateProxyTests
             {
                 HttpContext = new DefaultHttpContext
                 {
-                    RequestServices = new ServiceCollection().BuildServiceProvider()
+                    RequestServices = services.BuildServiceProvider()
                 }
             }
         };
@@ -316,6 +333,42 @@ public sealed class PublicLandingParticipateProxyTests
                 var response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(html, Encoding.UTF8, "text/html")
+                };
+                return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class HostedBoardPostsHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+            => new(new HostedBoardPostsHandler());
+
+        private sealed class HostedBoardPostsHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                const string json = """
+{
+  "data": [
+    {
+      "id": "sq49UU",
+      "title": "Mobile companion app for dice rolling",
+      "description_short": "Quick access app for rolling dice pools and checking modifiers without opening laptop at the table.",
+      "votes_count": 8,
+      "comments_count": 0,
+      "updated_at": "2026-04-22T21:10:23.000000Z",
+      "status": { "name": "Gathering votes" },
+      "category": null
+    }
+  ],
+  "hasMore": false,
+  "total": 1
+}
+""";
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
                 return Task.FromResult(response);
             }

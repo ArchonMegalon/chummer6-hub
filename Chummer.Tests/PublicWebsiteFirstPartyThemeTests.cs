@@ -26,12 +26,12 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
         string appNavigation = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml"));
         string participateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
+        string partizipateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
 
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
-        Assert.Contains("localBaseHref: \"/partizipate/\"", controller, StringComparison.Ordinal);
-        Assert.Contains("fallbackPath: \"/partizipate\"", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
@@ -52,6 +52,9 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("data-participate-board-fallback", participateView, StringComparison.Ordinal);
         Assert.Contains("['sup' + 'port', 'pro' + 'duct' + 'lift.dev'].join(String.fromCharCode(64))", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("support@productlift.dev", participateView, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("partizipate-board", partizipateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("iframe", partizipateView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ProductLift", partizipateView, StringComparison.OrdinalIgnoreCase);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
         if (!File.Exists(siblingNavigationPath))

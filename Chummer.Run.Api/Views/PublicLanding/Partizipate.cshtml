@@ -1,0 +1,47 @@
+@model FirstPartyParticipateBoardViewModel
+@{
+    ViewData["Title"] = "Participate";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
+    var posts = Model.LoadedFromBoard
+        ? Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status)).ToArray()
+        : Model.FallbackItems;
+}
+
+<section class="partizipate-board" aria-labelledby="partizipate-title">
+    <header class="partizipate-board__header">
+        <div>
+            <p class="partizipate-board__eyebrow">@Model.StatusLabel</p>
+            <h1 id="partizipate-title">@Model.Heading</h1>
+        </div>
+        <p>@Model.Summary</p>
+    </header>
+
+    <div class="partizipate-board__grid" aria-label="Public requests">
+        @foreach (var item in posts)
+        {
+            <article class="partizipate-request">
+                <div class="partizipate-request__score" aria-label="@item.Score requests">
+                    <strong>@item.Score</strong>
+                    <span>requests</span>
+                </div>
+                <div class="partizipate-request__body">
+                    <div class="partizipate-request__topline">
+                        <span>@item.Status</span>
+                    </div>
+                    <h2>@item.Title</h2>
+                    @if (!string.IsNullOrWhiteSpace(item.Summary))
+                    {
+                        <p>@item.Summary</p>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+
+    <nav class="partizipate-board__actions" aria-label="Participate actions">
+        <a class="button-like button-like--primary" href="@Model.RetryHref">Refresh</a>
+        <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
+        <a class="button-like button-like--secondary" href="@Model.SupportHref">Private issue</a>
+    </nav>
+</section>

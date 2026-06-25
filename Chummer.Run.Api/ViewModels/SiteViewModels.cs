@@ -982,6 +982,28 @@ public sealed record ParticipateItemViewModel(
     string Summary,
     string Status);
 
+public sealed record FirstPartyParticipateBoardViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Summary,
+    string StatusLabel,
+    IReadOnlyList<FirstPartyParticipatePostViewModel> Posts,
+    IReadOnlyList<ParticipateItemViewModel> FallbackItems,
+    string RoadmapHref,
+    string SupportHref,
+    string RetryHref,
+    bool LoadedFromBoard);
+
+public sealed record FirstPartyParticipatePostViewModel(
+    string Id,
+    string Title,
+    string Summary,
+    int Score,
+    int CommentCount,
+    string Status,
+    string Category,
+    string UpdatedLabel);
+
 public sealed record KarmaForgeIntakePageViewModel(
     SiteChromeViewModel Chrome,
     string Eyebrow,
