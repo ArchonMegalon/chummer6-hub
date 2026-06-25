@@ -466,7 +466,7 @@ async Task ProxyRybbitAsync(HttpContext context)
 {
     string origin = (context.RequestServices.GetRequiredService<IConfiguration>()["RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN"] ?? string.Empty).Trim().TrimEnd('/');
     if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? parsedOrigin)
-        || (parsedOrigin.Scheme != Uri.UriSchemeHttp && parsedOrigin.Scheme != Uri.UriSchemeHttps))
+        || parsedOrigin.Scheme != Uri.UriSchemeHttps)
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
         return;
