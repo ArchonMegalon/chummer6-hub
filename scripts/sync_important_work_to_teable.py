@@ -274,7 +274,7 @@ def important_work_items() -> list[ImportantWorkItem]:
             source="Release requirement",
             why_it_matters="The website is the user's source of truth for stable and nightly installers.",
             next_action="Keep stable/nightly buttons minimal and ensure each Windows/Linux build updates the download shelf automatically.",
-            acceptance_gate="After a build, chummer.run/downloads exposes the newest Windows and Linux installers with no account-first noise.",
+            acceptance_gate="After a build, chummer.run/downloads exposes lane buttons only for promoted installer platforms with no account-first noise.",
         ),
         ImportantWorkItem(
             item_id="public-website-minimal-redesign",

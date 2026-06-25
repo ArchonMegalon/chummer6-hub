@@ -77,6 +77,18 @@
         .ToArray();
     var stableAndNightlyMatch = stableArtifactIds.Length > 0
         && stableArtifactIds.SequenceEqual(nightlyArtifactIds, StringComparer.OrdinalIgnoreCase);
+    var promotedPlatformLabels = stablePlatformOptions
+        .Where(platform => platform.Option is not null)
+        .Select(platform => platform.PlatformLabel)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    var promotedPlatformSummary = promotedPlatformLabels.Length switch
+    {
+        0 => "No public installer is available right now.",
+        1 => $"Current public installer: {promotedPlatformLabels[0]}.",
+        2 => $"Current public installers: {promotedPlatformLabels[0]} and {promotedPlatformLabels[1]}.",
+        _ => $"Current public installers: {string.Join(", ", promotedPlatformLabels.Take(promotedPlatformLabels.Length - 1))}, and {promotedPlatformLabels[^1]}."
+    };
 
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
@@ -84,7 +96,7 @@
 <section class="minimal-page-hero">
     <div>
         <h1>Install Chummer</h1>
-        <p>Windows and Linux installers.</p>
+        <p>@promotedPlatformSummary</p>
     </div>
     <div class="minimal-status-pill" aria-label="Current release">
         <span>Updated</span>
@@ -126,7 +138,7 @@ else
             <div class="minimal-lane-card__head">
                 <span>Nightly</span>
                 <h2>Newest build</h2>
-                <p>Use this when you want the latest Windows or Linux build.</p>
+                <p>Use this when you want the newest promoted build.</p>
                 @if (stableAndNightlyMatch)
                 {
                     <p>Nightly currently matches Stable. There is no newer Nightly available.</p>

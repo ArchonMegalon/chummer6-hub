@@ -20,7 +20,7 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Windows and Linux installers.', 'Stable', 'Nightly'],
+    requiredText: ['Install Chummer', 'Current public installer', 'Stable', 'Nightly'],
   },
   {
     id: 'status',
@@ -44,7 +44,7 @@ const supportingSurfaces = [
     id: 'contact',
     route: '/contact',
     screenshotPrefix: 'contact',
-    requiredText: ['Contact Chummer', 'Choose one', 'Send private help request'],
+      requiredText: ['Contact Chummer', 'Choose one', 'Send support request'],
   },
 ] as const;
 

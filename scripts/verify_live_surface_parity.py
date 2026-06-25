@@ -46,12 +46,12 @@ SURFACES = [
         "path": "/downloads",
         "required_texts": [
             "Install Chummer",
-            "Windows and Linux installers.",
+            "Current public installer",
             "Current build",
             "Newest build",
             "Nightly",
             "Stable",
-            "Use this when you want the latest Windows or Linux build.",
+            "Use this when you want the newest promoted build.",
             "Help",
         ],
         "forbidden_texts": [

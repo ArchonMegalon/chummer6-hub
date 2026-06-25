@@ -48,21 +48,35 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
+  const manifestResponse = await desktop.request.get(`${baseUrl}/downloads/RELEASE_CHANNEL.generated.json`);
+  expect(manifestResponse.ok()).toBeTruthy();
+  const manifest = await manifestResponse.json();
+  const promotedPlatforms = Array.from(
+    new Set(
+      ((manifest.artifacts || []) as Array<Record<string, unknown>>)
+        .map((artifact) => String(artifact.platform || artifact.platformId || '').toLowerCase())
+        .filter((platform) => platform === 'windows' || platform === 'linux'),
+    ),
+  );
   const stableLane = desktop.locator('#stable');
   const nightlyLane = desktop.locator('#nightly');
   await expect(stableLane).toBeVisible();
   await expect(nightlyLane).toBeVisible();
-  await expect(stableLane.getByRole('link', { name: 'Windows' })).toBeVisible();
-  await expect(stableLane.getByRole('link', { name: 'Linux' })).toBeVisible();
-  await expect(nightlyLane.getByRole('link', { name: 'Windows' })).toBeVisible();
-  await expect(nightlyLane.getByRole('link', { name: 'Linux' })).toBeVisible();
+  for (const platform of promotedPlatforms) {
+    const label = platform === 'windows' ? 'Windows' : 'Linux';
+    await expect(stableLane.getByRole('link', { name: label })).toBeVisible();
+    await expect(nightlyLane.getByRole('link', { name: label })).toBeVisible();
+  }
   const downloadsText = await desktop.locator('body').innerText();
+  if (!promotedPlatforms.includes('linux') && downloadsText.includes('Windows and Linux installers.')) {
+    failures.push('downloads: claims Linux installers while the release manifest does not promote Linux');
+  }
   for (const forbidden of ['Signed-in download', 'portable', 'recommended download', 'proof', 'receipt']) {
     if (downloadsText.toLowerCase().includes(forbidden.toLowerCase())) {
       failures.push(`downloads: contains retired copy "${forbidden}"`);
     }
   }
-  results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true });
+  results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true, promoted_platforms: promotedPlatforms });
 
   await desktop.goto(`${baseUrl}/status`, { waitUntil: 'domcontentloaded' });
   const decisionSurface = desktop.locator('[data-status-surface="decision-surface"]');
@@ -105,7 +119,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes Windows and Linux lane buttons, one status decision card plus one next-action rail.',
+      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, one status decision card plus one next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

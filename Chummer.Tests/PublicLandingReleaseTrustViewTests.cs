@@ -11,7 +11,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("Install Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("Windows and Linux installers.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public installer", view, StringComparison.Ordinal);
         Assert.Contains("Current build", view, StringComparison.Ordinal);
         Assert.Contains("Newest build", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
@@ -85,13 +85,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Windows and Linux installers.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public installer", view, StringComparison.Ordinal);
         Assert.Contains("id=\"nightly\"", view, StringComparison.Ordinal);
         Assert.Contains("id=\"stable\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the latest Windows or Linux build.", view, StringComparison.Ordinal);
+        Assert.Contains("Use this when you want the newest promoted build.", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
@@ -342,12 +342,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string downloadsView = File.ReadAllText(downloadsViewPath);
         string nowView = File.ReadAllText(nowViewPath);
 
-        Assert.Contains("Windows and Linux installers.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Current public installer", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the latest Windows or Linux build.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Use this when you want the newest promoted build.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);

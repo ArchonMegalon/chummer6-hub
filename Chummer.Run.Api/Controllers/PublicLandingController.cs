@@ -430,7 +430,7 @@ public sealed class PublicLandingController : Controller
             .ToArray();
         var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
             surfacedWindowsArtifactIds);
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Stable and Nightly installers for Windows and Linux.", "/downloads", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Current Chummer installers and platform availability.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var model = new DownloadsPageViewModel(

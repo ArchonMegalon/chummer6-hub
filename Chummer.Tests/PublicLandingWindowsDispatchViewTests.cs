@@ -41,11 +41,11 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Windows and Linux installers.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Current public installer", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\" data-platform=\"@platform.PlatformId\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\" data-platform=\"@platform.PlatformId\"", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Current stable build", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Latest published build", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Current build", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Newest build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Use Help for install or update trouble.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);

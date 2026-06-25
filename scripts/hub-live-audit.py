@@ -11993,7 +11993,7 @@ def main() -> int:
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Windows and Linux installers.",
+                "Current public installer",
                 "Nightly",
                 "Stable",
                 "Updated",
