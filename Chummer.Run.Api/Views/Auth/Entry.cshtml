@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-auth";
+    ViewData["SurfaceClass"] = "surface-auth surface-minimal";
     var accessPosture = Model.AccessPosture;
     var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
     var installLinkReturnsToLocalApp = false;
@@ -35,14 +35,14 @@
                 : "the account area";
 }
 
-<section class="auth-entry">
-    <div class="auth-entry__story auth-entry__story--visual">
-        <p class="eyebrow">Account</p>
-        <h1 class="hero-brand">Chummer</h1>
-        <p class="auth-entry__copy">@(isInstallLinkReturn ? "Claim this copy and return to the app." : "Sign in when you want downloads, installs, and support tied to one account.")</p>
-    </div>
-
+<section class="auth-entry" aria-labelledby="auth-title">
     <div class="auth-entry__panel auth-panel auth-panel--entry">
+        <div class="auth-panel__intro auth-panel__intro--masthead">
+            <p class="eyebrow">Account</p>
+            <h1 id="auth-title">@(isInstallLinkReturn ? "Claim your copy" : Model.CreateAccount ? "Create account" : "Sign in")</h1>
+            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google. You can download Chummer without an account.")</p>
+        </div>
+
         <div class="auth-panel__mode-row">
             @if (Model.CreateAccount)
             {
@@ -59,8 +59,8 @@
         @if (Model.CreateAccount)
         {
             <div class="auth-panel__intro">
-                <h3>@(isInstallLinkReturn ? "Claim your copy" : "Create account")</h3>
-                <p>@(isInstallLinkReturn ? "Use the email that should own this install." : "Use email or Google. You can download without an account.")</p>
+                <h2>@(isInstallLinkReturn ? "Claim with email" : "Email")</h2>
+                <p>@(isInstallLinkReturn ? "Use the email that should own this install." : "We send one link. No password.")</p>
             </div>
             <p class="muted-copy">After you confirm the email, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
@@ -76,10 +76,10 @@
                     <label for="email">Email</label>
                     <input id="email" name="email" type="email" placeholder="runner@example.com" required />
                 </div>
-                <button class="button-like button-like--primary" type="submit">Continue with email</button>
+                <button class="button-like button-like--primary" type="submit">@(isInstallLinkReturn ? "Claim with email" : "Continue with email")</button>
             </form>
 
-            <div class="auth-divider"><span>Or use Google</span></div>
+            <div class="auth-divider"><span>or</span></div>
             @if (Model.GoogleAvailable)
             {
                 <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
@@ -93,8 +93,8 @@
         else
         {
             <div class="auth-panel__intro">
-                <h3>@(isInstallLinkReturn ? "Claim with your account" : "Sign in")</h3>
-                <p>@(isInstallLinkReturn ? "Use the account that should own this install." : $"Use email or Google. You return to {nextTarget} after sign-in.")</p>
+                <h2>@(isInstallLinkReturn ? "Claim with your account" : "Email")</h2>
+                <p>@(isInstallLinkReturn ? "Use the account that should own this install." : $"We send one link, then return you to {nextTarget}.")</p>
             </div>
             @if (isInstallLinkReturn)
             {
@@ -113,7 +113,7 @@
                 <button class="button-like button-like--primary auth-panel__primary" type="submit">Send magic link</button>
             </form>
 
-            <div class="auth-divider"><span>Or use Google</span></div>
+            <div class="auth-divider"><span>or</span></div>
             @if (Model.GoogleAvailable)
             {
                 <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>

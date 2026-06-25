@@ -8,7 +8,7 @@
     var surfaceClass = ViewData["SurfaceClass"] as string ?? string.Empty;
     var surfaceTokens = surfaceClass.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     var minimalSurface = surfaceTokens.Contains("surface-minimal", StringComparer.Ordinal);
-    var authSurface = string.Equals(surfaceClass, "surface-auth", StringComparison.Ordinal);
+    var authSurface = surfaceTokens.Contains("surface-auth", StringComparer.Ordinal);
     var headerClass = !minimalSurface && (routeKey is "landing" or "login" or "signup") ? "site-header site-header--immersive" : "site-header";
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
@@ -355,36 +355,39 @@
                     <span class="site-brand__wordmark">CHUMMER</span>
                     <span class="site-brand__surface">Shadowrun character manager</span>
                 </a>
-                <nav class="site-nav" aria-label="Primary navigation">
-                    @foreach (var link in primarySiteLinks)
-                    {
-                        var current = isContextualRouteCurrent(link.Href);
-                        if (current)
+                @if (!minimalSurface)
+                {
+                    <nav class="site-nav" aria-label="Primary navigation">
+                        @foreach (var link in primarySiteLinks)
                         {
-                            <span class="site-nav__current">@link.Label</span>
+                            var current = isContextualRouteCurrent(link.Href);
+                            if (current)
+                            {
+                                <span class="site-nav__current">@link.Label</span>
+                            }
+                            else
+                            {
+                                <a href="@link.Href">@link.Label</a>
+                            }
                         }
-                        else
+                    </nav>
+                    <div class="site-actions site-actions--quiet">
+                        <a class="site-actions__link" href="/help">Help</a>
+                        <a class="site-actions__link" href="/faq">FAQ</a>
+                        <a class="site-actions__link" href="/contact">Contact</a>
+                        @if (showBuildActionInHeader && buildAction is not null)
                         {
-                            <a href="@link.Href">@link.Label</a>
+                            if (isBuildCurrent)
+                            {
+                                <span class="site-actions__label">Build</span>
+                            }
+                            else
+                            {
+                                <a class="site-actions__link" href="@buildAction.Href">@buildAction.Label</a>
+                            }
                         }
-                    }
-                </nav>
-                <div class="site-actions site-actions--quiet">
-                    <a class="site-actions__link" href="/help">Help</a>
-                    <a class="site-actions__link" href="/faq">FAQ</a>
-                    <a class="site-actions__link" href="/contact">Contact</a>
-                    @if (showBuildActionInHeader && buildAction is not null)
-                    {
-                        if (isBuildCurrent)
-                        {
-                            <span class="site-actions__label">Build</span>
-                        }
-                        else
-                        {
-                            <a class="site-actions__link" href="@buildAction.Href">@buildAction.Label</a>
-                        }
-                    }
-                </div>
+                    </div>
+                }
             </div>
         </header>
     }
