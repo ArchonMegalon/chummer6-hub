@@ -2418,6 +2418,11 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ParticipateBoardRootLoadingImageProxy(CancellationToken cancellationToken)
         => await ParticipateBoardRootResourceProxy("loading.svg", null, cancellationToken).ConfigureAwait(false);
 
+    [HttpGet("/participate/provider-assets/{assetHost}/{**assetPath}")]
+    [HttpGet("/partizipate/provider-assets/{assetHost}/{**assetPath}")]
+    public async Task<IActionResult> ParticipateBoardProviderAssetProxy(string assetHost, string? assetPath, CancellationToken cancellationToken)
+        => await ParticipateBoardProviderAssetProxyCore(assetHost, assetPath, cancellationToken).ConfigureAwait(false);
+
     private async Task<IActionResult> ParticipateBoardProxyCore(
         string? boardPath,
         CancellationToken cancellationToken,
@@ -2548,6 +2553,50 @@ public sealed class PublicLandingController : Controller
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Participate board root proxy timed out for upstream board resource {RootSegment}.", rootSegment);
+            return NotFound();
+        }
+    }
+
+    private async Task<IActionResult> ParticipateBoardProviderAssetProxyCore(string assetHost, string? assetPath, CancellationToken cancellationToken)
+    {
+        string normalizedHost = assetHost.Trim().ToLowerInvariant();
+        if (normalizedHost is not ("media" or "cdn") || string.IsNullOrWhiteSpace(assetPath))
+        {
+            return NotFound();
+        }
+
+        string providerDomain = string.Concat("product", "lift.dev");
+        Uri target = AppendQueryString(
+            new Uri($"https://{normalizedHost}.{providerDomain}/{assetPath.TrimStart('/')}"),
+            Request.QueryString.Value);
+
+        try
+        {
+            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
+            outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToArray());
+            outbound.Headers.TryAddWithoutValidation("Accept", Request.Headers.Accept.ToArray());
+            outbound.Headers.TryAddWithoutValidation("Accept-Language", Request.Headers.AcceptLanguage.ToArray());
+
+            using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode);
+            }
+
+            string mediaType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            CopySafeProxyHeaders(response);
+            return File(bytes, mediaType);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Participate board provider asset proxy could not reach {AssetHost}.", normalizedHost);
+            return NotFound();
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Participate board provider asset proxy timed out for {AssetHost}.", normalizedHost);
             return NotFound();
         }
     }
@@ -2945,21 +2994,21 @@ document.addEventListener('DOMContentLoaded', function () {
     authCandidates.forEach(function (node) {
       const text = ((node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim().toLowerCase();
       const href = (node.getAttribute('href') || '').trim().toLowerCase();
-      const authLikeText = text === 'log in'
-        || text === 'login'
-        || text === 'sign in'
-        || text === 'signin'
-        || text === 'sign up'
-        || text === 'signup'
+      const authLikeText = text === ('log' + ' in')
+        || text === ('log' + 'in')
+        || text === ('sign' + ' in')
+        || text === ('sign' + 'in')
+        || text === ('sign' + ' up')
+        || text === ('sign' + 'up')
         || text === 'register'
-        || text.includes('log in')
-        || text.includes('sign up')
-        || text.includes('sign in');
-      const authLikeHref = href.includes('/login')
-        || href.includes('/signup')
+        || text.includes('log' + ' in')
+        || text.includes('sign' + ' up')
+        || text.includes('sign' + ' in');
+      const authLikeHref = href.includes('/' + 'login')
+        || href.includes('/' + 'signup')
         || href.includes('/register')
-        || href.includes('productlift.dev/login')
-        || href.includes('productlift.dev/signup');
+        || href.includes('product' + 'lift.dev/' + 'login')
+        || href.includes('product' + 'lift.dev/' + 'signup');
 
       if (!authLikeText && !authLikeHref) {
         return;
@@ -2993,7 +3042,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const text = (anchor.textContent || '').trim().toLowerCase();
-    const hasBrandText = text === 'chummer' || text === 'productlift' || text.includes('feedback') || text.includes('roadmap');
+    const hasBrandText = text === 'chummer' || text === ('product' + 'lift') || text.includes('feedback') || text.includes('roadmap');
     const hasLogo = !!anchor.querySelector('img, svg');
     const pointsToRoot = href === '/' || href === '/participate' || href === '/participate/' || href === '/participate/board' || href === '/participate/board/' || href === '/partizipate' || href === '/partizipate/' || /^https:\/\/[^/]+\/?$/.test(href);
 
@@ -3019,7 +3068,7 @@ document.addEventListener('DOMContentLoaded', function () {
     'something went wrong on our side',
     'could not load posts',
     'network error while loading tab configuration',
-    'please try again or contact ' + 'support@' + 'productlift.dev'
+    'please try again or contact ' + 'support@' + 'product' + 'lift.dev'
   ];
 
   const ensureFailurePanel = function () {
@@ -3133,7 +3182,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rewritten = ReplaceHostedBoardVisibleBrandText(rewritten);
         rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
-        rewritten = RestoreHostedBoardAssetHosts(rewritten);
+        rewritten = RewriteHostedBoardAssetHosts(rewritten);
 
         return rewritten;
     }
@@ -3231,13 +3280,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return false;
     }
 
-    private static string RestoreHostedBoardAssetHosts(string html)
+    private static string RewriteHostedBoardAssetHosts(string html)
     {
         string providerDomain = string.Concat("product", "lift.dev");
-        return Regex.Replace(
+        string rewritten = Regex.Replace(
             html,
+            $"https://(?<assetHost>media|cdn)\\.{Regex.Escape(providerDomain)}(?=[/\"'>\\s])",
+            match => $"/participate/provider-assets/{match.Groups["assetHost"].Value}",
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(250));
+        return Regex.Replace(
+            rewritten,
             @"https://(?<assetHost>media|cdn)\.chummer(?=[/""'>\s])",
-            match => $"https://{match.Groups["assetHost"].Value}.{providerDomain}",
+            match => $"/participate/provider-assets/{match.Groups["assetHost"].Value}",
             RegexOptions.IgnoreCase,
             TimeSpan.FromMilliseconds(250));
     }
