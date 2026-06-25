@@ -57,16 +57,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/participate":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_response(302)
+            self.send_header("Location", "/partizipate")
             self.end_headers()
-            self.wfile.write(
-                b"<html><body>"
-                b"<title>Participate - Chummer.run</title>"
-                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
-                b"<style data-chummer-board-skin></style>"
-                b"</body></html>"
-            )
             return
 
         if self.path == "/partizipate":
@@ -146,6 +139,8 @@ class LiveSurfaceParityTests(unittest.TestCase):
         participate = next(item for item in payload["results"] if item["path"] == "/participate")
         self.assertEqual(200, participate["status_code"])
         self.assertFalse(participate["cross_origin_redirect"])
+        self.assertEqual([f"{self.base_url}/partizipate"], participate["redirect_chain"])
+        self.assertTrue(participate["final_url"].endswith("/partizipate"))
         self.assertEqual([], participate["missing_required_texts"])
         self.assertEqual([], participate["missing_required_html_texts"])
         self.assertEqual([], participate["forbidden_html_hits"])
