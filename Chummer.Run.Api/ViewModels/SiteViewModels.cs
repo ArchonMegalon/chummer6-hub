@@ -989,6 +989,8 @@ public sealed record FirstPartyParticipateBoardViewModel(
     string StatusLabel,
     IReadOnlyList<FirstPartyParticipatePostViewModel> Posts,
     IReadOnlyList<ParticipateItemViewModel> FallbackItems,
+    int TotalRequestCount,
+    string SyncedLabel,
     string RoadmapHref,
     string SupportHref,
     string RetryHref,

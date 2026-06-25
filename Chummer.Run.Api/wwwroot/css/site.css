@@ -9896,6 +9896,11 @@ body {
   line-height: 1.45;
 }
 
+.partizipate-board__header > .partizipate-board__meta {
+  font-size: 0.78rem;
+  color: var(--minimal-soft);
+}
+
 .partizipate-board__grid {
   display: grid;
   gap: 0.55rem;

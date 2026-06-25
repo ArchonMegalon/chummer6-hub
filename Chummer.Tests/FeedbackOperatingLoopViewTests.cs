@@ -38,7 +38,7 @@ public sealed class FeedbackOperatingLoopViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("Roadmap", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("What is moving next.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current work, public requests, and shipped changes.", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Maintenance first.", roadmapView, StringComparison.Ordinal);
         Assert.Contains(">Changelog</a>", roadmapView, StringComparison.Ordinal);
         Assert.Contains("/changelog", roadmapView, StringComparison.Ordinal);

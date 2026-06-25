@@ -95,6 +95,9 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.True(model.LoadedFromBoard);
         Assert.Equal("/participate", model.RetryHref);
         Assert.Equal("Participate", model.Heading);
+        Assert.Equal("Live requests", model.StatusLabel);
+        Assert.Equal(1, model.TotalRequestCount);
+        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
         FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
         Assert.Equal("Mobile companion app for dice rolling", post.Title);
         Assert.DoesNotContain("AI-powered", post.Summary, StringComparison.OrdinalIgnoreCase);
@@ -116,7 +119,9 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.True(model.LoadedFromBoard);
         Assert.Equal("/partizipate", model.RetryHref);
         Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Live board", model.StatusLabel);
+        Assert.Equal("Live requests", model.StatusLabel);
+        Assert.Equal(1, model.TotalRequestCount);
+        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
         FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
         Assert.Equal("Mobile companion app for dice rolling", post.Title);
         Assert.Equal("Open", post.Status);

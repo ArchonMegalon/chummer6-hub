@@ -2152,8 +2152,8 @@ public sealed class PublicLandingController : Controller
             new(5, "Shared initiative tracker", "A table view for GM and players when combat starts moving fast.", "Open")
         ];
 
-        IReadOnlyList<FirstPartyParticipatePostViewModel> posts = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
-        bool loadedFromBoard = posts.Count > 0;
+        ProductLiftParticipateSnapshot snapshot = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
+        bool loadedFromBoard = snapshot.Posts.Count > 0;
 
         return new FirstPartyParticipateBoardViewModel(
             Chrome: subject is null
@@ -2169,9 +2169,11 @@ public sealed class PublicLandingController : Controller
                     subject.Email),
             Heading: "Participate",
             Summary: "Short requests, clear bugs, useful ideas.",
-            StatusLabel: loadedFromBoard ? "Live board" : "Board snapshot unavailable",
-            Posts: posts,
+            StatusLabel: loadedFromBoard ? "Live requests" : "Requests unavailable",
+            Posts: snapshot.Posts,
             FallbackItems: fallbackItems,
+            TotalRequestCount: loadedFromBoard ? snapshot.TotalCount : fallbackItems.Length,
+            SyncedLabel: loadedFromBoard ? FormatParticipateSyncedLabel(snapshot.SyncedAtUtc) : "Fallback list",
             RoadmapHref: "/roadmap",
             SupportHref: "/contact#support-intake",
             RetryHref: currentPath,
@@ -2179,12 +2181,12 @@ public sealed class PublicLandingController : Controller
             LoadedFromBoard: loadedFromBoard);
     }
 
-    private async Task<IReadOnlyList<FirstPartyParticipatePostViewModel>> TryFetchFirstPartyParticipatePostsAsync(CancellationToken cancellationToken)
+    private async Task<ProductLiftParticipateSnapshot> TryFetchFirstPartyParticipatePostsAsync(CancellationToken cancellationToken)
     {
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
         {
-            return [];
+            return ProductLiftParticipateSnapshot.Empty;
         }
 
         Uri upstreamOrigin = new($"{upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/')}/");
@@ -2200,20 +2202,20 @@ public sealed class PublicLandingController : Controller
             using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                return [];
+                return ProductLiftParticipateSnapshot.Empty;
             }
 
             string mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
             if (!mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
             {
-                return [];
+                return ProductLiftParticipateSnapshot.Empty;
             }
 
             await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
             if (!document.RootElement.TryGetProperty("data", out JsonElement data) || data.ValueKind != JsonValueKind.Array)
             {
-                return [];
+                return ProductLiftParticipateSnapshot.Empty;
             }
 
             List<FirstPartyParticipatePostViewModel> posts = [];
@@ -2244,23 +2246,37 @@ public sealed class PublicLandingController : Controller
                     UpdatedLabel: FormatParticipateUpdatedLabel(ReadJsonString(item, "updated_at"))));
             }
 
-            return posts;
+            int totalCount = ReadJsonInt(document.RootElement, "total");
+            if (totalCount <= 0)
+            {
+                totalCount = posts.Count;
+            }
+
+            return new ProductLiftParticipateSnapshot(posts, totalCount, DateTimeOffset.UtcNow);
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Participate first-party board could not fetch public board posts.");
-            return [];
+            return ProductLiftParticipateSnapshot.Empty;
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "Participate first-party board received invalid public board JSON.");
-            return [];
+            return ProductLiftParticipateSnapshot.Empty;
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Participate first-party board timed out while fetching posts.");
-            return [];
+            return ProductLiftParticipateSnapshot.Empty;
         }
+    }
+
+    private sealed record ProductLiftParticipateSnapshot(
+        IReadOnlyList<FirstPartyParticipatePostViewModel> Posts,
+        int TotalCount,
+        DateTimeOffset SyncedAtUtc)
+    {
+        public static ProductLiftParticipateSnapshot Empty { get; } = new([], 0, DateTimeOffset.MinValue);
     }
 
     private static string ReadJsonString(JsonElement element, string propertyName)
@@ -2363,6 +2379,11 @@ public sealed class PublicLandingController : Controller
 
         return $"Updated {updated.UtcDateTime:yyyy-MM-dd}";
     }
+
+    private static string FormatParticipateSyncedLabel(DateTimeOffset syncedAtUtc)
+        => syncedAtUtc == DateTimeOffset.MinValue
+            ? "Not synced"
+            : $"Synced {syncedAtUtc.UtcDateTime:HH:mm} UTC";
 
     [HttpGet("/partizipate/{**boardPath}")]
     public async Task<IActionResult> ParticipateBoardProxyLegacyAlias(string? boardPath, CancellationToken cancellationToken)
