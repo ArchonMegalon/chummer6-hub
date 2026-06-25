@@ -122,12 +122,14 @@ SURFACES = [
     {
         "path": "/partizipate",
         "required_texts": [
-            "Participate - Chummer.run",
+            "Participate",
+            "Requests, votes, and shipped work.",
+            "Roadmap",
+            "Support",
         ],
         "required_html_texts": [
-            "<title>Participate - Chummer.run</title>",
-            "content=\"Short requests, clear bugs, useful ideas.\"",
-            "data-chummer-board-skin",
+            "id=\"participate-board\"",
+            "src=\"/participate/board\"",
         ],
         "forbidden_texts": [
             "ProductLift",

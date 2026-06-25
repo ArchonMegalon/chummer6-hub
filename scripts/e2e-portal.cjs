@@ -73,12 +73,12 @@ const checks = [
     url: `${baseUrl}/partizipate`,
     assert: (text, response) =>
       /\/partizipate\/?$/.test(response.url)
-      && text.includes('Chummer.run')
-      && text.includes('What should Chummer do next?')
-      && text.includes('Short requests, clear bugs, useful ideas.')
-      && !text.includes('Requests, votes, and shipped work.')
+      && text.includes('Chummer')
+      && text.includes('Participate')
+      && text.includes('Requests, votes, and shipped work.')
+      && text.includes('participate-board')
+      && text.includes('/participate/board')
       && !text.includes('Use the right place')
-      && !text.includes('participate-board')
       && !text.includes('Chummer Participate')
       && !text.includes('What do you want to see next?')
       && !text.includes('Something went wrong')

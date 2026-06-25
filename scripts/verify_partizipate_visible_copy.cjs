@@ -35,7 +35,7 @@ const forbidden = [
 ];
 
 const requiredHtml = [
-  '<title>Participate - Chummer.run</title>',
+  '<title>Participate · Chummer</title>',
   '<h1>Participate</h1>',
   'Requests, votes, and shipped work.',
   'id="participate-board"',

@@ -39,8 +39,8 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Install Chummer Windows and Linux installers. Current build Newest build Nightly Stable "
-                b"Use this when you want the latest Windows or Linux build. Help"
+                b"Install Chummer Current public installer: Windows. Current build Newest build Nightly Stable "
+                b"Use this when you want the newest promoted build. Help"
                 b"</body></html>"
             )
             return
@@ -74,9 +74,8 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"<title>Participate - Chummer.run</title>"
-                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
-                b"<style data-chummer-board-skin></style>"
+                b"Participate Requests, votes, and shipped work. Roadmap Support "
+                b"<iframe id=\"participate-board\" src=\"/participate/board\"></iframe>"
                 b"</body></html>"
             )
             return
