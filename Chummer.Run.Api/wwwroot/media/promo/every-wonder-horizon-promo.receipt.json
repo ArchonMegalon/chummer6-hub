@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-25T15:37:41Z",
+  "generated_at_utc": "2026-06-25T16:11:55Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
   "title": "Chummer6 Product Spine Promo",
@@ -196,5 +196,15 @@
       "caption": "One product spine: build, run, remember, publish.",
       "narration": "The cleaner promise is simple: build clearly, run reliably, remember consequences, and publish only what the table approves."
     }
-  ]
+  ],
+  "audio_policy": "unmixr_only_premium_gain_remaster_no_openvoice_no_metallic_lowpass_repair",
+  "audio_quality_remaster": {
+    "reason": "replace metallic anti-whistle repair master with source Unmixr narration remux and non-clipping gain master",
+    "tts_provider": "unmixr-short-tts",
+    "openvoice_tts_used": false,
+    "metallic_lowpass_repair_used": false,
+    "gain_master": "volume=0.68,alimiter=limit=0.89",
+    "webm_fallback": "vp8_opus_640x360_from_corrected_mp4",
+    "synthetic_music_bed_enabled": false
+  }
 }
