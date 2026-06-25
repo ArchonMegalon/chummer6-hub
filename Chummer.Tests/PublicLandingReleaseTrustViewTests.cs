@@ -16,7 +16,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<span>Linux</span>", view, StringComparison.Ordinal);
         Assert.Contains("Build from source", view, StringComparison.Ordinal);
         Assert.Contains("build-chummer6-linux.sh", view, StringComparison.Ordinal);
-        Assert.Contains("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
+        Assert.Contains("Pick one. Stable for most tables, Nightly for newer builds, source script for Linux.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
@@ -93,9 +94,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("id=\"linux-source\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
-        Assert.Contains("The regular build for this device.", view, StringComparison.Ordinal);
-        Assert.Contains("The newest promoted build available from this page.", view, StringComparison.Ordinal);
-        Assert.Contains("Local build script. No sudo. Updates default to notify.", view, StringComparison.Ordinal);
+        Assert.Contains("The regular build.", view, StringComparison.Ordinal);
+        Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
+        Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("The regular build for this device.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("The newest promoted build available from this page.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Local build script. No sudo. Updates default to notify.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
@@ -355,7 +359,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("The newest promoted build available from this page.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);

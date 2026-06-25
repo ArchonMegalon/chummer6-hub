@@ -907,14 +907,17 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
 
     assert "Stable" in downloads
     assert "Nightly" in downloads
-    assert "Windows" in downloads
     assert "Linux" in downloads
     assert "Build from source" in downloads
-    assert "Local build script. No sudo. Updates default to notify." in downloads
+    assert "Pick one. Stable for most tables, Nightly for newer builds, source script for Linux." in downloads
+    assert "No sudo. Updates default to notify." in downloads
     assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
-    assert "Nightly currently matches Stable" in downloads
-    assert "There is no newer Nightly available" in downloads
+    assert "No newer Nightly right now." in downloads
+    assert "Chummer picks the right installer for this browser." not in downloads
+    assert "Nightly currently matches Stable" not in downloads
+    assert "There is no newer Nightly available" not in downloads
+    assert "The newest promoted build available from this page." not in downloads
 
     for forbidden in (
         "Signed-in download",

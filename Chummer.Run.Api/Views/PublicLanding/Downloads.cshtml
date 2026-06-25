@@ -53,7 +53,7 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Chummer picks the right installer for this browser. Windows, Linux, Nightly, and source builds stay short and separate.</p>
+        <p>Pick one. Stable for most tables, Nightly for newer builds, source script for Linux.</p>
     </div>
     <div class="minimal-status-pill" aria-label="Release freshness">
         <span>Updated</span>
@@ -76,7 +76,7 @@ else
             <div>
                 <span>Stable</span>
                 <h2>@stable.PlatformLabel</h2>
-                <p>The regular build for this device.</p>
+                <p>The regular build.</p>
             </div>
             <a class="button-like button-like--primary"
                href="@stable.DispatchHref"
@@ -97,7 +97,7 @@ else
             <div>
                 <span>Nightly</span>
                 <h2>@(nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel)</h2>
-                <p>@(nightly is null || stableAndNightlyMatch ? "There is no newer Nightly available. Nightly currently matches Stable." : "The newest promoted build available from this page.")</p>
+                <p>@(nightly is null || stableAndNightlyMatch ? "No newer Nightly right now." : "Newer than Stable.")</p>
             </div>
             @if (nightly is null || stableAndNightlyMatch)
             {
@@ -125,7 +125,7 @@ else
             <div>
                 <span>Linux</span>
                 <h2>Build from source</h2>
-                <p>Local build script. No sudo. Updates default to notify.</p>
+                <p>No sudo. Updates default to notify.</p>
             </div>
             <a class="button-like button-like--ghost"
                href="@sourceScriptHref"
