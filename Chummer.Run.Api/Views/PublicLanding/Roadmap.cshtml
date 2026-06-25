@@ -5,81 +5,72 @@
     ViewData["SurfaceClass"] = "surface-roadmap surface-minimal";
 }
 
-@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
-{
-    <section class="participate-shell roadmap-shell">
-        <div class="participate-shell__header">
-            <div class="participate-shell__lead">
-                <p class="eyebrow">Roadmap</p>
-                <h1>Roadmap</h1>
-                <p>Current work, public requests, and shipped changes.</p>
-            </div>
-        </div>
+<section class="minimal-page-hero route-anchor-target roadmap-signal">
+    <div>
+        <p class="eyebrow">Roadmap</p>
+        <h1>Maintenance first.</h1>
+        <p>Install reliability, cleaner screens, fewer dead ends.</p>
+    </div>
+</section>
 
-        <div class="participate-board">
-            <div class="participate-hosted">
-                <div class="participate-hosted__header">
-                    <div class="participate-hosted__lead">
-                        <h2>Current work</h2>
-                        <p>Loaded through Chummer so the page stays first-party.</p>
-                    </div>
-                </div>
-                <iframe
-                    id="roadmap-board"
-                    class="participate-hosted__frame"
-                    src="@Model.HostedBoardHref"
-                    title="Roadmap board"
-                    loading="lazy"
-                    referrerpolicy="strict-origin-when-cross-origin"></iframe>
-            </div>
-        </div>
-    </section>
-}
-else
-{
-    <section class="minimal-page-hero route-anchor-target roadmap-signal">
-        <div>
-            <p class="eyebrow">Roadmap</p>
-            <h1>Maintenance first.</h1>
-            <p>Install reliability, cleaner screens, fewer dead ends.</p>
-        </div>
-    </section>
+<section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Now</p>
+        <h2 id="roadmap-active-work">Current focus</h2>
+        <p>Short list.</p>
+    </div>
+    <div class="minimal-lane-grid">
+        <article class="minimal-lane-card">
+            <span class="tag">Install</span>
+            <h3>Make setup boring</h3>
+            <p>Smaller installers, visible update progress, and better recovery when something fails.</p>
+        </article>
+        <article class="minimal-lane-card">
+            <span class="tag">Desktop</span>
+            <h3>Clean the builder</h3>
+            <p>Readable controls, less duplicated UI, and fewer surprises while creating a runner.</p>
+        </article>
+        <article class="minimal-lane-card">
+            <span class="tag">Web</span>
+            <h3>Keep the site quiet</h3>
+            <p>Downloads, help, account, billing, and public feedback should stay short and clear.</p>
+        </article>
+    </div>
+</section>
 
-    <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
+@if (Model.PublicRequests.Count > 0)
+{
+    <section class="minimal-section minimal-section--tight roadmap-public-requests" aria-labelledby="roadmap-public-requests">
         <div class="minimal-section__lead">
-            <p class="eyebrow">Now</p>
-            <h2 id="roadmap-active-work">Current focus</h2>
-            <p>Short list.</p>
+            <p class="eyebrow">Requests</p>
+            <h2 id="roadmap-public-requests">What people ask for</h2>
+            <p>@Model.PublicRequestCount public requests - @Model.PublicRequestSyncedLabel</p>
         </div>
         <div class="minimal-lane-grid">
-            <article class="minimal-lane-card">
-                <span class="tag">Install</span>
-                <h3>Make setup boring</h3>
-                <p>Smaller installers, visible update progress, and better recovery when something fails.</p>
-            </article>
-            <article class="minimal-lane-card">
-                <span class="tag">Desktop</span>
-                <h3>Clean the builder</h3>
-                <p>Readable controls, less duplicated UI, and fewer surprises while creating a runner.</p>
-            </article>
-            <article class="minimal-lane-card">
-                <span class="tag">Web</span>
-                <h3>Keep the site quiet</h3>
-                <p>Downloads, help, account, billing, and public feedback should stay short and clear.</p>
-            </article>
-        </div>
-    </section>
-
-    <section class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Elsewhere</p>
-            <h2>More</h2>
-            <p>Requests, shipped work, and support.</p>
-        </div>
-        <div class="minimal-actions">
-            <a class="button-like button-like--primary" href="/participate">Participate</a>
-            <a class="button-like button-like--ghost" href="/changelog">Changelog</a>
-            <a class="button-like button-like--ghost" href="/help">Support</a>
+            @foreach (var item in Model.PublicRequests)
+            {
+                <article class="minimal-lane-card">
+                    <span class="tag">@item.Score votes</span>
+                    <h3>@item.Title</h3>
+                    @if (!string.IsNullOrWhiteSpace(item.Summary))
+                    {
+                        <p>@item.Summary</p>
+                    }
+                </article>
+            }
         </div>
     </section>
 }
+
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Elsewhere</p>
+        <h2>More</h2>
+        <p>Requests, shipped work, and support.</p>
+    </div>
+    <div class="minimal-actions">
+        <a class="button-like button-like--primary" href="/participate">Participate</a>
+        <a class="button-like button-like--ghost" href="/changelog">Changelog</a>
+        <a class="button-like button-like--ghost" href="/help">Support</a>
+    </div>
+</section>

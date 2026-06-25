@@ -5506,12 +5506,16 @@ document.addEventListener('DOMContentLoaded', function () {
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
         var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
+        ProductLiftParticipateSnapshot publicRequests = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
         string? hostedBoardHref = ResolveProductLiftHostedRoadmapHref();
         var model = new RoadmapPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "Milestone-backed public direction, current readiness, and the next honest routes.", currentPath, cancellationToken),
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, currentPath),
             Milestones: BuildRoadmapMilestones(),
             SignalLoop: signalLoop,
+            PublicRequests: publicRequests.Posts.Take(3).ToArray(),
+            PublicRequestCount: publicRequests.TotalCount,
+            PublicRequestSyncedLabel: publicRequests.Posts.Count > 0 ? FormatParticipateSyncedLabel(publicRequests.SyncedAtUtc) : "Requests unavailable",
             HostedBoardHref: hostedBoardHref,
             SignalProjection: signalProjection,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience));

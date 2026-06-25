@@ -61,22 +61,22 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     }
 
     [Fact]
-    public void RoadmapRouteCanUseHostedProductLiftBoardWithoutLeavingFirstPartyChrome()
+    public void RoadmapRouteRendersProductLiftRequestsAsFirstPartyData()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string roadmapView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml"));
 
-        Assert.Contains("ResolveProductLiftHostedRoadmapHref()", controller, StringComparison.Ordinal);
-        Assert.Contains("ResolveProductLiftHostedRoadmapUri()", controller, StringComparison.Ordinal);
+        Assert.Contains("TryFetchFirstPartyParticipatePostsAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("PublicRequests: publicRequests.Posts.Take(3).ToArray()", controller, StringComparison.Ordinal);
+        Assert.Contains("PublicRequestCount: publicRequests.TotalCount", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/roadmap/board\")]", controller, StringComparison.Ordinal);
         Assert.Contains("RoadmapBoardProxy", controller, StringComparison.Ordinal);
-        Assert.Contains("Chummer Roadmap", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("src=\"@Model.HostedBoardHref\"", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Current work, public requests, and shipped changes.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Loaded through Chummer so the page stays first-party.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Model.PublicRequests.Count > 0", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What people ask for", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Model.PublicRequestCount public requests", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("<iframe", roadmapView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Roadmap guidance", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("Quick links", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("planning surface", roadmapView, StringComparison.OrdinalIgnoreCase);

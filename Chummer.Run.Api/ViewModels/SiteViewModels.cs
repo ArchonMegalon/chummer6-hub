@@ -909,6 +909,9 @@ public sealed record RoadmapPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Horizons,
     IReadOnlyList<ProgramMilestoneSummaryViewModel> Milestones,
     PublicSignalLoopSnapshotViewModel SignalLoop,
+    IReadOnlyList<FirstPartyParticipatePostViewModel> PublicRequests,
+    int PublicRequestCount,
+    string PublicRequestSyncedLabel,
     string? HostedBoardHref = null,
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null);

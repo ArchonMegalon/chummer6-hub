@@ -186,10 +186,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Current work, public requests, and shipped changes.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Install reliability, cleaner screens, fewer dead ends.", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Maintenance first.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What people ask for", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Participate", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Current work", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current focus", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Recent changes", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
