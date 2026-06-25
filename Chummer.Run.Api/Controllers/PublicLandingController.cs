@@ -2831,6 +2831,25 @@ public sealed class PublicLandingController : Controller
                 TimeSpan.FromMilliseconds(250));
         }
 
+        rewritten = Regex.Replace(
+            rewritten,
+            @"<link\b(?=[^>]*\brel\s*=\s*[""']canonical[""'])[^>]*>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+        rewritten = Regex.Replace(
+            rewritten,
+            @"(<base\b[^>]*>)",
+            $"$1<link rel=\"canonical\" href=\"{localOrigin}\" />",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+        rewritten = Regex.Replace(
+            rewritten,
+            @"(<meta\b[^>]*\b(?:property|name)\s*=\s*[""'](?:og:url|twitter:url)[""'][^>]*\bcontent\s*=\s*[""'])[^""']+([""'][^>]*>)",
+            $"$1{localOrigin}$2",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
             string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);

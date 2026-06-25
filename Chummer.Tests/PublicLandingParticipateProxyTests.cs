@@ -63,6 +63,7 @@ public sealed class PublicLandingParticipateProxyTests
         ContentResult content = Assert.IsType<ContentResult>(result);
         string html = content.Content ?? string.Empty;
         Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("rel=\"canonical\" href=\"/participate/board\"", html, StringComparison.Ordinal);
         Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
         Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
@@ -107,6 +108,7 @@ public sealed class PublicLandingParticipateProxyTests
         string html = content.Content ?? string.Empty;
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
         Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
         Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/partizipate/", html, StringComparison.Ordinal);
         Assert.DoesNotContain("https://ideas.example.test", html, StringComparison.OrdinalIgnoreCase);
