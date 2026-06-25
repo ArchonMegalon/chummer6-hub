@@ -78,7 +78,8 @@ def write_receipt(
 def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
     root = tmp_path / "origin-live"
     project_id = "origin-live-gold"
-    share_url = f"https://audio.chummer.run/share/{project_id}"
+    audiobook_share_url = f"https://audio.chummer.run/share/{project_id}-audiobook"
+    dossier_share_url = f"https://audio.chummer.run/share/{project_id}-dossier"
     source = write_artifact(root, "approved-source-packet.json", '{"externalProcessingConsent": true}\n')
     manuscript = write_artifact(
         root,
@@ -179,7 +180,7 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
                 "target_file_sha256": sha256(audio),
                 "player_scoped_reference_status": "signed_reference_ready",
                 "public_share_status": "public_share_ready",
-                "public_share_url": share_url,
+                "public_share_url": audiobook_share_url,
                 "public_share_token_exposed": False,
                 "public_share_raw_library_path_exposed": False,
                 "public_share_telegram_delivery_status": "sent",
@@ -235,7 +236,13 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "projectId": project_id,
         "title": "A Gold Origin Dossier",
         "runnerAlias": "Kestrel",
-        "audiobookshelfShareUrl": share_url,
+        "familyName": "Varga",
+        "givenName": "Mira",
+        "runnerName": "Kestrel",
+        "originEditionNamespace": "origin.chummer.run/Varga/Mira/Kestrel",
+        "audiobookshelfShareUrl": audiobook_share_url,
+        "audiobookshelfDossierShareUrl": dossier_share_url,
+        "audiobookshelfAudiobookShareUrl": audiobook_share_url,
         "sourcePacketPath": str(source),
         "sourcePacketReceiptPath": str(source_receipt),
         "providerManuscriptPath": str(manuscript),
@@ -259,7 +266,8 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "eaJobReceipt": ea_job_receipt,
         "eaLiveReceipt": ea_live_receipt,
         "coverReceipt": cover_receipt,
-        "shareUrl": share_url,
+        "audiobookShareUrl": audiobook_share_url,
+        "dossierShareUrl": dossier_share_url,
     }
     return manifest_path, paths
 
@@ -279,6 +287,12 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     assert request["storySceneCoverUsesSelectedCharacterFace"] is True
     assert request["audiobookshelfPlaybackVerified"] is True
     assert request["telegramShareDelivered"] is True
+    assert request["familyName"] == "Varga"
+    assert request["givenName"] == "Mira"
+    assert request["runnerName"] == "Kestrel"
+    assert request["originEditionNamespace"] == "origin.chummer.run/Varga/Mira/Kestrel"
+    assert request["audiobookshelfDossierShareUrl"] == "https://audio.chummer.run/share/origin-live-gold-dossier"
+    assert request["audiobookshelfAudiobookShareUrl"] == "https://audio.chummer.run/share/origin-live-gold-audiobook"
     assert request["missingGoldRequirements"] == []
     assert Path(request["audiobookshelfImportReceiptPath"]).is_file()
     assert Path(request["telegramShareDeliveryReceiptPath"]).is_file()
@@ -288,10 +302,21 @@ def test_rejects_untrusted_audiobookshelf_share_url(tmp_path: Path) -> None:
     module = load_module()
     manifest, _paths = build_valid_fixture(tmp_path)
     payload = json.loads(manifest.read_text(encoding="utf-8"))
-    payload["audiobookshelfShareUrl"] = "https://evil.example/share/origin-live-gold"
+    payload["audiobookshelfAudiobookShareUrl"] = "https://evil.example/share/origin-live-gold"
     write_json(manifest, payload)
 
-    with pytest.raises(module.ValidationError, match="trusted chummer.run Audiobookshelf"):
+    with pytest.raises(module.ValidationError, match="audiobookshelfAudiobookShareUrl"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_missing_dossier_share_url(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["audiobookshelfDossierShareUrl"] = ""
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="audiobookshelfDossierShareUrl"):
         module.materialize(manifest, tmp_path / "out.json")
 
 

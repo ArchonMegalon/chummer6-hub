@@ -348,7 +348,9 @@ def _materialize_normalized_receipts(
     *,
     output_dir: Path,
     project_id: str,
-    share_url: str,
+    audiobook_share_url: str,
+    dossier_share_url: str,
+    origin_namespace: str,
     audiobook_hash: str,
     audiobook_provider: str,
     ea_job_receipt_path: Path,
@@ -367,14 +369,14 @@ def _materialize_normalized_receipts(
         "completedAtUtc": generated_at,
         "artifactSha256": [audiobook_hash],
         "audiobookProvider": audiobook_provider,
-        "audiobookshelfShareUrl": share_url,
+        "audiobookshelfShareUrl": audiobook_share_url,
         "deliveredLinks": [
             LIVE_TOKEN,
             f"{PROVIDER_REFERENCE_TOKEN}:ea_job_receipt:{job_receipt_hash}",
             f"{PROVIDER_REFERENCE_TOKEN}:ea_live_delivery_receipt:{live_receipt_hash}",
             f"narrationProvider: {audiobook_provider}",
             "machine_playback_e2e_verified",
-            share_url,
+            audiobook_share_url,
         ],
         "evidence": {
             "eaJobReceiptSha256": job_receipt_hash,
@@ -390,10 +392,16 @@ def _materialize_normalized_receipts(
         "deliveredAtUtc": generated_at,
         "deliveredLinks": [
             _owner_path(project_id),
+            _owner_path(project_id, "read"),
             _owner_path(project_id, "listen"),
+            _owner_path(project_id, "watch"),
+            origin_namespace,
+            dossier_share_url,
+            audiobook_share_url,
             LIVE_TOKEN,
             f"{PROVIDER_REFERENCE_TOKEN}:ea_live_delivery_receipt:{live_receipt_hash}",
-            f"audiobookshelf_share_sha256:{hashlib.sha256(share_url.encode('utf-8')).hexdigest()}",
+            f"audiobookshelf_dossier_share_sha256:{hashlib.sha256(dossier_share_url.encode('utf-8')).hexdigest()}",
+            f"audiobookshelf_audiobook_share_sha256:{hashlib.sha256(audiobook_share_url.encode('utf-8')).hexdigest()}",
         ],
         "evidence": {
             "eaLiveDeliveryReceiptSha256": live_receipt_hash,
@@ -414,9 +422,20 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         raise ValidationError("projectId is required")
     if "/" in project_id or "\\" in project_id:
         raise ValidationError("projectId must be a route-safe identifier")
-    share_url = _string(manifest.get("audiobookshelfShareUrl"))
-    if not _trusted_audiobookshelf_share_url(share_url):
-        raise ValidationError("audiobookshelfShareUrl must be a trusted chummer.run Audiobookshelf share URL")
+    audiobook_share_url = _string(manifest.get("audiobookshelfAudiobookShareUrl")) or _string(manifest.get("audiobookshelfShareUrl"))
+    dossier_share_url = _string(manifest.get("audiobookshelfDossierShareUrl"))
+    if not _trusted_audiobookshelf_share_url(audiobook_share_url):
+        raise ValidationError("audiobookshelfAudiobookShareUrl must be a trusted chummer.run Audiobookshelf share URL")
+    if not _trusted_audiobookshelf_share_url(dossier_share_url):
+        raise ValidationError("audiobookshelfDossierShareUrl must be a trusted chummer.run Audiobookshelf share URL")
+    family_name = _string(manifest.get("familyName"))
+    given_name = _string(manifest.get("givenName"))
+    runner_name = _string(manifest.get("runnerName")) or _string(manifest.get("runnerAlias")) or "Runner"
+    origin_namespace = _string(manifest.get("originEditionNamespace"))
+    if not origin_namespace:
+        raise ValidationError("originEditionNamespace is required")
+    if not origin_namespace.lower().startswith("origin.chummer.run/"):
+        raise ValidationError("originEditionNamespace must start with origin.chummer.run/")
 
     source_packet = _require_file(manifest.get("sourcePacketPath"), "sourcePacketPath")
     source_receipt = _require_file(manifest.get("sourcePacketReceiptPath"), "sourcePacketReceiptPath")
@@ -486,15 +505,17 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         artifact_hashes=(video_hash,),
         external=True,
     )
-    audiobook_provider = _validate_audio_job_receipt(ea_job_receipt, audiobook_hash, share_url)
-    live_receipt = _validate_live_delivery_receipt(ea_live_delivery_receipt, share_url)
+    audiobook_provider = _validate_audio_job_receipt(ea_job_receipt, audiobook_hash, audiobook_share_url)
+    live_receipt = _validate_live_delivery_receipt(ea_live_delivery_receipt, audiobook_share_url)
 
     resolved_output = output_path or manifest_path.with_name(DEFAULT_OUTPUT_NAME)
     normalized_dir = resolved_output.parent / "origin-dossier-live-normalized-receipts" / project_id
     audiobook_receipt, telegram_receipt = _materialize_normalized_receipts(
         output_dir=normalized_dir,
         project_id=project_id,
-        share_url=share_url,
+        audiobook_share_url=audiobook_share_url,
+        dossier_share_url=dossier_share_url,
+        origin_namespace=origin_namespace,
         audiobook_hash=audiobook_hash,
         audiobook_provider=audiobook_provider,
         ea_job_receipt_path=ea_job_receipt,
@@ -505,9 +526,15 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "projectId": project_id,
         "title": _string(manifest.get("title")) or "Origin Dossier",
         "runnerAlias": _string(manifest.get("runnerAlias")) or "Runner",
+        "familyName": family_name,
+        "givenName": given_name,
+        "runnerName": runner_name,
+        "originEditionNamespace": origin_namespace,
         "publicationState": "published_for_owner",
         "bookArtifactUrl": f"https://chummer.run{_owner_path(project_id, 'book')}",
-        "audiobookshelfShareUrl": share_url,
+        "audiobookshelfShareUrl": audiobook_share_url,
+        "audiobookshelfDossierShareUrl": dossier_share_url,
+        "audiobookshelfAudiobookShareUrl": audiobook_share_url,
         "dossierVideoUrl": f"https://chummer.run{_owner_path(project_id, 'video')}",
         "storySceneCoverUrl": f"https://chummer.run{_owner_path(project_id, 'cover')}",
         "providerAuthoredManuscriptImported": True,
@@ -541,7 +568,9 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "goalCompletionClaimAllowed": False,
         "claim": "This materializes a Chummer import payload from live Origin Dossier artifact evidence; it is not itself provider generation or user playback proof.",
         "chummerRunOwnerUrl": owner_url,
-        "audiobookshelfShareUrl": share_url,
+        "audiobookshelfShareUrl": audiobook_share_url,
+        "audiobookshelfDossierShareUrl": dossier_share_url,
+        "audiobookshelfAudiobookShareUrl": audiobook_share_url,
         "audiobookProvider": audiobook_provider,
         "realUserPlaybackAcceptanceVerified": _bool(live_receipt.get("real_user_playback_acceptance_verified")),
         "evidence": {
