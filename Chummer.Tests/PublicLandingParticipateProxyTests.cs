@@ -130,6 +130,25 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
+    public async Task PartizipateCatchAllEmptyPathRendersFirstPartyBoard()
+    {
+        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateBoardProxyLegacyAlias(string.Empty, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.LoadedFromBoard);
+        Assert.Equal("/partizipate", model.RetryHref);
+        Assert.Equal("Participate", model.Heading);
+        Assert.Equal("Live requests", model.StatusLabel);
+    }
+
+    [Fact]
     public async Task ParticipateBoardRootApiProxyDoesNotForwardChummerCredentials()
     {
         var factory = new RecordingHttpClientFactory();

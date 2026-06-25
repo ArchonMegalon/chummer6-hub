@@ -2391,7 +2391,7 @@ public sealed class PublicLandingController : Controller
         string raw = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
+            return await ParticipateAliasPage(cancellationToken).ConfigureAwait(false);
         }
 
         string targetPath = raw switch
