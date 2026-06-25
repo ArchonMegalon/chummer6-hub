@@ -24,6 +24,10 @@ E2E_ENV_KEYS = {
     "CHUMMER_DEPLOYED_E2E_COOKIE_NAME",
     "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
     "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
+    "CHUMMER_DEPLOYED_E2E_SUBJECT_ID",
+    "CHUMMER_DEPLOYED_E2E_DISPLAY_NAME",
+    "CHUMMER_DEPLOYED_E2E_EMAIL",
+    "CHUMMER_DEPLOYED_E2E_ROLES",
 }
 REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "logged_in_browser_verified",
@@ -166,6 +170,7 @@ def materialize(
     origin_context_args = context_args(context)
     required_commands = [
         "Set exactly one deployed owner-session input in /docker/chummercomplete/chummer.run-services/.env or in the current process: CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER.",
+        "Preferred operator path when IDENTITY_SERVICE_BASE_URL, IDENTITY_ADMIN_KEY, and CHUMMER_DEPLOYED_E2E_SUBJECT_ID are available: eval \"$(python3 scripts/issue_chummer_deployed_owner_session.py --env-file /docker/chummercomplete/chummer.run-services/.env --format env)\"",
         f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
         f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
@@ -236,6 +241,19 @@ def materialize(
                 "presentInCurrentProcess": owner_session_present(),
                 "valueStoredInReceipt": False,
                 "operatorInstruction": "Use one short-lived real owner session input only for the probe process; do not commit or paste it into artifacts.",
+            },
+            "operatorSessionIssuer": {
+                "required": False,
+                "acceptedKeys": [
+                    "IDENTITY_SERVICE_BASE_URL",
+                    "IDENTITY_ADMIN_KEY",
+                    "CHUMMER_DEPLOYED_E2E_SUBJECT_ID",
+                    "CHUMMER_DEPLOYED_E2E_DISPLAY_NAME",
+                    "CHUMMER_DEPLOYED_E2E_EMAIL",
+                    "CHUMMER_DEPLOYED_E2E_ROLES",
+                ],
+                "valueStoredInReceipt": False,
+                "operatorInstruction": "Use scripts/issue_chummer_deployed_owner_session.py to mint an operator-local owner session instead of copying browser cookies when the identity admin route is available.",
             }
         },
         "envFile": {

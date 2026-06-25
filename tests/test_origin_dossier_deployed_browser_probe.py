@@ -263,6 +263,7 @@ def test_deployed_probe_accepts_owner_session_token_alias_without_leaking_value(
     module = load_module()
     write_import_request(tmp_path)
     monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", raising=False)
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_AUTH_MODE", raising=False)
     monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN", "secret-owner-session-alias")
     monkeypatch.setattr(module.requests, "Session", FakeSession)
 
