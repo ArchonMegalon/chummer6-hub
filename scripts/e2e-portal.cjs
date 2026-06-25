@@ -64,7 +64,7 @@ const checks = [
     url: `${baseUrl}/participate`,
     assert: text =>
       text.includes('Participate')
-      && text.includes('Public requests and roadmap votes.')
+      && text.includes('Requests, votes, and shipped work.')
       && text.includes('participate-board')
       && text.includes('/participate/board')
       && !text.includes('ProductLift')
@@ -73,9 +73,17 @@ const checks = [
     url: `${baseUrl}/partizipate`,
     assert: (text, response) =>
       /\/partizipate\/?$/.test(response.url)
-      && text.includes('Participate')
-      && text.includes('Public requests and roadmap votes.')
-      && text.includes('participate-board')
+      && text.includes('Chummer.run')
+      && text.includes('What should Chummer do next?')
+      && text.includes('Short requests, clear bugs, useful ideas.')
+      && !text.includes('Requests, votes, and shipped work.')
+      && !text.includes('Use the right place')
+      && !text.includes('participate-board')
+      && !text.includes('Chummer Participate')
+      && !text.includes('What do you want to see next?')
+      && !text.includes('Something went wrong')
+      && !text.includes('Could not load posts')
+      && !text.includes('support@productlift.dev')
       && !text.includes('ProductLift')
   },
   {
@@ -108,8 +116,8 @@ const checks = [
     url: `${baseUrl}/blazor/`,
     assert: (text, response) =>
       /\/blazor\/?$/.test(response.url)
-      && text.includes('Published browser surface')
-      && text.includes('Launch browser workbench')
+      && (text.includes('Published browser surface') || text.includes('Published browser client'))
+      && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
       && hasBlazorBaseHref(text)
   },
   {

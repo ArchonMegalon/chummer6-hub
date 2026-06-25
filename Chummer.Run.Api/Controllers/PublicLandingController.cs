@@ -2538,6 +2538,11 @@ public sealed class PublicLandingController : Controller
         rewritten = rewritten.Replace("src=\"/", $"src=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("action=\"/", $"action=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("content=\"/", $"content=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("What do you want to see next? - Chummer.run", "Participate - Chummer.run", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("What do you want to see next?", "What should Chummer do next?", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("Tell us how we could make Chummer6 more useful to you", "Short requests, clear bugs, useful ideas.", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("Add Feature or Bug", "Add a note", StringComparison.OrdinalIgnoreCase);
+        rewritten = rewritten.Replace("Let us know how we can improve Chummer6.", "Tell us what would help.", StringComparison.OrdinalIgnoreCase);
 
         if (!rewritten.Contains("<base ", StringComparison.OrdinalIgnoreCase))
         {
@@ -2651,6 +2656,8 @@ document.addEventListener('DOMContentLoaded', function () {
       [/\bvotes\b/gi, 'requests'],
       [/\s{2,}/g, ' ']
     ];
+
+    document.title = 'Participate - Chummer.run';
 
     const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
     const textNodes = [];

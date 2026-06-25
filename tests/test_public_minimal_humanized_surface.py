@@ -426,6 +426,9 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "data-chummer-board-failure-patch" in controller
     assert "polishVisibleCopy" in controller
     assert "quietHostedBoardChrome" in controller
+    assert "document.title = 'Participate - Chummer.run';" in controller
+    assert '"What do you want to see next? - Chummer.run", "Participate - Chummer.run"' in controller
+    assert '"Tell us how we could make Chummer6 more useful to you", "Short requests, clear bugs, useful ideas."' in controller
     assert "What should Chummer do next?" in controller
     assert "Short requests, clear bugs, useful ideas." in controller
     assert "Add a note" in controller

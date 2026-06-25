@@ -60,8 +60,12 @@ public sealed class PublicLandingParticipateProxyTests
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         string html = content.Content ?? string.Empty;
-        Assert.Contains("What do you want to see next?", html, StringComparison.Ordinal);
+        Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Ctrl K", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Search<", html, StringComparison.OrdinalIgnoreCase);

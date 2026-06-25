@@ -44,9 +44,13 @@ const forbidden = [
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForSelector('text=What should Chummer do next?', { timeout: 10000 });
     const text = await page.locator('body').innerText({ timeout: 10000 });
+    const title = await page.title();
     const failures = forbidden
       .filter((pattern) => pattern.test(text))
       .map((pattern) => pattern.toString());
+    if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
+      failures.push(`title:${title}`);
+    }
 
     if (failures.length > 0) {
       console.error(JSON.stringify({
@@ -63,7 +67,7 @@ const forbidden = [
       status: 'pass',
       url,
       checked_forbidden_patterns: forbidden.length,
-      title: await page.title(),
+      title,
     }));
   } finally {
     await browser.close();
