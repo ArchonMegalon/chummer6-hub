@@ -1,15 +1,15 @@
 {
-  "generated_at_utc": "2026-06-04T07:01:13.528502Z",
+  "generated_at_utc": "2026-06-25T15:22:01.490910Z",
   "status": "pass",
   "provider": "MagicFit",
   "provider_status": "VERIFIED_PROVIDER",
   "render_mode": "magicfit_cinematic_faction_promo_with_narration",
-  "narration_provider": "edge-tts-live-repair-because-unmixr-unavailable",
-  "voice": "en-US-GuyNeural",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "Blue",
   "slug": "rust-market-syndicate",
   "title": "Rust Market Syndicate",
   "captions": [
-    "Debt Heat. Favor Load. The city\u2019s least free market.",
+    "Debt Heat. Favor Load. The city’s least free market.",
     "Join Rust Market. Everything is available. Nothing is free."
   ],
   "scene_payloads": [
@@ -97,13 +97,15 @@
     "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-audio.m4a"
   },
   "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/rust-market-syndicate/video_manifest.generated.json",
-  "audio_live_repair": {
-    "generated_at_utc": "2026-06-21T21:48:01Z",
+  "audio_rebuild": {
+    "generated_at_utc": "2026-06-25T15:22:01.490910Z",
     "status": "pass",
-    "reason": "mp4 variants had a stale truncated audio stream; Unmixr was unavailable during live repair",
-    "fallback_scope": "rust-market-syndicate-promo only",
-    "fallback_provider": "edge-tts-live-repair",
-    "voice": "en-US-GuyNeural",
-    "receipt": ".codex-studio/published/RUST_MARKET_AUDIO_LIVE_REPAIR.generated.json"
+    "reason": "replace prior non-premium live repair with Unmixr-only narration track",
+    "provider": "unmixr-short-tts",
+    "voice_policy": "unmixr_premium_required_no_edge_fallback",
+    "voice_label": "Blue",
+    "audio_source": "/docker/chummercomplete/_completion/public_video_audio_unmixr/rust-market-syndicate-promo/beats/beat-01..05.mp3",
+    "audio_output": "Chummer.Run.Api/wwwroot/media/ledger/factions/rust-market-syndicate-promo-audio.m4a",
+    "audio_normalization_contract": "unmixr_narration_only_loudnorm_trimmed_to_video_duration.v1"
   }
 }
