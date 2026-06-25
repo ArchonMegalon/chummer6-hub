@@ -423,6 +423,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
     assert "data-chummer-home-link-patch" in controller
     assert "data-chummer-board-failure-patch" in controller
+    assert "polishVisibleCopy" in controller
+    assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller
     assert "participate-shell" in participate

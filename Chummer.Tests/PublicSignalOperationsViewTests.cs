@@ -246,6 +246,9 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("https://cdn.chummer", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("data-chummer-board-failure-patch", rewritten, StringComparison.Ordinal);
+        Assert.Contains("polishVisibleCopy", rewritten, StringComparison.Ordinal);
+        Assert.Contains(@"\bAI-powered\b", rewritten, StringComparison.Ordinal);
+        Assert.Contains(@"\bAutomatically generate\b", rewritten, StringComparison.Ordinal);
         Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);

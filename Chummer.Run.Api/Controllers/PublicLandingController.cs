@@ -2555,6 +2555,37 @@ public sealed class PublicLandingController : Controller
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
+  const polishVisibleCopy = function () {
+    const replacements = [
+      [/\bAI-powered\b/gi, ''],
+      [/\bAI powered\b/gi, ''],
+      [new RegExp('\\bAI' + '-generated\\b', 'gi'), ''],
+      [new RegExp('\\bAI' + ' generated\\b', 'gi'), ''],
+      [/\bArtificial intelligence\b/gi, ''],
+      [/\bAutomatically generate\b/gi, 'Create'],
+      [/\bautomatically generate\b/g, 'create'],
+      [/\s{2,}/g, ' ']
+    ];
+
+    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    textNodes.forEach(function (node) {
+      let value = node.nodeValue || '';
+      const original = value;
+      replacements.forEach(function (pair) {
+        value = value.replace(pair[0], pair[1]);
+      });
+
+      if (value !== original) {
+        node.nodeValue = value.trimStart();
+      }
+    });
+  };
+
   const removeHostedAuth = function () {
     const authCandidates = Array.from(document.querySelectorAll('a[href], button, [role="button"]'));
     authCandidates.forEach(function (node) {
@@ -2583,8 +2614,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   };
 
+  polishVisibleCopy();
   removeHostedAuth();
-  const authObserver = new MutationObserver(removeHostedAuth);
+  const authObserver = new MutationObserver(function () {
+    polishVisibleCopy();
+    removeHostedAuth();
+  });
   authObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   const candidates = Array.from(document.querySelectorAll('header a[href], nav a[href], [class*="header"] a[href], [class*="brand"] a[href], [class*="logo"] a[href]'));
