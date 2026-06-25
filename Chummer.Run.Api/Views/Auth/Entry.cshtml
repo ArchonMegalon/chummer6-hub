@@ -40,28 +40,29 @@
         <div class="auth-panel__intro auth-panel__intro--masthead">
             <p class="eyebrow">Account</p>
             <h1 id="auth-title">@(isInstallLinkReturn ? "Claim your copy" : Model.CreateAccount ? "Create account" : "Sign in")</h1>
-            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google. You can download Chummer without an account.")</p>
+            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google. We send one link. You can download Chummer without an account.")</p>
         </div>
 
         <div class="auth-panel__mode-row">
             @if (Model.CreateAccount)
             {
-                <span class="action-pill action-pill--current">Create account</span>
                 <a class="action-pill action-pill--ghost" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Sign in</a>
             }
             else
             {
-                <span class="action-pill action-pill--current">Sign in</span>
                 <a class="action-pill action-pill--ghost" href="/signup?next=@Uri.EscapeDataString(Model.NextPath)">Create account</a>
             }
         </div>
 
         @if (Model.CreateAccount)
         {
-            <div class="auth-panel__intro">
-                <h2>@(isInstallLinkReturn ? "Claim with email" : "Email")</h2>
-                <p>@(isInstallLinkReturn ? "Use the email that should own this install." : "We send one link. No password.")</p>
-            </div>
+            @if (isInstallLinkReturn)
+            {
+                <div class="auth-panel__intro">
+                    <h2>Claim with email</h2>
+                    <p>Use the email that should own this install.</p>
+                </div>
+            }
             <p class="muted-copy">After you confirm the email, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
@@ -92,10 +93,13 @@
         }
         else
         {
-            <div class="auth-panel__intro">
-                <h2>@(isInstallLinkReturn ? "Claim with your account" : "Email")</h2>
-                <p>@(isInstallLinkReturn ? "Use the account that should own this install." : $"We send one link, then return you to {nextTarget}.")</p>
-            </div>
+            @if (isInstallLinkReturn)
+            {
+                <div class="auth-panel__intro">
+                    <h2>Claim with your account</h2>
+                    <p>Use the account that should own this install.</p>
+                </div>
+            }
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
