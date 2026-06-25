@@ -16,7 +16,7 @@ OUTPUT_PATH = PUBLISHED_ROOT / "ICANPRENEUR_DISCOVERY_LANE.generated.json"
 PUBLIC_COPY_FILES = [
     ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Changelog.cshtml",
     ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Feedback.cshtml",
-    ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Participate.cshtml",
+    ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml",
     ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "FeedbackOperationsDetail.cshtml",
     ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalOperationsPacket.cshtml",
     ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "KarmaForge.cshtml",

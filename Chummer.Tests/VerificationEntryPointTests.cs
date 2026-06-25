@@ -3504,7 +3504,7 @@ public sealed class VerificationEntryPointTests
         string landingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
         string faqView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
         string storyView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
-        string participateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
+        string participateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
         string horizonsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
         string shelfView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
         string featureDetailView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
@@ -3560,7 +3560,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("href=\"/downloads\"", landingView, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", landingView, StringComparison.Ordinal);
-        Assert.Contains("href=\"/partizipate\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("Get the app", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);

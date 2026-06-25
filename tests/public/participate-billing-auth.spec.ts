@@ -18,8 +18,10 @@ test('billing and participate stay first-party for guests and signed-in users', 
   const guestParticipate = await request.get(`${baseUrl}/participate`);
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
-  expect(guestParticipateText).toContain('participate-board');
-  expect(guestParticipateText).toContain('/participate/board');
+  expect(guestParticipateText).toContain('partizipate-board');
+  expect(guestParticipateText).toContain('Short requests, clear bugs, useful ideas.');
+  expect(guestParticipateText).not.toContain('participate-board');
+  expect(guestParticipateText).not.toContain('/participate/board');
   expect(guestParticipateText).not.toContain('Requests, votes, and shipped work.');
   expect(guestParticipateText).not.toContain('Support Chummer');
   expect(guestParticipateText).not.toContain('ProductLift');

@@ -11,7 +11,7 @@ POSTURE_TESTS = ROOT / "chummer.run-services" / "Chummer.Tests" / "BeHumanEventA
 INTEGRATION_TESTS = ROOT / "chummer.run-services" / "Chummer.Tests" / "BeHumanEventAdapterIntegrationTests.cs"
 SERVICE_COLLECTION = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "ServiceCollectionBoundedContextExtensions.cs"
 PUBLIC_CONTROLLER = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
-PARTICIPATE_VIEW = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Participate.cshtml"
+PARTICIPATE_VIEW = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml"
 VIEW_MODELS = ROOT / "chummer.run-services" / "Chummer.Run.Api" / "ViewModels" / "SiteViewModels.cs"
 
 

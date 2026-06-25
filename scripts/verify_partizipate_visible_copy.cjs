@@ -36,9 +36,9 @@ const forbidden = [
 
 const requiredHtml = [
   '<title>Participate · Chummer</title>',
-  '<h1 class="sr-only">Participate</h1>',
-  'id="participate-board"',
-  'src="/participate/board"',
+  'class="partizipate-board',
+  'Short requests, clear bugs, useful ideas.',
+  'Public requests',
 ];
 
 function extractVisibleText(html) {

@@ -356,10 +356,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/participate', async () => {
     await expectVisible(page, 'text=Participate');
-    await expectVisible(page, '#participate-board');
+    await expectVisible(page, '.partizipate-board');
     const participateBody = await page.locator('body').innerText();
     assert.equal(participateBody.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
     assert.equal(await page.locator('.participate-actions').count(), 0, '/participate should not show duplicate wrapper actions.');
+    assert.equal(await page.locator('#participate-board').count(), 0, '/participate should not embed the hosted board wrapper.');
     await assertNoBannedCopy(page, '/participate');
   });
 

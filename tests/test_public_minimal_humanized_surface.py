@@ -394,7 +394,8 @@ def test_public_views_use_neutral_note_markup_instead_of_proof_markup() -> None:
     ]
 
     assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Feedback.cshtml").exists()
-    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml").exists()
 
     for view_path in public_views:
         source = read(view_path)
@@ -404,20 +405,20 @@ def test_public_views_use_neutral_note_markup_instead_of_proof_markup() -> None:
 
 def test_participation_surface_renders_first_party_without_character_helper_copy() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
-    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml")
 
-    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml").exists()
+    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
     assert "DefaultProductLiftFeedbackUrl" not in controller
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller
-    assert '=> await ParticipatePage(cancellationToken).ConfigureAwait(false);' in controller
     assert 'BuildParticipateSignInHref(string targetPath = "/participate")' in controller
     assert '? _chrome.BuildPublicChrome(' in controller
     assert ': _chrome.BuildAuthenticatedChrome(' in controller
-    assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
+    assert 'return View("~/Views/PublicLanding/Partizipate.cshtml", model);' in controller
     assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
@@ -438,8 +439,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller
-    assert "participate-shell" in participate
-    assert "participate-hosted__frame" in participate
+    assert "partizipate-board" in participate
+    assert "participate-hosted__frame" not in participate
     assert "Model.SupporterHref" not in participate
     assert "Fallback form" not in participate
     assert "Join beta waitlist" not in participate
@@ -518,10 +519,11 @@ def test_signed_in_alice_handoff_uses_chartbrick_runner_insights() -> None:
 
 def test_participation_redirect_avoids_public_decision_and_account_explanation_page() -> None:
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
-    participate = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+    participate = read("Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml")
     layout = read("Chummer.Run.Api/Views/Shared/_Layout.cshtml")
 
-    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert not (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml").exists()
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert "ResolveProductLiftFeedbackUrl()" not in controller
     assert "productlift.dev" not in participate.lower()
@@ -947,7 +949,7 @@ def test_public_copy_uses_maintenance_language_instead_of_horizon_metaphor() -> 
         read("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml"),
         read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml"),
     ]
-    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml").exists()
     combined = "\n".join(sources)
 
     for forbidden in (
@@ -1994,7 +1996,7 @@ def test_public_pages_use_plain_promises_and_summaries_instead_of_claim_jargon()
         assert forbidden not in combined
 
     assert "What this path covers" in anarchy
-    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Participate.cshtml").exists()
+    assert (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml").exists()
     assert "no public summary beyond the saved state" in feedback_lookup
 
 

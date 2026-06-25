@@ -2129,7 +2129,7 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
     {
-        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken).ConfigureAwait(false);
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/partizipate").ConfigureAwait(false);
         return View("~/Views/PublicLanding/Partizipate.cshtml", model);
     }
 
@@ -2137,46 +2137,14 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        string? supporterHref = ResolveParticipateSupporterHref();
-        string? hostedBoardHref = ResolveProductLiftHostedBoardHref();
-
-        var model = new ParticipatePageViewModel(
-            Chrome: subject is null
-                ? _chrome.BuildPublicChrome(
-                    "Participate",
-                    "Public requests, visible bugs, and product signal.",
-                    "/participate")
-                : _chrome.BuildAuthenticatedChrome(
-                "Participate",
-                "Public requests, visible bugs, and product signal.",
-                "/participate",
-                string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
-                subject.Email),
-            Lanes:
-            [
-                new ParticipateLaneViewModel("Idea", "Ask for a change", "Keep public requests short, concrete, and easy to vote on.", hostedBoardHref ?? "#participate-board", "Open board"),
-                new ParticipateLaneViewModel("Bug", "Report a visible issue", "Keep public bug reports to safe repro notes. Move logs, installs, and account detail to Help.", "/contact#support-intake", "Open help"),
-                new ParticipateLaneViewModel("Roadmap", "See what is moving", "Use roadmap when you want direction instead of discussion.", "/roadmap", "Open roadmap")
-            ],
-            Items:
-            [
-                new ParticipateItemViewModel(41, "Readable dark mode across every dialog", "Keep dark theme text, inputs, and selection surfaces readable without hover hacks.", "In progress"),
-                new ParticipateItemViewModel(28, "Smaller and clearer installer flow", "Trim installer noise, show progress earlier, and keep update handoff obvious.", "Planned"),
-                new ParticipateItemViewModel(19, "Origin dossier before final character build", "Show the story artifact first, then continue into the finished build workflow.", "Research")
-            ],
-            PrivateHelpHref: "/contact#support-intake",
-            RoadmapHref: "/roadmap",
-            ChangelogHref: "/changelog",
-            SupporterHref: supporterHref,
-            HostedBoardHref: hostedBoardHref,
-            SignalOperations: null);
-        return View("~/Views/PublicLanding/Participate.cshtml", model);
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/participate").ConfigureAwait(false);
+        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
     }
 
-    private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken)
+    private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken, string currentPath = "/partizipate")
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken).ConfigureAwait(false);
+        currentPath = string.Equals(currentPath, "/participate", StringComparison.OrdinalIgnoreCase) ? "/participate" : "/partizipate";
         ParticipateItemViewModel[] fallbackItems =
         [
             new(8, "Mobile companion app for dice rolling", "Quick access for rolling dice pools and checking modifiers at the table.", "Open"),
@@ -2192,11 +2160,11 @@ public sealed class PublicLandingController : Controller
                 ? _chrome.BuildPublicChrome(
                     "Participate",
                     "Public requests and visible bugs.",
-                    "/partizipate")
+                    currentPath)
                 : _chrome.BuildAuthenticatedChrome(
                     "Participate",
                     "Public requests and visible bugs.",
-                    "/partizipate",
+                    currentPath,
                     string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                     subject.Email),
             Heading: "Participate",
@@ -2206,7 +2174,7 @@ public sealed class PublicLandingController : Controller
             FallbackItems: fallbackItems,
             RoadmapHref: "/roadmap",
             SupportHref: "/contact#support-intake",
-            RetryHref: "/partizipate",
+            RetryHref: currentPath,
             LoadedFromBoard: loadedFromBoard);
     }
 

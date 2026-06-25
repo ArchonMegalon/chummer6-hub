@@ -51,22 +51,21 @@ async function main() {
     assert(response, '/participate should return a response.');
     assert.equal(response.status(), 200, '/participate should return 200.');
 
-    const fallback = page.locator('[data-participate-board-fallback]');
+    const board = page.locator('.partizipate-board');
     const frame = page.locator('#participate-board');
 
-    await fallback.waitFor({ state: 'visible' });
-    assert.equal(await fallback.isVisible(), true, 'first-party participate fallback should become visible.');
-    assert.equal(await frame.isHidden(), true, 'embedded board should be hidden after vendor error copy appears.');
+    await board.waitFor({ state: 'visible' });
+    assert.equal(await board.isVisible(), true, 'first-party participate board should stay visible.');
+    assert.equal(await frame.count(), 0, 'public participate should not embed the hosted board wrapper.');
 
     const visibleText = await page.locator('body').innerText();
-    assert.equal(visibleText.includes('The board is unavailable'), true, 'fallback should explain the state.');
-    assert.equal(visibleText.includes('Try again shortly.'), true, 'fallback should give the next action.');
+    assert.equal(visibleText.includes('Short requests, clear bugs, useful ideas.'), true, 'first-party copy should explain the board.');
     assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(visibleText), false, 'vendor error copy must not be visible.');
 
     console.log(JSON.stringify({
       status: 'pass',
       url: `${baseUrl}/participate`,
-      mode: 'runtime_fallback',
+      mode: 'first_party_board',
     }));
   } finally {
     await browser.close();

@@ -29,7 +29,7 @@ public sealed class BeHumanEventAdapterIntegrationTests
     public void PublicParticipateViewNoLongerCarriesProviderBoundaryCopy()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);

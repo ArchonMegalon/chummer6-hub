@@ -8,14 +8,14 @@ import requests
 from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json, write_text
 
 
-PARTICIPATE_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Participate.cshtml"
+PARTICIPATE_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml"
 OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalOperationsPacket.cshtml"
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
     "Participate",
-    "participate-board",
-    "/participate/board",
+    "partizipate-board",
+    "Short requests, clear bugs, useful ideas.",
 )
 FORBIDDEN_HTML_PHRASES = (
     "Tell us what slows the table down.",
@@ -31,9 +31,8 @@ FORBIDDEN_HTML_PHRASES = (
     "proof-bound",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "<h1 class=\"sr-only\">Participate</h1>",
-    "id=\"participate-board\"",
-    "/participate/board",
+    "partizipate-board",
+    "Short requests, clear bugs, useful ideas.",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
 )

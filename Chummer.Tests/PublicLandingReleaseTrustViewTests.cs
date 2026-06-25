@@ -147,7 +147,6 @@ public sealed class PublicLandingReleaseTrustViewTests
         string publicController = File.ReadAllText(publicControllerPath);
 
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", publicController, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", publicController, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", publicController, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", publicController, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
@@ -175,7 +174,6 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Changelog.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
@@ -509,7 +507,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void PublicLandingSupportAndStoryPagesAvoidFollowThroughJargon()
     {
         string statusPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
-        string feedbackPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string feedbackPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string productStoryPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml");
         string packagesPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Packages.cshtml");
         string trustPagePath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
@@ -545,9 +543,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", status, StringComparison.Ordinal);
 
-        Assert.Contains("participate-shell", feedback, StringComparison.Ordinal);
-        Assert.Contains("participate-hosted__frame", feedback, StringComparison.Ordinal);
-        Assert.Contains("/participate/board", feedback, StringComparison.Ordinal);
+        Assert.Contains("partizipate-board", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-hosted__frame", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("/participate/board", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Need private help?", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Use <a class=\"inline-link\" href=\"/contact#support-intake\">Support</a>", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
@@ -675,7 +673,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     [Fact]
     public void ParticipateViewKeepsBuildGhostConciergeOutOfThePublicBoard()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string view = File.ReadAllText(viewPath);
 
         Assert.DoesNotContain("Character help preview", view, StringComparison.Ordinal);
@@ -1280,7 +1278,6 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("Not the front door", horizonsView, StringComparison.Ordinal);
         Assert.Contains("Future work stays behind the main app.", horizonsView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?source=feedback#public-feedback", horizonsView, StringComparison.Ordinal);

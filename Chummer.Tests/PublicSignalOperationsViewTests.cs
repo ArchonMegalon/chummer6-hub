@@ -10,13 +10,13 @@ public sealed class PublicSignalOperationsViewTests
     public void FeedbackKeepsHostedOperationsOffThePublicPage()
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
-        string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
 
         Assert.False(File.Exists(feedbackViewPath));
         string participateView = File.ReadAllText(participateViewPath);
 
-        Assert.Contains("participate-shell", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-hosted__frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("partizipate-board", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);

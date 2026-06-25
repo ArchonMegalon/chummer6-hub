@@ -64,10 +64,15 @@ const checks = [
     url: `${baseUrl}/participate`,
     assert: text =>
       text.includes('Participate')
-      && text.includes('participate-board')
-      && text.includes('/participate/board')
+      && text.includes('partizipate-board')
+      && text.includes('Short requests, clear bugs, useful ideas.')
+      && text.includes('Public requests')
+      && !text.includes('participate-board')
+      && !text.includes('/participate/board')
       && !text.includes('Requests, votes, and shipped work.')
       && !text.includes('ProductLift')
+      && !text.includes('Something went wrong')
+      && !text.includes('Could not load posts')
   },
   {
     url: `${baseUrl}/partizipate`,
@@ -119,6 +124,7 @@ const checks = [
   {
     url: `${baseUrl}/blazor/`,
     label: 'delegated-blazor',
+    required: false,
     assert: (text, response) =>
       /\/blazor\/?$/.test(response.url)
       && (

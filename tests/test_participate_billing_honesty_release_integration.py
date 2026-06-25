@@ -54,7 +54,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Updated')", text)
         self.assertIn("url: `${baseUrl}/participate`", text)
         self.assertIn("!text.includes('Requests, votes, and shipped work.')", text)
-        self.assertIn("text.includes('participate-board')", text)
+        self.assertIn("text.includes('partizipate-board')", text)
         self.assertIn("!text.includes('ProductLift')", text)
 
     def test_portal_e2e_reports_delegated_blazor_without_blocking_required_routes(self) -> None:
@@ -75,8 +75,8 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("Could not load posts.", text)
         self.assertIn("Network error while loading tab configuration.", text)
         self.assertIn("support@productlift.dev", text)
-        self.assertIn("fallback.waitFor({ state: 'visible' })", text)
-        self.assertIn("embedded board should be hidden after vendor error copy appears", text)
+        self.assertIn("board.waitFor({ state: 'visible' })", text)
+        self.assertIn("public participate should not embed the hosted board wrapper", text)
         self.assertIn("vendor error copy must not be visible", text)
 
 

@@ -2827,10 +2827,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
-    var participateSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
+    var participateSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
     Assert(!participateSource.Contains("story-guide-tail", StringComparison.Ordinal), "participate should open with a quieter route intro instead of a generic CTA band.");
     Assert(!participateSource.Contains("Requests, votes, and shipped work.", StringComparison.Ordinal), "participate should not add wrapper copy above the public board.");
-    Assert(participateSource.Contains("id=\"participate-board\"", StringComparison.Ordinal), "participate should embed the public board as the primary surface.");
+    Assert(participateSource.Contains("partizipate-board", StringComparison.Ordinal), "participate should render the first-party board as the primary surface.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");

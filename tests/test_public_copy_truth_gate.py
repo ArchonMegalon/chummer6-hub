@@ -18,7 +18,7 @@ def test_feedback_public_copy_truth_gate_script_exists() -> None:
 
 
 def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
-    feedback = read("Chummer.Run.Api/Views/PublicLanding/Participate.cshtml")
+    feedback = read("Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml")
     operations = read("Chummer.Run.Api/Views/Shared/_PublicSignalOperationsPacket.cshtml")
     projection = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
     spec = importlib.util.spec_from_file_location("public_copy_truth_gate", GATE_SCRIPT)
@@ -27,11 +27,11 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     sys.path.insert(0, str(GATE_SCRIPT.parent))
     spec.loader.exec_module(gate_module)
 
-    assert '<h1 class="sr-only">Participate</h1>' in feedback
+    assert 'class="partizipate-board' in feedback
     assert "Requests, votes, and shipped work." not in feedback
     assert "Need private help?" not in feedback
-    assert 'id="participate-board"' in feedback
-    assert "/participate/board" in feedback
+    assert 'id="participate-board"' not in feedback
+    assert "/participate/board" not in feedback
     assert "Tell us what slows the table down." not in feedback
     assert "Use the right place" not in feedback
     assert "Start with the shortest path." not in feedback
@@ -63,8 +63,9 @@ def test_auth_entry_uses_account_language_in_public_copy() -> None:
     auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
 
     assert 'ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";' in auth_entry
-    assert "Use your email to continue." in auth_entry
-    assert "Use email to create your account." in auth_entry
+    assert "@Model.SupportLine" in auth_entry
+    assert "Use your email to continue." not in auth_entry
+    assert "Use email to create your account." not in auth_entry
     assert "Continue with Google" in auth_entry
     assert "the signed-in product" not in auth_entry
     assert "Your signed-in home and account pages for return, recovery, and the next step." not in auth_entry

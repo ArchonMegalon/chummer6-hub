@@ -80,7 +80,28 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
-    public async Task PartizipateAliasRendersHostedBoardDirectlyAtTypoUrl()
+    public async Task ParticipatePageRendersFirstPartyBoardWithoutHostedIframe()
+    {
+        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipatePage(CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.LoadedFromBoard);
+        Assert.Equal("/participate", model.RetryHref);
+        Assert.Equal("Participate", model.Heading);
+        FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
+        Assert.Equal("Mobile companion app for dice rolling", post.Title);
+        Assert.DoesNotContain("AI-powered", post.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PartizipateAliasRendersFirstPartyBoardAtTypoUrl()
     {
         var controller = CreateController(new HostedBoardPostsHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -93,6 +114,7 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.True(model.LoadedFromBoard);
+        Assert.Equal("/partizipate", model.RetryHref);
         Assert.Equal("Participate", model.Heading);
         Assert.Equal("Live board", model.StatusLabel);
         FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
