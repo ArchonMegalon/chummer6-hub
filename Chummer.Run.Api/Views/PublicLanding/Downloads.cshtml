@@ -9,8 +9,13 @@
     var nightly = release.Alternatives.FirstOrDefault()
         ?? release.OtherPlatforms.FirstOrDefault(option =>
             stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase));
+    var stableAndNightlyMatch = stable is not null
+        && nightly is not null
+        && string.Equals(stable.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase);
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     var updatedLabel = Model.ReleaseTruth.VerifiedDateLabel;
+
+    static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PlatformId(ReleaseOptionViewModel? option)
     {
@@ -48,7 +53,7 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Chummer picks the right installer for this browser. Use Nightly only when you want the newest promoted build.</p>
+        <p>Chummer picks the right installer for this browser. Windows, Linux, Nightly, and source builds stay short and separate.</p>
     </div>
     <div class="minimal-status-pill" aria-label="Release freshness">
         <span>Updated</span>
@@ -60,7 +65,7 @@
 {
     <section class="minimal-empty">
         <h2>No build is available right now</h2>
-        <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Manifest.Message)</p>
+        <p>@PublicDownloadText(Model.Manifest.Message)</p>
         <a class="button-like button-like--primary" href="/status">Status</a>
     </section>
 }
@@ -91,10 +96,10 @@ else
         <article class="downloads-choice-card" id="nightly">
             <div>
                 <span>Nightly</span>
-                <h2>@(nightly is null ? "No newer build" : nightly.PlatformLabel)</h2>
-                <p>@(nightly is null ? "Nightly currently matches Stable." : "The newest promoted build available from this page.")</p>
+                <h2>@(nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel)</h2>
+                <p>@(nightly is null || stableAndNightlyMatch ? "There is no newer Nightly available. Nightly currently matches Stable." : "The newest promoted build available from this page.")</p>
             </div>
-            @if (nightly is null)
+            @if (nightly is null || stableAndNightlyMatch)
             {
                 <a class="button-like button-like--secondary" href="#stable">Use Stable</a>
             }

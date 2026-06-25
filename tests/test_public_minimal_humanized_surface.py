@@ -174,8 +174,8 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
     for expected in (
         "static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicDownloadText(Model.Manifest.Message)",
-        "@PublicDownloadText(package.Summary)",
-        "@PublicDownloadText(platform.Summary)",
+        "stableAndNightlyMatch",
+        "There is no newer Nightly available. Nightly currently matches Stable.",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
         "@compactReleaseSummary",

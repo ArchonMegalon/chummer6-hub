@@ -3340,7 +3340,17 @@ document.addEventListener('DOMContentLoaded', function () {
             failureReturnLabel: "Retry");
 
     private string? ResolveParticipateSupporterHref()
-        => "/account/billing";
+    {
+        BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();
+        try
+        {
+            return billing?.GetPage().ManageMembershipHref ?? "/account/billing";
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
 
     private void CopySafeProxyHeaders(HttpResponseMessage response)
     {

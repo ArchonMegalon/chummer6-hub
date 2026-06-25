@@ -38,6 +38,21 @@
     </div>
 </section>
 
+@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
+{
+    <section class="minimal-section minimal-section--tight roadmap-board" aria-labelledby="roadmap-board-title">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Board</p>
+            <h2 id="roadmap-board-title">Current work</h2>
+            <p>Loaded through Chummer so the page stays first-party.</p>
+        </div>
+        <iframe id="roadmap-board"
+                title="Chummer roadmap board"
+                src="@Model.HostedBoardHref"
+                loading="lazy"></iframe>
+    </section>
+}
+
 @if (Model.PublicRequests.Count > 0)
 {
     <section class="minimal-section minimal-section--tight roadmap-public-requests" aria-labelledby="roadmap-public-requests">
