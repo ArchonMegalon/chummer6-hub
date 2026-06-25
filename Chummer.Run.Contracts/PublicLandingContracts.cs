@@ -76,7 +76,12 @@ public sealed record PublicReleaseArtifactDto(
     string? ReleaseVersion = null,
     string? CompatibilityState = null,
     string? CompatibilityReason = null,
-    string? ArtifactId = null);
+    string? ArtifactId = null,
+    string? InstallerMode = null,
+    string? PayloadFileName = null,
+    string? PayloadDownloadUrl = null,
+    string? PayloadSha256 = null,
+    long? PayloadSizeBytes = null);
 
 public sealed record PublicReleaseManifestDto(
     string Version,

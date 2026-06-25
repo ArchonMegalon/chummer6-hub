@@ -25,6 +25,46 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestPreservesWindowsBootstrapPayloadMetadata()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(
+            version: "run-bootstrap",
+            downloads:
+            [
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Windows X64 Installer",
+                    ["fileName"] = "chummer-avalonia-win-x64-installer.exe",
+                    ["downloadUrl"] = "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    ["sha256"] = new string('a', 64),
+                    ["sizeBytes"] = 51856809L,
+                    ["installAccessClass"] = "open_public",
+                    ["installerMode"] = "bootstrap",
+                    ["payloadFileName"] = "chummer-avalonia-win-x64-payload.zip",
+                    ["payloadDownloadUrl"] = "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+                    ["payloadSha256"] = new string('b', 64),
+                    ["payloadSizeBytes"] = 47152146L
+                }
+            ]);
+
+        var manifest = fixture.CreateService().LoadManifest();
+        var windows = Assert.Single(manifest.Downloads);
+
+        Assert.Equal("bootstrap", windows.InstallerMode);
+        Assert.Equal("chummer-avalonia-win-x64-payload.zip", windows.PayloadFileName);
+        Assert.Equal("https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip", windows.PayloadDownloadUrl);
+        Assert.Equal(new string('b', 64), windows.PayloadSha256);
+        Assert.Equal(47152146L, windows.PayloadSizeBytes);
+    }
+
+    [Fact]
     public void LoadManifestUsesRepoLocalPortalDownloadsWhenNoDownloadsRootIsConfigured()
     {
         string root = Path.Combine(Path.GetTempPath(), "public-release-default-root-tests", Guid.NewGuid().ToString("N"));

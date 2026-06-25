@@ -662,7 +662,12 @@ public sealed class PublicReleaseManifestService
                 ReleaseVersion: parsed.Version,
                 CompatibilityState: item.CompatibilityState,
                 CompatibilityReason: item.CompatibilityReason,
-                ArtifactId: item.ArtifactId ?? item.FileName ?? "artifact"))
+                ArtifactId: item.ArtifactId ?? item.FileName ?? "artifact",
+                InstallerMode: item.InstallerMode,
+                PayloadFileName: item.PayloadFileName,
+                PayloadDownloadUrl: item.PayloadDownloadUrl,
+                PayloadSha256: item.PayloadSha256,
+                PayloadSizeBytes: item.PayloadSizeBytes))
             .ToList();
 
         var status = downloads.Count > 0
@@ -2410,7 +2415,12 @@ public sealed class PublicReleaseManifestService
         long? SizeBytes,
         string? InstallAccessClass,
         string? CompatibilityState,
-        string? CompatibilityReason);
+        string? CompatibilityReason,
+        string? InstallerMode,
+        string? PayloadFileName,
+        string? PayloadDownloadUrl,
+        string? PayloadSha256,
+        long? PayloadSizeBytes);
 
     private sealed record LocalReleaseProof(
         [property: JsonPropertyName("contract_name")] string? ContractName,
