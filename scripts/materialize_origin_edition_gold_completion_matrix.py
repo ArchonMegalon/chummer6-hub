@@ -53,6 +53,10 @@ FORBIDDEN_RECEIPT_SECRET_MARKERS = (
     "secret-session",
     "super-secret",
 )
+APPROVED_AUDIO_PROVIDERS = {
+    "unmixr": "Unmixr",
+    "inkfluence": "Inkfluence",
+}
 
 
 def now_iso() -> str:
@@ -76,6 +80,14 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def string(value: object) -> str:
     return str(value or "").strip()
+
+
+def approved_audio_provider_name(*values: object) -> str:
+    haystack = " ".join(string(value).lower() for value in values if string(value))
+    for token, label in APPROVED_AUDIO_PROVIDERS.items():
+        if token in haystack:
+            return label
+    return ""
 
 
 def is_pass(payload: dict[str, Any]) -> bool:
@@ -680,7 +692,11 @@ def movie_playback_row(live_import_path: Path, request: dict[str, Any], live_evi
         "source_packet_sha_matches": string(receipt.get("sourcePacketSha256")) == string(live_evidence.get("sourcePacketSha256")),
         "uses_accepted_humanized_story_scene": proof.get("usesAcceptedHumanizedStoryScene") is True,
         "uses_selected_character_face_cover": proof.get("usesSelectedCharacterFaceCover") is True,
-        "uses_unmixr_narration_audio": proof.get("usesUnmixrNarrationAudio") is True,
+        "uses_approved_premium_narration_audio": (
+            proof.get("usesApprovedPremiumNarrationAudio") is True
+            or proof.get("usesUnmixrNarrationAudio") is True
+            or proof.get("usesInkfluenceNarrationAudio") is True
+        ),
         "marker_media_not_used": proof.get("markerMediaUsed") is False,
         "synthetic_backup_audio_not_used": proof.get("syntheticBackupAudioUsed") is False,
         "raw_runtime_path_not_exposed": receipt.get("rawRuntimePathExposed") is False,
@@ -689,7 +705,7 @@ def movie_playback_row(live_import_path: Path, request: dict[str, Any], live_evi
     failed = [key for key, passed in flags.items() if not passed]
     return {
         "id": "chummer_movie_story_scene_playback_verified",
-        "label": "Chummer media story-scene movie is real, hash-bound, playable, and uses accepted story, selected face cover, and Unmixr audio",
+        "label": "Chummer media story-scene movie is real, hash-bound, playable, and uses accepted story, selected face cover, and approved premium narration audio",
         "status": "proved" if not failed else "blocked",
         "evidence": "dossier_video_import_receipt_and_live_import_hashes",
         "flags": flags,
@@ -780,6 +796,10 @@ def m4b_narration_row(live_import_path: Path, request: dict[str, Any], live_evid
     provider = read_json(provider_path) if provider_path.is_file() else {}
     gate_tokens = tokens(gate)
     provider_tokens = tokens(provider)
+    approved_provider = approved_audio_provider_name(
+        provider.get("provider"),
+        provider.get("voiceProvider"),
+    )
     expected_audio_sha = string(live_evidence.get("audiobookSha256"))
     expected_cover_sha = string(live_evidence.get("storySceneCoverSha256"))
     expected_manuscript_sha = string(live_evidence.get("acceptedHumanizedManuscriptSha256"))
@@ -788,7 +808,7 @@ def m4b_narration_row(live_import_path: Path, request: dict[str, Any], live_evid
         "provider_receipt_present": provider_path.is_file(),
         "gate_receipt_passed": is_pass(gate),
         "provider_receipt_verified": is_pass(provider),
-        "provider_is_unmixr": string(provider.get("provider")).lower() == "unmixr" and string(provider.get("voiceProvider")).lower() == "unmixr",
+        "provider_is_approved_premium_narration_provider": approved_provider != "",
         "audiobook_artifact_present": m4b_path.is_file() and m4b_path.stat().st_size > 0,
         "audiobook_file_sha_matches_import": m4b_path.is_file() and sha256_file(m4b_path) == expected_audio_sha,
         "gate_m4b_sha_matches_import": string(gate.get("m4bSha256")) == expected_audio_sha,
@@ -802,9 +822,10 @@ def m4b_narration_row(live_import_path: Path, request: dict[str, Any], live_evid
         "gate_raw_credentials_not_exposed": gate.get("rawCredentialExposed") is False and gate.get("rawProviderTokenExposed") is False,
         "provider_raw_credentials_not_exposed": provider.get("rawCredentialExposed") is False and provider.get("rawProviderTokenExposed") is False,
         "gate_raw_runtime_paths_not_exposed": gate.get("rawRuntimePathsExposed") is False,
-        "tokens_bind_unmixr_and_cover_and_m4b": (
-            "provider:Unmixr" in gate_tokens
-            and "provider:Unmixr" in provider_tokens
+        "tokens_bind_approved_provider_and_cover_and_m4b": (
+            approved_provider != ""
+            and f"provider:{approved_provider}" in gate_tokens
+            and f"provider:{approved_provider}" in provider_tokens
             and expected_audio_sha in gate_tokens
             and f"m4b_sha256:{expected_audio_sha}" in provider_tokens
             and expected_cover_sha in gate_tokens
@@ -818,12 +839,13 @@ def m4b_narration_row(live_import_path: Path, request: dict[str, Any], live_evid
     }
     failed = [key for key, passed in flags.items() if not passed]
     return {
-        "id": "m4b_unmixr_narration_import_verified",
-        "label": "M4B audiobook uses verified Unmixr narration, accepted manuscript, embedded cover, and no provider/direct-publish leakage",
+        "id": "m4b_premium_narration_import_verified",
+        "label": "M4B audiobook uses verified approved premium narration, accepted manuscript, embedded cover, and no provider/direct-publish leakage",
         "status": "proved" if not failed else "blocked",
-        "evidence": "m4b_provider_gate_and_unmixr_provider_receipts",
+        "evidence": "m4b_provider_gate_and_approved_premium_provider_receipts",
         "flags": flags,
         "failedFlags": failed,
+        "approvedAudioProvider": approved_provider,
         "gateReceiptPath": gate_path.as_posix(),
         "providerReceiptPath": provider_path.as_posix(),
         "m4bPath": m4b_path.as_posix(),
@@ -1050,7 +1072,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "no_fallback_audio": is_pass(read_json(Path(string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))) if string(request.get("finalNoFallbackNoSentinelAuditReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("finalNoFallbackNoSentinelAuditReceiptPath")))),
         "same_cover_sha_bound": bool(live_evidence.get("storySceneCoverSha256")),
         "dossier_ebook_pdf_packaging_verified": next((row for row in rows if row.get("id") == "dossier_ebook_pdf_packaging_verified"), {}).get("status") == "proved",
-        "m4b_unmixr_narration_import_verified": next((row for row in rows if row.get("id") == "m4b_unmixr_narration_import_verified"), {}).get("status") == "proved",
+        "m4b_premium_narration_import_verified": next((row for row in rows if row.get("id") == "m4b_premium_narration_import_verified"), {}).get("status") == "proved",
         "audiobookshelf_dossier_and_audiobook_shared": next((row for row in rows if row.get("id") == "audiobookshelf_dossier_and_audiobook_share_verified"), {}).get("status") == "proved",
         "chummer_movie_story_scene_playback_verified": next((row for row in rows if row.get("id") == "chummer_movie_story_scene_playback_verified"), {}).get("status") == "proved",
         "local_authenticated_route_tabs_verified": next((row for row in rows if row.get("id") == "local_authenticated_route_tabs_verified"), {}).get("status") == "proved",

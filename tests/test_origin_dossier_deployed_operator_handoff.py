@@ -145,6 +145,10 @@ def test_handoff_uses_origin_edition_context_for_namespace_and_commands(tmp_path
     assert result["deployedOwnerUrl"] == "https://staging.chummer.run/account/work/origin-dossiers/custom-runner"
     assert "origin.chummer.run/Case/Ari/Ghost/deployed-chummer-browser-probe.receipt.json" in serialized
     assert "--project-id custom-runner" in serialized
+    assert "--family-name Case" in serialized
+    assert "--given-name Ari" in serialized
+    assert "--runner-name Ghost" in serialized
+    assert "--namespace origin.chummer.run/Case/Ari/Ghost" in serialized
     assert "--base-url https://staging.chummer.run" in serialized
 
 

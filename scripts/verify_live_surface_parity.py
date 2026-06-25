@@ -77,7 +77,7 @@ SURFACES = [
         "required_texts": [
             "Current release",
             "The build, platforms, and current state in one place.",
-            "Release",
+            "Updated",
             "Open downloads",
             "Open help",
             "Platforms",

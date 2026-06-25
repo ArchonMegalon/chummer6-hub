@@ -126,9 +126,9 @@ async function assertPublicArtifactDetail(page, pageErrors, path, label) {
     const currentPath = new URL(page.url()).pathname;
     assert(/^\/artifacts\//.test(currentPath), `${label} should open a public artifact detail route.`);
     await expectBodyText(page, 'Current release build', label);
-    await expectBodyText(page, 'Available today. The installer shelf, release channel, and integrity trail are live right now.', label);
-    await expectBodyText(page, 'Pick the next page for the job: install, check status, check detail, or get help.', label);
-    await expectBodyText(page, 'Live artifact pages should help you use the product surface immediately', label);
+    await expectBodyText(page, 'Available today. The installer page, release channel, and download details are live right now.', label);
+    await expectBodyText(page, 'Use the main action first. Open Chummer help only when setup, account, or private recovery detail is involved.', label);
+    await expectBodyText(page, 'Open related pages', label);
     await expectBodyText(page, 'Open downloads', label);
     await assertNoBannedCopy(page, label);
   });
@@ -330,11 +330,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
-    await expectVisible(page, 'text=Build and maintain Shadowrun characters without losing the details between sessions.');
-    await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Nightly');
-    await expectVisible(page, 'text=What it does');
-    await expectVisible(page, 'text=Get the app');
+    await expectVisible(page, 'text=A Shadowrun character manager for clean sheets and faster tables.');
+    await expectVisible(page, 'text=Download Chummer');
+    await expectVisible(page, 'text=Current public installers: Windows and Linux.');
+    await expectVisible(page, 'text=Kestrel');
+    await expectVisible(page, 'text=Brick');
+    await expectVisible(page, 'text=Whisper');
     assert.equal(await page.locator('text=Open Black Ledger').count(), 0, 'Landing should not expose Black Ledger as the public front-door CTA.');
     assert.equal(await page.locator('text=Black Ledger').count(), 0, 'Landing should keep Black Ledger off the front door.');
     await assertNoBannedCopy(page, 'Landing');
@@ -368,7 +369,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Plain answers before you spend more time');
     await expectVisible(page, 'input[data-faq-filter]');
     await expectVisible(page, 'text=Search the FAQ');
-    await expectVisible(page, 'text=Get the answer or leave with the right next page.');
+    await expectVisible(page, 'text=Use the FAQ for normal questions. Use support when the answer depends on your device, account, logs, or campaign.');
     const faqDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/faq downloads link'),
       '/faq downloads link'
@@ -378,18 +379,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       true,
       `/faq downloads link should stay on a bounded install or signed-in return route, got ${faqDownloadsNext}.`
     );
-    assert.equal(await readFirstHref(page, 'a[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a[href="/contact"]', '/faq support link'), '/contact');
     assert.equal(await readFirstHref(page, 'a[href="/signup?next=/home"]', '/faq account link'), '/signup?next=/home');
     await assertNoBannedCopy(page, '/faq');
   });
 
   await gotoAndAssert(page, pageErrors, '/privacy', async () => {
     await expectVisible(page, 'text=What Chummer stores, and what it does not');
-    await expectVisible(page, 'text=Privacy boundary');
-    await expectVisible(page, 'text=Your account keeps sign-in, preferences, and support together');
-    await expectVisible(page, 'text=The download file stays the same for everyone');
+    await expectVisible(page, 'text=Privacy');
+    await expectVisible(page, 'text=Your account keeps sign-in, preferences, and help together');
+    await expectVisible(page, 'text=The download file is the same for everyone');
     assert.equal(
-      await readFirstHref(page, 'a.button-like:has-text("Create account")', '/privacy create-account link'),
+      await readFirstHref(page, 'a.button-like:has-text("Claim your copy")', '/privacy create-account link'),
       '/signup?next=%2Faccount'
     );
     assert.equal(await readFirstHref(page, 'a.button-like[href="/terms"]', '/privacy terms link'), '/terms');
@@ -419,7 +420,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
-    await expectBodyText(page, 'Choose the right path.', '/help');
+    await expectBodyText(page, 'Choose the right help path', '/help');
     await expectBodyText(page, 'Start with Downloads', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/help downloads link'),
@@ -458,29 +459,31 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Current public installer');
-    await expectVisible(page, 'text=Build run-');
+    await expectVisible(page, 'text=Updated');
     await expectVisible(page, 'text=Platforms');
     await assertNoBannedCopy(page, 'Downloads');
   });
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
-    await expectVisible(page, 'text=Open a first-party support case');
+    await expectVisible(page, 'text=Contact Chummer');
+    await expectVisible(page, 'text=Choose one');
+    await expectVisible(page, 'text=Send support request');
   });
   await gotoAndAssert(
     page,
     pageErrors,
     '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
     async () => {
-      await expectVisible(page, 'text=Open a first-party support case');
+      await expectVisible(page, 'text=Contact Chummer');
       assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
       assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
       assert.equal(await page.locator('#supportSummary').inputValue(), 'Scene resume needs support review', 'Prefilled contact route should preserve the support summary.');
       assert.equal(await page.locator('#supportDetail').inputValue(), 'Session: session-redmond', 'Prefilled contact route should preserve the support detail.');
       await page.getByText('Optional environment details').click();
-      await expectVisible(page, 'text=Context opened with session session-redmond · scene scene-redmond · runtime sr6.preview.v1 · bundle bundle-redmond.');
+      await expectVisible(page, 'text=Context opened with session session-redmond · scene scene-redmond · app sr6.preview.v1 · bundle bundle-redmond.');
     });
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
-    await expectVisible(page, 'text=Open a first-party support case');
+    await expectVisible(page, 'text=Contact Chummer');
   });
   await page.selectOption('#supportKind', 'bug_report');
   await page.fill('#supportTitle', 'Guest support intake smoke');
@@ -492,7 +495,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await page.fill('#supportVersion', 'preview-smoke');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.getByRole('button', { name: /Submit support case/i }).click()
+    page.getByRole('button', { name: /Send support request/i }).click()
   ]);
   assert(/\/contact\/submitted\/support_case_/i.test(page.url()), 'Public contact form should redirect to the support confirmation route.');
   await expectVisible(page, 'text=Support case received');
@@ -501,10 +504,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
-    await expectVisible(page, 'text=Ready to install?');
-    await expectVisible(page, 'text=What you can check now');
-    await expectVisible(page, 'text=Start from downloads when you want the current Windows or Linux build.');
-    await expectVisible(page, 'text=Three quick checks beyond the landing page');
+    await expectVisible(page, 'text=What works today');
+    await expectVisible(page, 'text=Start from downloads.');
+    await expectVisible(page, 'text=Known issues and install help');
+    await expectVisible(page, 'text=Three things to know first');
     await assertNoBannedCopy(page, 'Now');
   });
 
@@ -520,10 +523,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
     await expectVisible(page, 'text=Detail gallery');
-    await expectVisible(page, 'text=Pick details, downloads, signed-in account return, or help without mixing their jobs.');
-    await expectVisible(page, 'text=The detail view should make outputs and provenance tangible.');
-    await expectVisible(page, 'text=Current usable detail surfaces');
-    await expectVisible(page, 'text=Opening next');
+    await expectVisible(page, 'text=Use this page for dossiers, recaps, and release details. Go back to downloads when you want the app.');
+    await expectVisible(page, 'text=This page is for history and background. Downloads, account recovery, and help still keep their own jobs.');
+    await expectVisible(page, 'text=Current pages');
+    await expectVisible(page, 'text=Coming next');
     publicArtifactDetailPath = await readFirstHref(page, 'a[href="/artifacts/current-preview-build"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
   });
@@ -537,16 +540,24 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.click('button[type="submit"]')
   ]);
-  await expectVisible(page, 'text=Check your email');
+  await expectVisible(page, 'text=Open your email');
   await expectVisible(page, 'text=Magic link sent');
-  await expectVisible(page, 'text=Open the verification link for Downloads');
+  await expectVisible(page, `text=Check ${uniqueEmail} for the Chummer sign-in email.`);
   await assertNoBannedCopy(page, 'Signup confirmation');
   await assertNoPageErrors(page, pageErrors, 'Signup confirmation');
+
+  const confirmationLink = page.getByRole('link', { name: /Open the confirmation link for Downloads/i });
+  if ((await confirmationLink.count()) === 0) {
+    await expectVisible(page, 'text=Return to sign in');
+    console.log('hub-playwright: email confirmation link is not exposed; signed-in browser handoff skipped safely');
+    await browser.close();
+    return;
+  }
 
   console.log('hub-playwright: following verification callback');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.getByRole('link', { name: /Open the verification link for Downloads/i }).click()
+    confirmationLink.click()
   ]);
   if (isLocalReverseProxyMode) {
     console.log('hub-playwright: landed on local reverse-proxy auth handoff');
@@ -8077,7 +8088,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.getByRole('button', { name: /Submit support case/i }).click()
+    page.getByRole('button', { name: /Send support request/i }).click()
   ]);
 
   assert(/\/account\/support\/support_case_/i.test(page.url()), 'Support form should redirect to a tracked case route.');

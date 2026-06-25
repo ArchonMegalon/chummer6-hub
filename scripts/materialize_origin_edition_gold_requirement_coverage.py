@@ -44,10 +44,10 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
         ("dossier_ebook_pdf_packaging_verified",),
     ),
     (
-        "m4b_unmixr_audiobook_packaging",
-        "M4B audiobook uses verified Unmixr narration, no fallback audio, and the approved cover/manuscript",
-        ("m4b_provider_receipt", "m4b_artifact_file", "m4b_artifact_namespace", "m4b_unmixr_narration_import_verified"),
-        ("m4b_unmixr_narration_import_verified", "no_fallback_audio"),
+        "m4b_premium_audiobook_packaging",
+        "M4B audiobook uses verified Inkfluence or Unmixr premium narration, no fallback audio, and the approved cover/manuscript",
+        ("m4b_provider_receipt", "m4b_artifact_file", "m4b_artifact_namespace", "m4b_premium_narration_import_verified"),
+        ("m4b_premium_narration_import_verified", "no_fallback_audio"),
     ),
     (
         "audiobookshelf_dossier_and_audiobook_share",
@@ -57,7 +57,7 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         "movie_story_scene_playback",
-        "Chummer media hosts a real story-scene movie with selected-face cover and Unmixr audio",
+        "Chummer media hosts a real story-scene movie with selected-face cover and approved premium narration audio",
         ("movie_generation_receipt", "movie_artifact_file", "movie_artifact_namespace", "chummer_movie_story_scene_playback_verified"),
         ("chummer_movie_story_scene_playback_verified",),
     ),

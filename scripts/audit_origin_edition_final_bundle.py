@@ -48,6 +48,31 @@ def required_files(namespace: str) -> dict[str, str]:
     }
 
 
+LIVE_IMPORT_PATH_FIELDS = {
+    "approved_canon_packet": "sourcePacketPath",
+    "provider_manuscript": "providerManuscriptPath",
+    "humanizer_receipt": "humanizerReceiptPath",
+    "humanizer_quality_receipt": "humanizerQualityReceiptPath",
+    "ebook": "bookArtifactPath",
+    "m4b_provider_gate": "m4bProviderImportReceiptPath",
+    "movie": "dossierVideoPath",
+    "movie_receipt": "dossierVideoReceiptPath",
+}
+
+BRANCH_REQUIRED_SURFACES = {
+    "cover": ("root", (".jpg", ".jpeg", ".png", ".webp")),
+    "ebook": ("dossier", (".epub",)),
+    "pdf": ("dossier", (".pdf",)),
+    "pdf_cover_receipt": ("dossier", (".json",)),
+    "dossier_audiobookshelf_receipt": ("dossier", (".json",)),
+    "m4b_provider_gate": ("audiobook", (".json",)),
+    "real_m4b_artifact": ("audiobook", (".m4b",)),
+    "audiobookshelf_audiobook_receipt": ("audiobook", (".json",)),
+    "movie": ("movie", (".mp4",)),
+    "movie_receipt": ("movie", (".json",)),
+}
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -74,6 +99,46 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _string(value: object) -> str:
     return str(value or "").strip()
+
+
+def _live_import_request(root: Path) -> dict[str, Any]:
+    path = root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    if not path.is_file():
+        return {}
+    try:
+        payload = _read_json(path)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    request = payload.get("importRequest")
+    return request if isinstance(request, dict) else {}
+
+
+def _resolve_path(root: Path, value: object) -> Path:
+    text = _string(value)
+    if not text:
+        return root / "__missing__"
+    path = Path(text)
+    return path if path.is_absolute() else root / path
+
+
+def _relative_for_receipt(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _path_under_branch(path: Path, root: Path, namespace: str, branch: str, suffixes: tuple[str, ...]) -> bool:
+    try:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        relative = path.as_posix().lstrip("/")
+        marker = "origin.chummer.run/"
+        if marker in relative:
+            relative = relative[relative.index(marker) :]
+    expected = namespace if branch == "root" else f"{namespace}/{branch}"
+    prefix = expected.rstrip("/") + "/"
+    return relative.startswith(prefix) and relative.lower().endswith(tuple(item.lower() for item in suffixes))
 
 
 def _contains_reject_marker(value: object) -> bool:
@@ -148,41 +213,73 @@ def _file_surface(name: str, path: Path, root: Path, *, reject_content_markers: 
     return surface
 
 
+def _branch_surface(name: str, path: Path, root: Path, namespace: str, branch: str, suffixes: tuple[str, ...]) -> dict[str, Any]:
+    expected = namespace if branch == "root" else f"{namespace}/{branch}"
+    return {
+        "name": f"{name}_branch",
+        "path": _relative_for_receipt(path, root),
+        "required": True,
+        "expectedBranch": expected,
+        "status": "pass" if _path_under_branch(path, root, namespace, branch, suffixes) else "blocked_wrong_branch",
+    }
+
+
 def audit(root: Path, output: Path | None = None, context: OriginEditionContext | None = None) -> dict[str, Any]:
     root = root.resolve()
     context = context or OriginEditionContext.from_env()
     namespace = context.resolved_namespace
+    live_request = _live_import_request(root)
     surfaces: list[dict[str, Any]] = []
-    for name, relative in required_files(namespace).items():
-        path = root / relative
+    resolved_required_files = required_files(namespace)
+    for name, field in LIVE_IMPORT_PATH_FIELDS.items():
+        if _string(live_request.get(field)):
+            resolved_required_files[name] = _string(live_request.get(field))
+    for name, relative in resolved_required_files.items():
+        path = _resolve_path(root, relative)
         if name == "approved_canon_packet":
             surfaces.append(_file_surface(name, path, root))
         elif path.suffix.lower() == ".json":
             surfaces.append(_json_surface(name, path, root, reject_markers=name != "gap_audit"))
         else:
             surfaces.append(_file_surface(name, path, root, reject_content_markers=name in {"provider_manuscript"}))
+        if name in BRANCH_REQUIRED_SURFACES:
+            branch, suffixes = BRANCH_REQUIRED_SURFACES[name]
+            surfaces.append(_branch_surface(name, path, root, namespace, branch, suffixes))
 
     # The actual M4B and Audiobookshelf audiobook receipt are intentionally distinct from the gate receipt.
     audiobook_dir = root / namespace / "audiobook"
     m4b_candidates = sorted(audiobook_dir.glob("*.m4b"))
+    live_m4b_path = _resolve_path(root, live_request.get("audiobookPath")) if _string(live_request.get("audiobookPath")) else None
+    if live_m4b_path is not None:
+        m4b_candidates = [live_m4b_path] if live_m4b_path.is_file() else []
     surfaces.append(
         {
             "name": "real_m4b_artifact",
-            "path": f"{namespace}/audiobook/*.m4b",
+            "path": _relative_for_receipt(live_m4b_path, root) if live_m4b_path is not None else f"{namespace}/audiobook/*.m4b",
             "required": True,
             "status": "pass" if m4b_candidates else "blocked_missing_file",
             "candidateCount": len(m4b_candidates),
             "candidateSha256": [_sha256_file(path) for path in m4b_candidates],
         }
     )
+    if live_m4b_path is not None:
+        branch, suffixes = BRANCH_REQUIRED_SURFACES["real_m4b_artifact"]
+        surfaces.append(_branch_surface("real_m4b_artifact", live_m4b_path, root, namespace, branch, suffixes))
+    audiobook_receipt_path = (
+        _resolve_path(root, live_request.get("audiobookshelfImportReceiptPath"))
+        if _string(live_request.get("audiobookshelfImportReceiptPath"))
+        else audiobook_dir / "audiobookshelf-import.receipt.json"
+    )
     surfaces.append(
         _json_surface(
             "audiobookshelf_audiobook_receipt",
-            audiobook_dir / "audiobookshelf-import.receipt.json",
+            audiobook_receipt_path,
             root,
             reject_markers=True,
         )
     )
+    branch, suffixes = BRANCH_REQUIRED_SURFACES["audiobookshelf_audiobook_receipt"]
+    surfaces.append(_branch_surface("audiobookshelf_audiobook_receipt", audiobook_receipt_path, root, namespace, branch, suffixes))
 
     blocked = [surface["name"] for surface in surfaces if surface.get("status") != "pass"]
     completed_at = _now_iso()

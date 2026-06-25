@@ -12008,7 +12008,7 @@ def main() -> int:
             "Current release",
             required_texts=(
                 "Updated",
-                "Stable",
+                "Current",
                 "Open downloads",
                 "Open help",
                 "Changes"),
@@ -12035,28 +12035,28 @@ def main() -> int:
         AuditRoute(
             "/participate",
             "Participate",
-            required_texts=("Public board", "Roadmap", "Private help"),
+            required_texts=("Live board", "Roadmap", "Private issue"),
             forbidden_texts=("productlift.dev",),
             expects_header_count=1),
         AuditRoute(
             "/help",
             "Get help without guessing",
-            required_texts=("Open downloads", "Open support intake", "Create account"),
+            required_texts=("Open downloads", "Open support", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(
             "/faq",
             "Plain answers before you spend more time",
-            required_texts=("Open downloads", "Open support intake", "Create account"),
+            required_texts=("Open downloads", "Open support", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(
             "/contact",
-            "Open the right support case",
-            required_texts=("Submit support case", "Create account for tracked support", "Open Devices and access"),
+            "Contact Chummer",
+            required_texts=("Send support request", "Claim your copy", "Open Devices and access"),
             expects_header_count=1),
         AuditRoute(
             "/privacy",
             "What Chummer stores, and what it does not",
-            required_texts=("Open support intake", "Install linking", "What stays out"),
+            required_texts=("Open support", "Install linking", "What stays out"),
             expects_header_count=1),
         AuditRoute(
             "/terms",

@@ -18,7 +18,7 @@ EXPECTED_REQUIREMENTS = (
     "canon_privacy_audit",
     "cover_consistency_all_surfaces",
     "ebook_pdf_dossier_packaging",
-    "m4b_unmixr_audiobook_packaging",
+    "m4b_premium_audiobook_packaging",
     "audiobookshelf_dossier_and_audiobook_share",
     "movie_story_scene_playback",
     "local_authenticated_chummer_route",

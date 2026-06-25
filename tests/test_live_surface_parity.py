@@ -52,7 +52,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.wfile.write(
                 b"<html><body>"
                 b"Current release The build, platforms, and current state in one place. "
-                b"Release Open downloads Open help Platforms"
+                b"Updated Open downloads Open help Platforms"
                 b"</body></html>"
             )
             return

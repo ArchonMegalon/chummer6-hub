@@ -830,7 +830,36 @@ def test_completion_matrix_blocks_when_pdf_manuscript_hash_mismatches_accepted_t
     assert "pdf_manuscript_sha_matches_accepted" in row["failedFlags"]
 
 
-def test_completion_matrix_blocks_when_m4b_provider_is_not_unmixr(tmp_path: Path) -> None:
+def test_completion_matrix_allows_inkfluence_as_approved_premium_audio_provider(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    provider_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/unmixr-provider-m4b.receipt.json"
+    provider = json.loads(provider_path.read_text(encoding="utf-8"))
+    provider["provider"] = "Inkfluence"
+    provider["voiceProvider"] = "Inkfluence"
+    provider["tokens"] = [
+        token.replace("provider:Unmixr", "provider:Inkfluence")
+        for token in provider["tokens"]
+    ]
+    write_json(provider_path, provider)
+    gate_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/m4b-provider-import-gate.receipt.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate["tokens"] = [
+        token.replace("provider:Unmixr", "provider:Inkfluence")
+        for token in gate["tokens"]
+    ]
+    gate["providerReceiptSha256"] = hashlib.sha256(provider_path.read_bytes()).hexdigest()
+    write_json(gate_path, gate)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "m4b_premium_narration_import_verified")
+
+    assert row["status"] == "proved"
+    assert row["approvedAudioProvider"] == "Inkfluence"
+    assert row["flags"]["provider_is_approved_premium_narration_provider"] is True
+
+
+def test_completion_matrix_blocks_when_m4b_provider_is_not_approved_premium_provider(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
     provider_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/unmixr-provider-m4b.receipt.json"
@@ -844,14 +873,14 @@ def test_completion_matrix_blocks_when_m4b_provider_is_not_unmixr(tmp_path: Path
     write_json(gate_path, gate)
 
     result = module.materialize(tmp_path, tmp_path / "matrix.json")
-    row = next(item for item in result["rows"] if item["id"] == "m4b_unmixr_narration_import_verified")
+    row = next(item for item in result["rows"] if item["id"] == "m4b_premium_narration_import_verified")
 
     assert result["status"] == "blocked"
-    assert "m4b_unmixr_narration_import_verified" in result["blockedRows"]
-    assert "m4b_unmixr_narration_import_verified" in result["blockedHardGates"]
+    assert "m4b_premium_narration_import_verified" in result["blockedRows"]
+    assert "m4b_premium_narration_import_verified" in result["blockedHardGates"]
     assert row["status"] == "blocked"
-    assert row["flags"]["provider_is_unmixr"] is False
-    assert "provider_is_unmixr" in row["failedFlags"]
+    assert row["flags"]["provider_is_approved_premium_narration_provider"] is False
+    assert "provider_is_approved_premium_narration_provider" in row["failedFlags"]
 
 
 def test_completion_matrix_blocks_when_local_authenticated_listen_tab_missing(tmp_path: Path) -> None:

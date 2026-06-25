@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -19,6 +20,10 @@ def load_module():
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def module_sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def probe_payload(*, status: str = "blocked") -> dict:
@@ -50,6 +55,16 @@ def probe_payload(*, status: str = "blocked") -> dict:
     return {
         "contractName": "chummer.origin_edition.deployed_browser_probe.v1",
         "status": status,
+        "base_url": "https://chummer.run",
+        "projectId": "varga-mira-kestrel",
+        "owner_detail_page": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel",
+        "selected_face_cover_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover",
+        "read_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/read",
+        "book_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/book",
+        "listen_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/listen",
+        "watch_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/video",
+        "audiobookshelf_redirect": "https://audiobookshelf.girschele.com/audiobookshelf/share/audio",
+        "audiobookshelf_dossier_redirect": "https://audiobookshelf.girschele.com/audiobookshelf/share/book",
         "updated_at": "2026-06-25T13:00:00Z",
         "next_action": "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected." if passed else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
         "blocking_reason": "" if passed else ",".join(blockers),
@@ -74,14 +89,14 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "blockedChecks": [key for key, value in flags.items() if not value],
         },
         "url_hashes": {
-            "owner": "a" * 64,
-            "read": "b" * 64,
-            "book": "c" * 64,
-            "listen": "d" * 64,
-            "watch": "e" * 64,
-            "cover": "f" * 64,
-            "audiobookshelf_redirect": "1" * 64,
-            "audiobookshelf_dossier_redirect": "2" * 64,
+            "owner": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel"),
+            "read": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/read"),
+            "book": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/book"),
+            "listen": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/listen"),
+            "watch": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/video"),
+            "cover": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover"),
+            "audiobookshelf_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/audio"),
+            "audiobookshelf_dossier_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book"),
         },
         **flags,
     }
@@ -151,6 +166,48 @@ def test_verifier_rejects_missing_normalized_status_contract(tmp_path: Path) -> 
     assert ok is False
     assert "next_action_missing" in issues
     assert "blocked_probe_missing_blocking_reason" in issues
+
+
+def test_verifier_rejects_route_hash_that_does_not_match_declared_project(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["url_hashes"]["read"] = "0" * 64
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "url_hash_mismatch:read" in issues
+    assert "raw_route_hash_mismatch:read_url" in issues
+
+
+def test_verifier_rejects_raw_route_that_does_not_match_declared_project(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["read_url"] = "https://chummer.run/account/work/origin-dossiers/other/read"
+    payload["url_hashes"]["read"] = module_sha256(payload["read_url"])
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "url_hash_mismatch:read" in issues
+    assert "raw_route_mismatch:read_url" in issues
+
+
+def test_verifier_rejects_raw_audiobookshelf_share_hash_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["audiobookshelf_redirect"] = "https://audiobookshelf.girschele.com/audiobookshelf/share/changed"
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "raw_share_hash_mismatch:audiobookshelf_redirect" in issues
 
 
 def test_verifier_rejects_secret_marker_even_when_json_invalid(tmp_path: Path) -> None:

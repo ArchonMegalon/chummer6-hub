@@ -236,7 +236,7 @@ def test_verifier_rejects_completion_matrix_without_gold_audit_hard_gate(tmp_pat
 def test_verifier_rejects_blocked_chain_with_unexpected_requirement_coverage_blocker(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][5]["blockedRequirements"] = ["m4b_unmixr_audiobook_packaging"]
+    payload["stages"][5]["blockedRequirements"] = ["m4b_premium_audiobook_packaging"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)

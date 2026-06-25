@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 import sys
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from origin_edition_verify_paths import deployed_browser_probe_from_env
+from origin_edition_provider_config import origin_owner_url
 
 
 CONTRACT_NAME = "chummer.origin_edition.deployed_browser_probe.v1"
@@ -63,6 +65,11 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{path}: expected JSON object")
     return parsed
+
+
+def sha256_text(value: object) -> str:
+    text = str(value or "").strip()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else ""
 
 
 def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
@@ -163,6 +170,44 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
         value = str(url_hashes.get(key) or "")
         if len(value) != 64 or any(char not in "0123456789abcdef" for char in value.lower()):
             issues.append(f"url_hash_invalid:{key}")
+    base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+    project_id = str(payload.get("projectId") or payload.get("project_id") or "").strip()
+    if base_url and project_id:
+        expected_routes = {
+            "owner": origin_owner_url(base_url, project_id),
+            "read": origin_owner_url(base_url, project_id, "read"),
+            "book": origin_owner_url(base_url, project_id, "book"),
+            "listen": origin_owner_url(base_url, project_id, "listen"),
+            "watch": origin_owner_url(base_url, project_id, "video"),
+            "cover": origin_owner_url(base_url, project_id, "cover"),
+        }
+        for key, expected_url in expected_routes.items():
+            if url_hashes.get(key) != sha256_text(expected_url):
+                issues.append(f"url_hash_mismatch:{key}")
+        raw_route_fields = {
+            "owner": "owner_detail_page",
+            "read": "read_url",
+            "book": "book_url",
+            "listen": "listen_url",
+            "watch": "watch_url",
+            "cover": "selected_face_cover_url",
+        }
+        for key, field in raw_route_fields.items():
+            raw_value = str(payload.get(field) or "").strip()
+            if raw_value and raw_value != expected_routes[key]:
+                issues.append(f"raw_route_mismatch:{field}")
+            if raw_value and sha256_text(raw_value) != url_hashes.get(key):
+                issues.append(f"raw_route_hash_mismatch:{field}")
+    else:
+        issues.append("base_url_or_project_id_missing")
+    raw_share_fields = {
+        "audiobookshelf_redirect": "audiobookshelf_redirect",
+        "audiobookshelf_dossier_redirect": "audiobookshelf_dossier_redirect",
+    }
+    for key, field in raw_share_fields.items():
+        raw_value = str(payload.get(field) or "").strip()
+        if raw_value and sha256_text(raw_value) != url_hashes.get(key):
+            issues.append(f"raw_share_hash_mismatch:{field}")
 
     return not issues, issues
 

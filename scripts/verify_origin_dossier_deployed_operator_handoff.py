@@ -21,6 +21,14 @@ REQUIRED_COMMAND_SNIPPETS = (
     "verify_origin_edition_gold_final_verdict.py",
     "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD=1 bash scripts/ai/run_services_verification.sh",
 )
+REQUIRED_CONTEXT_ARGUMENTS = (
+    "--project-id ",
+    "--family-name ",
+    "--given-name ",
+    "--runner-name ",
+    "--namespace ",
+    "--base-url ",
+)
 FORBIDDEN_VALUE_MARKERS = (
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
@@ -99,6 +107,9 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     for snippet in REQUIRED_COMMAND_SNIPPETS:
         if snippet not in serialized_commands:
             issues.append(f"required_command_missing:{snippet}")
+    for argument in REQUIRED_CONTEXT_ARGUMENTS:
+        if argument not in serialized_commands:
+            issues.append(f"required_context_argument_missing:{argument.strip()}")
     if "--require-gold" not in serialized_commands:
         issues.append("strict_gold_verifier_missing")
     if "--allow-blocked" not in serialized_commands:

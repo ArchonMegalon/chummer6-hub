@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import sys
 from typing import Any
 
@@ -90,6 +91,23 @@ def token_present() -> bool:
     return bool(os.environ.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "").strip())
 
 
+def quote(value: object) -> str:
+    return shlex.quote(str(value))
+
+
+def context_args(context: OriginEditionContext) -> str:
+    return " ".join(
+        [
+            f"--project-id {quote(context.project_id)}",
+            f"--family-name {quote(context.family_name)}",
+            f"--given-name {quote(context.given_name)}",
+            f"--runner-name {quote(context.runner_name)}",
+            f"--namespace {quote(context.resolved_namespace)}",
+            f"--base-url {quote(context.base_url)}",
+        ]
+    )
+
+
 def materialize(
     evidence_root: Path,
     output: Path,
@@ -114,11 +132,12 @@ def materialize(
         for flag in REQUIRED_DEPLOYED_PROBE_FLAGS
     }
     missing_deployed_flags = [flag for flag, passed in deployed_flag_status.items() if not passed]
+    origin_context_args = context_args(context)
     required_commands = [
         "Set CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN in /docker/chummercomplete/chummer.run-services/.env or in the current process.",
-        f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {evidence_root_text} --project-id {context.project_id} --base-url {context.base_url}",
+        f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
-        f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {evidence_root_text} --project-id {context.project_id} --family-name {context.family_name} --given-name {context.given_name} --runner-name {context.runner_name} --base-url {context.base_url} --allow-blocked",
+        f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
         f"python3 scripts/materialize_origin_edition_gold_final_verdict.py --evidence-root {evidence_root_text} --allow-blocked",
         f"python3 scripts/verify_origin_edition_gold_proof_chain.py --proof-chain {evidence_root_text}/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json --require-gold",
         f"python3 scripts/verify_origin_edition_gold_final_verdict.py --verdict {evidence_root_text}/FINAL_ORIGIN_EDITION_GOLD_VERDICT.md --proof-chain {evidence_root_text}/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json --requirement-coverage {evidence_root_text}/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json",

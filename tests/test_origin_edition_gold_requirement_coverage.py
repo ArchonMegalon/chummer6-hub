@@ -97,12 +97,12 @@ def test_requirement_coverage_blocks_missing_required_receipt_row(tmp_path: Path
     seed_matrix(tmp_path, deployed_pass=True)
     matrix_path = tmp_path / "ORIGIN_EDITION_GOLD_COMPLETION_MATRIX.generated.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
-    matrix["rows"] = [row for row in matrix["rows"] if row["id"] != "m4b_unmixr_narration_import_verified"]
+    matrix["rows"] = [row for row in matrix["rows"] if row["id"] != "m4b_premium_narration_import_verified"]
     write_json(matrix_path, matrix)
 
     result = module.materialize(tmp_path, tmp_path / "coverage.json")
-    audiobook = next(item for item in result["requirements"] if item["id"] == "m4b_unmixr_audiobook_packaging")
+    audiobook = next(item for item in result["requirements"] if item["id"] == "m4b_premium_audiobook_packaging")
 
     assert result["status"] == "blocked"
-    assert "m4b_unmixr_audiobook_packaging" in result["blockedRequirements"]
-    assert audiobook["missingRows"] == ["m4b_unmixr_narration_import_verified"]
+    assert "m4b_premium_audiobook_packaging" in result["blockedRequirements"]
+    assert audiobook["missingRows"] == ["m4b_premium_narration_import_verified"]
