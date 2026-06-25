@@ -5549,7 +5549,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ProductLiftParticipateSnapshot publicRequests = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
         string? hostedBoardHref = ResolveProductLiftHostedRoadmapHref();
         var model = new RoadmapPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "Milestone-backed public direction, current readiness, and the next honest routes.", currentPath, cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "What Chummer is fixing next.", currentPath, cancellationToken),
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, currentPath),
             Milestones: BuildRoadmapMilestones(),
             SignalLoop: signalLoop,

@@ -1010,11 +1010,22 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         'id="roadmap-board"',
         'src="@Model.HostedBoardHref"',
         'Current work',
-        'Loaded through Chummer so the page stays first-party.',
+        'Shown here without leaving Chummer.',
     ):
         assert required in roadmap
 
     assert "Use the right place" not in roadmap
+
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
+    assert "What Chummer is fixing next." in controller
+    for forbidden in (
+        "Milestone-backed public direction",
+        "current readiness",
+        "next honest routes",
+        "Loaded through Chummer so the page stays first-party.",
+    ):
+        assert forbidden not in controller
+        assert forbidden not in roadmap
 
     for required in (
         "static string RoadmapText(string? value)",
