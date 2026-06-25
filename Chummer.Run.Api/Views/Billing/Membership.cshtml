@@ -36,16 +36,16 @@
             color: var(--text);
         }
         main {
-            max-width: 58rem;
+            max-width: 46rem;
             margin: 0 auto;
-            padding: 2rem 1.25rem 3rem;
+            padding: 2rem 1.25rem 2.5rem;
         }
         h1, h2, p { margin: 0; }
         .stack { display: grid; gap: 1rem; }
         .hero { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
         .eyebrow { color: var(--accent); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
         .summary { color: var(--muted); line-height: 1.55; max-width: 42rem; }
-        .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+        .grid { display: grid; gap: 0.85rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -67,17 +67,6 @@
         ul { margin: 0; padding-left: 1rem; color: var(--muted); display: grid; gap: 0.45rem; }
         .note, .field-help { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
         .action-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-        .story-examples { display: grid; gap: 0.75rem; }
-        .story-example {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.85rem;
-            background: rgba(255,255,255,0.02);
-            display: grid;
-            gap: 0.35rem;
-        }
-        .story-example h3 { font-size: 1rem; }
-        .story-meta { color: var(--accent); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; }
         a.button, button.button {
             appearance: none;
             border: 1px solid var(--border);
@@ -92,6 +81,7 @@
         button.button--primary { background: var(--accent); color: #071512; border-color: transparent; }
         button.button--primary:hover { background: var(--accent-strong); }
         .form-grid { display: grid; gap: 0.85rem; }
+        .quiet-list { list-style: none; padding: 0; }
         label { display: grid; gap: 0.4rem; font-size: 0.95rem; }
         input {
             width: 100%;
@@ -120,15 +110,15 @@
         <p class="eyebrow">Membership</p>
         <h1>@Model.Heading</h1>
         <p class="summary">@Model.Summary</p>
-        <div class="pill">Same Chummer app. Supporter helps cover the work.</div>
-        <div class="pill">Origin books: Free gets 1 per month. Supporter gets 2.</div>
+        <div class="pill">Same app for everyone.</div>
+        <div class="pill">Origin books: Free 1/month. Supporter 2/month.</div>
         @if (usingSignedInAccount)
         {
             <div class="pill">Signed in as @(string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel)</div>
         }
         @if (quota is not null)
         {
-            <div class="pill">This account: @quota.MonthlyUsed / @quota.MonthlyLimit MyFirstBook books used this month</div>
+            <div class="pill">Books this month: @quota.MonthlyUsed / @quota.MonthlyLimit</div>
         }
     </section>
 
@@ -151,26 +141,12 @@
                     <span class="label">Free</span>
                     <h2>@free.Name</h2>
                     <p class="note">@free.Summary</p>
-                    <ul>
+                    <ul class="quiet-list">
                         @foreach (var item in free.Included)
                         {
                             <li>@item</li>
                         }
                     </ul>
-                    @if (free.ExampleStoryBooks.Count > 0)
-                    {
-                        <div class="story-examples">
-                            @foreach (var example in free.ExampleStoryBooks)
-                            {
-                                <article class="story-example">
-                                    <p class="story-meta">@example.Edition</p>
-                                    <h3>@example.Title</h3>
-                                    <p class="note">@example.StoryHook</p>
-                                    <p class="field-help">@example.WhyItFits</p>
-                                </article>
-                            }
-                        </div>
-                    }
                     <div class="action-row">
                         <a class="button" href="@free.PrimaryAction.Href">@free.PrimaryAction.Label</a>
                     </div>
@@ -182,32 +158,18 @@
                     <span class="label">Supporter</span>
                     <h2>@supporter.Name</h2>
                     <p class="note">@supporter.Summary</p>
-                    <ul>
+                    <ul class="quiet-list">
                         @foreach (var item in supporter.Included)
                         {
                             <li>@item</li>
                         }
                     </ul>
-                    @if (supporter.ExampleStoryBooks.Count > 0)
-                    {
-                        <div class="story-examples">
-                            @foreach (var example in supporter.ExampleStoryBooks)
-                            {
-                                <article class="story-example">
-                                    <p class="story-meta">@example.Edition</p>
-                                    <h3>@example.Title</h3>
-                                    <p class="note">@example.StoryHook</p>
-                                    <p class="field-help">@example.WhyItFits</p>
-                                </article>
-                            }
-                        </div>
-                    }
                     <form class="form-grid" method="post" action="/account/billing/supporter">
                         <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
                         @if (hasUserId)
                         {
                             <input type="hidden" name="userId" value="@Model.UserId">
-                            <div class="pill">Account attached: @Model.UserId</div>
+                            <div class="pill">Account attached</div>
                         }
                         else
                         {
@@ -220,7 +182,7 @@
                             Email
                             <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
                         </label>
-                        <p class="field-help">This opens checkout. Signed-in Chummer accounts continue directly. Supporter keeps the same app access and raises the Origin Book allowance to 2 per month.</p>
+                        <p class="field-help">Supporter does not unlock extra app features right now. It only raises the monthly Origin Book allowance to 2 and helps pay for Chummer.</p>
                         <div class="action-row">
                             <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
                             <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>

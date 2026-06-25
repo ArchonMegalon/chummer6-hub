@@ -47,11 +47,10 @@ test('billing and participate stay first-party for guests and signed-in users', 
 
   await page.goto(`${baseUrl}/account/billing`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('h1')).toContainText('Membership');
-  await expect(page.locator('body')).toContainText('Same Chummer app. Supporter helps cover the work.');
-  await expect(page.locator('body')).toContainText('Origin books: Free gets 1 per month. Supporter gets 2.');
+  await expect(page.locator('body')).toContainText('Same app for everyone.');
+  await expect(page.locator('body')).toContainText('Origin books: Free 1/month. Supporter 2/month.');
   await expect(page.locator('body')).toContainText('Signed in as');
-  await expect(page.locator('body')).toContainText('Signed-in Chummer accounts continue directly.');
-  await expect(page.locator('body')).toContainText('Supporter keeps the same app access and raises the Origin Book allowance to 2 per month.');
+  await expect(page.locator('body')).toContainText('Supporter does not unlock extra app features right now.');
   await expect(page.locator('body')).not.toContainText('external billing checkout');
   await expect(page.locator('body')).not.toContainText('hosted billing route');
   await expect(page.locator('form[action="/account/billing/supporter"]')).toBeVisible();

@@ -54,14 +54,15 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
 
   const brilliantDirectoriesText = await brilliantDirectoriesPreviewPage.text();
   if (brilliantDirectoriesPreviewPage.status() === 200) {
-    expect(brilliantDirectoriesText).toContain('Free and Supporter have the same Chummer app access.');
+    expect(brilliantDirectoriesText).toContain('Free and Supporter use the same Chummer app.');
     expect(brilliantDirectoriesText).toContain('Supporter');
-    expect(brilliantDirectoriesText).toContain('Same Chummer app. Supporter helps cover the work.');
-    expect(brilliantDirectoriesText).toContain('Origin books: Free gets 1 per month. Supporter gets 2.');
-    expect(brilliantDirectoriesText).toContain('Supporter keeps the same app access and raises the Origin Book allowance to 2 per month.');
+    expect(brilliantDirectoriesText).toContain('Same app for everyone.');
+    expect(brilliantDirectoriesText).toContain('Origin books: Free 1/month. Supporter 2/month.');
+    expect(brilliantDirectoriesText).toContain('Supporter does not unlock extra app features right now.');
     expect(brilliantDirectoriesText).toContain('1 Origin Book per month');
     expect(brilliantDirectoriesText).toContain('2 Origin Books per month');
-    expect(brilliantDirectoriesText).toContain('This account:');
+    expect(brilliantDirectoriesText).toContain('Books this month:');
+    expect(brilliantDirectoriesText).not.toContain('Account attached: user-a');
     expect(brilliantDirectoriesText).not.toContain('external billing checkout');
     expect(brilliantDirectoriesText).not.toContain('external billing page');
     expect(brilliantDirectoriesText).not.toContain('hosted billing route');

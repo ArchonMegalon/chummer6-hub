@@ -23,7 +23,7 @@ public sealed class BrilliantDirectoriesBillingService
         new(
             BrilliantDirectoriesBillingConstants.FreePlanKey,
             BrilliantDirectoriesBillingConstants.FreePlanName,
-            "Use Chummer without a paid membership.",
+            "Use Chummer normally.",
             IsDefault: true,
             IsSupporter: false,
             Included:
@@ -44,7 +44,7 @@ public sealed class BrilliantDirectoriesBillingService
         new(
             BrilliantDirectoriesBillingConstants.SupporterPlanKey,
             BrilliantDirectoriesBillingConstants.SupporterPlanName,
-            "Support ongoing work. Same app access, 2 Origin Books per month.",
+            "Help pay for Chummer. The app stays the same.",
             IsDefault: false,
             IsSupporter: true,
             Included:
@@ -90,7 +90,7 @@ public sealed class BrilliantDirectoriesBillingService
             Provider: options.ProviderName,
             ProviderKey: options.ProviderKey,
             Heading: "Membership",
-            Summary: "Free and Supporter have the same Chummer app access. Supporter raises the Origin Book allowance.",
+            Summary: "Free and Supporter use the same Chummer app. Supporter is just a way to help pay for the work.",
             MyFirstBookQuotaPolicy: new MyFirstBookQuotaPolicyDto(
                 FreeMonthlyBooks: FreeMyFirstBookMonthlyLimit,
                 SupporterMonthlyBooks: SupporterMyFirstBookMonthlyLimit),

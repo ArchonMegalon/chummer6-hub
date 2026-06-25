@@ -525,12 +525,14 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     assert 'return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing")}")' in controller
     assert "<!doctype html>" not in controller
     assert '/auth/google/start?next={Uri.EscapeDataString("/account/billing")}' in controller
-    assert "Supporter is appreciation, not extra access." in billing_view
-    assert "MyFirstBook: Free gets 1 book per month. Supporter gets 2." in billing_view
-    assert "Signed-in Chummer accounts go through directly." in billing_view
-    assert "Supporter currently unlocks no extra features beyond Free." in billing_view
+    assert "Same app for everyone." in billing_view
+    assert "Origin books: Free 1/month. Supporter 2/month." in billing_view
+    assert "Supporter does not unlock extra app features right now." in billing_view
+    assert "Books this month:" in billing_view
     assert '__RequestVerificationToken' in billing_view
     assert "Manage billing" in billing_view
+    assert "story-example" not in billing_view
+    assert "Account attached: @Model.UserId" not in billing_view
     assert "Premium" not in billing_view
     assert "Upgrade" not in billing_view
 
