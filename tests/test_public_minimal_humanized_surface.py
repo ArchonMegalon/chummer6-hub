@@ -3135,6 +3135,10 @@ def test_account_page_does_not_expose_fake_advanced_settings_surface() -> None:
     assert '"settings" => "Billing"' in account_view
     assert '"advanced" => "settings"' in controller
     assert 'new SectionLinkViewModel("billing", "Billing", "/account/billing", false)' in controller
+    assert "Open campaigns on the web" in account_view
+    assert "<h2>Campaigns</h2>" in account_view
+    assert "deeper campaign continuity" in account_view
+    assert "Open Home > Campaigns to continue." in account_view
 
     for forbidden in (
         "showAdvancedSection",
@@ -3142,6 +3146,10 @@ def test_account_page_does_not_expose_fake_advanced_settings_surface() -> None:
         '"advanced" => "Account · Billing"',
         '"advanced" => "Billing"',
         "SectionLinkViewModel(\"advanced\"",
+        "Open work on the web",
+        "<h2>Work</h2>",
+        "deeper work continuity",
+        "Open Home > Work to continue.",
     ):
         assert forbidden not in account_view
         assert forbidden not in controller

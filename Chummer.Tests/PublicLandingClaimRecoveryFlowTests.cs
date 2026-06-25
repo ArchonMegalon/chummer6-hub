@@ -39,10 +39,10 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
         Assert.Contains("Devices and access is where you reconnect, replace, or recover this copy.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
         Assert.Contains(
-            "Enter each code in Chummer if it opens in recovery mode on the already-downloaded device. Do not redeem claim codes in a browser tab.",
+            "Recovery codes are only for the already-downloaded app when it asks for one.",
             accountView,
             StringComparison.Ordinal);
-        Assert.Contains("Current install path", accountView, StringComparison.Ordinal);
+        Assert.Contains("Linked install path", accountView, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", accountView, StringComparison.Ordinal);
         Assert.Contains("Open Devices and access", presenter, StringComparison.Ordinal);
         Assert.Contains(

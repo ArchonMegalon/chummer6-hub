@@ -20,11 +20,13 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
 
         Assert.Contains("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
-        Assert.Contains("\"advanced\" => \"Billing\"", view, StringComparison.Ordinal);
         Assert.Contains("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"work\" => \"Work\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"advanced\" => \"Billing\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"advanced\" => \"Advanced account details\"", view, StringComparison.Ordinal);
+        Assert.Contains("Open campaigns on the web", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open work on the web", view, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1459,7 +1459,7 @@
                                     : "This account does not have a linked desktop copy yet, so clicks should take you into install and claim first.")</p>
                                 <div class="stacked-actions">
                                     <a class="button-like button-like--secondary" href="@launcherSecondaryHref">@launcherSecondaryLabel</a>
-                                    <a class="button-like button-like--ghost" href="/account/work">Open work on the web</a>
+                                    <a class="button-like button-like--ghost" href="/account/work">Open campaigns on the web</a>
                                     <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
                                 </div>
                             </article>
@@ -1602,8 +1602,8 @@
             {
                 <section class="settings-section" data-account-panel id="workspaces-empty">
                     <div class="settings-section__header">
-                        <h2>Work</h2>
-                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this area keeps the deeper work surfaces separate from the customer core.</p>
+                        <h2>Campaigns</h2>
+                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this area keeps campaign details separate from installs, support, and billing.</p>
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="/home">Return to home</a>
@@ -3452,7 +3452,7 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign yet. Use the starter path to seed the first playable session before you come back for deeper work continuity.</p>
+                    <p class="muted-copy">No campaign yet. Use the starter path to seed the first playable session before you come back for deeper campaign continuity.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
                         <a class="inline-link" href="/home/work">Open Home</a>
@@ -4718,7 +4718,7 @@
         return;
       }
 
-      setStarterWorkspaceNotice("Starter campaign is not ready yet. Open Home > Work to continue.", true);
+      setStarterWorkspaceNotice("Starter campaign is not ready yet. Open Home > Campaigns to continue.", true);
     } catch (error) {
       setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."), true);
     } finally {
