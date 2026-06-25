@@ -181,7 +181,13 @@
     </article>
 </section>
 
-<section class="minimal-section minimal-section--tight" id="origin-edition-canon-audit" data-origin-edition-tab="canon-audit">
+<section class="minimal-section minimal-section--tight"
+         id="origin-edition-canon-audit"
+         data-origin-edition-tab="canon-audit"
+         data-chummer-owns-canon="true"
+         data-provider-created-facts-auto-canon="false"
+         data-canon-privacy-receipts-present="@((publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied).ToString().ToLowerInvariant())"
+         data-no-fallback-media-verified="@publication.GoldReady.ToString().ToLowerInvariant()">
     <article class="app-action-card">
         <span class="tag">Canon Audit</span>
         <h2>Publication proof</h2>

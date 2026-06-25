@@ -125,6 +125,12 @@ def body_size(response: requests.Response | None) -> int:
     return len(response.content or b"")
 
 
+def response_sha256(response: requests.Response | None) -> str:
+    if response is None:
+        return ""
+    return hashlib.sha256(response.content or b"").hexdigest()
+
+
 def share_reachable(response: requests.Response | None) -> bool:
     if status(response) != 200:
         return False
@@ -146,6 +152,10 @@ def materialize(
     loaded_env = load_env_file(env_file)
     imported = read_import_request(evidence_root)
     request = imported["importRequest"]
+    live_evidence = imported.get("evidence") if isinstance(imported.get("evidence"), dict) else {}
+    expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
+    expected_book_sha = str(live_evidence.get("bookArtifactSha256") or "").strip()
+    expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
     share_url = str(request.get("audiobookshelfShareUrl") or "").strip()
     dossier_share_url = str(request.get("audiobookshelfDossierShareUrl") or "").strip()
     audiobook_share_url_trusted = is_trusted_audiobookshelf_share(share_url)
@@ -216,6 +226,21 @@ def materialize(
     listen_tab = 'href="#origin-edition-listen"' in detail_text
     watch_tab = 'href="#origin-edition-watch"' in detail_text
     canon_tab = 'href="#origin-edition-canon-audit"' in detail_text
+    canon_section = 'id="origin-edition-canon-audit"' in detail_text and 'data-origin-edition-tab="canon-audit"' in detail_text
+    chummer_canon_owner = 'data-chummer-owns-canon="true"' in detail_text
+    provider_created_facts_blocked = 'data-provider-created-facts-auto-canon="false"' in detail_text
+    canon_privacy_receipts_present = 'data-canon-privacy-receipts-present="true"' in detail_text
+    no_fallback_media_verified = 'data-no-fallback-media-verified="true"' in detail_text
+    canon_audit_content_verified = all(
+        [
+            canon_tab,
+            canon_section,
+            chummer_canon_owner,
+            provider_created_facts_blocked,
+            canon_privacy_receipts_present,
+            no_fallback_media_verified,
+        ]
+    )
     read_gate = status(read) in {302, 303, 307, 308} and header(read, "location") == dossier_share_url
     listen_gate = status(listen) in {302, 303, 307, 308} and header(listen, "location") == share_url
     audiobook_share_reachable = share_reachable(audiobook_share)
@@ -226,6 +251,9 @@ def materialize(
     watch_artifact_nonempty = watch_gate and body_size(video) > 0
     cover_artifact_nonempty = cover_gate and body_size(cover) > 0
     book_artifact_nonempty = book_gate and body_size(book) > 0
+    cover_sha_matches_import = cover_artifact_nonempty and bool(expected_cover_sha) and response_sha256(cover) == expected_cover_sha
+    book_sha_matches_import = book_artifact_nonempty and bool(expected_book_sha) and response_sha256(book) == expected_book_sha
+    video_sha_matches_import = watch_artifact_nonempty and bool(expected_video_sha) and response_sha256(video) == expected_video_sha
     owner_playback_e2e = all(
         [
             logged_in,
@@ -234,6 +262,7 @@ def materialize(
             listen_tab,
             watch_tab,
             canon_tab,
+            canon_audit_content_verified,
             read_gate,
             listen_gate,
             watch_gate,
@@ -242,6 +271,9 @@ def materialize(
             watch_artifact_nonempty,
             cover_artifact_nonempty,
             book_artifact_nonempty,
+            cover_sha_matches_import,
+            book_sha_matches_import,
+            video_sha_matches_import,
             audiobook_share_url_trusted,
             dossier_share_url_trusted,
             audiobook_share_reachable,
@@ -266,6 +298,12 @@ def materialize(
         "listen_tab_visible": listen_tab,
         "watch_tab_visible": watch_tab,
         "canon_audit_tab_visible": canon_tab,
+        "canon_audit_section_visible": canon_section,
+        "chummer_canon_owner_visible": chummer_canon_owner,
+        "provider_created_facts_blocked_visible": provider_created_facts_blocked,
+        "canon_privacy_receipts_present": canon_privacy_receipts_present,
+        "no_fallback_media_verified": no_fallback_media_verified,
+        "canon_audit_content_verified": canon_audit_content_verified,
         "read_gate_verified": read_gate,
         "chummer_run_listen_gate_verified": listen_gate,
         "watch_gate_verified": watch_gate,
@@ -274,6 +312,9 @@ def materialize(
         "watch_artifact_nonempty": watch_artifact_nonempty,
         "cover_artifact_nonempty": cover_artifact_nonempty,
         "book_artifact_nonempty": book_artifact_nonempty,
+        "cover_sha_matches_import": cover_sha_matches_import,
+        "book_sha_matches_import": book_sha_matches_import,
+        "video_sha_matches_import": video_sha_matches_import,
         "audiobook_share_url_trusted": audiobook_share_url_trusted,
         "dossier_share_url_trusted": dossier_share_url_trusted,
         "audiobook_share_reachable": audiobook_share_reachable,
@@ -354,6 +395,16 @@ def materialize(
             "watch": body_size(video),
             "audiobook_share": body_size(audiobook_share),
             "dossier_share": body_size(dossier_share),
+        },
+        "response_sha256": {
+            "cover": response_sha256(cover),
+            "book": response_sha256(book),
+            "watch": response_sha256(video),
+        },
+        "expected_import_sha256": {
+            "cover": expected_cover_sha,
+            "book": expected_book_sha,
+            "watch": expected_video_sha,
         },
         "url_hashes": {
             "owner": sha256_text(owner_url),

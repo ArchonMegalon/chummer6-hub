@@ -42,6 +42,11 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   await expect(page.locator('[data-origin-edition-tab="listen"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="watch"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="canon-audit"]')).toBeVisible();
+  const canonAudit = page.locator('#origin-edition-canon-audit[data-origin-edition-tab="canon-audit"]');
+  await expect(canonAudit).toHaveAttribute('data-chummer-owns-canon', 'true');
+  await expect(canonAudit).toHaveAttribute('data-provider-created-facts-auto-canon', 'false');
+  await expect(canonAudit).toHaveAttribute('data-canon-privacy-receipts-present', 'true');
+  await expect(canonAudit).toHaveAttribute('data-no-fallback-media-verified', 'true');
   await expect(page.getByRole('link', { name: 'Read' })).toHaveAttribute('href', '#origin-edition-read');
   await expect(page.getByRole('link', { name: 'Listen' })).toHaveAttribute('href', '#origin-edition-listen');
   await expect(page.getByRole('link', { name: 'Watch' })).toHaveAttribute('href', '#origin-edition-watch');

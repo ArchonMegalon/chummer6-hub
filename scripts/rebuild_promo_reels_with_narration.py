@@ -132,9 +132,9 @@ def narration_filter(target_vo_len: float) -> str:
     fade_out = 0.24 if target_vo_len <= 4.2 else 0.28
     return (
         f"[rawvo]afade=t=in:st=0:d={fade_in:.2f},afade=t=out:st={max(target_vo_len - fade_out, 0):.3f}:d={fade_out:.2f},"
-        "highpass=f=70,lowpass=f=5200,"
+        "highpass=f=70,lowpass=f=4800,"
         "acompressor=threshold=-24dB:ratio=1.8:attack=24:release=260:makeup=1.6,"
-        "alimiter=limit=0.78,"
+        "volume=0.72,alimiter=limit=0.70,"
         "loudnorm=I=-16:LRA=9:TP=-1.5[vo0]"
     )
 
@@ -190,19 +190,19 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
         vo_filter = f"atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
     filters = [
         f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,"
-        "highpass=f=72,lowpass=f=5200,"
-        "acompressor=threshold=-23dB:ratio=1.9:attack=22:release=260:makeup=1.4,alimiter=limit=0.78,loudnorm=I=-17:LRA=9:TP=-2.0[vo0]",
+        "highpass=f=72,lowpass=f=4800,"
+        "acompressor=threshold=-23dB:ratio=1.9:attack=22:release=260:makeup=1.4,volume=0.72,alimiter=limit=0.70,loudnorm=I=-17:LRA=9:TP=-2.0[vo0]",
         f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.10[vo]",
     ]
     if synthetic_music_bed_enabled():
         filters.extend(
             [
                 cinematic_bed_filter(target_len, mode="continuous"),
-                "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.82[a]",
+                "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,volume=0.80,alimiter=limit=0.74[a]",
             ]
         )
     else:
-        filters.append("[vo]alimiter=limit=0.82[a]")
+        filters.append("[vo]volume=0.80,alimiter=limit=0.74[a]")
     run(
         "ffmpeg",
         "-y",
@@ -236,9 +236,9 @@ def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
     filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.11[vo]")
     if synthetic_music_bed_enabled():
         filters.append(cinematic_bed_filter(scene_len, mode="scene"))
-        filters.append("[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.82[a]")
+        filters.append("[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,volume=0.80,alimiter=limit=0.74[a]")
     else:
-        filters.append("[vo]alimiter=limit=0.82[a]")
+        filters.append("[vo]volume=0.80,alimiter=limit=0.74[a]")
     run(
         "ffmpeg",
         "-y",

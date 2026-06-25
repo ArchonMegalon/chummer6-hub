@@ -205,6 +205,10 @@ def materialize(
                     "href=\"#origin-edition-listen\"",
                     "href=\"#origin-edition-watch\"",
                     "href=\"#origin-edition-canon-audit\"",
+                    "data-chummer-owns-canon=\"true\"",
+                    "data-provider-created-facts-auto-canon=\"false\"",
+                    "data-canon-privacy-receipts-present=\"true\"",
+                    "data-no-fallback-media-verified=\"true\"",
                     "Read in Audiobookshelf",
                     "Listen in Audiobookshelf",
                     "Watch scene movie",
@@ -273,11 +277,33 @@ def materialize(
                     "listenTabVisible": "href=\"#origin-edition-listen\"" in detail_text,
                     "watchTabVisible": "href=\"#origin-edition-watch\"" in detail_text,
                     "canonAuditTabVisible": "href=\"#origin-edition-canon-audit\"" in detail_text,
+                    "canonAuditContentVerified": all(
+                        token in detail_text
+                        for token in (
+                            "id=\"origin-edition-canon-audit\"",
+                            "data-origin-edition-tab=\"canon-audit\"",
+                            "data-chummer-owns-canon=\"true\"",
+                            "data-provider-created-facts-auto-canon=\"false\"",
+                            "data-canon-privacy-receipts-present=\"true\"",
+                            "data-no-fallback-media-verified=\"true\"",
+                        )
+                    ),
                     "selectedFaceCoverVisible": expected_cover_alt in detail_text,
                     "read_tab_visible": "href=\"#origin-edition-read\"" in detail_text,
                     "listen_tab_visible": "href=\"#origin-edition-listen\"" in detail_text,
                     "watch_tab_visible": "href=\"#origin-edition-watch\"" in detail_text,
                     "canon_audit_tab_visible": "href=\"#origin-edition-canon-audit\"" in detail_text,
+                    "canon_audit_content_verified": all(
+                        token in detail_text
+                        for token in (
+                            "id=\"origin-edition-canon-audit\"",
+                            "data-origin-edition-tab=\"canon-audit\"",
+                            "data-chummer-owns-canon=\"true\"",
+                            "data-provider-created-facts-auto-canon=\"false\"",
+                            "data-canon-privacy-receipts-present=\"true\"",
+                            "data-no-fallback-media-verified=\"true\"",
+                        )
+                    ),
                     "selected_face_cover_visible": expected_cover_alt in detail_text,
                     "readRouteRedirectVerified": read.headers.get("location") == entry["audiobookshelfDossierShareUrl"],
                     "listenRouteRedirectVerified": listen.headers.get("location") == entry["audiobookshelfAudiobookShareUrl"],

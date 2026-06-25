@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_dossier_deployed_browser_probe.py"
+FAKE_COVER_BYTES = b"\xff\xd8cover-bytes"
+FAKE_BOOK_BYTES = b"PK\x03\x04ebook-bytes"
+FAKE_VIDEO_BYTES = b"\x00\x00\x00\x18ftypmp42movie-bytes"
 
 
 def load_module():
@@ -26,6 +30,11 @@ def write_import_request(
     (root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json").write_text(
         json.dumps(
             {
+                "evidence": {
+                    "storySceneCoverSha256": hashlib.sha256(FAKE_COVER_BYTES).hexdigest(),
+                    "bookArtifactSha256": hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+                    "dossierVideoSha256": hashlib.sha256(FAKE_VIDEO_BYTES).hexdigest(),
+                },
                 "importRequest": {
                     "audiobookshelfShareUrl": audiobook_share_url,
                     "audiobookshelfDossierShareUrl": dossier_share_url,
@@ -61,15 +70,15 @@ class FakeSession:
         if not self.has_cookie and not self.headers.get("Authorization", "").startswith("Bearer "):
             return FakeResponse(302, {"location": "/login?next=%2Faccount%2Fwork"})
         if url.endswith("/cover"):
-            return FakeResponse(200, {"content-type": "image/jpeg"}, content=b"\xff\xd8cover-bytes")
+            return FakeResponse(200, {"content-type": "image/jpeg"}, content=FAKE_COVER_BYTES)
         if url.endswith("/book"):
-            return FakeResponse(200, {"content-type": "application/epub+zip"}, content=b"PK\x03\x04ebook-bytes")
+            return FakeResponse(200, {"content-type": "application/epub+zip"}, content=FAKE_BOOK_BYTES)
         if url.endswith("/read"):
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/book"})
         if url.endswith("/listen"):
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/audio"})
         if url.endswith("/video"):
-            return FakeResponse(200, {"content-type": "video/mp4"}, content=b"\x00\x00\x00\x18ftypmp42movie-bytes")
+            return FakeResponse(200, {"content-type": "video/mp4"}, content=FAKE_VIDEO_BYTES)
         return FakeResponse(
             200,
             {"content-type": "text/html"},
@@ -80,6 +89,14 @@ class FakeSession:
               <a href="#origin-edition-listen">Listen</a>
               <a href="#origin-edition-watch">Watch</a>
               <a href="#origin-edition-canon-audit">Canon Audit</a>
+              <section id="origin-edition-canon-audit"
+                       data-origin-edition-tab="canon-audit"
+                       data-chummer-owns-canon="true"
+                       data-provider-created-facts-auto-canon="false"
+                       data-canon-privacy-receipts-present="true"
+                       data-no-fallback-media-verified="true">
+                Canon Audit
+              </section>
             </main>
             """,
         )
@@ -106,10 +123,37 @@ class EmptyOwnerVideoSession(FakeSession):
         return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
 
 
+class WrongHashOwnerVideoSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if (self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer ")) and url.endswith("/video"):
+            return FakeResponse(200, {"content-type": "video/mp4"}, content=b"\x00\x00\x00\x18ftypmp42wrong-movie")
+        return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
 class BrokenAudiobookshelfShareSession(FakeSession):
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         if "audiobookshelf.girschele.com/audiobookshelf/share/audio" in url:
             return FakeResponse(503, {"content-type": "text/plain"}, "temporarily unavailable")
+        return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
+class MissingCanonAuditContentSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer "):
+            if not any(url.endswith(suffix) for suffix in ("/cover", "/book", "/read", "/listen", "/video")):
+                return FakeResponse(
+                    200,
+                    {"content-type": "text/html"},
+                    """
+                    <main data-origin-dossier-detail>
+                      <img alt="Rendered Origin Dossier story scene cover for Kestrel">
+                      <a href="#origin-edition-read">Read</a>
+                      <a href="#origin-edition-listen">Listen</a>
+                      <a href="#origin-edition-watch">Watch</a>
+                      <a href="#origin-edition-canon-audit">Canon Audit</a>
+                    </main>
+                    """,
+                )
         return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
 
 
@@ -212,9 +256,17 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["audiobook_share_reachable"] is True
     assert result["dossier_share_reachable"] is True
     assert result["watch_gate_verified"] is True
+    assert result["canon_audit_content_verified"] is True
+    assert result["chummer_canon_owner_visible"] is True
+    assert result["provider_created_facts_blocked_visible"] is True
+    assert result["canon_privacy_receipts_present"] is True
+    assert result["no_fallback_media_verified"] is True
     assert result["watch_artifact_nonempty"] is True
     assert result["cover_artifact_nonempty"] is True
     assert result["book_artifact_nonempty"] is True
+    assert result["cover_sha_matches_import"] is True
+    assert result["book_sha_matches_import"] is True
+    assert result["video_sha_matches_import"] is True
     assert result["response_body_sizes"]["watch"] > 0
     assert result["response_body_sizes"]["cover"] > 0
     assert result["response_body_sizes"]["book"] > 0
@@ -278,6 +330,27 @@ def test_deployed_probe_blocks_when_audiobookshelf_share_page_is_unreachable(tmp
     assert "secret-session" not in serialized
 
 
+def test_deployed_probe_blocks_when_canon_audit_content_is_missing(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", MissingCanonAuditContentSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["canon_audit_tab_visible"] is True
+    assert result["canon_audit_content_verified"] is False
+    assert result["chummer_canon_owner_visible"] is False
+    assert result["provider_created_facts_blocked_visible"] is False
+    assert result["owner_playback_e2e_verified"] is False
+    assert "canon_audit_content_verified" in result["blockers"]
+    assert "canon_audit_content_verified" in result["progress"]["blockedChecks"]
+    assert "secret-session" not in serialized
+
+
 def test_deployed_probe_blocks_if_any_private_artifact_route_is_public_without_login(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     write_import_request(tmp_path)
@@ -336,6 +409,27 @@ def test_deployed_probe_blocks_when_owner_video_body_is_empty(tmp_path: Path, mo
     assert result["response_body_sizes"]["watch"] == 0
     assert "watch_artifact_nonempty" in result["blockers"]
     assert "watch_artifact_nonempty" in result["progress"]["blockedChecks"]
+    assert "secret-session" not in serialized
+
+
+def test_deployed_probe_blocks_when_owner_video_hash_does_not_match_import(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", WrongHashOwnerVideoSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["watch_artifact_nonempty"] is True
+    assert result["video_sha_matches_import"] is False
+    assert result["owner_playback_e2e_verified"] is False
+    assert result["expected_import_sha256"]["watch"] == hashlib.sha256(FAKE_VIDEO_BYTES).hexdigest()
+    assert result["response_sha256"]["watch"] != result["expected_import_sha256"]["watch"]
+    assert "video_sha_matches_import" in result["blockers"]
+    assert "video_sha_matches_import" in result["progress"]["blockedChecks"]
     assert "secret-session" not in serialized
 
 

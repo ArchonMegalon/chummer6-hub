@@ -36,6 +36,12 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "listen_tab_visible": passed,
         "watch_tab_visible": passed,
         "canon_audit_tab_visible": passed,
+        "canon_audit_section_visible": passed,
+        "chummer_canon_owner_visible": passed,
+        "provider_created_facts_blocked_visible": passed,
+        "canon_privacy_receipts_present": passed,
+        "no_fallback_media_verified": passed,
+        "canon_audit_content_verified": passed,
         "read_gate_verified": passed,
         "chummer_run_listen_gate_verified": passed,
         "watch_gate_verified": passed,
@@ -44,6 +50,9 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "watch_artifact_nonempty": passed,
         "cover_artifact_nonempty": passed,
         "book_artifact_nonempty": passed,
+        "cover_sha_matches_import": passed,
+        "book_sha_matches_import": passed,
+        "video_sha_matches_import": passed,
         "audiobook_share_url_trusted": passed,
         "dossier_share_url_trusted": passed,
         "audiobook_share_reachable": passed,
@@ -169,6 +178,32 @@ def test_verifier_rejects_pass_probe_with_empty_owner_video_artifact(tmp_path: P
 
     assert ok is False
     assert "pass_flag_not_true:watch_artifact_nonempty" in issues
+
+
+def test_verifier_rejects_pass_probe_with_missing_canon_audit_content(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["canon_audit_content_verified"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "pass_flag_not_true:canon_audit_content_verified" in issues
+
+
+def test_verifier_rejects_pass_probe_with_mismatched_video_hash(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["video_sha_matches_import"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "pass_flag_not_true:video_sha_matches_import" in issues
 
 
 def test_verifier_rejects_missing_normalized_status_contract(tmp_path: Path) -> None:
