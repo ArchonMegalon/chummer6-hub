@@ -7,6 +7,8 @@ namespace Chummer.Run.Api.Services;
 public sealed class ReleaseSelectionService
 {
     private readonly PublicCanonFileLoader _canon;
+    private readonly Lazy<PublicReleaseExperienceDocument> _experience;
+    private readonly Lazy<DesktopPlatformAcceptanceDocument> _platformAcceptance;
     private const string ExperienceRelativePath = ".codex-design/product/PUBLIC_RELEASE_EXPERIENCE.yaml";
     private const string PlatformAcceptanceRelativePath = ".codex-design/product/DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml";
     private const string DefaultGuestReadableChannel = "stable";
@@ -14,6 +16,8 @@ public sealed class ReleaseSelectionService
     public ReleaseSelectionService(PublicCanonFileLoader canon)
     {
         _canon = canon;
+        _experience = new Lazy<PublicReleaseExperienceDocument>(LoadExperienceDocument, LazyThreadSafetyMode.ExecutionAndPublication);
+        _platformAcceptance = new Lazy<DesktopPlatformAcceptanceDocument>(LoadPlatformAcceptanceDocument, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public PublicReleaseManifestDto ApplyAccessPolicy(PublicReleaseManifestDto manifest)
@@ -242,10 +246,14 @@ public sealed class ReleaseSelectionService
         return BuildNormalizedOption(normalized, authenticated, recommended);
     }
 
-    private PublicReleaseExperienceDocument LoadExperience()
+    private PublicReleaseExperienceDocument LoadExperience() => _experience.Value;
+
+    private DesktopPlatformAcceptanceDocument LoadPlatformAcceptance() => _platformAcceptance.Value;
+
+    private PublicReleaseExperienceDocument LoadExperienceDocument()
         => _canon.LoadRequiredYaml<PublicReleaseExperienceDocument>(ExperienceRelativePath);
 
-    private DesktopPlatformAcceptanceDocument LoadPlatformAcceptance()
+    private DesktopPlatformAcceptanceDocument LoadPlatformAcceptanceDocument()
         => _canon.LoadRequiredYaml<DesktopPlatformAcceptanceDocument>(PlatformAcceptanceRelativePath);
 
     private static PublicReleaseManifestDto ApplyAccessPolicy(

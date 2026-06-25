@@ -9,14 +9,18 @@ public sealed class PublicLandingService
     private const string AssetRegistryRelativePath = ".codex-design/product/PUBLIC_LANDING_ASSET_REGISTRY.yaml";
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicActionResolver _actions;
+    private readonly Lazy<PublicLandingSurfaceDto> _surface;
 
     public PublicLandingService(PublicCanonFileLoader canon, PublicActionResolver actions)
     {
         _canon = canon;
         _actions = actions;
+        _surface = new Lazy<PublicLandingSurfaceDto>(BuildSurface, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    public PublicLandingSurfaceDto LoadSurface()
+    public PublicLandingSurfaceDto LoadSurface() => _surface.Value;
+
+    private PublicLandingSurfaceDto BuildSurface()
     {
         var repoRoot = _canon.ResolveRepoRoot(ManifestRelativePath);
         var manifest = _canon.LoadRequiredYaml<PublicLandingManifestDocument>(ManifestRelativePath);

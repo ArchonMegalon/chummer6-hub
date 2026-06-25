@@ -15,14 +15,18 @@ public sealed class PublicNavigationService
     private const string NavigationRelativePath = ".codex-design/product/PUBLIC_NAVIGATION.yaml";
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicRouteCatalogService _routes;
+    private readonly Lazy<PublicNavigationModel> _navigation;
 
     public PublicNavigationService(PublicCanonFileLoader canon, PublicRouteCatalogService routes)
     {
         _canon = canon;
         _routes = routes;
+        _navigation = new Lazy<PublicNavigationModel>(BuildNavigation, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    public PublicNavigationModel LoadNavigation()
+    public PublicNavigationModel LoadNavigation() => _navigation.Value;
+
+    private PublicNavigationModel BuildNavigation()
     {
         var document = _canon.LoadRequiredYaml<PublicNavigationDocument>(NavigationRelativePath);
         return new PublicNavigationModel(
