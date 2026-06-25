@@ -27,14 +27,19 @@ public sealed class RybbitProxyHardeningTests
                  {
                      "Authorization",
                      "Cookie",
+                     "DNT",
                      "Proxy-Authorization",
                      "Forwarded",
                      "Host",
                      "Connection",
+                     "Origin",
+                     "Referer",
                      "Transfer-Encoding",
+                     "X-CSRF-Token",
                      "X-Forwarded-For",
                      "X-Forwarded-Host",
-                     "X-Forwarded-Proto"
+                     "X-Forwarded-Proto",
+                     "X-XSRF-TOKEN"
                  })
         {
             Assert.False(RybbitProxyPolicy.ShouldForwardRequestHeader(header), $"{header} must not leave chummer.run.");
