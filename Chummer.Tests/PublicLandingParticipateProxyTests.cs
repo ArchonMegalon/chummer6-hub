@@ -69,6 +69,8 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("imageModal", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("&times;", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -272,6 +274,20 @@ public sealed class PublicLandingParticipateProxyTests
   </ul>
 </nav>
 <main><h1>What do you want to see next?</h1></main>
+<div class="modal fade" id="imageModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center p-0">
+        <img class="img-fluid" src="" id="modalImage" style="cursor: pointer;">
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
 """;

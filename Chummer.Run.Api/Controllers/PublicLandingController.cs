@@ -2875,9 +2875,16 @@ document.addEventListener('DOMContentLoaded', function () {
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
 
-        return Regex.Replace(
+        rewritten = Regex.Replace(
             rewritten,
             @"<button\b(?=[^>]*(?:\blogin\b|\bsignup\b|\bsign-up\b|\bsignin\b|\bsign-in\b|\bregister\b))[^>]*>[\s\S]*?</button>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+
+        return Regex.Replace(
+            rewritten,
+            @"<div\b(?=[^>]*\bid\s*=\s*(?:""imageModal""|'imageModal'|imageModal))[^>]*>[\s\S]*?</div>\s*</div>\s*</div>\s*</div>",
             string.Empty,
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));

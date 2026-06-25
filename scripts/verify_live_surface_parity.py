@@ -153,6 +153,7 @@ SURFACES = [
             "Sign in",
             "Search",
             "Ctrl K",
+            "×",
             "Something went wrong",
             "Could not load posts",
             "Network error while loading tab configuration",

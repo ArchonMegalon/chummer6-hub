@@ -148,6 +148,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Sign up", board_surface["forbidden_texts"])
         self.assertIn("Search", board_surface["forbidden_texts"])
         self.assertIn("Ctrl K", board_surface["forbidden_texts"])
+        self.assertIn("×", board_surface["forbidden_texts"])
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
         self.assertIn("Requests, votes, and shipped work.", board_surface["required_texts"])
 
