@@ -3,8 +3,6 @@
     ViewData["Title"] = "Chummer — Shadowrun character manager";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing surface-minimal";
-    var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
-    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -19,7 +17,7 @@
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
             @if (Model.Chrome.Authenticated)
             {
-                <a href="/partizipate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
+                <a href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
             }
             <a href="/status" data-analytics-event="homepage_open_status" data-analytics-surface="minimal_home" data-analytics-label="Status">Status</a>
         </p>
@@ -32,36 +30,15 @@
 
 @if (Model.Chrome.Authenticated)
 {
-    @if (Model.OpenRail is { Items.Count: > 0 })
-    {
-        <section class="minimal-section minimal-section--support" data-homepage-section="open-rail">
-            <div class="minimal-section__lead">
-                <h2>@Model.OpenRail.Heading</h2>
-                <p>@Model.OpenRail.Summary</p>
-            </div>
-            <div class="minimal-facts" role="list" aria-label="Open in Chummer">
-                @foreach (var item in Model.OpenRail.Items)
-                {
-                    <article role="listitem">
-                        <strong>@item.Label</strong>
-                        <p>@item.Summary</p>
-                        <p class="minimal-meta">@item.Kind</p>
-                        <a class="button-like button-like--ghost" href="@item.Href">Open</a>
-                    </article>
-                }
-            </div>
-        </section>
-    }
-
-    <section class="minimal-section minimal-section--support" data-homepage-section="starter-lane">
+    <section class="minimal-section minimal-section--tight minimal-section--runner-picker" data-homepage-section="runner-roster">
         <div class="minimal-section__lead">
-            <h2>Next session</h2>
-            <p>@(starterFirstPlayableSession?.CampaignStartSummary ?? "Open Home when you are ready to start the first playable session.")</p>
+            <h2>Open a runner</h2>
+            <p>Open an existing runner in the client.</p>
         </div>
         <div class="minimal-actions">
-            <a class="button-like button-like--primary" href="/home/work">Open Home</a>
-            <a class="button-like button-like--ghost" href="@(starterWorkspace is null ? "/home/work" : $"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session</a>
-            <a class="button-like button-like--ghost" href="/contact?kind=install_help">Open install support</a>
+            <a class="button-like button-like--primary" href="/blazor" data-analytics-event="homepage_open_blazor_roster" data-analytics-surface="minimal_home" data-analytics-label="Open Blazor roster">
+                Open character roster
+            </a>
         </div>
     </section>
 }

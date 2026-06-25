@@ -33,7 +33,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("/media/product/chummer-desktop-runner.png", view, StringComparison.Ordinal);
         Assert.Contains("/media/promo/chummer6-flagship-promo.mp4", view, StringComparison.Ordinal);
         Assert.Contains("A Shadowrun character manager for clean sheets and faster tables.", view, StringComparison.Ordinal);
-        Assert.Contains("href=\"/partizipate\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"workflow\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", view, StringComparison.Ordinal);
@@ -147,7 +147,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", publicController, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", publicController, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateAliasPage()", publicController, StringComparison.Ordinal);
-        Assert.Contains("=> RedirectPermanent(\"/partizipate\");", publicController, StringComparison.Ordinal);
+        Assert.Contains("=> RedirectPermanent(\"/participate\");", publicController, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
         Assert.Contains("Start a temporary contribution session", consoleView, StringComparison.Ordinal);
@@ -170,7 +170,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateAliasPage()", controller, StringComparison.Ordinal);
-        Assert.Contains("=> RedirectPermanent(\"/partizipate\");", controller, StringComparison.Ordinal);
+        Assert.Contains("=> RedirectPermanent(\"/participate\");", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
@@ -1135,7 +1135,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("Use Participate for ideas and safe public bugs", trustView, StringComparison.Ordinal);
-        Assert.Contains("Href: \"/partizipate\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Href: \"/participate\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open participate\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Use Participate for ideas and safe public bugs. Use the support form when the issue needs logs, account detail, or recovery.", trustView, StringComparison.Ordinal);
@@ -1256,7 +1256,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string nowView = File.ReadAllText(nowViewPath);
 
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
-        Assert.Contains("=> RedirectPermanent(\"/partizipate\");", controller, StringComparison.Ordinal);
+        Assert.Contains("=> RedirectPermanent(\"/participate\");", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("Not the front door", horizonsView, StringComparison.Ordinal);

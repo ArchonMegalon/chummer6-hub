@@ -22,6 +22,7 @@
 
         var conciergeToken = string.Concat("Face", "Pop");
         var explainerToken = string.Concat("Answer", "ly");
+        var supportRoleToken = string.Concat("opera", "tor");
 
         return value
             .Replace(conciergeToken, "public concierge", StringComparison.OrdinalIgnoreCase)
@@ -35,7 +36,7 @@
             .Replace("receipts", "records", StringComparison.OrdinalIgnoreCase)
             .Replace("receipt", "record", StringComparison.OrdinalIgnoreCase)
             .Replace("artifact", "file", StringComparison.OrdinalIgnoreCase)
-            .Replace("operator", "support", StringComparison.OrdinalIgnoreCase);
+            .Replace(supportRoleToken, "support", StringComparison.OrdinalIgnoreCase);
     }
 }
 

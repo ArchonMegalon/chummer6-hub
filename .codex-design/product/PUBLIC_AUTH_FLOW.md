@@ -56,12 +56,12 @@ Forbidden public wording:
 * guest access to `/home` must redirect or fall back to `/login?next=/home`
 * guest access to `/account` must redirect or fall back to `/login?next=/account`
 * guest access to `/participate/codex` must redirect or fall back to `/login?next=/participate/codex`
-* `/partizipate` remains the public explainer and must not require sign-in
-* guest-visible participation CTAs should prefer `/partizipate` first; the deep `/participate/codex` lane is a later step, not the first public landing target
+* `/participate` remains the public explainer and must not require sign-in
+* guest-visible participation CTAs should prefer `/participate` first; the deep `/participate/codex` lane is a later step, not the first public landing target
 
 ## Account-aware front-door rule
 
-`/partizipate` is the guest-readable account-aware front door.
+`/participate` is the guest-readable account-aware front door.
 
 It should behave like a compact first-party public board, not a long explainer page.
 The intended interaction model is ProductLift-backed feedback, roadmap, and closeout data under Chummer-owned chrome:

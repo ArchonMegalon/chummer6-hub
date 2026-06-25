@@ -20,6 +20,10 @@ const requiredLandingLinks = [
   '/contact',
 ];
 
+function hasBlazorBaseHref(html) {
+  return /<base href="[^"]*\/blazor\/"/i.test(html);
+}
+
 const checks = [
   {
     url: `${baseUrl}/`,
@@ -53,15 +57,25 @@ const checks = [
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      text.includes('Open the right support case')
+      text.includes('Choose public feedback for ideas.')
       && text.includes('Product bug')
   },
   {
-    url: `${baseUrl}/partizipate`,
+    url: `${baseUrl}/participate`,
     assert: text =>
       text.includes('Participate')
-      && text.includes('Tell us what slows the table down.')
-      && text.includes('Public board')
+      && text.includes('Public requests and roadmap votes.')
+      && text.includes('participate-board')
+      && text.includes('/participate/board')
+      && !text.includes('ProductLift')
+  },
+  {
+    url: `${baseUrl}/partizipate`,
+    assert: (text, response) =>
+      /\/partizipate\/?$/.test(response.url)
+      && text.includes('Participate')
+      && text.includes('Public requests and roadmap votes.')
+      && text.includes('participate-board')
       && !text.includes('ProductLift')
   },
   {
@@ -93,8 +107,10 @@ const checks = [
   {
     url: `${baseUrl}/blazor/`,
     assert: (text, response) =>
-      /\/downloads\/?$/.test(response.url)
-      && text.includes('Install Chummer')
+      /\/blazor\/?$/.test(response.url)
+      && text.includes('Published browser surface')
+      && text.includes('Launch browser workbench')
+      && hasBlazorBaseHref(text)
   },
   {
     url: `${baseUrl}/avalonia/`,

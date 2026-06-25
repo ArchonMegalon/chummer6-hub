@@ -5,7 +5,7 @@ primary_nav:
   - label: Home
     href: /
   - label: Participate
-    href: /partizipate
+    href: /participate
   - label: Help
     href: /help
 public_signal_nav:

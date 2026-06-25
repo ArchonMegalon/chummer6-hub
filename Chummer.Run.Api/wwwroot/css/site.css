@@ -5817,6 +5817,7 @@ body.shell-authenticated {
     position: static;
     width: 100%;
   }
+}
 
 /* Minimal account entry surface. Keep this late so it overrides older auth art direction. */
 .route-login,
@@ -8803,16 +8804,16 @@ body {
 .minimal-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 0.58fr);
-  gap: clamp(0.8rem, 1.6vw, 1.1rem);
+  gap: clamp(0.65rem, 1.3vw, 0.95rem);
   align-items: center;
   min-height: auto;
-  padding: clamp(0.65rem, 1.3vw, 0.95rem) 0;
+  padding: clamp(0.35rem, 0.9vw, 0.6rem) 0;
 }
 
 .route-landing [data-homepage-section="hero"] {
   border-bottom: 0;
   min-height: 0;
-  padding: clamp(0.75rem, 1.6vw, 1.1rem) 0 clamp(0.55rem, 1.2vw, 0.85rem);
+  padding: clamp(0.5rem, 1.2vw, 0.72rem) 0 clamp(0.35rem, 0.8vw, 0.62rem);
 }
 
 .route-landing [data-homepage-section="help"] {
@@ -8820,7 +8821,7 @@ body {
   border-bottom: 0;
 }
 
-.route-landing [data-homepage-section="starter-lane"] {
+.route-landing [data-homepage-section="runner-roster"] {
   grid-column: 1 / -1;
 }
 
@@ -8839,7 +8840,7 @@ body {
   max-width: 12ch;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(2rem, 3.8vw, 3rem);
+  font-size: clamp(1.85rem, 3vw, 2.35rem);
   line-height: 1;
   letter-spacing: 0;
 }
@@ -8856,21 +8857,21 @@ body {
   max-width: 39rem;
   margin: 0.5rem 0 0;
   color: var(--minimal-muted);
-  font-size: clamp(0.96rem, 1.1vw, 1.03rem);
+  font-size: clamp(0.8rem, 0.96vw, 0.92rem);
   line-height: 1.42;
 }
 
 .minimal-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 0.72rem;
+  gap: 0.38rem;
+  margin-top: 0.55rem;
 }
 
 .minimal-meta {
-  margin: 0.55rem 0 0;
+  margin: 0.42rem 0 0;
   color: var(--minimal-muted);
-  font-size: 0.86rem;
+  font-size: 0.76rem;
 }
 
 .minimal-hero__points {
@@ -8898,10 +8899,10 @@ body {
 .minimal-inline-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem;
-  margin: 0.4rem 0 0;
+  gap: 0.6rem;
+  margin: 0.3rem 0 0;
   color: var(--minimal-muted);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
 }
 
 .minimal-inline-links a {
@@ -8931,7 +8932,7 @@ body {
 
 .minimal-hero__visual--screenshot {
   aspect-ratio: 16 / 9;
-  max-height: 176px;
+  max-height: 120px;
 }
 
 .minimal-hero__visual--screenshot img {
@@ -8948,13 +8949,13 @@ body {
   bottom: 0.8rem;
   display: inline-flex;
   align-items: center;
-  min-height: 2rem;
-  padding: 0.38rem 0.72rem;
+  min-height: 1.35rem;
+  padding: 0.2rem 0.52rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--minimal-panel) 90%, transparent);
   border: 1px solid color-mix(in srgb, var(--minimal-line) 78%, transparent);
   color: var(--minimal-ink);
-  font-size: 0.78rem;
+  font-size: 0.64rem;
   line-height: 1;
   letter-spacing: 0;
   backdrop-filter: blur(8px);
@@ -9009,17 +9010,17 @@ body {
 }
 
 .minimal-section {
-  padding: clamp(1rem, 2vw, 1.45rem) 0;
+  padding: clamp(0.55rem, 1.2vw, 0.82rem) 0;
 }
 
 .minimal-section--tight {
-  padding: clamp(0.8rem, 1.5vw, 1.15rem) 0;
+  padding: clamp(0.42rem, 0.9vw, 0.68rem) 0;
 }
 
 .minimal-section__lead {
   display: grid;
-  gap: 0.4rem;
-  margin-bottom: 0.8rem;
+  gap: 0.28rem;
+  margin-bottom: 0.52rem;
 }
 
 .minimal-section h2,
@@ -9028,7 +9029,7 @@ body {
   margin: 0;
   color: var(--minimal-ink);
   font-family: var(--font-family-base);
-  font-size: clamp(1.28rem, 2.1vw, 1.75rem);
+  font-size: clamp(1.02rem, 1.5vw, 1.22rem);
   line-height: 1.05;
   letter-spacing: 0;
 }
@@ -9113,51 +9114,52 @@ body {
 }
 
 .route-landing .minimal-hero {
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: clamp(0.8rem, 1.8vw, 1.4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 230px);
+  gap: clamp(0.6rem, 1.5vw, 0.9rem);
   align-items: end;
   min-height: 0;
 }
 
 .route-landing .minimal-hero__copy {
   display: grid;
-  gap: 0.14rem;
+  gap: 0.08rem;
   align-content: end;
   max-width: 27rem;
 }
 
 .route-landing .minimal-hero h1 {
   max-width: 9ch;
-  font-size: clamp(1.85rem, 2.5vw, 2.3rem);
+  font-size: clamp(1.4rem, 1.9vw, 1.75rem);
 }
 
 .route-landing .minimal-hero__lead {
   max-width: 25rem;
   margin-top: 0.14rem;
-  font-size: 0.94rem;
+  font-size: 0.8rem;
   line-height: 1.34;
 }
 
 .route-landing .minimal-meta {
-  margin-top: 0.18rem;
-  font-size: 0.8rem;
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
 }
 
 .route-landing .minimal-actions {
-  margin-top: 0.58rem;
+  margin-top: 0.4rem;
+  gap: 0.34rem;
 }
 
 .route-landing .minimal-inline-links {
   margin-top: 0.3rem;
-  font-size: 0.8rem;
-  gap: 0.75rem;
+  font-size: 0.72rem;
+  gap: 0.62rem;
 }
 
 .route-landing .minimal-hero__visual--screenshot {
   justify-self: stretch;
   width: 100%;
-  max-width: 360px;
-  max-height: 210px;
+  max-width: 220px;
+  max-height: 120px;
   border-color: color-mix(in srgb, var(--minimal-line) 62%, transparent);
   opacity: 0.98;
 }
@@ -9165,8 +9167,8 @@ body {
 .route-landing .minimal-hero__visual--preview {
   justify-self: stretch;
   width: 100%;
-  max-width: 360px;
-  min-height: 210px;
+  max-width: 220px;
+  min-height: 120px;
   border-color: color-mix(in srgb, var(--minimal-line) 62%, transparent);
 }
 
@@ -9517,8 +9519,8 @@ body {
 }
 
 .surface-participate .site-main {
-  width: min(1154px, calc(100% - 2rem));
-  padding-top: 0.95rem;
+  width: min(1180px, calc(100% - 1.5rem));
+  padding-top: 0.55rem;
 }
 
 .participate-hero {
@@ -9550,24 +9552,38 @@ body {
 
 .participate-shell {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.55rem;
   border: 1px solid var(--minimal-line);
-  border-radius: 12px;
-  padding: clamp(1rem, 1.8vw, 1.4rem);
+  border-radius: 8px;
+  padding: clamp(0.55rem, 1vw, 0.8rem);
   background: var(--minimal-surface);
 }
 
 .participate-shell__header {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.85rem 1rem;
+  gap: 0.45rem 0.75rem;
   justify-content: space-between;
   align-items: end;
 }
 
 .participate-shell__lead {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.participate-shell__lead h1 {
+  margin: 0;
+  color: var(--minimal-ink);
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.1;
+}
+
+.participate-shell__lead p {
   margin: 0;
   color: var(--minimal-muted);
+  font-size: 0.84rem;
+  line-height: 1.32;
 }
 
 .participate-lanes {
@@ -9605,11 +9621,14 @@ body {
 .participate-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.35rem;
 }
 
 .participate-actions .button-like {
   background: var(--minimal-soft);
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
 }
 
 .participate-toolbar {
@@ -9649,10 +9668,7 @@ body {
 }
 
 .participate-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
-  gap: 0.9rem;
-  align-items: start;
+  display: block;
 }
 
 .participate-hosted {
@@ -9688,17 +9704,17 @@ body {
 
 .participate-hosted__frame {
   width: 100%;
-  min-height: 1240px;
+  min-height: min(76svh, 860px);
   border: 1px solid var(--minimal-line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--minimal-page);
 }
 
 .participate-fallback {
   border: 1px solid var(--minimal-line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--minimal-page);
-  padding: 0.85rem 0.95rem;
+  padding: 0.48rem 0.6rem;
 }
 
 .participate-fallback summary {
@@ -9706,8 +9722,9 @@ body {
 }
 
 .participate-fallback p {
-  margin: 0.55rem 0 0;
+  margin: 0.32rem 0 0;
   color: var(--minimal-muted);
+  font-size: 0.8rem;
 }
 
 .participate-supporter-pill {
@@ -9999,8 +10016,6 @@ body {
   .minimal-actions .button-like {
     flex: 1 1 11rem;
   }
-}
-
 }
 
 /* Auth top-level override. The file contains legacy auth blocks above. */

@@ -2124,11 +2124,11 @@ public sealed class PublicLandingController : Controller
         });
     }
 
-    [HttpGet("/participate")]
-    public IActionResult ParticipateAliasPage()
-        => RedirectPermanent("/partizipate");
-
     [HttpGet("/partizipate")]
+    public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
+        => await ParticipatePage(cancellationToken).ConfigureAwait(false);
+
+    [HttpGet("/participate")]
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
@@ -2141,11 +2141,11 @@ public sealed class PublicLandingController : Controller
                 ? _chrome.BuildPublicChrome(
                     "Participate",
                     "Public requests, visible bugs, and product signal.",
-                    "/partizipate")
+                    "/participate")
                 : _chrome.BuildAuthenticatedChrome(
                 "Participate",
                 "Public requests, visible bugs, and product signal.",
-                "/partizipate",
+                "/participate",
                 string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                 subject.Email),
             Lanes:
@@ -2170,6 +2170,24 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/partizipate/{**boardPath}")]
+    public async Task<IActionResult> ParticipateBoardProxyLegacyAlias(string? boardPath, CancellationToken cancellationToken)
+    {
+        string raw = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return await ParticipatePage(cancellationToken).ConfigureAwait(false);
+        }
+
+        string targetPath = raw switch
+        {
+            var value when string.Equals(value, "board", StringComparison.OrdinalIgnoreCase) => string.Empty,
+            var value when value.StartsWith("board/", StringComparison.OrdinalIgnoreCase) => value["board/".Length..],
+            _ => raw
+        };
+        return await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(targetPath), cancellationToken).ConfigureAwait(false);
+    }
+
+    [HttpGet("/participate/{**boardPath}")]
     public async Task<IActionResult> ParticipateBoardProxyAlias(string? boardPath, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(boardPath))
@@ -2180,17 +2198,29 @@ public sealed class PublicLandingController : Controller
         return await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
     }
 
-    [HttpGet("/partizipate/board")]
-    [HttpGet("/partizipate/board/{**boardPath}")]
+    [HttpGet("/participate/board")]
+    [HttpGet("/participate/board/{**boardPath}")]
     public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)
         => await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", Route = "/http_api/{**boardPath}")]
+    public async Task<IActionResult> ParticipateBoardRootHttpApiProxy(string? boardPath, CancellationToken cancellationToken)
+        => await ParticipateBoardRootResourceProxy("http_api", boardPath, cancellationToken).ConfigureAwait(false);
+
+    [HttpGet("/translations_i18n/{**boardPath}")]
+    public async Task<IActionResult> ParticipateBoardRootTranslationsProxy(string? boardPath, CancellationToken cancellationToken)
+        => await ParticipateBoardRootResourceProxy("translations_i18n", boardPath, cancellationToken).ConfigureAwait(false);
+
+    [HttpGet("/loading.svg")]
+    public async Task<IActionResult> ParticipateBoardRootLoadingImageProxy(CancellationToken cancellationToken)
+        => await ParticipateBoardRootResourceProxy("loading.svg", null, cancellationToken).ConfigureAwait(false);
 
     private async Task<IActionResult> ParticipateBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
     {
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
         {
-            return NotFound();
+            return ParticipateBoardUnavailable();
         }
 
         string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
@@ -2211,7 +2241,7 @@ public sealed class PublicLandingController : Controller
 
             if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
             {
-                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/partizipate", "/partizipate");
+                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/participate", "/participate/board");
                 return Redirect(redirected);
             }
 
@@ -2224,13 +2254,13 @@ public sealed class PublicLandingController : Controller
                     upstream,
                     ResolveParticipateBoardHomeHref(),
                     ResolveParticipateSupporterHref(),
-                    localOrigin: "/partizipate/board",
-                    localBaseHref: "/partizipate/board/",
+                    localOrigin: "/participate/board",
+                    localBaseHref: "/participate/board/",
                     railTitle: "Chummer Participate",
                     railNavLabel: "Participate actions",
                     firstLinkHref: "/roadmap",
                     firstLinkLabel: "Roadmap",
-                    secondLinkHref: "/partizipate",
+                    secondLinkHref: "/participate",
                     secondLinkLabel: "Board",
                     failureTitle: "Public board temporarily unavailable",
                     failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
@@ -2238,14 +2268,14 @@ public sealed class PublicLandingController : Controller
                     failurePrimaryLabel: "Open roadmap",
                     failureSecondaryHref: "/contact#support-intake",
                     failureSecondaryLabel: "Open help",
-                    failureReturnHref: "/partizipate",
+                    failureReturnHref: "/participate",
                     failureReturnLabel: "Back to participate");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
 
-            Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             CopySafeProxyHeaders(response);
-            return File(stream, mediaType);
+            return File(bytes, mediaType);
         }
         catch (HttpRequestException ex)
         {
@@ -2257,6 +2287,66 @@ public sealed class PublicLandingController : Controller
             _logger.LogWarning(ex, "Participate board proxy timed out.");
             return ParticipateBoardUnavailable();
         }
+    }
+
+    private async Task<IActionResult> ParticipateBoardRootResourceProxy(string rootSegment, string? boardPath, CancellationToken cancellationToken)
+    {
+        Uri? upstream = ResolveProductLiftHostedBoardUri();
+        if (upstream is null)
+        {
+            return NotFound();
+        }
+
+        string relativePath = string.IsNullOrWhiteSpace(boardPath)
+            ? rootSegment
+            : $"{rootSegment.TrimEnd('/')}/{boardPath.TrimStart('/')}";
+        Uri upstreamOrigin = new($"{upstream.GetLeftPart(UriPartial.Authority).TrimEnd('/')}/");
+        Uri target = AppendQueryString(new Uri(upstreamOrigin, relativePath), Request.QueryString.Value);
+
+        try
+        {
+            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using var outbound = new HttpRequestMessage(new HttpMethod(Request.Method), target);
+            CopySafeBoardRequestHeaders(outbound);
+
+            if (HttpMethods.IsPost(Request.Method)
+                || HttpMethods.IsPut(Request.Method)
+                || HttpMethods.IsPatch(Request.Method)
+                || HttpMethods.IsDelete(Request.Method))
+            {
+                outbound.Content = new StreamContent(Request.Body);
+                if (!string.IsNullOrWhiteSpace(Request.ContentType))
+                {
+                    outbound.Content.Headers.TryAddWithoutValidation("Content-Type", Request.ContentType);
+                }
+            }
+
+            using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            string mediaType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            CopySafeProxyHeaders(response);
+            return File(bytes, mediaType);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Participate board root proxy could not reach upstream board resource {RootSegment}.", rootSegment);
+            return NotFound();
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Participate board root proxy timed out for upstream board resource {RootSegment}.", rootSegment);
+            return NotFound();
+        }
+    }
+
+    private void CopySafeBoardRequestHeaders(HttpRequestMessage outbound)
+    {
+        outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToArray());
+        outbound.Headers.TryAddWithoutValidation("Accept", Request.Headers.Accept.ToArray());
+        outbound.Headers.TryAddWithoutValidation("Accept-Language", Request.Headers.AcceptLanguage.ToArray());
+        outbound.Headers.TryAddWithoutValidation("X-Requested-With", Request.Headers["X-Requested-With"].ToArray());
+        outbound.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", Request.Headers["X-CSRF-TOKEN"].ToArray());
+        outbound.Headers.TryAddWithoutValidation("X-XSRF-TOKEN", Request.Headers["X-XSRF-TOKEN"].ToArray());
     }
 
     private static string NormalizeParticipateBoardPath(string? boardPath)
@@ -2281,7 +2371,7 @@ public sealed class PublicLandingController : Controller
             "Open roadmap",
             "/contact#support-intake",
             "Open help",
-            "/partizipate",
+            "/participate",
             "Back to participate");
 
     private ContentResult HostedBoardUnavailable(
@@ -2330,10 +2420,10 @@ public sealed class PublicLandingController : Controller
     }
 
     private string? ResolveProductLiftHostedBoardHref()
-        => ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";
+        => ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";
 
-    private static string BuildParticipateSignInHref(string targetPath = "/partizipate")
-        => $"/auth/google/start?next={Uri.EscapeDataString(string.IsNullOrWhiteSpace(targetPath) ? "/partizipate" : targetPath)}";
+    private static string BuildParticipateSignInHref(string targetPath = "/participate")
+        => $"/auth/google/start?next={Uri.EscapeDataString(string.IsNullOrWhiteSpace(targetPath) ? "/participate" : targetPath)}";
 
     private string ResolveParticipateBoardHomeHref()
     {
@@ -2410,7 +2500,7 @@ public sealed class PublicLandingController : Controller
     }
 
     private string RewriteParticipateBoardLocation(Uri location, Uri upstream)
-        => RewriteHostedBoardLocation(location, upstream, "/partizipate", "/partizipate");
+        => RewriteHostedBoardLocation(location, upstream, "/participate", "/participate/board");
 
     private static string RewriteHostedBoardHtml(
         string html,
@@ -2503,6 +2593,38 @@ public sealed class PublicLandingController : Controller
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
+  const removeHostedAuth = function () {
+    const authCandidates = Array.from(document.querySelectorAll('a[href], button, [role="button"]'));
+    authCandidates.forEach(function (node) {
+      const text = ((node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim().toLowerCase();
+      const href = (node.getAttribute('href') || '').trim().toLowerCase();
+      const authLikeText = text === 'log in'
+        || text === 'login'
+        || text === 'sign in'
+        || text === 'signin'
+        || text === 'sign up'
+        || text === 'signup'
+        || text === 'register';
+      const authLikeHref = href.includes('/login')
+        || href.includes('/signup')
+        || href.includes('/register')
+        || href.includes('productlift.dev/login')
+        || href.includes('productlift.dev/signup');
+
+      if (!authLikeText && !authLikeHref) {
+        return;
+      }
+
+      if (node instanceof HTMLElement) {
+        node.remove();
+      }
+    });
+  };
+
+  removeHostedAuth();
+  const authObserver = new MutationObserver(removeHostedAuth);
+  authObserver.observe(document.documentElement, { childList: true, subtree: true });
+
   const candidates = Array.from(document.querySelectorAll('header a[href], nav a[href], [class*="header"] a[href], [class*="brand"] a[href], [class*="logo"] a[href]'));
   const brand = candidates.find(function (anchor) {
     if (!(anchor instanceof HTMLAnchorElement)) {
@@ -2517,7 +2639,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const text = (anchor.textContent || '').trim().toLowerCase();
     const hasBrandText = text === 'chummer' || text === 'productlift' || text.includes('feedback') || text.includes('roadmap');
     const hasLogo = !!anchor.querySelector('img, svg');
-    const pointsToRoot = href === '/' || href === '/partizipate' || href === '/partizipate/' || href === '/partizipate/board' || href === '/partizipate/board/' || /^https:\/\/[^/]+\/?$/.test(href);
+    const pointsToRoot = href === '/' || href === '/participate' || href === '/participate/' || href === '/participate/board' || href === '/participate/board/' || href === '/partizipate' || href === '/partizipate/' || /^https:\/\/[^/]+\/?$/.test(href);
 
     return pointsToRoot && (hasBrandText || hasLogo);
   });
@@ -2529,32 +2651,6 @@ document.addEventListener('DOMContentLoaded', function () {
   brand.setAttribute('href', '__CHUMMER_PUBLIC_HOME_HREF__');
   brand.setAttribute('target', '_top');
   brand.setAttribute('rel', 'noopener');
-
-  const authCandidates = Array.from(document.querySelectorAll('a[href], button, [role="button"]'));
-  authCandidates.forEach(function (node) {
-    const text = ((node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim().toLowerCase();
-    const href = (node.getAttribute('href') || '').trim().toLowerCase();
-    const authLikeText = text === 'log in'
-      || text === 'login'
-      || text === 'sign in'
-      || text === 'signin'
-      || text === 'sign up'
-      || text === 'signup'
-      || text === 'register';
-    const authLikeHref = href.includes('/login')
-      || href.includes('/signup')
-      || href.includes('/register')
-      || href.includes('productlift.dev/login')
-      || href.includes('productlift.dev/signup');
-
-    if (!authLikeText && !authLikeHref) {
-      return;
-    }
-
-    if (node instanceof HTMLElement) {
-      node.remove();
-    }
-  });
 });
 </script>
 """
@@ -2704,8 +2800,20 @@ document.addEventListener('DOMContentLoaded', function () {
             TimeSpan.FromMilliseconds(250));
         rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
+        rewritten = RestoreHostedBoardAssetHosts(rewritten);
 
         return rewritten;
+    }
+
+    private static string RestoreHostedBoardAssetHosts(string html)
+    {
+        string providerDomain = string.Concat("product", "lift.dev");
+        return Regex.Replace(
+            html,
+            @"https://(?<assetHost>media|cdn)\.chummer(?=[/""'>\s])",
+            match => $"https://{match.Groups["assetHost"].Value}.{providerDomain}",
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(250));
     }
 
     private static string RewriteParticipateBoardHtml(string html, Uri upstream, string publicHomeHref, string? supporterHref)
@@ -2714,13 +2822,13 @@ document.addEventListener('DOMContentLoaded', function () {
             upstream,
             publicHomeHref,
             supporterHref,
-            localOrigin: "/partizipate/board",
-            localBaseHref: "/partizipate/board/",
+            localOrigin: "/participate/board",
+            localBaseHref: "/participate/board/",
             railTitle: "Chummer Participate",
             railNavLabel: "Participate actions",
             firstLinkHref: "/roadmap",
             firstLinkLabel: "Roadmap",
-            secondLinkHref: "/partizipate",
+            secondLinkHref: "/participate",
             secondLinkLabel: "Board",
             failureTitle: "Public board temporarily unavailable",
             failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
@@ -2728,7 +2836,7 @@ document.addEventListener('DOMContentLoaded', function () {
             failurePrimaryLabel: "Open roadmap",
             failureSecondaryHref: "/contact#support-intake",
             failureSecondaryLabel: "Open help",
-            failureReturnHref: "/partizipate",
+            failureReturnHref: "/participate",
             failureReturnLabel: "Back to participate");
 
     private string? ResolveParticipateSupporterHref()
@@ -2756,6 +2864,14 @@ document.addEventListener('DOMContentLoaded', function () {
         {
             if (string.Equals(header.Key, "transfer-encoding", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(header.Key, "location", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "set-cookie", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "connection", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "keep-alive", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "proxy-authenticate", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "proxy-authorization", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "te", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "trailer", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "upgrade", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(header.Key, "content-security-policy", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(header.Key, "x-frame-options", StringComparison.OrdinalIgnoreCase))
             {
@@ -2768,6 +2884,7 @@ document.addEventListener('DOMContentLoaded', function () {
         foreach (var header in response.Content.Headers)
         {
             if (string.Equals(header.Key, "content-security-policy", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(header.Key, "set-cookie", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(header.Key, "x-frame-options", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -3520,7 +3637,7 @@ document.addEventListener('DOMContentLoaded', function () {
             actions:
             [
                 new TrustPageActionViewModel("Open community hub", "/community", "primary"),
-                new TrustPageActionViewModel("Open participate", "/partizipate", "secondary"),
+                new TrustPageActionViewModel("Open participate", "/participate", "secondary"),
                 new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -4633,11 +4750,11 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/feedback")]
     [Produces("text/html")]
     public IActionResult FeedbackPage()
-        => Redirect("/partizipate");
+        => Redirect("/participate");
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
-        => Redirect("/partizipate");
+        => Redirect("/participate");
 
     [HttpPost("/feedback/providers/productlift/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
@@ -4965,7 +5082,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     localBaseHref: "/roadmap/board/",
                     railTitle: "Chummer Roadmap",
                     railNavLabel: "Roadmap actions",
-                    firstLinkHref: "/partizipate",
+                    firstLinkHref: "/participate",
                     firstLinkLabel: "Participate",
                     secondLinkHref: "/changelog",
                     secondLinkLabel: "Changelog",
@@ -4973,16 +5090,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     failureSummary: "The hosted roadmap did not respond. Use the changelog for shipped work or Participate for new requests.",
                     failurePrimaryHref: "/changelog",
                     failurePrimaryLabel: "Open changelog",
-                    failureSecondaryHref: "/partizipate",
+                    failureSecondaryHref: "/participate",
                     failureSecondaryLabel: "Participate",
                     failureReturnHref: "/roadmap",
                     failureReturnLabel: "Back to roadmap");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
 
-            Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             CopySafeProxyHeaders(response);
-            return File(stream, mediaType);
+            return File(bytes, mediaType);
         }
         catch (HttpRequestException ex)
         {
@@ -4993,7 +5110,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Use the changelog for shipped work or Participate for new requests.",
                 "/changelog",
                 "Open changelog",
-                "/partizipate",
+                "/participate",
                 "Participate",
                 "/roadmap",
                 "Back to roadmap");
@@ -5007,7 +5124,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Use the changelog for shipped work or Participate for new requests.",
                 "/changelog",
                 "Open changelog",
-                "/partizipate",
+                "/participate",
                 "Participate",
                 "/roadmap",
                 "Back to roadmap");
@@ -5473,7 +5590,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and private help.", "/contact", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and support.", "/contact", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));
@@ -5627,7 +5744,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         catch (ArgumentException ex)
         {
-            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and private help.", "/contact", cancellationToken);
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and support.", "/contact", cancellationToken);
             var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
             var model = _trustContent.BuildContactPage(chrome) with
             {

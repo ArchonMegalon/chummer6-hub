@@ -241,15 +241,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: public progress report only
-- path: /partizipate
+- path: /participate
   title: Participate
   audience: public
   purpose: first_party_public_board
   requires_auth: false
-  guest_fallback: /partizipate
+  guest_fallback: /participate
   must_exist: true
   placeholder_allowed: false
-  placeholder_requirements: ProductLift-backed feedback, roadmap, and shipped-closeout board rendered in first-party Chummer chrome with compact dark presentation, visible filters/vote signals, private-support routing to Help, and no third-party brand feel
+  placeholder_requirements: public requests, roadmap movement, and shipped-update follow-up rendered in first-party Chummer chrome with compact dark presentation, private-support routing to Help, and no third-party brand feel
 - path: /feedback
   title: Feedback
   audience: public

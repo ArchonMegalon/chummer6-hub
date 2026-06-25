@@ -57,22 +57,22 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             )
             return
 
-        if self.path == "/partizipate":
-            self.send_response(302)
-            self.send_header("Location", "https://accounts.google.com/v3/signin/identifier")
+        if self.path in {"/participate", "/partizipate"}:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
+            self.wfile.write(
+                b"<html><body>"
+                b"Participate Public requests and roadmap votes. Roadmap Help"
+                b"</body></html>"
+            )
             return
 
-        if self.path == "/partizipate/board":
-            self.send_response(302)
-            self.send_header("Location", "/auth/google/start?next=%2Fpartizipate")
+        if self.path == "/participate/board":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            return
-
-        if self.path.startswith("/auth/google/start"):
-            self.send_response(302)
-            self.send_header("Location", "https://accounts.google.com/v3/signin/identifier")
-            self.end_headers()
+            self.wfile.write(b"<html><body>What do you want to see next?</body></html>")
             return
 
         if self.path == "/ledger":
@@ -116,35 +116,22 @@ class LiveSurfaceParityTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=5)
 
-    def test_verify_marks_redirected_participate_surfaces_as_failures(self) -> None:
+    def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()
 
         payload = module.verify(self.base_url)
 
-        self.assertEqual("fail", payload["status"])
-        failure_text = "\n".join(payload["failures"])
-        self.assertIn("/partizipate: expected 200, got 302", failure_text)
-        self.assertIn("/partizipate: redirected off-origin to https://accounts.google.com/v3/signin/identifier", failure_text)
-        self.assertIn("/partizipate/board: expected 200, got 302", failure_text)
-        self.assertIn("/partizipate/board: redirected off-origin to https://accounts.google.com/v3/signin/identifier", failure_text)
+        self.assertEqual("pass", payload["status"])
 
-        participate = next(item for item in payload["results"] if item["path"] == "/partizipate")
-        self.assertEqual(302, participate["status_code"])
-        self.assertTrue(participate["cross_origin_redirect"])
-        self.assertEqual(
-            "https://accounts.google.com/v3/signin/identifier",
-            participate["redirect_target_url"],
-        )
+        participate = next(item for item in payload["results"] if item["path"] == "/participate")
+        self.assertEqual(200, participate["status_code"])
+        self.assertFalse(participate["cross_origin_redirect"])
+        self.assertEqual([], participate["missing_required_texts"])
 
-        board = next(item for item in payload["results"] if item["path"] == "/partizipate/board")
-        self.assertEqual(302, board["status_code"])
-        self.assertEqual(
-            [
-                f"{self.base_url}/auth/google/start?next=%2Fpartizipate",
-                "https://accounts.google.com/v3/signin/identifier",
-            ],
-            board["redirect_chain"],
-        )
+        board = next(item for item in payload["results"] if item["path"] == "/participate/board")
+        self.assertEqual(200, board["status_code"])
+        self.assertFalse(board["cross_origin_redirect"])
+        self.assertEqual([], board["missing_required_texts"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()
@@ -152,7 +139,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         payload = module.verify(self.base_url)
 
         serialized = json.dumps(payload)
-        self.assertIn("LIVE_SURFACE_PARITY_NOT_READY", serialized)
+        self.assertIn("LIVE_SURFACE_PARITY_READY", serialized)
 
 
 if __name__ == "__main__":

@@ -44,17 +44,17 @@
     {
         "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
         "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Create account", authenticated ? "/account" : "/signup?next=/home", "secondary"),
-        "product-bug" => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "secondary"),
+        "product-bug" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "secondary"),
         "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
         _ => null
     };
 
     static TrustPageActionViewModel? HelpFallbackActionFor(string sectionId, bool authenticated) => sectionId switch
     {
-        "install-update" => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "ghost"),
-        "sign-in-recovery" => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "ghost"),
+        "install-update" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
+        "sign-in-recovery" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
         "product-bug" => new TrustPageActionViewModel("Open status", "/status", "ghost"),
-        "product-question" => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "ghost"),
+        "product-question" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
         _ => null
     };
 
@@ -108,16 +108,16 @@
             Badge: "Public",
             Title: "Ideas and safe public bugs",
             Summary: "Use Participate when the discussion can be public and does not need logs, account detail, or campaign secrets.",
-            Href: "/partizipate",
+            Href: "/participate",
             Label: "Open participate",
             Details: new[] { "Public board", "Votes and comments", "No private logs" }));
         contactRouteChoices.Add((
             Id: "private-help",
             Badge: "Private",
             Title: "Install trouble, crashes, or account detail",
-            Summary: "Use private help when the issue needs a reply, screenshots, logs, install recovery, or anything you do not want public.",
+            Summary: "Use support when the issue needs a reply, screenshots, logs, install recovery, or anything you do not want public.",
             Href: "#support-intake",
-            Label: "Open private help",
+            Label: "Open support",
             Details: new[] { "Guest allowed", "Private reply", "Tracked later if you sign in" }));
     }
 }
@@ -287,7 +287,7 @@ else if (!contactPage)
 
     <section class="minimal-section minimal-section--tight" id="support-intake">
         <article class="trust-page-section trust-page-section--form minimal-help-card">
-            <p class="eyebrow">Private help</p>
+            <p class="eyebrow">Support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
             <p>@PublicText(Model.SupportIntake.Intro)</p>
 
@@ -367,7 +367,7 @@ else if (!contactPage)
                     </div>
                 </details>
                 <div class="stacked-actions">
-                    <button class="button-like button-like--primary" type="submit">Send private help request</button>
+                    <button class="button-like button-like--primary" type="submit">Send support request</button>
                     <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>
                     <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>
                 </div>

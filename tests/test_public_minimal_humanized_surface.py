@@ -374,7 +374,7 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     assert "minimal-inline-links" in landing
     assert 'data-homepage-section="help"' not in landing
     assert '@if (Model.Chrome.Authenticated)' in landing
-    assert 'href="/partizipate"' in landing
+    assert 'href="/participate"' in landing
     assert ".minimal-video" in site_css
     assert "aspect-ratio: 16 / 9;" in site_css
 
@@ -410,14 +410,15 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "DefaultProductLiftFeedbackUrl" not in controller
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
-    assert '[HttpGet("/partizipate/board")]' in controller
+    assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
-    assert 'RedirectPermanent("/partizipate")' in controller
-    assert 'BuildParticipateSignInHref(string targetPath = "/partizipate")' in controller
+    assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller
+    assert '=> await ParticipatePage(cancellationToken).ConfigureAwait(false);' in controller
+    assert 'BuildParticipateSignInHref(string targetPath = "/participate")' in controller
     assert '? _chrome.BuildPublicChrome(' in controller
     assert ': _chrome.BuildAuthenticatedChrome(' in controller
     assert 'return View("~/Views/PublicLanding/Participate.cshtml", model);' in controller
-    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/partizipate/board";' in controller
+    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
     assert "data-chummer-board-rail" in controller
@@ -426,17 +427,14 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "node.remove()" in controller
     assert "participate-shell" in participate
     assert "participate-hosted__frame" in participate
-    assert "participate-supporter-pill" in participate
-    assert "participate-supporter-note" in participate
     assert "Model.SupporterHref" in participate
     assert "Fallback form" not in participate
     assert "Join beta waitlist" not in participate
     assert "participate-quick-form" not in participate
-    assert "@foreach (var lane in Model.Lanes)" in participate
-    assert "@lane.ActionLabel" in participate
-    assert "Private help" in participate
+    assert "@foreach (var lane in Model.Lanes)" not in participate
+    assert "@lane.ActionLabel" not in participate
+    assert "Help" in participate
     assert "Support Chummer" in participate
-    assert "Supporter currently unlocks no extra product access." in participate
     assert "Current themes" not in participate
     assert "Open in a tab" not in participate
     assert "BuildParticipatePageModel(" not in controller
@@ -514,8 +512,8 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert "ResolveProductLiftFeedbackUrl()" not in controller
     assert "productlift.dev" not in participate.lower()
-    assert '"/partizipate/board"' in controller
-    assert '"/partizipate"' in controller
+    assert '"/participate/board"' in controller
+    assert '"/participate"' in controller
     assert "suppressHeaderActionsForPublicParticipate" in layout
     assert 'normalizedCurrentPath is "/participate" or "/partizipate"' in layout
 
@@ -811,18 +809,13 @@ def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> 
 def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
     entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
 
-    assert "Claim your copy" in entry
-    assert "Email me a link" in entry
-    assert "Use Google" in entry
-    assert "Use email or Google. The download stays open." in entry
-    assert "Account optional. Useful for linked installs, recovery, and private pages." in entry
-    assert "The download stays open." in entry
-    assert "Keep Chummer open while the browser connects this copy." in entry
+    assert "Sign in" in entry
+    assert "Use your email to continue." in entry
+    assert "Continue with Google" in entry
 
     for forbidden in (
         "Create account",
         "Send magic link",
-        "Continue with Google",
         "Campaign OS",
         "roadmap follows",
         "preview interest",
@@ -833,6 +826,11 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
         "A calmer return path",
         "The binary stays the same for everyone.",
         "Keep Chummer open while the browser finishes connecting this copy.",
+        "Use email or Google. The download stays open.",
+        "Account optional. Useful for linked installs, recovery, and private pages.",
+        "Claim your copy",
+        "Email me a link",
+        "Use your email to sign in.",
     ):
         assert forbidden not in entry
 
@@ -3019,7 +3017,7 @@ def test_login_view_is_minimal_auth_surface() -> None:
         "auth-entry--lean",
         'class="button-like button-like--secondary auth-panel__primary"',
         "Continue with Google",
-        "Use your email to sign in.",
+        "Use your email to continue.",
     ):
         assert expected in auth_entry
 

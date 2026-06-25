@@ -103,13 +103,12 @@ SURFACES = [
         ],
     },
     {
-        "path": "/partizipate",
+        "path": "/participate",
         "required_texts": [
             "Participate",
-            "Public board",
-            "Tell us what slows the table down.",
-            "Use the right place",
-            "Support Chummer",
+            "Public requests and roadmap votes.",
+            "Roadmap",
+            "Help",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -121,15 +120,30 @@ SURFACES = [
         ],
     },
     {
-        "path": "/partizipate/board",
+        "path": "/partizipate",
         "required_texts": [
-            "Public board",
+            "Participate",
+            "Public requests and roadmap votes.",
+            "Roadmap",
+            "Help",
+        ],
+        "forbidden_texts": [
+            "ProductLift",
+            "Log in",
+            "Sign up",
+            "Sign in",
+            "Authorize Codex access.",
+            "OpenAI account in ChatGPT",
+        ],
+    },
+    {
+        "path": "/participate/board",
+        "required_texts": [
+            "What do you want to see next?",
         ],
         "forbidden_texts": [
             "/auth/google/start?next=",
             "accounts.google.com",
-            "Log in",
-            "Sign up",
         ],
     },
     {

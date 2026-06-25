@@ -10,10 +10,10 @@ trust_pages:
     updated_date: "2026-03-25"
     summary_points:
       - "First-party help comes first"
-      - "Private help is separate from participation"
+      - "Support is separate from participation"
       - "Downloads and setup stay clear"
     actions:
-      - label: "Open private help"
+      - label: "Open support"
         href: "/contact#support-intake"
         tone: primary
       - label: "Open downloads"
@@ -53,7 +53,7 @@ trust_pages:
         body: "FAQ and Help should answer the normal questions without making you dig through project details."
         bullets:
           - "FAQ answers normal product questions in plain language."
-          - "Private help stays separate from public feedback."
+          - "Support stays separate from public feedback."
           - "You do not need another account to ask for help."
   - id: privacy
     eyebrow: "Privacy"
@@ -72,14 +72,14 @@ trust_pages:
       - label: "Read terms"
         href: "/terms"
         tone: secondary
-      - label: "Open private help"
+      - label: "Open support"
         href: "/contact#support-intake"
         tone: ghost
     sections:
       - id: hosted-account
         eyebrow: "Account record"
         heading: "Your account keeps sign-in, preferences, and help together"
-        body: "Your Chummer account keeps your basic profile, linked sign-in methods, device access, private help history, and preferences together so you do not have to rebuild that history by hand."
+        body: "Your Chummer account keeps your basic profile, linked sign-in methods, device access, support history, and preferences together so you do not have to rebuild that history by hand."
       - id: install-linking
         eyebrow: "Install linking"
         heading: "The download file is the same for everyone"
@@ -118,7 +118,7 @@ trust_pages:
         body: "Expect current downloads and explicit labels when compatibility or platform breadth is still moving."
       - id: account-support
         eyebrow: "Account and help"
-        heading: "Sign-in is simple, and private help starts with Chummer"
+        heading: "Sign-in is simple, and support starts with Chummer"
         body: "Sign-in keeps your access, devices, and help history together. Help and Contact are the normal first stops before any public feedback thread."
       - id: delivery
         eyebrow: "Delivery"
@@ -127,15 +127,15 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact Chummer"
-    intro: "Choose public feedback for ideas. Use private help for install trouble, bugs, or anything with logs or account detail."
+    intro: "Choose public feedback for ideas. Use support for install trouble, bugs, or anything with logs or account detail."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
-      - "Private help form"
+      - "Support form"
       - "Guest submissions allowed"
       - "Tracked follow-up with an account"
     actions:
-      - label: "Open private help"
+      - label: "Open support"
         href: "/contact#support-intake"
         tone: primary
       - label: "Open account support"
@@ -166,7 +166,7 @@ faq_pages:
       - label: "Open downloads"
         href: "/downloads"
         tone: primary
-      - label: "Open private help"
+      - label: "Open support"
         href: "/contact#support-intake"
         tone: secondary
       - label: "Create account"
@@ -192,6 +192,6 @@ faq_pages:
       - title: "Participation and help"
         entries:
           - question: "Do I need to participate to help or report a bug?"
-            answer: "No. Private help and feedback stand on their own. Participation is optional and separate from the normal customer help path."
+            answer: "No. Support and feedback stand on their own. Participation is optional and separate from the normal customer help path."
           - question: "Can I get help without another account?"
-            answer: "Yes. Private help is the default help path. Create a Chummer account if you want saved help history inside your account."
+            answer: "Yes. Support is the default help path. Create a Chummer account if you want saved help history inside your account."

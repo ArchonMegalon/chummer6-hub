@@ -51,7 +51,7 @@ public sealed class PublicSignalProjectionServiceTests
         using var fixture = new PublicSignalProjectionFixture();
         fixture.WriteSupportFiles();
 
-        var packet = fixture.CreateService().BuildPacket("/partizipate");
+        var packet = fixture.CreateService().BuildPacket("/participate");
 
         Assert.Null(packet);
     }

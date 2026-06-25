@@ -70,7 +70,7 @@ Public visitors may access:
 * `/horizons`
 * `/downloads`
 * `/progress`
-* `/partizipate`
+* `/participate`
 * `/status`
 * `/artifacts`
 

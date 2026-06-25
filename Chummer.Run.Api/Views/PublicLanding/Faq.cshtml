@@ -32,23 +32,23 @@
         {
             Badge = "Account",
             Title = Model.Chrome.Authenticated
-                ? "Account keeps recovery, devices, and support together"
-                : "Create an account when you want recovery and support history",
+                ? "Keep recovery, devices, and return flow together"
+                : "Create an account for recovery and linked installs",
             Summary = Model.Chrome.Authenticated
-                ? "Return to Account for devices, recovery, and support history."
-                : accessPosture?.AccountValueSummary ?? "The download stays the same. An account helps you find linked installs, recovery, and support history later.",
+                ? "Return to Account for your return path, devices, and history."
+                : accessPosture?.AccountValueSummary ?? "The download file does not change. An account helps keep return path and linked installs together.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
             Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
-            Highlights = new[] { "Linked installs", "Devices", "Support history" }
+            Highlights = new[] { "Linked installs", "Device return", "Recovery" }
         },
         new
         {
             Badge = "Private help",
-            Title = "Use support when the issue needs logs or account detail",
-            Summary = "Install failures, crashes, account issues, and private campaign details belong in support.",
-            Href = "/contact#support-intake",
-            Label = "Open support intake",
-            Highlights = new[] { "Private reply", "Account optional", "Saved case" }
+            Title = "Use support for cases with device logs",
+            Summary = "Private issues usually need logs and a direct answer.",
+            Href = "/contact",
+            Label = "Open support",
+            Highlights = new[] { "Private reply", "No login needed", "Route stays calm" }
         }
     };
 
@@ -86,7 +86,7 @@
             || combined.Contains("help", StringComparison.Ordinal)
             || combined.Contains("support", StringComparison.Ordinal))
         {
-            return new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "secondary");
+            return new TrustPageActionViewModel("Open support", "/contact", "secondary");
         }
 
         if (combined.Contains("trust", StringComparison.Ordinal) || combined.Contains("use chummer right now", StringComparison.Ordinal))
@@ -169,10 +169,10 @@
 <section class="minimal-section minimal-section--support">
     <div class="minimal-section__lead">
         <h2>Still stuck?</h2>
-        <p>If the FAQ answered only part of the question, open support and keep the case in one place.</p>
+        <p>If the FAQ missed the edge case, open support and keep the context together.</p>
     </div>
     <div class="minimal-actions">
-        <a class="button-like button-like--secondary" href="/contact#support-intake">Open support</a>
+        <a class="button-like button-like--secondary" href="/contact">Open support</a>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
 </section>

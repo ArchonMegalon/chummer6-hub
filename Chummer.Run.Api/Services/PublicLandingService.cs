@@ -245,7 +245,7 @@ public sealed class PublicLandingService
             "whats_real_now" => "/now",
             "coming_next" => "/horizons",
             "featured_artifacts" => "/artifacts",
-            "participate" => "/partizipate",
+            "participate" => "/participate",
             _ => null
         };
 

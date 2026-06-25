@@ -1003,27 +1003,27 @@ public sealed class PublicSignalOperationsService
         {
             ["contractName"] = "chummer.public_signal_operations",
             ["generatedAtUtc"] = DateTimeOffset.UtcNow,
-            ["eyebrow"] = SanitizePublicArtifactText(packet.Eyebrow),
-            ["heading"] = SanitizePublicArtifactText(packet.Heading),
-            ["summary"] = SanitizePublicArtifactText(packet.Summary),
-            ["hostedDomainLabel"] = packet.HostedDomainLabel,
+            ["eyebrow"] = "Public board status",
+            ["heading"] = "Public requests and roadmap status.",
+            ["summary"] = "Chummer keeps public requests, roadmap movement, shipped updates, and private help on separate pages.",
+            ["hostedDomainLabel"] = "Chummer public board",
             ["hostedProjectionReady"] = packet.HostedProjectionReady,
-            ["hostedProjectionSummary"] = SanitizePublicArtifactText(packet.HostedProjectionSummary),
+            ["hostedProjectionSummary"] = BuildPublicBoardArtifactSummary(packet.HostedProjectionReady),
             ["intakeStatusLabel"] = SanitizePublicArtifactText(packet.WebhookStatusLabel),
-            ["intakeSummary"] = SanitizePublicArtifactText(packet.WebhookSummary),
-            ["closeoutStatusLabel"] = SanitizePublicArtifactText(packet.VoterCloseoutStatusLabel),
-            ["closeoutSummary"] = SanitizePublicArtifactText(packet.VoterCloseoutSummary),
+            ["intakeSummary"] = "The public board is visible. Use Help for private or blocked issues.",
+            ["closeoutStatusLabel"] = BuildPublicCloseoutArtifactStatus(packet.VoterCloseoutStatusLabel),
+            ["closeoutSummary"] = "People can follow visible public items. Finished updates still belong on Changelog.",
             ["followSettingsPath"] = packet.FollowSettingsPath,
             ["recipientProjectionStatusLabel"] = SanitizePublicArtifactText(packet.RecipientProjectionStatusLabel),
-            ["recipientProjectionSummary"] = SanitizePublicArtifactText(packet.RecipientProjectionSummary),
+            ["recipientProjectionSummary"] = "Account follow-up is not ready on this host yet.",
             ["consentStatusLabel"] = SanitizePublicArtifactText(packet.ConsentStatusLabel),
-            ["consentSummary"] = SanitizePublicArtifactText(packet.ConsentSummary),
+            ["consentSummary"] = "Follow-up messages wait until account settings are connected.",
             ["queueStatusLabel"] = SanitizePublicArtifactText(packet.QueueStatusLabel),
-            ["queueSummary"] = SanitizePublicArtifactText(packet.QueueSummary),
+            ["queueSummary"] = "No follow-up is sent until account settings and Changelog are ready.",
             ["decisionStatusLabel"] = SanitizePublicArtifactText(packet.GovernorStatusLabel),
-            ["decisionSummary"] = SanitizePublicArtifactText(packet.GovernorSummary),
+            ["decisionSummary"] = "Shipped public items are reviewed before follow-up is sent.",
             ["releaseProofStatusLabel"] = SanitizePublicArtifactText(packet.ReleaseProofStatusLabel),
-            ["releaseProofSummary"] = SanitizePublicArtifactText(packet.ReleaseProofSummary),
+            ["releaseProofSummary"] = "Follow-up waits for a current Changelog update.",
             ["releaseProofRoute"] = packet.ReleaseProofRoute,
             ["releaseProofReceiptId"] = packet.ReleaseProofReceiptId,
             ["counts"] = new JsonObject
@@ -1044,6 +1044,16 @@ public sealed class PublicSignalOperationsService
         return artifact.ToJsonString(JsonOptions);
     }
 
+    private static string BuildPublicBoardArtifactSummary(bool ready)
+        => ready
+            ? "The public board is available through Chummer."
+            : "The Chummer participation page remains available while the board connection is incomplete.";
+
+    private static string BuildPublicCloseoutArtifactStatus(string? value)
+        => string.Equals(value, "Closeout mail pending", StringComparison.OrdinalIgnoreCase)
+            ? "Follow-up pending"
+            : "Follow-up ready";
+
     private static string SanitizePublicArtifactText(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1052,13 +1062,45 @@ public sealed class PublicSignalOperationsService
         }
 
         return value
+            .Replace("Hosted promotion seam", "Public board status", StringComparison.OrdinalIgnoreCase)
+            .Replace("Promotion", "Public board", StringComparison.OrdinalIgnoreCase)
+            .Replace("hosted-board", "public board", StringComparison.OrdinalIgnoreCase)
+            .Replace("hosted board split", "public board setup", StringComparison.OrdinalIgnoreCase)
+            .Replace("hosted board", "public board", StringComparison.OrdinalIgnoreCase)
+            .Replace("hosted public-board", "public board", StringComparison.OrdinalIgnoreCase)
+            .Replace("hosted public board", "public board", StringComparison.OrdinalIgnoreCase)
+            .Replace("first-party", "Chummer", StringComparison.OrdinalIgnoreCase)
             .Replace("Webhook", "Intake", StringComparison.OrdinalIgnoreCase)
             .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
             .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase)
             .Replace("operator", "review", StringComparison.OrdinalIgnoreCase)
             .Replace("provider", "delivery", StringComparison.OrdinalIgnoreCase)
-            .Replace("callback", "outcome update", StringComparison.OrdinalIgnoreCase);
+            .Replace("callback", "outcome update", StringComparison.OrdinalIgnoreCase)
+            .Replace("Closeout mail canonized", "Follow-up ready", StringComparison.OrdinalIgnoreCase)
+            .Replace("Closeout mail pending", "Follow-up pending", StringComparison.OrdinalIgnoreCase)
+            .Replace("canonized", "ready", StringComparison.OrdinalIgnoreCase)
+            .Replace("canon", "records", StringComparison.OrdinalIgnoreCase)
+            .Replace("Recipient list", "Follower list", StringComparison.OrdinalIgnoreCase)
+            .Replace("Recipient matching", "Follower matching", StringComparison.OrdinalIgnoreCase)
+            .Replace("recipient mapping", "follower matching", StringComparison.OrdinalIgnoreCase)
+            .Replace("recipient", "follower", StringComparison.OrdinalIgnoreCase)
+            .Replace("Consent basis", "Permission record", StringComparison.OrdinalIgnoreCase)
+            .Replace("consent basis", "permission record", StringComparison.OrdinalIgnoreCase)
+            .Replace("transactional-basis", "permission", StringComparison.OrdinalIgnoreCase)
+            .Replace("Queue blocked", "Follow-up blocked", StringComparison.OrdinalIgnoreCase)
+            .Replace("delivery queue", "follow-up queue", StringComparison.OrdinalIgnoreCase)
+            .Replace("outbox candidate", "follow-up update", StringComparison.OrdinalIgnoreCase)
+            .Replace("outbox", "follow-up", StringComparison.OrdinalIgnoreCase)
+            .Replace("Governor approval", "Decision review", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor approval", "decision review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Product governor", "product decision", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor", "decision review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Release status", "Update status", StringComparison.OrdinalIgnoreCase)
+            .Replace("release status", "update status", StringComparison.OrdinalIgnoreCase)
+            .Replace("release proof", "update status", StringComparison.OrdinalIgnoreCase)
+            .Replace("Release proof", "Update status", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof", "status", StringComparison.OrdinalIgnoreCase);
     }
 
     public static string WebhookSecretHeader => WebhookSecretHeaderName;

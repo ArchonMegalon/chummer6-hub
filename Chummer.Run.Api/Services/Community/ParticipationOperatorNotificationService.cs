@@ -84,7 +84,7 @@ public sealed class ParticipationOperatorNotificationService
         {
             return new ParticipationIntentResolution(
                 "guided_contribution",
-                normalized.StartsWith("/participate/codex", StringComparison.OrdinalIgnoreCase) ? "/participate/codex" : "/partizipate");
+                normalized.StartsWith("/participate/codex", StringComparison.OrdinalIgnoreCase) ? "/participate/codex" : "/participate");
         }
 
         if (normalized.StartsWith("/feedback", StringComparison.OrdinalIgnoreCase))

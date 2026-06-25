@@ -126,7 +126,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveProductLiftHostedBoardUri()", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveParticipateBoardHomeHref()", controller, StringComparison.Ordinal);
-        Assert.Contains("[HttpGet(\"/partizipate/board\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/board\")]", controller, StringComparison.Ordinal);
         Assert.Contains("ParticipateBoardProxy", controller, StringComparison.Ordinal);
         Assert.Contains("RewriteParticipateBoardHtml", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-home-link-patch", controller, StringComparison.Ordinal);
@@ -217,6 +217,8 @@ public sealed class PublicSignalOperationsViewTests
 <!doctype html>
 <html>
 <head><title>Board</title></head>
+<link rel="preload" href="https://media.productlift.dev/branding-stylesheets/theme.css" as="style">
+<script src="https://cdn.productlift.dev/js/all.js"></script>
 <body>
   <header>
     <a class="brand-link" href="/">Chummer</a>
@@ -235,9 +237,13 @@ public sealed class PublicSignalOperationsViewTests
             null,
             [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", "/account/billing/supporter/start"])!;
 
-        Assert.Contains("<base href=\"/partizipate/board/\" />", rewritten, StringComparison.Ordinal);
-        Assert.Contains("href=\"/partizipate/board/roadmap\"", rewritten, StringComparison.Ordinal);
-        Assert.Contains("src=\"/partizipate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/participate/board/\" />", rewritten, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate/board/roadmap\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("src=\"/participate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
+        Assert.Contains("https://media.productlift.dev/branding-stylesheets/theme.css", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://cdn.productlift.dev/js/all.js", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://media.chummer", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://cdn.chummer", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("data-chummer-board-failure-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
@@ -251,6 +257,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Support Chummer", rewritten, StringComparison.Ordinal);
         Assert.Contains("node.style.display = 'none';", rewritten, StringComparison.Ordinal);
         Assert.Contains("new MutationObserver", rewritten, StringComparison.Ordinal);
+        Assert.Contains("removeHostedAuth", rewritten, StringComparison.Ordinal);
+        Assert.Contains("authObserver.observe(document.documentElement", rewritten, StringComparison.Ordinal);
         Assert.Contains("node.remove()", rewritten, StringComparison.Ordinal);
         Assert.Contains("brand.setAttribute('href', 'https://chummer.run/')", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("support@productlift.dev", rewritten, StringComparison.OrdinalIgnoreCase);

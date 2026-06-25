@@ -1883,10 +1883,16 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.True(document.RootElement.GetProperty("hostedProjectionReady").GetBoolean());
         Assert.True(document.RootElement.TryGetProperty("generatedAtUtc", out _));
         Assert.True(document.RootElement.TryGetProperty("hostedDomainLabel", out _));
+        Assert.Equal("Chummer public board", document.RootElement.GetProperty("hostedDomainLabel").GetString());
         Assert.True(document.RootElement.TryGetProperty("hostedProjectionSummary", out _));
         Assert.True(document.RootElement.TryGetProperty("recipientProjectionStatusLabel", out _));
         Assert.True(document.RootElement.TryGetProperty("queueStatusLabel", out _));
         Assert.True(document.RootElement.TryGetProperty("releaseProofStatusLabel", out _));
+        Assert.DoesNotContain("ProductLift", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("productlift.dev", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Hosted promotion seam", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Governor approval", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("canonized", json, StringComparison.OrdinalIgnoreCase);
         JsonElement counts = document.RootElement.GetProperty("counts");
         Assert.Equal(4, counts.GetProperty("categoryCount").GetInt32());
         Assert.Equal(0, counts.GetProperty("receiptCount").GetInt32());
