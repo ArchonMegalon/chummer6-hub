@@ -5996,6 +5996,25 @@ body.shell-authenticated {
   min-height: auto;
   margin: 0 auto;
   padding: 20px 0 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.surface-auth.surface-minimal .site-brand {
+  width: auto;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(243, 234, 219, 0.78);
+}
+
+.surface-auth.surface-minimal .site-brand__wordmark {
+  color: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
 }
 
 .surface-auth.surface-minimal .site-brand__surface {
@@ -6078,6 +6097,7 @@ body.shell-authenticated {
 .surface-auth.surface-minimal .privacy-note {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
+  font-family: inherit;
   font-size: 0.94rem;
   line-height: 1.45;
 }
