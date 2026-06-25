@@ -3049,7 +3049,8 @@ def test_login_view_is_minimal_auth_surface() -> None:
     for forbidden in (
         "clamp(1.75rem",
         "width: min(420px",
-        "box-shadow:",
+        "0 14px 34px",
+        "linear-gradient",
     ):
         assert forbidden not in auth_compact
 

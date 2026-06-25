@@ -84,10 +84,53 @@
   font-size: 0.9rem;
 }
 
+.route-login.surface-auth.surface-minimal .button-like--primary,
+.route-signup.surface-auth.surface-minimal .button-like--primary {
+  border: 1px solid rgba(243, 234, 219, 0.18);
+  background: #d6b763;
+  color: #15130f;
+  box-shadow: none;
+}
+
+.route-login.surface-auth.surface-minimal .button-like--primary:hover,
+.route-login.surface-auth.surface-minimal .button-like--primary:focus-visible,
+.route-signup.surface-auth.surface-minimal .button-like--primary:hover,
+.route-signup.surface-auth.surface-minimal .button-like--primary:focus-visible {
+  background: #e0c270;
+  box-shadow: none;
+  transform: none;
+}
+
+.route-login.surface-auth.surface-minimal .button-like--secondary,
+.route-signup.surface-auth.surface-minimal .button-like--secondary {
+  border-color: rgba(243, 234, 219, 0.16);
+  background: #24231f;
+  color: #f3eadb;
+  box-shadow: none;
+}
+
+.route-login.surface-auth.surface-minimal .button-like--secondary:hover,
+.route-login.surface-auth.surface-minimal .button-like--secondary:focus-visible,
+.route-signup.surface-auth.surface-minimal .button-like--secondary:hover,
+.route-signup.surface-auth.surface-minimal .button-like--secondary:focus-visible {
+  background: #2b2924;
+  box-shadow: none;
+  transform: none;
+}
+
 .route-login.surface-auth.surface-minimal .auth-divider,
 .route-signup.surface-auth.surface-minimal .auth-divider {
   gap: 0.6rem;
-  font-size: 0.76rem;
+  color: rgba(243, 234, 219, 0.62);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.route-login.surface-auth.surface-minimal .auth-divider::before,
+.route-login.surface-auth.surface-minimal .auth-divider::after,
+.route-signup.surface-auth.surface-minimal .auth-divider::before,
+.route-signup.surface-auth.surface-minimal .auth-divider::after {
+  border-top-color: rgba(243, 234, 219, 0.16);
 }
 
 @media (max-width: 420px) {
