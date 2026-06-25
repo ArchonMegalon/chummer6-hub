@@ -22,7 +22,8 @@ public sealed record IdentityEmailDeliveryResult(
     string DeliveryMode,
     string PreviewNote,
     bool Delivered,
-    string? ProviderMessageId = null);
+    string? ProviderMessageId = null,
+    bool ExposeInlinePreviewTicket = false);
 
 public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 {
@@ -325,7 +326,8 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         return new IdentityEmailDeliveryResult(
             DeliveryMode: "preview_inline_link",
             PreviewNote: previewNote,
-            Delivered: false);
+            Delivered: false,
+            ExposeInlinePreviewTicket: true);
     }
 
     public IdentityEmailDeliveryStatusResponse GetStatus()

@@ -170,7 +170,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
             }
 
             return new EmailAuthStartResponse(
-                TicketId: IsInlinePreviewDelivery(delivery.DeliveryMode) ? ticketId : string.Empty,
+                TicketId: IsInlinePreviewDelivery(delivery.DeliveryMode) && delivery.ExposeInlinePreviewTicket ? ticketId : string.Empty,
                 SubjectId: ticket.SubjectId,
                 Email: ticket.Email,
                 DisplayName: ticket.DisplayName,

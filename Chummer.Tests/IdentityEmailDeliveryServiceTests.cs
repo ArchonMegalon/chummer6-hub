@@ -154,6 +154,7 @@ public sealed class IdentityEmailDeliveryServiceTests
 
             Assert.False(result.Delivered);
             Assert.Equal("preview_inline_link", result.DeliveryMode);
+            Assert.True(result.ExposeInlinePreviewTicket);
             Assert.Contains("development preview callback link", result.PreviewNote, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -200,6 +201,44 @@ public sealed class IdentityEmailDeliveryServiceTests
             Assert.Equal(string.Empty, response.TicketId);
             Assert.Equal("email_delivery_unavailable", response.DeliveryMode);
             Assert.Throws<ArgumentException>(() => access.CompleteEmailEntry(new EmailAuthCompleteRequest(response.TicketId)));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void StartEmailEntryDoesNotReturnBearerTicketWhenPreviewModeIsSpoofedWithoutExplicitExposure()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
+                })
+                .Build();
+            var access = new IdentityAccessService(
+                configuration,
+                NullLogger<IdentityAccessService>.Instance,
+                new SpoofedInlinePreviewDelivery());
+
+            EmailAuthStartResponse response = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+
+            Assert.Equal(string.Empty, response.TicketId);
+            Assert.Equal("preview_inline_link", response.DeliveryMode);
         }
         finally
         {
@@ -294,6 +333,34 @@ public sealed class IdentityEmailDeliveryServiceTests
             new(
                 DeliveryMode: "preview_inline_link",
                 PreviewNote: "development preview callback link",
+                Delivered: false,
+                ExposeInlinePreviewTicket: true);
+
+        public IdentityEmailWebhookAckResponse RecordEmailitWebhook(System.Text.Json.JsonElement payload) =>
+            new(
+                Provider: "test",
+                Status: "accepted",
+                RecordedEvents: 0,
+                ReceivedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    private sealed class SpoofedInlinePreviewDelivery : IIdentityEmailDeliveryService
+    {
+        public IdentityEmailDeliveryStatusResponse GetStatus() =>
+            new(
+                RecentDeliveries: Array.Empty<IdentityEmailDeliveryEventResponse>(),
+                Recipients: Array.Empty<IdentityEmailRecipientStateResponse>(),
+                GeneratedAtUtc: DateTimeOffset.UtcNow);
+
+        public IdentityEmailDeliveryResult DeliverMagicLink(
+            string email,
+            string displayName,
+            string ticketId,
+            string? nextPath,
+            DateTimeOffset expiresAtUtc) =>
+            new(
+                DeliveryMode: "preview_inline_link",
+                PreviewNote: "spoofed preview mode without ticket exposure",
                 Delivered: false);
 
         public IdentityEmailWebhookAckResponse RecordEmailitWebhook(System.Text.Json.JsonElement payload) =>
