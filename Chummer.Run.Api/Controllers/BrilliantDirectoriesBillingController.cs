@@ -71,7 +71,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         {
             return Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                detail: "Membership billing is temporarily unavailable on this host right now.");
+                detail: "Membership billing is unavailable right now.");
         }
     }
 
@@ -298,7 +298,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
             Heading: "Membership temporarily unavailable",
-            Summary: "Free and Supporter still unlock the same product today. Billing is not ready on this host yet.",
+            Summary: "Your Chummer access is unchanged while billing is unavailable.",
             ManageMembershipHref: "/account");
 
     private async Task<HubUserDto?> TryGetCurrentUserAsync(CancellationToken cancellationToken)

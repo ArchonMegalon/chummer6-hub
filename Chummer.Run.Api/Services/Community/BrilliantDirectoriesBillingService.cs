@@ -339,7 +339,7 @@ public sealed class BrilliantDirectoriesBillingService
         catch (InvalidOperationException ex) when (ex is not BrilliantDirectoriesBillingUnavailableException)
         {
             throw new BrilliantDirectoriesBillingUnavailableException(
-                "Membership billing is temporarily unavailable on this host right now.",
+                "Membership billing is unavailable right now.",
                 ex);
         }
     }
