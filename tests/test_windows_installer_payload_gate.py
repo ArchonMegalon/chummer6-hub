@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify-windows-installer-payloads.py"
 PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-download-bundle.sh"
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
+WINDOWS_INSTALLER_STUB = b"MZ" + (b"installer-stub" * 200)
 
 
 def _write_bootstrap_payload(payload_path: Path, *, launch_executable: str = "Chummer.Avalonia.exe") -> bytes:
@@ -89,7 +90,7 @@ def test_windows_installer_verifier_accepts_bootstrap_payload_with_sidecar_metad
     files_dir = tmp_path / "files"
     files_dir.mkdir()
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(b"installer-stub" * 200)
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
     _write_payload_sidecar(
@@ -122,7 +123,7 @@ def test_windows_installer_verifier_rejects_bootstrap_payload_without_sidecar_me
     files_dir = tmp_path / "files"
     files_dir.mkdir()
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(b"installer-stub" * 200)
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
     manifest_path = tmp_path / "releases.json"
@@ -149,7 +150,7 @@ def test_windows_installer_verifier_rejects_mismatched_bootstrap_sidecar_metadat
     files_dir = tmp_path / "files"
     files_dir.mkdir()
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(b"installer-stub" * 200)
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
     _write_payload_sidecar(
@@ -183,7 +184,7 @@ def test_windows_installer_verifier_rejects_mismatched_manifest_download_url(tmp
     files_dir = tmp_path / "files"
     files_dir.mkdir()
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(b"installer-stub" * 200)
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
     _write_payload_sidecar(
@@ -220,7 +221,7 @@ def test_windows_installer_verifier_accepts_appended_payload(tmp_path: Path) -> 
     payload_zip_path = tmp_path / "payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_zip_path)
     installer_path.write_bytes(
-        (b"installer-stub" * 200)
+        WINDOWS_INSTALLER_STUB
         + payload_bytes
         + struct.pack("<q", len(payload_bytes))
         + APPENDED_PAYLOAD_MAGIC
@@ -242,7 +243,7 @@ def test_publish_download_bundle_fails_before_promotion_when_windows_payload_is_
     files_dir = bundle_dir / "files"
     files_dir.mkdir(parents=True)
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(b"installer-stub" * 200)
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     _write_bundle_manifest(bundle_dir / "releases.json", installer_name=installer_path.name)
 
     deploy_dir = tmp_path / "deploy"
@@ -257,3 +258,70 @@ def test_publish_download_bundle_fails_before_promotion_when_windows_payload_is_
     assert result.returncode != 0
     assert "windows_installer_payload_gate:fail" in result.stderr
     assert "no appended payload and no bootstrap sidecar" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_non_windows_executable(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(b"not-a-windows-exe" * 200)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        ["python3", str(VERIFY_SCRIPT), "--files-dir", str(files_dir), "--manifest", str(manifest_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "installer does not start with Windows MZ executable magic" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_non_zip_bootstrap_payload(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = b"not-a-zip-payload"
+    payload_path.write_bytes(payload_bytes)
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        ["python3", str(VERIFY_SCRIPT), "--files-dir", str(files_dir), "--manifest", str(manifest_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "payload does not start with ZIP local-file header magic" in result.stderr

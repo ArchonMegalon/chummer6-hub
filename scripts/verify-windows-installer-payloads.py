@@ -17,6 +17,8 @@ from typing import Any
 
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
 FOOTER_LENGTH = len(APPENDED_PAYLOAD_MAGIC) + 8
+WINDOWS_EXE_MAGIC = b"MZ"
+ZIP_LOCAL_FILE_MAGIC = b"PK\x03\x04"
 
 DEFAULT_LAUNCH_EXECUTABLES = {
     "avalonia": "Chummer.Avalonia.exe",
@@ -307,6 +309,8 @@ def validate_zip_payload(
     require_sample: bool,
 ) -> list[str]:
     failures: list[str] = []
+    if not candidate.data.startswith(ZIP_LOCAL_FILE_MAGIC):
+        failures.append("payload does not start with ZIP local-file header magic")
     try:
         with zipfile.ZipFile(BytesIO(candidate.data), "r") as archive:
             names = [normalize_zip_name(info.filename) for info in archive.infolist() if not info.is_dir()]
@@ -347,6 +351,10 @@ def verify_installer(
         return [f"installer does not exist: {installer_path}"]
     if installer_path.stat().st_size <= FOOTER_LENGTH:
         return [f"installer is too small to contain a payload-aware executable: {installer_path}"]
+    with installer_path.open("rb") as handle:
+        installer_magic = handle.read(2)
+    if installer_magic != WINDOWS_EXE_MAGIC:
+        failures.append("installer does not start with Windows MZ executable magic")
 
     candidate = read_appended_payload(installer_path)
     if candidate is None:
