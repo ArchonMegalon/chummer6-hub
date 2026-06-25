@@ -422,8 +422,14 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
     assert "data-chummer-home-link-patch" in controller
+    assert "data-chummer-board-skin" in controller
     assert "data-chummer-board-failure-patch" in controller
     assert "polishVisibleCopy" in controller
+    assert "quietHostedBoardChrome" in controller
+    assert "What should Chummer do next?" in controller
+    assert "Short requests, clear bugs, useful ideas." in controller
+    assert "Add a note" in controller
+    assert "data-chummer-hidden-status" in controller
     assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller

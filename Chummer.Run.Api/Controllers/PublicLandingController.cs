@@ -2552,6 +2552,81 @@ public sealed class PublicLandingController : Controller
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
             string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);
+            const string boardSkin = """
+<style data-chummer-board-skin>
+:root {
+  color-scheme: dark;
+  --chummer-board-bg: #0b0c0d;
+  --chummer-board-panel: #15171a;
+  --chummer-board-panel-soft: #111315;
+  --chummer-board-line: rgba(241, 233, 219, 0.1);
+  --chummer-board-text: #f4eee4;
+  --chummer-board-muted: #b8afa1;
+  --chummer-board-accent: #d6b763;
+}
+
+body {
+  background: var(--chummer-board-bg) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+main,
+[role="main"] {
+  max-width: 1180px !important;
+  margin-inline: auto !important;
+}
+
+main > section:first-of-type,
+[role="main"] > section:first-of-type {
+  margin: 0.8rem 0 1rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+article,
+form,
+[class*="card"],
+[class*="panel"] {
+  border-color: var(--chummer-board-line) !important;
+  border-radius: 8px !important;
+  background-color: var(--chummer-board-panel) !important;
+  box-shadow: none !important;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+button,
+[role="button"] {
+  background-image: none !important;
+}
+
+input,
+textarea,
+select {
+  background-color: #111315 !important;
+  border-color: rgba(241, 233, 219, 0.14) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(244, 238, 228, 0.52) !important;
+}
+
+[data-chummer-hidden-status] {
+  display: none !important;
+}
+</style>
+""";
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
@@ -2564,6 +2639,16 @@ document.addEventListener('DOMContentLoaded', function () {
       [/\bArtificial intelligence\b/gi, ''],
       [/\bAutomatically generate\b/gi, 'Create'],
       [/\bautomatically generate\b/g, 'create'],
+      [/\bWhat do you want to see next\?/g, 'What should Chummer do next?'],
+      [/\bTell us how we could make Chummer6 more useful to you\b/g, 'Short requests, clear bugs, useful ideas.'],
+      [/\bAdd Feature or Bug\b/g, 'Add a note'],
+      [/\bLet us know how we can improve Chummer6\./g, 'Tell us what would help.'],
+      [/\bShort title of your feedback\.\.\./g, 'Short title'],
+      [/\bDescribe your idea or bug\.\.\./g, 'What happened, or what should exist?'],
+      [/\b-- Choose a category --\b/g, 'Choose a category'],
+      [/\bGathering votes\b/g, ''],
+      [/\bFeature\b/g, 'Idea'],
+      [/\bvotes\b/gi, 'requests'],
       [/\s{2,}/g, ' ']
     ];
 
@@ -2582,6 +2667,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (value !== original) {
         node.nodeValue = value.trimStart();
+      }
+    });
+  };
+
+  const quietHostedBoardChrome = function () {
+    const nodes = Array.from(document.querySelectorAll('span, small, label, div, button, option'));
+    nodes.forEach(function (node) {
+      const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (text === 'gathering votes' || text === 'planned' || text === 'in progress') {
+        node.setAttribute('data-chummer-hidden-status', 'true');
       }
     });
   };
@@ -2615,9 +2710,11 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
   polishVisibleCopy();
+  quietHostedBoardChrome();
   removeHostedAuth();
   const authObserver = new MutationObserver(function () {
     polishVisibleCopy();
+    quietHostedBoardChrome();
     removeHostedAuth();
   });
   authObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -2747,13 +2844,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 rewritten = Regex.Replace(
                     rewritten,
                     "</head>",
-                    $"{homeLinkPatch}{boardFailurePatch}</head>",
+                    $"{boardSkin}{homeLinkPatch}{boardFailurePatch}</head>",
                     RegexOptions.IgnoreCase,
                     TimeSpan.FromMilliseconds(250));
             }
             else
             {
-                rewritten = homeLinkPatch + boardFailurePatch + rewritten;
+                rewritten = boardSkin + homeLinkPatch + boardFailurePatch + rewritten;
             }
         }
 

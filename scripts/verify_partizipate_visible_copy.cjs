@@ -28,6 +28,11 @@ const forbidden = [
   /\bSign in\b/i,
   /Chummer Participate/i,
   /Requests, votes, and shipped work\./i,
+  /\bGathering votes\b/i,
+  /\bAdd Feature or Bug\b/i,
+  /\bShort title of your feedback/i,
+  /\bDescribe your idea or bug/i,
+  /Tell us how we could make Chummer6 more useful to you/i,
 ];
 
 (async () => {
