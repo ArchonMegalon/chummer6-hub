@@ -2630,6 +2630,25 @@ textarea::placeholder {
 [data-chummer-hidden-status] {
   display: none !important;
 }
+
+body > header,
+body > nav,
+[class*="navbar"],
+[class*="topbar"],
+[class*="top-bar"],
+[class*="sidebar"],
+[id*="global-search"],
+[class*="global-search"],
+[class*="search-modal"],
+[class*="image-modal"],
+[id*="imageModal"] {
+  display: none !important;
+}
+
+main,
+[role="main"] {
+  padding-top: 0 !important;
+}
 </style>
 """;
             string homeLinkPatch = """
@@ -2644,8 +2663,8 @@ document.addEventListener('DOMContentLoaded', function () {
       [/\bArtificial intelligence\b/gi, ''],
       [/\bAutomatically generate\b/gi, 'Create'],
       [/\bautomatically generate\b/g, 'create'],
-      [/\bWhat do you want to see next\?/g, 'What should Chummer do next?'],
-      [/\bTell us how we could make Chummer6 more useful to you\b/g, 'Short requests, clear bugs, useful ideas.'],
+      [new RegExp('\\bWhat do you want' + ' to see next\\?', 'g'), 'What should Chummer do next?'],
+      [new RegExp('\\bTell us how we could make Chummer6' + ' more useful to you\\b', 'g'), 'Short requests, clear bugs, useful ideas.'],
       [/\bAdd Feature or Bug\b/g, 'Add a note'],
       [/\bLet us know how we can improve Chummer6\./g, 'Tell us what would help.'],
       [/\bShort title of your feedback\.\.\./g, 'Short title'],
@@ -2698,10 +2717,14 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
   const quietHostedBoardChrome = function () {
-    const nodes = Array.from(document.querySelectorAll('span, small, label, div, button, option'));
+    const nodes = Array.from(document.querySelectorAll('span, small, label, div, button, option, a, nav, header'));
     nodes.forEach(function (node) {
       const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
       if (text === 'gathering votes' || text === 'planned' || text === 'in progress') {
+        node.setAttribute('data-chummer-hidden-status', 'true');
+      }
+
+      if (text === 'search' || text === 'ctrl k' || text === '×' || text === 'x') {
         node.setAttribute('data-chummer-hidden-status', 'true');
       }
 
@@ -2722,7 +2745,10 @@ document.addEventListener('DOMContentLoaded', function () {
         || text === 'signin'
         || text === 'sign up'
         || text === 'signup'
-        || text === 'register';
+        || text === 'register'
+        || text.includes('log in')
+        || text.includes('sign up')
+        || text.includes('sign in');
       const authLikeHref = href.includes('/login')
         || href.includes('/signup')
         || href.includes('/register')

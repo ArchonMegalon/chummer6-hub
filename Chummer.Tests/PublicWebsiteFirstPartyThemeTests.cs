@@ -39,6 +39,10 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("href: /participate", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("body > header,", controller, StringComparison.Ordinal);
+        Assert.Contains("[id*=\"global-search\"]", controller, StringComparison.Ordinal);
+        Assert.Contains("new RegExp('\\\\bWhat do you want' + ' to see next\\\\?'", controller, StringComparison.Ordinal);
+        Assert.Contains("text === 'search' || text === 'ctrl k'", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Support Chummer", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
