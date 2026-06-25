@@ -43,10 +43,10 @@ test('help, contact, and participate keep public and private paths clear', async
   await helpPage.close();
 
   const contactPage = await openPublicPage(browser, '/contact');
-  await expect(contactPage.getByRole('heading', { name: 'Open the right support case' })).toBeVisible();
-  await expect(contactPage.locator('body')).toContainText('Use Participate for ideas and safe public bugs.');
+  await expect(contactPage.getByRole('heading', { name: 'Contact Chummer' })).toBeVisible();
+  await expect(contactPage.locator('body')).toContainText('Public ideas go to Participate. Private problems stay here.');
   await expect(contactPage.getByRole('link', { name: 'Open participate' })).toBeVisible();
-  await expect(contactPage.getByRole('link', { name: 'Open support intake' })).toBeVisible();
+  await expect(contactPage.getByRole('link', { name: 'Open private help' })).toBeVisible();
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/partizipate');

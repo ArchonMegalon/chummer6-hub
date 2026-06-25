@@ -5473,7 +5473,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and private help.", "/contact", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));
@@ -5543,7 +5543,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         else
         {
-            actions.Add(new TrustPageActionViewModel("Create account for tracked support", "/signup?next=%2Faccount%2Fsupport", "primary"));
+            actions.Add(new TrustPageActionViewModel("Create account for saved history", "/signup?next=%2Faccount%2Fsupport", "primary"));
         }
 
         actions.Add(new TrustPageActionViewModel("Return to help", "/help", "secondary"));
@@ -5627,7 +5627,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         catch (ArgumentException ex)
         {
-            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Public ideas and private help.", "/contact", cancellationToken);
             var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
             var model = _trustContent.BuildContactPage(chrome) with
             {
@@ -10361,13 +10361,13 @@ Boundary:
 
         return new(
             ActionHref: QueryHelpers.AddQueryString("/contact", BuildSupportRailQuery(installRail)),
-            Heading: "Open a support case",
+            Heading: "Private help",
             Intro: authenticated
-                ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
-                : "Use this form when you want help without another account. Create an account later if you want support history inside Chummer.",
+                ? "Send one clear problem here, or open Account > Support when you want the full saved history."
+                : "Send one clear problem here. You can create an account later if you want saved history inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
-            AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
+            AccountSupportLabel: authenticated ? "Open account support" : "Create account for saved history",
             InstallAccessHref: installRail.ReturnHref ?? "/account/access",
             InstallAccessLabel: installRail.ReturnLabel ?? "Open Devices and access",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),

@@ -126,16 +126,16 @@ trust_pages:
         body: "Public downloads should match what is honestly available right now. If a regular installer exists later, it becomes the normal path, while manual packages stay as fallback for edge cases or support-directed setup."
   - id: contact
     eyebrow: "Contact"
-    heading: "Open the right support case"
-    intro: "Chummer should not make you guess where to send a problem. Start here for install help, bugs, and practical feedback."
+    heading: "Contact Chummer"
+    intro: "Choose public feedback for ideas. Use private help for install trouble, bugs, or anything with logs or account detail."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
-      - "Direct support intake"
+      - "Private help form"
       - "Guest submissions allowed"
       - "Tracked follow-up with an account"
     actions:
-      - label: "Open support intake"
+      - label: "Open private help"
         href: "/contact#support-intake"
         tone: primary
       - label: "Open account support"

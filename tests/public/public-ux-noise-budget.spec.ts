@@ -61,10 +61,13 @@ test('contact page keeps routing and private intake clear without extra ceremony
 
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
-  await expect(page.locator('h1')).toContainText('Open the right support case');
-  expect(bodyText).toContain('Pick the path');
-  expect(bodyText).toContain('Use Participate for ideas and safe public bugs');
-  expect(bodyText).toContain('Keep one issue per case so the reply stays clear.');
+  await expect(page.locator('h1')).toContainText('Contact Chummer');
+  expect(bodyText).toContain('Choose one');
+  expect(bodyText).toContain('Public ideas go to Participate. Private problems stay here.');
+  expect(bodyText).toContain('One problem per message keeps the reply clear.');
+  expect(bodyText).not.toContain('Open the right support case');
+  expect(bodyText).not.toContain('Use Participate for ideas and safe public bugs');
+  expect(bodyText).not.toContain('Keep one issue per case so the reply stays clear.');
   expect(bodyText).not.toContain('Case-type guide');
   expect(bodyText).not.toContain('Need a different path?');
   expect(bodyText).not.toContain('Safe public feedback should start on the public feedback page');

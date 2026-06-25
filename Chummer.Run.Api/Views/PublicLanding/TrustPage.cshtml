@@ -104,42 +104,21 @@
             ? Model.SupportIntake.InstallAccessLabel
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
-            Id: "public-issues",
-            Badge: "Participate",
-            Title: "Use Participate for ideas and safe public bugs",
-            Summary: "Feature requests and safe public UX bugs belong there. Logs, account issues, and private campaign detail do not.",
+            Id: "public-ideas",
+            Badge: "Public",
+            Title: "Ideas and safe public bugs",
+            Summary: "Use Participate when the discussion can be public and does not need logs, account detail, or campaign secrets.",
             Href: "/partizipate",
             Label: "Open participate",
-            Details: new[] { "Public page", "Votes show demand", "No private logs" }));
+            Details: new[] { "Public board", "Votes and comments", "No private logs" }));
         contactRouteChoices.Add((
-            Id: "right-lane",
-            Badge: "Private support",
-            Title: "Use support when the issue needs logs or account detail",
-            Summary: "Use this for crashes, install recovery, broken behavior, or anything that should stay private.",
+            Id: "private-help",
+            Badge: "Private",
+            Title: "Install trouble, crashes, or account detail",
+            Summary: "Use private help when the issue needs a reply, screenshots, logs, install recovery, or anything you do not want public.",
             Href: "#support-intake",
-            Label: "Open support intake",
-            Details: new[] { "Private reply", "Saved case", "Account optional" }));
-        contactRouteChoices.Add((
-            Id: "tracked-support",
-            Badge: "Saved history",
-            Title: "Create an account only when you want case history",
-            Summary: "Guest submissions are allowed. An account keeps the case, recovery state, and later replies in one place.",
-            Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
-            Label: Model.SupportIntake.AccountSupportLabel,
-            Details: new[] { "Guest allowed", "History in Account", "Everything in one place" }));
-        contactRouteChoices.Add((
-            Id: "install-continuity",
-            Badge: "Return to setup",
-            Title: installTitle,
-            Summary: installSummary,
-            Href: installHref,
-            Label: installRouteLabel,
-            Details: new[]
-            {
-                Model.SupportIntake.RecoveryModeOnly ? "Recovery only" : "Normal install path",
-                "Devices & access stays simple",
-                "Account return"
-            }));
+            Label: "Open private help",
+            Details: new[] { "Guest allowed", "Private reply", "Tracked later if you sign in" }));
     }
 }
 
@@ -284,8 +263,8 @@ else if (!contactPage)
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Pick the path</h2>
-            <p>Use Participate for ideas and safe public bugs. Use the support form when the issue needs logs, account detail, or recovery.</p>
+            <h2>Choose one</h2>
+            <p>Public ideas go to Participate. Private problems stay here.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -308,7 +287,7 @@ else if (!contactPage)
 
     <section class="minimal-section minimal-section--tight" id="support-intake">
         <article class="trust-page-section trust-page-section--form minimal-help-card">
-            <p class="eyebrow">Private support</p>
+            <p class="eyebrow">Private help</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
             <p>@PublicText(Model.SupportIntake.Intro)</p>
 
@@ -316,12 +295,12 @@ else if (!contactPage)
             {
                 <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
             }
-            <p class="muted-copy">Keep one issue per case so the reply stays clear.</p>
+            <p class="muted-copy">One problem per message keeps the reply clear.</p>
 
             <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="field">
-                    <label for="supportKind">Case type</label>
+                    <label for="supportKind">Problem type</label>
                     <select id="supportKind" name="kind" required>
                         @foreach (var option in Model.SupportIntake.Options)
                         {
@@ -330,11 +309,11 @@ else if (!contactPage)
                     </select>
                 </div>
                 <div class="field">
-                    <label for="supportTitle">Short title</label>
+                    <label for="supportTitle">Title</label>
                     <input id="supportTitle" name="title" maxlength="160" placeholder="Installer linked, but first launch did not explain the next step" value="@Model.SupportIntake.DefaultTitle" required />
                 </div>
                 <div class="field">
-                    <label for="supportSummary">One-line summary</label>
+                    <label for="supportSummary">Short summary</label>
                     <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux release installed successfully, but the post-install guidance was unclear." value="@Model.SupportIntake.DefaultSummary" required />
                 </div>
                 <div class="field">
@@ -388,7 +367,7 @@ else if (!contactPage)
                     </div>
                 </details>
                 <div class="stacked-actions">
-                    <button class="button-like button-like--primary" type="submit">Submit support case</button>
+                    <button class="button-like button-like--primary" type="submit">Send private help request</button>
                     <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>
                     <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>
                 </div>
@@ -397,7 +376,7 @@ else if (!contactPage)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
             {
-                <p class="muted-copy">Need to go back to setup? <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a></p>
+                <p class="muted-copy">Back to setup: <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a></p>
             }
         </article>
     </section>

@@ -31,6 +31,9 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-card__list' in trust_page
     assert 'aria-label="Quick notes"' in trust_page
     assert 'route-choice-grid--compact' in trust_page
+    assert 'Choose one' in trust_page
+    assert 'Public ideas go to Participate. Private problems stay here.' in trust_page
+    assert 'Send private help request' in trust_page
     assert 'other routes below' not in trust_page
 
 
@@ -38,6 +41,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
     trust_page = read("Chummer.Run.Api/Views/PublicLanding/TrustPage.cshtml")
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     install_setup = read("Chummer.Run.Api/Services/DesktopInstallRail.cs")
+    public_trust_content = read(".codex-design/product/PUBLIC_TRUST_CONTENT.yaml")
 
     for expected in (
         'ViewData["Title"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);',
@@ -87,10 +91,18 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         ">@Model.SupportIntake.InstallRailLabel</a>",
         "installer or app does the real work",
         "Return to the guided installer after support",
+        "Open the right support case",
+        "Pick the path",
+        "Use Participate for ideas and safe public bugs",
+        "Keep one issue per case",
+        "Submit support case",
+        "Case type",
+        "One-line summary",
+        "Need to go back to setup?",
     ):
         assert forbidden not in trust_page
 
-    combined = "\n".join((trust_page, controller, install_setup))
+    combined = "\n".join((trust_page, controller, install_setup, public_trust_content))
     for forbidden in (
         "Fixer Board",
         "Return to installer",
@@ -104,9 +116,11 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Devices and access is where you reconnect, replace, or recover this copy.",
         "Public feedback should start on the feedback page.",
         "Return to setup",
-        "Need to go back to setup?",
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
+        "Contact Chummer",
+        "Public ideas and private help.",
+        "Create account for saved history",
     ):
         assert expected in combined
 
