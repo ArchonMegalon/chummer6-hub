@@ -31,7 +31,7 @@ public sealed class BrilliantDirectoriesBillingService
                 "Full current product access",
                 "Account linking and updates",
                 "Same runtime features as supporters today",
-                "1 MyFirstBook origin book per month"
+                "1 Origin Book per month"
             ],
             ExampleStoryBooks:
             [
@@ -44,15 +44,15 @@ public sealed class BrilliantDirectoriesBillingService
         new(
             BrilliantDirectoriesBillingConstants.SupporterPlanKey,
             BrilliantDirectoriesBillingConstants.SupporterPlanName,
-            "Support ongoing work. Supporters do not unlock extra features yet.",
+            "Support ongoing work. Same app access, 2 Origin Books per month.",
             IsDefault: false,
             IsSupporter: true,
             Included:
             [
                 "Supports Chummer directly",
                 "Same current product access as free users",
-                "No exclusive features today",
-                "2 MyFirstBook origin books per month"
+                "No exclusive app features today",
+                "2 Origin Books per month"
             ],
             ExampleStoryBooks:
             [
@@ -90,7 +90,7 @@ public sealed class BrilliantDirectoriesBillingService
             Provider: options.ProviderName,
             ProviderKey: options.ProviderKey,
             Heading: "Membership",
-            Summary: "Chummer uses an external billing page. Free and Supporter unlock the same product today.",
+            Summary: "Free and Supporter have the same Chummer app access. Supporter raises the Origin Book allowance.",
             MyFirstBookQuotaPolicy: new MyFirstBookQuotaPolicyDto(
                 FreeMonthlyBooks: FreeMyFirstBookMonthlyLimit,
                 SupporterMonthlyBooks: SupporterMyFirstBookMonthlyLimit),

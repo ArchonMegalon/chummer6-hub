@@ -120,8 +120,8 @@
         <p class="eyebrow">Membership</p>
         <h1>@Model.Heading</h1>
         <p class="summary">@Model.Summary</p>
-        <div class="pill">Supporter is appreciation, not extra access.</div>
-        <div class="pill">MyFirstBook: Free gets 1 book per month. Supporter gets 2.</div>
+        <div class="pill">Same Chummer app. Supporter helps cover the work.</div>
+        <div class="pill">Origin books: Free gets 1 per month. Supporter gets 2.</div>
         @if (usingSignedInAccount)
         {
             <div class="pill">Signed in as @(string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel)</div>
@@ -136,7 +136,7 @@
     {
         <section class="card card--accent">
             <h2>Try again later</h2>
-            <p class="note">The hosted billing route is not available on this host right now. Product access does not change while this is down.</p>
+            <p class="note">Billing is unavailable right now. Your Chummer access is unchanged.</p>
             <div class="action-row">
                 <a class="button" href="@Model.ManageMembershipHref">Back to account</a>
             </div>
@@ -213,14 +213,14 @@
                         {
                             <label>
                                 Account ID
-                                <input type="text" name="userId" value="@Model.UserId" autocomplete="username" placeholder="Required for supporter checkout">
+                                <input type="text" name="userId" value="@Model.UserId" autocomplete="username" placeholder="Required for checkout">
                             </label>
                         }
                         <label>
                             Email
                             <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
                         </label>
-                        <p class="field-help">This opens the external billing checkout. Signed-in Chummer accounts go through directly. Supporter currently unlocks no extra features beyond Free.</p>
+                        <p class="field-help">This opens checkout. Signed-in Chummer accounts continue directly. Supporter keeps the same app access and raises the Origin Book allowance to 2 per month.</p>
                         <div class="action-row">
                             <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
                             <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
