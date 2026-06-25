@@ -14,7 +14,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify-windows-installer-payloads.py"
 PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-download-bundle.sh"
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
-WINDOWS_INSTALLER_STUB = b"MZ" + (b"installer-stub" * 200)
+
+
+def _minimal_windows_exe() -> bytes:
+    data = bytearray(4096)
+    data[0:2] = b"MZ"
+    data[0x3C:0x40] = (0x80).to_bytes(4, "little")
+    data[0x80:0x84] = b"PE\0\0"
+    data[0x84:0x86] = (0x8664).to_bytes(2, "little")
+    data[0x86:0x88] = (3).to_bytes(2, "little")
+    return bytes(data)
+
+
+WINDOWS_INSTALLER_STUB = _minimal_windows_exe()
+WINDOWS_PLACEHOLDER_INSTALLER_STUB = b"MZ" + (b"installer-stub" * 200)
 
 
 def _write_bootstrap_payload(payload_path: Path, *, launch_executable: str = "Chummer.Avalonia.exe") -> bytes:
@@ -255,6 +268,40 @@ def test_windows_installer_verifier_rejects_bootstrap_payload_without_sidecar_me
 
     assert result.returncode != 0
     assert "bootstrap payload sidecar metadata is missing" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_placeholder_bootstrap_stub(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_PLACEHOLDER_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        ["python3", str(VERIFY_SCRIPT), "--files-dir", str(files_dir), "--manifest", str(manifest_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "installer has an invalid Windows PE header offset" in result.stderr
+    assert "installer still contains placeholder installer-stub bytes" in result.stderr
 
 
 def test_windows_installer_verifier_rejects_mismatched_bootstrap_sidecar_metadata(tmp_path: Path) -> None:

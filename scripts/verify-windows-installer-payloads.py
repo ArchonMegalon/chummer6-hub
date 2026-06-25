@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
 FOOTER_LENGTH = len(APPENDED_PAYLOAD_MAGIC) + 8
 WINDOWS_EXE_MAGIC = b"MZ"
+WINDOWS_PE_MAGIC = b"PE\0\0"
 ZIP_LOCAL_FILE_MAGIC = b"PK\x03\x04"
 
 DEFAULT_LAUNCH_EXECUTABLES = {
@@ -371,6 +372,26 @@ def validate_zip_payload(
     return failures
 
 
+def validate_windows_executable_structure(installer_path: Path) -> list[str]:
+    data = installer_path.read_bytes()
+    failures: list[str] = []
+    if not data.startswith(WINDOWS_EXE_MAGIC):
+        return ["installer does not start with Windows MZ executable magic"]
+    if len(data) < 0x40:
+        return ["installer is too small to contain a Windows PE header"]
+
+    pe_offset = int.from_bytes(data[0x3C:0x40], "little", signed=False)
+    if pe_offset <= 0 or pe_offset + len(WINDOWS_PE_MAGIC) > len(data):
+        failures.append("installer has an invalid Windows PE header offset")
+    elif data[pe_offset:pe_offset + len(WINDOWS_PE_MAGIC)] != WINDOWS_PE_MAGIC:
+        failures.append("installer is missing the Windows PE header signature")
+
+    if b"installer-stub" in data[:4096]:
+        failures.append("installer still contains placeholder installer-stub bytes")
+
+    return failures
+
+
 def verify_installer(
     installer_path: Path,
     files_dir: Path | None,
@@ -385,10 +406,7 @@ def verify_installer(
         return [f"installer does not exist: {installer_path}"]
     if installer_path.stat().st_size <= FOOTER_LENGTH:
         return [f"installer is too small to contain a payload-aware executable: {installer_path}"]
-    with installer_path.open("rb") as handle:
-        installer_magic = handle.read(2)
-    if installer_magic != WINDOWS_EXE_MAGIC:
-        failures.append("installer does not start with Windows MZ executable magic")
+    failures.extend(validate_windows_executable_structure(installer_path))
 
     candidate = read_appended_payload(installer_path)
     if candidate is None:
