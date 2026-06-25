@@ -415,93 +415,79 @@
         @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
         {
             <section class="release-shelf release-shelf--manual">
-                <div class="home-stream">
-                                <div class="home-stream__column">
-                                    <div class="home-stream__lead">
-                                        <p class="eyebrow">Access</p>
-                                        <h2 class="home-stream__title">What changed for you</h2>
-                                        <p class="home-stream__summary">Support, install return, and release follow-up stay grouped so the next step is clear.</p>
-                                    </div>
-                                    <div class="app-rail">
-                                        @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
-                                        {
-                                            <article class="app-rail__item">
-                                                    <span class="tag">Calm</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>No urgent follow-up</h3>
-                                                    <p>There is no urgent support update, setup step, or restore conflict right now.</p>
-                                                </div>
-                                                <a class="inline-link" href="/now">Open current release</a>
-                                            </article>
-                                        }
-                                        else
-                                        {
-                                            @foreach (var supportCase in releasedOrNotifiedCases)
-                                            {
-                                                <article class="app-rail__item">
-                                                    <span class="tag">@PublicText(supportCase.StageLabel)</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>@PublicText(supportCase.Case.Title)</h3>
-                                                        <p>@PublicText(supportCase.ClosureSummary) <span>Next: @PublicText(supportCase.NextSafeAction)</span></p>
-                                                        <p class="muted-copy">@PublicText(supportCase.ReleaseProgressSummary)</p>
-                                                        @if (!string.IsNullOrWhiteSpace(supportCase.AffectedInstallSummary))
-                                                        {
-                                                            <p class="muted-copy">@PublicText(supportCase.AffectedInstallSummary)</p>
-                                                        }
-                                                    </div>
-                                                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
-                                                </article>
-                                            }
-                                            @foreach (var receipt in recentReceipts)
-                                            {
-                                                <article class="app-rail__item">
-                                                    <span class="tag">Install</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>@HomeText(receipt.ArtifactLabel)</h3>
-                                                        <p>@HomeText(receipt.Version) on @HomeText(receipt.Channel) is still attached to this account if you need to reconnect the copy later.</p>
-                                                    </div>
-                                                    <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
-                                                </article>
-                                            }
-                                            @if (restoreConflicts > 0)
-                                            {
-                                                <article class="app-rail__item">
-                                                    <span class="tag">Return path</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>Campaign return needs confirmation</h3>
-                                                        <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
-                                                    </div>
-                                                    <a class="inline-link" href="/account/work">Open campaign return</a>
-                                                </article>
-                                            }
-                                        }
-                                    </div>
+                <div class="home-stream__lead">
+                    <p class="eyebrow">Access</p>
+                    <h2 class="home-stream__title">Your install path</h2>
+                    <p class="home-stream__summary">Current release, linked devices, and support follow-up stay here.</p>
+                </div>
+                <div class="app-rail">
+                    <article class="app-rail__item">
+                        <span class="tag">Release</span>
+                        <div class="app-rail__copy">
+                            <h3>Updated</h3>
+                            <p>Use this when you want the latest public build or need to check whether updating is worth it.</p>
+                        </div>
+                        <a class="inline-link" href="/now">Open release</a>
+                    </article>
+                    <article class="app-rail__item">
+                        <span class="tag">Device</span>
+                        <div class="app-rail__copy">
+                            <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s)" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
+                            <p>Reconnect, replace, or recover a local copy from one place.</p>
+                        </div>
+                        <a class="inline-link" href="/account/access">Open devices</a>
+                    </article>
+                    @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
+                    {
+                        <article class="app-rail__item">
+                            <span class="tag">Support</span>
+                            <div class="app-rail__copy">
+                                <h3>No urgent follow-up</h3>
+                                <p>No support update, setup step, or restore conflict needs attention.</p>
+                            </div>
+                            <a class="inline-link" href="/account/support">Open support</a>
+                        </article>
+                    }
+                    else
+                    {
+                        @foreach (var supportCase in releasedOrNotifiedCases)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">@PublicText(supportCase.StageLabel)</span>
+                                <div class="app-rail__copy">
+                                    <h3>@PublicText(supportCase.Case.Title)</h3>
+                                    <p>@PublicText(supportCase.ClosureSummary) <span>Next: @PublicText(supportCase.NextSafeAction)</span></p>
+                                    @if (!string.IsNullOrWhiteSpace(supportCase.AffectedInstallSummary))
+                                    {
+                                        <p class="muted-copy">@PublicText(supportCase.AffectedInstallSummary)</p>
+                                    }
                                 </div>
-
-                                <div class="home-stream__column">
-                                    <details class="details-drawer">
-                                        <summary>Release and device state</summary>
-                                        <div class="app-rail">
-                                            <article class="app-rail__item">
-                                                <span class="tag">Current release</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>Use the current release</h3>
-                                                    <p>See what changed, what is working today, and whether this is the right moment to install or update.</p>
-                                                </div>
-                                                <a class="inline-link" href="/now">Open current release</a>
-                                            </article>
-                                            <article class="app-rail__item">
-                                                <span class="tag">Device state</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                                    <p>Claim tickets, linked installs, release access, and device access state stay in one place instead of being rediscovered during the next install.</p>
-                                                </div>
-                                                <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
-                                            </article>
-                                        </div>
-                                        <p class="muted-copy">Need current release status before you install or return? <a class="inline-link" href="/now">Open current release</a>.</p>
-                                    </details>
+                                <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
+                            </article>
+                        }
+                        @foreach (var receipt in recentReceipts)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">Install</span>
+                                <div class="app-rail__copy">
+                                    <h3>@HomeText(receipt.ArtifactLabel)</h3>
+                                    <p>@HomeText(receipt.Version) on @HomeText(receipt.Channel) is attached to this account.</p>
                                 </div>
+                                <a class="inline-link" href="/account/access">Open devices</a>
+                            </article>
+                        }
+                        @if (restoreConflicts > 0)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">Campaign</span>
+                                <div class="app-rail__copy">
+                                    <h3>Return needs confirmation</h3>
+                                    <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
+                                </div>
+                                <a class="inline-link" href="/account/work">Open campaign</a>
+                            </article>
+                        }
+                    }
                 </div>
             </section>
         }
