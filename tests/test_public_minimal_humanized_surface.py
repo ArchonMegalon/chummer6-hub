@@ -413,7 +413,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller
-    assert '=> await ParticipatePage(cancellationToken).ConfigureAwait(false);' in controller
+    assert '=> await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);' in controller
     assert 'BuildParticipateSignInHref(string targetPath = "/participate")' in controller
     assert '? _chrome.BuildPublicChrome(' in controller
     assert ': _chrome.BuildAuthenticatedChrome(' in controller

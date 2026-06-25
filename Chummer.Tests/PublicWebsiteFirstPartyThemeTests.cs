@@ -29,7 +29,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
 
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("=> await ParticipatePage(cancellationToken).ConfigureAwait(false);", controller, StringComparison.Ordinal);
+        Assert.Contains("=> await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);", controller, StringComparison.Ordinal);
         Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
