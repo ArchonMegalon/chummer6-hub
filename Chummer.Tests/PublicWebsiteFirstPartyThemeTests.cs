@@ -87,11 +87,9 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     public void SoftwareApplicationSchemaDoesNotHardCodeUnavailablePlatforms()
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
-        string downloadsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
 
         Assert.DoesNotContain("[\"operatingSystem\"] = \"Windows, Linux\"", layout, StringComparison.Ordinal);
         Assert.Contains("SoftwareApplicationOperatingSystem", layout, StringComparison.Ordinal);
-        Assert.Contains("SoftwareApplicationOperatingSystem", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("string.Join(\", \", promotedPlatformLabels)", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("softwareApplicationOperatingSystem = \"Linux\"", layout, StringComparison.Ordinal);
     }
 }

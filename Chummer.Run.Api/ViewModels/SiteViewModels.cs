@@ -992,6 +992,7 @@ public sealed record FirstPartyParticipateBoardViewModel(
     string RoadmapHref,
     string SupportHref,
     string RetryHref,
+    string? SupporterHref,
     bool LoadedFromBoard);
 
 public sealed record FirstPartyParticipatePostViewModel(

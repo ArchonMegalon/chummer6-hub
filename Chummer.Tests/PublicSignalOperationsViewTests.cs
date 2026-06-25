@@ -240,8 +240,10 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("<base href=\"/participate/board/\" />", rewritten, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate/board/roadmap\"", rewritten, StringComparison.Ordinal);
         Assert.Contains("src=\"/participate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
-        Assert.Contains("https://media.productlift.dev/branding-stylesheets/theme.css", rewritten, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("https://cdn.productlift.dev/js/all.js", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/participate/provider-assets/media/branding-stylesheets/theme.css", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/participate/provider-assets/cdn/js/all.js", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://media.productlift.dev", rewritten, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://cdn.productlift.dev", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("https://media.chummer", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("https://cdn.chummer", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);

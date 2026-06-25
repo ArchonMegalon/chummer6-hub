@@ -2128,22 +2128,18 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(
-            string.Empty,
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+    {
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/partizipate").ConfigureAwait(false);
+        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
+    }
 
     [HttpGet("/participate")]
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(
-            string.Empty,
-            cancellationToken,
-            localOrigin: "/participate",
-            localBaseHref: "/participate/",
-            fallbackPath: "/participate").ConfigureAwait(false);
+    {
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/participate").ConfigureAwait(false);
+        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
+    }
 
     private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken, string currentPath = "/partizipate")
     {
@@ -2179,6 +2175,7 @@ public sealed class PublicLandingController : Controller
             RoadmapHref: "/roadmap",
             SupportHref: "/contact#support-intake",
             RetryHref: currentPath,
+            SupporterHref: ResolveParticipateSupporterHref(),
             LoadedFromBoard: loadedFromBoard);
     }
 
@@ -3322,23 +3319,7 @@ document.addEventListener('DOMContentLoaded', function () {
             failureReturnLabel: "Retry");
 
     private string? ResolveParticipateSupporterHref()
-    {
-        BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();
-        if (billing is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            _ = billing.GetPage();
-            return "/account/billing/supporter/start";
-        }
-        catch (BrilliantDirectoriesBillingUnavailableException)
-        {
-            return null;
-        }
-    }
+        => "/account/billing";
 
     private void CopySafeProxyHeaders(HttpResponseMessage response)
     {
