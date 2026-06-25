@@ -122,8 +122,12 @@ SURFACES = [
     {
         "path": "/partizipate",
         "required_texts": [
-            "Chummer.run",
-            "What do you want to see next?",
+            "Participate - Chummer.run",
+        ],
+        "required_html_texts": [
+            "<title>Participate - Chummer.run</title>",
+            "content=\"Short requests, clear bugs, useful ideas.\"",
+            "data-chummer-board-skin",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -137,8 +141,12 @@ SURFACES = [
     {
         "path": "/participate/board",
         "required_texts": [
-            "Chummer.run",
-            "What do you want to see next?",
+            "Participate - Chummer.run",
+        ],
+        "required_html_texts": [
+            "<title>Participate - Chummer.run</title>",
+            "content=\"Short requests, clear bugs, useful ideas.\"",
+            "data-chummer-board-skin",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -299,6 +307,7 @@ def verify(base_url: str) -> dict[str, Any]:
         status_code, body, final_url, redirect_location, redirect_chain = fetch(url, base)
         flattened = flatten_text(body) if status_code == 200 else body
         missing = [token for token in surface.get("required_texts", []) if token not in flattened]
+        missing_html = [token for token in surface.get("required_html_texts", []) if token not in body]
         forbidden = [token for token in surface.get("forbidden_texts", []) if token in flattened]
         final_url_prefix = str(surface.get("required_final_url_prefix") or "")
         final_url_matches = True
@@ -331,6 +340,8 @@ def verify(base_url: str) -> dict[str, Any]:
             failures.append(f"{path}: redirected off-origin to {redirect_target_url}")
         if missing:
             failures.append(f"{path}: missing required text: {', '.join(missing)}")
+        if missing_html:
+            failures.append(f"{path}: missing required html text: {', '.join(missing_html)}")
         if forbidden:
             failures.append(f"{path}: contains forbidden text: {', '.join(forbidden)}")
 
@@ -345,12 +356,14 @@ def verify(base_url: str) -> dict[str, Any]:
                 "status_code": status_code,
                 "redirect_chain": redirect_chain,
                 "required_texts": surface.get("required_texts", []),
+                "required_html_texts": surface.get("required_html_texts", []),
                 "missing_required_texts": missing,
+                "missing_required_html_texts": missing_html,
                 "forbidden_texts": surface.get("forbidden_texts", []),
                 "forbidden_hits": forbidden,
                 "required_final_url_prefix": final_url_prefix or None,
                 "final_url_matches": final_url_matches,
-                "status": "pass" if status_code == 200 and not missing and not forbidden and final_url_matches else "fail",
+                "status": "pass" if status_code == 200 and not missing and not missing_html and not forbidden and final_url_matches else "fail",
             }
         )
 

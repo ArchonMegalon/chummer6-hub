@@ -74,7 +74,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Chummer.run What do you want to see next?"
+                b"<title>Participate - Chummer.run</title>"
+                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
+                b"<style data-chummer-board-skin></style>"
                 b"</body></html>"
             )
             return
@@ -85,8 +87,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Chummer.run "
-                b"What do you want to see next?"
+                b"<title>Participate - Chummer.run</title>"
+                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
+                b"<style data-chummer-board-skin></style>"
                 b"</body></html>"
             )
             return
@@ -161,7 +164,9 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Ctrl K", board_surface["forbidden_texts"])
         self.assertIn("×", board_surface["forbidden_texts"])
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
-        self.assertIn("What do you want to see next?", board_surface["required_texts"])
+        self.assertIn("Participate - Chummer.run", board_surface["required_texts"])
+        self.assertIn("<title>Participate - Chummer.run</title>", board_surface["required_html_texts"])
+        self.assertIn("data-chummer-board-skin", board_surface["required_html_texts"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()

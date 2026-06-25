@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 'use strict';
 
-const { chromium } = require('playwright');
-
 const args = process.argv.slice(2);
 let baseUrl = process.env.CHUMMER_PUBLIC_BASE_URL || 'https://chummer.run';
 for (let index = 0; index < args.length; index += 1) {
@@ -37,41 +35,70 @@ const forbidden = [
   /\bSend unique NPCs\b/i,
 ];
 
+const requiredHtml = [
+  '<title>Participate - Chummer.run</title>',
+  'content="Short requests, clear bugs, useful ideas."',
+  'data-chummer-board-skin',
+  'data-chummer-home-link-patch',
+];
+
+function extractVisibleText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<template[\s\S]*?<\/template>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 (async () => {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForSelector('text=What should Chummer do next?', { timeout: 10000 });
-    const text = await page.locator('body').innerText({ timeout: 10000 });
-    const title = await page.title();
-    const failures = forbidden
-      .filter((pattern) => pattern.test(text))
-      .map((pattern) => pattern.toString());
-    if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
-      failures.push(`title:${title}`);
-    }
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'chummer-partizipate-copy-gate/1',
+      'Accept': 'text/html,application/xhtml+xml',
+    },
+  });
+  const html = await response.text();
+  const text = extractVisibleText(html);
+  const title = (html.match(/<title>(.*?)<\/title>/i) || [])[1] || '';
+  const failures = forbidden
+    .filter((pattern) => pattern.test(text))
+    .map((pattern) => pattern.toString());
 
-    if (failures.length > 0) {
-      console.error(JSON.stringify({
-        status: 'fail',
-        url,
-        failures,
-        text: text.slice(0, 2000),
-      }, null, 2));
-      process.exitCode = 1;
-      return;
+  requiredHtml.forEach((needle) => {
+    if (!html.includes(needle)) {
+      failures.push(`missing-html:${needle}`);
     }
+  });
 
-    console.log(JSON.stringify({
-      status: 'pass',
-      url,
-      checked_forbidden_patterns: forbidden.length,
-      title,
-    }));
-  } finally {
-    await browser.close();
+  if (!response.ok) {
+    failures.push(`status:${response.status}`);
   }
+  if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
+    failures.push(`title:${title}`);
+  }
+
+  if (failures.length > 0) {
+    console.error(JSON.stringify({
+      status: 'fail',
+      url,
+      failures,
+      text: text.slice(0, 2000),
+      title,
+    }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(JSON.stringify({
+    status: 'pass',
+    url,
+    checked_forbidden_patterns: forbidden.length,
+    checked_required_html: requiredHtml.length,
+    title,
+  }));
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
