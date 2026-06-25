@@ -3180,6 +3180,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rewritten = RemoveHostedBoardAuthLinks(rewritten);
         rewritten = RemoveHostedBoardProviderChrome(rewritten);
         rewritten = ReplaceHostedBoardVisibleBrandText(rewritten);
+        rewritten = rewritten.Replace("productlift-", "board-", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = RewriteHostedBoardAssetHosts(rewritten);
