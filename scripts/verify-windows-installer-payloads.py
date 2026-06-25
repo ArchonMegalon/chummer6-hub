@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
@@ -53,6 +54,20 @@ def normalize_zip_name(value: str) -> str:
 
 def is_truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def is_sha256_hex(value: str) -> bool:
+    return len(value) == 64 and all(char in "0123456789abcdef" for char in value.lower())
+
+
+def url_file_name(value: str) -> str:
+    parsed = urlparse(value)
+    return Path(parsed.path).name
+
+
+def is_https_download_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme.lower() == "https" and bool(parsed.netloc)
 
 
 def is_windows_installer_name(name: str) -> bool:
@@ -205,6 +220,25 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
     failures: list[str] = []
     if manifest_row.installer_mode == "bootstrap" and candidate.mode != "bootstrap":
         failures.append("manifest says installerMode=bootstrap but the payload was not a sidecar payload")
+    if manifest_row.installer_mode == "bootstrap":
+        if not manifest_row.payload_file_name:
+            failures.append("manifest installerMode=bootstrap is missing payloadFileName")
+        if not manifest_row.payload_download_url:
+            failures.append("manifest installerMode=bootstrap is missing payloadDownloadUrl")
+        elif not is_https_download_url(manifest_row.payload_download_url):
+            failures.append("manifest installerMode=bootstrap payloadDownloadUrl must be an absolute HTTPS URL")
+        if not manifest_row.payload_sha256:
+            failures.append("manifest installerMode=bootstrap is missing payloadSha256")
+        elif not is_sha256_hex(manifest_row.payload_sha256):
+            failures.append("manifest installerMode=bootstrap payloadSha256 is not a 64-character hex digest")
+        if manifest_row.payload_size_bytes is None or manifest_row.payload_size_bytes <= 0:
+            failures.append("manifest installerMode=bootstrap is missing payloadSizeBytes")
+        if manifest_row.payload_file_name and manifest_row.payload_download_url:
+            download_file_name = url_file_name(manifest_row.payload_download_url)
+            if download_file_name != manifest_row.payload_file_name:
+                failures.append(
+                    f"manifest payloadDownloadUrl file name {download_file_name or '<empty>'} does not match payloadFileName {manifest_row.payload_file_name}"
+                )
     if manifest_row.installer_mode == "bundled" and candidate.mode != "bundled":
         failures.append("manifest says installerMode=bundled but the payload was not appended")
     if candidate.mode == "bootstrap":

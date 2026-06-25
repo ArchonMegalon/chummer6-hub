@@ -38,6 +38,7 @@ HTML_ROUTES = [
     "/contact",
     "/participate",
     "/partizipate",
+    "/participate/board",
     "/karma-forge",
     "/participate/karma-forge",
     "/participate/karma-forge/submitted/sample-submission-id",

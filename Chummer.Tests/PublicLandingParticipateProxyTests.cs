@@ -4,6 +4,7 @@ using Chummer.Run.Api.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -23,10 +24,51 @@ public sealed class PublicLandingParticipateProxyTests
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Public board temporarily unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Participate is not loading", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("href=\"/roadmap\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ParticipateBoardProxyReturnsFirstPartyFallbackWhenHostedBoardShowsProviderError()
+    {
+        var controller = CreateController(new HostedBoardErrorHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Participate is not loading", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Use Support for account, install, or private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("Could not load posts", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("support@productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ParticipateBoardProxyRemovesHostedProviderAuthAndSearchChrome()
+    {
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Contains("Chummer Participate", html, StringComparison.Ordinal);
+        Assert.Contains("What do you want to see next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Ctrl K", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Search<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Sign up<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -123,7 +165,10 @@ public sealed class PublicLandingParticipateProxyTests
         {
             ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext()
+                HttpContext = new DefaultHttpContext
+                {
+                    RequestServices = new ServiceCollection().BuildServiceProvider()
+                }
             }
         };
     }
@@ -157,6 +202,83 @@ public sealed class PublicLandingParticipateProxyTests
                     Content = new StringContent("{\"ok\":true}", Encoding.UTF8, "application/json")
                 };
                 response.Headers.TryAddWithoutValidation("Set-Cookie", "provider_session=bad");
+                return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class HostedBoardErrorHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+            => new(new HostedBoardErrorHandler());
+
+        private sealed class HostedBoardErrorHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                const string html = """
+<!doctype html>
+<html lang="en">
+<body>
+<main>
+  <h1>Something went wrong on our side.</h1>
+  <p>Could not load posts. Please try again or contact support@example.invalid.</p>
+</main>
+</body>
+</html>
+""";
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(html, Encoding.UTF8, "text/html")
+                };
+                return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class HostedBoardChromeHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+            => new(new HostedBoardChromeHandler());
+
+        private sealed class HostedBoardChromeHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                const string html = """
+<!doctype html>
+<html lang="en">
+<head><title>What do you want to see next?</title></head>
+<body>
+<nav>
+  <ul class="navbar-nav navbar-right ml-auto align-items-center">
+    <li class="nav-item mr-2 d-none d-md-block">
+      <a class="nav-link p-0" href="#" id="global-search-trigger">
+        <span class="global-search-trigger-btn">
+          <span>Search</span>
+          <kbd class="global-search-trigger-kbd">Ctrl K</kbd>
+        </span>
+      </a>
+    </li>
+    <li class="nav-item mr-2 d-block d-md-none">
+      <a class="nav-link" href="#" id="global-search-trigger-mobile">Search</a>
+    </li>
+    <li class="nav-item pl-0">
+      <a class="nav-link pl-0" href="/register" rel="nofollow" id="menubar_signup" title="Sign up">Sign up</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/login" rel="nofollow" id="menubar_login" title="Log in">Log in</a>
+    </li>
+  </ul>
+</nav>
+<main><h1>What do you want to see next?</h1></main>
+</body>
+</html>
+""";
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(html, Encoding.UTF8, "text/html")
+                };
                 return Task.FromResult(response);
             }
         }

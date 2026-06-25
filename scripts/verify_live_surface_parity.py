@@ -106,9 +106,9 @@ SURFACES = [
         "path": "/participate",
         "required_texts": [
             "Participate",
-            "Public requests and roadmap votes.",
+            "Requests, votes, and shipped work.",
             "Roadmap",
-            "Help",
+            "Support",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -123,9 +123,9 @@ SURFACES = [
         "path": "/partizipate",
         "required_texts": [
             "Participate",
-            "Public requests and roadmap votes.",
+            "Requests, votes, and shipped work.",
             "Roadmap",
-            "Help",
+            "Support",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -139,9 +139,23 @@ SURFACES = [
     {
         "path": "/participate/board",
         "required_texts": [
+            "Chummer Participate",
+            "Requests, votes, and shipped work.",
+            "Roadmap",
+            "Support",
             "What do you want to see next?",
         ],
         "forbidden_texts": [
+            "ProductLift",
+            "productlift.dev",
+            "Log in",
+            "Sign up",
+            "Sign in",
+            "Search",
+            "Ctrl K",
+            "Something went wrong",
+            "Could not load posts",
+            "Network error while loading tab configuration",
             "/auth/google/start?next=",
             "accounts.google.com",
         ],
@@ -231,7 +245,13 @@ def fetch(url: str, base_url: str) -> tuple[int | None, str, str, str | None, li
     current_url = url
 
     for _ in range(5):
-        request = urllib.request.Request(current_url, headers={"User-Agent": "chummer-live-surface-parity/1"})
+        request = urllib.request.Request(
+            current_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36 chummer-live-surface-parity/1",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        )
         try:
             with opener.open(request, timeout=30) as response:
                 body = response.read().decode("utf-8", errors="replace")

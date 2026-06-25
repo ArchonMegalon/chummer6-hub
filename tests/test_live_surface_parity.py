@@ -63,7 +63,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Participate Public requests and roadmap votes. Roadmap Help"
+                b"Participate Requests, votes, and shipped work. Roadmap Support"
                 b"</body></html>"
             )
             return
@@ -72,7 +72,12 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(b"<html><body>What do you want to see next?</body></html>")
+            self.wfile.write(
+                b"<html><body>"
+                b"Chummer Participate Requests, votes, and shipped work. Roadmap Support "
+                b"What do you want to see next?"
+                b"</body></html>"
+            )
             return
 
         if self.path == "/ledger":
@@ -132,6 +137,19 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual(200, board["status_code"])
         self.assertFalse(board["cross_origin_redirect"])
         self.assertEqual([], board["missing_required_texts"])
+        self.assertEqual([], board["forbidden_hits"])
+
+    def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:
+        module = load_module()
+        board_surface = next(item for item in module.SURFACES if item["path"] == "/participate/board")
+
+        self.assertIn("ProductLift", board_surface["forbidden_texts"])
+        self.assertIn("Log in", board_surface["forbidden_texts"])
+        self.assertIn("Sign up", board_surface["forbidden_texts"])
+        self.assertIn("Search", board_surface["forbidden_texts"])
+        self.assertIn("Ctrl K", board_surface["forbidden_texts"])
+        self.assertIn("Could not load posts", board_surface["forbidden_texts"])
+        self.assertIn("Requests, votes, and shipped work.", board_surface["required_texts"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()

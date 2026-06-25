@@ -127,18 +127,27 @@ def test_participation_external_redirect_fails_because_participate_is_first_part
 
     class FakeSession:
         def get(self, url: str, timeout: int, allow_redirects: bool):
-            assert url == "https://chummer.run/partizipate"
+            assert url == "https://chummer.run/participate"
             assert timeout == 10
             assert allow_redirects is False
             return FakeResponse()
 
-    result = module.verify_route(FakeSession(), "https://chummer.run", "/partizipate")
+    result = module.verify_route(FakeSession(), "https://chummer.run", "/participate")
 
     assert result.success is False
     assert result.redirect_external is True
     assert result.redirect_url == "https://chummer6.productlift.dev"
     assert result.detail == "route redirects outside Chummer from an unapproved public path"
     assert result.forbidden_hits == []
+
+
+def test_public_copy_leak_gate_scans_participate_board_route():
+    module = load_module()
+
+    assert "/participate" in module.DEFAULT_ROUTES
+    assert "/partizipate" in module.DEFAULT_ROUTES
+    assert "/participate/board" in module.DEFAULT_ROUTES
+    assert module.forbidden_hits("ProductLift Log in Sign up Could not load posts")
 
 
 def test_unapproved_external_redirect_fails_public_copy_gate():
@@ -199,3 +208,9 @@ def test_provider_scanner_uses_visible_html_text_not_script_or_href_details():
 
     assert module.scan_text("html", "/", module.visible_text(markup)) == []
     assert module.scan_text("html", "/", module.visible_text("<main>Open ProductLift</main>"))
+
+
+def test_provider_scanner_checks_participate_board_route():
+    module = load_forbidden_scan_module()
+
+    assert "/participate/board" in module.HTML_ROUTES

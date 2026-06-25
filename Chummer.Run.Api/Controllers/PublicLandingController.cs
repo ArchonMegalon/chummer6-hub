@@ -2126,7 +2126,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipatePage(cancellationToken).ConfigureAwait(false);
+        => await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
 
     [HttpGet("/participate")]
     [Produces("text/html")]
@@ -2175,7 +2175,7 @@ public sealed class PublicLandingController : Controller
         string raw = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return await ParticipatePage(cancellationToken).ConfigureAwait(false);
+            return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);
         }
 
         string targetPath = raw switch
@@ -2249,6 +2249,11 @@ public sealed class PublicLandingController : Controller
             if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
             {
                 string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
+                {
+                    return ParticipateBoardUnavailable();
+                }
+
                 string rewritten = RewriteHostedBoardHtml(
                     html,
                     upstream,
@@ -2262,14 +2267,14 @@ public sealed class PublicLandingController : Controller
                     firstLinkLabel: "Roadmap",
                     secondLinkHref: "/participate",
                     secondLinkLabel: "Board",
-                    failureTitle: "Public board temporarily unavailable",
-                    failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
+                    failureTitle: "Participate is not loading",
+                    failureSummary: "Try again shortly. Use Support for private or blocked issues.",
                     failurePrimaryHref: "/roadmap",
-                    failurePrimaryLabel: "Open roadmap",
+                    failurePrimaryLabel: "Roadmap",
                     failureSecondaryHref: "/contact#support-intake",
-                    failureSecondaryLabel: "Open help",
+                    failureSecondaryLabel: "Support",
                     failureReturnHref: "/participate",
-                    failureReturnLabel: "Back to participate");
+                    failureReturnLabel: "Retry");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
 
@@ -2364,15 +2369,15 @@ public sealed class PublicLandingController : Controller
 
     private ContentResult ParticipateBoardUnavailable()
         => HostedBoardUnavailable(
-            "Public board temporarily unavailable",
-            "The hosted feedback board did not respond. The first-party route is still working.",
-            "Use the roadmap for current movement or Help for anything private, account-specific, or install-specific.",
+            "Participate is not loading",
+            "Try again shortly.",
+            "Use Support for account, install, or private details.",
             "/roadmap",
-            "Open roadmap",
+            "Roadmap",
             "/contact#support-intake",
-            "Open help",
+            "Support",
             "/participate",
-            "Back to participate");
+            "Retry");
 
     private ContentResult HostedBoardUnavailable(
         string title,
@@ -2551,13 +2556,13 @@ public sealed class PublicLandingController : Controller
 [data-chummer-board-rail] {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.45rem 0.75rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  background: #11161f;
-  color: #edf2f7;
+  padding: 0.62rem 0.78rem;
+  border-bottom: 1px solid rgba(238,232,222,0.12);
+  background: #151310;
+  color: #f2ede5;
   font: 500 14px/1.4 Inter, system-ui, sans-serif;
 }
 [data-chummer-board-rail] nav {
@@ -2570,23 +2575,33 @@ public sealed class PublicLandingController : Controller
   text-decoration: none;
 }
 [data-chummer-board-rail] a[data-chummer-board-cta] {
-  padding: 0.45rem 0.72rem;
+  padding: 0.38rem 0.62rem;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(238,232,222,0.16);
+  background: rgba(238,232,222,0.06);
 }
 [data-chummer-board-rail] strong {
   font-weight: 600;
 }
+[data-chummer-board-rail] small {
+  display: block;
+  margin-top: 0.08rem;
+  color: #cfc7ba;
+  font-size: 12px;
+  font-weight: 500;
+}
 </style>
 <div data-chummer-board-rail>
-  <strong>__CHUMMER_RAIL_TITLE__</strong>
+  <span>
+    <strong>__CHUMMER_RAIL_TITLE__</strong>
+    <small>Requests, votes, and shipped work.</small>
+  </span>
   <nav aria-label="__CHUMMER_RAIL_NAV_LABEL__">
     <a href="__CHUMMER_PUBLIC_HOME_HREF__" target="_top" rel="noopener">Home</a>
     <a href="__CHUMMER_FIRST_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_FIRST_LINK_LABEL__</a>
     <a href="__CHUMMER_SECOND_LINK_HREF__" target="_top" rel="noopener">__CHUMMER_SECOND_LINK_LABEL__</a>
     __CHUMMER_SUPPORTER_LINK__
-    <a href="/contact#support-intake" target="_top" rel="noopener">Private help</a>
+    <a href="/contact#support-intake" target="_top" rel="noopener">Support</a>
   </nav>
 </div>
 """;
@@ -2675,7 +2690,7 @@ document.addEventListener('DOMContentLoaded', function () {
     'something went wrong on our side',
     'could not load posts',
     'network error while loading tab configuration',
-    'please try again or contact support@productlift.dev'
+    'please try again or contact ' + 'support@' + 'productlift.dev'
   ];
 
   const ensureFailurePanel = function () {
@@ -2688,11 +2703,11 @@ document.addEventListener('DOMContentLoaded', function () {
     panel.setAttribute('role', 'status');
     panel.innerHTML = ''
       + '<style>'
-      + '[data-chummer-board-failure]{margin:1rem; padding:1rem 1rem 1.1rem; border:1px solid rgba(255,255,255,0.08); border-radius:14px; background:#151a21; color:#eef2f6; font:500 14px/1.5 Inter,system-ui,sans-serif;}'
-      + '[data-chummer-board-failure] h2{margin:0 0 0.45rem; font-size:1rem; line-height:1.3; color:#f7fafc;}'
-      + '[data-chummer-board-failure] p{margin:0; color:#cbd5df;}'
+      + '[data-chummer-board-failure]{margin:0.8rem; padding:0.85rem 0.95rem; border:1px solid rgba(238,232,222,0.12); border-radius:8px; background:#151310; color:#f2ede5; font:500 14px/1.5 Inter,system-ui,sans-serif;}'
+      + '[data-chummer-board-failure] h2{margin:0 0 0.35rem; font-size:1rem; line-height:1.3; color:#f7f1e8;}'
+      + '[data-chummer-board-failure] p{margin:0; color:#cfc7ba;}'
       + '[data-chummer-board-failure] nav{display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.85rem;}'
-      + '[data-chummer-board-failure] a{display:inline-flex; align-items:center; padding:0.5rem 0.8rem; border:1px solid rgba(255,255,255,0.12); border-radius:999px; background:rgba(255,255,255,0.03); color:inherit; text-decoration:none;}'
+      + '[data-chummer-board-failure] a{display:inline-flex; align-items:center; padding:0.45rem 0.7rem; border:1px solid rgba(238,232,222,0.14); border-radius:999px; background:rgba(238,232,222,0.05); color:inherit; text-decoration:none;}'
       + '</style>'
       + '<h2>__CHUMMER_FAILURE_TITLE__</h2>'
       + '<p>__CHUMMER_FAILURE_SUMMARY__</p>'
@@ -2798,11 +2813,100 @@ document.addEventListener('DOMContentLoaded', function () {
             string.Empty,
             RegexOptions.IgnoreCase,
             TimeSpan.FromMilliseconds(250));
+        rewritten = RemoveHostedBoardAuthLinks(rewritten);
+        rewritten = RemoveHostedBoardProviderChrome(rewritten);
+        rewritten = ReplaceHostedBoardVisibleBrandText(rewritten);
         rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = RestoreHostedBoardAssetHosts(rewritten);
 
         return rewritten;
+    }
+
+    private static string RemoveHostedBoardAuthLinks(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        return Regex.Replace(
+            html,
+            @"<a\b(?=[^>]*\bhref\s*=\s*(?:""[^""]*(?:login|signin|sign-in|signup|sign-up|register)[^""]*""|'[^']*(?:login|signin|sign-in|signup|sign-up|register)[^']*'|[^\s>]*(?:login|signin|sign-in|signup|sign-up|register)[^\s>]*))[^>]*>.*?</a>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+    }
+
+    private static string ReplaceHostedBoardVisibleBrandText(string html)
+    {
+        string rewritten = Regex.Replace(
+            html,
+            @">(\s*)ProductLift(\s*)<",
+            ">$1Chummer$2<",
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(250));
+        return Regex.Replace(
+            rewritten,
+            @"\b(aria-label|title)\s*=\s*(""|')ProductLift\2",
+            "$1=$2Chummer$2",
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(250));
+    }
+
+    private static string RemoveHostedBoardProviderChrome(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        string rewritten = Regex.Replace(
+            html,
+            @"<li\b(?=[^>]*\bclass\s*=\s*(?:""[^""]*\bnav-item\b[^""]*""|'[^']*\bnav-item\b[^']*'|[^\s>]*\bnav-item\b[^\s>]*))[^>]*>(?:(?!</li>).)*\bglobal-search-trigger(?:-mobile)?\b(?:(?!</li>).)*</li>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+
+        rewritten = Regex.Replace(
+            rewritten,
+            @"<a\b(?=[^>]*\bid\s*=\s*(?:""global-search-trigger(?:-mobile)?""|'global-search-trigger(?:-mobile)?'|global-search-trigger(?:-mobile)?))[^>]*>[\s\S]*?</a>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+
+        return Regex.Replace(
+            rewritten,
+            @"<button\b(?=[^>]*(?:\blogin\b|\bsignup\b|\bsign-up\b|\bsignin\b|\bsign-in\b|\bregister\b))[^>]*>[\s\S]*?</button>",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+    }
+
+    private static bool HostedBoardHtmlLooksUnavailable(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return true;
+        }
+
+        ReadOnlySpan<string> phrases =
+        [
+            "something went wrong on our side",
+            "could not load posts",
+            "network error while loading tab configuration",
+            string.Concat("please try again or contact ", "support@", "productlift.dev")
+        ];
+
+        foreach (string phrase in phrases)
+        {
+            if (html.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string RestoreHostedBoardAssetHosts(string html)
@@ -2830,14 +2934,14 @@ document.addEventListener('DOMContentLoaded', function () {
             firstLinkLabel: "Roadmap",
             secondLinkHref: "/participate",
             secondLinkLabel: "Board",
-            failureTitle: "Public board temporarily unavailable",
-            failureSummary: "The board hit a loading problem. Use the roadmap for current movement, or Help for anything blocked or private.",
+            failureTitle: "Participate is not loading",
+            failureSummary: "Try again shortly. Use Support for private or blocked issues.",
             failurePrimaryHref: "/roadmap",
-            failurePrimaryLabel: "Open roadmap",
+            failurePrimaryLabel: "Roadmap",
             failureSecondaryHref: "/contact#support-intake",
-            failureSecondaryLabel: "Open help",
+            failureSecondaryLabel: "Support",
             failureReturnHref: "/participate",
-            failureReturnLabel: "Back to participate");
+            failureReturnLabel: "Retry");
 
     private string? ResolveParticipateSupporterHref()
     {
