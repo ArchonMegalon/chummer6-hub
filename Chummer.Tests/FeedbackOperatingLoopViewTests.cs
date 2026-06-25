@@ -21,8 +21,10 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/partizipate\");", controller, StringComparison.Ordinal);
+        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
+        Assert.Contains("localBaseHref: \"/partizipate/\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
         Assert.Contains("partizipate-board", partizipateView, StringComparison.Ordinal);
         Assert.DoesNotContain("iframe", partizipateView, StringComparison.OrdinalIgnoreCase);

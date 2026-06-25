@@ -29,8 +29,10 @@ public sealed class PublicWebsiteFirstPartyThemeTests
 
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/partizipate\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Partizipate.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
         Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
@@ -45,7 +47,6 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("new RegExp('\\\\bWhat do you want' + ' to see next\\\\?'", controller, StringComparison.Ordinal);
         Assert.Contains("text === 'search' || text === 'ctrl k'", controller, StringComparison.Ordinal);
         Assert.Contains("partizipate-board", partizipateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("iframe", partizipateView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProductLift", partizipateView, StringComparison.OrdinalIgnoreCase);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
@@ -75,8 +76,8 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("Model.PublicRequests.Count > 0", roadmapView, StringComparison.Ordinal);
         Assert.Contains("What people ask for", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Model.PublicRequestCount public requests", roadmapView, StringComparison.Ordinal);
-        Assert.DoesNotContain("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
-        Assert.DoesNotContain("<iframe", roadmapView, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("<iframe", roadmapView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Roadmap guidance", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("Quick links", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("planning surface", roadmapView, StringComparison.OrdinalIgnoreCase);

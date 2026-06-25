@@ -80,7 +80,7 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
-    public async Task ParticipatePageRendersFirstPartyBoardWithoutHostedIframe()
+    public async Task ParticipatePageRedirectsToVisiblePartizipateUrl()
     {
         var controller = CreateController(new HostedBoardPostsHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -89,63 +89,46 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.LoadedFromBoard);
-        Assert.Equal("/participate", model.RetryHref);
-        Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Live requests", model.StatusLabel);
-        Assert.Equal(1, model.TotalRequestCount);
-        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
-        FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
-        Assert.Equal("Mobile companion app for dice rolling", post.Title);
-        Assert.DoesNotContain("AI-powered", post.Summary, StringComparison.OrdinalIgnoreCase);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/partizipate", redirect.Url);
     }
 
     [Fact]
-    public async Task PartizipateAliasRendersFirstPartyBoardAtTypoUrl()
+    public async Task PartizipateAliasHostsRewrittenBoardAtTypoUrl()
     {
-        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.LoadedFromBoard);
-        Assert.Equal("/partizipate", model.RetryHref);
-        Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Live requests", model.StatusLabel);
-        Assert.Equal(1, model.TotalRequestCount);
-        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
-        FirstPartyParticipatePostViewModel post = Assert.Single(model.Posts);
-        Assert.Equal("Mobile companion app for dice rolling", post.Title);
-        Assert.Equal("Open", post.Status);
-        Assert.Equal("Request", post.Category);
-        Assert.DoesNotContain("AI-powered", post.Summary, StringComparison.OrdinalIgnoreCase);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/partizipate/", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://ideas.example.test", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ProductLift", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PartizipateCatchAllEmptyPathRendersFirstPartyBoard()
+    public async Task PartizipateCatchAllEmptyPathHostsRewrittenBoard()
     {
-        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipateBoardProxyLegacyAlias(string.Empty, CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.LoadedFromBoard);
-        Assert.Equal("/partizipate", model.RetryHref);
-        Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Live requests", model.StatusLabel);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/partizipate/", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
