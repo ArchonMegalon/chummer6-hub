@@ -8,7 +8,6 @@
         "access" => "Account · Installs",
         "work" => "Account · Campaigns",
         "settings" => "Account · Billing",
-        "advanced" => "Account · Billing",
         _ => "Account"
     };
     var sectionTitle = Model.CurrentSection switch
@@ -18,7 +17,6 @@
         "access" => "Installs",
         "work" => "Campaigns",
         "settings" => "Billing",
-        "advanced" => "Billing",
         _ => "Account"
     };
     var sectionCopy = Model.CurrentSection switch
@@ -28,7 +26,6 @@
         "access" => "See installed copies, pending setup, and install help without the internal machinery.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
-        "advanced" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
         _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account surface."
     };
     ViewData["Title"] = pageTitle;
@@ -119,7 +116,6 @@
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
     var showParticipationSettings = showParticipationPage || showSettingsSection;
-    var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var showInlineAccountStatus = showAccessSection || showSupportSection;
     var showAccountStatusDrawer = Model.SignedInTrustStatus is not null && !showInlineAccountStatus;
     var selectedSupportCase = Model.SelectedSupportCase;
@@ -639,7 +635,7 @@
         </div>
     }
 
-    @if (showProfileSection || showSettingsSection || showAdvancedSection)
+    @if (showProfileSection || showSettingsSection)
     {
         <section class="editorial-block">
             <details class="details-drawer">
@@ -4666,39 +4662,6 @@
             }
         </div>
     </div>
-
-    @if (showAdvancedSection)
-    {
-    <details class="details-drawer">
-        <summary>Advanced account details</summary>
-        <dl class="detail-grid detail-grid--account">
-            <div>
-                <dt>Hub account id</dt>
-                <dd class="mono-receipt">@Model.User.UserId</dd>
-            </div>
-            <div>
-                <dt>Primary auth</dt>
-                <dd>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</dd>
-            </div>
-            <div>
-                <dt>Linked identities</dt>
-                <dd>@Model.Links.LinkedIdentities.Count</dd>
-            </div>
-            <div>
-                <dt>Linked channels</dt>
-                <dd>@Model.Links.ChannelLinks.Count</dd>
-            </div>
-            <div>
-                <dt>Recovery status</dt>
-                <dd>@PublicText(Model.Links.RecoveryPosture)</dd>
-            </div>
-            <div>
-                <dt>Follow horizons</dt>
-                <dd>@(Model.Experience.FollowHorizons ? "Yes" : "No")</dd>
-            </div>
-        </dl>
-    </details>
-    }
 </section>
 
 @section Scripts {

@@ -1512,7 +1512,6 @@ public sealed class AccountsController : Controller
             "access" => ("Account · Installs", "Linked installs, access rights, and claim handoff in one calmer route."),
             "work" => ("Account · Campaigns", "Campaign return and table context when you explicitly need them."),
             "settings" => ("Account · Billing", "Membership and billing are handled by the billing provider."),
-            "advanced" => ("Account · Billing", "Membership and billing are handled by the billing provider."),
             _ => ("Account", "Profile, sign-in methods, recovery posture, and billing entry points.")
         };
 

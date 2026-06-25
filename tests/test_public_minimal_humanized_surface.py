@@ -3110,3 +3110,22 @@ def test_minimal_landing_does_not_build_signed_in_or_campaign_surfaces_for_guest
         "BuildLandingOpenRailAsync",
     ):
         assert forbidden not in action
+
+
+def test_account_page_does_not_expose_fake_advanced_settings_surface() -> None:
+    account_view = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+    controller = read("Chummer.Run.Api/Controllers/AccountsController.cs")
+
+    assert '"settings" => "Billing"' in account_view
+    assert '"advanced" => "settings"' in controller
+    assert 'new SectionLinkViewModel("billing", "Billing", "/account/billing", false)' in controller
+
+    for forbidden in (
+        "showAdvancedSection",
+        "Advanced account details",
+        '"advanced" => "Account · Billing"',
+        '"advanced" => "Billing"',
+        "SectionLinkViewModel(\"advanced\"",
+    ):
+        assert forbidden not in account_view
+        assert forbidden not in controller
