@@ -170,11 +170,23 @@ def materialize(
 
                 anonymous = requests.Session()
                 anon_detail = get(anonymous, owner_url)
+                anon_read = get(anonymous, read_route)
                 anon_listen = get(anonymous, listen_route)
+                anon_book = get(anonymous, book_route)
+                anon_cover = get(anonymous, cover_route)
+                anon_video = get(anonymous, video_route)
                 require(anon_detail.status_code in {302, 303, 307, 308}, "anonymous detail did not redirect", failures)
                 require("/login?next=" in anon_detail.headers.get("location", ""), "anonymous detail redirect missing login next", failures)
+                require(anon_read.status_code in {302, 303, 307, 308}, "anonymous read did not redirect", failures)
+                require("/login?next=" in anon_read.headers.get("location", ""), "anonymous read redirect missing login next", failures)
                 require(anon_listen.status_code in {302, 303, 307, 308}, "anonymous listen did not redirect", failures)
-                require("/login?next=" in anon_listen.headers.get("location", ""), "anonymous artifact redirect missing login next", failures)
+                require("/login?next=" in anon_listen.headers.get("location", ""), "anonymous listen redirect missing login next", failures)
+                require(anon_book.status_code in {302, 303, 307, 308}, "anonymous book did not redirect", failures)
+                require("/login?next=" in anon_book.headers.get("location", ""), "anonymous book redirect missing login next", failures)
+                require(anon_cover.status_code in {302, 303, 307, 308}, "anonymous cover did not redirect", failures)
+                require("/login?next=" in anon_cover.headers.get("location", ""), "anonymous cover redirect missing login next", failures)
+                require(anon_video.status_code in {302, 303, 307, 308}, "anonymous video did not redirect", failures)
+                require("/login?next=" in anon_video.headers.get("location", ""), "anonymous video redirect missing login next", failures)
 
                 signed = requests.Session()
                 signed.cookies.set("chummer_hub_access_token", token, domain="127.0.0.1", path="/")
@@ -242,7 +254,20 @@ def materialize(
                     "ownerDetailStatus": detail.status_code,
                     "ownerLibraryStatus": library.status_code,
                     "anonymousDetailRedirectVerified": anon_detail.status_code in {302, 303, 307, 308},
-                    "anonymousArtifactRedirectVerified": anon_listen.status_code in {302, 303, 307, 308},
+                    "anonymousReadRedirectVerified": anon_read.status_code in {302, 303, 307, 308},
+                    "anonymousListenRedirectVerified": anon_listen.status_code in {302, 303, 307, 308},
+                    "anonymousBookRedirectVerified": anon_book.status_code in {302, 303, 307, 308},
+                    "anonymousCoverRedirectVerified": anon_cover.status_code in {302, 303, 307, 308},
+                    "anonymousVideoRedirectVerified": anon_video.status_code in {302, 303, 307, 308},
+                    "anonymousArtifactRedirectVerified": all(
+                        response.status_code in {302, 303, 307, 308}
+                        for response in (anon_read, anon_listen, anon_book, anon_cover, anon_video)
+                    ),
+                    "all_private_routes_login_protected": all(
+                        response.status_code in {302, 303, 307, 308}
+                        and "/login?next=" in response.headers.get("location", "")
+                        for response in (anon_detail, anon_read, anon_listen, anon_book, anon_cover, anon_video)
+                    ),
                     "logged_in_browser_verified": detail.status_code == 200,
                     "readTabVisible": "href=\"#origin-edition-read\"" in detail_text,
                     "listenTabVisible": "href=\"#origin-edition-listen\"" in detail_text,

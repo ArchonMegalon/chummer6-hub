@@ -158,6 +158,8 @@ def bool_row(row_id: str, label: str, value: bool, evidence: str) -> dict[str, A
 
 def cover_surface_row(path: Path) -> dict[str, Any]:
     flags = {surface: False for surface in REQUIRED_COVER_SURFACES}
+    flags["expected_cover_sha_valid"] = False
+    flags["all_required_surface_hashes_match_expected"] = False
     row: dict[str, Any] = {
         "id": "cover_consistency_required_surfaces",
         "label": "Same rendered story-scene cover is proved across ebook, PDF, M4B, Audiobookshelf, movie poster, and Chummer hero",
@@ -171,13 +173,23 @@ def cover_surface_row(path: Path) -> dict[str, Any]:
     payload = read_json(path)
     row["sha256"] = sha256_file(path)
     row["reportedStatus"] = payload.get("status")
-    row["expectedCoverSha256"] = payload.get("expectedCoverSha256")
+    expected_cover_sha = string(payload.get("expectedCoverSha256"))
+    row["expectedCoverSha256"] = expected_cover_sha
+    flags["expected_cover_sha_valid"] = len(expected_cover_sha) == 64 and all(char in "0123456789abcdef" for char in expected_cover_sha.lower())
     surfaces = payload.get("surfaces") if isinstance(payload.get("surfaces"), list) else []
     by_name = {string(surface.get("name")): surface for surface in surfaces if isinstance(surface, dict)}
     for surface in REQUIRED_COVER_SURFACES:
         flags[surface] = string(by_name.get(surface, {}).get("status")).lower() == "pass"
+    surface_hash_mismatches = []
+    for surface_name in REQUIRED_COVER_SURFACES:
+        surface = by_name.get(surface_name, {})
+        surface_hash = string(surface.get("sha256") or surface.get("reportedCoverSha256"))
+        if surface_hash != expected_cover_sha:
+            surface_hash_mismatches.append(surface_name)
+    flags["all_required_surface_hashes_match_expected"] = flags["expected_cover_sha_valid"] and not surface_hash_mismatches
     blocked = [surface for surface, passed in flags.items() if not passed]
     row["blockedSurfaces"] = blocked
+    row["coverHashMismatchedSurfaces"] = surface_hash_mismatches
     row["status"] = "proved" if string(payload.get("status")).lower() == "pass" and not blocked else "blocked"
     row["evidence"] = "strict_cover_surface_matrix"
     if payload.get("goldEligible") is False:
@@ -189,15 +201,18 @@ def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def telegram_link_bundle_row(path: Path, project_id: str, base_url: str) -> dict[str, Any]:
+def telegram_link_bundle_row(path: Path, project_id: str, base_url: str, namespace: str) -> dict[str, Any]:
     expected = {
         "read_url_sha256": origin_owner_url(base_url, project_id, "/read"),
         "listen_url_sha256": origin_owner_url(base_url, project_id, "/listen"),
         "watch_url_sha256": origin_owner_url(base_url, project_id, "/video"),
         "open_in_chummer_url_sha256": origin_owner_url(base_url, project_id),
+        "origin_namespace_sha256": namespace,
     }
     flags = {
         "telegram_receipt_present": path.is_file(),
+        "telegram_receipt_status_pass": False,
+        "project_id_matches": False,
         "telegram_delivery_status_sent": False,
         "telegram_message_id_present": False,
         "all_required_links_present": False,
@@ -206,6 +221,7 @@ def telegram_link_bundle_row(path: Path, project_id: str, base_url: str) -> dict
         "listen_link_hash_matches": False,
         "watch_link_hash_matches": False,
         "open_in_chummer_link_hash_matches": False,
+        "origin_namespace_hash_matches": False,
     }
     row: dict[str, Any] = {
         "id": "telegram_origin_links_verified",
@@ -222,14 +238,17 @@ def telegram_link_bundle_row(path: Path, project_id: str, base_url: str) -> dict
     bundle = selected.get("origin_edition_link_bundle") if isinstance(selected.get("origin_edition_link_bundle"), dict) else {}
     row["sha256"] = sha256_file(path)
     row["reportedStatus"] = payload.get("status")
+    flags["telegram_receipt_status_pass"] = string(payload.get("status")).lower() == "pass"
+    flags["project_id_matches"] = string(bundle.get("project_id")) == project_id
     flags["telegram_delivery_status_sent"] = string(bundle.get("telegram_delivery_status")) == "sent"
     flags["telegram_message_id_present"] = bundle.get("telegram_message_id_present") is True
     flags["all_required_links_present"] = bundle.get("all_required_links_present") is True
-    flags["raw_urls_not_exposed"] = bundle.get("raw_urls_exposed") is not True
+    flags["raw_urls_not_exposed"] = bundle.get("raw_urls_exposed") is False
     flags["read_link_hash_matches"] = string(bundle.get("read_url_sha256")) == sha256_text(expected["read_url_sha256"])
     flags["listen_link_hash_matches"] = string(bundle.get("listen_url_sha256")) == sha256_text(expected["listen_url_sha256"])
     flags["watch_link_hash_matches"] = string(bundle.get("watch_url_sha256")) == sha256_text(expected["watch_url_sha256"])
     flags["open_in_chummer_link_hash_matches"] = string(bundle.get("open_in_chummer_url_sha256")) == sha256_text(expected["open_in_chummer_url_sha256"])
+    flags["origin_namespace_hash_matches"] = string(bundle.get("origin_namespace_sha256")) == sha256_text(expected["origin_namespace_sha256"])
     failed = [key for key, passed in flags.items() if not passed]
     row["failedFlags"] = failed
     row["status"] = "proved" if not failed else "blocked"
@@ -867,7 +886,13 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "owner_detail_status_ok": False,
         "owner_library_status_ok": False,
         "anonymous_detail_redirect_verified": False,
+        "anonymous_read_redirect_verified": False,
+        "anonymous_listen_redirect_verified": False,
+        "anonymous_book_redirect_verified": False,
+        "anonymous_cover_redirect_verified": False,
+        "anonymous_video_redirect_verified": False,
         "anonymous_artifact_redirect_verified": False,
+        "all_private_routes_login_protected": False,
         "logged_in_browser_verified": False,
         "selected_face_cover_visible": False,
         "read_tab_visible": False,
@@ -923,7 +948,13 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
     flags["owner_detail_status_ok"] = payload.get("ownerDetailStatus") == 200
     flags["owner_library_status_ok"] = payload.get("ownerLibraryStatus") == 200
     flags["anonymous_detail_redirect_verified"] = payload.get("anonymousDetailRedirectVerified") is True
+    flags["anonymous_read_redirect_verified"] = payload.get("anonymousReadRedirectVerified") is True
+    flags["anonymous_listen_redirect_verified"] = payload.get("anonymousListenRedirectVerified") is True
+    flags["anonymous_book_redirect_verified"] = payload.get("anonymousBookRedirectVerified") is True
+    flags["anonymous_cover_redirect_verified"] = payload.get("anonymousCoverRedirectVerified") is True
+    flags["anonymous_video_redirect_verified"] = payload.get("anonymousVideoRedirectVerified") is True
     flags["anonymous_artifact_redirect_verified"] = payload.get("anonymousArtifactRedirectVerified") is True
+    flags["all_private_routes_login_protected"] = payload.get("all_private_routes_login_protected") is True
     flags["logged_in_browser_verified"] = payload.get("logged_in_browser_verified") is True
     flags["selected_face_cover_visible"] = payload.get("selected_face_cover_visible") is True
     flags["read_tab_visible"] = payload.get("read_tab_visible") is True
@@ -1022,7 +1053,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         receipt_row("runsite_integration_proof", "RunSite integration proof", branch / "runsite-integration-proof.receipt.json"),
         runsite_handoff_row(branch / "runsite-integration-proof.receipt.json"),
         receipt_row("telegram_delivery_receipt", "Telegram read/listen/watch/open link delivery receipt", Path(string(request.get("telegramShareDeliveryReceiptPath"))) if string(request.get("telegramShareDeliveryReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("telegramShareDeliveryReceiptPath"))),
-        telegram_link_bundle_row(branch / "telegram-origin-link-bundle-live.receipt.json", string(request.get("projectId")) or context.project_id, context.base_url),
+        telegram_link_bundle_row(branch / "telegram-origin-link-bundle-live.receipt.json", string(request.get("projectId")) or context.project_id, context.base_url, namespace),
         receipt_row("final_no_fallback_no_sentinel_audit", "Final no-fallback/no-sentinel audit", Path(string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))) if string(request.get("finalNoFallbackNoSentinelAuditReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))),
         final_bundle_row(Path(string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))) if string(request.get("finalNoFallbackNoSentinelAuditReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))),
         secret_hygiene_row(evidence_root),

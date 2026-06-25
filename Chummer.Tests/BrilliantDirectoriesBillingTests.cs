@@ -111,6 +111,34 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public void MyFirstBookQuotaCanAttachLifetimeSupporterByEmailBeforeHubUserExists()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "email:joschi.grey@posteo.de",
+                MemberId: "manual-lifetime-joschi-grey-posteo-de",
+                Email: "joschi.grey@posteo.de",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "lifetime",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 25, 12, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        DateTimeOffset now = new(2026, 6, 25, 12, 30, 0, TimeSpan.Zero);
+        MyFirstBookQuotaSnapshotDto quota = service.GetMyFirstBookQuota("usr-created-later", now, "JOSCHI.GREY@POSTEO.DE");
+        MyFirstBookQuotaConsumeResultDto first = service.ConsumeMyFirstBookQuota("usr-created-later", now, "joschi.grey@posteo.de");
+        MyFirstBookQuotaConsumeResultDto second = service.ConsumeMyFirstBookQuota("usr-created-later", now, "joschi.grey@posteo.de");
+
+        Assert.Equal("supporter", quota.PlanKey);
+        Assert.True(quota.SupporterActive);
+        Assert.Equal(2, quota.MonthlyLimit);
+        Assert.Equal(1, first.Quota.MonthlyRemaining);
+        Assert.Equal(0, second.Quota.MonthlyRemaining);
+    }
+
+    [Fact]
     public async Task BillingPagePreviewCarriesCurrentMyFirstBookQuota()
     {
         BrilliantDirectoriesBillingService service = CreateService();

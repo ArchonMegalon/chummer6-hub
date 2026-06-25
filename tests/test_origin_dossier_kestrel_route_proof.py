@@ -75,6 +75,7 @@ def test_publication_index_uses_origin_edition_context_for_routes_and_artifacts(
     assert entry["finalNoFallbackNoSentinelAuditReceiptPath"].endswith(
         "origin.chummer.run/Case/Ari/Ghost/final-no-fallback-no-sentinel-audit.receipt.json"
     )
+    assert entry["requiresAuthenticatedChummerRunUser"] is True
 
 
 def test_route_proof_identity_defaults_remain_stable_for_kestrel_and_generic_for_custom_runner() -> None:

@@ -49,7 +49,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             var page = _billing.GetPage();
             var quota = string.IsNullOrWhiteSpace(resolvedUserId)
                 ? null
-                : _billing.GetMyFirstBookQuota(resolvedUserId);
+                : _billing.GetMyFirstBookQuota(resolvedUserId, email: resolvedEmail);
             return View("~/Views/Billing/Membership.cshtml", BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser));
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
@@ -111,7 +111,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         try
         {
-            return Ok(_billing.GetMyFirstBookQuota(currentUser.UserId));
+            return Ok(_billing.GetMyFirstBookQuota(currentUser.UserId, email: currentUser.Email));
         }
         catch (InvalidOperationException ex)
         {
@@ -156,7 +156,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         try
         {
-            return Ok(_billing.ConsumeMyFirstBookQuota(currentUser.UserId));
+            return Ok(_billing.ConsumeMyFirstBookQuota(currentUser.UserId, email: currentUser.Email));
         }
         catch (InvalidOperationException ex)
         {

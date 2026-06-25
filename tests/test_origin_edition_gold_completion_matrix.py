@@ -51,15 +51,24 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def telegram_origin_link_receipt(path: Path, *, project_id: str = "varga-mira-kestrel", watch_hash: str | None = None) -> Path:
+def telegram_origin_link_receipt(
+    path: Path,
+    *,
+    project_id: str = "varga-mira-kestrel",
+    namespace: str = "origin.chummer.run/Varga/Mira/Kestrel",
+    watch_hash: str | None = None,
+    status: str = "pass",
+) -> Path:
     return write_json(
         path,
         {
             "contract_name": "ea.telegram_audiobook_live_delivery_receipt.v1",
-            "status": "pass",
+            "status": status,
             "selected_delivery": {
                 "origin_edition_link_bundle": {
                     "status": "sent",
+                    "project_id": project_id,
+                    "origin_namespace_sha256": sha256_text(namespace),
                     "telegram_delivery_status": "sent",
                     "telegram_message_id_present": True,
                     "all_required_links_present": True,
@@ -103,7 +112,13 @@ def authenticated_route_receipt(
             "ownerDetailStatus": 200,
             "ownerLibraryStatus": 200,
             "anonymousDetailRedirectVerified": True,
+            "anonymousReadRedirectVerified": True,
+            "anonymousListenRedirectVerified": True,
+            "anonymousBookRedirectVerified": True,
+            "anonymousCoverRedirectVerified": True,
+            "anonymousVideoRedirectVerified": True,
             "anonymousArtifactRedirectVerified": True,
+            "all_private_routes_login_protected": True,
             "logged_in_browser_verified": True,
             "selected_face_cover_visible": True,
             "read_tab_visible": True,
@@ -680,6 +695,42 @@ def test_completion_matrix_blocks_missing_required_cover_surface(tmp_path: Path)
     assert row["blockedSurfaces"] == ["movie_poster"]
 
 
+def test_completion_matrix_blocks_cover_surface_that_passes_with_wrong_hash(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/cover-consistency-strict.receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    for surface in receipt["surfaces"]:
+        if surface["name"] == "audiobookshelf_audiobook_cover":
+            surface["sha256"] = "b" * 64
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "cover_consistency_required_surfaces")
+
+    assert result["status"] == "blocked"
+    assert "cover_consistency_required_surfaces" in result["blockedRows"]
+    assert row["flags"]["audiobookshelf_audiobook_cover"] is True
+    assert row["flags"]["all_required_surface_hashes_match_expected"] is False
+    assert row["coverHashMismatchedSurfaces"] == ["audiobookshelf_audiobook_cover"]
+
+
+def test_completion_matrix_blocks_cover_consistency_without_valid_expected_hash(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/cover-consistency-strict.receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["expectedCoverSha256"] = ""
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "cover_consistency_required_surfaces")
+
+    assert result["status"] == "blocked"
+    assert row["flags"]["expected_cover_sha_valid"] is False
+    assert "expected_cover_sha_valid" in row["blockedSurfaces"]
+
+
 def test_completion_matrix_blocks_mismatched_telegram_origin_link_hash(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -696,6 +747,54 @@ def test_completion_matrix_blocks_mismatched_telegram_origin_link_hash(tmp_path:
     assert row["status"] == "blocked"
     assert row["flags"]["watch_link_hash_matches"] is False
     assert "watch_link_hash_matches" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_failed_telegram_origin_link_receipt(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    telegram_origin_link_receipt(
+        tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/telegram-origin-link-bundle-live.receipt.json",
+        status="blocked",
+    )
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "telegram_origin_links_verified")
+
+    assert result["status"] == "blocked"
+    assert "telegram_origin_links_verified" in result["blockedRows"]
+    assert row["flags"]["telegram_receipt_status_pass"] is False
+    assert "telegram_receipt_status_pass" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_telegram_origin_link_raw_url_exposure(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/telegram-origin-link-bundle-live.receipt.json"
+    telegram_origin_link_receipt(receipt_path)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["selected_delivery"]["origin_edition_link_bundle"]["raw_urls_exposed"] = True
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "telegram_origin_links_verified")
+
+    assert result["status"] == "blocked"
+    assert row["flags"]["raw_urls_not_exposed"] is False
+    assert "raw_urls_not_exposed" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_telegram_origin_link_namespace_hash_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/telegram-origin-link-bundle-live.receipt.json"
+    telegram_origin_link_receipt(receipt_path, namespace="origin.chummer.run/Other/Runner/Name")
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "telegram_origin_links_verified")
+
+    assert result["status"] == "blocked"
+    assert row["flags"]["origin_namespace_hash_matches"] is False
+    assert "origin_namespace_hash_matches" in row["failedFlags"]
 
 
 def test_completion_matrix_blocks_when_provider_created_facts_guard_missing(tmp_path: Path) -> None:
@@ -900,6 +999,27 @@ def test_completion_matrix_blocks_when_local_authenticated_listen_tab_missing(tm
     assert row["status"] == "blocked"
     assert row["flags"]["listen_tab_visible"] is False
     assert "listen_tab_visible" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_local_private_artifact_route_is_public(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    route_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/authenticated-chummer-route-live.receipt.json"
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    route["anonymousVideoRedirectVerified"] = False
+    route["anonymousArtifactRedirectVerified"] = False
+    route["all_private_routes_login_protected"] = False
+    write_json(route_path, route)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "local_authenticated_route_tabs_verified")
+
+    assert result["status"] == "blocked"
+    assert "local_authenticated_route_tabs_verified" in result["blockedRows"]
+    assert row["flags"]["anonymous_video_redirect_verified"] is False
+    assert row["flags"]["all_private_routes_login_protected"] is False
+    assert "anonymous_video_redirect_verified" in row["failedFlags"]
+    assert "all_private_routes_login_protected" in row["failedFlags"]
 
 
 def test_completion_matrix_accepts_local_authenticated_route_on_ephemeral_port(tmp_path: Path) -> None:

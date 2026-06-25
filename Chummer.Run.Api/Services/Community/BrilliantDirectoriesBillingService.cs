@@ -108,14 +108,15 @@ public sealed class BrilliantDirectoriesBillingService
             ManageMembershipHref: options.MemberPortalUrl ?? "/account");
     }
 
-    public MyFirstBookQuotaSnapshotDto GetMyFirstBookQuota(string userId, DateTimeOffset? now = null)
+    public MyFirstBookQuotaSnapshotDto GetMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
     {
         string normalizedUserId = RequireValue(userId, "A user id is required before checking MyFirstBook quota.");
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
         DateTimeOffset windowStartUtc = new(effectiveNow.Year, effectiveNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
         DateTimeOffset windowEndUtc = windowStartUtc.AddMonths(1);
 
-        BrilliantDirectoriesMemberSnapshotDto? membership = GetAccount(normalizedUserId);
+        BrilliantDirectoriesMemberSnapshotDto? membership = GetAccount(normalizedUserId)
+            ?? GetAccountByEmail(email);
         bool supporterActive = membership?.SupporterActive == true;
         string planKey = supporterActive
             ? BrilliantDirectoriesBillingConstants.SupporterPlanKey
@@ -147,9 +148,9 @@ public sealed class BrilliantDirectoriesBillingService
             WindowEndUtc: windowEndUtc);
     }
 
-    public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null)
+    public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
     {
-        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, now);
+        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, now, email);
         if (snapshot.MonthlyRemaining <= 0)
         {
             throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
@@ -182,7 +183,7 @@ public sealed class BrilliantDirectoriesBillingService
 
         return new MyFirstBookQuotaConsumeResultDto(
             Status: "consumed",
-            Quota: GetMyFirstBookQuota(userId, effectiveNow));
+            Quota: GetMyFirstBookQuota(userId, effectiveNow, email));
     }
 
     public BrilliantDirectoriesCheckoutResponseDto CreateSupporterCheckout(BrilliantDirectoriesCheckoutRequest request)
@@ -228,6 +229,23 @@ public sealed class BrilliantDirectoriesBillingService
         {
             return _store.Members
                 .Where(item => string.Equals(item.UserId, userId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(item => item.SyncedAtUtc)
+                .FirstOrDefault();
+        }
+    }
+
+    public BrilliantDirectoriesMemberSnapshotDto? GetAccountByEmail(string? email)
+    {
+        string? normalizedEmail = NormalizeEmail(email);
+        if (normalizedEmail is null)
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            return _store.Members
+                .Where(item => string.Equals(NormalizeEmail(item.Email), normalizedEmail, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(item => item.SyncedAtUtc)
                 .FirstOrDefault();
         }
@@ -313,8 +331,8 @@ public sealed class BrilliantDirectoriesBillingService
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "BrilliantDirectories:CheckoutEmailParameter") ?? "email",
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "BrilliantDirectories:CheckoutPlanParameter") ?? "plan",
             ReadRequired("BRILLIANT_DIRECTORIES_SYNC_SECRET", "BrilliantDirectories:SyncSecret", "sync secret"),
-            ReadCsv("BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses", ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended"]),
-            ReadCsv("BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active"]));
+            ReadCsv("BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses", ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]),
+            ReadCsv("BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]));
     }
 
     private string? ReadOptional(string environmentKey, string configurationKey)
@@ -432,6 +450,9 @@ public sealed class BrilliantDirectoriesBillingService
         string? trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
+
+    private static string? NormalizeEmail(string? value)
+        => TrimToNull(value)?.ToLower(CultureInfo.InvariantCulture);
 
     private static string NormalizeKey(string value)
         => value.Trim().ToLower(CultureInfo.InvariantCulture).Replace('-', '_').Replace(' ', '_');
