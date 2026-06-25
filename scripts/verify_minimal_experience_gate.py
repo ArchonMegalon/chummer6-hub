@@ -59,6 +59,21 @@ def count_occurrences(text: str, needle: str) -> int:
     return len(re.findall(re.escape(needle), text, flags=re.IGNORECASE))
 
 
+def find_release_noise(text: str) -> list[str]:
+    patterns = [
+        r"\brun-\d{8}-\d{6}\b",
+        r"\bReleased\b",
+        r"\bChecks passed\b",
+        r"\bstale proof\b",
+        r"\bnot gold-ready\b",
+    ]
+    findings: list[str] = []
+    for pattern in patterns:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            findings.append(pattern)
+    return findings
+
+
 def build_payload(
     base_url: str,
     *,
@@ -95,6 +110,10 @@ def build_payload(
     nightly_visible = 'id="nightly"' in downloads_html and "Newest build" in downloads_html
     decision_card_count = count_occurrences(status_html, 'class="minimal-status-pill"')
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
+    status_updated_count = count_occurrences(status_html, "Updated")
+    downloads_updated_count = count_occurrences(downloads_html, "Updated")
+    status_release_noise = find_release_noise(status_html)
+    downloads_release_noise = find_release_noise(downloads_html)
 
     if nav_panel_open:
         failures.append("home navigation panel is open by default")
@@ -114,6 +133,14 @@ def build_payload(
         failures.append("status page should expose exactly one decision card")
     if next_action_count < 3:
         failures.append("status page should expose at least three next actions")
+    if status_updated_count > 1:
+        failures.append("status page repeats the update date")
+    if downloads_updated_count > 1:
+        failures.append("downloads page repeats the update date")
+    if status_release_noise:
+        failures.append(f"status page exposes internal release noise: {', '.join(status_release_noise)}")
+    if downloads_release_noise:
+        failures.append(f"downloads page exposes internal release noise: {', '.join(downloads_release_noise)}")
 
     payload = {
         "generated_at_utc": now_iso(),
@@ -135,11 +162,15 @@ def build_payload(
                 "surface": "downloads",
                 "stable_visible": stable_visible,
                 "nightly_visible": nightly_visible,
+                "updated_label_count": downloads_updated_count,
+                "release_noise": downloads_release_noise,
             },
             {
                 "surface": "status",
                 "decision_card_count": decision_card_count,
                 "next_action_count": next_action_count,
+                "updated_label_count": status_updated_count,
+                "release_noise": status_release_noise,
             },
         ],
     }
