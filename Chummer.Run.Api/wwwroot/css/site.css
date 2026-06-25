@@ -9977,6 +9977,10 @@ body {
   min-height: auto;
   margin: 0 auto;
   padding: 20px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .surface-auth.surface-minimal .site-brand__surface {
@@ -10059,6 +10063,7 @@ body {
 .surface-auth.surface-minimal .privacy-note {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
+  font-family: var(--font-family-base);
   font-size: 0.94rem;
   line-height: 1.45;
 }
