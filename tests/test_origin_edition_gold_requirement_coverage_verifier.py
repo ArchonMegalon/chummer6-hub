@@ -43,6 +43,16 @@ def coverage_payload(*, ready: bool = False) -> dict:
     return {
         "contractName": "chummer.origin_edition.gold_requirement_coverage.v1",
         "status": "pass" if ready else "blocked",
+        "updated_at": "2026-06-25T13:00:00Z",
+        "next_action": "Gold requirement coverage is complete. Keep the artifacts archived outside providers."
+        if ready
+        else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+        "blocking_reason": "" if ready else "requirement:deployed_owner_read_listen_watch_canon",
+        "progress": {
+            "provedRequirements": len(module.EXPECTED_REQUIREMENTS) if ready else len(module.EXPECTED_REQUIREMENTS) - 1,
+            "totalRequirements": len(module.EXPECTED_REQUIREMENTS),
+            "blockedRequirements": blocked,
+        },
         "goalCompletionClaimAllowed": ready,
         "matrixSha256": "a" * 64,
         "proofChainSha256": "b" * 64,
@@ -117,3 +127,20 @@ def test_verifier_rejects_secret_marker_even_when_json_invalid(tmp_path: Path) -
     assert ok is False
     assert "forbidden_secret_marker:Bearer " in issues
     assert any(issue.startswith("invalid_json:") for issue in issues)
+
+
+def test_verifier_rejects_missing_normalized_coverage_status(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "coverage.json"
+    payload = coverage_payload()
+    payload.pop("next_action")
+    payload.pop("blocking_reason")
+    payload.pop("progress")
+    write_json(path, payload)
+
+    ok, issues = module.verify(path)
+
+    assert ok is False
+    assert "next_action_missing" in issues
+    assert "blocked_coverage_missing_blocking_reason" in issues
+    assert "progress_total_requirements_missing" in issues

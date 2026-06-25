@@ -403,7 +403,9 @@ void VerifyIdentityWorkflow()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
-            ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true"
+            ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
+            ["ASPNETCORE_ENVIRONMENT"] = "Development",
+            ["IDENTITY_PUBLIC_BASE_URL"] = "http://127.0.0.1:5101"
         })
         .Build();
     var identity = new IdentityAccessService(configuration, loggerFactory.CreateLogger<IdentityAccessService>());
@@ -619,10 +621,11 @@ void VerifyIdentityEmailDeliveryProviders()
         var unsafePreviewConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["IDENTITY_PUBLIC_BASE_URL"] = "http://127.0.0.1:5101",
                 ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
                 ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
                 ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
+                ["ASPNETCORE_ENVIRONMENT"] = "Development",
                 ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery-preview.json")
             })
             .Build();

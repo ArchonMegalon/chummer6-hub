@@ -68,6 +68,23 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
 
     if payload.get("contractName") != CONTRACT_NAME:
         issues.append("contract_name_mismatch")
+    coverage_status = str(payload.get("status") or "")
+    if not str(payload.get("updated_at") or "").strip():
+        issues.append("updated_at_missing")
+    if not str(payload.get("next_action") or "").strip():
+        issues.append("next_action_missing")
+    blocking_reason = str(payload.get("blocking_reason") or "")
+    if coverage_status == "pass" and blocking_reason:
+        issues.append("pass_coverage_has_blocking_reason")
+    if coverage_status == "blocked" and not blocking_reason:
+        issues.append("blocked_coverage_missing_blocking_reason")
+    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+    if not isinstance(progress.get("totalRequirements"), int):
+        issues.append("progress_total_requirements_missing")
+    if not isinstance(progress.get("provedRequirements"), int):
+        issues.append("progress_proved_requirements_missing")
+    if not isinstance(progress.get("blockedRequirements"), list):
+        issues.append("progress_blocked_requirements_missing")
     if not valid_sha(payload.get("matrixSha256")):
         issues.append("matrix_sha256_invalid")
     if not valid_sha(payload.get("proofChainSha256")):
@@ -86,10 +103,10 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
             issues.append("requirement_not_object")
             continue
         requirement_id = str(item.get("id") or "")
-        status = str(item.get("status") or "")
-        if status not in {"proved", "blocked"}:
-            issues.append(f"requirement_status_invalid:{requirement_id}:{status}")
-        if status == "blocked":
+        requirement_status = str(item.get("status") or "")
+        if requirement_status not in {"proved", "blocked"}:
+            issues.append(f"requirement_status_invalid:{requirement_id}:{requirement_status}")
+        if requirement_status == "blocked":
             computed_blocked.append(requirement_id)
             has_reason = any(
                 isinstance(item.get(key), list) and bool(item.get(key))
@@ -97,7 +114,7 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
             )
             if not has_reason:
                 issues.append(f"blocked_requirement_without_reason:{requirement_id}")
-        if status == "proved":
+        if requirement_status == "proved":
             for key in ("missingRows", "blockedRows", "missingHardGates", "blockedHardGates"):
                 if item.get(key) not in ([], None):
                     issues.append(f"proved_requirement_has_blockers:{requirement_id}:{key}")
@@ -105,18 +122,17 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
     if blocked_requirements != computed_blocked:
         issues.append(f"blocked_requirement_mismatch:{blocked_requirements}:{computed_blocked}")
 
-    status = str(payload.get("status") or "")
     if require_gold:
-        if status != "pass":
+        if coverage_status != "pass":
             issues.append("coverage_not_pass")
         if payload.get("goalCompletionClaimAllowed") is not True:
             issues.append("coverage_goal_completion_not_allowed")
         if blocked_requirements:
             issues.append("coverage_has_blocked_requirements")
     else:
-        if status not in {"pass", "blocked"}:
-            issues.append(f"unexpected_status:{status}")
-        if status == "blocked":
+        if coverage_status not in {"pass", "blocked"}:
+            issues.append(f"unexpected_status:{coverage_status}")
+        if coverage_status == "blocked":
             if blocked_requirements != CURRENT_ALLOWED_BLOCKED_REQUIREMENTS:
                 issues.append(f"unexpected_blocked_requirements:{blocked_requirements}")
             if payload.get("goalCompletionClaimAllowed") is not False:

@@ -22,15 +22,19 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def fake_modules(calls: list[str], *, matrix_pass: bool) -> SimpleNamespace:
-    def deployed_probe(evidence_root, base_url, project_id, output, env_file):
+def fake_modules(calls: list[str], *, matrix_pass: bool, seen_contexts: dict[str, object] | None = None) -> SimpleNamespace:
+    seen_contexts = seen_contexts if seen_contexts is not None else {}
+
+    def deployed_probe(evidence_root, base_url, project_id, output, env_file, context=None):
         calls.append("deployed_probe")
+        seen_contexts["deployed_probe"] = context
         payload = {"status": "pass", "goldEligible": True, "blockers": [], "next_action": "probe done", "blocking_reason": "", "progress": {"totalChecks": 1}}
         write_json(output, payload)
         return payload
 
-    def handoff(evidence_root, output, env_file):
+    def handoff(evidence_root, output, env_file, context=None):
         calls.append("handoff")
+        seen_contexts["handoff"] = context
         payload = {"status": "pass", "goldEligible": True, "goalCompletionClaimAllowed": False, "blockers": [], "next_action": "handoff done", "blocking_reason": "", "progress": {"blockerCount": 0}}
         write_json(output, payload)
         return payload
@@ -41,14 +45,16 @@ def fake_modules(calls: list[str], *, matrix_pass: bool) -> SimpleNamespace:
         write_json(kwargs["output"], payload)
         return payload
 
-    def runsite(repo_root, ea_root, evidence_root, output):
+    def runsite(repo_root, ea_root, evidence_root, output, context=None):
         calls.append("runsite")
+        seen_contexts["runsite"] = context
         payload = {"status": "pass", "goldEligible": matrix_pass, "goalCompletionClaimAllowed": False}
         write_json(output, payload)
         return payload
 
-    def matrix(evidence_root, output):
+    def matrix(evidence_root, output, context=None):
         calls.append("matrix")
+        seen_contexts["matrix"] = context
         payload = {
             "status": "pass" if matrix_pass else "blocked",
             "goalCompletionClaimAllowed": matrix_pass,
@@ -82,16 +88,18 @@ def test_gold_proof_chain_uses_origin_edition_context_for_branch_and_project(tmp
     module = load_module()
     calls: list[str] = []
     seen: dict[str, object] = {}
+    seen_contexts: dict[str, object] = {}
 
-    def deployed_probe(evidence_root, base_url, project_id, output, env_file):
+    def deployed_probe(evidence_root, base_url, project_id, output, env_file, context=None):
         seen["base_url"] = base_url
         seen["project_id"] = project_id
         seen["deployed_output"] = output
+        seen_contexts["deployed_probe"] = context
         payload = {"status": "pass", "goldEligible": True, "blockers": []}
         write_json(output, payload)
         return payload
 
-    modules = fake_modules(calls, matrix_pass=True)
+    modules = fake_modules(calls, matrix_pass=True, seen_contexts=seen_contexts)
     modules.deployed_probe = SimpleNamespace(materialize=deployed_probe)
     context = module.OriginEditionContext.from_env(
         project_id="custom-runner",
@@ -116,6 +124,10 @@ def test_gold_proof_chain_uses_origin_edition_context_for_branch_and_project(tmp
     assert seen["base_url"] == "https://staging.chummer.run"
     assert seen["project_id"] == "custom-runner"
     assert seen["deployed_output"] == tmp_path / "origin.chummer.run/Case/Ari/Ghost/deployed-chummer-browser-probe.receipt.json"
+    assert seen_contexts["deployed_probe"] is context
+    assert seen_contexts["handoff"] is context
+    assert seen_contexts["runsite"] is context
+    assert seen_contexts["matrix"] is context
 
 
 def test_gold_proof_chain_blocks_when_completion_matrix_blocks_and_keeps_env_secret_out(tmp_path: Path) -> None:

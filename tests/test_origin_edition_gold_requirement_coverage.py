@@ -53,6 +53,9 @@ def seed_matrix(root: Path, *, deployed_pass: bool = False) -> None:
             "contractName": "chummer.origin_edition.gold_proof_chain.v1",
             "status": "pass" if deployed_pass else "blocked",
             "goalCompletionClaimAllowed": deployed_pass,
+            "next_action": "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
+            if deployed_pass
+            else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
         },
     )
 
@@ -64,6 +67,10 @@ def test_requirement_coverage_blocks_only_deployed_owner_requirement_for_current
     result = module.materialize(tmp_path, tmp_path / "coverage.json")
 
     assert result["status"] == "blocked"
+    assert result["updated_at"]
+    assert result["next_action"] == "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
+    assert result["blocking_reason"] == "requirement:deployed_owner_read_listen_watch_canon"
+    assert result["progress"]["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
     assert result["goalCompletionClaimAllowed"] is False
     assert result["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
     deployed = next(item for item in result["requirements"] if item["id"] == "deployed_owner_read_listen_watch_canon")
@@ -78,6 +85,9 @@ def test_requirement_coverage_passes_when_all_matrix_rows_and_hard_gates_pass(tm
     result = module.materialize(tmp_path, tmp_path / "coverage.json")
 
     assert result["status"] == "pass"
+    assert result["next_action"] == "Gold requirement coverage is complete. Keep the artifacts archived outside providers."
+    assert result["blocking_reason"] == ""
+    assert result["progress"]["blockedRequirements"] == []
     assert result["goalCompletionClaimAllowed"] is True
     assert result["blockedRequirements"] == []
 

@@ -97,10 +97,17 @@ def run_chain(
     branch = context.branch(evidence_root)
 
     deployed_probe_path = branch / "deployed-chummer-browser-probe.receipt.json"
-    deployed_probe = modules.deployed_probe.materialize(evidence_root, context.base_url, context.project_id, deployed_probe_path, env_file)
+    deployed_probe = modules.deployed_probe.materialize(
+        evidence_root,
+        context.base_url,
+        context.project_id,
+        deployed_probe_path,
+        env_file,
+        context,
+    )
 
     handoff_path = branch / "deployed-operator-handoff.receipt.json"
-    handoff = modules.handoff.materialize(evidence_root, handoff_path, env_file)
+    handoff = modules.handoff.materialize(evidence_root, handoff_path, env_file, context)
 
     gold_audit_path = evidence_root / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json"
     gold_audit = modules.gold_audit.audit(
@@ -112,10 +119,10 @@ def run_chain(
     )
 
     runsite_path = branch / "runsite-integration-proof.receipt.json"
-    runsite = modules.runsite.materialize(repo_root, ea_root, evidence_root, runsite_path)
+    runsite = modules.runsite.materialize(repo_root, ea_root, evidence_root, runsite_path, context)
 
     matrix_path = evidence_root / "ORIGIN_EDITION_GOLD_COMPLETION_MATRIX.generated.json"
-    matrix = modules.matrix.materialize(evidence_root, matrix_path)
+    matrix = modules.matrix.materialize(evidence_root, matrix_path, context)
 
     coverage_path = evidence_root / "ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json"
     coverage = modules.coverage.materialize(evidence_root, coverage_path)

@@ -153,11 +153,27 @@ def materialize(evidence_root: Path, output: Path) -> dict[str, Any]:
         )
 
     blocked = [item["id"] for item in requirement_results if item["status"] != "proved"]
+    passed = not blocked
+    next_action = (
+        "Gold requirement coverage is complete. Keep the artifacts archived outside providers."
+        if passed
+        else str(proof_chain.get("next_action") or "Resolve blocked requirements and rerun the strict Gold verifier.").strip()
+    )
+    blocking_reason = "" if passed else ",".join(f"requirement:{item}" for item in blocked)
+    progress = {
+        "provedRequirements": len(requirement_results) - len(blocked),
+        "totalRequirements": len(requirement_results),
+        "blockedRequirements": blocked,
+    }
     payload: dict[str, Any] = {
         "contractName": CONTRACT_NAME,
         "generatedAtUtc": now_iso(),
-        "status": "pass" if not blocked else "blocked",
-        "goalCompletionClaimAllowed": not blocked and proof_chain.get("goalCompletionClaimAllowed") is True,
+        "updated_at": now_iso(),
+        "status": "pass" if passed else "blocked",
+        "goalCompletionClaimAllowed": passed and proof_chain.get("goalCompletionClaimAllowed") is True,
+        "next_action": next_action,
+        "blocking_reason": blocking_reason,
+        "progress": progress,
         "matrixPath": matrix_path.as_posix(),
         "matrixSha256": sha256_file(matrix_path),
         "proofChainPath": proof_chain_path.as_posix(),
