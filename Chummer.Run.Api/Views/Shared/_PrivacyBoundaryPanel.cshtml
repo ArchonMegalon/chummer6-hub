@@ -31,30 +31,11 @@
         {
             <article class="workflow-card">
                 <div class="workflow-card__copy">
-                    <span class="tag">@PublicPrivacyText(domain.Owner)</span>
                     <h3>@PublicPrivacyText(domain.Label)</h3>
-                    <p><strong>Kept for:</strong> @PublicPrivacyText(domain.RetentionSummary)</p>
-                    <p><strong>Removed from public pages:</strong> @PublicPrivacyText(domain.RedactionSummary)</p>
-                    <p><strong>Public:</strong> @PublicPrivacyText(domain.PublicProjection)</p>
-                    <p><strong>Account:</strong> @PublicPrivacyText(domain.SignedInProjection)</p>
+                    <p>@PublicPrivacyText(domain.PublicProjection)</p>
+                    <p class="muted-copy">@PublicPrivacyText(domain.SignedInProjection)</p>
                 </div>
             </article>
         }
     </div>
-
-    @if (Model.SurfaceRules.Count > 0)
-    {
-        <div class="compact-rail">
-            @foreach (var rule in Model.SurfaceRules)
-            {
-                <article class="compact-rail__item">
-                    <div class="compact-rail__copy">
-                        <h3>@PublicPrivacyText(rule.Label)</h3>
-                        <p>@PublicPrivacyText(rule.Summary)</p>
-                        <p class="muted-copy"><strong>Never shown:</strong> @PublicPrivacyText(rule.BlockedSummary)</p>
-                    </div>
-                </article>
-            }
-        </div>
-    }
 </section>

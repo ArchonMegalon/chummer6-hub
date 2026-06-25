@@ -18,15 +18,15 @@ public sealed class PublicPrivacyBoundaryService
         new(
             MarkdownHeading: "Support cases",
             Id: "support_case_truth",
-            Label: "Support cases",
-            PublicProjection: "Public routes may show known issues, fix availability, and limited support status.",
-            SignedInProjection: "Signed-in routes may show the reporter-safe case timeline and closure state."),
+            Label: "Private help",
+            PublicProjection: "Public pages can mention known issues and fix availability.",
+            SignedInProjection: "Your account can show your own help history and follow-up."),
         new(
             MarkdownHeading: "Claim and install linkage",
             Id: "claim_install_linkage",
-            Label: "Install linkage",
-            PublicProjection: "Public routes may show release status, install help, and channel-aware fix visibility.",
-            SignedInProjection: "Signed-in routes may show claimed-install state, access status, and linked-device context."),
+            Label: "Install linking",
+            PublicProjection: "Public pages show release status and install help.",
+            SignedInProjection: "Your account can show linked installs and recovery context."),
         new(
             MarkdownHeading: "Survey and follow-up results",
             Id: "survey_follow_up",
@@ -128,7 +128,7 @@ public sealed class PublicPrivacyBoundaryService
         var secondary = pageId switch
         {
             "contact" => new TrustPageActionViewModel("Open help", "/help", "ghost"),
-            _ => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost")
+            _ => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "ghost")
         };
 
         _routes.ValidateRouteTarget(primary.Href, $"privacy boundary action '{primary.Label}'");
@@ -154,9 +154,9 @@ public sealed class PublicPrivacyBoundaryService
             Version = 1,
             ContractName = DefaultContractName,
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
-            Eyebrow = "Privacy boundary",
-            Heading = "Support and feedback data expire on a clear schedule",
-            Summary = "Chummer keeps support, install, feedback, and help data on clear retention windows instead of stockpiling raw payloads.",
+            Eyebrow = "Privacy",
+            Heading = "What Chummer keeps",
+            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product and answer you.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
                 .Select(spec => BuildDomain(spec, retentionDomains))

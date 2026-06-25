@@ -2048,13 +2048,8 @@ def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
         "@PublicPrivacyText(Model.Heading)",
         "@PublicPrivacyText(Model.Summary)",
         "@PublicPrivacyText(Model.PrimaryAction.Label)",
-        "@PublicPrivacyText(domain.RetentionSummary)",
-        "@PublicPrivacyText(rule.BlockedSummary)",
-        "Kept for:",
-        "Removed from public pages:",
-        "Public:",
-        "Account:",
-        "Never shown:",
+        "@PublicPrivacyText(domain.PublicProjection)",
+        "@PublicPrivacyText(domain.SignedInProjection)",
         "@PublicSignedInTrustText(Model.Heading)",
         "@PublicSignedInTrustText(Model.PrimaryAction.Label)",
         "@PublicSignedInTrustText(row.Label)",
@@ -2077,6 +2072,11 @@ def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
         "@domain.RetentionSummary",
         "@domain.RedactionSummary",
         "@rule.BlockedSummary",
+        "Kept for:",
+        "Removed from public pages:",
+        "Public:",
+        "Account:",
+        "Never shown:",
     ):
         assert forbidden not in combined
 
