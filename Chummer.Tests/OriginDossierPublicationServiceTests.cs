@@ -64,10 +64,15 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Equal(2, publications.Count);
         Assert.Contains(publications, publication => publication.ProjectId == "origin-1" && publication.GoldReady);
         OriginDossierPublicationViewModel gold = publications.Single(publication => publication.ProjectId == "origin-1");
+        Assert.Equal("origin.chummer.run/Varga/Mira/Vanta", gold.OriginEditionNamespace);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/read", gold.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/listen", gold.AudiobookshelfShareUrl);
         Assert.Equal(
-            "https://audio.chummer.run/share/origin-1",
-            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-1"));
+            "https://audio.chummer.run/share/origin-1-audiobook",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-1", "listen"));
+        Assert.Equal(
+            "https://audio.chummer.run/share/origin-1-dossier",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-1", "read"));
         Assert.Equal("origin-1", service.GetForAccount("user-1", "subject-1", "origin-1")?.ProjectId);
         Assert.Null(service.GetForAccount("user-1", "subject-1", "origin-other"));
         Assert.Contains(publications, publication =>
@@ -133,9 +138,15 @@ public sealed class OriginDossierPublicationServiceTests
                 ProjectId: "origin-imported",
                 Title: "Imported Rain",
                 RunnerAlias: "Vanta",
+                FamilyName: "Varga",
+                GivenName: "Mira",
+                RunnerName: "Vanta",
+                OriginEditionNamespace: "origin.chummer.run/Varga/Mira/Vanta",
                 PublicationState: "published_for_owner",
                 BookArtifactUrl: "https://chummer.run/account/work/origin-dossiers/origin-imported/book",
-                AudiobookshelfShareUrl: "https://audio.chummer.run/share/origin-imported",
+                AudiobookshelfShareUrl: "https://audio.chummer.run/share/origin-imported-audiobook",
+                AudiobookshelfDossierShareUrl: "https://audio.chummer.run/share/origin-imported-dossier",
+                AudiobookshelfAudiobookShareUrl: "https://audio.chummer.run/share/origin-imported-audiobook",
                 DossierVideoUrl: "https://chummer.run/account/work/origin-dossiers/origin-imported/video",
                 StorySceneCoverUrl: "https://example.invalid/raw-origin-cover.png",
                 ProviderAuthoredManuscriptImported: true,
@@ -155,21 +166,29 @@ public sealed class OriginDossierPublicationServiceTests
                 BookArtifactReceiptPath: artifacts.BookArtifactReceiptPath,
                 StorySceneCoverPath: artifacts.StorySceneCoverPath,
                 StorySceneCoverReceiptPath: artifacts.StorySceneCoverReceiptPath,
+                EbookArtifactPath: artifacts.EbookArtifactPath,
+                EbookAudiobookshelfImportReceiptPath: artifacts.EbookAudiobookshelfImportReceiptPath,
+                CoverConsistencyReceiptPath: artifacts.CoverConsistencyReceiptPath,
                 AudiobookPath: artifacts.AudiobookPath,
                 AudiobookshelfImportReceiptPath: artifacts.AudiobookshelfImportReceiptPath,
                 DossierVideoPath: artifacts.DossierVideoPath,
                 DossierVideoReceiptPath: artifacts.DossierVideoReceiptPath,
+                MoviePosterPath: artifacts.StorySceneCoverPath,
+                MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
+                MovieStoryboardPath: artifacts.MovieStoryboardPath,
                 TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath));
 
         Assert.True(imported.GoldReady);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported", imported.ChummerRunOwnerUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/book", imported.BookArtifactUrl);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/read", imported.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/listen", imported.AudiobookshelfShareUrl);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/listen", imported.AudiobookshelfAudiobookShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/cover", imported.StorySceneCoverUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/video", imported.DossierVideoUrl);
         Assert.Equal(
-            "https://audio.chummer.run/share/origin-imported",
-            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-imported"));
+            "https://audio.chummer.run/share/origin-imported-audiobook",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-imported", "listen"));
         Assert.True(imported.TelegramShareDelivered);
         Assert.True(File.Exists(indexPath));
         OriginDossierPublicationViewModel? reloaded = service.GetForAccount("user-1", "subject-1", "origin-imported");
@@ -633,10 +652,16 @@ public sealed class OriginDossierPublicationServiceTests
             projectId,
             title,
             runnerAlias,
+            familyName = "Varga",
+            givenName = "Mira",
+            runnerName = runnerAlias,
+            originEditionNamespace = $"origin.chummer.run/Varga/Mira/{runnerAlias}",
             publicationState = "published_for_owner",
             chummerRunOwnerUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}",
             bookArtifactUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/book",
-            audiobookshelfShareUrl = audiobookshelfShareUrl ?? $"https://audio.chummer.run/share/{projectId}",
+            audiobookshelfShareUrl = audiobookshelfShareUrl ?? $"https://audio.chummer.run/share/{projectId}-audiobook",
+            audiobookshelfDossierShareUrl = $"https://audio.chummer.run/share/{projectId}-dossier",
+            audiobookshelfAudiobookShareUrl = audiobookshelfShareUrl ?? $"https://audio.chummer.run/share/{projectId}-audiobook",
             dossierVideoUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/video",
             storySceneCoverUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/cover",
             providerAuthoredManuscriptImported = true,
@@ -657,10 +682,15 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.BookArtifactReceiptPath,
             artifacts.StorySceneCoverPath,
             artifacts.StorySceneCoverReceiptPath,
+            artifacts.EbookArtifactPath,
+            artifacts.EbookAudiobookshelfImportReceiptPath,
+            artifacts.CoverConsistencyReceiptPath,
             artifacts.AudiobookPath,
             artifacts.AudiobookshelfImportReceiptPath,
             artifacts.DossierVideoPath,
             artifacts.DossierVideoReceiptPath,
+            artifacts.MovieSubtitlesPath,
+            artifacts.MovieStoryboardPath,
             artifacts.TelegramShareDeliveryReceiptPath
         };
 
@@ -703,6 +733,14 @@ public sealed class OriginDossierPublicationServiceTests
             "book_artifact_import",
             "Inkfluence",
             artifactPaths: [bookArtifactPath]);
+        string ebookArtifactPath = WriteArtifact(projectRoot, "ebook.epub", "EPUB Origin Dossier ebook artifact with embedded cover");
+        string ebookAudiobookshelfImportReceiptPath = WriteReceipt(
+            projectRoot,
+            "audiobookshelf-dossier-import.receipt.json",
+            "audiobookshelf_dossier_import",
+            "Audiobookshelf",
+            [$"dossierShare: https://audio.chummer.run/share/{projectId}-dossier"],
+            artifactPaths: [ebookArtifactPath]);
         string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG story scene cover artifact");
         string storySceneCoverReceiptPath = WriteReceipt(
             projectRoot,
@@ -712,9 +750,22 @@ public sealed class OriginDossierPublicationServiceTests
             [
                 $"/account/work/origin-dossiers/{projectId}",
                 $"/account/work/origin-dossiers/{projectId}/cover",
+                "origin.chummer.run/Varga/Mira/Vanta",
                 "selected_character_face"
             ],
             artifactPaths: [storySceneCoverPath]);
+        string coverConsistencyReceiptPath = WriteReceipt(
+            projectRoot,
+            "cover-consistency.receipt.json",
+            "origin_edition_cover_consistency",
+            "Chummer",
+            [
+                ComputeSha256(storySceneCoverPath),
+                "origin.chummer.run/Varga/Mira/Vanta",
+                "ebook_cover_embedded",
+                "m4b_cover_embedded",
+                "movie_poster_matches_cover"
+            ]);
         string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B audiobook artifact");
         string audiobookshelfImportReceiptPath = WriteReceipt(
             projectRoot,
@@ -724,6 +775,8 @@ public sealed class OriginDossierPublicationServiceTests
             ["narrationProvider: Unmixr"],
             artifactPaths: [audiobookPath]);
         string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 dossier film artifact");
+        string movieSubtitlesPath = WriteArtifact(projectRoot, "subtitles.vtt", "WEBVTT\n\n00:00.000 --> 00:02.000\nOrigin scene.\n");
+        string movieStoryboardPath = WriteArtifact(projectRoot, "storyboard.json", """{"sceneId":"clinic-door-rain"}""");
         string dossierVideoReceiptPath = WriteReceipt(
             projectRoot,
             "dossier-film.receipt.json",
@@ -737,7 +790,10 @@ public sealed class OriginDossierPublicationServiceTests
             "EA Telegram",
             [
                 $"/account/work/origin-dossiers/{projectId}",
-                $"/account/work/origin-dossiers/{projectId}/listen"
+                $"/account/work/origin-dossiers/{projectId}/read",
+                $"/account/work/origin-dossiers/{projectId}/listen",
+                $"/account/work/origin-dossiers/{projectId}/watch",
+                "origin.chummer.run/Varga/Mira/Vanta"
             ]);
 
         return new OriginDossierArtifactPaths(
@@ -751,10 +807,15 @@ public sealed class OriginDossierPublicationServiceTests
             bookArtifactReceiptPath,
             storySceneCoverPath,
             storySceneCoverReceiptPath,
+            ebookArtifactPath,
+            ebookAudiobookshelfImportReceiptPath,
+            coverConsistencyReceiptPath,
             audiobookPath,
             audiobookshelfImportReceiptPath,
             dossierVideoPath,
             dossierVideoReceiptPath,
+            movieSubtitlesPath,
+            movieStoryboardPath,
             telegramShareDeliveryReceiptPath);
     }
 
@@ -816,9 +877,14 @@ public sealed class OriginDossierPublicationServiceTests
         string BookArtifactReceiptPath,
         string StorySceneCoverPath,
         string StorySceneCoverReceiptPath,
+        string EbookArtifactPath,
+        string EbookAudiobookshelfImportReceiptPath,
+        string CoverConsistencyReceiptPath,
         string AudiobookPath,
         string AudiobookshelfImportReceiptPath,
         string DossierVideoPath,
         string DossierVideoReceiptPath,
+        string MovieSubtitlesPath,
+        string MovieStoryboardPath,
         string TelegramShareDeliveryReceiptPath);
 }
