@@ -181,7 +181,7 @@
             <h2 class="editorial-title">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Read the short privacy summary first, then the full policy." : "Read the short rules summary first, then the full terms."))</h2>
             <p class="editorial-copy">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
                 ? "Start with the short version: the app file stays the same for everyone, and telemetry or diagnostics stay explicit about what they capture."
-                : "Start with the short version: Windows and Linux are public now, macOS is guided support only, and Downloads stays the normal place to get the current build."))</p>
+                : "Start with the short version: Downloads shows the current public installer, platform notes, and any limits before you install."))</p>
         </div>
         <div class="continuity-band__panel">
             @foreach (var fact in policyFacts)

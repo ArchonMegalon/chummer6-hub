@@ -30,7 +30,7 @@ const checks = [
     assert: text =>
       text.includes('Chummer') &&
       text.includes('Download Chummer') &&
-      text.includes('Windows and Linux.') &&
+      text.includes('Current public installer') &&
       text.includes('Watch 90 sec') &&
       requiredLandingLinks.every(link => text.includes(link))
   },

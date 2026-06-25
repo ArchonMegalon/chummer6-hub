@@ -42,7 +42,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
     def test_portal_e2e_covers_public_participate_surface(self) -> None:
         text = PORTAL_E2E_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("text.includes('Download Chummer')", text)
-        self.assertIn("text.includes('Windows and Linux.')", text)
+        self.assertIn("text.includes('Current public installer')", text)
         self.assertIn("text.includes('Watch 90 sec')", text)
         self.assertIn("text.includes('Detail gallery')", text)
         self.assertIn("text.includes('Use this page for dossiers, recaps, and release details.')", text)

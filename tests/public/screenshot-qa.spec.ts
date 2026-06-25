@@ -66,7 +66,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
 
     await expect(heroTitle).toContainText('Chummer');
     await expect(primaryCta).toHaveAttribute('aria-label', 'Download Chummer');
-    await expect(page.locator('.minimal-meta')).toContainText('Windows and Linux.');
+    await expect(page.locator('.minimal-meta')).toContainText('Current public installer');
     await expect(page.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(page.locator('.minimal-inline-links')).toContainText('Help');

@@ -335,7 +335,7 @@ public sealed class PublicPackageCatalogService
                 "Desktop install package",
                 "Live now",
                 [
-                    "Matches the current release channels on Downloads: Windows and Linux public, macOS guided support only.",
+                    "Matches the current release channels on Downloads: public installers and platform notes stay on the downloads page.",
                     "Claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
                     "This page explains the choice. Downloads is still where you get the app."
                 ],

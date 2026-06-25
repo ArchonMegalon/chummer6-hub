@@ -448,10 +448,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         Assert.DoesNotContain("Windows, macOS, and Linux", publicFrontDoorCopy, StringComparison.Ordinal);
         Assert.Contains(
-            "Windows and Linux are public now. macOS is guided support only for now.",
+            "Downloads shows the current public installer, platform notes, and any known limits.",
             publicFrontDoorCopy,
             StringComparison.Ordinal);
-        Assert.Contains("Windows and Linux public, macOS guided support only", publicFrontDoorCopy, StringComparison.Ordinal);
+        Assert.Contains("public installers and platform notes stay on the downloads page", publicFrontDoorCopy, StringComparison.Ordinal);
     }
 
     [Fact]

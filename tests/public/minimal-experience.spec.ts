@@ -35,6 +35,20 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');
   await expect(desktop.locator('.minimal-inline-links')).not.toContainText('Participate');
   await expect(desktop.locator('.site-nav')).toHaveCount(0);
+  const homepageText = await desktop.locator('[data-homepage-section="hero"]').innerText();
+  const homepageManifestResponse = await desktop.request.get(`${baseUrl}/downloads/RELEASE_CHANNEL.generated.json`);
+  expect(homepageManifestResponse.ok()).toBeTruthy();
+  const homepageManifest = await homepageManifestResponse.json();
+  const homepagePromotedPlatforms = Array.from(
+    new Set(
+      ((homepageManifest.artifacts || []) as Array<Record<string, unknown>>)
+        .map((artifact) => String(artifact.platform || artifact.platformId || '').toLowerCase())
+        .filter((platform) => platform === 'windows' || platform === 'linux'),
+    ),
+  );
+  if (!homepagePromotedPlatforms.includes('linux') && homepageText.includes('Windows and Linux')) {
+    failures.push('homepage: claims Linux availability while the release manifest does not promote Linux');
+  }
   const heroBox = await desktop.locator('[data-homepage-section="hero"]').boundingBox();
   if (!heroBox || heroBox.y + heroBox.height > 768) {
     failures.push('homepage: hero still extends below the desktop viewport');
@@ -45,6 +59,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     hero_image_loaded: heroImageLoaded,
     promo_video_entry: '/media/promo/chummer6-flagship-promo.mp4',
     first_viewport_fits: !!heroBox && heroBox.y + heroBox.height <= 768,
+    promoted_platforms: homepagePromotedPlatforms,
   });
 
   await desktop.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });

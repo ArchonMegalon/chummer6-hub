@@ -23,7 +23,7 @@ SURFACES = [
         "required_texts": [
             "A Shadowrun character manager for clean sheets and faster tables.",
             "Download Chummer",
-            "Windows and Linux.",
+            "Current public installer",
             "Help",
             "Status",
             "Watch 90 sec",

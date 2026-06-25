@@ -28,7 +28,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.wfile.write(
                 b"<html><body>"
                 b"A Shadowrun character manager for clean sheets and faster tables."
-                b"<a>Download Chummer</a><a>Windows and Linux.</a><a>Help</a><a>Status</a><a>Watch 90 sec</a>"
+                b"<a>Download Chummer</a><a>Current public installer: Windows.</a><a>Help</a><a>Status</a><a>Watch 90 sec</a>"
                 b"</body></html>"
             )
             return

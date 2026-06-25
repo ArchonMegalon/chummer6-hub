@@ -3,6 +3,18 @@
     ViewData["Title"] = "Chummer — Shadowrun character manager";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing surface-minimal";
+    var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
+        .Where(static platform => platform.PubliclyAvailable)
+        .Select(static platform => platform.PlatformLabel)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    var publicPlatformSummary = publicPlatformLabels.Length switch
+    {
+        0 => "No public installer right now.",
+        1 => $"Current public installer: {publicPlatformLabels[0]}.",
+        2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
+        _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
+    };
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -12,7 +24,7 @@
         <div class="minimal-actions" aria-label="Main download">
             <a class="button-like button-like--primary" href="/downloads" title="Download Chummer" aria-label="Download Chummer" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
         </div>
-        <p class="minimal-meta">Windows and Linux.</p>
+        <p class="minimal-meta">@publicPlatformSummary</p>
         <p class="minimal-inline-links">
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
             @if (Model.Chrome.Authenticated)

@@ -54,8 +54,24 @@ def main() -> int:
     )
     doc_text = download_doc.lower() + "\n" + status_doc.lower()
 
-    windows_live = "windows" in live_download_text
-    linux_live = "linux" in live_download_text
+    promoted_platforms = sorted(
+        {
+            str(download.get("platformId") or download.get("platform") or "").strip().lower()
+            for download in live_releases.get("downloads") or []
+            if isinstance(download, dict)
+        }
+    )
+    platform_mentions = {
+        "windows": "windows" in live_download_text,
+        "linux": "linux" in live_download_text,
+        "macos": "macos" in live_download_text or "mac" in live_download_text,
+    }
+    missing_promoted_platform_mentions = [
+        platform for platform in promoted_platforms
+        if platform in platform_mentions and not platform_mentions[platform]
+    ]
+    windows_live = platform_mentions["windows"]
+    linux_live = platform_mentions["linux"]
     mac_live = "mac" in live_download_text or "macos" in live_status_text
     mac_doc_note = "no public macos" in doc_text or "macos download today" in doc_text or "mac setup-script preview" in live_download_text
     review_required = "review-required" in live_status_text or "review required" in live_status_text
@@ -98,8 +114,8 @@ def main() -> int:
         failures.append("live releases.json is not public_stable/gold_supported")
     if preview_machine_truth:
         failures.append("public download machine truth still contains preview posture")
-    if not windows_live or not linux_live:
-        failures.append("live downloads page does not mention both Windows and Linux")
+    if missing_promoted_platform_mentions:
+        failures.append(f"live downloads page does not mention promoted platform(s): {', '.join(missing_promoted_platform_mentions)}")
 
     payload = {
         "generated_at_utc": now_iso(),
@@ -112,6 +128,8 @@ def main() -> int:
             "releases_status_code": live_releases_response.status_code,
             "windows_mentioned": windows_live,
             "linux_mentioned": linux_live,
+            "promoted_platforms": promoted_platforms,
+            "missing_promoted_platform_mentions": missing_promoted_platform_mentions,
             "mac_mentioned": mac_live,
             "preview_mentioned": "preview" in live_download_copy_text or "preview" in live_status_copy_text,
             "review_required_mentioned": review_required,
@@ -136,7 +154,7 @@ def main() -> int:
             "public_release_truth_aligned": public_stable and gold_supported,
             "live_public_release_truth_aligned": live_public_stable and live_gold_supported,
             "preview_machine_truth_absent": not preview_machine_truth,
-            "windows_linux_truth_aligned": windows_live and linux_live,
+            "promoted_platform_truth_aligned": not missing_promoted_platform_mentions,
             "mac_truth_aligned": mac_live or public_stable,
         },
         "failures": failures,

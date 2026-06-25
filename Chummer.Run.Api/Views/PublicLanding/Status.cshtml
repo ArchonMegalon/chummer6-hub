@@ -8,8 +8,20 @@
         : "Unavailable";
     var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
     var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);
+    var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
+        .Where(static platform => platform.PubliclyAvailable)
+        .Select(static platform => platform.PlatformLabel)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    var publicPlatformSummary = publicPlatformLabels.Length switch
+    {
+        0 => "No public installer right now.",
+        1 => $"Current public installer: {publicPlatformLabels[0]}.",
+        2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
+        _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
+    };
     var compactReleaseSummary = releaseSummaryText.StartsWith("Updated ", StringComparison.OrdinalIgnoreCase)
-        ? "Available for Windows and Linux."
+        ? publicPlatformSummary
         : releaseSummaryText;
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);

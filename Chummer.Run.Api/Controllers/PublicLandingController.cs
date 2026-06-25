@@ -12305,7 +12305,7 @@ Boundary:
                             : string.Equals(entry.Question, "Can I actually use Chummer right now?", StringComparison.Ordinal)
                                 ? entry with
                                 {
-                                    Answer = "Yes. Windows and Linux are public now. macOS is guided support only for now. Downloads shows the current packages and any known limits."
+                                    Answer = "Yes. Downloads shows the current public installer, platform notes, and any known limits."
                                 }
                             : string.Equals(entry.Question, "What does account creation give me right away?", StringComparison.Ordinal)
                                 ? entry with { Answer = accessPosture.AccountFaqAnswer }

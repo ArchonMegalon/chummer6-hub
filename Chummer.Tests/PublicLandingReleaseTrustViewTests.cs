@@ -33,6 +33,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("/media/product/chummer-desktop-runner.png", view, StringComparison.Ordinal);
         Assert.Contains("/media/promo/chummer6-flagship-promo.mp4", view, StringComparison.Ordinal);
         Assert.Contains("A Shadowrun character manager for clean sheets and faster tables.", view, StringComparison.Ordinal);
+        Assert.Contains("@publicPlatformSummary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Windows and Linux.", view, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"workflow\"", view, StringComparison.Ordinal);

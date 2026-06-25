@@ -11955,7 +11955,7 @@ def main() -> int:
             "A Shadowrun character manager for clean sheets and faster tables.",
             required_texts=(
                 "Download Chummer",
-                "Windows and Linux.",
+                "Current public installer",
                 "Help",
                 "Status",
                 "Watch 90 sec"),
