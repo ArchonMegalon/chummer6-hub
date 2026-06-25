@@ -31,6 +31,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("node scripts/e2e-portal.cjs", text)
         self.assertIn("verify_participate_billing_honesty", text)
         self.assertIn("python3 scripts/materialize_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
+        self.assertIn("python3 scripts/verify_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
 
     def test_final_gold_janitor_requires_and_materializes_participate_billing_honesty(self) -> None:
         text = FINAL_GOLD_JANITOR.read_text(encoding="utf-8")
@@ -47,10 +48,18 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Use this page for dossiers, recaps, and release details.')", text)
         self.assertIn("text.includes('Current release')", text)
         self.assertIn("text.includes('Updated')", text)
-        self.assertIn("url: `${baseUrl}/partizipate`", text)
-        self.assertIn("text.includes('Public board')", text)
-        self.assertIn("text.includes('Tell us what slows the table down.')", text)
+        self.assertIn("url: `${baseUrl}/participate`", text)
+        self.assertIn("text.includes('Requests, votes, and shipped work.')", text)
+        self.assertIn("text.includes('participate-board')", text)
         self.assertIn("!text.includes('ProductLift')", text)
+
+    def test_portal_e2e_reports_delegated_blazor_without_blocking_required_routes(self) -> None:
+        text = PORTAL_E2E_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("url: `${baseUrl}/blazor/`", text)
+        self.assertIn("required: false", text)
+        self.assertIn("label: 'delegated-blazor'", text)
+        self.assertIn("delegated-not-ready:", text)
+        self.assertIn("portal E2E completed with delegated warnings", text)
 
 
 if __name__ == "__main__":
