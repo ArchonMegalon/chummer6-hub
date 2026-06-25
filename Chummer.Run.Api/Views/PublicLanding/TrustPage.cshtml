@@ -43,7 +43,7 @@
     static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
     {
         "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-        "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Create account", authenticated ? "/account" : "/signup?next=/home", "secondary"),
+        "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Claim your copy", authenticated ? "/account" : "/signup?next=/home", "secondary"),
         "product-bug" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "secondary"),
         "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
         _ => null
