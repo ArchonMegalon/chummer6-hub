@@ -7,6 +7,10 @@
         ? "Available"
         : "Unavailable";
     var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
+    var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);
+    var compactReleaseSummary = releaseSummaryText.StartsWith("Updated ", StringComparison.OrdinalIgnoreCase)
+        ? "Available for Windows and Linux."
+        : releaseSummaryText;
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
@@ -42,7 +46,7 @@
         <article class="route-choice-card">
             <span class="tag">Release</span>
             <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
-            <p>@PublicStatusText(Model.ReleaseSummary)</p>
+            <p>@compactReleaseSummary</p>
         </article>
         <article>
             <span>Available now</span>
