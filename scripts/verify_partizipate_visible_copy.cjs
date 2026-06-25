@@ -36,8 +36,7 @@ const forbidden = [
 
 const requiredHtml = [
   '<title>Participate · Chummer</title>',
-  '<h1>Participate</h1>',
-  'Requests, votes, and shipped work.',
+  '<h1 class="sr-only">Participate</h1>',
   'id="participate-board"',
   'src="/participate/board"',
 ];

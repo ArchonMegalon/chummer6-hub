@@ -63,7 +63,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Participate Requests, votes, and shipped work. Roadmap Support"
+                b"Participate <iframe id=\"participate-board\" src=\"/participate/board\"></iframe>"
                 b"</body></html>"
             )
             return
@@ -74,7 +74,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Participate Requests, votes, and shipped work. Roadmap Support "
+                b"Participate "
                 b"<iframe id=\"participate-board\" src=\"/participate/board\"></iframe>"
                 b"</body></html>"
             )

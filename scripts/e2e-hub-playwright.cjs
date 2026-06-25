@@ -354,14 +354,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
-  await gotoAndAssert(page, pageErrors, '/partizipate', async () => {
+  await gotoAndAssert(page, pageErrors, '/participate', async () => {
     await expectVisible(page, 'text=Participate');
-    await expectVisible(page, 'text=Follow the public board.');
-    await expectVisible(page, 'text=Vote, add requests, and track what is moving. Keep private support in Help.');
-    await expectVisible(page, 'text=Public board');
-    await expectVisible(page, 'text=Roadmap');
-    await expectVisible(page, 'text=Help');
-    await assertNoBannedCopy(page, '/partizipate');
+    await expectVisible(page, '#participate-board');
+    const participateBody = await page.locator('body').innerText();
+    assert.equal(participateBody.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
+    assert.equal(await page.locator('.participate-actions').count(), 0, '/participate should not show duplicate wrapper actions.');
+    await assertNoBannedCopy(page, '/participate');
   });
 
   await gotoAndAssert(page, pageErrors, '/faq', async () => {

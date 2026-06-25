@@ -4,9 +4,25 @@ import { writeJsonArtifact } from './ux-artifacts';
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 async function openPublicPage(browser: Browser, route: string) {
-  const page = await browser.newPage({ baseURL: baseUrl });
-  await page.goto(route, { waitUntil: 'domcontentloaded' });
-  return page;
+  let lastNetworkError: unknown;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const page = await browser.newPage({ baseURL: baseUrl });
+    try {
+      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      return page;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await page.close().catch(() => undefined);
+      if (!message.includes('ERR_NETWORK_CHANGED')) {
+        throw error;
+      }
+      lastNetworkError = error;
+      await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)));
+    }
+  }
+  throw lastNetworkError instanceof Error
+    ? lastNetworkError
+    : new Error(String(lastNetworkError));
 }
 
 test('help, contact, and participate keep public and private paths clear', async ({ request, browser }) => {
@@ -14,8 +30,8 @@ test('help, contact, and participate keep public and private paths clear', async
 
   const helpResponse = await request.get(`${baseUrl}/help`);
   const contactResponse = await request.get(`${baseUrl}/contact`);
-  const participateResponse = await request.get(`${baseUrl}/partizipate`);
-  const participateBoardResponse = await request.get(`${baseUrl}/partizipate/board`, { maxRedirects: 0 });
+  const participateResponse = await request.get(`${baseUrl}/participate`);
+  const participateBoardResponse = await request.get(`${baseUrl}/participate/board`, { maxRedirects: 0 });
 
   expect(helpResponse.status()).toBe(200);
   expect(contactResponse.status()).toBe(200);
@@ -30,8 +46,9 @@ test('help, contact, and participate keep public and private paths clear', async
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateText).toContain('Public board');
-  expect(participateText).toContain('Use the right place');
+  expect(participateText).toContain('participate-board');
+  expect(participateText).toContain('/participate/board');
+  expect(participateText).not.toContain('Requests, votes, and shipped work.');
   expect(participateText).not.toContain('ProductLift');
   expect(participateBoardText).not.toContain('/auth/google/start?next=');
 
@@ -46,13 +63,13 @@ test('help, contact, and participate keep public and private paths clear', async
   await expect(contactPage.getByRole('heading', { name: 'Contact Chummer' })).toBeVisible();
   await expect(contactPage.locator('body')).toContainText('Public ideas go to Participate. Private problems stay here.');
   await expect(contactPage.getByRole('link', { name: 'Open participate' })).toBeVisible();
-  await expect(contactPage.getByRole('link', { name: 'Open private help' })).toBeVisible();
+  await expect(contactPage.getByRole('link', { name: 'Open support' })).toBeVisible();
   await contactPage.close();
 
-  const participatePage = await openPublicPage(browser, '/partizipate');
-  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toBeVisible();
-  await expect(participatePage.locator('body')).toContainText('Tell us what slows the table down.');
-  await expect(participatePage.locator('body')).toContainText('Public board');
+  const participatePage = await openPublicPage(browser, '/participate');
+  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toHaveCount(1);
+  await expect(participatePage.locator('#participate-board')).toBeVisible();
+  await expect(participatePage.locator('body')).not.toContainText('Requests, votes, and shipped work.');
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
   await participatePage.close();
 
@@ -66,6 +83,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'public_wrapper',
+    participate_mode: 'embedded_board',
   });
 });

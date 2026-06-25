@@ -106,9 +106,10 @@ SURFACES = [
         "path": "/participate",
         "required_texts": [
             "Participate",
-            "Requests, votes, and shipped work.",
-            "Roadmap",
-            "Support",
+        ],
+        "required_html_texts": [
+            "id=\"participate-board\"",
+            "src=\"/participate/board\"",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -123,9 +124,6 @@ SURFACES = [
         "path": "/partizipate",
         "required_texts": [
             "Participate",
-            "Requests, votes, and shipped work.",
-            "Roadmap",
-            "Support",
         ],
         "required_html_texts": [
             "id=\"participate-board\"",

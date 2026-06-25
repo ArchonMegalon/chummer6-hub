@@ -5,20 +5,7 @@
     ViewData["SurfaceClass"] = "surface-minimal surface-participate";
 }
 <section class="participate-shell">
-    <div class="participate-shell__header">
-        <div class="participate-shell__lead">
-            <h1>Participate</h1>
-            <p>Requests, votes, and shipped work.</p>
-        </div>
-        <div class="participate-actions">
-            <a class="button-like button-like--ghost" href="@Model.RoadmapHref">Roadmap</a>
-            <a class="button-like button-like--ghost" href="/contact#support-intake">Support</a>
-            @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
-            {
-                <a class="button-like button-like--primary" href="@Model.SupporterHref">Support Chummer</a>
-            }
-        </div>
-    </div>
+    <h1 class="sr-only">Participate</h1>
 
     <iframe
         id="participate-board"
@@ -27,9 +14,4 @@
         title="Chummer participation board"
         loading="eager"
         referrerpolicy="strict-origin-when-cross-origin"></iframe>
-
-    <details class="participate-fallback">
-        <summary>Need private help?</summary>
-        <p>Use <a class="inline-link" href="/contact#support-intake">Support</a> for account, install, or private details.</p>
-    </details>
 </section>

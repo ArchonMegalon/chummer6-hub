@@ -15,15 +15,12 @@ ROUTE_REQUIREMENTS = {
         "Nightly",
     ],
     "/feedback": [
-        "Votes show demand. Chummer decides what ships.",
-        "Good reports include context and reproduction steps.",
-        "Private logs and account issues belong in Help, not public feedback.",
-        "Create account for follow-up",
+        "participate-board",
+        "/participate/board",
     ],
-    "/partizipate": [
-        "Follow an item to hear when it changes.",
-        "Join beta waitlist",
-        "Open support intake",
+    "/participate": [
+        "participate-board",
+        "/participate/board",
     ],
 }
 ROUTE_FORBIDDEN = (

@@ -27,10 +27,14 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     sys.path.insert(0, str(GATE_SCRIPT.parent))
     spec.loader.exec_module(gate_module)
 
-    assert "Tell us what slows the table down." in feedback
-    assert "Use this page for public requests and safe bug reports. Use Help for anything private, account-linked, or install-specific." in feedback
-    assert "Use the right place" in feedback
-    assert "Start with the shortest path." in feedback
+    assert '<h1 class="sr-only">Participate</h1>' in feedback
+    assert "Requests, votes, and shipped work." not in feedback
+    assert "Need private help?" not in feedback
+    assert 'id="participate-board"' in feedback
+    assert "/participate/board" in feedback
+    assert "Tell us what slows the table down." not in feedback
+    assert "Use the right place" not in feedback
+    assert "Start with the shortest path." not in feedback
     assert "Public Feedback And Content Registry" not in feedback
     assert "Open the Alice compare bench" not in feedback
     assert "BLACK LEDGER" not in feedback
@@ -44,7 +48,7 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "Open first-party fallback" not in projection
     assert "Boundary conditions" not in projection
     assert "Before it ships" in projection
-    assert "The /feedback public copy stays clear, public-safe, and honest about what has shipped." in GATE_SCRIPT.read_text(encoding="utf-8")
+    assert "The public participation copy stays compact, public-safe, and honest about what belongs in Help." in GATE_SCRIPT.read_text(encoding="utf-8")
     assert "webhook verification" not in feedback
     assert "delivery candidates" not in feedback
     assert "release-backed closeout" not in gate_module.REQUIRED_HTML_PHRASES
@@ -58,9 +62,9 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
 def test_auth_entry_uses_account_language_in_public_copy() -> None:
     auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
 
-    assert "the account area" in auth_entry
-    assert 'ViewData["SurfaceClass"] = "surface-auth surface-minimal";' in auth_entry
-    assert "Use email or Google. The download stays open." in auth_entry
-    assert "Account optional. Useful for linked installs, recovery, and private pages." in auth_entry
+    assert 'ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";' in auth_entry
+    assert "Use your email to continue." in auth_entry
+    assert "Use email to create your account." in auth_entry
+    assert "Continue with Google" in auth_entry
     assert "the signed-in product" not in auth_entry
     assert "Your signed-in home and account pages for return, recovery, and the next step." not in auth_entry

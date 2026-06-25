@@ -9533,8 +9533,12 @@ body {
 }
 
 .surface-participate .site-main {
-  width: min(1180px, calc(100% - 1.5rem));
-  padding-top: 0.55rem;
+  width: min(1280px, calc(100% - 1rem));
+  padding-top: 0.35rem;
+}
+
+.route-participate.surface-participate .site-footer {
+  display: none;
 }
 
 .participate-hero {
@@ -9566,11 +9570,11 @@ body {
 
 .participate-shell {
   display: grid;
-  gap: 0.55rem;
-  border: 1px solid var(--minimal-line);
-  border-radius: 8px;
-  padding: clamp(0.55rem, 1vw, 0.8rem);
-  background: var(--minimal-surface);
+  min-height: calc(100svh - 5.8rem);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .participate-shell__header {
@@ -9718,7 +9722,7 @@ body {
 
 .participate-hosted__frame {
   width: 100%;
-  min-height: min(76svh, 860px);
+  min-height: calc(100svh - 6rem);
   border: 1px solid var(--minimal-line);
   border-radius: 8px;
   background: var(--minimal-page);
@@ -9728,7 +9732,7 @@ body {
   border: 1px solid var(--minimal-line);
   border-radius: 8px;
   background: var(--minimal-page);
-  padding: 0.48rem 0.6rem;
+  padding: 0.4rem 0.55rem;
 }
 
 .participate-fallback summary {
@@ -10011,7 +10015,7 @@ body {
   }
 
   .participate-hosted__frame {
-    min-height: 980px;
+    min-height: calc(100svh - 5.5rem);
   }
 
   .minimal-hero {

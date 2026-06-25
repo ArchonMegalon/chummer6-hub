@@ -9,10 +9,9 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 
 REQUIRED_PHRASES = [
-    "Votes show demand. Chummer decides what ships.",
-    "Follow an item to hear when it changes.",
-    "Good reports include context and reproduction steps.",
-    "Private logs and account issues belong in Help, not public feedback.",
+    "Participate",
+    "participate-board",
+    "/participate/board",
 ]
 
 FORBIDDEN_PHRASES = [
@@ -21,11 +20,15 @@ FORBIDDEN_PHRASES = [
     "Top voters decide roadmap",
     "Guaranteed implementation",
     "Public bug reports are support tickets",
+    "Votes show demand. Chummer decides what ships.",
+    "Follow an item to hear when it changes.",
+    "Good reports include context and reproduction steps.",
+    "Private logs and account issues belong in Help, not public feedback.",
 ]
 
 ROUTES = [
     "/feedback",
-    "/partizipate",
+    "/participate",
 ]
 
 

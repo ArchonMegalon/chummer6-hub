@@ -106,11 +106,12 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
     'AI generated',
   ];
 
-  const participateResponse = await request.get(`${baseUrl}/partizipate`);
+  const participateResponse = await request.get(`${baseUrl}/participate`);
   expect(participateResponse.status()).toBe(200);
   const participateText = await participateResponse.text();
-  expect(participateText).toContain('Public board');
-  expect(participateText).toContain('Use the right place');
+  expect(participateText).toContain('participate-board');
+  expect(participateText).toContain('/participate/board');
+  expect(participateText).not.toContain('Requests, votes, and shipped work.');
   expect(participateText).not.toContain('ProductLift');
   expect(participateText).not.toContain('productlift.dev');
 
@@ -217,7 +218,7 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   const sitemapText = await sitemapResponse.text();
   expect(sitemapText).not.toContain('/ledger');
   expect(sitemapText).not.toContain('/alice');
-  expect(sitemapText).not.toContain('/partizipate');
+  expect(sitemapText).not.toContain('/participate');
 
   const robotsResponse = await request.get(`${baseUrl}/robots.txt?public-route-guard=1`);
   expect(robotsResponse.ok()).toBeTruthy();
@@ -225,7 +226,7 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   for (const path of ['/alice', '/ledger', '/table-pulse', '/quicksilver', '/local-co-processor', '/karma-forge']) {
     expect(robotsText).toContain(`Disallow: ${path}`);
   }
-  for (const path of ['/participate', '/participate/', '/partizipate', '/partizipate/']) {
+  for (const path of ['/participate', '/participate/', '/participate', '/participate/']) {
     expect(robotsText).not.toContain(`Disallow: ${path}`);
   }
 });

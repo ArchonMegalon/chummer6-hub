@@ -547,9 +547,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("participate-shell", feedback, StringComparison.Ordinal);
         Assert.Contains("participate-hosted__frame", feedback, StringComparison.Ordinal);
-        Assert.Contains("/contact", feedback, StringComparison.Ordinal);
-        Assert.Contains("Need private help?", feedback, StringComparison.Ordinal);
-        Assert.Contains("Use <a class=\"inline-link\" href=\"/contact#support-intake\">Support</a>", feedback, StringComparison.Ordinal);
+        Assert.Contains("/participate/board", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("Need private help?", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use <a class=\"inline-link\" href=\"/contact#support-intake\">Support</a>", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
 
         Assert.Contains("Character tools for Shadowrun.", productStory, StringComparison.Ordinal);

@@ -24,7 +24,7 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Participate.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
-        Assert.Contains("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
         Assert.Contains("id=\"participate-board\"", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
     }

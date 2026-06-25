@@ -18,16 +18,14 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
 
     def test_participate_view_stays_first_party_and_supporter_ready(self) -> None:
         text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
-        self.assertIn('href="@Model.RoadmapHref"', text)
-        self.assertIn('href="/contact#support-intake"', text)
-        self.assertIn("Support Chummer", text)
-        self.assertIn('@if (!string.IsNullOrWhiteSpace(Model.SupporterHref))', text)
+        self.assertIn('<h1 class="sr-only">Participate</h1>', text)
         self.assertIn('src="@(string.IsNullOrWhiteSpace(Model.HostedBoardHref) ? "/participate/board" : Model.HostedBoardHref)"', text)
         self.assertIn('id="participate-board"', text)
         self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
         self.assertNotIn("ProductLift", text)
-        self.assertIn("Requests, votes, and shipped work.", text)
+        self.assertNotIn("Requests, votes, and shipped work.", text)
+        self.assertNotIn("Support Chummer", text)
         self.assertNotIn("Use the right place", text)
         self.assertNotIn("Use the right lane", text)
         self.assertNotIn("first-party route", text)
@@ -39,6 +37,8 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertIn("participate-shell", text)
         self.assertNotIn("participate-lane", text)
         self.assertNotIn("participate-quick-form", text)
+        self.assertNotIn("participate-actions", text)
+        self.assertNotIn("participate-fallback", text)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
 
     def test_public_participate_controller_targets_board_proxy_instead_of_recursive_wrapper(self) -> None:

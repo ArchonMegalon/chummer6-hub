@@ -2816,7 +2816,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var faqSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
     Assert(faqSource.Contains("Open downloads", StringComparison.Ordinal), "faq should expose a direct downloads route for install/update answers.");
-    Assert(faqSource.Contains("Open support intake", StringComparison.Ordinal), "faq should expose a direct support route for help and bug-report answers.");
+    Assert(faqSource.Contains("Open support", StringComparison.Ordinal), "faq should expose a direct support route for help and bug-report answers.");
     Assert(faqSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared signed-in trust panel instead of inventing a faq-only trust surface.");
     Assert(faqSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!faqSource.Contains("story-guide-tail", StringComparison.Ordinal), "faq should end with a quieter footnote instead of a full landing-style CTA band.");
@@ -2829,12 +2829,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
     var participateSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
     Assert(!participateSource.Contains("story-guide-tail", StringComparison.Ordinal), "participate should open with a quieter route intro instead of a generic CTA band.");
-    Assert(participateSource.Contains("Public Fixer Board", StringComparison.Ordinal), "participate should keep the public lane explicit.");
-    Assert(participateSource.Contains("Signed-in participation", StringComparison.Ordinal), "participate should keep the signed-in lane explicit.");
+    Assert(!participateSource.Contains("Requests, votes, and shipped work.", StringComparison.Ordinal), "participate should not add wrapper copy above the public board.");
+    Assert(participateSource.Contains("id=\"participate-board\"", StringComparison.Ordinal), "participate should embed the public board as the primary surface.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
-    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/partizipate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
+    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
@@ -5270,11 +5270,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "publication", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit publication truth from governed creator-publication posture.");
     Assert(hostedCompanionPacketBundle.PublicHubPackets.Any(item => string.Equals(item.OwningDomain, "public_hub", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit public-hub truth from the hosted downloads and support posture.");
     var publicSignalPacketBundle = publicSignalPackets.Build(supportCase, "en-US");
-    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/partizipate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.");
     Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?source=roadmap#public-roadmap-projection", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.");
     Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
     Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.Route, "/contact", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.");
-    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/partizipate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
     var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(
         OpenRun: reloadedOpenRunDetail,
         PublicSignals: publicSignalPacketBundle,
@@ -5284,7 +5284,7 @@ async Task VerifyPublicLandingProjectionAsync()
         Locale: "en-US"));
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "open_runs", StringComparison.Ordinal) && string.Equals(item.Route, $"/api/v1/campaign-spine/me/open-runs/{openRunListingPayload.OpenRunId}", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit open-run proof on the governed open-run route.");
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "shadowcasters", StringComparison.Ordinal) && string.Equals(item.Route, "/roadmap/shadowcasters-network", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit Shadowcasters horizon proof on the public roadmap route.");
-    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/partizipate", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.");
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.");
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit community-hub proof on the signed-in work rail.");
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "account_aware_horizon_conversion", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/account/access", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route.");
     var registryTruthBindings = new RegistryTruthBindingService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new RegistryTruthBindingContext(
@@ -5336,7 +5336,7 @@ async Task VerifyPublicLandingProjectionAsync()
         Locale: "en-US"));
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep support status on the account support rail.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "crash_status", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/support/crashes/work-items", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep crash status on the crash work-item rail.");
-    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/partizipate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "telemetry_rollup", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep telemetry rollups on the privacy-bounded progress route.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail.");
@@ -5468,7 +5468,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
     Assert(progressHtml.Contains("Chummer public navigation", StringComparison.Ordinal), "progress page should render inside the shared public shell");
     Assert(progressHtml.Contains("progress-shell-nav-current", StringComparison.Ordinal) && progressHtml.Contains(">Progress<", StringComparison.Ordinal), "progress page shell should mark the progress route as current in navigation");
-    Assert(progressHtml.Contains("href=\"/partizipate\"", StringComparison.Ordinal), "progress page navigation should link back into the public participation flow");
+    Assert(progressHtml.Contains("href=\"/participate\"", StringComparison.Ordinal), "progress page navigation should link back into the public participation flow");
 
     var progressJson = progressController.ProgressReport().Content ?? string.Empty;
     using (var progressDocument = JsonDocument.Parse(progressJson))

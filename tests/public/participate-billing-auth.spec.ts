@@ -15,11 +15,13 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect(guestLocation).toContain('/auth/google/start?next=');
   expect(guestLocation).toContain('%2Faccount%2Fbilling');
 
-  const guestParticipate = await request.get(`${baseUrl}/partizipate`);
+  const guestParticipate = await request.get(`${baseUrl}/participate`);
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
-  expect(guestParticipateText).toContain('Public board');
-  expect(guestParticipateText).toContain('Support Chummer');
+  expect(guestParticipateText).toContain('participate-board');
+  expect(guestParticipateText).toContain('/participate/board');
+  expect(guestParticipateText).not.toContain('Requests, votes, and shipped work.');
+  expect(guestParticipateText).not.toContain('Support Chummer');
   expect(guestParticipateText).not.toContain('ProductLift');
 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
@@ -93,7 +95,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
   await signedInRequest.dispose();
 
   if (boardBaseUrl) {
-    await page.goto(`${baseUrl}/partizipate`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('body')).toContainText(boardSentinel);
     await expect(page.getByRole('link', { name: 'Support Chummer' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Support Chummer' })).toHaveAttribute('href', '/account/billing/supporter/start');
@@ -101,7 +103,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
     await expect(page.locator('body')).not.toContainText('Sign up');
     await expect(page.locator('body')).not.toContainText('Sign in');
 
-    const signedInParticipate = await request.get(`${baseUrl}/partizipate`, {
+    const signedInParticipate = await request.get(`${baseUrl}/participate`, {
       maxRedirects: 0,
       headers: {
         Cookie: `chummer_hub_access_token=${identityToken}`,
@@ -111,7 +113,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
     const signedInParticipateText = await signedInParticipate.text();
     expect(signedInParticipateText).toContain(boardSentinel);
     expect(signedInParticipateText).not.toContain(boardBaseUrl);
-    expect(signedInParticipateText).toContain('/partizipate/board/');
+    expect(signedInParticipateText).toContain('/participate/board/');
     expect(signedInParticipateText).toContain('/account/billing/supporter/start');
     expect(signedInParticipateText).toContain('Support Chummer');
     expect(signedInParticipateText).not.toContain('Sign in');

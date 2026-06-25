@@ -49,7 +49,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Current release')", text)
         self.assertIn("text.includes('Updated')", text)
         self.assertIn("url: `${baseUrl}/participate`", text)
-        self.assertIn("text.includes('Requests, votes, and shipped work.')", text)
+        self.assertIn("!text.includes('Requests, votes, and shipped work.')", text)
         self.assertIn("text.includes('participate-board')", text)
         self.assertIn("!text.includes('ProductLift')", text)
 

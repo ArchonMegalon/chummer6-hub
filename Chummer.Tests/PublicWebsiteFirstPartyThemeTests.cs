@@ -29,7 +29,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
 
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("=> await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardProxyCore(string.Empty, cancellationToken).ConfigureAwait(false);", controller, StringComparison.Ordinal);
         Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
@@ -39,7 +39,8 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("href: /participate", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Requests, votes, and shipped work.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Support Chummer", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("The board stays here. Open a separate tab only if your browser blocks the embed.", participateView, StringComparison.Ordinal);
 
