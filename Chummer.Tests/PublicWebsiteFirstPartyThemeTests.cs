@@ -75,8 +75,10 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))", roadmapView, StringComparison.Ordinal);
         Assert.Contains("id=\"roadmap-board\"", roadmapView, StringComparison.Ordinal);
         Assert.Contains("src=\"@Model.HostedBoardHref\"", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("What is moving next.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Planned work, visible here.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current work, public requests, and shipped changes.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Loaded through Chummer so the page stays first-party.", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Roadmap guidance", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Quick links", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("planning surface", roadmapView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
     }

@@ -63,7 +63,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Participate <iframe id=\"participate-board\" src=\"/participate/board\"></iframe>"
+                b"<section class=\"partizipate-board\">Participate Short requests, clear bugs, useful ideas.</section>"
                 b"</body></html>"
             )
             return
@@ -74,8 +74,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Participate "
-                b"<iframe id=\"participate-board\" src=\"/participate/board\"></iframe>"
+                b"<section class=\"partizipate-board\">Participate Short requests, clear bugs, useful ideas.</section>"
                 b"</body></html>"
             )
             return
@@ -145,12 +144,22 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual(200, participate["status_code"])
         self.assertFalse(participate["cross_origin_redirect"])
         self.assertEqual([], participate["missing_required_texts"])
+        self.assertEqual([], participate["missing_required_html_texts"])
+        self.assertEqual([], participate["forbidden_html_hits"])
 
         board = next(item for item in payload["results"] if item["path"] == "/participate/board")
         self.assertEqual(200, board["status_code"])
         self.assertFalse(board["cross_origin_redirect"])
         self.assertEqual([], board["missing_required_texts"])
         self.assertEqual([], board["forbidden_hits"])
+
+    def test_verify_blocks_participate_iframe_wrapper(self) -> None:
+        module = load_module()
+        participate_surface = next(item for item in module.SURFACES if item["path"] == "/participate")
+
+        self.assertIn('class="partizipate-board', participate_surface["required_html_texts"])
+        self.assertIn('id="participate-board"', participate_surface["forbidden_html_texts"])
+        self.assertIn('src="/participate/board"', participate_surface["forbidden_html_texts"])
 
     def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:
         module = load_module()

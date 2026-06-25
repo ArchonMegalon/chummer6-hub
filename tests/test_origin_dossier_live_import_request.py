@@ -28,6 +28,10 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -114,6 +118,27 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         provider="Undetectable Humanizer",
         artifacts=[manuscript],
         external=True,
+    )
+    humanizer_quality_receipt = write_json(
+        root / "undetectable-humanizer-quality.receipt.json",
+        {
+            "contractName": "chummer.origin_dossier.humanizer_quality_gate.v1",
+            "provider": "Undetectable Humanizer",
+            "operation": "humanizer_quality_gate",
+            "status": "pass",
+            "goldEligible": True,
+            "issues": [],
+            "sourceTextSha256": sha256(manuscript),
+            "candidateTextSha256": sha256(manuscript),
+            "rawCredentialExposed": False,
+            "rawProviderTokenExposed": False,
+            "createdAtUtc": now_iso(),
+            "metrics": {
+                "sourceContentOverlapRatio": 0.88,
+                "fusedArtifactCount": 0,
+                "providerPreambleCount": 0,
+            },
+        },
     )
     canon_receipt = write_receipt(
         root,
@@ -206,6 +231,38 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
             },
         },
     )
+    ea_m4b_provider_receipt = write_json(
+        root / "ea-m4b-provider-import.receipt.json",
+        {
+            "contractName": "ea.origin_m4b_provider_import_gate.v1",
+            "operation": "origin_m4b_provider_import_gate",
+            "provider": "EA",
+            "status": "pass",
+            "goldEligible": True,
+            "createdAtUtc": now_iso(),
+            "namespace": "origin.chummer.run/Varga/Mira/Kestrel",
+            "m4bPath": "origin.chummer.run/Varga/Mira/Kestrel/audiobook/audiobook.m4b",
+            "m4bSha256": sha256(audio),
+            "coverPath": "origin.chummer.run/Varga/Mira/Kestrel/audiobook/cover.jpg",
+            "coverSha256": sha256(cover),
+            "sourceSha256": sha256(manuscript),
+            "providerReceiptPath": "origin.chummer.run/Varga/Mira/Kestrel/audiobook/provider-m4b.receipt.json",
+            "coverReceiptPath": "origin.chummer.run/Varga/Mira/Kestrel/audiobook/m4b-cover.receipt.json",
+            "issues": [],
+            "shareCreated": False,
+            "rawRuntimePathsExposed": False,
+            "rawCredentialExposed": False,
+            "rawProviderTokenExposed": False,
+            "tokens": [
+                "origin.chummer.run/Varga/Mira/Kestrel",
+                sha256(audio),
+                sha256(cover),
+                sha256(manuscript),
+                "provider_m4b_verified",
+                "m4b_cover_embedded",
+            ],
+        },
+    )
     ea_live_receipt = write_json(
         root / "ea-telegram-live-delivery.receipt.json",
         {
@@ -222,6 +279,19 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
                 "telegram_delivery_status": "sent",
                 "telegram_delivery_message_id_present": True,
                 "machine_playback_e2e_verified": True,
+                "origin_edition_link_bundle": {
+                    "status": "sent",
+                    "project_id": project_id,
+                    "origin_namespace_sha256": sha256_text("origin.chummer.run/Varga/Mira/Kestrel"),
+                    "telegram_delivery_status": "sent",
+                    "telegram_message_id_present": True,
+                    "all_required_links_present": True,
+                    "raw_urls_exposed": False,
+                    "read_url_sha256": sha256_text(f"https://chummer.run/account/work/origin-dossiers/{project_id}/read"),
+                    "listen_url_sha256": sha256_text(f"https://chummer.run/account/work/origin-dossiers/{project_id}/listen"),
+                    "watch_url_sha256": sha256_text(f"https://chummer.run/account/work/origin-dossiers/{project_id}/video"),
+                    "open_in_chummer_url_sha256": sha256_text(f"https://chummer.run/account/work/origin-dossiers/{project_id}"),
+                },
             },
             "privacy": {
                 "raw_job_receipts_persisted": False,
@@ -230,6 +300,36 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
                 "provider_secret_exposed": False,
                 "audiobookshelf_token_exposed": False,
             },
+        },
+    )
+    final_bundle_receipt = write_json(
+        root / "final-origin-edition-bundle.receipt.json",
+        {
+            "contractName": "chummer.origin_edition.final_no_fallback_bundle_audit.v1",
+            "operation": "origin_edition_final_no_fallback_bundle_audit",
+            "provider": "Chummer",
+            "status": "pass",
+            "goldEligible": True,
+            "completedAtUtc": now_iso(),
+            "namespace": "origin.chummer.run/Varga/Mira/Kestrel",
+            "blockedSurfaces": [],
+            "surfaces": [
+                {"name": "approved_canon_packet", "status": "pass"},
+                {"name": "provider_manuscript", "status": "pass"},
+                {"name": "humanizer_receipt", "status": "pass"},
+                {"name": "humanizer_quality_receipt", "status": "pass"},
+                {"name": "cover", "status": "pass"},
+                {"name": "ebook", "status": "pass"},
+                {"name": "pdf", "status": "pass"},
+                {"name": "pdf_cover_receipt", "status": "pass"},
+                {"name": "dossier_audiobookshelf_receipt", "status": "pass"},
+                {"name": "m4b_provider_gate", "status": "pass"},
+                {"name": "cover_consistency", "status": "pass"},
+                {"name": "movie", "status": "pass"},
+                {"name": "movie_receipt", "status": "pass"},
+                {"name": "real_m4b_artifact", "status": "pass"},
+                {"name": "audiobookshelf_audiobook_receipt", "status": "pass"},
+            ],
         },
     )
     manifest = {
@@ -248,6 +348,7 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "providerManuscriptPath": str(manuscript),
         "providerManuscriptReceiptPath": str(provider_receipt),
         "humanizerReceiptPath": str(humanizer_receipt),
+        "humanizerQualityReceiptPath": str(humanizer_quality_receipt),
         "canonAuditReceiptPath": str(canon_receipt),
         "bookArtifactPath": str(book),
         "bookArtifactReceiptPath": str(book_receipt),
@@ -257,15 +358,20 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "dossierVideoPath": str(video),
         "dossierVideoReceiptPath": str(video_receipt),
         "eaAudiobookJobReceiptPath": str(ea_job_receipt),
+        "eaM4bProviderImportReceiptPath": str(ea_m4b_provider_receipt),
         "eaTelegramLiveDeliveryReceiptPath": str(ea_live_receipt),
+        "finalNoFallbackNoSentinelAuditReceiptPath": str(final_bundle_receipt),
     }
     manifest_path = write_json(root / "live-manifest.json", manifest)
     paths: dict[str, Path | str] = {
         "root": root,
         "manifest": manifest_path,
         "eaJobReceipt": ea_job_receipt,
+        "eaM4bProviderReceipt": ea_m4b_provider_receipt,
         "eaLiveReceipt": ea_live_receipt,
+        "finalBundleReceipt": final_bundle_receipt,
         "coverReceipt": cover_receipt,
+        "humanizerQualityReceipt": humanizer_quality_receipt,
         "audiobookShareUrl": audiobook_share_url,
         "dossierShareUrl": dossier_share_url,
     }
@@ -284,6 +390,7 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     request = result["importRequest"]
     assert request["providerAuthoredManuscriptImported"] is True
     assert request["undetectableHumanizerApplied"] is True
+    assert Path(request["humanizerQualityReceiptPath"]).is_file()
     assert request["storySceneCoverUsesSelectedCharacterFace"] is True
     assert request["audiobookshelfPlaybackVerified"] is True
     assert request["telegramShareDelivered"] is True
@@ -294,8 +401,104 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     assert request["audiobookshelfDossierShareUrl"] == "https://audio.chummer.run/share/origin-live-gold-dossier"
     assert request["audiobookshelfAudiobookShareUrl"] == "https://audio.chummer.run/share/origin-live-gold-audiobook"
     assert request["missingGoldRequirements"] == []
+    assert result["evidence"]["humanizerQualityReceiptSha256"] == sha256(Path(request["humanizerQualityReceiptPath"]))
+    assert Path(request["m4bProviderImportReceiptPath"]).is_file()
     assert Path(request["audiobookshelfImportReceiptPath"]).is_file()
     assert Path(request["telegramShareDeliveryReceiptPath"]).is_file()
+    assert Path(request["finalNoFallbackNoSentinelAuditReceiptPath"]).is_file()
+    assert "/origin.chummer.run/Varga/Mira/Kestrel/audiobook/" in request["audiobookshelfImportReceiptPath"].replace("\\", "/")
+    assert "/origin.chummer.run/Varga/Mira/Kestrel/audiobook/" in request["telegramShareDeliveryReceiptPath"].replace("\\", "/")
+    assert result["evidence"]["eaM4bProviderImportReceiptSha256"] == sha256(Path(request["m4bProviderImportReceiptPath"]))
+
+
+def test_materializes_import_request_with_internal_chummer_originbookengine_manuscript(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    provider_receipt = Path(paths["root"]) / "provider-manuscript.chummer.receipt.json"
+    write_json(
+        provider_receipt,
+        {
+            "operation": "provider_manuscript_import",
+            "provider": "Chummer OriginBookEngine",
+            "status": "verified",
+            "completedAtUtc": now_iso(),
+            "artifactSha256": [sha256(Path(payload["providerManuscriptPath"]))],
+            "tokens": [
+                "approved_sample_runner_canon_only",
+                "no_provider_created_facts_entered_canon",
+                "internal_standard_origin_dossier_generation",
+            ],
+        },
+    )
+    payload["providerManuscriptReceiptPath"] = str(provider_receipt)
+    write_json(manifest, payload)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    assert result["status"] == "pass"
+    assert result["importRequest"]["providerAuthoredManuscriptImported"] is True
+
+
+def test_materializes_import_request_with_custom_origin_context_and_base_url(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    project_id = "case-ari-ghost"
+    namespace = "origin.chummer.run/Case/Ari/Ghost"
+    base_url = "https://staging.chummer.run"
+    payload.update(
+        {
+            "projectId": project_id,
+            "familyName": "Case",
+            "givenName": "Ari",
+            "runnerName": "Ghost",
+            "runnerAlias": "Ghost",
+            "originEditionNamespace": namespace,
+            "baseUrl": base_url,
+        }
+    )
+    write_json(manifest, payload)
+    m4b_receipt_path = Path(paths["eaM4bProviderReceipt"])
+    m4b_receipt = json.loads(m4b_receipt_path.read_text(encoding="utf-8"))
+    m4b_receipt["namespace"] = namespace
+    m4b_receipt["tokens"] = [
+        namespace if token == "origin.chummer.run/Varga/Mira/Kestrel" else token
+        for token in m4b_receipt["tokens"]
+    ]
+    write_json(m4b_receipt_path, m4b_receipt)
+    cover_receipt_path = Path(paths["coverReceipt"])
+    cover_receipt = json.loads(cover_receipt_path.read_text(encoding="utf-8"))
+    cover_receipt["deliveredLinks"] = [
+        f"/account/work/origin-dossiers/{project_id}" if token == "/account/work/origin-dossiers/origin-live-gold" else token
+        for token in cover_receipt["deliveredLinks"]
+    ]
+    cover_receipt["deliveredLinks"] = [
+        f"/account/work/origin-dossiers/{project_id}/cover" if token == "/account/work/origin-dossiers/origin-live-gold/cover" else token
+        for token in cover_receipt["deliveredLinks"]
+    ]
+    write_json(cover_receipt_path, cover_receipt)
+    live_receipt_path = Path(paths["eaLiveReceipt"])
+    live_receipt = json.loads(live_receipt_path.read_text(encoding="utf-8"))
+    bundle = live_receipt["selected_delivery"]["origin_edition_link_bundle"]
+    bundle["project_id"] = project_id
+    bundle["origin_namespace_sha256"] = sha256_text(namespace)
+    bundle["read_url_sha256"] = sha256_text(f"{base_url}/account/work/origin-dossiers/{project_id}/read")
+    bundle["listen_url_sha256"] = sha256_text(f"{base_url}/account/work/origin-dossiers/{project_id}/listen")
+    bundle["watch_url_sha256"] = sha256_text(f"{base_url}/account/work/origin-dossiers/{project_id}/video")
+    bundle["open_in_chummer_url_sha256"] = sha256_text(f"{base_url}/account/work/origin-dossiers/{project_id}")
+    write_json(live_receipt_path, live_receipt)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+    request = result["importRequest"]
+
+    assert result["status"] == "pass"
+    assert result["chummerRunOwnerUrl"] == f"{base_url}/account/work/origin-dossiers/{project_id}"
+    assert request["originEditionNamespace"] == namespace
+    assert request["bookArtifactUrl"] == f"{base_url}/account/work/origin-dossiers/{project_id}/book"
+    assert request["dossierVideoUrl"] == f"{base_url}/account/work/origin-dossiers/{project_id}/video"
+    assert request["storySceneCoverUrl"] == f"{base_url}/account/work/origin-dossiers/{project_id}/cover"
+    assert f"/{namespace}/audiobook/" in request["audiobookshelfImportReceiptPath"].replace("\\", "/")
 
 
 def test_rejects_untrusted_audiobookshelf_share_url(tmp_path: Path) -> None:
@@ -307,6 +510,31 @@ def test_rejects_untrusted_audiobookshelf_share_url(tmp_path: Path) -> None:
 
     with pytest.raises(module.ValidationError, match="audiobookshelfAudiobookShareUrl"):
         module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_accepts_live_audiobookshelf_host_for_dossier_and_audiobook_shares(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    live_audiobook_share_url = "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-live-gold-audiobook"
+    live_dossier_share_url = "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-live-gold-dossier"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["audiobookshelfShareUrl"] = live_audiobook_share_url
+    payload["audiobookshelfDossierShareUrl"] = live_dossier_share_url
+    payload["audiobookshelfAudiobookShareUrl"] = payload["audiobookshelfShareUrl"]
+    write_json(manifest, payload)
+    ea_job_receipt = json.loads(Path(paths["eaJobReceipt"]).read_text(encoding="utf-8"))
+    ea_job_receipt["audiobookshelf_import"]["public_share_url"] = live_audiobook_share_url
+    write_json(Path(paths["eaJobReceipt"]), ea_job_receipt)
+    ea_live_receipt = json.loads(Path(paths["eaLiveReceipt"]).read_text(encoding="utf-8"))
+    ea_live_receipt["selected_delivery"]["public_share_host"] = "audiobookshelf.girschele.com"
+    write_json(Path(paths["eaLiveReceipt"]), ea_live_receipt)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    assert result["status"] == "pass"
+    request = result["importRequest"]
+    assert request["audiobookshelfDossierShareUrl"] == live_dossier_share_url
+    assert request["audiobookshelfAudiobookShareUrl"] == live_audiobook_share_url
 
 
 def test_rejects_missing_dossier_share_url(tmp_path: Path) -> None:
@@ -332,6 +560,67 @@ def test_rejects_ea_delivery_without_public_share(tmp_path: Path) -> None:
         module.materialize(manifest, tmp_path / "out.json")
 
 
+def test_rejects_missing_m4b_provider_import_gate(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload.pop("eaM4bProviderImportReceiptPath", None)
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="eaM4bProviderImportReceiptPath"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_failed_m4b_provider_import_gate(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaM4bProviderReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["status"] = "blocked"
+    receipt["goldEligible"] = False
+    receipt["issues"] = ["m4b_missing"]
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="M4B provider import gate is not pass"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_m4b_provider_import_gate_hash_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaM4bProviderReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["sourceSha256"] = "0" * 64
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="manuscript/source hash mismatch"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_ea_delivery_without_origin_edition_link_bundle(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaLiveReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["selected_delivery"].pop("origin_edition_link_bundle", None)
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="Origin Edition link bundle"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_ea_delivery_with_origin_edition_link_hash_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaLiveReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["selected_delivery"]["origin_edition_link_bundle"]["watch_url_sha256"] = "0" * 64
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="watch_url_sha256"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
 def test_rejects_raw_audiobookshelf_path_or_secret_leak(tmp_path: Path) -> None:
     module = load_module()
     manifest, paths = build_valid_fixture(tmp_path)
@@ -353,6 +642,82 @@ def test_rejects_non_approved_audiobook_provider(tmp_path: Path) -> None:
     write_json(receipt_path, receipt)
 
     with pytest.raises(module.ValidationError, match="Inkfluence or Unmixr"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_failed_undetectable_humanizer_quality_gate(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    receipt_path = Path(payload["humanizerReceiptPath"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["status"] = "failed_quality_gate"
+    receipt["goldEligible"] = False
+    receipt["qualityIssues"] = [
+        {
+            "issue": "spacing_or_preamble_artifacts",
+            "markers": ["Pleaseprovidetheinputtexttoberewritten"],
+        }
+    ]
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="receipt status is not verified"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_missing_humanizer_quality_gate(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload.pop("humanizerQualityReceiptPath", None)
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="humanizerQualityReceiptPath"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_failed_deterministic_humanizer_quality_gate(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["humanizerQualityReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["status"] = "failed_quality_gate"
+    receipt["goldEligible"] = False
+    receipt["issues"] = ["fused_spacing_artifacts_detected"]
+    receipt["metrics"]["fusedArtifactCount"] = 12
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="humanizer quality gate is not pass"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_humanizer_quality_gate_source_hash_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["humanizerQualityReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["sourceTextSha256"] = "0" * 64
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="source manuscript hash mismatch"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_audiobook_import_when_provider_text_fidelity_gate_failed(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaJobReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["audiobookshelf_import"]["public_share_status"] = "blocked_audio_publication_gate"
+    receipt["audiobookshelf_import"]["public_share_url"] = ""
+    receipt["audiobookshelf_import"]["public_share_playback_e2e_status"] = "blocked"
+    receipt["render"]["audio_quality"] = {
+        "status": "fail",
+        "issues": ["stt_transcript_not_book_text"],
+    }
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="public share is not ready"):
         module.materialize(manifest, tmp_path / "out.json")
 
 

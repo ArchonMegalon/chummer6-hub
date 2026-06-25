@@ -12033,7 +12033,7 @@ def main() -> int:
             required_texts=("Current pages", "Current release build", "Open saved pages"),
             expects_header_count=1),
         AuditRoute(
-            "/partizipate",
+            "/participate",
             "Participate",
             required_texts=("Public board", "Roadmap", "Private help"),
             forbidden_texts=("productlift.dev",),

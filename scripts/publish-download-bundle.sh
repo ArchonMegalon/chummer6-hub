@@ -35,6 +35,9 @@ is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
   case "$artifact_name" in
+    chummer-*-win-*-payload.zip.json)
+      return 0
+      ;;
     chummer-*-win-*-payload.zip)
       return 0
       ;;
@@ -50,6 +53,38 @@ is_public_artifact() {
       ;;
   esac
   return 0
+}
+
+is_desktop_artifact() {
+  local artifact_name
+  artifact_name="$(basename "$1")"
+  case "$artifact_name" in
+    chummer-avalonia-*|chummer-blazor-desktop-*|chummer-6-*)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  case "$artifact_name" in
+    *.exe|*.zip|*.zip.json|*.tar.gz|*-installer.deb|*-installer.pkg|*-installer.dmg|*-installer.msix)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+cleanup_desktop_artifacts() {
+  local files_dir="$1"
+  local file_path=""
+
+  [[ -d "$files_dir" ]] || return 0
+  for file_path in "$files_dir"/*; do
+    [[ -f "$file_path" ]] || continue
+    if is_desktop_artifact "$file_path"; then
+      rm -f -- "$file_path"
+    fi
+  done
 }
 
 verify_windows_installer_payload_gate() {
@@ -152,20 +187,12 @@ if [[ ! -d "$FILES_SOURCE" ]]; then
 fi
 
 artifacts=()
-while IFS= read -r artifact_path; do
-  [[ -n "$artifact_path" ]] || continue
-  artifacts+=("$artifact_path")
-done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
-  \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o \
-     -name "chummer-avalonia-*.tar.gz" -o -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
-     -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
-     -name "chummer-avalonia-*-payload.zip" -o \
-     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
-     -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
-     -name "chummer-blazor-desktop-*-payload.zip" -o \
-     -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
-     -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
-  | sort)
+for artifact_path in "$FILES_SOURCE"/*; do
+  [[ -f "$artifact_path" ]] || continue
+  if is_desktop_artifact "$artifact_path"; then
+    artifacts+=("$artifact_path")
+  fi
+done
 
 if [[ "${#artifacts[@]}" -eq 0 ]]; then
   echo "No desktop artifacts found under $FILES_SOURCE" >&2
@@ -187,11 +214,13 @@ append_unique_downloads_mirror_dir() {
 
   [[ -n "$candidate" ]] || return 0
   resolved_candidate="$(realpath -m "$candidate")"
-  for existing in "${live_downloads_mirror_dirs[@]:-}"; do
-    if [[ "$(realpath -m "$existing")" == "$resolved_candidate" ]]; then
-      return 0
-    fi
-  done
+  if [[ "${#live_downloads_mirror_dirs[@]}" -gt 0 ]]; then
+    for existing in "${live_downloads_mirror_dirs[@]}"; do
+      if [[ "$(realpath -m "$existing")" == "$resolved_candidate" ]]; then
+        return 0
+      fi
+    done
+  fi
   live_downloads_mirror_dirs+=("$candidate")
 }
 
@@ -208,6 +237,10 @@ discover_live_downloads_mirror_dirs() {
       [[ -n "$candidate" ]] || continue
       append_unique_downloads_mirror_dir "$candidate"
     done
+  fi
+
+  if ! to_bool "${CHUMMER_PUBLIC_EDGE_DOWNLOADS_MIRROR_AUTO:-true}"; then
+    return 0
   fi
 
   for sibling_root in \
@@ -262,20 +295,7 @@ sync_live_downloads_mirror_dir() {
     "$files_dir"/chummer6-bin-aur-source.tar.gz \
     "$files_dir"/chummer6-bin.PKGBUILD \
     "$files_dir"/chummer6-bin.SRCINFO
-  find "$files_dir" -maxdepth 1 -type f \
-    \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
-       -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
-       -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
-       -name "chummer-avalonia-*-payload.zip" -o \
-       -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
-       -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
-       -name "chummer-blazor-desktop-*-payload.zip" -o \
-       -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
-       -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" -o \
-       -name "chummer-6-*.exe" -o -name "chummer-6-*.zip" -o -name "chummer-6-*.tar.gz" -o -name "chummer-6-*-installer.exe" -o \
-       -name "chummer-6-*-payload.zip" -o -name "chummer-6-*-installer.deb" -o -name "chummer-6-*-installer.pkg" -o -name "chummer-6-*-installer.dmg" -o \
-       -name "chummer-6-*-installer.msix" \) \
-    -delete
+  cleanup_desktop_artifacts "$files_dir"
 
   for file_name in "${promoted_file_names[@]}"; do
     source_path="$DEPLOY_DIR/files/$file_name"
@@ -407,25 +427,22 @@ for file_name in "${promoted_file_names[@]}"; do
     if [[ -f "$sync_source_dir/$payload_name" ]]; then
       promoted_file_names+=("$payload_name")
     fi
+    if [[ -f "$sync_source_dir/$payload_name.json" ]]; then
+      promoted_file_names+=("$payload_name.json")
+    fi
+  elif [[ "$file_name" == chummer-*-win-*-payload.zip ]]; then
+    if [[ -f "$sync_source_dir/$file_name.json" ]]; then
+      promoted_file_names+=("$file_name.json")
+    fi
   fi
 done
 
+if [[ "${#promoted_file_names[@]}" -gt 0 ]]; then
+  mapfile -t promoted_file_names < <(printf '%s\n' "${promoted_file_names[@]}" | awk 'NF && !seen[$0]++')
+fi
+
 mkdir -p "$DEPLOY_DIR/files"
-find "$DEPLOY_DIR/files" -maxdepth 1 -type f \
-  \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
-     -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
-     -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
-     -name "chummer-avalonia-*-payload.zip" -o \
-     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
-     -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
-     -name "chummer-blazor-desktop-*-payload.zip" -o \
-     -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
-     -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" -o \
-     -name "chummer-6-*.exe" -o -name "chummer-6-*.zip" -o -name "chummer-6-*.tar.gz" -o -name "chummer-6-*-installer.exe" -o \
-     -name "chummer-6-*-payload.zip" -o -name "chummer-6-*-installer.deb" -o \
-     -name "chummer-6-*-installer.pkg" -o -name "chummer-6-*-installer.dmg" -o \
-     -name "chummer-6-*-installer.msix" \) \
-  -delete
+cleanup_desktop_artifacts "$DEPLOY_DIR/files"
 
 for file_name in "${promoted_file_names[@]}"; do
   source_path="$sync_source_dir/$file_name"
@@ -434,10 +451,6 @@ for file_name in "${promoted_file_names[@]}"; do
     exit 1
   fi
   cp "$source_path" "$DEPLOY_DIR/files/"
-done
-
-for mirror_dir in "${live_downloads_mirror_dirs[@]:-}"; do
-  sync_live_downloads_mirror_dir "$mirror_dir" "public-edge"
 done
 
 if [[ -d "$STARTUP_SMOKE_SOURCE" ]]; then
@@ -754,6 +767,12 @@ PY
     cp "$startup_smoke_stage_dir"/* "$startup_smoke_deploy_dir"/
   fi
   rm -rf "$startup_smoke_stage_dir"
+fi
+
+if [[ "${#live_downloads_mirror_dirs[@]}" -gt 0 ]]; then
+  for mirror_dir in "${live_downloads_mirror_dirs[@]}"; do
+    sync_live_downloads_mirror_dir "$mirror_dir" "public-edge"
+  done
 fi
 
 if to_bool "$DEPLOY_MODE"; then

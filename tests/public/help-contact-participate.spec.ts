@@ -56,7 +56,7 @@ test('help, contact, and participate keep public and private paths clear', async
 
   const helpPage = await openPublicPage(browser, '/help');
   await expect(helpPage.getByRole('heading', { name: 'Get help without guessing' })).toBeVisible();
-  await expect(helpPage.locator('body')).toContainText('Pick the problem');
+  await expect(helpPage.locator('body')).toContainText('Choose the right help path');
   await expect(helpPage.getByRole('link', { name: 'Open downloads' })).toBeVisible();
   await expect(helpPage.getByRole('link', { name: 'Read the FAQ' })).toBeVisible();
   await helpPage.close();

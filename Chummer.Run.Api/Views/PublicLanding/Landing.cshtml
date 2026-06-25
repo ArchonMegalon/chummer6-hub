@@ -21,7 +21,7 @@
     <div class="minimal-hero__copy">
         <h1>Chummer</h1>
         <p class="minimal-hero__lead">A Shadowrun character manager for clean sheets and faster tables.</p>
-        <div class="minimal-actions" aria-label="Main download">
+        <div class="minimal-actions" aria-label="Main actions">
             <a class="button-like button-like--primary" href="/downloads" title="Download Chummer" aria-label="Download Chummer" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
         </div>
         <p class="minimal-meta">@publicPlatformSummary</p>
@@ -38,19 +38,18 @@
         <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop preview" />
         <span class="minimal-hero__visual-badge">Watch 90 sec</span>
     </a>
+    <div class="minimal-runner-rail" data-homepage-section="runner-roster" aria-label="Example runners">
+        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Kestrel after signing in">
+            <span>Kestrel</span>
+            <small>infiltration</small>
+        </a>
+        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Brick after signing in">
+            <span>Brick</span>
+            <small>street samurai</small>
+        </a>
+        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Whisper after signing in">
+            <span>Whisper</span>
+            <small>face</small>
+        </a>
+    </div>
 </section>
-
-@if (Model.Chrome.Authenticated)
-{
-    <section class="minimal-section minimal-section--tight minimal-section--runner-picker" data-homepage-section="runner-roster">
-        <div class="minimal-section__lead">
-            <h2>Open a runner</h2>
-            <p>Open an existing runner in the client.</p>
-        </div>
-        <div class="minimal-actions">
-            <a class="button-like button-like--primary" href="/blazor" data-analytics-event="homepage_open_blazor_roster" data-analytics-surface="minimal_home" data-analytics-label="Open Blazor roster">
-                Open character roster
-            </a>
-        </div>
-    </section>
-}

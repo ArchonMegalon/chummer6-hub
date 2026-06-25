@@ -105,6 +105,7 @@
 ### unmixr
 
 - tier: `4`
+- account_model: `generic_alias_registry`
 - credential_source: local `.env`
 - env_email_key: `CHUMMER_EA_UNMIXR_EMAIL`
 - env_password_key: `CHUMMER_EA_UNMIXR_PASSWORD`
@@ -112,8 +113,11 @@
 - env_login_password_key: `UNMIXR_PASSWORD`
 - env_api_key: `UNMIXR_API_KEY`
 - env_voice_id_key: `UNMIXR_VOICE_ID`
+- env_preferred_account_key: `UNMIXR_PREFERRED_ACCOUNT`
+- env_account_alias_pattern: `UNMIXR_ACCOUNT_<ALIAS>_{EMAIL,PASSWORD,API_KEY,VOICE_ID,CREDITS}`
 - mirrors_default: `true`
-- runtime_boundary: `passing EA-local runtime proof exists for private API key, selected voice id, Piper fallback, and voice roundtrip validation; secrets stay outside git`
+- current_account_aliases: `legacy`, `tibor_girschele_gmail_com`, `tibor_girschele_gmail_com_tier4b`, `tibor_chummer_run`
+- runtime_boundary: `passing EA-local runtime proof exists for private API key, selected voice id, no fallback narration, and voice roundtrip validation; extra accounts must remain inactive until voice id, quota, commercial rights, deletion, and privacy are verified; secrets stay outside git`
 
 ### joggai
 

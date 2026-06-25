@@ -64,7 +64,7 @@ public sealed class HostedBoundedContextCoverageService
             ProjectionId: StableId("hosted-bounded-context-public", manifest.Version),
             SurfaceId: "public_context",
             Route: "/",
-            ComparisonRoute: feedbackPacket?.Route ?? "/partizipate",
+            ComparisonRoute: feedbackPacket?.Route ?? "/participate",
             BoundaryOwner: "public_guide_context",
             DecisionAuthority: "public_release_manifest_and_navigation",
             ReleaseChannel: manifest.Channel,
@@ -84,7 +84,7 @@ public sealed class HostedBoundedContextCoverageService
             [
                 new HostedBoundedContextCoverageActionProjection("open_public_landing", "Open public landing", "/", "Inspect the openly readable product entry page."),
                 new HostedBoundedContextCoverageActionProjection("open_downloads", "Open downloads", "/downloads", "Compare public release and install entry status."),
-                new HostedBoundedContextCoverageActionProjection("open_participate", "Open Participate", feedbackPacket?.Route ?? "/partizipate", "Inspect the reviewed public feedback page.")
+                new HostedBoundedContextCoverageActionProjection("open_participate", "Open Participate", feedbackPacket?.Route ?? "/participate", "Inspect the reviewed public feedback page.")
             ],
             EmittedAtUtc: now,
             Locale: locale,

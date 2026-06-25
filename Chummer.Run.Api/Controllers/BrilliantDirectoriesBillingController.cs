@@ -33,16 +33,16 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> BillingPage([FromQuery] string? userId = null, [FromQuery] string? email = null, CancellationToken cancellationToken = default)
     {
+        _ = userId;
+        _ = email;
         HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
-        string? requestedUserId = TrimToNull(userId);
-        string? requestedEmail = TrimToNull(email);
-        if (currentUser is null && string.IsNullOrWhiteSpace(requestedUserId))
+        if (currentUser is null)
         {
             return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing")}");
         }
 
-        string? resolvedUserId = requestedUserId ?? currentUser?.UserId;
-        string? resolvedEmail = requestedEmail ?? TrimToNull(currentUser?.Email);
+        string resolvedUserId = currentUser.UserId;
+        string? resolvedEmail = TrimToNull(currentUser.Email);
 
         try
         {
@@ -81,7 +81,16 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         try
         {
+            _billing.EnsureAuthorized(BillingSecretHeader());
             return Ok(_billing.GetMyFirstBookQuota(userId));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Billing quota lookup was not authorized.");
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (InvalidOperationException ex)
         {
@@ -116,7 +125,16 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         try
         {
+            _billing.EnsureAuthorized(BillingSecretHeader());
             return Ok(_billing.ConsumeMyFirstBookQuota(userId));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Billing quota mutation was not authorized.");
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (InvalidOperationException ex)
         {
@@ -212,7 +230,12 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         try
         {
+            _billing.EnsureAuthorized(BillingSecretHeader());
             return Ok(_billing.CreateSupporterCheckout(request));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Billing checkout API was not authorized.");
         }
         catch (BrilliantDirectoriesBillingUnavailableException ex)
         {
@@ -230,8 +253,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         try
         {
-            string? secret = Request.Headers["X-Chummer-Billing-Secret"].ToString();
-            return Ok(_billing.SyncMember(request, secret));
+            return Ok(_billing.SyncMember(request, BillingSecretHeader()));
         }
         catch (UnauthorizedAccessException)
         {
@@ -251,8 +273,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         try
         {
-            string? secret = Request.Headers["X-Chummer-Billing-Secret"].ToString();
-            _billing.EnsureAuthorized(secret);
+            _billing.EnsureAuthorized(BillingSecretHeader());
             var snapshot = _billing.GetAccount(userId);
             return snapshot is null ? NotFound() : Ok(snapshot);
         }
@@ -326,4 +347,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private string? BillingSecretHeader()
+        => HttpContext?.Request.Headers["X-Chummer-Billing-Secret"].ToString();
 }

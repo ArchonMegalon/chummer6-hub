@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from origin_edition_verify_paths import deployed_operator_handoff_from_env
+
+
+CONTRACT_NAME = "chummer.origin_edition.deployed_operator_handoff.v1"
+REQUIRED_COMMAND_SNIPPETS = (
+    "materialize_origin_dossier_deployed_browser_probe.py",
+    "audit_origin_dossier_gold_e2e.py",
+    "materialize_origin_edition_gold_proof_chain.py",
+    "materialize_origin_edition_gold_final_verdict.py",
+    "verify_origin_edition_gold_proof_chain.py",
+    "verify_origin_edition_gold_final_verdict.py",
+    "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD=1 bash scripts/ai/run_services_verification.sh",
+)
+FORBIDDEN_VALUE_MARKERS = (
+    "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
+    "Bearer ",
+    "Cookie:",
+    "secret-token",
+    "owner-session-token",
+    "super-secret",
+    "rangersofB5",
+    "api:",
+)
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    parsed = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{path}: expected JSON object")
+    return parsed
+
+
+def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
+    issues: list[str] = []
+    if not path.is_file():
+        return False, [f"missing_deployed_operator_handoff:{path}"]
+    text = path.read_text(encoding="utf-8")
+    for marker in FORBIDDEN_VALUE_MARKERS:
+        if marker in text:
+            issues.append(f"forbidden_secret_marker:{marker}")
+    try:
+        payload = read_json(path)
+    except (json.JSONDecodeError, ValueError) as exc:
+        issues.append(f"invalid_json:{exc.__class__.__name__}")
+        return False, issues
+
+    if payload.get("contractName") != CONTRACT_NAME:
+        issues.append("contract_name_mismatch")
+    status = str(payload.get("status") or "")
+    if status not in {"pass", "ready_for_operator_token", "blocked"}:
+        issues.append(f"unexpected_status:{status}")
+    if require_pass and status != "pass":
+        issues.append("handoff_not_pass")
+    if payload.get("goalCompletionClaimAllowed") is not False:
+        issues.append("handoff_must_not_claim_goal_completion")
+    if not str(payload.get("updated_at") or "").strip():
+        issues.append("updated_at_missing")
+    if not str(payload.get("next_action") or "").strip():
+        issues.append("next_action_missing")
+    blocking_reason = str(payload.get("blocking_reason") or "")
+    if status == "pass" and blocking_reason:
+        issues.append("pass_handoff_has_blocking_reason")
+    if status != "pass" and not blocking_reason:
+        issues.append("blocked_handoff_missing_blocking_reason")
+    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+    if not isinstance(progress.get("blockerCount"), int):
+        issues.append("progress_blocker_count_missing")
+
+    required_env = payload.get("requiredEnv") if isinstance(payload.get("requiredEnv"), dict) else {}
+    token_env = required_env.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN") if isinstance(required_env.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"), dict) else {}
+    release_env = required_env.get("CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD") if isinstance(required_env.get("CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"), dict) else {}
+    if token_env.get("required") is not True:
+        issues.append("identity_token_not_marked_required")
+    if token_env.get("valueStoredInReceipt") is not False:
+        issues.append("identity_token_value_stored")
+    if release_env.get("requiredForRelease") is not True:
+        issues.append("release_gold_env_not_required")
+    if release_env.get("expectedValueForRelease") != "1":
+        issues.append("release_gold_env_expected_value_not_1")
+    if release_env.get("valueStoredInReceipt") is not False:
+        issues.append("release_gold_env_value_stored")
+
+    env_file = payload.get("envFile") if isinstance(payload.get("envFile"), dict) else {}
+    if env_file.get("valuesStoredInReceipt") is not False:
+        issues.append("env_file_values_stored")
+
+    commands = payload.get("requiredCommands") if isinstance(payload.get("requiredCommands"), list) else []
+    serialized_commands = "\n".join(str(command) for command in commands)
+    for snippet in REQUIRED_COMMAND_SNIPPETS:
+        if snippet not in serialized_commands:
+            issues.append(f"required_command_missing:{snippet}")
+    if "--require-gold" not in serialized_commands:
+        issues.append("strict_gold_verifier_missing")
+    if "--allow-blocked" not in serialized_commands:
+        issues.append("blocked_materialization_command_missing")
+
+    current = payload.get("currentEvidence") if isinstance(payload.get("currentEvidence"), dict) else {}
+    required_flags = current.get("deployedProbeRequiredFlags") if isinstance(current.get("deployedProbeRequiredFlags"), dict) else {}
+    missing_flags = current.get("deployedProbeMissingRequiredFlags") if isinstance(current.get("deployedProbeMissingRequiredFlags"), list) else []
+    if not str(current.get("deployedProbeNextAction") or "").strip():
+        issues.append("deployed_probe_next_action_missing")
+    if status != "pass" and not str(current.get("deployedProbeBlockingReason") or "").strip():
+        issues.append("deployed_probe_blocking_reason_missing")
+    if not isinstance(current.get("deployedProbeProgress"), dict):
+        issues.append("deployed_probe_progress_missing")
+    if status == "pass":
+        if payload.get("blockers") != []:
+            issues.append("pass_handoff_has_blockers")
+        if missing_flags != []:
+            issues.append("pass_handoff_has_missing_deployed_flags")
+        if any(value is not True for value in required_flags.values()):
+            issues.append("pass_handoff_required_flag_not_true")
+        if token_env.get("presentInCurrentProcess") is not True:
+            issues.append("pass_handoff_token_not_present")
+    if status == "ready_for_operator_token":
+        blockers = payload.get("blockers") if isinstance(payload.get("blockers"), list) else []
+        if "missing_deployed_identity_token" not in blockers:
+            issues.append("ready_handoff_missing_identity_token_blocker")
+        if token_env.get("presentInCurrentProcess") is not False:
+            issues.append("ready_handoff_token_presence_not_false")
+
+    privacy = payload.get("privacy") if isinstance(payload.get("privacy"), dict) else {}
+    for key in ("rawCredentialExposed", "rawSessionTokenExposed", "envValuesExposed", "deploymentPerformed"):
+        if privacy.get(key) is not False:
+            issues.append(f"privacy_flag_not_false:{key}")
+    return not issues, issues
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Verify the secret-safe deployed operator handoff receipt.")
+    parser.add_argument(
+        "--handoff",
+        type=Path,
+        default=deployed_operator_handoff_from_env(),
+    )
+    parser.add_argument("--require-pass", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    ok, issues = verify(args.handoff, require_pass=args.require_pass)
+    if not ok:
+        for issue in issues:
+            print(issue, file=sys.stderr)
+        return 1
+    print("origin dossier deployed operator handoff verified")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -58,10 +58,10 @@ public sealed class HubPageChromeServiceTests
 
         var service = CreateService(configuration);
 
-        var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/partizipate");
+        var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/participate");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
-        Assert.Equal("/auth/google/start?next=%2Fpartizipate", signIn.Href);
+        Assert.Equal("/auth/google/start?next=%2Fparticipate", signIn.Href);
     }
 
     [Fact]
@@ -83,6 +83,7 @@ public sealed class HubPageChromeServiceTests
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
         Assert.Equal("/help", chrome.PrimaryNavigation[1].Href);
+        Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/participate", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -101,7 +102,7 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildAuthenticatedChrome("Home", "Flagship shell.", "/home", "Runner", "runner@example.com");
 
         Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Label, "Participate", StringComparison.Ordinal));
-        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/participate", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

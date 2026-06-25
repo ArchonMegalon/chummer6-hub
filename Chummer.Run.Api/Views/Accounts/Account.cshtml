@@ -175,18 +175,18 @@
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "This workspace is not attached to a live server plane yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout status here."
+        ? "This campaign is not attached to live continuity yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout status here."
         : selectedWorkspaceLeadConsequence is not null
-            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
-            : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next inbox update can return through carry-forward, memory, and Table Pulse Aftermath on the same path.";
+            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} consequence cue(s) on this campaign, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
+            : "Table Pulse Live is armed on this campaign even before the next reaction resolves, so the next inbox update can return through carry-forward, memory, and Table Pulse Aftermath on the same path.";
     var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
         ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
         : selectedWorkspaceCampaignMemory is not null
             ? $"Living Newsroom framing is currently anchored by campaign memory: {selectedWorkspaceCampaignMemory.Summary}"
-            : "Living Newsroom watch framing is armed, but this workspace has not attached a current carry-forward or memory note yet.";
+            : "Living Newsroom watch framing is armed, but this campaign has not attached a current carry-forward or memory note yet.";
     var selectedWorkspaceRunnerPassportSummary = selectedWorkspaceLeadConsequence is not null
-        ? "Runner Passport continuity is now attached to real command fallout on this workspace instead of sitting in a separate status card."
-        : "Runner Passport is ready to update the moment the next reaction lands on this workspace.";
+        ? "Runner Passport continuity is now attached to real command fallout on this campaign instead of sitting in a separate status card."
+        : "Runner Passport is ready to update the moment the next reaction lands on this campaign.";
     var selectedRun = Model.SelectedRun;
     var selectedRunWorkspace = selectedRun is null
         ? null
@@ -203,7 +203,7 @@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same workspace path instead of splitting into a separate Table Pulse Aftermath story."
+            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same campaign path instead of splitting into a separate Table Pulse Aftermath story."
             : "This run is ready to bind the next reaction, carry-forward detail, and aftermath package on the shared command path.";
     var launcherDossiers = Model.CampaignSpine.Dossiers
         .OrderByDescending(static item => item.UpdatedAtUtc)
@@ -335,7 +335,7 @@
         => route switch
         {
             "/account/access" => "Open account access",
-            "/account/work" => "Open workspace",
+            "/account/work" => "Open work",
             "/downloads" => "Open downloads",
             _ when IsNavigableAccountRoute(route) => $"Open {route}",
             _ => "Open this page"
@@ -578,7 +578,7 @@
             || normalized.Contains("hydrate", StringComparison.Ordinal)
             || normalized.Contains("catch up", StringComparison.Ordinal))
         {
-            return "Resumable. Retry from this workspace and keep the work on the same account view.";
+            return "Resumable. Retry from this campaign and keep the work on the same account view.";
         }
 
         return "No resume action needed right now.";
@@ -1623,7 +1623,7 @@
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns &amp; dossiers</h2>
-                    <p>Campaign workspaces, runner dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
+                    <p>Campaigns, runner dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -1631,7 +1631,7 @@
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Campaign workspaces</span>
+                        <span>Campaigns</span>
                         <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1670,7 +1670,7 @@
                 @if (selectedWorkspace is not null)
                 {
                     <article class="app-action-card app-action-card--primary" id="workspace-@selectedWorkspace.WorkspaceId">
-                        <span class="tag">Campaign workspace</span>
+                        <span class="tag">Campaign</span>
                         <h3>@selectedWorkspace.CampaignName</h3>
                         <p>@(selectedWorkspaceServerPlane?.CampaignSummary.SessionReadinessSummary ?? selectedWorkspace.ReturnSummary)</p>
                         <div class="settings-summary-list">
@@ -1715,7 +1715,7 @@
                             }
                             <div class="settings-summary-row">
                                 <span>Support status</span>
-                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign workspace.")</strong>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next safe action</span>
@@ -1730,7 +1730,7 @@
                                     }
                                     else
                                     {
-                                        <text>Open the campaign workspace and confirm the current return path before you continue.</text>
+                                        <text>Open the campaign and confirm the current return path before you continue.</text>
                                     }
                                 </strong>
                             </div>
@@ -1838,7 +1838,7 @@
                                 <summary>What changed for me</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
-                                        <span>Workspace state</span>
+                                        <span>Campaign state</span>
                                         <strong>@selectedWorkspaceServerPlane.WorkspaceState.Label</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -1959,7 +1959,7 @@
                                 }
                                 else if (selectedWorkspaceServerPlane.DecisionNotices.Count > 0)
                                 {
-                                    <p class="muted-copy">A previous campaign workspace needs attention before you continue. Open the workspace sections below for the next safe step.</p>
+                                    <p class="muted-copy">A previous campaign needs attention before you continue. Open the campaign sections below for the next safe step.</p>
                                 }
                             </details>
 
@@ -2349,7 +2349,7 @@
                                 }
                                 @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
                                 {
-                                    <p class="muted-copy">No restore history is attached to this workspace yet.</p>
+                                    <p class="muted-copy">No restore history is attached to this campaign yet.</p>
                                 }
                                 else
                                 {
@@ -2397,7 +2397,7 @@
                                                 @PublicText(receipt.Summary)
                                                 <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>Issue: @HumanizeStatus(receipt.ConflictPosture, "Needs attention")</span>
-                                                <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable from workspace details")</span>
+                                                <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable from campaign details")</span>
                                                 @* Recovery route: @receipt.RecoveryRoute *@
                                                 <span>Next: @DescribeRecoveryRouteAction(receipt.RecoveryRoute)</span>
                                                 @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
@@ -2418,7 +2418,7 @@
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">No restore conflicts are active for this workspace right now.</p>
+                                    <p class="muted-copy">No restore conflicts are active for this campaign right now.</p>
                                 }
                             </details>
 
@@ -2631,7 +2631,7 @@
                             </form>
                             @if (selectedWorkspacePrepLibraryQueryHistory.Length > 0)
                             {
-                                <p>Recent searches for this workspace:</p>
+                                <p>Recent searches for this campaign:</p>
                                 <div class="muted-copy">
                                     @foreach (var item in selectedWorkspacePrepLibraryQueryHistory)
                                     {
@@ -2848,7 +2848,7 @@
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the workspace has a tracked run to pin into the return path.</p>
+                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the campaign has a tracked run to pin into the return path.</p>
                                 }
                                 @if (selectedWorkspaceAftermathPackages.Count > 0)
                                 {
@@ -2903,7 +2903,7 @@
                                     <strong>Use the Table Pulse Live inbox to trigger or open the next response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Workspace return</span>
+                                    <span>Campaign return</span>
                                     <strong>@(selectedRunWorkspace is null ? "Open campaign work" : $"{selectedRunWorkspace.CampaignName} · return path")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -2915,7 +2915,7 @@
                                 <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
                                 <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                 <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
-                                <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign workspace</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Open carry-forward</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Open aftermath</a>
                             </div>
@@ -3456,7 +3456,7 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign workspace yet. Use the starter path to seed the first playable session before you come back for deeper work continuity.</p>
+                    <p class="muted-copy">No campaign yet. Use the starter path to seed the first playable session before you come back for deeper work continuity.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
                         <a class="inline-link" href="/home/work">Open Home</a>
@@ -3468,7 +3468,7 @@
                     @foreach (var workspace in Model.CampaignSpine.Workspaces)
                     {
                         <details class="details-drawer">
-                            <summary>@workspace.CampaignName · Campaign workspace</summary>
+                            <summary>@workspace.CampaignName · Campaign</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Visibility</span>
@@ -3511,7 +3511,7 @@
                                 }
                                 <div class="settings-summary-row">
                                     <span>Next safe action</span>
-                                    <strong>@(workspace.NextSafeAction ?? "Open the campaign workspace and confirm the current return path before you continue.")</strong>
+                                    <strong>@(workspace.NextSafeAction ?? "Open the campaign and confirm the current return path before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next-session carry-forward</span>
@@ -3551,7 +3551,7 @@
                                 </div>
                             </div>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open campaign workspace</a>
+                                <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open campaign</a>
                                 @if (workspace.Runs.Count > 0)
                                 {
                                     <a class="button-like button-like--secondary" href="@RunDetailHref(workspace.Runs[0].RunId)">Open run context</a>
@@ -4236,7 +4236,7 @@
                                                 {
                                                     <span> Needs attention: @entry.WatchoutSummary</span>
                                                 }
-                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign workspace</a>
+                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign</a>
                                             </li>
                                         }
                                     </ul>
@@ -4755,9 +4755,9 @@
         return;
       }
 
-      setStarterWorkspaceNotice("Starter workspace is not ready yet. Open Home > Work to continue.", true);
+      setStarterWorkspaceNotice("Starter campaign is not ready yet. Open Home > Work to continue.", true);
     } catch (error) {
-      setStarterWorkspaceNotice(ui.describeError(error, "Starter workspace could not be seeded right now."), true);
+      setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."), true);
     } finally {
       ui.setButtonBusy(starterWorkspaceButton, false, "Starting...");
     }
@@ -4881,7 +4881,7 @@
       ["Device", device ? `${device.DeviceRole} · ${device.Platform} / ${device.HeadId} / ${device.Channel}` : "Select a claimed device"],
       ["Status", device?.Status ? ui.humanizeStatus(device.Status, "Needs attention") : "Needs attention"],
       ["Restore status", device?.Summary || "Travel data will be staged against the claimed device."],
-      ["Prefetch inventory", travelPrefetchInventorySummary || "Prefetch inventory stays on the shared workspace."]
+      ["Prefetch inventory", travelPrefetchInventorySummary || "Prefetch inventory stays on the shared campaign."]
     ];
 
     preview.hidden = false;

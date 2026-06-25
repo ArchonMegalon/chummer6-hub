@@ -37,6 +37,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Windows and Linux.", view, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-runner-rail", view, StringComparison.Ordinal);
+        Assert.Contains("data-homepage-section=\"runner-roster\"", view, StringComparison.Ordinal);
+        Assert.Contains("Kestrel", view, StringComparison.Ordinal);
+        Assert.Contains("Brick", view, StringComparison.Ordinal);
+        Assert.Contains("Whisper", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/login?next=%2Fhome%2Faccess\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"workflow\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", view, StringComparison.Ordinal);
@@ -1228,13 +1234,14 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void LayoutFooterKeepsPublicProofAndHelpLinksWithoutCanonDisclosureChrome()
+    public void LayoutFooterKeepsStatusLinkWithoutExtraDownloadChrome()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
 
         string layout = File.ReadAllText(layoutPath);
 
-        Assert.Contains("<a class=\"quiet-link\" href=\"/downloads\">Get Chummer</a> · <a class=\"quiet-link\" href=\"/status\">Status</a>", layout, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"site-footer__provenance\"><a class=\"quiet-link\" href=\"/status\">Status</a></p>", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Get Chummer</a>", layout, StringComparison.Ordinal);
         Assert.Contains("<p class=\"site-footer__copy\">Shadowrun character manager.</p>", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);

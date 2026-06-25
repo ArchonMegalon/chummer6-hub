@@ -1,17 +1,14 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-24T13:42:30Z",
+  "generated_at_utc": "2026-06-25T09:18:51Z",
   "base_url": "https://chummer.run",
-  "status": "fail",
+  "status": "pass",
   "summary": {
-    "route_count": 16,
-    "failed_route_count": 2,
+    "route_count": 18,
+    "failed_route_count": 0,
     "forbidden_pattern_count": 67,
     "minimal_route_forbidden_pattern_count": 26,
-    "failed_routes": [
-      "/partizipate",
-      "/feedback"
-    ]
+    "failed_routes": []
   },
   "forbidden_patterns": [
     "\\bchummer-api\\b",
@@ -244,26 +241,50 @@
       "redirect_external": false
     },
     {
-      "route": "/partizipate",
-      "url": "https://chummer.run/partizipate",
-      "status_code": 302,
-      "success": false,
+      "route": "/participate",
+      "url": "https://chummer.run/participate",
+      "status_code": 200,
+      "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": "route returned HTTP 302",
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
+    },
+    {
+      "route": "/partizipate",
+      "url": "https://chummer.run/partizipate",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "minimal_route": false,
+      "minimal_forbidden_hits": [],
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
+    },
+    {
+      "route": "/participate/board",
+      "url": "https://chummer.run/participate/board",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "minimal_route": false,
+      "minimal_forbidden_hits": [],
+      "detail": null,
       "redirect_url": null,
       "redirect_external": false
     },
     {
       "route": "/feedback",
       "url": "https://chummer.run/feedback",
-      "status_code": 302,
-      "success": false,
+      "status_code": 200,
+      "success": true,
       "forbidden_hits": [],
       "minimal_route": false,
       "minimal_forbidden_hits": [],
-      "detail": "route returned HTTP 302",
+      "detail": null,
       "redirect_url": null,
       "redirect_external": false
     },

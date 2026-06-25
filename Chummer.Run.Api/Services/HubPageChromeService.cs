@@ -31,7 +31,12 @@ public sealed class HubPageChromeService
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
         var guestPrimaryNavigation = nav.Primary
-            .Where(link => !string.Equals(NormalizeRoute(link.Href), "/partizipate", StringComparison.OrdinalIgnoreCase))
+            .Where(link =>
+            {
+                string normalized = NormalizeRoute(link.Href);
+                return !string.Equals(normalized, "/participate", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(normalized, "/partizipate", StringComparison.OrdinalIgnoreCase);
+            })
             .ToArray();
         var guestPublicSignalNavigation = nav.PublicSignal
             .Where(link => !string.Equals(NormalizeRoute(link.Href), "/feedback", StringComparison.OrdinalIgnoreCase))

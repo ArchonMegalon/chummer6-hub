@@ -6,17 +6,23 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
+import sys
 from typing import Any
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from origin_edition_context import OriginEditionContext
+from origin_edition_provider_config import is_trusted_audiobookshelf_share, origin_owner_url
 
 
 CONTRACT_NAME = "chummer.origin_dossier_live_artifact_import_request.v1"
 EA_JOB_RECEIPT_CONTRACT_NAME = "ea.telegram_epub_audiobook_job_receipt.v1"
 EA_LIVE_DELIVERY_CONTRACT_NAME = "ea.telegram_audiobook_live_delivery_receipt.v1"
+EA_M4B_PROVIDER_IMPORT_CONTRACT_NAME = "ea.origin_m4b_provider_import_gate.v1"
+HUMANIZER_QUALITY_CONTRACT_NAME = "chummer.origin_dossier.humanizer_quality_gate.v1"
 DEFAULT_OUTPUT_NAME = "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
-APPROVED_MANUSCRIPT_PROVIDERS = ("inkfluence", "youbooks", "first book", "firstbook")
+APPROVED_MANUSCRIPT_PROVIDERS = ("inkfluence", "youbooks", "first book", "firstbook", "chummer originbookengine")
 APPROVED_AUDIO_PROVIDERS = ("inkfluence", "unmixr")
-TRUSTED_AUDIOBOOKSHELF_SHARE_HOSTS = ("audio.chummer.run", "audiobookshelf.chummer.run")
 FAKE_MARKERS = (
     "stub",
     "fallback",
@@ -79,6 +85,10 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def _require_file(value: object, field: str) -> Path:
     text = str(value or "").strip()
     if not text:
@@ -99,7 +109,13 @@ def _json_text(value: object) -> str:
 
 def _contains_fake_marker(value: object) -> bool:
     if isinstance(value, str):
-        lowered = value.lower()
+        lowered = (
+            value.lower()
+            .replace("no-fallback", "")
+            .replace("no_fallback", "")
+            .replace("nofallback", "")
+            .replace("no fallback", "")
+        )
         return any(marker in lowered for marker in FAKE_MARKERS)
     if isinstance(value, dict):
         return any(_contains_fake_marker(key) or _contains_fake_marker(item) for key, item in value.items())
@@ -168,12 +184,7 @@ def _completion_time_present(receipt: dict[str, Any]) -> bool:
 
 
 def _trusted_audiobookshelf_share_url(url: str) -> bool:
-    parsed = urlparse(url)
-    return (
-        parsed.scheme.lower() == "https"
-        and parsed.hostname in TRUSTED_AUDIOBOOKSHELF_SHARE_HOSTS
-        and "/share/" in parsed.path.lower()
-    )
+    return is_trusted_audiobookshelf_share(url)
 
 
 def _owner_path(project_id: str, artifact_kind: str | None = None) -> str:
@@ -221,16 +232,56 @@ def _validate_receipt(
 
 
 def _validate_provider_manuscript_receipt(path: Path, manuscript_hash: str) -> None:
+    raw = _read_json(path)
+    provider = _json_text(raw)
+    internal_chummer_origin = _provider_allowed(provider, ("chummer originbookengine",))
     receipt = _validate_receipt(
         path=path,
         label="providerManuscriptReceiptPath",
         operation="provider_manuscript_import",
         provider_token=None,
         artifact_hashes=(manuscript_hash,),
-        external=True,
+        external=not internal_chummer_origin,
     )
     if not _provider_allowed(_json_text(receipt), APPROVED_MANUSCRIPT_PROVIDERS):
-        raise ValidationError("providerManuscriptReceiptPath: provider must be Inkfluence, Youbooks, or First Book")
+        raise ValidationError("providerManuscriptReceiptPath: provider must be Inkfluence, Youbooks, First Book, or Chummer OriginBookEngine")
+
+
+def _validate_humanizer_quality_receipt(path: Path, manuscript_hash: str) -> None:
+    receipt = _read_json(path)
+    _reject_fake_markers(receipt, "humanizerQualityReceiptPath")
+    _reject_raw_evidence_leaks(receipt, "humanizerQualityReceiptPath")
+    if _string(receipt.get("contractName")) != HUMANIZER_QUALITY_CONTRACT_NAME:
+        raise ValidationError("humanizerQualityReceiptPath: unsupported contract")
+    if _string(receipt.get("operation")) != "humanizer_quality_gate":
+        raise ValidationError("humanizerQualityReceiptPath: expected operation=humanizer_quality_gate")
+    if "Undetectable" not in _string(receipt.get("provider")):
+        raise ValidationError("humanizerQualityReceiptPath: provider must be Undetectable Humanizer")
+    if _string(receipt.get("status")) != "pass":
+        raise ValidationError("humanizerQualityReceiptPath: humanizer quality gate is not pass")
+    if receipt.get("goldEligible") is not True:
+        raise ValidationError("humanizerQualityReceiptPath: humanizer quality gate is not gold eligible")
+    if receipt.get("issues") not in ([], None):
+        raise ValidationError("humanizerQualityReceiptPath: humanizer quality gate has issues")
+    if _string(receipt.get("sourceTextSha256")) != manuscript_hash:
+        raise ValidationError("humanizerQualityReceiptPath: source manuscript hash mismatch")
+    if receipt.get("rawCredentialExposed") is not False or receipt.get("rawProviderTokenExposed") is not False:
+        raise ValidationError("humanizerQualityReceiptPath: provider credential/token exposure flag is not false")
+    metrics = receipt.get("metrics") if isinstance(receipt.get("metrics"), dict) else {}
+    if float(metrics.get("sourceContentOverlapRatio") or 0) < 0.52:
+        raise ValidationError("humanizerQualityReceiptPath: source overlap ratio is below the accepted floor")
+    if int(metrics.get("fusedArtifactCount") or 0) != 0:
+        raise ValidationError("humanizerQualityReceiptPath: fused spacing artifacts are present")
+
+
+def _accepted_humanized_manuscript_hash(path: Path, fallback_hash: str) -> str:
+    receipt = _read_json(path)
+    accepted = _string(receipt.get("acceptedHumanizedManuscriptSha256"))
+    if accepted:
+        return accepted
+    quality = receipt.get("quality") if isinstance(receipt.get("quality"), dict) else {}
+    accepted = _string(quality.get("candidateTextSha256"))
+    return accepted or fallback_hash
 
 
 def _validate_cover_receipt(path: Path, cover_hash: str, project_id: str, manuscript_hash: str) -> None:
@@ -313,7 +364,49 @@ def _validate_audio_job_receipt(path: Path, audiobook_hash: str, share_url: str)
     return provider
 
 
-def _validate_live_delivery_receipt(path: Path, share_url: str) -> dict[str, Any]:
+def _validate_m4b_provider_import_receipt(
+    path: Path,
+    *,
+    audiobook_hash: str,
+    cover_hash: str,
+    manuscript_hash: str,
+    origin_namespace: str,
+) -> None:
+    receipt = _read_json(path)
+    _reject_fake_markers(receipt, "eaM4bProviderImportReceiptPath")
+    _reject_raw_evidence_leaks(receipt, "eaM4bProviderImportReceiptPath")
+    if _string(receipt.get("contractName")) != EA_M4B_PROVIDER_IMPORT_CONTRACT_NAME:
+        raise ValidationError("eaM4bProviderImportReceiptPath: unsupported contract")
+    if _string(receipt.get("status")) != "pass":
+        raise ValidationError("eaM4bProviderImportReceiptPath: M4B provider import gate is not pass")
+    if receipt.get("goldEligible") is not True:
+        raise ValidationError("eaM4bProviderImportReceiptPath: M4B provider import gate is not gold eligible")
+    if receipt.get("issues") not in ([], None):
+        raise ValidationError("eaM4bProviderImportReceiptPath: M4B provider import gate has issues")
+    if _string(receipt.get("namespace")) != origin_namespace:
+        raise ValidationError("eaM4bProviderImportReceiptPath: Origin namespace mismatch")
+    if _string(receipt.get("m4bSha256")) != audiobook_hash:
+        raise ValidationError("eaM4bProviderImportReceiptPath: M4B hash mismatch")
+    if _string(receipt.get("coverSha256")) != cover_hash:
+        raise ValidationError("eaM4bProviderImportReceiptPath: cover hash mismatch")
+    if _string(receipt.get("sourceSha256")) != manuscript_hash:
+        raise ValidationError("eaM4bProviderImportReceiptPath: manuscript/source hash mismatch")
+    if receipt.get("rawRuntimePathsExposed") is not False:
+        raise ValidationError("eaM4bProviderImportReceiptPath: raw runtime paths are exposed")
+    if receipt.get("rawCredentialExposed") is not False or receipt.get("rawProviderTokenExposed") is not False:
+        raise ValidationError("eaM4bProviderImportReceiptPath: provider credential/token exposure flag is not false")
+    if not _contains_token(receipt, "provider_m4b_verified") or not _contains_token(receipt, "m4b_cover_embedded"):
+        raise ValidationError("eaM4bProviderImportReceiptPath: provider M4B/cover verification tokens missing")
+
+
+def _validate_live_delivery_receipt(
+    path: Path,
+    *,
+    project_id: str,
+    base_url: str,
+    share_url: str,
+    origin_namespace: str,
+) -> dict[str, Any]:
     receipt = _read_json(path)
     _reject_fake_markers(receipt, "eaTelegramLiveDeliveryReceiptPath")
     _reject_raw_evidence_leaks(receipt, "eaTelegramLiveDeliveryReceiptPath")
@@ -337,6 +430,29 @@ def _validate_live_delivery_receipt(path: Path, share_url: str) -> dict[str, Any
         raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Telegram delivery was not sent")
     if selected.get("telegram_delivery_message_id_present") is not True:
         raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Telegram message proof is missing")
+    link_bundle = selected.get("origin_edition_link_bundle") if isinstance(selected.get("origin_edition_link_bundle"), dict) else {}
+    if _string(link_bundle.get("status")) not in {"sent", "pass", "delivered"}:
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle was not sent")
+    if _string(link_bundle.get("project_id")) != project_id:
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle project mismatch")
+    if _string(link_bundle.get("telegram_delivery_status")) != "sent":
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle Telegram delivery was not sent")
+    if link_bundle.get("telegram_message_id_present") is not True:
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle message proof is missing")
+    if link_bundle.get("all_required_links_present") is not True:
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle is missing required links")
+    if link_bundle.get("raw_urls_exposed") is True:
+        raise ValidationError("eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle exposes raw URLs")
+    expected_links = {
+        "read_url_sha256": origin_owner_url(base_url, project_id, "read"),
+        "listen_url_sha256": origin_owner_url(base_url, project_id, "listen"),
+        "watch_url_sha256": origin_owner_url(base_url, project_id, "video"),
+        "open_in_chummer_url_sha256": origin_owner_url(base_url, project_id),
+        "origin_namespace_sha256": origin_namespace,
+    }
+    for key, expected_value in expected_links.items():
+        if _string(link_bundle.get(key)) != _sha256_text(expected_value):
+            raise ValidationError(f"eaTelegramLiveDeliveryReceiptPath: Origin Edition link bundle hash mismatch for {key}")
     privacy = receipt.get("privacy") if isinstance(receipt.get("privacy"), dict) else {}
     for key in ("provider_secret_exposed", "audiobookshelf_token_exposed"):
         if privacy.get(key) is True:
@@ -436,12 +552,25 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         raise ValidationError("originEditionNamespace is required")
     if not origin_namespace.lower().startswith("origin.chummer.run/"):
         raise ValidationError("originEditionNamespace must start with origin.chummer.run/")
+    context = OriginEditionContext.from_env(
+        project_id=project_id,
+        family_name=family_name,
+        given_name=given_name,
+        runner_name=runner_name,
+        namespace=origin_namespace,
+        base_url=_string(manifest.get("baseUrl") or manifest.get("chummerBaseUrl") or manifest.get("originEditionBaseUrl")),
+    )
+    base_url = context.base_url
 
     source_packet = _require_file(manifest.get("sourcePacketPath"), "sourcePacketPath")
     source_receipt = _require_file(manifest.get("sourcePacketReceiptPath"), "sourcePacketReceiptPath")
     provider_manuscript = _require_file(manifest.get("providerManuscriptPath"), "providerManuscriptPath")
     provider_receipt = _require_file(manifest.get("providerManuscriptReceiptPath"), "providerManuscriptReceiptPath")
     humanizer_receipt = _require_file(manifest.get("humanizerReceiptPath"), "humanizerReceiptPath")
+    humanizer_quality_receipt = _require_file(
+        manifest.get("humanizerQualityReceiptPath"),
+        "humanizerQualityReceiptPath",
+    )
     canon_receipt = _require_file(manifest.get("canonAuditReceiptPath"), "canonAuditReceiptPath")
     book_artifact = _require_file(manifest.get("bookArtifactPath"), "bookArtifactPath")
     book_receipt = _require_file(manifest.get("bookArtifactReceiptPath"), "bookArtifactReceiptPath")
@@ -450,7 +579,18 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
     audiobook_artifact = _require_file(manifest.get("audiobookPath"), "audiobookPath")
     video_artifact = _require_file(manifest.get("dossierVideoPath"), "dossierVideoPath")
     video_receipt = _require_file(manifest.get("dossierVideoReceiptPath"), "dossierVideoReceiptPath")
+    final_no_fallback_receipt = _require_file(
+        manifest.get(
+            "finalNoFallbackNoSentinelAuditReceiptPath",
+            f"{origin_namespace}/final-no-fallback-no-sentinel-audit.receipt.json",
+        ),
+        "finalNoFallbackNoSentinelAuditReceiptPath",
+    )
     ea_job_receipt = _require_file(manifest.get("eaAudiobookJobReceiptPath"), "eaAudiobookJobReceiptPath")
+    ea_m4b_provider_receipt = _require_file(
+        manifest.get("eaM4bProviderImportReceiptPath"),
+        "eaM4bProviderImportReceiptPath",
+    )
     ea_live_delivery_receipt = _require_file(
         manifest.get("eaTelegramLiveDeliveryReceiptPath"),
         "eaTelegramLiveDeliveryReceiptPath",
@@ -458,6 +598,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
 
     source_hash = _sha256_file(source_packet)
     manuscript_hash = _sha256_file(provider_manuscript)
+    accepted_manuscript_hash = _accepted_humanized_manuscript_hash(humanizer_receipt, manuscript_hash)
     book_hash = _sha256_file(book_artifact)
     cover_hash = _sha256_file(cover_artifact)
     audiobook_hash = _sha256_file(audiobook_artifact)
@@ -480,6 +621,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         artifact_hashes=(manuscript_hash,),
         external=True,
     )
+    _validate_humanizer_quality_receipt(humanizer_quality_receipt, manuscript_hash)
     _validate_receipt(
         path=canon_receipt,
         label="canonAuditReceiptPath",
@@ -496,7 +638,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         artifact_hashes=(book_hash,),
         external=True,
     )
-    _validate_cover_receipt(cover_receipt, cover_hash, project_id, manuscript_hash)
+    _validate_cover_receipt(cover_receipt, cover_hash, project_id, accepted_manuscript_hash)
     _validate_receipt(
         path=video_receipt,
         label="dossierVideoReceiptPath",
@@ -506,10 +648,23 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         external=True,
     )
     audiobook_provider = _validate_audio_job_receipt(ea_job_receipt, audiobook_hash, audiobook_share_url)
-    live_receipt = _validate_live_delivery_receipt(ea_live_delivery_receipt, audiobook_share_url)
+    _validate_m4b_provider_import_receipt(
+        ea_m4b_provider_receipt,
+        audiobook_hash=audiobook_hash,
+        cover_hash=cover_hash,
+        manuscript_hash=accepted_manuscript_hash,
+        origin_namespace=origin_namespace,
+    )
+    live_receipt = _validate_live_delivery_receipt(
+        ea_live_delivery_receipt,
+        project_id=project_id,
+        base_url=base_url,
+        share_url=audiobook_share_url,
+        origin_namespace=origin_namespace,
+    )
 
     resolved_output = output_path or manifest_path.with_name(DEFAULT_OUTPUT_NAME)
-    normalized_dir = resolved_output.parent / "origin-dossier-live-normalized-receipts" / project_id
+    normalized_dir = resolved_output.parent / origin_namespace / "audiobook"
     audiobook_receipt, telegram_receipt = _materialize_normalized_receipts(
         output_dir=normalized_dir,
         project_id=project_id,
@@ -521,7 +676,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         ea_job_receipt_path=ea_job_receipt,
         ea_live_receipt_path=ea_live_delivery_receipt,
     )
-    owner_url = f"https://chummer.run{_owner_path(project_id)}"
+    owner_url = origin_owner_url(base_url, project_id)
     import_request = {
         "projectId": project_id,
         "title": _string(manifest.get("title")) or "Origin Dossier",
@@ -531,12 +686,12 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "runnerName": runner_name,
         "originEditionNamespace": origin_namespace,
         "publicationState": "published_for_owner",
-        "bookArtifactUrl": f"https://chummer.run{_owner_path(project_id, 'book')}",
+        "bookArtifactUrl": origin_owner_url(base_url, project_id, "book"),
         "audiobookshelfShareUrl": audiobook_share_url,
         "audiobookshelfDossierShareUrl": dossier_share_url,
         "audiobookshelfAudiobookShareUrl": audiobook_share_url,
-        "dossierVideoUrl": f"https://chummer.run{_owner_path(project_id, 'video')}",
-        "storySceneCoverUrl": f"https://chummer.run{_owner_path(project_id, 'cover')}",
+        "dossierVideoUrl": origin_owner_url(base_url, project_id, "video"),
+        "storySceneCoverUrl": origin_owner_url(base_url, project_id, "cover"),
         "providerAuthoredManuscriptImported": True,
         "undetectableHumanizerApplied": True,
         "bookArtifactVerified": True,
@@ -550,15 +705,18 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "providerManuscriptPath": str(provider_manuscript),
         "providerManuscriptReceiptPath": str(provider_receipt),
         "humanizerReceiptPath": str(humanizer_receipt),
+        "humanizerQualityReceiptPath": str(humanizer_quality_receipt),
         "bookArtifactPath": str(book_artifact),
         "bookArtifactReceiptPath": str(book_receipt),
         "storySceneCoverPath": str(cover_artifact),
         "storySceneCoverReceiptPath": str(cover_receipt),
         "audiobookPath": str(audiobook_artifact),
+        "m4bProviderImportReceiptPath": str(ea_m4b_provider_receipt),
         "audiobookshelfImportReceiptPath": str(audiobook_receipt),
         "dossierVideoPath": str(video_artifact),
         "dossierVideoReceiptPath": str(video_receipt),
         "telegramShareDeliveryReceiptPath": str(telegram_receipt),
+        "finalNoFallbackNoSentinelAuditReceiptPath": str(final_no_fallback_receipt),
         "missingGoldRequirements": [],
     }
     result = {
@@ -576,11 +734,14 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "evidence": {
             "sourcePacketSha256": source_hash,
             "providerManuscriptSha256": manuscript_hash,
+            "acceptedHumanizedManuscriptSha256": accepted_manuscript_hash,
+            "humanizerQualityReceiptSha256": _sha256_file(humanizer_quality_receipt),
             "bookArtifactSha256": book_hash,
             "storySceneCoverSha256": cover_hash,
             "audiobookSha256": audiobook_hash,
             "dossierVideoSha256": video_hash,
             "eaAudiobookJobReceiptSha256": _sha256_file(ea_job_receipt),
+            "eaM4bProviderImportReceiptSha256": _sha256_file(ea_m4b_provider_receipt),
             "eaTelegramLiveDeliveryReceiptSha256": _sha256_file(ea_live_delivery_receipt),
             "normalizedAudiobookshelfImportReceiptPath": str(audiobook_receipt),
             "normalizedTelegramShareDeliveryReceiptPath": str(telegram_receipt),

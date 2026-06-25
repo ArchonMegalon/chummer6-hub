@@ -411,7 +411,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("label: Get Chummer", firstVisitSource, StringComparison.Ordinal);
         Assert.DoesNotContain("href: /downloads", firstVisitSource, StringComparison.Ordinal);
         Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);
-        Assert.Contains("href: /partizipate", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /participate", navigation, StringComparison.Ordinal);
         Assert.Contains("label: Help", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /help", navigation, StringComparison.Ordinal);
         Assert.Contains("<nav class=\"site-nav\" aria-label=\"Primary navigation\">", layout, StringComparison.Ordinal);

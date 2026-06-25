@@ -24,7 +24,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Equal("Brilliant Directories", page.Provider);
         Assert.Equal("brilliant_directories", page.ProviderKey);
-        Assert.Contains("same product", page.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("same Chummer app", page.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, page.MyFirstBookQuotaPolicy.FreeMonthlyBooks);
         Assert.Equal(2, page.MyFirstBookQuotaPolicy.SupporterMonthlyBooks);
         Assert.False(page.Capabilities.StoresTenantCredentials);
@@ -40,15 +40,32 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.True(supporter.IsSupporter);
         Assert.False(supporter.UnlocksProductFeatures);
         Assert.Equal("supporter_membership_marker", supporter.EntitlementEffect);
-        Assert.Contains("1 MyFirstBook origin book per month", free.Included);
-        Assert.Contains("2 MyFirstBook origin books per month", supporter.Included);
-        Assert.Contains("do not unlock extra features yet", supporter.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 Origin Book per month", free.Included);
+        Assert.Contains("2 Origin Books per month", supporter.Included);
+        Assert.Contains("app stays the same", supporter.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Single(free.ExampleStoryBooks);
         Assert.Equal("Origin Dossier", free.ExampleStoryBooks[0].Edition);
         Assert.Contains("Debt Before Dawn", free.ExampleStoryBooks[0].Title, StringComparison.Ordinal);
         Assert.Equal(2, supporter.ExampleStoryBooks.Count);
         Assert.Contains("Narrative Origin", supporter.ExampleStoryBooks[0].Edition, StringComparison.Ordinal);
         Assert.Contains("Runner Memoir", supporter.ExampleStoryBooks[1].Edition, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MembershipViewKeepsBillingCopyFirstParty()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
+
+        Assert.Contains("Same app for everyone.", view, StringComparison.Ordinal);
+        Assert.Contains("Origin books: Free 1/month. Supporter 2/month.", view, StringComparison.Ordinal);
+        Assert.Contains("Required to continue", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Required for checkout", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Brilliant", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Directories", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("external billing", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hosted billing", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Premium", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Upgrade", view, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -97,9 +114,10 @@ public sealed class BrilliantDirectoriesBillingTests
     public async Task BillingPagePreviewCarriesCurrentMyFirstBookQuota()
     {
         BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
         service.SyncMember(
             new BrilliantDirectoriesMemberSyncRequest(
-                UserId: "user-a",
+                UserId: user.UserId,
                 MemberId: "bd-42",
                 Email: "runner@example.com",
                 PlanKey: "supporter",
@@ -108,20 +126,13 @@ public sealed class BrilliantDirectoriesBillingTests
                 SupporterActive: true,
                 ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
             "sync-secret");
-        service.ConsumeMyFirstBookQuota("user-a", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+        service.ConsumeMyFirstBookQuota(user.UserId, new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
 
-        BrilliantDirectoriesBillingController controller = new(service)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            }
-        };
-
-        IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
+        IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com");
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.Equal(user.UserId, model.UserId);
         Assert.NotNull(model.CurrentMyFirstBookQuota);
         Assert.Equal(2, model.CurrentMyFirstBookQuota!.MonthlyLimit);
         Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyUsed);
@@ -135,16 +146,32 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public void MyFirstBookQuotaApiReturns429WhenLimitIsExhausted()
+    public void DirectMyFirstBookQuotaApisRequireBillingSecretAndReturnQuotaOnlyWhenAuthorized()
     {
         BrilliantDirectoriesBillingService service = CreateService();
-        BrilliantDirectoriesBillingController controller = new(service);
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
 
         service.ConsumeMyFirstBookQuota("user-a", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
 
-        ActionResult<MyFirstBookQuotaConsumeResultDto> result = controller.ConsumeMyFirstBookQuota("user-a");
+        ActionResult<MyFirstBookQuotaSnapshotDto> unauthorizedLookup = controller.MyFirstBookQuota("user-a");
+        ActionResult<MyFirstBookQuotaConsumeResultDto> unauthorizedConsume = controller.ConsumeMyFirstBookQuota("user-a");
 
-        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(unauthorizedLookup.Result).StatusCode);
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(unauthorizedConsume.Result).StatusCode);
+
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
+        ActionResult<MyFirstBookQuotaSnapshotDto> authorizedLookup = controller.MyFirstBookQuota("user-a");
+        MyFirstBookQuotaSnapshotDto quota = Assert.IsType<MyFirstBookQuotaSnapshotDto>(Assert.IsType<OkObjectResult>(authorizedLookup.Result).Value);
+        Assert.Equal(1, quota.MonthlyUsed);
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> exhausted = controller.ConsumeMyFirstBookQuota("user-a");
+        ObjectResult problem = Assert.IsType<ObjectResult>(exhausted.Result);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
     }
 
@@ -356,7 +383,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task BillingPageReturnsServiceUnavailableInsteadOfThrowingWhenConfigurationIsMissing()
+    public async Task BillingPageRequiresSignInBeforeRenderingUnavailableProviderState()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
         IConfiguration configuration = new ConfigurationBuilder()
@@ -375,6 +402,25 @@ public sealed class BrilliantDirectoriesBillingTests
         };
 
         IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+    }
+
+    [Fact]
+    public async Task SignedInBillingPageReturnsServiceUnavailableInsteadOfThrowingWhenConfigurationIsMissing()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+            })
+            .Build();
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
+        (BrilliantDirectoriesBillingController controller, _) = CreateAuthenticatedController(service, email: "runner@example.com");
+
+        IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com");
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, controller.Response.StatusCode);
@@ -469,13 +515,43 @@ public sealed class BrilliantDirectoriesBillingTests
             })
             .Build();
         BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
-        BrilliantDirectoriesBillingController controller = new(service);
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
 
         ActionResult<BrilliantDirectoriesCheckoutResponseDto> result = controller.StartSupporterCheckoutApi(
             new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
 
         ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+    }
+
+    [Fact]
+    public void SupporterCheckoutApiRequiresMatchingBillingSecret()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<BrilliantDirectoriesCheckoutResponseDto> unauthorized = controller.StartSupporterCheckoutApi(
+            new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(unauthorized.Result).StatusCode);
+
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
+        ActionResult<BrilliantDirectoriesCheckoutResponseDto> authorized = controller.StartSupporterCheckoutApi(
+            new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
+        BrilliantDirectoriesCheckoutResponseDto checkout = Assert.IsType<BrilliantDirectoriesCheckoutResponseDto>(Assert.IsType<OkObjectResult>(authorized.Result).Value);
+        Assert.Contains("billing.example.test/supporter", checkout.CheckoutUrl, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -530,7 +606,7 @@ public sealed class BrilliantDirectoriesBillingTests
         BrilliantDirectoriesBillingUnavailableException ex = Assert.Throws<BrilliantDirectoriesBillingUnavailableException>(() =>
             service.CreateSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", null)));
 
-        Assert.Contains("temporarily unavailable", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unavailable", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static BrilliantDirectoriesBillingService CreateService()

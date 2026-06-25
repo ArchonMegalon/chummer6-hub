@@ -83,9 +83,9 @@ Public CTAs should point readers toward:
 
 ### `public_board_model`
 
-`/partizipate` should feel like the public board itself, not a speech about the board.
+`/participate` should feel like the public board itself, not a speech about the board.
 It is ProductLift-backed signal, roadmap, and closeout data rendered as a Chummer-owned surface.
-The hosted board is served through the local `/partizipate/board` proxy so the public URL stays on `chummer.run`.
+The hosted board is served through the local `/participate/board` proxy so the public URL stays on `chummer.run`.
 
 Required posture:
 

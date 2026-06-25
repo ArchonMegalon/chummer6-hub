@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +18,9 @@ DEFAULT_ENV_PATH = ROOT / ".env"
 DEFAULT_CONTAINER = "chummer6-hub-chummer-portal-1"
 DEFAULT_INTERNAL_API_BASE_URL = "http://127.0.0.1:8091"
 DEFAULT_INTERNAL_API_TIMEOUT_SECONDS = 10.0
+DEFAULT_WHATSAPP_WEB_SIDECAR_BASE_URL = "http://127.0.0.1:8098"
+DEFAULT_WHATSAPP_WEB_SESSION_REF = "default-wa-web"
+DEFAULT_EA_HERTA_LIVE_VERIFIER = "/docker/EA/scripts/verify_whatsapp_web_herta_live_e2e.py"
 
 HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED",
@@ -22,6 +28,7 @@ HEYY_KEYS = (
     "CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID",
     "CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION",
     "CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL",
+    "CHUMMER_HEYY_SCAM_CHAT_BLOCKED_EA_DELIVERY_HOSTS",
     "CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN",
     "CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID",
     "CHUMMER_HEYY_SCAM_CHAT_EA_BINDING_ID",
@@ -54,7 +61,12 @@ CHANNEL_MESSAGING_KEYS = (
     "CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT",
 )
 
-ALL_KEYS = HEYY_KEYS + CHANNEL_MESSAGING_KEYS
+WHATSAPP_WEB_KEYS = (
+    "EA_WHATSAPP_WEB_DEFAULT_SESSION_REF",
+    "WA_WEB_SESSION_REF",
+)
+
+ALL_KEYS = HEYY_KEYS + CHANNEL_MESSAGING_KEYS + WHATSAPP_WEB_KEYS
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -108,10 +120,47 @@ def normalize_phone(value: str | None) -> str | None:
 
 
 def base_url_is_real(values: dict[str, str]) -> bool:
-    base_url = str(values.get("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL") or "").strip().lower()
-    if not base_url:
+    host = extract_host(str(values.get("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL") or ""))
+    if not host:
         return False
-    return not any(marker in base_url for marker in ("support-progress-mock", "127.0.0.1", "localhost"))
+    return host not in blocked_ea_delivery_hosts(values)
+
+
+def blocked_ea_delivery_hosts(values: dict[str, str]) -> set[str]:
+    default_hosts = {"support-progress-mock", "localhost", "127.0.0.1", "::1"}
+    configured = str(values.get("CHUMMER_HEYY_SCAM_CHAT_BLOCKED_EA_DELIVERY_HOSTS") or "").strip()
+    raw_hosts = re.split(r"[;,\|\r\n]+", configured) if configured else []
+    hosts = {extract_host(value) or value.strip().strip("[]").rstrip("/").lower() for value in raw_hosts if value.strip()}
+    return default_hosts | {host for host in hosts if host}
+
+
+def extract_host(value: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    parsed = urllib.parse.urlparse(normalized if "://" in normalized else f"http://{normalized.lstrip('/')}")
+    return parsed.hostname.strip("[]").rstrip(".").lower() if parsed.hostname else ""
+
+
+def resolve_whatsapp_web_session_ref(values: dict[str, str], explicit_session_ref: str | None) -> str:
+    explicit = str(explicit_session_ref or "").strip()
+    if explicit:
+        return explicit
+    for key in WHATSAPP_WEB_KEYS:
+        configured = str(values.get(key) or "").strip()
+        if configured:
+            return configured
+    return DEFAULT_WHATSAPP_WEB_SESSION_REF
+
+
+def parse_iso_timestamp(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return None
 
 
 def normalize_value(values: dict[str, str], key: str) -> str | None:
@@ -286,8 +335,180 @@ def probe_internal_api(api_base_url: str, token: str) -> dict[str, Any]:
     }
 
 
-def build_report(values: dict[str, str], recipient: str | None, internal_api: dict[str, Any]) -> dict[str, Any]:
+def probe_whatsapp_web_sidecar(base_url: str, session_ref: str) -> dict[str, Any]:
+    normalized_base_url = str(base_url or "").strip().rstrip("/")
+    normalized_session_ref = str(session_ref or "").strip()
+    if not normalized_base_url or not normalized_session_ref:
+        return {
+            "status": "not_checked",
+            "ready": False,
+            "reason": "sidecar_probe_unconfigured",
+            "session_ref": normalized_session_ref,
+        }
+
+    try:
+        with urllib.request.urlopen(f"{normalized_base_url}/healthz", timeout=DEFAULT_INTERNAL_API_TIMEOUT_SECONDS) as response:
+            health_payload = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "unreachable",
+            "ready": False,
+            "reason": f"http_{exc.code}",
+            "detail": detail[:300],
+            "session_ref": normalized_session_ref,
+        }
+    except Exception as exc:
+        return {
+            "status": "unreachable",
+            "ready": False,
+            "reason": exc.__class__.__name__,
+            "detail": str(exc)[:300],
+            "session_ref": normalized_session_ref,
+        }
+
+    status = str(health_payload.get("status") or "").strip() or "unknown"
+    reported_session_ref = str(health_payload.get("session_ref") or normalized_session_ref).strip()
+    qr_metadata = {"status": "not_checked"}
+    if status == "qr_required" and reported_session_ref:
+        qr_metadata = probe_whatsapp_web_qr_metadata(normalized_base_url, reported_session_ref)
+    ready = bool(health_payload.get("ready")) or status in {"ready", "authenticated", "connected"}
+    result = {
+        "status": status,
+        "ready": ready,
+        "reason": "" if ready else status,
+        "session_ref": reported_session_ref,
+        "ok": bool(health_payload.get("ok")),
+        "qr": qr_metadata,
+    }
+    return result
+
+
+def probe_whatsapp_web_qr_metadata(base_url: str, session_ref: str) -> dict[str, Any]:
+    normalized_base_url = str(base_url or "").strip().rstrip("/")
+    normalized_session_ref = str(session_ref or "").strip()
+    quoted_session_ref = urllib.parse.quote(normalized_session_ref)
+    url = f"{normalized_base_url}/sessions/{quoted_session_ref}/qr"
+    try:
+        with urllib.request.urlopen(url, timeout=DEFAULT_INTERNAL_API_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "unavailable",
+            "reason": f"http_{exc.code}",
+            "detail": detail[:200],
+            "raw_qr_included": False,
+        }
+    except Exception as exc:
+        return {
+            "status": "unavailable",
+            "reason": exc.__class__.__name__,
+            "detail": str(exc)[:200],
+            "raw_qr_included": False,
+        }
+
+    last_qr_at = str(payload.get("last_qr_at") or "").strip()
+    last_qr = parse_iso_timestamp(last_qr_at)
+    age_seconds = None
+    if last_qr is not None:
+        age_seconds = max(0, int((datetime.now(UTC) - last_qr).total_seconds()))
+    reported_session_ref = str(payload.get("session_ref") or normalized_session_ref)
+    reported_quoted_session_ref = urllib.parse.quote(reported_session_ref)
+    qr_present = bool(payload.get("qr_present"))
+    return {
+        "status": str(payload.get("status") or "").strip() or "unknown",
+        "ready": bool(payload.get("ready")),
+        "qr_present": qr_present,
+        "qr_required": bool(payload.get("qr_required")),
+        "last_qr_at": last_qr_at,
+        "qr_age_seconds": age_seconds,
+        "session_ref": reported_session_ref,
+        "pair_url": f"{normalized_base_url}/sessions/{reported_quoted_session_ref}/pair" if qr_present else "",
+        "qr_svg_url": f"{normalized_base_url}/sessions/{reported_quoted_session_ref}/qr.svg" if qr_present else "",
+        "raw_qr_included": False,
+    }
+
+
+def whatsapp_web_operator_next_action(whatsapp_web_sidecar: dict[str, Any] | None) -> dict[str, Any]:
+    if not whatsapp_web_sidecar:
+        return {"status": "not_needed"}
+    if bool(whatsapp_web_sidecar.get("ready")):
+        return {"status": "not_needed", "reason": "whatsapp_web_sidecar_ready"}
+
+    qr = whatsapp_web_sidecar.get("qr")
+    qr_metadata = qr if isinstance(qr, dict) else {}
+    if bool(qr_metadata.get("qr_required")) and bool(qr_metadata.get("qr_present")):
+        return {
+            "status": "operator_required",
+            "reason": "whatsapp_web_qr_scan_required",
+            "pair_url": str(qr_metadata.get("pair_url") or ""),
+            "qr_svg_url": str(qr_metadata.get("qr_svg_url") or ""),
+            "session_ref": str(qr_metadata.get("session_ref") or whatsapp_web_sidecar.get("session_ref") or ""),
+            "after_scan": "rerun_heyy_whatsapp_live_readiness",
+            "raw_qr_included": False,
+        }
+
+    reason = str(whatsapp_web_sidecar.get("reason") or whatsapp_web_sidecar.get("status") or "whatsapp_web_sidecar_not_ready")
+    return {
+        "status": "blocked",
+        "reason": reason,
+        "session_ref": str(whatsapp_web_sidecar.get("session_ref") or ""),
+        "raw_qr_included": False,
+    }
+
+
+def enrich_operator_next_action_commands(
+    report: dict[str, Any],
+    *,
+    args: argparse.Namespace,
+    session_ref: str,
+) -> None:
+    action = report.get("operator_next_action")
+    if not isinstance(action, dict) or action.get("status") != "operator_required":
+        return
+
+    readiness_command = ["python3", "scripts/check_heyy_whatsapp_live_readiness.py"]
+    if str(args.env_file or "") != str(DEFAULT_ENV_PATH):
+        readiness_command.extend(["--env-file", str(args.env_file)])
+    if bool(args.skip_container):
+        readiness_command.append("--skip-container")
+    else:
+        readiness_command.extend(["--container", str(args.container)])
+    if str(args.recipient or "").strip():
+        readiness_command.extend(["--recipient", str(args.recipient).strip()])
+    readiness_command.extend(
+        [
+            "--include-whatsapp-web-sidecar",
+            "--whatsapp-web-sidecar-base-url",
+            str(args.whatsapp_web_sidecar_base_url or DEFAULT_WHATSAPP_WEB_SIDECAR_BASE_URL),
+            "--whatsapp-web-session-ref",
+            str(session_ref or ""),
+            "--internal-api-base-url",
+            str(args.internal_api_base_url or DEFAULT_INTERNAL_API_BASE_URL),
+        ]
+    )
+    action["rerun_readiness_command"] = readiness_command
+    action["herta_live_verifier_command"] = [
+        "python3",
+        DEFAULT_EA_HERTA_LIVE_VERIFIER,
+        "--session-api-base-url",
+        str(args.whatsapp_web_sidecar_base_url or DEFAULT_WHATSAPP_WEB_SIDECAR_BASE_URL),
+        "--session-ref",
+        str(session_ref or ""),
+    ]
+
+
+def build_report(
+    values: dict[str, str],
+    recipient: str | None,
+    internal_api: dict[str, Any],
+    whatsapp_web_sidecar: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     recipient_digits = normalize_phone(recipient)
+    ea_base_host = extract_host(str(values.get("CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL") or ""))
+    blocked_delivery_hosts = blocked_ea_delivery_hosts(values)
+    ea_base_url_blocked = bool(ea_base_host and ea_base_host in blocked_delivery_hosts)
     meta_ready = (
         enabled(values, "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED")
         and present(values, "CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN")
@@ -317,6 +538,8 @@ def build_report(values: dict[str, str], recipient: str | None, internal_api: di
         blockers.append("live_provider_unconfigured")
     if internal_api.get("status") != "reachable":
         blockers.append("internal_api_unreachable")
+    if whatsapp_web_sidecar is not None and not bool(whatsapp_web_sidecar.get("ready")):
+        blockers.append("whatsapp_web_sidecar_not_ready")
     if not draft_generation_ready:
         blockers.append("draft_generation_unconfigured")
         if draft_blocking_reason:
@@ -348,6 +571,9 @@ def build_report(values: dict[str, str], recipient: str | None, internal_api: di
             "meta_access_token_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"),
             "meta_phone_number_id_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"),
             "ea_base_url_real": base_url_is_real(values),
+            "ea_base_url_host": ea_base_host,
+            "ea_base_url_blocked": ea_base_url_blocked,
+            "blocked_ea_delivery_hosts": sorted(blocked_delivery_hosts),
             "ea_api_token_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"),
             "ea_principal_id_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"),
             "ea_whatsapp_binding_present": present(values, "CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"),
@@ -392,6 +618,8 @@ def build_report(values: dict[str, str], recipient: str | None, internal_api: di
             "ready": draft_generation_ready,
         },
         "internal_api": internal_api,
+        "whatsapp_web_sidecar": whatsapp_web_sidecar or {"status": "not_checked", "ready": False},
+        "operator_next_action": whatsapp_web_operator_next_action(whatsapp_web_sidecar),
         "channel_messaging": {
             "ea_base_url_real": base_url_is_real({
                 "CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL": values.get("CHUMMER_EA_CHANNEL_MESSAGING_EA_BASE_URL", "")
@@ -414,6 +642,9 @@ def main() -> int:
     parser.add_argument("--skip-container", action="store_true")
     parser.add_argument("--include-ea-db", action="store_true")
     parser.add_argument("--internal-api-base-url", default=DEFAULT_INTERNAL_API_BASE_URL)
+    parser.add_argument("--include-whatsapp-web-sidecar", action="store_true")
+    parser.add_argument("--whatsapp-web-sidecar-base-url", default=DEFAULT_WHATSAPP_WEB_SIDECAR_BASE_URL)
+    parser.add_argument("--whatsapp-web-session-ref", default="")
     args = parser.parse_args()
 
     env_values = load_env_file(Path(args.env_file))
@@ -425,13 +656,30 @@ def main() -> int:
         if not token
         else probe_internal_api(args.internal_api_base_url, token)
     )
-    report = build_report(effective, args.recipient, internal_api)
+    whatsapp_web_session_ref = resolve_whatsapp_web_session_ref(effective, args.whatsapp_web_session_ref)
+    sidecar_report = (
+        probe_whatsapp_web_sidecar(
+            args.whatsapp_web_sidecar_base_url,
+            whatsapp_web_session_ref,
+        )
+        if args.include_whatsapp_web_sidecar
+        else None
+    )
+    report = build_report(effective, args.recipient, internal_api, sidecar_report)
+    effective_whatsapp_web_session_ref = str((sidecar_report or {}).get("session_ref") or whatsapp_web_session_ref)
+    enrich_operator_next_action_commands(report, args=args, session_ref=effective_whatsapp_web_session_ref)
     report["sources"] = {
         "env_file": str(Path(args.env_file)),
         "env_file_present": Path(args.env_file).exists(),
         "container": None if args.skip_container else args.container,
         "container_env_present": bool(container_values),
         "internal_api_base_url": args.internal_api_base_url,
+        "whatsapp_web_sidecar_base_url": args.whatsapp_web_sidecar_base_url if args.include_whatsapp_web_sidecar else "",
+        "whatsapp_web_session_ref": effective_whatsapp_web_session_ref if args.include_whatsapp_web_sidecar else "",
+        "whatsapp_web_requested_session_ref": whatsapp_web_session_ref if args.include_whatsapp_web_sidecar else "",
+        "whatsapp_web_reported_session_ref": str((sidecar_report or {}).get("session_ref") or "")
+        if args.include_whatsapp_web_sidecar
+        else "",
     }
     if args.include_ea_db:
         report["ea_db"] = inspect_ea_db_binding()

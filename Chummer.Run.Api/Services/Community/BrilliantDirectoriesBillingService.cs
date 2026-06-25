@@ -62,7 +62,7 @@ public sealed class BrilliantDirectoriesBillingService
                     "A runner cuts ties with an old identity after one irreversible extraction and has to become someone sharper to survive.",
                     "Fits the supporter tier because one premium monthly slot can go to a cleaner chaptered origin instead of a short dossier."),
                 new BillingTierExampleStoryDto(
-                    "Runner Memoir: Becoming Kestrel",
+                    "Runner Memoir: Becoming the Runner",
                     "Runner Memoir",
                     "A first-person street memoir that opens on the worst mistake, then tracks crew, betrayal, and the choice that made the runner.",
                     "Fits the supporter tier because the second premium monthly slot can go to a longer voice-driven memoir.")

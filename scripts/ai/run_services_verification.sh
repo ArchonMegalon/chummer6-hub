@@ -101,7 +101,7 @@ rg -n 'AccountsController|GroupsController|BoostCodesController|BoostSessionsCon
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
 rg -n 'linked identities|channel links|Google|Facebook|Telegram|EA remains the orchestrator brain|/api/v1/accounts/me/links' \
   docs/HUB_IDENTITY_AND_CHANNEL_MODEL.md >/dev/null
-rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|/what-is-chummer|/downloads|/partizipate|/status|/artifacts|/login|/signup|/logout|product front door|Create account|self-link|external fallback' \
+rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|/what-is-chummer|/downloads|/participate|/status|/artifacts|/login|/signup|/logout|product front door|Create account|self-link|external fallback' \
   docs/PUBLIC_LANDING_SURFACE.md >/dev/null
 rg -n 'durable local snapshot|CHUMMER_COMMUNITY_STORE_PATH|parallel intent-only state model' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
@@ -114,7 +114,7 @@ rg -n 'linked identity and channel-link state|EA remains the orchestrator brain 
 rg -n 'public sealed class AccountsController|public sealed class GroupsController|public sealed class BoostCodesController|public sealed class BoostSessionsController|public sealed class LedgerController|public sealed class LeaderboardsController|public sealed class EntitlementsController' \
   Chummer.Run.Api/Controllers/*.cs >/dev/null
 rg -n 'public sealed class AccountLinksController' Chummer.Run.Api/Controllers/AccountLinksController.cs >/dev/null
-rg -n 'public sealed class PublicLandingController|PublicReleaseManifestService|/what-is-chummer|/downloads|/partizipate|/status|/artifacts|GetLanding|GuestShellActions|ResolveCardHref' \
+rg -n 'public sealed class PublicLandingController|PublicReleaseManifestService|/what-is-chummer|/downloads|/participate|/status|/artifacts|GetLanding|GuestShellActions|ResolveCardHref' \
   Chummer.Run.Api/Controllers/PublicLandingController.cs >/dev/null
 rg -n 'public sealed class CampaignSpineController|api/v1/campaign-spine|GetMyCampaignSummary' \
   Chummer.Run.Api/Controllers/CampaignSpineController.cs >/dev/null
@@ -138,7 +138,7 @@ rg -n 'StartEmailEntry|CompleteEmailEntry|RevokeSession|CHUMMER_IDENTITY_STORE_P
   Chummer.Run.Identity/Services/IdentityAccessService.cs \
   Chummer.Run.Identity/Controllers/IdentityController.cs >/dev/null
 rg -n '^GET .*//$' Chummer.Run.Api/Chummer.Run.Api.http -v >/dev/null
-rg -n '/login\?next=/home|/partizipate|/status' Chummer.Run.Api/Chummer.Run.Api.http >/dev/null
+rg -n '/login\?next=/home|/participate|/status' Chummer.Run.Api/Chummer.Run.Api.http >/dev/null
 rg -n 'CHUMMER_COMMUNITY_STORE_PATH|PersistLocked|File.Move' Chummer.Run.Api/Services/Community/CommunityStore.cs >/dev/null
 rg -n 'BoostSessionService|/api/v1/participation/intents|sponsor-session/community-ledger path' Chummer.Run.Api/Controllers/CodexParticipationController.cs >/dev/null
 rg -n 'public sealed class BoosterReceiptsController|public sealed class BoosterReceiptProjectionService' \
@@ -269,6 +269,41 @@ for retired_media_service in \
     exit 1
   fi
 done
+
+ORIGIN_EDITION_EVIDENCE_ROOT="${CHUMMER_ORIGIN_EDITION_EVIDENCE_ROOT:-$ROOT_DIR/../.tmp/origin-dossier-fresh-gold}"
+ORIGIN_EDITION_ENV_FILE="${CHUMMER_ORIGIN_EDITION_ENV_FILE:-$ROOT_DIR/.env}"
+ORIGIN_EDITION_REQUIRE_GOLD="${CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD:-0}"
+ORIGIN_EDITION_NAMESPACE="${CHUMMER_ORIGIN_EDITION_NAMESPACE:-origin.chummer.run/Varga/Mira/Kestrel}"
+ORIGIN_EDITION_BRANCH="$ORIGIN_EDITION_EVIDENCE_ROOT/$ORIGIN_EDITION_NAMESPACE"
+if [ -f "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json" ]; then
+  python3 scripts/materialize_origin_edition_gold_proof_chain.py \
+    --env-file "$ORIGIN_EDITION_ENV_FILE" \
+    --evidence-root "$ORIGIN_EDITION_EVIDENCE_ROOT" \
+    --allow-blocked >/dev/null
+  python3 scripts/materialize_origin_edition_gold_final_verdict.py \
+    --evidence-root "$ORIGIN_EDITION_EVIDENCE_ROOT" \
+    --allow-blocked >/dev/null
+  python3 scripts/verify_origin_dossier_deployed_browser_probe.py \
+    --probe "$ORIGIN_EDITION_BRANCH/deployed-chummer-browser-probe.receipt.json" >/dev/null
+  python3 scripts/verify_origin_dossier_deployed_operator_handoff.py \
+    --handoff "$ORIGIN_EDITION_BRANCH/deployed-operator-handoff.receipt.json" >/dev/null
+  python3 scripts/verify_origin_edition_gold_requirement_coverage.py \
+    --coverage "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json" >/dev/null
+  ORIGIN_EDITION_VERIFY_ARGS=(
+    --proof-chain "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json"
+  )
+  if [ "$ORIGIN_EDITION_REQUIRE_GOLD" = "1" ] || [ "$ORIGIN_EDITION_REQUIRE_GOLD" = "true" ]; then
+    ORIGIN_EDITION_VERIFY_ARGS+=(--require-gold)
+  fi
+  python3 scripts/verify_origin_edition_gold_proof_chain.py \
+    "${ORIGIN_EDITION_VERIFY_ARGS[@]}" >/dev/null
+  python3 scripts/verify_origin_edition_gold_final_verdict.py \
+    --verdict "$ORIGIN_EDITION_EVIDENCE_ROOT/FINAL_ORIGIN_EDITION_GOLD_VERDICT.md" \
+    --proof-chain "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json" \
+    --requirement-coverage "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json" >/dev/null
+else
+  echo "skip Origin Edition proof-chain verification: evidence bundle not present at $ORIGIN_EDITION_EVIDENCE_ROOT"
+fi
 
 bash scripts/ai/build_r1_cleanroom.sh >/dev/null
 

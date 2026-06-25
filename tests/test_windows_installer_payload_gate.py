@@ -712,3 +712,14 @@ def test_windows_installer_verifier_rejects_non_zip_bootstrap_payload(tmp_path: 
 
     assert result.returncode != 0
     assert "payload does not start with ZIP local-file header magic" in result.stderr
+
+
+def test_publish_download_bundle_keeps_desktop_artifact_classification_centralized() -> None:
+    script = PUBLISH_SCRIPT.read_text(encoding="utf-8")
+
+    assert "is_desktop_artifact()" in script
+    assert "cleanup_desktop_artifacts()" in script
+    assert script.count("chummer-avalonia-*|chummer-blazor-desktop-*|chummer-6-*") == 1
+    assert script.count('-name "chummer-avalonia-*.exe"') == 0
+    assert script.count('-name "chummer-blazor-desktop-*.exe"') == 0
+    assert script.count('-name "chummer-6-*.exe"') == 0

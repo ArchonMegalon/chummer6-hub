@@ -37,13 +37,13 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Services/Support/PublicSignalToCanonPacketService.cs": [
         "public sealed class PublicSignalToCanonPacketService",
         'Route: "/feedback"',
-        'DestinationRoute: "/partizipate?source=feedback#public-feedback"',
+        'DestinationRoute: "/participate?source=feedback#public-feedback"',
         'Route: "/roadmap"',
         'DestinationRoute: "/horizons?source=roadmap#public-roadmap-projection"',
         'Route: "/changelog"',
         'DestinationRoute: "/now?source=changelog#public-shipped-closeout"',
         'Route: "/contact"',
-        'Route: "/partizipate"',
+        'Route: "/participate"',
     ],
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs": [
         "services.AddSingleton<PublicSignalToCanonPacketService>();",

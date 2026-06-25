@@ -601,6 +601,91 @@ public sealed class HeyyScamChatServiceTests
     }
 
     [Fact]
+    public async Task ApproveDraftWhatsappModeFallsBackToMetaWhenEaBaseUrlIsBlockedHost()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE"] = "ea",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "http://local-ea-mock:8090",
+            ["CHUMMER_HEYY_SCAM_CHAT_BLOCKED_EA_DELIVERY_HOSTS"] = "local-ea-mock",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-route-blocked-ea",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-route-blocked-ea",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ConsentingTestPhone,
+                ConfirmManualApproval: true,
+                DryRun: false,
+                DraftId: draft.DraftId),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Equal("wamid.meta1", approval.DeliveryRef);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        LoggedRequest request = Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+        Assert.Equal("whatsapp", JsonDocument.Parse(request.Body).RootElement.GetProperty("messaging_product").GetString());
+    }
+
+    [Fact]
+    public async Task ApproveDraftWhatsappModeKeepsDefaultBlockedEaHostsWhenCustomHostsAreConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HEYY_SCAM_CHAT_REDACT_NUMBERS"] = "false",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ENABLED"] = "true",
+            ["CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_DELIVERY_ROUTE"] = "ea",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_BASE_URL"] = "http://support-progress-mock:8080",
+            ["CHUMMER_HEYY_SCAM_CHAT_BLOCKED_EA_DELIVERY_HOSTS"] = "local-ea-mock",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_PRINCIPAL_ID"] = "principal-1",
+            ["CHUMMER_HEYY_SCAM_CHAT_EA_WHATSAPP_BINDING_ID"] = "whatsapp-binding",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_ACCESS_TOKEN"] = "meta-token",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_PHONE_NUMBER_ID"] = "1234567890",
+            ["CHUMMER_HEYY_SCAM_CHAT_META_GRAPH_VERSION"] = "v21.0",
+        });
+        HeyyScamChatDraftResponse draft = await fixture.Service.IngestIncomingAsync(
+            new HeyyScamChatIngestRequest(
+                Channel: "heyy",
+                ConversationId: "conv-whatsapp-route-default-blocked-ea",
+                CounterpartyHandle: ScammerFixturePhone,
+                MessageText: ScamMessage),
+            CancellationToken.None);
+
+        HeyyScamChatApprovalResponse approval = await fixture.Service.ApproveDraftAsync(
+            "conv-whatsapp-route-default-blocked-ea",
+            new HeyyScamChatApproveDraftRequest(
+                OperatorId: "tibor",
+                DeliveryMode: "whatsapp_approved",
+                Recipient: ConsentingTestPhone,
+                ConfirmManualApproval: true,
+                DryRun: false,
+                DraftId: draft.DraftId),
+            CancellationToken.None);
+
+        Assert.Equal("sent_whatsapp_approved", approval.Status);
+        Assert.Equal("wamid.meta1", approval.DeliveryRef);
+        Assert.DoesNotContain(fixture.Handler.Requests, static item => item.Path == "/v1/tools/execute");
+        Assert.Single(fixture.Handler.Requests, static item => item.Path == "/v21.0/1234567890/messages");
+    }
+
+    [Fact]
     public async Task ApproveDraftWhatsappModeIsSuppressedWhenNoWhatsappProviderConfigured()
     {
         using Fixture fixture = new(new Dictionary<string, string?>

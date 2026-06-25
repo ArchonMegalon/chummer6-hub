@@ -82,7 +82,7 @@
         }
 
         return notices is { Count: > 0 }
-            ? "A previous campaign workspace needs attention before you continue. Open the campaign workspace for the safe next step."
+            ? "A previous campaign needs attention before you continue. Open the campaign page for the safe next step."
             : null;
     }
 
@@ -525,7 +525,7 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
-                                        @* Campaign workspace. GM readiness cues. *@
+                                        @* Campaign return. GM readiness cues. *@
                                         <p class="home-stream__summary">Dossiers, runs, and current work stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
                                         <p class="muted-copy">Recent work, rules answers, and active sessions stay visible here before you open the deeper work page.</p>
                                     </div>
@@ -590,7 +590,7 @@
                                             @foreach (var workspace in workspaces)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Workspace</span>
+                                                    <span class="tag">Campaign</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@workspace.CampaignName</h3>
                                                         <p>
@@ -669,7 +669,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign workspace</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign</a>
                                                 </article>
                                             }
                                         }
@@ -708,11 +708,11 @@
                                                             }
                                                             else if (!string.IsNullOrWhiteSpace(leadWorkspaceDecisionNoticeSummary))
                                                             {
-                                                                <span> Workspace note: @PublicText(leadWorkspaceDecisionNoticeSummary)</span>
+                                                                <span> Campaign note: @PublicText(leadWorkspaceDecisionNoticeSummary)</span>
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign workspace</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
                                                 </article>
 
                                                 @if (leadFirstPlayableSession is not null)
@@ -766,7 +766,7 @@
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
                                                                 @leadAftermathPackage.Summary
-                                                                <span> Aftermath stays with this workspace.</span>
+                                                                <span> Aftermath stays with this campaign.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
                                                                 {
                                                                     <span> Note: @leadAftermathEvidence</span>
@@ -916,7 +916,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign workspace</a>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
                                                     </article>
                                                 }
 
@@ -1505,11 +1505,11 @@
           return;
         }
 
-        setStarterWorkspaceNotice("Starter workspace is not ready yet. Open Account Work to continue.");
+        setStarterWorkspaceNotice("Starter campaign is not ready yet. Open Account Work to continue.");
         window.location.href = "/account/work";
       });
     } catch (error) {
-      setStarterWorkspaceNotice(ui.describeError(error, "Starter workspace could not be seeded right now."));
+      setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."));
     }
   });
 

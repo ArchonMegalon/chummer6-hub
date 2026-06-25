@@ -99,7 +99,8 @@ public sealed record OriginDossierPublicationImportRequest(
     string? CoverConsistencyReceiptPath = null,
     string? MoviePosterPath = null,
     string? MovieSubtitlesPath = null,
-    string? MovieStoryboardPath = null);
+    string? MovieStoryboardPath = null,
+    string? FinalNoFallbackNoSentinelAuditReceiptPath = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,

@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-24T13:40:01Z",
-  "base_url": "http://127.0.0.1:37425",
-  "status": "fail",
-  "verdict": "LIVE_SURFACE_PARITY_NOT_READY",
+  "generated_at_utc": "2026-06-25T13:39:06Z",
+  "base_url": "https://chummer.run",
+  "status": "pass",
+  "verdict": "LIVE_SURFACE_PARITY_READY",
   "results": [
     {
       "path": "/",
-      "url": "http://127.0.0.1:37425/",
-      "final_url": "http://127.0.0.1:37425/",
+      "url": "https://chummer.run/",
+      "final_url": "https://chummer.run/",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -17,12 +17,14 @@
       "required_texts": [
         "A Shadowrun character manager for clean sheets and faster tables.",
         "Download Chummer",
-        "Windows and Linux.",
+        "Current public installer",
         "Help",
         "Status",
         "Watch 90 sec"
       ],
+      "required_html_texts": [],
       "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "Next move",
         "Need help?",
@@ -36,15 +38,17 @@
         "Trust and support",
         "Account and quick actions"
       ],
+      "forbidden_html_texts": [],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
       "status": "pass"
     },
     {
       "path": "/downloads",
-      "url": "http://127.0.0.1:37425/downloads",
-      "final_url": "http://127.0.0.1:37425/downloads",
+      "url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/downloads",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -52,15 +56,17 @@
       "redirect_chain": [],
       "required_texts": [
         "Install Chummer",
-        "Windows and Linux installers.",
+        "Current public installer",
         "Current build",
         "Newest build",
         "Nightly",
         "Stable",
-        "Use this when you want the latest Windows or Linux build.",
+        "Use this when you want the newest promoted build.",
         "Help"
       ],
+      "required_html_texts": [],
       "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "Need account return?",
         "Current notes.",
@@ -78,15 +84,17 @@
         "Trust and support",
         "Account and quick actions"
       ],
+      "forbidden_html_texts": [],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
       "status": "pass"
     },
     {
       "path": "/status",
-      "url": "http://127.0.0.1:37425/status",
-      "final_url": "http://127.0.0.1:37425/status",
+      "url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/status",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -100,7 +108,9 @@
         "Open help",
         "Platforms"
       ],
+      "required_html_texts": [],
       "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "Release and next step.",
         "Release, caution, next click.",
@@ -120,94 +130,146 @@
         "Trust and support",
         "Account and quick actions"
       ],
+      "forbidden_html_texts": [],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
       "status": "pass"
     },
     {
-      "path": "/partizipate",
-      "url": "http://127.0.0.1:37425/partizipate",
-      "final_url": "http://127.0.0.1:37425/partizipate",
-      "redirect_location": "https://accounts.google.com/v3/signin/identifier",
-      "redirect_target_url": "https://accounts.google.com/v3/signin/identifier",
-      "cross_origin_redirect": true,
-      "status_code": 302,
-      "redirect_chain": [
-        "https://accounts.google.com/v3/signin/identifier"
-      ],
+      "path": "/participate",
+      "url": "https://chummer.run/participate",
+      "final_url": "https://chummer.run/participate",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
       "required_texts": [
         "Participate",
-        "Public board",
-        "Tell us what slows the table down.",
-        "Use the right place",
-        "Support Chummer"
+        "Short requests, clear bugs, useful ideas."
       ],
-      "missing_required_texts": [
-        "Participate",
-        "Public board",
-        "Tell us what slows the table down.",
-        "Use the right place",
-        "Support Chummer"
+      "required_html_texts": [
+        "class=\"partizipate-board"
       ],
+      "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "ProductLift",
         "Log in",
         "Sign up",
         "Sign in",
         "Authorize Codex access.",
-        "OpenAI account in ChatGPT"
+        "OpenAI account in ChatGPT",
+        "Requests, votes, and shipped work."
+      ],
+      "forbidden_html_texts": [
+        "id=\"participate-board\"",
+        "src=\"/participate/board\""
       ],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
-      "status": "fail"
+      "status": "pass"
     },
     {
-      "path": "/partizipate/board",
-      "url": "http://127.0.0.1:37425/partizipate/board",
-      "final_url": "http://127.0.0.1:37425/auth/google/start?next=%2Fpartizipate",
-      "redirect_location": "https://accounts.google.com/v3/signin/identifier",
-      "redirect_target_url": "https://accounts.google.com/v3/signin/identifier",
-      "cross_origin_redirect": true,
-      "status_code": 302,
-      "redirect_chain": [
-        "http://127.0.0.1:37425/auth/google/start?next=%2Fpartizipate",
-        "https://accounts.google.com/v3/signin/identifier"
-      ],
+      "path": "/partizipate",
+      "url": "https://chummer.run/partizipate",
+      "final_url": "https://chummer.run/partizipate",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
       "required_texts": [
-        "Public board"
+        "Participate",
+        "Short requests, clear bugs, useful ideas."
       ],
-      "missing_required_texts": [
-        "Public board"
+      "required_html_texts": [
+        "class=\"partizipate-board"
       ],
+      "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
-        "/auth/google/start?next=",
-        "accounts.google.com",
+        "ProductLift",
         "Log in",
-        "Sign up"
+        "Sign up",
+        "Sign in",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT",
+        "Requests, votes, and shipped work."
+      ],
+      "forbidden_html_texts": [
+        "id=\"participate-board\"",
+        "src=\"/participate/board\""
       ],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
-      "status": "fail"
+      "status": "pass"
+    },
+    {
+      "path": "/participate/board",
+      "url": "https://chummer.run/participate/board",
+      "final_url": "https://chummer.run/participate/board",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "required_texts": [
+        "Participate - Chummer.run"
+      ],
+      "required_html_texts": [
+        "<title>Participate - Chummer.run</title>",
+        "content=\"Short requests, clear bugs, useful ideas.\"",
+        "data-chummer-board-skin"
+      ],
+      "missing_required_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "ProductLift",
+        "productlift.dev",
+        "Log in",
+        "Sign up",
+        "Sign in",
+        "Search",
+        "Ctrl K",
+        "\u00d7",
+        "Something went wrong",
+        "Could not load posts",
+        "Network error while loading tab configuration",
+        "/auth/google/start?next=",
+        "accounts.google.com"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
     },
     {
       "path": "/ledger",
-      "url": "http://127.0.0.1:37425/ledger",
-      "final_url": "http://127.0.0.1:37425/ledger/map",
+      "url": "https://chummer.run/ledger",
+      "final_url": "https://chummer.run/ledger/map",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:37425/ledger/map"
+        "https://chummer.run/ledger/map"
       ],
       "required_texts": [
         "Black Ledger command map",
         "Command map"
       ],
+      "required_html_texts": [],
       "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "Internal Error",
         "Board signal:",
@@ -222,43 +284,42 @@
         "Scene notes",
         "<p class=\"editorial-copy\"></p>"
       ],
+      "forbidden_html_texts": [],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": "/ledger/map",
       "final_url_matches": true,
       "status": "pass"
     },
     {
       "path": "/ledger/newsroom",
-      "url": "http://127.0.0.1:37425/ledger/newsroom",
-      "final_url": "http://127.0.0.1:37425/ledger/newsroom",
+      "url": "https://chummer.run/ledger/newsroom",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
-      "redirect_chain": [],
+      "redirect_chain": [
+        "https://chummer.run/ledger/newsroom/turn-2-newsreel"
+      ],
       "required_texts": [
         "Black Ledger Newsroom",
         "Transcript",
         "Published:"
       ],
+      "required_html_texts": [],
       "missing_required_texts": [],
+      "missing_required_html_texts": [],
       "forbidden_texts": [
         "Internal Error"
       ],
+      "forbidden_html_texts": [],
       "forbidden_hits": [],
+      "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
       "status": "pass"
     }
   ],
-  "failures": [
-    "/partizipate: expected 200, got 302",
-    "/partizipate: redirected to https://accounts.google.com/v3/signin/identifier",
-    "/partizipate: redirected off-origin to https://accounts.google.com/v3/signin/identifier",
-    "/partizipate: missing required text: Participate, Public board, Tell us what slows the table down., Use the right place, Support Chummer",
-    "/partizipate/board: expected 200, got 302",
-    "/partizipate/board: redirected to https://accounts.google.com/v3/signin/identifier",
-    "/partizipate/board: redirected off-origin to https://accounts.google.com/v3/signin/identifier",
-    "/partizipate/board: missing required text: Public board"
-  ]
+  "failures": []
 }

@@ -16,7 +16,10 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Recent change", view, StringComparison.Ordinal);
         Assert.Contains("Use as guest or link this copy later.", view, StringComparison.Ordinal);
         Assert.Contains("Everything you need in one place.", view, StringComparison.Ordinal);
-        Assert.Contains("Workspace", view, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"tag\">Campaign</span>", view, StringComparison.Ordinal);
+        Assert.Contains(">Open campaign</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">Workspace</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open campaign workspace", view, StringComparison.Ordinal);
         Assert.Contains("Build, explain, and next step", view, StringComparison.Ordinal);
     }
 
@@ -29,8 +32,8 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("BuildCalmHomeDecisionNoticeSummary", view, StringComparison.Ordinal);
         Assert.Contains("WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("leadPortableExchangeSummary", view, StringComparison.Ordinal);
-        Assert.Contains("A previous campaign workspace needs attention before you continue. Open the campaign workspace for the safe next step.", view, StringComparison.Ordinal);
-        Assert.Contains("Workspace note: @PublicText(leadWorkspaceDecisionNoticeSummary)", view, StringComparison.Ordinal);
+        Assert.Contains("A previous campaign needs attention before you continue. Open the campaign page for the safe next step.", view, StringComparison.Ordinal);
+        Assert.Contains("Campaign note: @PublicText(leadWorkspaceDecisionNoticeSummary)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Portable exchange: @leadPortableExchangeNotice.Summary", view, StringComparison.Ordinal);
     }
@@ -45,7 +48,8 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Build next step", view, StringComparison.Ordinal);
         Assert.Contains("Contribution credit follows useful closeout and continuity.", view, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay in reserve.", view, StringComparison.Ordinal);
-        Assert.Contains("Keep the browser step secondary.", view, StringComparison.Ordinal);
+        Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", view, StringComparison.Ordinal);
+        Assert.Contains("keep browser pages as backup help instead of the normal path", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -57,7 +61,7 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceDecisionNotices", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspacePortableExchangeSummary", view, StringComparison.Ordinal);
-        Assert.Contains("A previous campaign workspace needs attention before you continue. Open the workspace sections below for the next safe step.", view, StringComparison.Ordinal);
+        Assert.Contains("A previous campaign needs attention before you continue. Open the campaign sections below for the next safe step.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@selectedWorkspacePortableExchangeNotice.Summary", view, StringComparison.Ordinal);
     }

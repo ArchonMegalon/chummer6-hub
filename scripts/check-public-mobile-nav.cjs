@@ -63,7 +63,7 @@ async function assertMobileNav(page, path, contentNeedle) {
 
   try {
     await assertMobileNav(page, '/', 'Open downloads');
-    await assertMobileNav(page, '/partizipate', 'Signed-in participation');
+    await assertMobileNav(page, '/participate', 'Signed-in participation');
     console.log('mobile-nav: ok');
   } finally {
     await browser.close();

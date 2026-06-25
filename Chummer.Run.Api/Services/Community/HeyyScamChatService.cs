@@ -114,8 +114,10 @@ public sealed class HeyyScamChatService
     private const string PersonaMinimumDelaySecondsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_PERSONA_MINIMUM_DELAY_SECONDS";
     private const string WhatsappAllowedRecipientsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_ALLOWED_RECIPIENTS";
     private const string WhatsappBlockedRecipientsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_WHATSAPP_BLOCKED_RECIPIENTS";
+    private const string BlockedEaDeliveryHostsConfigKey = "CHUMMER_HEYY_SCAM_CHAT_BLOCKED_EA_DELIVERY_HOSTS";
     private const string WhatsappDeliveryRouteMeta = "meta";
     private const string WhatsappDeliveryRouteEa = "ea";
+    private static readonly string[] DefaultBlockedEaDeliveryHosts = ["support-progress-mock", "localhost", "127.0.0.1", "::1"];
 
     private const string DefaultPersonaSystemPrompt =
         """
@@ -2280,10 +2282,7 @@ public sealed class HeyyScamChatService
             return false;
         }
 
-        string normalizedBaseUrl = baseUrl.Trim().TrimEnd('/');
-        return !normalizedBaseUrl.Contains("support-progress-mock", StringComparison.OrdinalIgnoreCase)
-            && !normalizedBaseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
-            && !normalizedBaseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase);
+        return IsRealEaDeliveryBaseUrl(baseUrl);
     }
 
     private bool MetaWhatsAppConfigured()
@@ -2373,9 +2372,58 @@ public sealed class HeyyScamChatService
             return false;
         }
 
-        return !baseUrl.Contains("support-progress-mock", StringComparison.OrdinalIgnoreCase)
-            && !baseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
-            && !baseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase);
+        return IsRealEaDeliveryBaseUrl(baseUrl);
+    }
+
+    private bool IsRealEaDeliveryBaseUrl(string baseUrl)
+    {
+        string? host = TryExtractHost(baseUrl);
+        if (host is null)
+        {
+            return false;
+        }
+
+        return !ResolveBlockedEaDeliveryHosts().Contains(host, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<string> ResolveBlockedEaDeliveryHosts()
+    {
+        string? configured = AccountService.NormalizeOptional(_configuration[BlockedEaDeliveryHostsConfigKey]);
+        if (configured is null)
+        {
+            return DefaultBlockedEaDeliveryHosts;
+        }
+
+        string[] configuredHosts = configured
+            .Split([';', ',', '|', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(static value => TryExtractHost(value) ?? value.Trim().Trim('[', ']').TrimEnd('/'))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return configuredHosts.Length > 0
+            ? DefaultBlockedEaDeliveryHosts.Concat(configuredHosts).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            : DefaultBlockedEaDeliveryHosts;
+    }
+
+    private static string? TryExtractHost(string value)
+    {
+        string? normalized = AccountService.NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out Uri? absolute) && !string.IsNullOrWhiteSpace(absolute.Host))
+        {
+            return absolute.Host.Trim('[', ']').TrimEnd('.').ToLowerInvariant();
+        }
+
+        if (Uri.TryCreate($"http://{normalized.TrimStart('/')}", UriKind.Absolute, out Uri? inferred) && !string.IsNullOrWhiteSpace(inferred.Host))
+        {
+            return inferred.Host.Trim('[', ']').TrimEnd('.').ToLowerInvariant();
+        }
+
+        return null;
     }
 
     private string ResolveDigestRecipient()

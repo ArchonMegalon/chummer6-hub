@@ -230,7 +230,7 @@ public sealed class KarmaForgeDiscoveryService
                 boundary: "public_signal_only",
                 summary: "Public discovery can invite a table into the governed intake, but it never becomes support, backlog, or rules truth.",
                 actionLabel: "Open the first-party invite lane",
-                actionHref: NormalizeConfiguredPath(_configuration[FacePopPublicInvitePathConfigKey]) ?? "/partizipate",
+                actionHref: NormalizeConfiguredPath(_configuration[FacePopPublicInvitePathConfigKey]) ?? "/participate",
                 enabled: true),
             BuildStageProjection(
                 stageKey: "structured_prescreen",

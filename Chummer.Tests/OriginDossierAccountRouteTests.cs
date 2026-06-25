@@ -259,7 +259,8 @@ public sealed class OriginDossierAccountRouteTests
                     MoviePosterPath: artifacts.StorySceneCoverPath,
                     MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                     MovieStoryboardPath: artifacts.MovieStoryboardPath,
-                    TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath));
+                    TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
+                    FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath));
             return artifacts;
         }
 
@@ -334,18 +335,11 @@ public sealed class OriginDossierAccountRouteTests
                     "Audiobookshelf",
                     ["dossierShare: https://audio.chummer.run/share/origin-route-dossier"],
                     [ebookArtifactPath]),
-                CoverConsistencyReceiptPath: WriteReceipt(
+                CoverConsistencyReceiptPath: WriteCoverConsistencyReceipt(
                     projectRoot,
                     "cover-consistency.receipt.json",
-                    "origin_edition_cover_consistency",
-                    "Chummer",
-                    [
-                        ComputeSha256(storySceneCoverPath),
-                        "origin.chummer.run/Varga/Mira/Route-Runner",
-                        "ebook_cover_embedded",
-                        "m4b_cover_embedded",
-                        "movie_poster_matches_cover"
-                    ]),
+                    "origin.chummer.run/Varga/Mira/Route-Runner",
+                    ComputeSha256(storySceneCoverPath)),
                 AudiobookPath: audiobookPath,
                 AudiobookshelfImportReceiptPath: WriteReceipt(
                     projectRoot,
@@ -373,6 +367,10 @@ public sealed class OriginDossierAccountRouteTests
                         $"/account/work/origin-dossiers/{projectId}/watch",
                         "origin.chummer.run/Varga/Mira/Route-Runner"
                     ]),
+                FinalNoFallbackNoSentinelAuditReceiptPath: WriteFinalNoFallbackNoSentinelAuditReceipt(
+                    projectRoot,
+                    "final-no-fallback-no-sentinel.receipt.json",
+                    "origin.chummer.run/Varga/Mira/Route-Runner"),
                 MovieSubtitlesPath: movieSubtitlesPath,
                 MovieStoryboardPath: movieStoryboardPath);
         }
@@ -433,6 +431,95 @@ public sealed class OriginDossierAccountRouteTests
             return path;
         }
 
+        private static string WriteFinalNoFallbackNoSentinelAuditReceipt(
+            string projectRoot,
+            string fileName,
+            string originEditionNamespace)
+        {
+            string path = Path.Combine(projectRoot, fileName);
+            string[] requiredSurfaces =
+            [
+                "approved_canon_packet",
+                "provider_manuscript",
+                "humanizer_receipt",
+                "humanizer_quality_receipt",
+                "cover",
+                "ebook",
+                "pdf",
+                "pdf_cover_receipt",
+                "dossier_audiobookshelf_receipt",
+                "m4b_provider_gate",
+                "cover_consistency",
+                "movie",
+                "movie_receipt",
+                "gap_audit",
+                "real_m4b_artifact",
+                "audiobookshelf_audiobook_receipt"
+            ];
+
+            File.WriteAllText(
+                path,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        contractName = "chummer.origin_edition.final_no_fallback_bundle_audit.v1",
+                        operation = "origin_edition_final_no_fallback_bundle_audit",
+                        provider = "Chummer",
+                        status = "pass",
+                        goldEligible = true,
+                        completedAtUtc = DateTimeOffset.UtcNow,
+                        @namespace = originEditionNamespace,
+                        blockedSurfaces = Array.Empty<string>(),
+                        surfaces = requiredSurfaces
+                            .Select(surface => new { name = surface, status = "pass" })
+                            .ToArray()
+                    },
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
+            return path;
+        }
+
+        private static string WriteCoverConsistencyReceipt(
+            string projectRoot,
+            string fileName,
+            string originEditionNamespace,
+            string coverSha256)
+        {
+            string path = Path.Combine(projectRoot, fileName);
+            string[] requiredSurfaces =
+            [
+                "chummer_hero_cover",
+                "dossier_cover_asset",
+                "ebook_embedded_cover",
+                "pdf_cover_embedding",
+                "audiobook_cover_asset",
+                "m4b_cover_embedding",
+                "audiobookshelf_dossier_cover",
+                "audiobookshelf_audiobook_cover",
+                "movie_poster"
+            ];
+
+            File.WriteAllText(
+                path,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        contractName = "chummer.origin_edition.cover_consistency_audit.v1",
+                        operation = "origin_edition_cover_consistency",
+                        provider = "Chummer",
+                        status = "pass",
+                        goldEligible = true,
+                        completedAtUtc = DateTimeOffset.UtcNow,
+                        @namespace = originEditionNamespace,
+                        expectedCoverSha256 = coverSha256,
+                        blockedSurfaces = Array.Empty<string>(),
+                        surfaces = requiredSurfaces
+                            .Select(surface => new { name = surface, status = "pass", sha256 = coverSha256 })
+                            .ToArray()
+                    },
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
+            return path;
+        }
+
         private static string ComputeSha256(string path)
         {
             using FileStream stream = File.OpenRead(path);
@@ -460,7 +547,8 @@ public sealed class OriginDossierAccountRouteTests
         string DossierVideoReceiptPath,
         string MovieSubtitlesPath,
         string MovieStoryboardPath,
-        string TelegramShareDeliveryReceiptPath);
+        string TelegramShareDeliveryReceiptPath,
+        string FinalNoFallbackNoSentinelAuditReceiptPath);
 
     private sealed class TestHostEnvironment : IHostEnvironment
     {

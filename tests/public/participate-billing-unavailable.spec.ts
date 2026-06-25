@@ -24,7 +24,7 @@ test('participate suppresses supporter links when billing is unavailable', async
   ]);
 
   const page = await context.newPage();
-  await page.goto(`${baseUrl}/partizipate`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('body')).toContainText(boardSentinel);
   await expect(page.locator('body')).not.toContainText('Support Chummer');
   await expect(page.locator('a[href="/account/billing"]')).toHaveCount(0);

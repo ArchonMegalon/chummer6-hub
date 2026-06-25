@@ -42,7 +42,7 @@ public sealed class BuildGhostConciergeServiceTests
 
         BuildGhostConciergeProjection projection = service.Build();
 
-        Assert.Equal("/partizipate", projection.FacePopEntryHref);
+        Assert.Equal("/participate", projection.FacePopEntryHref);
         Assert.Equal("Fallback explainer only", projection.AnswerlyStatus);
         Assert.Contains("A short intake can", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("legality", projection.RuntimeBoundary, StringComparison.OrdinalIgnoreCase);

@@ -13,7 +13,7 @@ test('guest support case submission reaches the confirmation route', async ({ pa
   await page.fill('#supportDetail', 'This browser test submits the public support form as a guest and expects the confirmation page to resolve cleanly.');
   await page.fill('#supportReplyEmail', 'guest-support-e2e@example.test');
 
-  await page.getByRole('button', { name: 'Send private help request' }).click();
+  await page.getByRole('button', { name: 'Send support request' }).click();
   await page.waitForURL(/\/contact\/submitted\/support_case_/);
 
   await expect(page.getByRole('heading', { name: 'Support case received' })).toBeVisible();

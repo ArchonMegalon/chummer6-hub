@@ -144,9 +144,9 @@ public sealed class OriginDossierPublicationServiceTests
                 OriginEditionNamespace: "origin.chummer.run/Varga/Mira/Vanta",
                 PublicationState: "published_for_owner",
                 BookArtifactUrl: "https://chummer.run/account/work/origin-dossiers/origin-imported/book",
-                AudiobookshelfShareUrl: "https://audio.chummer.run/share/origin-imported-audiobook",
-                AudiobookshelfDossierShareUrl: "https://audio.chummer.run/share/origin-imported-dossier",
-                AudiobookshelfAudiobookShareUrl: "https://audio.chummer.run/share/origin-imported-audiobook",
+                AudiobookshelfShareUrl: "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-audiobook",
+                AudiobookshelfDossierShareUrl: "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-dossier",
+                AudiobookshelfAudiobookShareUrl: "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-audiobook",
                 DossierVideoUrl: "https://chummer.run/account/work/origin-dossiers/origin-imported/video",
                 StorySceneCoverUrl: "https://example.invalid/raw-origin-cover.png",
                 ProviderAuthoredManuscriptImported: true,
@@ -176,7 +176,8 @@ public sealed class OriginDossierPublicationServiceTests
                 MoviePosterPath: artifacts.StorySceneCoverPath,
                 MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                 MovieStoryboardPath: artifacts.MovieStoryboardPath,
-                TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath));
+                TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
+                FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath));
 
         Assert.True(imported.GoldReady);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported", imported.ChummerRunOwnerUrl);
@@ -187,8 +188,11 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/cover", imported.StorySceneCoverUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/video", imported.DossierVideoUrl);
         Assert.Equal(
-            "https://audio.chummer.run/share/origin-imported-audiobook",
+            "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-audiobook",
             service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-imported", "listen"));
+        Assert.Equal(
+            "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-dossier",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-imported", "read"));
         Assert.True(imported.TelegramShareDelivered);
         Assert.True(File.Exists(indexPath));
         OriginDossierPublicationViewModel? reloaded = service.GetForAccount("user-1", "subject-1", "origin-imported");
@@ -637,6 +641,40 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
     }
 
+    [Fact]
+    public void ListForAccountRequiresPassingFinalNoFallbackNoSentinelAuditBeforeGoldReady()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-blocked-final-audit");
+        WriteFinalNoFallbackNoSentinelAuditReceipt(
+            Path.GetDirectoryName(artifacts.FinalNoFallbackNoSentinelAuditReceiptPath)!,
+            Path.GetFileName(artifacts.FinalNoFallbackNoSentinelAuditReceiptPath),
+            "origin.chummer.run/Varga/Mira/Vanta",
+            status: "blocked");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-blocked-final-audit", "Blocked Final Audit", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("final no-fallback/no-sentinel audit receipt path", publication.MissingGoldRequirements);
+    }
+
     private static object BuildIndexEntry(
         string ownerUserId,
         string subjectId,
@@ -691,7 +729,8 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.DossierVideoReceiptPath,
             artifacts.MovieSubtitlesPath,
             artifacts.MovieStoryboardPath,
-            artifacts.TelegramShareDeliveryReceiptPath
+            artifacts.TelegramShareDeliveryReceiptPath,
+            artifacts.FinalNoFallbackNoSentinelAuditReceiptPath
         };
 
     private static OriginDossierArtifactPaths CreateGoldArtifacts(string tempRoot, string projectId)
@@ -754,18 +793,11 @@ public sealed class OriginDossierPublicationServiceTests
                 "selected_character_face"
             ],
             artifactPaths: [storySceneCoverPath]);
-        string coverConsistencyReceiptPath = WriteReceipt(
+        string coverConsistencyReceiptPath = WriteCoverConsistencyReceipt(
             projectRoot,
             "cover-consistency.receipt.json",
-            "origin_edition_cover_consistency",
-            "Chummer",
-            [
-                ComputeSha256(storySceneCoverPath),
-                "origin.chummer.run/Varga/Mira/Vanta",
-                "ebook_cover_embedded",
-                "m4b_cover_embedded",
-                "movie_poster_matches_cover"
-            ]);
+            "origin.chummer.run/Varga/Mira/Vanta",
+            ComputeSha256(storySceneCoverPath));
         string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B audiobook artifact");
         string audiobookshelfImportReceiptPath = WriteReceipt(
             projectRoot,
@@ -795,6 +827,10 @@ public sealed class OriginDossierPublicationServiceTests
                 $"/account/work/origin-dossiers/{projectId}/watch",
                 "origin.chummer.run/Varga/Mira/Vanta"
             ]);
+        string finalNoFallbackNoSentinelAuditReceiptPath = WriteFinalNoFallbackNoSentinelAuditReceipt(
+            projectRoot,
+            "final-no-fallback-no-sentinel.receipt.json",
+            "origin.chummer.run/Varga/Mira/Vanta");
 
         return new OriginDossierArtifactPaths(
             sourcePacketPath,
@@ -816,7 +852,8 @@ public sealed class OriginDossierPublicationServiceTests
             dossierVideoReceiptPath,
             movieSubtitlesPath,
             movieStoryboardPath,
-            telegramShareDeliveryReceiptPath);
+            telegramShareDeliveryReceiptPath,
+            finalNoFallbackNoSentinelAuditReceiptPath);
     }
 
     private static string WriteArtifact(string projectRoot, string fileName, string contents)
@@ -860,6 +897,102 @@ public sealed class OriginDossierPublicationServiceTests
         return path;
     }
 
+    private static string WriteFinalNoFallbackNoSentinelAuditReceipt(
+        string projectRoot,
+        string fileName,
+        string originEditionNamespace,
+        string status = "pass")
+    {
+        string path = Path.Combine(projectRoot, fileName);
+        string[] requiredSurfaces =
+        [
+            "approved_canon_packet",
+            "provider_manuscript",
+            "humanizer_receipt",
+            "humanizer_quality_receipt",
+            "cover",
+            "ebook",
+            "pdf",
+            "pdf_cover_receipt",
+            "dossier_audiobookshelf_receipt",
+            "m4b_provider_gate",
+            "cover_consistency",
+            "movie",
+            "movie_receipt",
+            "gap_audit",
+            "real_m4b_artifact",
+            "audiobookshelf_audiobook_receipt"
+        ];
+
+        File.WriteAllText(
+            path,
+            JsonSerializer.Serialize(
+                new
+                {
+                    contractName = "chummer.origin_edition.final_no_fallback_bundle_audit.v1",
+                    operation = "origin_edition_final_no_fallback_bundle_audit",
+                    provider = "Chummer",
+                    status,
+                    goldEligible = string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase),
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    @namespace = originEditionNamespace,
+                    blockedSurfaces = string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase)
+                        ? Array.Empty<string>()
+                        : ["real_m4b_artifact"],
+                    surfaces = requiredSurfaces
+                        .Select(surface => new
+                        {
+                            name = surface,
+                            status = string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase) ? "pass" : "blocked"
+                        })
+                        .ToArray()
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        return path;
+    }
+
+    private static string WriteCoverConsistencyReceipt(
+        string projectRoot,
+        string fileName,
+        string originEditionNamespace,
+        string coverSha256)
+    {
+        string path = Path.Combine(projectRoot, fileName);
+        string[] requiredSurfaces =
+        [
+            "chummer_hero_cover",
+            "dossier_cover_asset",
+            "ebook_embedded_cover",
+            "pdf_cover_embedding",
+            "audiobook_cover_asset",
+            "m4b_cover_embedding",
+            "audiobookshelf_dossier_cover",
+            "audiobookshelf_audiobook_cover",
+            "movie_poster"
+        ];
+
+        File.WriteAllText(
+            path,
+            JsonSerializer.Serialize(
+                new
+                {
+                    contractName = "chummer.origin_edition.cover_consistency_audit.v1",
+                    operation = "origin_edition_cover_consistency",
+                    provider = "Chummer",
+                    status = "pass",
+                    goldEligible = true,
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    @namespace = originEditionNamespace,
+                    expectedCoverSha256 = coverSha256,
+                    blockedSurfaces = Array.Empty<string>(),
+                    surfaces = requiredSurfaces
+                        .Select(surface => new { name = surface, status = "pass", sha256 = coverSha256 })
+                        .ToArray()
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        return path;
+    }
+
     private static string ComputeSha256(string path)
     {
         using FileStream stream = File.OpenRead(path);
@@ -886,5 +1019,6 @@ public sealed class OriginDossierPublicationServiceTests
         string DossierVideoReceiptPath,
         string MovieSubtitlesPath,
         string MovieStoryboardPath,
-        string TelegramShareDeliveryReceiptPath);
+        string TelegramShareDeliveryReceiptPath,
+        string FinalNoFallbackNoSentinelAuditReceiptPath);
 }

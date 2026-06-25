@@ -106,10 +106,10 @@ SURFACES = [
         "path": "/participate",
         "required_texts": [
             "Participate",
+            "Short requests, clear bugs, useful ideas.",
         ],
         "required_html_texts": [
-            "id=\"participate-board\"",
-            "src=\"/participate/board\"",
+            "class=\"partizipate-board",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -118,16 +118,21 @@ SURFACES = [
             "Sign in",
             "Authorize Codex access.",
             "OpenAI account in ChatGPT",
+            "Requests, votes, and shipped work.",
+        ],
+        "forbidden_html_texts": [
+            "id=\"participate-board\"",
+            "src=\"/participate/board\"",
         ],
     },
     {
         "path": "/partizipate",
         "required_texts": [
             "Participate",
+            "Short requests, clear bugs, useful ideas.",
         ],
         "required_html_texts": [
-            "id=\"participate-board\"",
-            "src=\"/participate/board\"",
+            "class=\"partizipate-board",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -136,6 +141,11 @@ SURFACES = [
             "Sign in",
             "Authorize Codex access.",
             "OpenAI account in ChatGPT",
+            "Requests, votes, and shipped work.",
+        ],
+        "forbidden_html_texts": [
+            "id=\"participate-board\"",
+            "src=\"/participate/board\"",
         ],
     },
     {
@@ -309,6 +319,7 @@ def verify(base_url: str) -> dict[str, Any]:
         missing = [token for token in surface.get("required_texts", []) if token not in flattened]
         missing_html = [token for token in surface.get("required_html_texts", []) if token not in body]
         forbidden = [token for token in surface.get("forbidden_texts", []) if token in flattened]
+        forbidden_html = [token for token in surface.get("forbidden_html_texts", []) if token in body]
         final_url_prefix = str(surface.get("required_final_url_prefix") or "")
         final_url_matches = True
         cross_origin_redirect = False
@@ -344,6 +355,8 @@ def verify(base_url: str) -> dict[str, Any]:
             failures.append(f"{path}: missing required html text: {', '.join(missing_html)}")
         if forbidden:
             failures.append(f"{path}: contains forbidden text: {', '.join(forbidden)}")
+        if forbidden_html:
+            failures.append(f"{path}: contains forbidden html text: {', '.join(forbidden_html)}")
 
         results.append(
             {
@@ -360,10 +373,12 @@ def verify(base_url: str) -> dict[str, Any]:
                 "missing_required_texts": missing,
                 "missing_required_html_texts": missing_html,
                 "forbidden_texts": surface.get("forbidden_texts", []),
+                "forbidden_html_texts": surface.get("forbidden_html_texts", []),
                 "forbidden_hits": forbidden,
+                "forbidden_html_hits": forbidden_html,
                 "required_final_url_prefix": final_url_prefix or None,
                 "final_url_matches": final_url_matches,
-                "status": "pass" if status_code == 200 and not missing and not missing_html and not forbidden and final_url_matches else "fail",
+                "status": "pass" if status_code == 200 and not missing and not missing_html and not forbidden and not forbidden_html and final_url_matches else "fail",
             }
         )
 

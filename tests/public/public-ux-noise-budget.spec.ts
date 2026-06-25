@@ -44,7 +44,8 @@ test('help page stays practical instead of exposing internal policy language', a
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
   await expect(page.locator('h1')).toContainText('Get help without guessing');
-  expect(bodyText).toContain('Pick the problem');
+  expect(bodyText).toContain('Choose the right help path');
+  expect(bodyText).not.toContain('Pick the problem');
   expect(bodyText).not.toContain('Provider-backed help');
   expect(bodyText).not.toContain('Retention window');
   expect(bodyText).not.toContain('receipt');

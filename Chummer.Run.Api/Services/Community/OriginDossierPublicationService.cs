@@ -11,8 +11,9 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class OriginDossierPublicationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly IReadOnlyList<string> ApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook"];
+    private static readonly IReadOnlyList<string> ApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
     private static readonly IReadOnlyList<string> ApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
+    private static readonly IReadOnlyList<string> DefaultTrustedAudiobookshelfHosts = ["audio.chummer.run", "audiobookshelf.chummer.run", "audiobookshelf.girschele.com"];
     private const string SelectedCharacterFaceProofToken = "selected_character_face";
     private const string ApprovedSourcePacketToken = "approved_source_packet";
     private const string ExternalProcessingConsentToken = "external_processing_consent";
@@ -337,7 +338,7 @@ public sealed class OriginDossierPublicationService
                 : null);
     }
 
-    private static IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)
+    private IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)
     {
         List<string> missing = new(entry.MissingGoldRequirements ?? Array.Empty<string>());
         AddIfMissing(missing, IsPublishedForOwner(entry.PublicationState), "published_for_owner publication state");
@@ -397,6 +398,7 @@ public sealed class OriginDossierPublicationService
                 "Telegram",
                 RequiredTelegramDeliveryTokens(entry)),
             "Telegram share delivery receipt path");
+        AddIfMissing(missing, HasFinalNoFallbackNoSentinelReceipt(entry), "final no-fallback/no-sentinel audit receipt path");
         AddIfMissing(missing, !ContainsFakeMarker(entry), "no generated placeholder artifact markers");
         return missing
             .Where(static item => !string.IsNullOrWhiteSpace(item))
@@ -436,12 +438,26 @@ public sealed class OriginDossierPublicationService
             && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
 
-    private static bool IsTrustedAudiobookshelfShareUrl(string? url)
+    private bool IsTrustedAudiobookshelfShareUrl(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
             && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            && (string.Equals(uri.Host, "audio.chummer.run", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(uri.Host, "audiobookshelf.chummer.run", StringComparison.OrdinalIgnoreCase))
+            && ResolveTrustedAudiobookshelfHosts().Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
             && uri.AbsolutePath.Contains("/share/", StringComparison.OrdinalIgnoreCase);
+
+    private IReadOnlySet<string> ResolveTrustedAudiobookshelfHosts()
+    {
+        string? configured = _configuration["CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS"]
+            ?? _configuration["OriginDossier:AudiobookshelfTrustedHosts"];
+        IEnumerable<string> hosts = string.IsNullOrWhiteSpace(configured)
+            ? DefaultTrustedAudiobookshelfHosts
+            : configured
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(static host => !string.IsNullOrWhiteSpace(host));
+        return hosts
+            .Select(static host => host.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 
     private static bool HasRealPath(string? path)
         => !string.IsNullOrWhiteSpace(path)
@@ -590,17 +606,106 @@ public sealed class OriginDossierPublicationService
             return false;
         }
 
-        return HasReceiptFile(
-            entry.CoverConsistencyReceiptPath,
-            "origin_edition_cover_consistency",
-            "Chummer",
-            [
-                coverHash,
-                BuildOriginEditionNamespace(entry),
-                "ebook_cover_embedded",
-                "m4b_cover_embedded",
-                "movie_poster_matches_cover"
-            ]);
+        if (!HasArchivedArtifact(entry.CoverConsistencyReceiptPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.CoverConsistencyReceiptPath!, Encoding.UTF8));
+            JsonElement root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && !ContainsFakeMarker(root)
+                && ReceiptHasExpectedOperation(root, "origin_edition_cover_consistency")
+                && ReceiptHasExpectedProvider(root, "Chummer")
+                && TryGetString(root, "status", out string? status)
+                && string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase)
+                && TryGetString(root, "expectedCoverSha256", out string? expectedCoverHash)
+                && string.Equals(expectedCoverHash, coverHash, StringComparison.OrdinalIgnoreCase)
+                && TryGetString(root, "namespace", out string? namespaceValue)
+                && string.Equals(namespaceValue, BuildOriginEditionNamespace(entry), StringComparison.OrdinalIgnoreCase)
+                && TryGetBoolean(root, "goldEligible", out bool goldEligible)
+                && goldEligible
+                && ReceiptArrayIsEmpty(root, "blockedSurfaces")
+                && ReceiptHasCompletionTime(root)
+                && ReceiptSurfacePassed(root, "chummer_hero_cover")
+                && ReceiptSurfacePassed(root, "dossier_cover_asset")
+                && ReceiptSurfacePassed(root, "ebook_embedded_cover")
+                && ReceiptSurfacePassed(root, "pdf_cover_embedding")
+                && ReceiptSurfacePassed(root, "audiobook_cover_asset")
+                && ReceiptSurfacePassed(root, "m4b_cover_embedding")
+                && ReceiptSurfacePassed(root, "audiobookshelf_dossier_cover")
+                && ReceiptSurfacePassed(root, "audiobookshelf_audiobook_cover")
+                && ReceiptSurfacePassed(root, "movie_poster");
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasFinalNoFallbackNoSentinelReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        if (!HasArchivedArtifact(entry.FinalNoFallbackNoSentinelAuditReceiptPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.FinalNoFallbackNoSentinelAuditReceiptPath!, Encoding.UTF8));
+            JsonElement root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && !ContainsFakeMarker(root)
+                && TryGetString(root, "contractName", out string? contractName)
+                && string.Equals(contractName, "chummer.origin_edition.final_no_fallback_bundle_audit.v1", StringComparison.OrdinalIgnoreCase)
+                && ReceiptHasExpectedOperation(root, "origin_edition_final_no_fallback_bundle_audit")
+                && ReceiptHasExpectedProvider(root, "Chummer")
+                && TryGetString(root, "status", out string? status)
+                && string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase)
+                && TryGetString(root, "namespace", out string? namespaceValue)
+                && string.Equals(namespaceValue, BuildOriginEditionNamespace(entry), StringComparison.OrdinalIgnoreCase)
+                && TryGetBoolean(root, "goldEligible", out bool goldEligible)
+                && goldEligible
+                && ReceiptArrayIsEmpty(root, "blockedSurfaces")
+                && ReceiptHasCompletionTime(root)
+                && ReceiptSurfacePassed(root, "approved_canon_packet")
+                && ReceiptSurfacePassed(root, "provider_manuscript")
+                && ReceiptSurfacePassed(root, "humanizer_receipt")
+                && ReceiptSurfacePassed(root, "humanizer_quality_receipt")
+                && ReceiptSurfacePassed(root, "cover")
+                && ReceiptSurfacePassed(root, "ebook")
+                && ReceiptSurfacePassed(root, "pdf")
+                && ReceiptSurfacePassed(root, "pdf_cover_receipt")
+                && ReceiptSurfacePassed(root, "dossier_audiobookshelf_receipt")
+                && ReceiptSurfacePassed(root, "m4b_provider_gate")
+                && ReceiptSurfacePassed(root, "cover_consistency")
+                && ReceiptSurfacePassed(root, "movie")
+                && ReceiptSurfacePassed(root, "movie_receipt")
+                && ReceiptSurfacePassed(root, "real_m4b_artifact")
+                && ReceiptSurfacePassed(root, "audiobookshelf_audiobook_receipt");
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static bool ReceiptContainsAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
@@ -741,6 +846,47 @@ public sealed class OriginDossierPublicationService
         return !string.IsNullOrWhiteSpace(value);
     }
 
+    private static bool TryGetBoolean(JsonElement root, string propertyName, out bool value)
+    {
+        value = false;
+        if (!root.TryGetProperty(propertyName, out JsonElement property)
+            || property.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+        {
+            return false;
+        }
+
+        value = property.GetBoolean();
+        return true;
+    }
+
+    private static bool ReceiptArrayIsEmpty(JsonElement root, string propertyName)
+        => root.TryGetProperty(propertyName, out JsonElement property)
+            && property.ValueKind == JsonValueKind.Array
+            && !property.EnumerateArray().Any();
+
+    private static bool ReceiptSurfacePassed(JsonElement root, string surfaceName)
+    {
+        if (!root.TryGetProperty("surfaces", out JsonElement surfaces)
+            || surfaces.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (JsonElement surface in surfaces.EnumerateArray())
+        {
+            if (surface.ValueKind == JsonValueKind.Object
+                && TryGetString(surface, "name", out string? name)
+                && string.Equals(name, surfaceName, StringComparison.OrdinalIgnoreCase)
+                && TryGetString(surface, "status", out string? status)
+                && string.Equals(status, "pass", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool ContainsFakeMarker(OriginDossierPublicationIndexEntry entry)
     {
         string?[] values =
@@ -770,16 +916,27 @@ public sealed class OriginDossierPublicationService
             entry.MoviePosterPath,
             entry.MovieSubtitlesPath,
             entry.MovieStoryboardPath,
-            entry.TelegramShareDeliveryReceiptPath
+            entry.TelegramShareDeliveryReceiptPath,
+            entry.FinalNoFallbackNoSentinelAuditReceiptPath
         ];
 
         return values.Any(HasFakeMarker);
     }
 
     private static bool HasFakeMarker(string? value)
-        => !string.IsNullOrWhiteSpace(value)
-            && (value.Contains("stub", StringComparison.OrdinalIgnoreCase)
-                || value.Contains("fallback", StringComparison.OrdinalIgnoreCase));
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string normalized = value
+            .Replace("no-fallback", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("no_fallback", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("no fallback", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return normalized.Contains("stub", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("fallback", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool Matches(string? left, string right)
         => string.Equals(left?.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -850,6 +1007,7 @@ public sealed class OriginDossierPublicationService
             MovieSubtitlesPath = CleanNullable(request.MovieSubtitlesPath),
             MovieStoryboardPath = CleanNullable(request.MovieStoryboardPath),
             TelegramShareDeliveryReceiptPath = CleanNullable(request.TelegramShareDeliveryReceiptPath),
+            FinalNoFallbackNoSentinelAuditReceiptPath = CleanNullable(request.FinalNoFallbackNoSentinelAuditReceiptPath),
             MissingGoldRequirements = request.MissingGoldRequirements ?? Array.Empty<string>()
         };
     }
@@ -1005,5 +1163,6 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? MovieSubtitlesPath { get; init; }
     public string? MovieStoryboardPath { get; init; }
     public string? TelegramShareDeliveryReceiptPath { get; init; }
+    public string? FinalNoFallbackNoSentinelAuditReceiptPath { get; init; }
     public IReadOnlyList<string>? MissingGoldRequirements { get; init; }
 }

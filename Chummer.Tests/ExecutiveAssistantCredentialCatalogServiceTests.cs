@@ -179,6 +179,33 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
     }
 
     [Fact]
+    public void GetCatalog_marks_unmixr_configured_from_generic_account_alias_without_leaking_runtime_secrets()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_UNMIXR_TIER"] = "4",
+                ["UNMIXR_ACCOUNT_TIBOR_CHUMMER_RUN_EMAIL"] = "tibor@chummer.run",
+                ["UNMIXR_ACCOUNT_TIBOR_CHUMMER_RUN_API_KEY"] = "generic-unmixr-api-secret",
+                ["UNMIXR_ACCOUNT_TIBOR_CHUMMER_RUN_VOICE_ID"] = "generic-voice-secret"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry unmixr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "unmixr");
+
+        Assert.Equal("4", unmixr.Tier);
+        Assert.True(unmixr.PasswordAltConfigured);
+        Assert.Equal("configured", unmixr.Status);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("generic-unmixr-api-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("generic-voice-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("tibor@chummer.run", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetCatalog_tracks_icanpreneur_as_bounded_discovery_lane()
     {
         IConfiguration configuration = new ConfigurationBuilder()

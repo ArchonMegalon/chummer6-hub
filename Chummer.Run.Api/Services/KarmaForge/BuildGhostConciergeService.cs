@@ -59,7 +59,7 @@ public sealed class BuildGhostConciergeService
 
     public BuildGhostConciergeProjection Build()
     {
-        string facePopHref = NormalizeConfiguredPath(_configuration[FacePopPublicInvitePathConfigKey]) ?? "/partizipate";
+        string facePopHref = NormalizeConfiguredPath(_configuration[FacePopPublicInvitePathConfigKey]) ?? "/participate";
         RuleSafeAnswerPacket packet = new(
             PacketId: "build-ghost-concierge",
             QuestionId: "build-ghost-entry",
