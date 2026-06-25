@@ -33,12 +33,49 @@ public sealed class OriginDossierAccountRouteTests
         OriginDossierPublicationDetailPageViewModel model = Assert.IsType<OriginDossierPublicationDetailPageViewModel>(view.Model);
         Assert.Equal("origin-route", model.Publication.ProjectId);
         Assert.True(model.Publication.GoldReady);
+        Assert.Equal("origin.chummer.run/Varga/Mira/Route-Runner", model.Publication.OriginEditionNamespace);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/read", model.Publication.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfShareUrl);
+        Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfAudiobookShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/cover", model.Publication.StorySceneCoverUrl);
     }
 
     [Fact]
-    public async Task OriginDossierArtifactsRequireSignedInOwnerAndRouteListenThroughChummerRun()
+    public void OriginDossierViewExposesReadListenWatchAndCanonAuditTabs()
+    {
+        string view = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "Chummer.Run.Api",
+            "Views",
+            "Accounts",
+            "OriginDossier.cshtml"));
+
+        Assert.Contains("data-origin-edition-tabs", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-read\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-listen\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-watch\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-canon-audit\"", view, StringComparison.Ordinal);
+        Assert.Contains("Read in Audiobookshelf", view, StringComparison.Ordinal);
+        Assert.Contains("Listen in Audiobookshelf", view, StringComparison.Ordinal);
+        Assert.Contains("Watch scene movie", view, StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "Chummer.Run.Api")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate Chummer.Run.Api from the test output directory.");
+    }
+
+    [Fact]
+    public async Task OriginDossierArtifactsRequireSignedInOwnerAndRouteReadListenWatchThroughChummerRun()
     {
         using var fixture = OriginDossierRouteFixture.Create();
         OriginDossierRouteArtifacts artifacts = fixture.ImportGoldPublication("origin-route", fixture.SubjectId);
@@ -52,7 +89,16 @@ public sealed class OriginDossierAccountRouteTests
 
         IActionResult listenResult = await controller.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
         RedirectResult listen = Assert.IsType<RedirectResult>(listenResult);
-        Assert.Equal("https://audio.chummer.run/share/origin-route", listen.Url);
+        Assert.Equal("https://audio.chummer.run/share/origin-route-audiobook", listen.Url);
+
+        IActionResult readResult = await controller.OriginDossierArtifact("origin-route", "read", CancellationToken.None);
+        RedirectResult read = Assert.IsType<RedirectResult>(readResult);
+        Assert.Equal("https://audio.chummer.run/share/origin-route-dossier", read.Url);
+
+        IActionResult watchResult = await controller.OriginDossierArtifact("origin-route", "watch", CancellationToken.None);
+        PhysicalFileResult watch = Assert.IsType<PhysicalFileResult>(watchResult);
+        Assert.Equal(artifacts.DossierVideoPath, watch.FileName);
+        Assert.Equal("video/mp4", watch.ContentType);
 
         AccountsController anonymous = fixture.CreateController(authenticated: false);
         IActionResult anonymousResult = await anonymous.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
@@ -175,9 +221,15 @@ public sealed class OriginDossierAccountRouteTests
                     ProjectId: projectId,
                     Title: "Route Runner Origin Dossier",
                     RunnerAlias: "Route Runner",
+                    FamilyName: "Varga",
+                    GivenName: "Mira",
+                    RunnerName: "Route Runner",
+                    OriginEditionNamespace: "origin.chummer.run/Varga/Mira/Route-Runner",
                     PublicationState: "published_for_owner",
                     BookArtifactUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/book",
-                    AudiobookshelfShareUrl: $"https://audio.chummer.run/share/{projectId}",
+                    AudiobookshelfShareUrl: $"https://audio.chummer.run/share/{projectId}-audiobook",
+                    AudiobookshelfDossierShareUrl: $"https://audio.chummer.run/share/{projectId}-dossier",
+                    AudiobookshelfAudiobookShareUrl: $"https://audio.chummer.run/share/{projectId}-audiobook",
                     DossierVideoUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/video",
                     StorySceneCoverUrl: $"https://chummer.run/account/work/origin-dossiers/{projectId}/cover",
                     ProviderAuthoredManuscriptImported: true,
@@ -197,10 +249,16 @@ public sealed class OriginDossierAccountRouteTests
                     BookArtifactReceiptPath: artifacts.BookArtifactReceiptPath,
                     StorySceneCoverPath: artifacts.StorySceneCoverPath,
                     StorySceneCoverReceiptPath: artifacts.StorySceneCoverReceiptPath,
+                    EbookArtifactPath: artifacts.EbookArtifactPath,
+                    EbookAudiobookshelfImportReceiptPath: artifacts.EbookAudiobookshelfImportReceiptPath,
+                    CoverConsistencyReceiptPath: artifacts.CoverConsistencyReceiptPath,
                     AudiobookPath: artifacts.AudiobookPath,
                     AudiobookshelfImportReceiptPath: artifacts.AudiobookshelfImportReceiptPath,
                     DossierVideoPath: artifacts.DossierVideoPath,
                     DossierVideoReceiptPath: artifacts.DossierVideoReceiptPath,
+                    MoviePosterPath: artifacts.StorySceneCoverPath,
+                    MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
+                    MovieStoryboardPath: artifacts.MovieStoryboardPath,
                     TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath));
             return artifacts;
         }
@@ -212,9 +270,12 @@ public sealed class OriginDossierAccountRouteTests
             string sourcePacketPath = WriteArtifact(projectRoot, "approved-source-packet.json", """{"runnerAlias":"Route Runner","approvedForExternalProcessing":true}""");
             string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", "Provider-authored Origin Dossier manuscript.");
             string bookArtifactPath = WriteArtifact(projectRoot, "book.pdf", "%PDF-1.7\nOrigin Dossier route test book artifact\n");
+            string ebookArtifactPath = WriteArtifact(projectRoot, "ebook.epub", "EPUB route test ebook artifact with embedded cover");
             string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG route test story scene cover artifact");
             string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B route test audiobook artifact");
             string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 route test dossier film artifact");
+            string movieSubtitlesPath = WriteArtifact(projectRoot, "subtitles.vtt", "WEBVTT\n\n00:00.000 --> 00:02.000\nRain made the clinic sign stutter.\n");
+            string movieStoryboardPath = WriteArtifact(projectRoot, "storyboard.json", """{"sceneId":"clinic-door-rain","shots":["threshold","clinic","sedan"]}""");
 
             return new OriginDossierRouteArtifacts(
                 SourcePacketPath: sourcePacketPath,
@@ -261,9 +322,30 @@ public sealed class OriginDossierAccountRouteTests
                     [
                         $"/account/work/origin-dossiers/{projectId}",
                         $"/account/work/origin-dossiers/{projectId}/cover",
+                        "origin.chummer.run/Varga/Mira/Route-Runner",
                         "selected_character_face"
                     ],
                     [storySceneCoverPath]),
+                EbookArtifactPath: ebookArtifactPath,
+                EbookAudiobookshelfImportReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "audiobookshelf-dossier-import.receipt.json",
+                    "audiobookshelf_dossier_import",
+                    "Audiobookshelf",
+                    ["dossierShare: https://audio.chummer.run/share/origin-route-dossier"],
+                    [ebookArtifactPath]),
+                CoverConsistencyReceiptPath: WriteReceipt(
+                    projectRoot,
+                    "cover-consistency.receipt.json",
+                    "origin_edition_cover_consistency",
+                    "Chummer",
+                    [
+                        ComputeSha256(storySceneCoverPath),
+                        "origin.chummer.run/Varga/Mira/Route-Runner",
+                        "ebook_cover_embedded",
+                        "m4b_cover_embedded",
+                        "movie_poster_matches_cover"
+                    ]),
                 AudiobookPath: audiobookPath,
                 AudiobookshelfImportReceiptPath: WriteReceipt(
                     projectRoot,
@@ -286,8 +368,13 @@ public sealed class OriginDossierAccountRouteTests
                     "EA Telegram",
                     [
                         $"/account/work/origin-dossiers/{projectId}",
-                        $"/account/work/origin-dossiers/{projectId}/listen"
-                    ]));
+                        $"/account/work/origin-dossiers/{projectId}/read",
+                        $"/account/work/origin-dossiers/{projectId}/listen",
+                        $"/account/work/origin-dossiers/{projectId}/watch",
+                        "origin.chummer.run/Varga/Mira/Route-Runner"
+                    ]),
+                MovieSubtitlesPath: movieSubtitlesPath,
+                MovieStoryboardPath: movieStoryboardPath);
         }
 
         public void Dispose()
@@ -364,10 +451,15 @@ public sealed class OriginDossierAccountRouteTests
         string BookArtifactReceiptPath,
         string StorySceneCoverPath,
         string StorySceneCoverReceiptPath,
+        string EbookArtifactPath,
+        string EbookAudiobookshelfImportReceiptPath,
+        string CoverConsistencyReceiptPath,
         string AudiobookPath,
         string AudiobookshelfImportReceiptPath,
         string DossierVideoPath,
         string DossierVideoReceiptPath,
+        string MovieSubtitlesPath,
+        string MovieStoryboardPath,
         string TelegramShareDeliveryReceiptPath);
 
     private sealed class TestHostEnvironment : IHostEnvironment

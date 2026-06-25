@@ -87,7 +87,19 @@ public sealed record OriginDossierPublicationImportRequest(
     string? DossierVideoPath,
     string? DossierVideoReceiptPath,
     string? TelegramShareDeliveryReceiptPath,
-    IReadOnlyList<string>? MissingGoldRequirements = null);
+    IReadOnlyList<string>? MissingGoldRequirements = null,
+    string? FamilyName = null,
+    string? GivenName = null,
+    string? RunnerName = null,
+    string? OriginEditionNamespace = null,
+    string? AudiobookshelfDossierShareUrl = null,
+    string? AudiobookshelfAudiobookShareUrl = null,
+    string? EbookArtifactPath = null,
+    string? EbookAudiobookshelfImportReceiptPath = null,
+    string? CoverConsistencyReceiptPath = null,
+    string? MoviePosterPath = null,
+    string? MovieSubtitlesPath = null,
+    string? MovieStoryboardPath = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,
@@ -108,7 +120,13 @@ public sealed record OriginDossierPublicationImportResultDto(
     bool TelegramShareDelivered,
     bool RequiresAuthenticatedChummerRunUser,
     bool GoldReady,
-    IReadOnlyList<string> MissingGoldRequirements);
+    IReadOnlyList<string> MissingGoldRequirements,
+    string? FamilyName = null,
+    string? GivenName = null,
+    string? RunnerName = null,
+    string? OriginEditionNamespace = null,
+    string? AudiobookshelfDossierShareUrl = null,
+    string? AudiobookshelfAudiobookShareUrl = null);
 
 public sealed record GroupRoleDto(
     string Role,

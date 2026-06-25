@@ -6,12 +6,14 @@
     var publication = Model.Publication;
     var canShowCover = publication.StorySceneCoverUsesSelectedCharacterFace
         && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl);
+    var canRead = publication.GoldReady
+        && !string.IsNullOrWhiteSpace(publication.AudiobookshelfDossierShareUrl);
     var canOpenBook = publication.GoldReady
         && publication.BookArtifactVerified
         && !string.IsNullOrWhiteSpace(publication.BookArtifactUrl);
     var canListen = publication.GoldReady
         && publication.AudiobookshelfPlaybackVerified
-        && !string.IsNullOrWhiteSpace(publication.AudiobookshelfShareUrl);
+        && !string.IsNullOrWhiteSpace(publication.AudiobookshelfAudiobookShareUrl);
     var canWatch = publication.GoldReady
         && publication.DossierVideoVerified
         && !string.IsNullOrWhiteSpace(publication.DossierVideoUrl);
@@ -22,6 +24,10 @@
         <p class="minimal-kicker">Private Origin Dossier</p>
         <h1>@Clean(publication.Title)</h1>
         <p>@Clean(publication.RunnerAlias) · @Humanize(publication.PublicationState)</p>
+        @if (!string.IsNullOrWhiteSpace(publication.OriginEditionNamespace))
+        {
+            <p class="muted-copy">@Clean(publication.OriginEditionNamespace)</p>
+        }
     </div>
 </section>
 
@@ -99,36 +105,102 @@
     </div>
 </section>
 
-<section class="minimal-section minimal-section--tight" id="origin-dossier-playback">
+<section class="minimal-section minimal-section--tight" id="origin-edition-tabs" data-origin-edition-tabs>
     <article class="app-action-card">
         <span class="tag">Owner links</span>
-        <h2>Read, listen, and watch</h2>
-        <p>These actions unlock only after the verified book, Audiobookshelf playback, rendered cover, dossier video, and share-delivery gates pass for this signed-in account.</p>
-        <div class="minimal-actions" aria-label="Origin Dossier artifact actions">
-            @if (canOpenBook)
+        <h2>Read, listen, watch, and audit</h2>
+        <p>These tabs unlock only after the verified ebook, Audiobookshelf playback, rendered cover, dossier video, and share-delivery gates pass for this signed-in account.</p>
+        <nav class="minimal-actions" aria-label="Origin Edition tabs">
+            <a class="button-like button-like--ghost" href="#origin-edition-read">Read</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-listen">Listen</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-watch">Watch</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-canon-audit">Canon Audit</a>
+        </nav>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-edition-read" data-origin-edition-tab="read">
+    <article class="app-action-card">
+        <span class="tag">Read</span>
+        <h2>Dossier ebook</h2>
+        <p>The dossier ebook is shared through Audiobookshelf under the Origin Edition namespace while Chummer keeps canon and publication state.</p>
+        <div class="minimal-actions" aria-label="Origin Edition read actions">
+            @if (canRead)
             {
-                <a class="button-like button-like--primary" href="@publication.BookArtifactUrl">Open book edition</a>
+                <a class="button-like button-like--primary" href="@publication.AudiobookshelfDossierShareUrl" target="_blank" rel="noopener">Read in Audiobookshelf</a>
             }
             else
             {
-                <span class="button-like button-like--disabled" aria-disabled="true">Book edition locked</span>
+                <span class="button-like button-like--disabled" aria-disabled="true">Dossier ebook share locked</span>
             }
+            @if (canOpenBook)
+            {
+                <a class="button-like button-like--secondary" href="@publication.BookArtifactUrl">Open archived book</a>
+            }
+            else
+            {
+                <span class="button-like button-like--disabled" aria-disabled="true">Archived book locked</span>
+            }
+        </div>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-edition-listen" data-origin-edition-tab="listen">
+    <article class="app-action-card">
+        <span class="tag">Listen</span>
+        <h2>Audiobook</h2>
+        <p>The M4B audiobook must be real provider narration, imported into Audiobookshelf, and covered with the same rendered story scene.</p>
+        <div class="minimal-actions" aria-label="Origin Edition listen actions">
             @if (canListen)
             {
-                <a class="button-like button-like--secondary" href="@publication.AudiobookshelfShareUrl" target="_blank" rel="noopener">Listen in Audiobookshelf</a>
+                <a class="button-like button-like--primary" href="@publication.AudiobookshelfAudiobookShareUrl" target="_blank" rel="noopener">Listen in Audiobookshelf</a>
             }
             else
             {
                 <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
             }
+        </div>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-edition-watch" data-origin-edition-tab="watch">
+    <article class="app-action-card">
+        <span class="tag">Watch</span>
+        <h2>Story scene movie</h2>
+        <p>The scene movie is hosted by Chummer media so video playback stays tied to Chummer approval and canon audit state.</p>
+        <div class="minimal-actions" aria-label="Origin Edition watch actions">
             @if (canWatch)
             {
-                <a class="button-like button-like--ghost" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch dossier film</a>
+                <a class="button-like button-like--primary" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch scene movie</a>
             }
             else
             {
                 <span class="button-like button-like--disabled" aria-disabled="true">Dossier film locked</span>
             }
+        </div>
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-edition-canon-audit" data-origin-edition-tab="canon-audit">
+    <article class="app-action-card">
+        <span class="tag">Canon Audit</span>
+        <h2>Publication proof</h2>
+        <p>Chummer will not publish provider-created facts directly. Gold requires approved canon, privacy proof, humanizer receipt, cover consistency, real media, and Telegram delivery receipts.</p>
+        <div class="settings-summary-list">
+            <div class="settings-summary-row">
+                <span>Namespace</span>
+                <strong>@Clean(publication.OriginEditionNamespace)</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Canon and privacy</span>
+                <strong>@(publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied ? "Receipts present" : "Pending")</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>No fallback media</span>
+                <strong>@(publication.GoldReady ? "Verified" : "Gated")</strong>
+            </div>
+        </div>
+        <div class="minimal-actions">
             <a class="button-like button-like--ghost" href="@Model.LibraryHref">Back to Origin Dossier library</a>
         </div>
     </article>

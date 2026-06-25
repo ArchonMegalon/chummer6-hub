@@ -113,7 +113,8 @@ public sealed class OriginDossierPublicationService
     public string? GetAudiobookshelfShareForAccount(
         string userId,
         string subjectId,
-        string projectId)
+        string projectId,
+        string shareKind = "audiobook")
     {
         if (string.IsNullOrWhiteSpace(projectId))
         {
@@ -137,8 +138,14 @@ public sealed class OriginDossierPublicationService
                 return null;
             }
 
-            return IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfShareUrl)
-                ? entry.AudiobookshelfShareUrl
+            string? shareUrl = shareKind.Trim().ToLowerInvariant() switch
+            {
+                "dossier" or "read" or "ebook" => entry.AudiobookshelfDossierShareUrl,
+                "audiobook" or "listen" => entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl,
+                _ => null
+            };
+            return IsTrustedAudiobookshelfShareUrl(shareUrl)
+                ? shareUrl
                 : null;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
@@ -214,7 +221,13 @@ public sealed class OriginDossierPublicationService
             TelegramShareDelivered: publication.TelegramShareDelivered,
             RequiresAuthenticatedChummerRunUser: publication.RequiresAuthenticatedChummerRunUser,
             GoldReady: publication.GoldReady,
-            MissingGoldRequirements: publication.MissingGoldRequirements);
+            MissingGoldRequirements: publication.MissingGoldRequirements,
+            FamilyName: publication.FamilyName,
+            GivenName: publication.GivenName,
+            RunnerName: publication.RunnerName,
+            OriginEditionNamespace: publication.OriginEditionNamespace,
+            AudiobookshelfDossierShareUrl: publication.AudiobookshelfDossierShareUrl,
+            AudiobookshelfAudiobookShareUrl: publication.AudiobookshelfAudiobookShareUrl);
 
     private string? ResolveIndexPath()
     {
@@ -311,7 +324,17 @@ public sealed class OriginDossierPublicationService
             TelegramShareDelivered: entry.TelegramShareDelivered,
             RequiresAuthenticatedChummerRunUser: entry.RequiresAuthenticatedChummerRunUser,
             GoldReady: missing.Count == 0,
-            MissingGoldRequirements: missing);
+            MissingGoldRequirements: missing,
+            FamilyName: Clean(entry.FamilyName, string.Empty),
+            GivenName: Clean(entry.GivenName, string.Empty),
+            RunnerName: Clean(entry.RunnerName, Clean(entry.RunnerAlias, "Runner")),
+            OriginEditionNamespace: Clean(entry.OriginEditionNamespace, BuildOriginEditionNamespace(entry)),
+            AudiobookshelfDossierShareUrl: IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfDossierShareUrl)
+                ? BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "read")
+                : null,
+            AudiobookshelfAudiobookShareUrl: IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl)
+                ? BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "listen")
+                : null);
     }
 
     private static IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)
@@ -326,6 +349,9 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, entry.BookArtifactVerified, "book artifact verification");
         AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.BookArtifactUrl, "book"), "book artifact URL");
         AddIfMissing(missing, IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfShareUrl), "trusted Audiobookshelf share URL");
+        AddIfMissing(missing, HasOriginEditionNamespace(entry), "canonical origin.chummer.run family/given/runner namespace");
+        AddIfMissing(missing, IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfDossierShareUrl), "trusted Audiobookshelf dossier ebook share URL");
+        AddIfMissing(missing, IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl), "trusted Audiobookshelf audiobook share URL");
         AddIfMissing(missing, entry.DossierVideoVerified, "dossier video verification");
         AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.DossierVideoUrl, "video"), "dossier video URL");
         AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.StorySceneCoverUrl, "cover"), "rendered story scene cover URL");
@@ -345,6 +371,8 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasCanonAuditReceipt(entry.SourcePacketPath, entry.ProviderManuscriptPath, entry.CanonAuditReceiptPath), "Chummer canon audit receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.BookArtifactPath), "book artifact path");
         AddIfMissing(missing, HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, ExternalProviderReceiptTokens()), "book artifact receipt path");
+        AddIfMissing(missing, HasArchivedArtifact(entry.EbookArtifactPath), "ebook artifact path");
+        AddIfMissing(missing, HasAudiobookshelfDossierImportReceipt(entry.EbookArtifactPath, entry.EbookAudiobookshelfImportReceiptPath), "Audiobookshelf dossier ebook import receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "story scene cover artifact path");
         AddIfMissing(
             missing,
@@ -355,6 +383,7 @@ public sealed class OriginDossierPublicationService
                 null,
                 RequiredStorySceneCoverTokens(entry)),
             "story scene cover receipt path");
+        AddIfMissing(missing, HasCoverConsistencyReceipt(entry), "cover consistency receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
         AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry.AudiobookPath, entry.AudiobookshelfImportReceiptPath), "Audiobookshelf import receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.DossierVideoPath), "dossier video artifact path");
@@ -550,6 +579,30 @@ public sealed class OriginDossierPublicationService
         return ReceiptContainsAnyToken(receiptPath, ApprovedAudiobookProviderTokens);
     }
 
+    private static bool HasAudiobookshelfDossierImportReceipt(string? ebookPath, string? receiptPath)
+        => HasArtifactReceipt(ebookPath, receiptPath, "audiobookshelf_dossier_import", "Audiobookshelf", ExternalProviderReceiptTokens());
+
+    private static bool HasCoverConsistencyReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        string? coverHash = TryComputeSha256(entry.StorySceneCoverPath);
+        if (string.IsNullOrWhiteSpace(coverHash))
+        {
+            return false;
+        }
+
+        return HasReceiptFile(
+            entry.CoverConsistencyReceiptPath,
+            "origin_edition_cover_consistency",
+            "Chummer",
+            [
+                coverHash,
+                BuildOriginEditionNamespace(entry),
+                "ebook_cover_embedded",
+                "m4b_cover_embedded",
+                "movie_poster_matches_cover"
+            ]);
+    }
+
     private static bool ReceiptContainsAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
     {
         if (!HasArchivedArtifact(receiptPath))
@@ -707,10 +760,16 @@ public sealed class OriginDossierPublicationService
             entry.BookArtifactReceiptPath,
             entry.StorySceneCoverPath,
             entry.StorySceneCoverReceiptPath,
+            entry.EbookArtifactPath,
+            entry.EbookAudiobookshelfImportReceiptPath,
+            entry.CoverConsistencyReceiptPath,
             entry.AudiobookPath,
             entry.AudiobookshelfImportReceiptPath,
             entry.DossierVideoPath,
             entry.DossierVideoReceiptPath,
+            entry.MoviePosterPath,
+            entry.MovieSubtitlesPath,
+            entry.MovieStoryboardPath,
             entry.TelegramShareDeliveryReceiptPath
         ];
 
@@ -746,10 +805,20 @@ public sealed class OriginDossierPublicationService
             ProjectId = projectId,
             Title = Clean(request.Title, "Origin Dossier"),
             RunnerAlias = Clean(request.RunnerAlias, "Runner"),
+            FamilyName = CleanNullable(request.FamilyName),
+            GivenName = CleanNullable(request.GivenName),
+            RunnerName = Clean(request.RunnerName, Clean(request.RunnerAlias, "Runner")),
             PublicationState = Clean(request.PublicationState, "awaiting_provider_manuscript"),
+            OriginEditionNamespace = CleanNullable(request.OriginEditionNamespace)
+                ?? BuildOriginEditionNamespace(
+                    CleanNullable(request.FamilyName),
+                    CleanNullable(request.GivenName),
+                    Clean(request.RunnerName, Clean(request.RunnerAlias, "Runner"))),
             ChummerRunOwnerUrl = ownerUrl,
             BookArtifactUrl = BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "book"),
             AudiobookshelfShareUrl = CleanNullable(request.AudiobookshelfShareUrl),
+            AudiobookshelfDossierShareUrl = CleanNullable(request.AudiobookshelfDossierShareUrl),
+            AudiobookshelfAudiobookShareUrl = CleanNullable(request.AudiobookshelfAudiobookShareUrl) ?? CleanNullable(request.AudiobookshelfShareUrl),
             DossierVideoUrl = BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "video"),
             StorySceneCoverUrl = BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "cover"),
             ProviderAuthoredManuscriptImported = request.ProviderAuthoredManuscriptImported,
@@ -770,10 +839,16 @@ public sealed class OriginDossierPublicationService
             BookArtifactReceiptPath = CleanNullable(request.BookArtifactReceiptPath),
             StorySceneCoverPath = CleanNullable(request.StorySceneCoverPath),
             StorySceneCoverReceiptPath = CleanNullable(request.StorySceneCoverReceiptPath),
+            EbookArtifactPath = CleanNullable(request.EbookArtifactPath),
+            EbookAudiobookshelfImportReceiptPath = CleanNullable(request.EbookAudiobookshelfImportReceiptPath),
+            CoverConsistencyReceiptPath = CleanNullable(request.CoverConsistencyReceiptPath),
             AudiobookPath = CleanNullable(request.AudiobookPath),
             AudiobookshelfImportReceiptPath = CleanNullable(request.AudiobookshelfImportReceiptPath),
             DossierVideoPath = CleanNullable(request.DossierVideoPath),
             DossierVideoReceiptPath = CleanNullable(request.DossierVideoReceiptPath),
+            MoviePosterPath = CleanNullable(request.MoviePosterPath),
+            MovieSubtitlesPath = CleanNullable(request.MovieSubtitlesPath),
+            MovieStoryboardPath = CleanNullable(request.MovieStoryboardPath),
             TelegramShareDeliveryReceiptPath = CleanNullable(request.TelegramShareDeliveryReceiptPath),
             MissingGoldRequirements = request.MissingGoldRequirements ?? Array.Empty<string>()
         };
@@ -789,7 +864,10 @@ public sealed class OriginDossierPublicationService
         =>
         [
             BuildOwnerPath(entry, null),
+            BuildOwnerPath(entry, "read"),
             BuildOwnerPath(entry, "listen"),
+            BuildOwnerPath(entry, "watch"),
+            BuildOriginEditionNamespace(entry),
             OperatorVerifiedLiveRunToken,
             ProviderReceiptReferenceToken
         ];
@@ -799,6 +877,7 @@ public sealed class OriginDossierPublicationService
         [
             BuildOwnerPath(entry, null),
             BuildOwnerPath(entry, "cover"),
+            BuildOriginEditionNamespace(entry),
             SelectedCharacterFaceProofToken,
             OperatorVerifiedLiveRunToken,
             ProviderReceiptReferenceToken
@@ -817,6 +896,40 @@ public sealed class OriginDossierPublicationService
         return string.IsNullOrWhiteSpace(artifactKind)
             ? path
             : $"{path}/{Uri.EscapeDataString(artifactKind.Trim().ToLowerInvariant())}";
+    }
+
+    private static bool HasOriginEditionNamespace(OriginDossierPublicationIndexEntry entry)
+    {
+        string value = Clean(entry.OriginEditionNamespace, BuildOriginEditionNamespace(entry));
+        return value.StartsWith("origin.chummer.run/", StringComparison.OrdinalIgnoreCase)
+            && value.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length >= 4;
+    }
+
+    private static string BuildOriginEditionNamespace(OriginDossierPublicationIndexEntry entry)
+        => BuildOriginEditionNamespace(entry.FamilyName, entry.GivenName, entry.RunnerName ?? entry.RunnerAlias);
+
+    private static string BuildOriginEditionNamespace(string? familyName, string? givenName, string? runnerName)
+        => $"origin.chummer.run/{NamespaceSegment(familyName, "Family")}/{NamespaceSegment(givenName, "Given")}/{NamespaceSegment(runnerName, "Runner")}";
+
+    private static string NamespaceSegment(string? value, string fallback)
+    {
+        string clean = Clean(value, fallback);
+        Span<char> buffer = stackalloc char[clean.Length];
+        int written = 0;
+        foreach (char c in clean)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                buffer[written++] = c;
+            }
+            else if ((c is '-' or '_' || char.IsWhiteSpace(c)) && written > 0 && buffer[written - 1] != '-')
+            {
+                buffer[written++] = '-';
+            }
+        }
+
+        string segment = new string(buffer[..written]).Trim('-');
+        return string.IsNullOrWhiteSpace(segment) ? fallback : segment;
     }
 
     private static string ResolveContentType(string path, string artifactKind)
@@ -852,9 +965,15 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? Title { get; init; }
     public string? RunnerAlias { get; init; }
     public string? PublicationState { get; init; }
+    public string? FamilyName { get; init; }
+    public string? GivenName { get; init; }
+    public string? RunnerName { get; init; }
+    public string? OriginEditionNamespace { get; init; }
     public string? ChummerRunOwnerUrl { get; init; }
     public string? BookArtifactUrl { get; init; }
     public string? AudiobookshelfShareUrl { get; init; }
+    public string? AudiobookshelfDossierShareUrl { get; init; }
+    public string? AudiobookshelfAudiobookShareUrl { get; init; }
     public string? DossierVideoUrl { get; init; }
     public string? StorySceneCoverUrl { get; init; }
     public string? SourcePacketPath { get; init; }
@@ -875,10 +994,16 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? BookArtifactReceiptPath { get; init; }
     public string? StorySceneCoverPath { get; init; }
     public string? StorySceneCoverReceiptPath { get; init; }
+    public string? EbookArtifactPath { get; init; }
+    public string? EbookAudiobookshelfImportReceiptPath { get; init; }
+    public string? CoverConsistencyReceiptPath { get; init; }
     public string? AudiobookPath { get; init; }
     public string? AudiobookshelfImportReceiptPath { get; init; }
     public string? DossierVideoPath { get; init; }
     public string? DossierVideoReceiptPath { get; init; }
+    public string? MoviePosterPath { get; init; }
+    public string? MovieSubtitlesPath { get; init; }
+    public string? MovieStoryboardPath { get; init; }
     public string? TelegramShareDeliveryReceiptPath { get; init; }
     public IReadOnlyList<string>? MissingGoldRequirements { get; init; }
 }

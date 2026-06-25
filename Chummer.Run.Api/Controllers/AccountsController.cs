@@ -304,8 +304,12 @@ public sealed class AccountsController : Controller
     {
         string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}/{Uri.EscapeDataString(artifactKind)}";
         if (!string.Equals(artifactKind, "book", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "read", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "dossier", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "cover", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "video", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "watch", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "movie", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
         {
             return NotFound();
@@ -315,22 +319,33 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            if (string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(artifactKind, "read", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(artifactKind, "dossier", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
             {
+                string shareKind = string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase)
+                    ? "audiobook"
+                    : "dossier";
                 string? audiobookshelfShareUrl = _originDossierPublications.GetAudiobookshelfShareForAccount(
                     user.UserId,
                     subject.SubjectId,
-                    originDossierProjectId);
+                    originDossierProjectId,
+                    shareKind);
                 return string.IsNullOrWhiteSpace(audiobookshelfShareUrl)
                     ? NotFound()
                     : Redirect(audiobookshelfShareUrl);
             }
 
+            string resolvedArtifactKind = artifactKind.Trim().ToLowerInvariant() switch
+            {
+                "watch" or "movie" => "video",
+                _ => artifactKind
+            };
             OriginDossierPublicationArtifact? artifact = _originDossierPublications.GetArtifactForAccount(
                 user.UserId,
                 subject.SubjectId,
                 originDossierProjectId,
-                artifactKind);
+                resolvedArtifactKind);
             return artifact is null
                 ? NotFound()
                 : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);

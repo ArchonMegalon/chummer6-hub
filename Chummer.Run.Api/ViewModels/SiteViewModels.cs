@@ -2164,7 +2164,13 @@ public sealed record OriginDossierPublicationViewModel(
     bool TelegramShareDelivered,
     bool RequiresAuthenticatedChummerRunUser,
     bool GoldReady,
-    IReadOnlyList<string> MissingGoldRequirements);
+    IReadOnlyList<string> MissingGoldRequirements,
+    string? FamilyName = null,
+    string? GivenName = null,
+    string? RunnerName = null,
+    string? OriginEditionNamespace = null,
+    string? AudiobookshelfDossierShareUrl = null,
+    string? AudiobookshelfAudiobookShareUrl = null);
 
 public sealed record OriginDossierPublicationDetailPageViewModel(
     SiteChromeViewModel Chrome,

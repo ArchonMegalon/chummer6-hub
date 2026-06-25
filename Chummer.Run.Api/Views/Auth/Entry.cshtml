@@ -38,24 +38,8 @@
 <section class="auth-entry">
     <div class="auth-entry__story auth-entry__story--visual">
         <p class="eyebrow">Account</p>
-        <h1 class="hero-brand">CHUMMER</h1>
-        <h2 class="hero-headline">@(isInstallLinkReturn ? "Claim your copy" : Model.Heading)</h2>
-        <p class="auth-entry__copy">@(isInstallLinkReturn ? "Use your email or Google account to connect this install to you. The app returns when that is done." : Model.SupportLine)</p>
-        <div class="auth-value-strip" aria-label="Immediate account value">
-            <article class="auth-value-strip__fact">
-                <span>Linked installs</span>
-                <strong>Keep this copy attached to your account.</strong>
-            </article>
-            <article class="auth-value-strip__fact">
-                <span>Devices and access</span>
-                <strong>Reconnect, replace, or recover from one place.</strong>
-            </article>
-            <article class="auth-value-strip__fact">
-                <span>Support history</span>
-                <strong>Tracked help stays attached to the same account.</strong>
-            </article>
-        </div>
-        <p class="auth-entry__trust">@(isInstallLinkReturn ? "The download stays the same. Claiming only connects this copy to your account." : (accessPosture?.AccountValueSummary ?? "The download stays the same for everyone. An account adds device return and support history when you want them."))</p>
+        <h1 class="hero-brand">Chummer</h1>
+        <p class="auth-entry__copy">@(isInstallLinkReturn ? "Claim this copy and return to the app." : "Sign in when you want downloads, installs, and support tied to one account.")</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">
@@ -75,16 +59,8 @@
         @if (Model.CreateAccount)
         {
             <div class="auth-panel__intro">
-                <h3>@(isInstallLinkReturn ? "Claim with email" : "Email first")</h3>
-                <p>@(isInstallLinkReturn ? "Enter the email you want attached to this copy. Google is available if that is how you normally sign in." : "Create the account first, then finish setup. Email keeps the first step simple. Google is available too.")</p>
-            </div>
-            <div class="auth-benefits">
-                <span class="tag">What you get right away</span>
-                <ul>
-                    <li>An account that can link downloads, install history, and future device return.</li>
-                    <li>A place to keep support history and device return in one account home.</li>
-                    <li>A simple way back when this install, your account, or your support case needs attention.</li>
-                </ul>
+                <h3>@(isInstallLinkReturn ? "Claim your copy" : "Create account")</h3>
+                <p>@(isInstallLinkReturn ? "Use the email that should own this install." : "Use email or Google. You can download without an account.")</p>
             </div>
             <p class="muted-copy">After you confirm the email, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
@@ -117,18 +93,9 @@
         else
         {
             <div class="auth-panel__intro">
-                <h3>@(isInstallLinkReturn ? "Claim with your account" : "Fastest way back in")</h3>
-                <p>@(isInstallLinkReturn ? "Sign in with the account that should own this copy." : "Sign in to reopen downloads, devices and access, and support history.")</p>
+                <h3>@(isInstallLinkReturn ? "Claim with your account" : "Sign in")</h3>
+                <p>@(isInstallLinkReturn ? "Use the account that should own this install." : $"Use email or Google. You return to {nextTarget} after sign-in.")</p>
             </div>
-            <div class="auth-benefits">
-                <span class="tag">What opens after sign-in</span>
-                <ul>
-                    <li>Your home and account pages for return, recovery, and the next step.</li>
-                    <li>Account-linked downloads, connected copies, and device return.</li>
-                    <li>Support history already on the account.</li>
-                </ul>
-            </div>
-            <p class="muted-copy">After you confirm the sign-in, you return to @nextTarget.</p>
             @if (isInstallLinkReturn)
             {
                 <p class="muted-copy">@(installLinkReturnsToLocalApp
@@ -157,6 +124,6 @@
                 <p class="muted-copy">@Model.GoogleUnavailableReason</p>
             }
         }
-        <p class="privacy-note">The account keeps downloads, updates, linked installs, devices and access, and support history together.</p>
+        <p class="privacy-note">Accounts are optional unless a private page or install claim needs one.</p>
     </div>
 </section>
