@@ -61,13 +61,6 @@
         .OrderByDescending(item => item.Case.UpdatedAtUtc)
         .ToArray();
     var leadInstallation = linkedInstallations.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
-    var leadGrant = leadInstallation is null
-        ? activeGrants.OrderByDescending(static item => item.IssuedAtUtc).FirstOrDefault()
-        : activeGrants
-            .Where(item => string.Equals(item.InstallationId, leadInstallation.InstallationId, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(static item => item.IssuedAtUtc)
-            .FirstOrDefault()
-            ?? activeGrants.OrderByDescending(static item => item.IssuedAtUtc).FirstOrDefault();
     var leadPendingClaim = pendingClaimTickets.FirstOrDefault();
     var leadInstallRailSupport = installRailSupportCases.FirstOrDefault();
     var dossierCount = Model.CampaignSpine.Dossiers.Count;
@@ -1125,41 +1118,18 @@
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Installs</h2>
-                    <p>Linked copies, pending setup, and install help stay in one place. Technical details are still available, but they do not lead the page.</p>
+                    <p>See linked copies, pending setup, and install help without the internal machinery.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
                     <span class="tag">Current install</span>
                     <h3>@installRailHeading</h3>
                     <p>@installRailSummary</p>
                     <div class="settings-summary-list">
-                        <div class="settings-summary-row">
-                            <span>Recommended</span>
-                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open downloads to confirm the current guided installer path.")</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Available to</span>
-                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open downloads to confirm live access.")</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Fixes</span>
-                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Fix availability", "Open downloads to confirm whether the current linked install already has the fix.")</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Note</span>
-                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Use the current release page when you need the newest caution before you continue this install.")</strong>
-                        </div>
                         @if (leadInstallation is not null)
                         {
                             <div class="settings-summary-row">
                                 <span>Linked copy</span>
                                 <strong>@(InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)) · @PlatformSummary(leadInstallation.Platform, leadInstallation.Arch) · @InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)</strong>
-                            </div>
-                        }
-                        @if (leadGrant is not null)
-                        {
-                            <div class="settings-summary-row">
-                                <span>Access right</span>
-                                <strong>Until @leadGrant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                             </div>
                         }
                         @if (leadPendingClaim is not null)
@@ -1181,13 +1151,9 @@
                         <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
                         <a class="button-like button-like--secondary" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                     </div>
-                    <p class="muted-copy">Recovery codes stay below as a reserve option. They are not the normal way to set up Chummer.</p>
+                    <p class="muted-copy">Recovery codes are only for the already-downloaded app when it asks for one.</p>
                 </article>
                 <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Recent installs</span>
-                        <strong>@Model.InstallLinking.RecentReceipts.Count</strong>
-                    </div>
                     <div class="settings-summary-row">
                         <span>Pending setup</span>
                         <strong>@Model.InstallLinking.PendingClaimTickets.Count</strong>
@@ -1196,18 +1162,10 @@
                         <span>Linked copies</span>
                         <strong>@claimedInstallations</strong>
                     </div>
-                    <div class="settings-summary-row">
-                        <span>Active access</span>
-                        <strong>@activeAccessRights</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Recovery backup</span>
-                        <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Not started" : $"{restoreArtifactCount} file(s) · {restoreEntitlementCount} access item(s)")</strong>
-                    </div>
                     @if (entitlementSyncReceipts is not null)
                     {
                         <div class="settings-summary-row">
-                            <span>Status</span>
+                            <span>Connection</span>
                             <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Needs a look")</strong>
                         </div>
                         <div class="settings-summary-row">
@@ -1226,10 +1184,6 @@
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.Summary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>History</span>
-                                <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ProvenanceSummary)</strong>
-                            </div>
-                            <div class="settings-summary-row">
                                 <span>Problems</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ConflictSummary)</strong>
                             </div>
@@ -1238,114 +1192,17 @@
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Recovery</span>
-                                <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.RecoverySummary)</strong>
-                            </div>
-                            <div class="settings-summary-row">
                                 <span>Updated</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
                             </div>
-                            <div class="settings-summary-row">
-                                <span>Access updates</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncProvenanceCount</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Access problems</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Stale items</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Ready items</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.SafeToContinueWithReceiptCount</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Needs refresh</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.RefreshBeforeContinueCount</strong>
-                            </div>
-                            <div class="settings-summary-row">
-                                <span>Blocking problems</span>
-                                <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
-                            </div>
                         </div>
-                        @if (entitlementSyncReceipts.ReceiptSurfaces.Count > 0)
-                        {
-                            <ul class="muted-copy">
-                                @foreach (var surface in entitlementSyncReceipts.ReceiptSurfaces)
-                                {
-                                    <li>
-                                        <strong>@surface.Label:</strong> @PublicText(surface.Status.Summary)
-                                        <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
-                                        <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>@PublicText(surface.Status.RecoverySummary)</span>
-                                        <span>Needs refresh: @surface.Status.RefreshBeforeContinueCount</span>
-                                        <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
-                                        @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
-                                        {
-                                            <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
-                                        }
-                                        <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue")</span>
-                                    </li>
-                                }
-                            </ul>
-                        }
-                        @if (entitlementSyncReceipts.ReceiptStatus.RecoveryActions.Count > 0)
-                        {
-                            <ul class="muted-copy">
-                                @foreach (var action in entitlementSyncReceipts.ReceiptStatus.RecoveryActions)
-                                {
-                                    <li>
-                                        <strong>@action.Label:</strong> @PublicText(action.Summary)
-                                        <span>@HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
-                                        <span>Next: @DescribeRecoveryRouteAction(action.Route)</span>
-                                        <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Check details before continuing")</span>
-                                        @if (IsNavigableAccountRoute(action.Route))
-                                        {
-                                            <span><a href="@action.Route">@DescribeRecoveryRouteAction(action.Route)</a></span>
-                                        }
-                                    </li>
-                                }
-                            </ul>
-                        }
                         @if (IsNavigableAccountRoute(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute))
                         {
                             <p class="muted-copy">
                                 <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)</a>
                             </p>
                         }
-                        @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
-                        {
-                            <p class="muted-copy">No connection history is attached right now.</p>
-                        }
-                        else
-                        {
-                            <ul class="muted-copy">
-                                @foreach (var receipt in entitlementSyncReceipts.ProvenanceRecoveryReceipts.Take(4))
-                                {
-                                    <li>
-                                        <strong>Account update:</strong>
-                                        @PublicText(receipt.Summary)
-                                        <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>Current: @HumanizeStatus(receipt.StalenessPosture, "Current")</span>
-                                        <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable")</span>
-                                        @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
-                                        {
-                                            <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
-                                        }
-                                        <span>@receipt.RecoveryHint</span>
-                                        <span>@receipt.RecoverySummary</span>
-                                        <span>@HumanizeStatus(receipt.ContinuePosture, "Safe to continue")</span>
-                                    </li>
-                                }
-                            </ul>
-                        }
-                        @if (entitlementSyncReceipts.ConflictReceipts.Count == 0)
-                        {
-                            <p class="muted-copy">No connection problems are active right now.</p>
-                        }
-                        else
+                        @if (entitlementSyncReceipts.ConflictReceipts.Count > 0)
                         {
                             <ul class="muted-copy">
                                 @foreach (var receipt in entitlementSyncReceipts.ConflictReceipts.Take(4))
@@ -1353,16 +1210,6 @@
                                     <li>
                                         <strong>@HumanizeStatus(receipt.Severity, "Warning"):</strong>
                                         @PublicText(receipt.Summary)
-                                        <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>Issue: @HumanizeStatus(receipt.ConflictPosture, "Needs attention")</span>
-                                        <span>Recovery: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by account access")</span>
-                                        @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
-                                        {
-                                            <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
-                                        }
-                                        <span>@receipt.RecoveryHint</span>
-                                        <span>@receipt.RecoverySummary</span>
-                                        <span>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Check details before continuing")</span>
                                         @if (receipt.BlocksContinue)
                                         {
                                             <span>Finish this item before you continue.</span>
@@ -1373,21 +1220,20 @@
                         }
                     </details>
                 }
-                @if (Model.InstallLinking.RecentReceipts.Count == 0)
+                @if (Model.InstallLinking.RecentReceipts.Count > 0)
                 {
-                    <p class="muted-copy">No linked downloads yet. Start from the recommended installer while signed in if you want Chummer to remember this copy.</p>
-                }
-                else
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var receipt in Model.InstallLinking.RecentReceipts)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@PublicText(receipt.ArtifactLabel)</span>
-                                <strong>@receipt.Version on @receipt.Channel · @receipt.IssuedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
-                            </div>
-                        }
-                    </div>
+                    <details class="details-drawer">
+                        <summary>Download history</summary>
+                        <div class="settings-summary-list">
+                            @foreach (var receipt in Model.InstallLinking.RecentReceipts.Take(5))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>@PublicText(receipt.ArtifactLabel)</span>
+                                    <strong>@receipt.Version on @receipt.Channel · @receipt.IssuedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                </div>
+                            }
+                        </div>
+                    </details>
                 }
                 @if (claimedInstallations > 0)
                 {
@@ -1407,7 +1253,7 @@
                 @if (activeAccessRights > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Active access</summary>
+                        <summary>Access grants</summary>
                         <div class="settings-summary-list">
                             @foreach (var grant in Model.InstallLinking.ActiveGrants!)
                             {
@@ -1444,7 +1290,7 @@
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
                 <details class="details-drawer">
-                    <summary>Advanced device recovery</summary>
+                    <summary>Recovery backup</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
                             <span>Recovery devices</span>

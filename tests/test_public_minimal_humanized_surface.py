@@ -832,9 +832,12 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
     assert '"access" => "Installs"' in account
-    assert "Linked copies, pending setup, and install help stay in one place." in account
+    assert "See linked copies, pending setup, and install help without the internal machinery." in account
     assert "<summary>Connection details</summary>" in account
-    assert "Recovery codes stay below as a reserve option. They are not the normal way to set up Chummer." in account
+    assert "Recovery codes are only for the already-downloaded app when it asks for one." in account
+    assert "<summary>Download history</summary>" in account
+    assert "<summary>Access grants</summary>" in account
+    assert "<summary>Recovery backup</summary>" in account
     assert "Pending setup codes" in account
 
     for forbidden in (
@@ -845,6 +848,14 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
         "<span>Blocking sync conflicts</span>",
         "Technical claim details stay available, but they do not need to be the first thing you read.",
         "Do not redeem claim codes in a browser tab.",
+        "Linked copies, pending setup, and install help stay in one place. Technical details are still available, but they do not lead the page.",
+        "Recovery codes stay below as a reserve option. They are not the normal way to set up Chummer.",
+        "<span>Access updates</span>",
+        "<span>Stale items</span>",
+        "<span>Ready items</span>",
+        "hub_entitlement_ledger",
+        "No connection history is attached right now.",
+        "No connection problems are active right now.",
     ):
         assert forbidden not in account
 
