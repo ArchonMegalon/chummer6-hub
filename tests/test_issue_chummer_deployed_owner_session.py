@@ -81,6 +81,17 @@ def test_render_env_output_is_directly_exportable_for_probe() -> None:
     assert "CHUMMER_DEPLOYED_E2E_COOKIE_NAME=chummer_hub_access_token" in rendered
 
 
+def test_render_dotenv_output_is_directly_loadable_by_probe_env_file() -> None:
+    module = load_module()
+
+    rendered = module.render_output(issued_session(), "dotenv", "chummer_hub_access_token")
+
+    assert 'CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN="secret-owner-access-token"' in rendered
+    assert 'CHUMMER_DEPLOYED_E2E_AUTH_MODE="cookie"' in rendered
+    assert 'CHUMMER_DEPLOYED_E2E_COOKIE_NAME="chummer_hub_access_token"' in rendered
+    assert "export " not in rendered
+
+
 def test_render_header_outputs_match_probe_inputs() -> None:
     module = load_module()
 
@@ -103,3 +114,15 @@ def test_summary_output_does_not_expose_raw_token() -> None:
     assert payload["rawTokenPrinted"] is False
     assert payload["accessTokenSha256"]
     assert "secret-owner-access-token" not in rendered
+
+
+def test_derives_identity_subject_from_owner_email_like_chummer_identity() -> None:
+    module = load_module()
+
+    assert module.derive_subject_from_email("OWNER@Example.Test ") == "subject.email.b2096dbc5111b630"
+
+
+def test_derives_route_proof_subject_from_origin_namespace() -> None:
+    module = load_module()
+
+    assert module.derive_subject_from_origin_namespace("origin.chummer.run/Varga/Mira/Kestrel") == "subject.origin-edition.c96868f7b6a6a550"

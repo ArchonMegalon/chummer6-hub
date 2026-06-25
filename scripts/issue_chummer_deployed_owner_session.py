@@ -18,6 +18,8 @@ ENV_KEYS = {
     "IDENTITY_SERVICE_BASE_URL",
     "IDENTITY_ADMIN_KEY",
     "CHUMMER_DEPLOYED_E2E_SUBJECT_ID",
+    "CHUMMER_DEPLOYED_E2E_OWNER_EMAIL",
+    "CHUMMER_ORIGIN_EDITION_NAMESPACE",
     "CHUMMER_DEPLOYED_E2E_DISPLAY_NAME",
     "CHUMMER_DEPLOYED_E2E_EMAIL",
     "CHUMMER_DEPLOYED_E2E_ROLES",
@@ -67,6 +69,18 @@ def roles_from(value: str | None) -> list[str]:
     return list(dict.fromkeys(roles or ["player"]))
 
 
+def derive_subject_from_email(email: str) -> str:
+    normalized = required(email, "owner email").lower()
+    digest = hashlib.sha256(normalized.encode("utf-8")).digest()[:8].hex()
+    return f"subject.email.{digest}"
+
+
+def derive_subject_from_origin_namespace(namespace: str) -> str:
+    normalized = required(namespace, "origin namespace")
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+    return f"subject.origin-edition.{digest}"
+
+
 def sha256_text(value: object) -> str:
     text = str(value or "")
     return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else ""
@@ -111,6 +125,11 @@ def env_line(key: str, value: str) -> str:
     return f"export {key}={shlex.quote(value)}"
 
 
+def dotenv_line(key: str, value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'{key}="{escaped}"'
+
+
 def render_output(session: dict[str, Any], output_format: str, cookie_name: str) -> str:
     access_token = required(str(session.get("accessToken") or ""), "accessToken")
     if output_format == "env":
@@ -119,6 +138,14 @@ def render_output(session: dict[str, Any], output_format: str, cookie_name: str)
                 env_line("CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN", access_token),
                 env_line("CHUMMER_DEPLOYED_E2E_AUTH_MODE", "cookie"),
                 env_line("CHUMMER_DEPLOYED_E2E_COOKIE_NAME", cookie_name),
+            ]
+        )
+    if output_format == "dotenv":
+        return "\n".join(
+            [
+                dotenv_line("CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN", access_token),
+                dotenv_line("CHUMMER_DEPLOYED_E2E_AUTH_MODE", "cookie"),
+                dotenv_line("CHUMMER_DEPLOYED_E2E_COOKIE_NAME", cookie_name),
             ]
         )
     if output_format == "cookie-header":
@@ -154,11 +181,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--identity-base-url", default=None)
     parser.add_argument("--admin-key", default=None)
     parser.add_argument("--subject-id", default=None, help="Owner subject id that owns the deployed Origin Dossier publication.")
+    parser.add_argument("--owner-email", default=None, help="Derive subject.email.* from this owner email when --subject-id is not provided.")
+    parser.add_argument("--origin-namespace", default=None, help="Derive subject.origin-edition.* from the Origin Edition namespace when no owner subject/email is provided.")
     parser.add_argument("--display-name", default=None)
     parser.add_argument("--email", default=None)
     parser.add_argument("--roles", default=None, help="Comma-separated roles. Defaults to player.")
     parser.add_argument("--cookie-name", default=None)
-    parser.add_argument("--format", choices=("env", "cookie-header", "authorization-header", "summary"), default="env")
+    parser.add_argument("--format", choices=("env", "dotenv", "cookie-header", "authorization-header", "summary"), default="env")
     parser.add_argument("--output-env-file", type=Path, help="Write the rendered export lines to an operator-local file with 0600 permissions.")
     return parser.parse_args()
 
@@ -168,7 +197,14 @@ def main() -> int:
     load_env_file(args.env_file)
     identity_base_url = required(args.identity_base_url or os.environ.get("IDENTITY_SERVICE_BASE_URL"), "IDENTITY_SERVICE_BASE_URL")
     admin_key = required(args.admin_key or os.environ.get("IDENTITY_ADMIN_KEY"), "IDENTITY_ADMIN_KEY")
-    subject_id = required(args.subject_id or os.environ.get("CHUMMER_DEPLOYED_E2E_SUBJECT_ID"), "CHUMMER_DEPLOYED_E2E_SUBJECT_ID")
+    subject_id = optional(args.subject_id or os.environ.get("CHUMMER_DEPLOYED_E2E_SUBJECT_ID"))
+    owner_email = optional(args.owner_email or os.environ.get("CHUMMER_DEPLOYED_E2E_OWNER_EMAIL"))
+    if subject_id is None and owner_email is not None:
+        subject_id = derive_subject_from_email(owner_email)
+    origin_namespace = optional(args.origin_namespace or os.environ.get("CHUMMER_ORIGIN_EDITION_NAMESPACE"))
+    if subject_id is None and origin_namespace is not None:
+        subject_id = derive_subject_from_origin_namespace(origin_namespace)
+    subject_id = required(subject_id, "CHUMMER_DEPLOYED_E2E_SUBJECT_ID, CHUMMER_DEPLOYED_E2E_OWNER_EMAIL, or CHUMMER_ORIGIN_EDITION_NAMESPACE")
     session = issue_session(
         identity_base_url=identity_base_url,
         admin_key=admin_key,
