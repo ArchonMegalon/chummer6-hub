@@ -2645,9 +2645,10 @@ document.addEventListener('DOMContentLoaded', function () {
       [/\bLet us know how we can improve Chummer6\./g, 'Tell us what would help.'],
       [/\bShort title of your feedback\.\.\./g, 'Short title'],
       [/\bDescribe your idea or bug\.\.\./g, 'What happened, or what should exist?'],
-      [/\b-- Choose a category --\b/g, 'Choose a category'],
+      [/-- Choose a category --/g, 'Choose a category'],
       [/\bGathering votes\b/g, ''],
       [/\bFeature\b/g, 'Idea'],
+      [/\bCreate\b/g, 'Send'],
       [/\bvotes\b/gi, 'requests'],
       [/\s{2,}/g, ' ']
     ];
@@ -2668,6 +2669,25 @@ document.addEventListener('DOMContentLoaded', function () {
       if (value !== original) {
         node.nodeValue = value.trimStart();
       }
+    });
+
+    const attributeCandidates = Array.from(document.querySelectorAll('[placeholder], [aria-label], [title]'));
+    attributeCandidates.forEach(function (node) {
+      ['placeholder', 'aria-label', 'title'].forEach(function (name) {
+        if (!node.hasAttribute(name)) {
+          return;
+        }
+
+        let value = node.getAttribute(name) || '';
+        const original = value;
+        replacements.forEach(function (pair) {
+          value = value.replace(pair[0], pair[1]);
+        });
+
+        if (value !== original) {
+          node.setAttribute(name, value.trim());
+        }
+      });
     });
   };
 

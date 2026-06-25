@@ -32,6 +32,7 @@ const forbidden = [
   /\bAdd Feature or Bug\b/i,
   /\bShort title of your feedback/i,
   /\bDescribe your idea or bug/i,
+  /-- Choose a category --/i,
   /Tell us how we could make Chummer6 more useful to you/i,
 ];
 
@@ -40,7 +41,7 @@ const forbidden = [
   try {
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForSelector('text=What do you want to see next?', { timeout: 10000 });
+    await page.waitForSelector('text=What should Chummer do next?', { timeout: 10000 });
     const text = await page.locator('body').innerText({ timeout: 10000 });
     const failures = forbidden
       .filter((pattern) => pattern.test(text))

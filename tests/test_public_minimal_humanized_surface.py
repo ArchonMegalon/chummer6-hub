@@ -429,6 +429,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "What should Chummer do next?" in controller
     assert "Short requests, clear bugs, useful ideas." in controller
     assert "Add a note" in controller
+    assert "attributeCandidates" in controller
+    assert "Choose a category" in controller
     assert "data-chummer-hidden-status" in controller
     assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
