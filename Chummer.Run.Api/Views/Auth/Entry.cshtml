@@ -1,9 +1,9 @@
 @model AuthPageViewModel
 @{
-    ViewData["Title"] = "Claim your copy";
+    ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-auth surface-minimal";
-    var accessPosture = Model.AccessPosture;
+    ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";
+    ViewData["HideAuthChrome"] = !Model.CreateAccount;
     var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
     var installLinkReturnsToLocalApp = false;
     static bool IsLoopbackCallbackUri(string candidate)
@@ -24,98 +24,38 @@
             installLinkReturnsToLocalApp = IsLoopbackCallbackUri(callbackUri);
         }
     }
-    var nextTarget = isInstallLinkReturn
-        ? "this copy"
-        : Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
-        ? "Downloads"
-        : Model.NextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
-            ? "Account"
-            : Model.NextPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)
-                ? "Home"
-                : "the account area";
+
+    var introCopy = Model.CreateAccount
+        ? "Create an account with email or Google."
+        : "Use your email to sign in.";
 }
 
-<section class="auth-entry" aria-labelledby="auth-title">
-    <div class="auth-entry__panel auth-panel auth-panel--entry">
+<section class="auth-entry auth-entry--lean" aria-labelledby="auth-title">
+    <div class="auth-panel auth-panel--entry">
         <div class="auth-panel__intro auth-panel__intro--masthead">
-            <h1 id="auth-title">Claim your copy</h1>
-            <p>@(isInstallLinkReturn ? "Connect this install. The download stays the same." : "Use email or Google. The download stays open.")</p>
+            <h1 id="auth-title">@(Model.CreateAccount ? "Create account" : "Sign in")</h1>
+            <p>@introCopy</p>
         </div>
 
-        @if (Model.CreateAccount)
+        <form class="auth-form" method="post" action="/auth/email/start">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="next" value="@Model.NextPath" />
+            <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" placeholder="runner@example.com" required />
+            </div>
+            <button class="button-like button-like--primary auth-panel__primary" type="submit">Continue</button>
+        </form>
+
+        @if (Model.GoogleAvailable)
         {
-            @if (isInstallLinkReturn)
-            {
-                <div class="auth-panel__intro">
-                    <h2>Email</h2>
-                    <p>Use the address that should own this install.</p>
-                </div>
-            }
-            <p class="muted-copy">After the link opens, you return to @nextTarget.</p>
-            @if (isInstallLinkReturn)
-            {
-                <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser connects this copy."
-                    : "If the browser cannot return to Chummer, open this page again from the app.")</p>
-            }
-            <form class="auth-form" method="post" action="/auth/email/start">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="next" value="@Model.NextPath" />
-                <div class="field">
-                    <label for="email">Email</label>
-                    <input id="email" name="email" type="email" placeholder="runner@example.com" required />
-                </div>
-                <button class="button-like button-like--primary" type="submit">Email me a link</button>
-            </form>
-
             <div class="auth-divider"><span>or</span></div>
-            @if (Model.GoogleAvailable)
-            {
-                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Use Google</a>
-            }
-            else
-            {
-                <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
-                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
-            }
+            <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
         }
-        else
+
+        @if (isInstallLinkReturn)
         {
-            @if (isInstallLinkReturn)
-            {
-                <div class="auth-panel__intro">
-                    <h2>Email</h2>
-                    <p>Use the address that should own this install.</p>
-                </div>
-            }
-            @if (isInstallLinkReturn)
-            {
-                <p class="muted-copy">@(installLinkReturnsToLocalApp
-                    ? "Keep Chummer open while the browser connects this copy."
-                    : "If the browser cannot return to Chummer, open this page again from the app.")</p>
-            }
-
-            <form class="auth-form" method="post" action="/auth/email/start">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="next" value="@Model.NextPath" />
-                <div class="field">
-                    <label for="email">Email</label>
-                    <input id="email" name="email" type="email" placeholder="runner@example.com" required />
-                </div>
-                <button class="button-like button-like--primary auth-panel__primary" type="submit">Email me a link</button>
-            </form>
-
-            <div class="auth-divider"><span>or</span></div>
-            @if (Model.GoogleAvailable)
-            {
-                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Use Google</a>
-            }
-            else
-            {
-                <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
-                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
-            }
+            <p class="muted-copy">Keep Chummer open until the browser returns to the app.</p>
         }
-        <p class="privacy-note">Account optional. Useful for linked installs, recovery, and private pages.</p>
     </div>
 </section>

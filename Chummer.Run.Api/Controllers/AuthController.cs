@@ -77,7 +77,7 @@ public sealed class AuthController : Controller
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
-            heading: "Claim your copy",
+            heading: "Sign in to Chummer",
             nextPath,
             createAccount: false));
     }
@@ -669,7 +669,7 @@ public sealed class AuthController : Controller
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
         var supportLine = createAccount
             ? accessPosture.CreateAccountSummary
-            : "Email or Google. The download stays open.";
+            : "Continue with email or Google.";
         return new AuthPageViewModel(
             Chrome: _chrome.BuildPublicChrome(heading, supportLine, createAccount ? "/signup" : "/login"),
             Heading: heading,

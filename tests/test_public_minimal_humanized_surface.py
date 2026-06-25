@@ -33,7 +33,7 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'route-choice-grid--compact' in trust_page
     assert 'Choose one' in trust_page
     assert 'Public ideas go to Participate. Private problems stay here.' in trust_page
-    assert 'Send private help request' in trust_page
+    assert 'Send support request' in trust_page
     assert 'other routes below' not in trust_page
 
 
@@ -127,7 +127,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Public ideas and private help.",
         "Create account for saved history",
         "Choose the closest problem",
-        "Open private help",
+        "Open support",
         "Private help stays separate from public feedback.",
         "Create an account only when you want saved help history or recovery.",
     ):
@@ -3007,3 +3007,24 @@ def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None
     assert "IDENTITY_EMAILIT_WEBHOOK_SECRET" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")
     assert "IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")
     assert "StatusCodes.Status503ServiceUnavailable" in read("Chummer.Run.Identity/Controllers/IdentityController.cs")
+
+
+def test_login_view_is_minimal_auth_surface() -> None:
+    auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
+    layout = read("Chummer.Run.Api/Views/Shared/_Layout.cshtml")
+
+    for expected in (
+        'ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";',
+        'ViewData["HideAuthChrome"] = !Model.CreateAccount;',
+        "auth-entry--lean",
+        'class="button-like button-like--secondary auth-panel__primary"',
+        "Continue with Google",
+        "Use your email to sign in.",
+    ):
+        assert expected in auth_entry
+
+    for expected in (
+        'var hideAuthChrome = (ViewData["HideAuthChrome"] as bool?) == true;',
+        "if (!hideAuthChrome)",
+    ):
+        assert expected in layout

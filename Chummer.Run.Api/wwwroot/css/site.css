@@ -6197,6 +6197,32 @@ body.shell-authenticated {
   display: none;
 }
 
+.route-login.surface-minimal.surface-auth-login .site-header {
+  display: none;
+}
+
+.route-login.surface-minimal.surface-auth-login .site-footer {
+  display: none;
+}
+
+.route-login.surface-minimal.surface-auth-login .site-main {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 0 16px;
+}
+
+.route-login.surface-minimal.surface-auth-login .auth-entry {
+  width: min(340px, calc(100% - 32px));
+  border: 0;
+  background: transparent;
+}
+
+.route-login.surface-minimal.surface-auth-login .auth-panel--entry {
+  padding: 0;
+  gap: 12px;
+}
+
 .route-login.surface-minimal .site-main,
 .route-signup.surface-minimal .site-main {
   min-height: calc(100svh - 60px);
@@ -6220,6 +6246,10 @@ body.shell-authenticated {
 .route-login.surface-minimal .auth-entry__story,
 .route-signup.surface-minimal .auth-entry__story {
   display: none;
+}
+
+.route-login.surface-minimal.surface-auth-login .auth-entry.auth-entry--lean {
+  width: min(340px, calc(100% - 32px));
 }
 
 .route-login.surface-minimal .auth-panel--entry,
@@ -6296,6 +6326,10 @@ body.shell-authenticated {
 .route-signup.surface-minimal .auth-panel__intro h2 {
   font-size: 1rem;
   line-height: 1.25;
+}
+
+.route-login.surface-minimal.surface-auth-login .auth-panel__intro p {
+  max-width: 32ch;
 }
 
 .route-login.surface-minimal .auth-panel__intro p,
@@ -6376,6 +6410,12 @@ body.shell-authenticated {
 .route-signup.surface-minimal .auth-divider span {
   background: transparent;
   color: inherit;
+}
+
+.route-login.surface-minimal.surface-auth-login .privacy-note {
+  text-align: center;
+  color: rgba(243, 234, 219, 0.6);
+  margin-top: 0.2rem;
 }
 
 @media (max-width: 720px) {
