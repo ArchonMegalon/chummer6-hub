@@ -13,6 +13,7 @@ from origin_edition_verify_paths import deployed_operator_handoff_from_env
 
 CONTRACT_NAME = "chummer.origin_edition.deployed_operator_handoff.v1"
 REQUIRED_COMMAND_SNIPPETS = (
+    "materialize_origin_dossier_deployed_state_import.py",
     "materialize_origin_dossier_deployed_browser_probe.py",
     "audit_origin_dossier_gold_e2e.py",
     "materialize_origin_edition_gold_proof_chain.py",

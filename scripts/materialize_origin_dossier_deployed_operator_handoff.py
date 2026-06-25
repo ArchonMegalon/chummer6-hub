@@ -159,6 +159,7 @@ def materialize(
     gold_audit = evidence_root / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json"
     runsite_proof = branch / "runsite-integration-proof.receipt.json"
     live_import = evidence_root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    deployed_state_import = branch / "deployed-state-import.receipt.json"
     evidence_root_text = evidence_root.as_posix()
     branch_text = branch.as_posix()
 
@@ -173,6 +174,8 @@ def materialize(
     required_commands = [
         "Set exactly one deployed owner-session input in /docker/chummercomplete/chummer.run-services/.env or in the current process: CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER.",
         "Preferred operator path when IDENTITY_SERVICE_BASE_URL, IDENTITY_ADMIN_KEY, and one owner resolver are available: eval \"$(python3 scripts/issue_chummer_deployed_owner_session.py --env-file /docker/chummercomplete/chummer.run-services/.env --format env)\". Owner resolvers: CHUMMER_DEPLOYED_E2E_SUBJECT_ID, CHUMMER_DEPLOYED_E2E_OWNER_EMAIL, or CHUMMER_ORIGIN_EDITION_NAMESPACE for deterministic fictional Origin sample proofs.",
+        f"python3 scripts/materialize_origin_dossier_deployed_state_import.py --live-import {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data --container-state-root /app/state --output-receipt {branch_text}/deployed-state-import.receipt.json",
+        "After explicit deploy/restart approval only: recreate or restart chummer-portal so CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json is active.",
         f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
         f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
@@ -269,6 +272,9 @@ def materialize(
         "requiredCommands": required_commands,
         "currentEvidence": {
             "liveImportRequestSha256": sha256_file(live_import) if live_import.is_file() else "",
+            "deployedStateImportSha256": sha256_file(deployed_state_import) if deployed_state_import.is_file() else "",
+            "deployedStateImportStatus": read_json(deployed_state_import).get("status") if deployed_state_import.is_file() else "",
+            "deployedStateImportRestartRequired": read_json(deployed_state_import).get("restartRequiredForExistingContainer") if deployed_state_import.is_file() else None,
             "runsiteIntegrationProofSha256": sha256_file(runsite_proof) if runsite_proof.is_file() else "",
             "deployedProbeSha256": sha256_file(deployed_probe) if deployed_probe.is_file() else "",
             "goldAuditSha256": sha256_file(gold_audit) if gold_audit.is_file() else "",

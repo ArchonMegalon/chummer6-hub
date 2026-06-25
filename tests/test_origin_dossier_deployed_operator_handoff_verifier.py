@@ -64,6 +64,7 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
         },
         "envFile": {"valuesStoredInReceipt": False},
         "requiredCommands": [
+            "python3 scripts/materialize_origin_dossier_deployed_state_import.py --live-import /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data --container-state-root /app/state --output-receipt /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/origin.chummer.run/Varga/Mira/Kestrel/deployed-state-import.receipt.json",
             "python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root /docker/chummercomplete/.tmp/origin-dossier-fresh-gold --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run",
             "python3 scripts/audit_origin_dossier_gold_e2e.py --pretty --require-pass",
             "python3 scripts/materialize_origin_edition_gold_proof_chain.py --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run --allow-blocked",
@@ -240,6 +241,7 @@ def test_default_handoff_path_uses_origin_edition_env_context(monkeypatch, tmp_p
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Case")
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Ari")
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Ghost")
+    monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
     monkeypatch.delenv("CHUMMER_ORIGIN_EDITION_NAMESPACE", raising=False)
 
     assert module.deployed_operator_handoff_from_env() == (
