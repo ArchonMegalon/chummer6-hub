@@ -191,6 +191,7 @@ CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chum
 CHUMMER_PORTAL_PUBLIC_HOST= \
 CHUMMER_PORTAL_FORWARDED_PROTO= \
 node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null
+node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
 run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {

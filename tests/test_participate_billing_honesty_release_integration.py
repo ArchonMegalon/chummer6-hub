@@ -9,6 +9,7 @@ FINAL_GOLD_JANITOR = RUN_SERVICES_ROOT / "scripts" / "final_gold_janitor.py"
 VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "ai" / "verify.sh"
 RELEASE_READY_SCRIPT = Path("/docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh")
 PORTAL_E2E_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "e2e-portal.cjs"
+PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_partizipate_runtime_fallback.cjs"
 
 
 class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn('python3 -m pytest "$ROOT_DIR/tests/test_public_minimal_humanized_surface.py" "$ROOT_DIR/tests/test_participate_codex_guest_fallback.py" -q >/dev/null', text)
         self.assertIn('CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}"', text)
         self.assertIn('node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null', text)
+        self.assertIn('node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null', text)
         self.assertIn('run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"', text)
 
     def test_release_ready_script_runs_participate_billing_honesty_gate(self) -> None:
@@ -29,6 +31,8 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("verify_public_portal_e2e", text)
         self.assertIn("CHUMMER_PORTAL_BASE_URL=${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}", text)
         self.assertIn("node scripts/e2e-portal.cjs", text)
+        self.assertIn("verify_partizipate_runtime_fallback", text)
+        self.assertIn("node scripts/verify_partizipate_runtime_fallback.cjs --base-url ${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}", text)
         self.assertIn("verify_participate_billing_honesty", text)
         self.assertIn("python3 scripts/materialize_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
         self.assertIn("python3 scripts/verify_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
@@ -60,6 +64,20 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("label: 'delegated-blazor'", text)
         self.assertIn("delegated-not-ready:", text)
         self.assertIn("portal E2E completed with delegated warnings", text)
+
+    def test_partizipate_runtime_fallback_gate_forces_vendor_error_state(self) -> None:
+        text = PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("chromium.launch", text)
+        self.assertIn("'--no-sandbox'", text)
+        self.assertIn("context.route('**/participate/board**'", text)
+        self.assertIn("Something went wrong on our side.", text)
+        self.assertIn("Could not load posts.", text)
+        self.assertIn("Network error while loading tab configuration.", text)
+        self.assertIn("support@productlift.dev", text)
+        self.assertIn("fallback.waitFor({ state: 'visible' })", text)
+        self.assertIn("embedded board should be hidden after vendor error copy appears", text)
+        self.assertIn("vendor error copy must not be visible", text)
 
 
 if __name__ == "__main__":
