@@ -211,12 +211,18 @@
     {
         if (routeKey is "landing" or "what-is-chummer" or "downloads")
         {
+            var softwareApplicationOperatingSystem = (ViewData["SoftwareApplicationOperatingSystem"] as string)?.Trim();
+            if (string.IsNullOrWhiteSpace(softwareApplicationOperatingSystem))
+            {
+                softwareApplicationOperatingSystem = "Linux";
+            }
+
             publicSchema = new Dictionary<string, object?>
             {
                 ["@context"] = "https://schema.org",
                 ["@type"] = "SoftwareApplication",
                 ["name"] = "Chummer",
-                ["operatingSystem"] = "Windows, Linux",
+                ["operatingSystem"] = softwareApplicationOperatingSystem,
                 ["applicationCategory"] = "GameApplication",
                 ["url"] = canonicalUrl,
                 ["description"] = chrome.Description

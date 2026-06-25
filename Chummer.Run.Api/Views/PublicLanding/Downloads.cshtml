@@ -89,6 +89,9 @@
         2 => $"Current public installers: {promotedPlatformLabels[0]} and {promotedPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", promotedPlatformLabels.Take(promotedPlatformLabels.Length - 1))}, and {promotedPlatformLabels[^1]}."
     };
+    ViewData["SoftwareApplicationOperatingSystem"] = promotedPlatformLabels.Length == 0
+        ? "No public installer available"
+        : string.Join(", ", promotedPlatformLabels);
 
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }

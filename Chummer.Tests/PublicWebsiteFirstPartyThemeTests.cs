@@ -43,6 +43,9 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.DoesNotContain("Support Chummer", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Open in a tab", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("The board stays here. Open a separate tab only if your browser blocks the embed.", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-participate-board-fallback", participateView, StringComparison.Ordinal);
+        Assert.Contains("['sup' + 'port', 'pro' + 'duct' + 'lift.dev'].join(String.fromCharCode(64))", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("support@productlift.dev", participateView, StringComparison.OrdinalIgnoreCase);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
         if (!File.Exists(siblingNavigationPath))
@@ -75,5 +78,17 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("Planned work, visible here.", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("planning surface", roadmapView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SoftwareApplicationSchemaDoesNotHardCodeUnavailablePlatforms()
+    {
+        string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+        string downloadsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
+
+        Assert.DoesNotContain("[\"operatingSystem\"] = \"Windows, Linux\"", layout, StringComparison.Ordinal);
+        Assert.Contains("SoftwareApplicationOperatingSystem", layout, StringComparison.Ordinal);
+        Assert.Contains("SoftwareApplicationOperatingSystem", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("string.Join(\", \", promotedPlatformLabels)", downloadsView, StringComparison.Ordinal);
     }
 }

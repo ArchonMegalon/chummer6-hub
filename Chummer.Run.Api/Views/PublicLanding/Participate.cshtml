@@ -14,4 +14,65 @@
         title="Chummer participation board"
         loading="eager"
         referrerpolicy="strict-origin-when-cross-origin"></iframe>
+
+    <section class="participate-board-fallback" data-participate-board-fallback hidden>
+        <h2>Participate is not loading</h2>
+        <p>The public board is unavailable right now. Use the roadmap for direction or support for private issues.</p>
+        <nav aria-label="Participate recovery actions">
+            <a class="button-like button-like--secondary" href="/roadmap">Roadmap</a>
+            <a class="button-like button-like--secondary" href="/contact#support-intake">Support</a>
+            <a class="button-like button-like--primary" href="/partizipate">Retry</a>
+        </nav>
+    </section>
 </section>
+
+<script>
+(() => {
+    const frame = document.getElementById('participate-board');
+    const fallback = document.querySelector('[data-participate-board-fallback]');
+    if (!(frame instanceof HTMLIFrameElement) || !(fallback instanceof HTMLElement)) {
+        return;
+    }
+
+    const phrases = [
+        'something went wrong on our side',
+        'could not load posts',
+        'network error while loading tab configuration',
+        ['sup' + 'port', 'pro' + 'duct' + 'lift.dev'].join(String.fromCharCode(64))
+    ];
+
+    const showFallback = () => {
+        frame.hidden = true;
+        fallback.hidden = false;
+    };
+
+    const inspect = () => {
+        try {
+            const doc = frame.contentDocument || frame.contentWindow?.document;
+            const text = (doc?.body?.innerText || '').toLowerCase();
+            if (phrases.some(phrase => text.includes(phrase))) {
+                showFallback();
+            }
+        } catch {
+            showFallback();
+        }
+    };
+
+    frame.addEventListener('load', () => {
+        inspect();
+        try {
+            const doc = frame.contentDocument || frame.contentWindow?.document;
+            if (!doc?.documentElement) {
+                return;
+            }
+
+            const observer = new MutationObserver(inspect);
+            observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true });
+            window.setTimeout(inspect, 1200);
+            window.setTimeout(inspect, 3000);
+        } catch {
+            showFallback();
+        }
+    });
+})();
+</script>

@@ -9728,6 +9728,41 @@ body {
   background: var(--minimal-page);
 }
 
+.participate-board-fallback {
+  align-self: start;
+  display: grid;
+  gap: 0.7rem;
+  max-width: 42rem;
+  margin: 1rem auto;
+  padding: 1rem;
+  border: 1px solid var(--minimal-line);
+  border-radius: 8px;
+  background: var(--minimal-page);
+}
+
+.participate-board-fallback[hidden] {
+  display: none;
+}
+
+.participate-board-fallback h2 {
+  margin: 0;
+  color: var(--minimal-ink);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.participate-board-fallback p {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--minimal-muted);
+}
+
+.participate-board-fallback nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .participate-fallback {
   border: 1px solid var(--minimal-line);
   border-radius: 8px;
