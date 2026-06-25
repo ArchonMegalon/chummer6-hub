@@ -2648,7 +2648,6 @@ document.addEventListener('DOMContentLoaded', function () {
       [/-- Choose a category --/g, 'Choose a category'],
       [/\bGathering votes\b/g, ''],
       [/\bFeature\b/g, 'Idea'],
-      [/\bCreate\b/g, 'Send'],
       [/\bvotes\b/gi, 'requests'],
       [/\s{2,}/g, ' ']
     ];
@@ -2697,6 +2696,10 @@ document.addEventListener('DOMContentLoaded', function () {
       const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
       if (text === 'gathering votes' || text === 'planned' || text === 'in progress') {
         node.setAttribute('data-chummer-hidden-status', 'true');
+      }
+
+      if (node instanceof HTMLButtonElement && text === 'create') {
+        node.textContent = 'Send';
       }
     });
   };

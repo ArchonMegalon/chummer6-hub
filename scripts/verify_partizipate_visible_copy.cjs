@@ -34,6 +34,7 @@ const forbidden = [
   /\bDescribe your idea or bug/i,
   /-- Choose a category --/i,
   /Tell us how we could make Chummer6 more useful to you/i,
+  /\bSend unique NPCs\b/i,
 ];
 
 (async () => {
