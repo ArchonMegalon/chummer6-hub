@@ -12602,7 +12602,7 @@ Boundary:
             {
                 if (rebindSignIn
                     && requiresAccount
-                    && string.Equals(action.Label, "Sign in", StringComparison.OrdinalIgnoreCase))
+                    && IsGuestAccountOpenAction(action))
                 {
                     return action with
                     {
@@ -12641,6 +12641,17 @@ Boundary:
             HeaderActions = reboundActions,
             PublicPrimaryCta = reboundPublicPrimaryCta
         };
+    }
+
+    private static bool IsGuestAccountOpenAction(SiteChromeActionViewModel action)
+    {
+        if (!string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return action.Href.StartsWith("/login", StringComparison.OrdinalIgnoreCase)
+            || action.Href.StartsWith("/auth/google/start", StringComparison.OrdinalIgnoreCase);
     }
 
     private string BuildAbsoluteUrl(string path, QueryString query = default)

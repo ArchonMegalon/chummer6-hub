@@ -43,7 +43,7 @@ public sealed class HubPageChromeService
             .FirstOrDefault(action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase));
         var signInAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/login", StringComparison.OrdinalIgnoreCase))
-            ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
+            ?? new PublicLandingActionDto("Open Chummer", "/login?next=/home", "secondary");
         var createAccountAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Claim your copy", "/signup?next=/home", "primary");
@@ -58,7 +58,7 @@ public sealed class HubPageChromeService
         var actions = new List<SiteChromeActionViewModel>
         {
             new(
-                signInAction.Label,
+                "Open Chummer",
                 contextualSignInHref,
                 "link",
                 Current: string.Equals(normalizedCurrentPath, NormalizeRoute(contextualSignInHref), StringComparison.OrdinalIgnoreCase))

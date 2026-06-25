@@ -118,7 +118,7 @@ public sealed class PublicLandingDownloadsChromeTests
             UtilityNavigation: [],
             HeaderActions:
             [
-                new SiteChromeActionViewModel("Sign in", "/auth/google/start?next=%2Fdownloads", "link"),
+                new SiteChromeActionViewModel("Open Chummer", "/auth/google/start?next=%2Fdownloads", "link"),
                 new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
             PublicPrimaryCta: new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
@@ -134,7 +134,7 @@ public sealed class PublicLandingDownloadsChromeTests
         Assert.NotNull(method);
 
         var rebound = Assert.IsType<SiteChromeViewModel>(method!.Invoke(null, [chrome, releaseExperience]));
-        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Open Chummer");
         var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
@@ -157,7 +157,7 @@ public sealed class PublicLandingDownloadsChromeTests
             UtilityNavigation: [],
             HeaderActions:
             [
-                new SiteChromeActionViewModel("Sign in", "/login?next=%2Fstatus", "link"),
+                new SiteChromeActionViewModel("Open Chummer", "/login?next=%2Fstatus", "link"),
                 new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
             PublicPrimaryCta: new SiteChromeActionViewModel("Open account-assisted install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
@@ -173,7 +173,7 @@ public sealed class PublicLandingDownloadsChromeTests
         Assert.NotNull(method);
 
         var rebound = Assert.IsType<SiteChromeViewModel>(method!.Invoke(null, [chrome, releaseExperience, false]));
-        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Open Chummer");
         var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal("/login?next=%2Fstatus", signIn.Href);
@@ -196,7 +196,7 @@ public sealed class PublicLandingDownloadsChromeTests
             UtilityNavigation: [],
             HeaderActions:
             [
-                new SiteChromeActionViewModel("Sign in", "/login?next=%2Ffaq", "link"),
+                new SiteChromeActionViewModel("Open Chummer", "/login?next=%2Ffaq", "link"),
                 new SiteChromeActionViewModel("Install Chummer", "/downloads", "primary")
             ],
             PublicPrimaryCta: new SiteChromeActionViewModel("Install Chummer", "/downloads", "primary"),
@@ -212,7 +212,7 @@ public sealed class PublicLandingDownloadsChromeTests
         Assert.NotNull(method);
 
         var rebound = Assert.IsType<SiteChromeViewModel>(method!.Invoke(null, [chrome, releaseExperience, false]));
-        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Open Chummer");
         var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal("/login?next=%2Ffaq", signIn.Href);

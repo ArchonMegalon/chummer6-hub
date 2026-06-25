@@ -40,7 +40,7 @@ public sealed class HubPageChromeServiceTests
 
         var chrome = service.BuildPublicChrome("Downloads", "Install the current release build.", "/downloads");
 
-        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
         Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
         Assert.DoesNotContain(chrome.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
         Assert.Null(chrome.PublicPrimaryCta);
@@ -60,7 +60,7 @@ public sealed class HubPageChromeServiceTests
 
         var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/partizipate");
 
-        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
         Assert.Equal("/auth/google/start?next=%2Fpartizipate", signIn.Href);
     }
 
@@ -170,7 +170,7 @@ public sealed class HubPageChromeServiceTests
 
         var chrome = service.BuildPublicChrome("Sign in", "Continue into account surfaces.", "/login");
 
-        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
         Assert.Equal("/login?next=/home", signIn.Href);
     }
 
@@ -188,7 +188,7 @@ public sealed class HubPageChromeServiceTests
 
         var chrome = service.BuildPublicChrome("Auth", "Provider handoff.", "/auth/google/start");
 
-        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
+        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
         Assert.Equal("/login?next=/home", signIn.Href);
     }
 
