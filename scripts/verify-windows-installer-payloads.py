@@ -31,6 +31,8 @@ DEFAULT_LAUNCH_EXECUTABLES = {
 @dataclass(frozen=True)
 class ManifestRow:
     file_name: str
+    sha256: str
+    size_bytes: int | None
     payload_file_name: str
     payload_download_url: str
     payload_sha256: str
@@ -121,6 +123,8 @@ def read_manifest_rows(manifest_paths: list[Path]) -> dict[str, ManifestRow]:
                     continue
                 rows[file_name] = ManifestRow(
                     file_name=file_name,
+                    sha256=str(item.get("sha256") or "").strip().lower(),
+                    size_bytes=try_int(item.get("sizeBytes")),
                     payload_file_name=str(item.get("payloadFileName") or "").strip(),
                     payload_download_url=str(item.get("payloadDownloadUrl") or "").strip(),
                     payload_sha256=str(item.get("payloadSha256") or "").strip().lower(),
@@ -254,6 +258,31 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
             failures.append(
                 f"manifest payloadSizeBytes {manifest_row.payload_size_bytes} does not match sidecar size {len(candidate.data)}"
             )
+    return failures
+
+
+def validate_manifest_installer_metadata(installer_path: Path, manifest_row: ManifestRow | None) -> list[str]:
+    if manifest_row is None:
+        return []
+
+    failures: list[str] = []
+    if not manifest_row.sha256:
+        failures.append("manifest Windows installer row is missing sha256")
+    elif not is_sha256_hex(manifest_row.sha256):
+        failures.append("manifest Windows installer row sha256 is not a 64-character hex digest")
+    else:
+        observed_sha256 = sha256_bytes(installer_path.read_bytes())
+        if manifest_row.sha256 != observed_sha256:
+            failures.append("manifest Windows installer row sha256 does not match installer bytes")
+
+    observed_size = installer_path.stat().st_size
+    if manifest_row.size_bytes is None or manifest_row.size_bytes <= 0:
+        failures.append("manifest Windows installer row is missing sizeBytes")
+    elif manifest_row.size_bytes != observed_size:
+        failures.append(
+            f"manifest Windows installer row sizeBytes {manifest_row.size_bytes} does not match installer size {observed_size}"
+        )
+
     return failures
 
 
@@ -418,6 +447,7 @@ def verify_installer(
             f"{installer_path.name}: no appended payload and no bootstrap sidecar '{payload_name}' was found"
         ]
 
+    failures.extend(validate_manifest_installer_metadata(installer_path, manifest_row))
     failures.extend(validate_manifest_payload_metadata(candidate, manifest_row))
     failures.extend(validate_bootstrap_sidecar_metadata(installer_path, candidate, manifest_row))
     failures.extend(

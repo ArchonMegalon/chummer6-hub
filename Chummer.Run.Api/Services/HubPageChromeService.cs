@@ -129,6 +129,12 @@ public sealed class HubPageChromeService
         var normalizedCurrentPath = NormalizeRoute(currentPath);
         var actions = new List<SiteChromeActionViewModel>
         {
+            new SiteChromeActionViewModel(
+                "Open Chummer",
+                "/app?command=character_roster",
+                "link",
+                normalizedCurrentPath.StartsWith("/app", StringComparison.OrdinalIgnoreCase)
+                    || normalizedCurrentPath.StartsWith("/blazor/app", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase))
         };
 

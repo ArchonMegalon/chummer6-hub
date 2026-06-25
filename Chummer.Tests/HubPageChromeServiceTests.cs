@@ -106,6 +106,25 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
+    public void BuildAuthenticatedChromeKeepsDirectChummerOnlineAction()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome("Home", "Flagship shell.", "/home", "Runner", "runner@example.com");
+
+        var openChummer = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
+        Assert.Equal("/app?command=character_roster", openChummer.Href);
+        Assert.Equal("link", openChummer.Tone);
+    }
+
+    [Fact]
     public void PublicLayoutSuppressesLandingDownloadHeaderAction()
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
