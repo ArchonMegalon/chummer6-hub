@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "CodexParticipationController.cs"
+PUBLIC_CONTROLLER = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 PARTICIPATE_VIEW = REPO_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml"
 FEEDBACK_VIEW = REPO_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Feedback.cshtml"
 
@@ -16,30 +17,25 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertIn('return Redirect("/login?next=%2Fparticipate%2Fcodex");', controller)
         self.assertNotIn('return Redirect("/auth/google/start?next=%2Fparticipate%2Fcodex");', controller)
 
-    def test_participate_view_stays_first_party_and_supporter_ready(self) -> None:
-        text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
-        self.assertIn('class="partizipate-board', text)
-        self.assertNotIn('src="@(string.IsNullOrWhiteSpace(Model.HostedBoardHref) ? "/participate/board" : Model.HostedBoardHref)"', text)
-        self.assertNotIn('id="participate-board"', text)
-        self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text)
-        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
-        self.assertNotIn("ProductLift", text)
-        self.assertNotIn("Requests, votes, and shipped work.", text)
-        self.assertNotIn("Support Chummer", text)
-        self.assertNotIn("Use the right place", text)
-        self.assertNotIn("Use the right lane", text)
-        self.assertNotIn("first-party route", text)
-        self.assertNotIn("Open in a tab", text)
+    def test_participate_route_uses_whitelabeled_board_proxy_and_supporter_guard(self) -> None:
+        controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
+        self.assertIn('localOrigin: "/participate"', controller)
+        self.assertIn('localBaseHref: "/participate/"', controller)
+        self.assertIn('ResolveParticipateSupporterHref()', controller)
+        self.assertIn('return "/account/billing/supporter/start";', controller)
+        self.assertNotIn('return View("~/Views/PublicLanding/Partizipate.cshtml"', controller)
+        self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', controller)
+        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
+        self.assertNotIn("Requests, votes, and shipped work.", controller)
 
     def test_feedback_public_view_stays_on_participation_surface(self) -> None:
         self.assertFalse(FEEDBACK_VIEW.exists())
-        text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
-        self.assertIn("partizipate-board", text)
-        self.assertNotIn("participate-lane", text)
-        self.assertNotIn("participate-quick-form", text)
-        self.assertNotIn("participate-actions", text)
-        self.assertNotIn("participate-fallback", text)
-        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
+        controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
+        self.assertIn("ParticipateBoardProxyCore", controller)
+        self.assertNotIn("participate-lane", controller)
+        self.assertNotIn("participate-quick-form", controller)
+        self.assertNotIn("participate-fallback", controller)
+        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
 
     def test_public_participate_controller_targets_board_proxy_instead_of_recursive_wrapper(self) -> None:
         controller = (REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs").read_text(encoding="utf-8")

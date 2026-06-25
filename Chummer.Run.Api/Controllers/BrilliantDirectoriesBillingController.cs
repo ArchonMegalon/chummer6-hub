@@ -59,6 +59,11 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         }
     }
 
+    [HttpGet("/billing")]
+    [Produces("text/html")]
+    public IActionResult BillingAlias()
+        => Redirect("/account/billing");
+
     [HttpGet("/api/billing")]
     [ProducesResponseType<BrilliantDirectoriesBillingPageDto>(StatusCodes.Status200OK)]
     public ActionResult<BrilliantDirectoriesBillingPageDto> BillingProjection()

@@ -18,7 +18,7 @@ def test_feedback_public_copy_truth_gate_script_exists() -> None:
 
 
 def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
-    feedback = read("Chummer.Run.Api/Views/PublicLanding/Partizipate.cshtml")
+    controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     operations = read("Chummer.Run.Api/Views/Shared/_PublicSignalOperationsPacket.cshtml")
     projection = read("Chummer.Run.Api/Views/Shared/_PublicSignalProjectionPacket.cshtml")
     spec = importlib.util.spec_from_file_location("public_copy_truth_gate", GATE_SCRIPT)
@@ -27,18 +27,17 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     sys.path.insert(0, str(GATE_SCRIPT.parent))
     spec.loader.exec_module(gate_module)
 
-    assert 'class="partizipate-board' in feedback
-    assert "Requests, votes, and shipped work." not in feedback
-    assert "Need private help?" not in feedback
-    assert 'id="participate-board"' not in feedback
-    assert "/participate/board" not in feedback
-    assert "Tell us what slows the table down." not in feedback
-    assert "Use the right place" not in feedback
-    assert "Start with the shortest path." not in feedback
-    assert "Public Feedback And Content Registry" not in feedback
-    assert "Open the Alice compare bench" not in feedback
-    assert "BLACK LEDGER" not in feedback
-    assert "release-backed closeout" not in feedback
+    assert 'localOrigin: "/participate"' in controller
+    assert 'localBaseHref: "/participate/"' in controller
+    assert 'ResolveParticipateSupporterHref()' in controller
+    assert "Requests, votes, and shipped work." not in controller
+    assert 'id="participate-board"' not in controller
+    assert "Tell us what slows the table down." not in controller
+    assert "Use the right place" not in controller
+    assert "Public Feedback And Content Registry" not in controller
+    assert "Open the Alice compare bench" not in controller
+    assert "BLACK LEDGER" not in controller
+    assert "release-backed closeout" not in controller
     assert "Chummer follow-up is not visible here yet." in operations
     assert "account follow-up waits until the shipped path is available on this host" in operations
     assert "Public feedback stays easy to sort." in operations
@@ -49,8 +48,8 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "Boundary conditions" not in projection
     assert "Before it ships" in projection
     assert "The public participation copy stays compact, public-safe, and honest about what belongs in Help." in GATE_SCRIPT.read_text(encoding="utf-8")
-    assert "webhook verification" not in feedback
-    assert "delivery candidates" not in feedback
+    assert "webhook verification" not in controller
+    assert "delivery candidates" not in controller
     assert "release-backed closeout" not in gate_module.REQUIRED_HTML_PHRASES
     assert "release-backed closeout" not in gate_module.REQUIRED_SOURCE_PHRASES
     assert "proof-bound" not in gate_module.REQUIRED_HTML_PHRASES

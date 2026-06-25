@@ -21,10 +21,10 @@ const forbidden = [
   new RegExp('Automatically' + ' generate', 'i'),
   /ProductLift/i,
   /productlift\.dev/i,
+  /chummer6\.productlift\.dev/i,
   /\bLog in\b/i,
   /\bSign up\b/i,
   /\bSign in\b/i,
-  /Chummer Participate/i,
   /\bGathering votes\b/i,
   /\bAdd Feature or Bug\b/i,
   /\bShort title of your feedback/i,
@@ -35,10 +35,8 @@ const forbidden = [
 ];
 
 const requiredHtml = [
-  '<title>Participate · Chummer</title>',
-  'class="partizipate-board',
-  'Short requests, clear bugs, useful ideas.',
-  'Public requests',
+  '<title>Participate - Chummer.run</title>',
+  'data-chummer-board-skin',
 ];
 
 function extractVisibleText(html) {

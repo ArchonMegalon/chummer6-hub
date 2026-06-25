@@ -63,7 +63,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"<section class=\"partizipate-board\">Participate Short requests, clear bugs, useful ideas.</section>"
+                b"<title>Participate - Chummer.run</title>"
+                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
+                b"<style data-chummer-board-skin></style>"
                 b"</body></html>"
             )
             return
@@ -74,7 +76,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"<section class=\"partizipate-board\">Participate Short requests, clear bugs, useful ideas.</section>"
+                b"<title>Participate - Chummer.run</title>"
+                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
+                b"<style data-chummer-board-skin></style>"
                 b"</body></html>"
             )
             return
@@ -157,9 +161,8 @@ class LiveSurfaceParityTests(unittest.TestCase):
         module = load_module()
         participate_surface = next(item for item in module.SURFACES if item["path"] == "/participate")
 
-        self.assertIn('class="partizipate-board', participate_surface["required_html_texts"])
-        self.assertIn('id="participate-board"', participate_surface["forbidden_html_texts"])
-        self.assertIn('src="/participate/board"', participate_surface["forbidden_html_texts"])
+        self.assertIn("data-chummer-board-skin", participate_surface["required_html_texts"])
+        self.assertIn("chummer6.productlift.dev", participate_surface["forbidden_html_texts"])
 
     def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:
         module = load_module()

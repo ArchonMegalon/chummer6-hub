@@ -104,12 +104,9 @@ SURFACES = [
     },
     {
         "path": "/participate",
-        "required_texts": [
-            "Participate",
-            "Short requests, clear bugs, useful ideas.",
-        ],
+        "required_texts": [],
         "required_html_texts": [
-            "class=\"partizipate-board",
+            "data-chummer-board-skin",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -121,18 +118,14 @@ SURFACES = [
             "Requests, votes, and shipped work.",
         ],
         "forbidden_html_texts": [
-            "id=\"participate-board\"",
-            "src=\"/participate/board\"",
+            "chummer6.productlift.dev",
         ],
     },
     {
         "path": "/partizipate",
-        "required_texts": [
-            "Participate",
-            "Short requests, clear bugs, useful ideas.",
-        ],
+        "required_texts": [],
         "required_html_texts": [
-            "class=\"partizipate-board",
+            "data-chummer-board-skin",
         ],
         "forbidden_texts": [
             "ProductLift",
@@ -144,8 +137,7 @@ SURFACES = [
             "Requests, votes, and shipped work.",
         ],
         "forbidden_html_texts": [
-            "id=\"participate-board\"",
-            "src=\"/participate/board\"",
+            "chummer6.productlift.dev",
         ],
     },
     {

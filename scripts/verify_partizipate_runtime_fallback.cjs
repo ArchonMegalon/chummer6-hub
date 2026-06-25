@@ -51,21 +51,18 @@ async function main() {
     assert(response, '/participate should return a response.');
     assert.equal(response.status(), 200, '/participate should return 200.');
 
-    const board = page.locator('.partizipate-board');
-    const frame = page.locator('#participate-board');
+    const boardSkin = page.locator('[data-chummer-board-skin]');
 
-    await board.waitFor({ state: 'visible' });
-    assert.equal(await board.isVisible(), true, 'first-party participate board should stay visible.');
-    assert.equal(await frame.count(), 0, 'public participate should not embed the hosted board wrapper.');
+    await boardSkin.waitFor({ state: 'attached' });
+    assert.equal(await boardSkin.count(), 1, 'public participate should render the whitelabeled hosted board skin.');
 
     const visibleText = await page.locator('body').innerText();
-    assert.equal(visibleText.includes('Short requests, clear bugs, useful ideas.'), true, 'first-party copy should explain the board.');
     assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(visibleText), false, 'vendor error copy must not be visible.');
 
     console.log(JSON.stringify({
       status: 'pass',
       url: `${baseUrl}/participate`,
-      mode: 'first_party_board',
+      mode: 'whitelabeled_productlift_board',
     }));
   } finally {
     await browser.close();
