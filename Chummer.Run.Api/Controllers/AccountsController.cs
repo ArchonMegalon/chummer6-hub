@@ -122,6 +122,11 @@ public sealed class AccountsController : Controller
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
                 ? "work"
                 : NormalizeAccountSection(section);
+        if (string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect("/account/billing");
+        }
+
         var currentPath = BuildAccountCurrentPath(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId);
         var (chromeTitle, chromeDescription) = DescribeAccountSection(selectedSection);
 
@@ -1495,8 +1500,7 @@ public sealed class AccountsController : Controller
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
         => new[]
         {
-            new SectionLinkViewModel("settings", "More settings", "/account/settings", string.Equals(currentSection, "settings", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("advanced", "Advanced", "/account/advanced", string.Equals(currentSection, "advanced", StringComparison.OrdinalIgnoreCase))
+            new SectionLinkViewModel("billing", "Billing", "/account/billing", false)
         };
 
     private static (string Title, string Description) DescribeAccountSection(string currentSection)

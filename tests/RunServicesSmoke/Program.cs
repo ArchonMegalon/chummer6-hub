@@ -893,7 +893,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             AuthorizationTierAtReceipt: "pro",
             TierSource: "fleet_detected"),
         mintedPoints: 0);
-    Assert(seededEntitlements.Contains("supporter-flair", StringComparer.OrdinalIgnoreCase), "signed-in smoke setup should seed a supporter entitlement before the entitlements api is queried.");
+    Assert(seededEntitlements.Contains("contributor-marker", StringComparer.OrdinalIgnoreCase), "signed-in smoke setup should seed a supporter entitlement before the entitlements api is queried.");
     var entitlementSmokeManifest = new PublicReleaseManifestDto(
         Version: "0.6.0-entitlement-smoke",
         Channel: "preview",
@@ -949,7 +949,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var entitlementResult = await entitlementsController.GetMine("subject.demo", CancellationToken.None);
     var entitlementPayload = (entitlementResult.Result as OkObjectResult)?.Value as EntitlementAccountProjection ?? entitlementResult.Value;
     Assert(entitlementPayload is not null && entitlementPayload.Entitlements.Count >= 1, "entitlements api should keep the signed-in entitlement list available.");
-    Assert(entitlementPayload!.Entitlements.Any(item => string.Equals(item.Key, "supporter-flair", StringComparison.OrdinalIgnoreCase)), "entitlements api should preserve the seeded supporter entitlement on the signed-in account surface.");
+    Assert(entitlementPayload!.Entitlements.Any(item => string.Equals(item.Key, "contributor-marker", StringComparison.OrdinalIgnoreCase)), "entitlements api should preserve the seeded supporter entitlement on the signed-in account surface.");
     Assert(entitlementPayload.SyncReceipts.ProvenanceReceipts.Count >= 1, "entitlements api should expose entitlement-sync provenance receipts alongside grants.");
     Assert(entitlementPayload.SyncReceipts.ProvenanceReceipts.All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)), "entitlements api should isolate entitlement-sync provenance receipts instead of mixing workspace-only restore items.");
     Assert(entitlementPayload.SyncReceipts.ProvenanceRecoveryReceipts.Any(item => string.Equals(item.RecoveryRoute, "/account/access", StringComparison.Ordinal)), "entitlements api should expose recoverable account-access provenance routes for entitlement replay.");
@@ -2570,6 +2570,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
     Assert(!homeSource.Contains("story-guide-tail", StringComparison.Ordinal), "home should use quieter release-footnote sections instead of the older full-width CTA band.");
+    var accountsControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "AccountsController.cs"));
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
@@ -2790,13 +2791,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("setRateLimitNotice", StringComparison.Ordinal), "account support interactions should keep a shared rate-limit notice helper.");
     Assert(accountSource.Contains("Retry after", StringComparison.Ordinal), "account support interactions should project retry timing when pacing applies.");
     Assert(accountSource.Contains("Support intake is pacing requests to keep queue and closure timelines trustworthy.", StringComparison.Ordinal), "account support form should surface a trustworthy pacing explanation instead of a generic failure.");
-    Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
+    Assert(!accountSource.Contains("More settings", StringComparison.Ordinal), "account should not advertise fake local account settings when billing owns membership settings.");
+    Assert(accountsControllerSource.Contains("Redirect(\"/account/billing\")", StringComparison.Ordinal), "account settings should hand off to the real Brilliant Directories billing surface.");
     Assert(accountSource.Contains("Model.PrivacyBoundary", StringComparison.Ordinal), "account privacy should render the shared privacy-boundary panel on the signed-in surface.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
     Assert(!accountSource.Contains("<details class=\"details-drawer\" open>\n                <summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should not expand the sign-in drawer by default.");
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
     Assert(accountSource.Contains("<summary>Need routing help first?</summary>", StringComparison.Ordinal), "account support should keep the grounded assistant behind a calmer disclosure so case filing stays primary.");
-    Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
+    Assert(!accountsControllerSource.Contains("new SectionLinkViewModel(\"advanced\", \"Advanced\"", StringComparison.Ordinal), "account should not advertise advanced diagnostics as a normal account action.");
     Assert(accountSource.Contains("Cross-device recovery", StringComparison.Ordinal), "account access should describe restore state as cross-device recovery.");
     Assert(accountSource.Contains("What stays on this device", StringComparison.Ordinal), "account access should keep install-local notes in customer-facing wording.");
     Assert(accountSource.Contains("Recent recaps", StringComparison.Ordinal), "account work should describe recap counts in customer-facing language.");
@@ -2864,14 +2866,17 @@ async Task VerifyPublicLandingProjectionAsync()
     var liveProofDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailLiveProof.cshtml"));
     var previewDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailPreviewConcept.cshtml"));
     var roadmapDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailRoadmap.cshtml"));
-    Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
+    Assert(downloadsSource.Contains("<span>Stable</span>", StringComparison.Ordinal), "downloads should keep the stable lane visible.");
+    Assert(downloadsSource.Contains("<span>Nightly</span>", StringComparison.Ordinal), "downloads should keep the nightly lane visible.");
+    Assert(downloadsSource.Contains("build-chummer6-linux.sh", StringComparison.Ordinal), "downloads should expose the Linux build-from-source script.");
+    Assert(!downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should not carry an advanced-options drawer on the primary install page.");
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
-    Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
+    Assert(!downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should keep release education off the minimal install page.");
     Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
-    Assert(downloadsSource.Contains("recommendedIsInstaller ? \"Install path\" : \"Download path\"", StringComparison.Ordinal), "downloads should keep the technical path label grounded in whether the current shelf item is an installer or a package.");
-    Assert(downloadsSource.Contains("recommendedIsInstaller", StringComparison.Ordinal), "downloads should keep the top card copy grounded in whether the current shelf item is an installer or a package.");
+    Assert(!downloadsSource.Contains("recommendedIsInstaller ? \"Install path\" : \"Download path\"", StringComparison.Ordinal), "downloads should not expose technical install-path labels on the minimal install page.");
+    Assert(!downloadsSource.Contains("recommendedIsInstaller", StringComparison.Ordinal), "downloads should let the browser-selected stable action carry the install choice.");
     Assert(!downloadsSource.Contains("<p>@release.Recommended.SupportLine</p>", StringComparison.Ordinal), "downloads should not surface the technical install-path line as the primary top-card copy.");
-    Assert(downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should route broader release posture back to the dedicated current-release page instead of turning the install card into a second status page.");
+    Assert(!downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should not add a secondary current-release CTA to the minimal install page.");
     Assert(!downloadsSource.Contains("flagship-coverage", StringComparison.Ordinal), "downloads should remove the whole-product frontier strip from the install page.");
     Assert(!downloadsSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "downloads should stop restating the weekly trust pulse on the install page.");
     Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");

@@ -25,12 +25,11 @@ test('downloads and status stay concise and point to the right next steps', asyn
 
   const downloadsPage = await openPublicPage(browser, '/downloads');
   const downloadsMain = downloadsPage.locator('#main');
-  await expect(downloadsPage.getByRole('heading', { name: 'Install Chummer' })).toBeVisible();
-  await expect(downloadsPage.locator('body')).toContainText(/Current public installer/);
-  await expect(downloadsPage.getByRole('heading', { name: 'Current build' })).toBeVisible();
-  await expect(downloadsPage.getByRole('heading', { name: 'Newest build' })).toBeVisible();
-  await expect(downloadsMain.getByRole('link', { name: 'Help' })).toBeVisible();
-  await expect(downloadsMain.getByRole('link', { name: 'Status' })).toBeVisible();
+  await expect(downloadsPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
+  await expect(downloadsPage.locator('body')).toContainText('Stable');
+  await expect(downloadsPage.locator('body')).toContainText('Nightly');
+  await expect(downloadsPage.locator('body')).toContainText('Build from source');
+  await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Stable/ })).toHaveCount(3);
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');

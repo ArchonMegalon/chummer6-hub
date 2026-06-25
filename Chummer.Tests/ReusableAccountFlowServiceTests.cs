@@ -142,7 +142,7 @@ public sealed class ReusableAccountFlowServiceTests
                 EntitlementId: "ent-demo-001",
                 Scope: "user",
                 ScopeId: user.UserId,
-                Key: "supporter-flair",
+                Key: "contributor-marker",
                 Status: "active",
                 Source: "verified landed slice",
                 SponsorSessionId: null,

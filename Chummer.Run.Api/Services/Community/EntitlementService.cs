@@ -25,7 +25,7 @@ public sealed class EntitlementService
             if (string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)
                 && receipt.Verified)
             {
-                GrantIfMissingLocked("user", receipt.UserId!, "supporter-flair", receipt.ReceiptId, "verified landed slice", grantedKeys);
+                GrantIfMissingLocked("user", receipt.UserId!, "contributor-marker", receipt.ReceiptId, "verified landed slice", grantedKeys);
             }
 
             var userTotal = _store.RewardEntries

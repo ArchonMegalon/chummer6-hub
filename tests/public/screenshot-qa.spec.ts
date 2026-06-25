@@ -20,7 +20,7 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Install Chummer', 'Current public installer', 'Stable', 'Nightly'],
+    requiredText: ['Downloads', 'Stable', 'Nightly', 'Build from source'],
   },
   {
     id: 'status',

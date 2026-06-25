@@ -3,210 +3,131 @@
     ViewData["Title"] = "Downloads";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
+
     var release = Model.ReleaseExperience;
-    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
-    var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
-        .Concat(release.Alternatives)
-        .Concat(release.OtherPlatforms)
-        .Concat(release.ManualPackages)
-        .GroupBy(option => option.Artifact.Id, StringComparer.OrdinalIgnoreCase)
-        .Select(group => group.First())
-        .ToArray();
-    var platforms = new[] { ("windows", "Windows"), ("linux", "Linux") };
-    var stableLaneIds = new[] { "stable", "public_stable" };
-    var nightlyLaneIds = new[] { "nightly", "preview", "public_preview", "public_stable" };
-    var aurPackages = Model.AurPackages ?? Array.Empty<AurPackageEntry>();
+    var stable = release.Recommended;
+    var nightly = release.Alternatives.FirstOrDefault()
+        ?? release.OtherPlatforms.FirstOrDefault(option =>
+            stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase));
+    var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
+    var updatedLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
-    static bool MatchesPlatform(PublicReleaseArtifactDto artifact, string platformId)
+    static string PlatformId(ReleaseOptionViewModel? option)
     {
-        var candidatePlatformId = artifact.PlatformId ?? string.Empty;
-        var candidatePlatform = artifact.Platform ?? string.Empty;
-        return platformId switch
+        if (option is null)
         {
-            "windows" => candidatePlatformId.Contains("win", StringComparison.OrdinalIgnoreCase)
-                || candidatePlatform.Contains("Windows", StringComparison.OrdinalIgnoreCase),
-            "linux" => candidatePlatformId.Contains("linux", StringComparison.OrdinalIgnoreCase)
-                || candidatePlatform.Contains("Linux", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
+            return "unknown";
+        }
+
+        var platformId = option.Artifact.PlatformId ?? string.Empty;
+        if (platformId.Contains("win", StringComparison.OrdinalIgnoreCase))
+        {
+            return "windows";
+        }
+
+        if (platformId.Contains("linux", StringComparison.OrdinalIgnoreCase))
+        {
+            return "linux";
+        }
+
+        if (platformId.Contains("osx", StringComparison.OrdinalIgnoreCase)
+            || platformId.Contains("mac", StringComparison.OrdinalIgnoreCase))
+        {
+            return "macos";
+        }
+
+        return string.IsNullOrWhiteSpace(platformId) ? "unknown" : platformId.Trim().ToLowerInvariant();
     }
 
-    static bool MatchesReleaseLane(PublicReleaseArtifactDto artifact, IReadOnlyList<string> laneIds)
-    {
-        var artifactLaneIds = new[] { artifact.ChannelId, artifact.Channel };
-        return artifactLaneIds.Any(candidate =>
-            !string.IsNullOrWhiteSpace(candidate)
-            && laneIds.Any(lane => string.Equals(candidate.Trim(), lane, StringComparison.OrdinalIgnoreCase)));
-    }
-
-    ReleaseOptionViewModel? ResolveLanePlatformOption(string platformId, IReadOnlyList<string> laneIds, bool allowFallback)
-    {
-        var platformOptions = optionPool
-            .Where(option => option.Installer)
-            .Where(option => MatchesPlatform(option.Artifact, platformId))
-            .ToArray();
-        return platformOptions.FirstOrDefault(option => MatchesReleaseLane(option.Artifact, laneIds))
-            ?? (allowFallback ? platformOptions.FirstOrDefault() : null);
-    }
-
-    var stablePlatformOptions = platforms
-        .Select(platform => new
-        {
-            PlatformId = platform.Item1,
-            PlatformLabel = platform.Item2,
-            Option = ResolveLanePlatformOption(platform.Item1, stableLaneIds, allowFallback: true)
-        })
-        .ToArray();
-    var nightlyPlatformOptions = platforms
-        .Select(platform => new
-        {
-            PlatformId = platform.Item1,
-            PlatformLabel = platform.Item2,
-            Option = ResolveLanePlatformOption(platform.Item1, nightlyLaneIds, allowFallback: true)
-        })
-        .ToArray();
-    var stableArtifactIds = stablePlatformOptions
-        .Where(platform => platform.Option is not null)
-        .Select(platform => platform.Option!.Artifact.Id)
-        .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-    var nightlyArtifactIds = nightlyPlatformOptions
-        .Where(platform => platform.Option is not null)
-        .Select(platform => platform.Option!.Artifact.Id)
-        .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-    var stableAndNightlyMatch = stableArtifactIds.Length > 0
-        && stableArtifactIds.SequenceEqual(nightlyArtifactIds, StringComparer.OrdinalIgnoreCase);
-    var promotedPlatformLabels = stablePlatformOptions
-        .Where(platform => platform.Option is not null)
-        .Select(platform => platform.PlatformLabel)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-    var promotedPlatformSummary = promotedPlatformLabels.Length switch
-    {
-        0 => "No public installer is available right now.",
-        1 => $"Current public installer: {promotedPlatformLabels[0]}.",
-        2 => $"Current public installers: {promotedPlatformLabels[0]} and {promotedPlatformLabels[1]}.",
-        _ => $"Current public installers: {string.Join(", ", promotedPlatformLabels.Take(promotedPlatformLabels.Length - 1))}, and {promotedPlatformLabels[^1]}."
-    };
-    ViewData["SoftwareApplicationOperatingSystem"] = promotedPlatformLabels.Length == 0
-        ? "No public installer available"
-        : string.Join(", ", promotedPlatformLabels);
-
-    static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
+    static string ButtonText(ReleaseOptionViewModel option)
+        => string.IsNullOrWhiteSpace(option.PlatformLabel)
+            ? "Download"
+            : $"Download for {option.PlatformLabel}";
 }
 
-<section class="minimal-page-hero">
+<section class="minimal-page-hero downloads-simple-hero">
     <div>
-        <h1>Install Chummer</h1>
-        <p>@promotedPlatformSummary</p>
+        <h1>Downloads</h1>
+        <p>Chummer picks the right installer for this browser. Use Nightly only when you want the newest promoted build.</p>
     </div>
-    <div class="minimal-status-pill" aria-label="Current release">
+    <div class="minimal-status-pill" aria-label="Release freshness">
         <span>Updated</span>
-        <strong>@verifiedLabel</strong>
+        <strong>@updatedLabel</strong>
     </div>
 </section>
 
-@if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
+@if (Model.Manifest.Downloads.Count == 0 || stable is null)
 {
     <section class="minimal-empty">
-        <h2>No download is available right now</h2>
-        <p>@PublicDownloadText(Model.Manifest.Message)</p>
-        <a class="button-like button-like--primary" href="/status">Open status</a>
+        <h2>No build is available right now</h2>
+        <p>@UndetectableHumanizerCopyAdapter.Humanize(Model.Manifest.Message)</p>
+        <a class="button-like button-like--primary" href="/status">Status</a>
     </section>
 }
 else
 {
-    <section class="minimal-lane-grid" aria-label="Downloads">
-        <article class="minimal-lane-card" id="stable">
-            <div class="minimal-lane-card__head">
+    <section class="downloads-choice-list" aria-label="Downloads">
+        <article class="downloads-choice-card" id="stable">
+            <div>
                 <span>Stable</span>
-                <h2>Current build</h2>
-                <p>The default choice for regular play.</p>
+                <h2>@stable.PlatformLabel</h2>
+                <p>The regular build for this device.</p>
             </div>
-            <div class="minimal-platform-actions">
-                @foreach (var platform in stablePlatformOptions)
-                {
-                    var option = platform.Option;
-                    if (option is not null)
-                    {
-                        var installRoute = $"/downloads/install/{Uri.EscapeDataString(option.Artifact.Id)}";
-                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-download-action="download-artifact" data-download-artifact="@option.Artifact.Id" data-download-platform="@platform.PlatformId" data-download-raw-url="@option.DirectFileHref" data-download-install-route="@installRoute" data-download-link-mode="raw-url" data-release-lane="stable" data-platform="@platform.PlatformId" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
-                    }
-                }
-            </div>
+            <a class="button-like button-like--primary"
+               href="@stable.DispatchHref"
+               data-download-action="download-artifact"
+               data-download-artifact="@stable.Artifact.Id"
+               data-download-platform="@PlatformId(stable)"
+               data-download-raw-url="@stable.DirectFileHref"
+               data-download-install-route="/downloads/install/@Uri.EscapeDataString(stable.Artifact.Id)"
+               data-download-link-mode="raw-url"
+               data-release-lane="stable"
+               data-platform="@PlatformId(stable)"
+               data-analytics-event="downloads_stable_install"
+               data-analytics-surface="minimal_downloads"
+               data-analytics-label="@stable.PlatformLabel">@ButtonText(stable)</a>
         </article>
 
-        <article class="minimal-lane-card" id="nightly">
-            <div class="minimal-lane-card__head">
+        <article class="downloads-choice-card" id="nightly">
+            <div>
                 <span>Nightly</span>
-                <h2>Newest build</h2>
-                <p>Use this when you want the newest promoted build.</p>
-                @if (stableAndNightlyMatch)
-                {
-                    <p>Nightly currently matches Stable. There is no newer Nightly available.</p>
-                }
+                <h2>@(nightly is null ? "No newer build" : nightly.PlatformLabel)</h2>
+                <p>@(nightly is null ? "Nightly currently matches Stable." : "The newest promoted build available from this page.")</p>
             </div>
-            <div class="minimal-platform-actions">
-                @foreach (var platform in nightlyPlatformOptions)
-                {
-                    var option = platform.Option;
-                    if (option is not null)
-                    {
-                        var installRoute = $"/downloads/install/{Uri.EscapeDataString(option.Artifact.Id)}";
-                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-download-action="download-artifact" data-download-artifact="@option.Artifact.Id" data-download-platform="@platform.PlatformId" data-download-raw-url="@option.DirectFileHref" data-download-install-route="@installRoute" data-download-link-mode="raw-url" data-release-lane="nightly" data-platform="@platform.PlatformId" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
-                    }
-                }
+            @if (nightly is null)
+            {
+                <a class="button-like button-like--secondary" href="#stable">Use Stable</a>
+            }
+            else
+            {
+                <a class="button-like button-like--secondary"
+                   href="@nightly.DispatchHref"
+                   data-download-action="download-artifact"
+                   data-download-artifact="@nightly.Artifact.Id"
+                   data-download-platform="@PlatformId(nightly)"
+                   data-download-raw-url="@nightly.DirectFileHref"
+                   data-download-install-route="/downloads/install/@Uri.EscapeDataString(nightly.Artifact.Id)"
+                   data-download-link-mode="raw-url"
+                   data-release-lane="nightly"
+                   data-platform="@PlatformId(nightly)"
+                   data-analytics-event="downloads_nightly_install"
+                   data-analytics-surface="minimal_downloads"
+                   data-analytics-label="@nightly.PlatformLabel">@ButtonText(nightly)</a>
+            }
+        </article>
+
+        <article class="downloads-choice-card" id="linux-source">
+            <div>
+                <span>Linux</span>
+                <h2>Build from source</h2>
+                <p>For users who want a local source build instead of a package.</p>
             </div>
+            <a class="button-like button-like--ghost"
+               href="@sourceScriptHref"
+               download
+               data-analytics-event="downloads_linux_source_script"
+               data-analytics-surface="minimal_downloads"
+               data-analytics-label="build-chummer6-linux.sh">Download script</a>
         </article>
     </section>
-
-    @if (aurPackages.Count > 0)
-    {
-        <section class="minimal-section minimal-section--tight" id="arch-linux">
-            <div class="minimal-section__lead">
-                <h2>Arch Linux</h2>
-                <p>AUR-compatible package source for Arch-based distributions.</p>
-            </div>
-            <div class="minimal-platform-list">
-                @foreach (var package in aurPackages)
-                {
-                <article>
-                    <h3>@package.PlatformLabel</h3>
-                    <p>@PublicDownloadText(package.Summary)</p>
-                    <div class="minimal-actions">
-                        <a href="@package.SourceArchiveUrl" data-analytics-event="downloads_arch_aur_source" data-analytics-surface="minimal_downloads" data-analytics-label="@package.PackageName">AUR source</a>
-                        <a href="@package.PkgbuildUrl">PKGBUILD</a>
-                        </div>
-                    </article>
-                }
-            </div>
-        </section>
-    }
-
-    <section class="minimal-section minimal-section--tight" id="platforms">
-        <div class="minimal-section__lead">
-            <h2>Platforms</h2>
-        </div>
-        <div class="minimal-platform-list">
-            @foreach (var platform in release.PlatformAvailability.Where(item => item.PlatformId is "windows" or "linux" or "macos"))
-            {
-                <article>
-                    <h3>@platform.PlatformLabel</h3>
-                    <p>@PublicDownloadText(platform.Summary)</p>
-                </article>
-            }
-        </div>
-    </section>
-
-    <div class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <h2>Help</h2>
-            <p>Use Help for install or update trouble. Use Status for platforms and dates. Use Changelog for release notes.</p>
-        </div>
-        <div class="minimal-actions">
-            <a class="button-like button-like--primary" href="/help">Help</a>
-            <a class="button-like button-like--ghost" href="/status">Status</a>
-        </div>
-    </div>
 }

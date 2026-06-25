@@ -13,6 +13,8 @@ from origin_edition_verify_paths import gold_proof_chain_from_env
 
 CONTRACT_NAME = "chummer.origin_edition.gold_proof_chain.v1"
 EXPECTED_STAGE_NAMES = [
+    "portal_publication_index_preflight",
+    "portal_restart_plan",
     "deployed_browser_probe",
     "deployed_operator_handoff",
     "gold_gap_audit",
@@ -20,7 +22,7 @@ EXPECTED_STAGE_NAMES = [
     "completion_matrix",
     "requirement_coverage",
 ]
-NON_BLOCKING_STAGE_STATUSES = {"pass", "ready_for_operator_token"}
+NON_BLOCKING_STAGE_STATUSES = {"pass", "ready_for_operator_token", "not_required"}
 FORBIDDEN_VALUE_MARKERS = [
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
@@ -141,7 +143,7 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
             if not isinstance(stage, dict):
                 continue
             name = str(stage.get("name") or "")
-            if str(stage.get("status") or "").lower() != "pass":
+            if str(stage.get("status") or "").lower() not in {"pass", "not_required"}:
                 issues.append(f"gold_stage_not_pass:{name}")
             blockers = stage.get("blockers") if isinstance(stage.get("blockers"), list) else []
             if blockers:

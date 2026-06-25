@@ -5,6 +5,7 @@ using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -66,6 +67,57 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.DoesNotContain("hosted billing", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Premium", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Upgrade", view, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ContributionEntitlementsDoNotUseSupporterBillingLanguage()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-entitlement-billing-boundary-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json")
+                })
+                .Build();
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            EntitlementService entitlements = new(store);
+
+            IReadOnlyList<string> granted = entitlements.ApplyReceipt(
+                new ContributionReceiptDto(
+                    ReceiptId: "rcpt-contribution-boundary-001",
+                    EventKind: "slice_landed",
+                    LaneId: "lane-001",
+                    ProjectId: "chummer",
+                    UserId: "user-a",
+                    GroupId: null,
+                    SponsorSessionId: null,
+                    ParticipantCodexCode: null,
+                    AuthClass: "signed_in",
+                    LaneType: "guided_contribution",
+                    LaneRole: "review",
+                    Verified: true,
+                    SignedByFleet: "hmac-sha256:test",
+                    AuthorizationTierAtReceipt: "free",
+                    TierSource: "hub"),
+                mintedPoints: 0);
+
+            Assert.Contains("contributor-marker", granted);
+            Assert.DoesNotContain(granted, key => key.Contains("supporter", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(entitlements.ListForUser("user-a"), entitlement =>
+                entitlement.Key.Contains("supporter", StringComparison.OrdinalIgnoreCase)
+                || entitlement.Key.Contains("premium", StringComparison.OrdinalIgnoreCase)
+                || entitlement.Key.Contains("billing", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]

@@ -5,17 +5,18 @@ namespace Chummer.Tests;
 public sealed class PublicLandingReleaseTrustViewTests
 {
     [Fact]
-    public void DownloadsViewKeepsCurrentReleaseKnownIssuesAndInstallHelpVisibleBesidePrimaryCta()
+    public void DownloadsViewKeepsOnlyStableNightlyAndLinuxSourceBuildVisible()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Install Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("Current public installer", view, StringComparison.Ordinal);
-        Assert.Contains("Current build", view, StringComparison.Ordinal);
-        Assert.Contains("Newest build", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
+        Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Linux</span>", view, StringComparison.Ordinal);
+        Assert.Contains("Build from source", view, StringComparison.Ordinal);
+        Assert.Contains("build-chummer6-linux.sh", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
@@ -66,23 +67,17 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void DownloadsViewCollapsesOtherPlatformsBeforeAdvancedSupportOnlyRails()
+    public void DownloadsViewRemovesPlatformShelvesAndAdvancedSupportRails()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        int laneGridIndex = view.IndexOf("minimal-lane-grid", StringComparison.Ordinal);
-        int platformShelfIndex = view.IndexOf("id=\"platforms\"", StringComparison.Ordinal);
-        int helpIndex = view.IndexOf("<h2>Help</h2>", StringComparison.Ordinal);
-
         Assert.Contains("aria-label=\"Downloads\"", view, StringComparison.Ordinal);
-        Assert.Contains("Platforms", view, StringComparison.Ordinal);
-        Assert.Contains("Arch Linux", view, StringComparison.Ordinal);
-        Assert.True(laneGridIndex >= 0, "stable/nightly lane grid should stay visible on the main downloads page");
-        Assert.True(platformShelfIndex >= 0, "platform shelf should stay visible on the main downloads page");
-        Assert.True(helpIndex >= 0, "help should stay visible on the main downloads page");
-        Assert.True(laneGridIndex < platformShelfIndex, "download lanes should appear before platform details");
-        Assert.True(platformShelfIndex < helpIndex, "platform details should appear before help");
+        Assert.Contains("downloads-choice-list", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"platforms\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>Help</h2>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Arch Linux", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("AUR-compatible package source for Arch-based distributions.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"advanced-downloads\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("aria-label=\"Download filters\"", view, StringComparison.Ordinal);
     }
@@ -93,21 +88,19 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Current public installer", view, StringComparison.Ordinal);
         Assert.Contains("id=\"nightly\"", view, StringComparison.Ordinal);
         Assert.Contains("id=\"stable\"", view, StringComparison.Ordinal);
+        Assert.Contains("id=\"linux-source\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
-        Assert.Contains("The default choice for regular play.", view, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the newest promoted build.", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Help</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Use Help for install or update trouble.", view, StringComparison.Ordinal);
+        Assert.Contains("The regular build for this device.", view, StringComparison.Ordinal);
+        Assert.Contains("The newest promoted build available from this page.", view, StringComparison.Ordinal);
+        Assert.Contains("For users who want a local source build instead of a package.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Known issues", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
-        Assert.Contains("AUR-compatible package source for Arch-based distributions.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows ZIP", view, StringComparison.Ordinal);
     }
 
@@ -348,13 +341,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string downloadsView = File.ReadAllText(downloadsViewPath);
         string nowView = File.ReadAllText(nowViewPath);
 
-        Assert.Contains("Current public installer", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("<h1>Downloads</h1>", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Use this when you want the newest promoted build.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("The newest promoted build available from this page.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);

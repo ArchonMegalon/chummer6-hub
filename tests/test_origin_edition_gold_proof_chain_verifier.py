@@ -24,6 +24,14 @@ def write_json(path: Path, payload: dict) -> Path:
 
 def proof_payload(*, status: str = "blocked") -> dict:
     sha = "a" * 64
+    blocked_stages = [
+        "portal_publication_index_preflight",
+        "portal_restart_plan",
+        "deployed_browser_probe",
+        "gold_gap_audit",
+        "completion_matrix",
+        "requirement_coverage",
+    ]
     return {
         "contractName": "chummer.origin_edition.gold_proof_chain.v1",
         "status": status,
@@ -35,9 +43,9 @@ def proof_payload(*, status: str = "blocked") -> dict:
         if status == "pass"
         else "stage:deployed_browser_probe,requirement:deployed_owner_read_listen_watch_canon",
         "progress": {
-            "passedStages": 6 if status == "pass" else 2,
-            "totalStages": 6,
-            "blockedStages": [] if status == "pass" else ["deployed_browser_probe", "gold_gap_audit", "completion_matrix", "requirement_coverage"],
+            "passedStages": 8 if status == "pass" else 2,
+            "totalStages": 8,
+            "blockedStages": [] if status == "pass" else blocked_stages,
             "blockedRequirements": [] if status == "pass" else ["deployed_owner_read_listen_watch_canon"],
         },
         "goalCompletionClaimAllowed": status == "pass",
@@ -48,8 +56,24 @@ def proof_payload(*, status: str = "blocked") -> dict:
             "envValuesExposed": False,
             "deploymentPerformed": False,
         },
-        "blockedStages": [] if status == "pass" else ["deployed_browser_probe", "gold_gap_audit", "completion_matrix", "requirement_coverage"],
+        "blockedStages": [] if status == "pass" else blocked_stages,
         "stages": [
+            {
+                "name": "portal_publication_index_preflight",
+                "path": "/evidence/portal-publication-index-preflight.receipt.json",
+                "sha256": sha,
+                "status": "pass" if status == "pass" else "blocked",
+                "blockers": [] if status == "pass" else ["running_portal_publication_index_env_missing"],
+            },
+            {
+                "name": "portal_restart_plan",
+                "path": "/evidence/portal-restart-plan.receipt.json",
+                "sha256": sha,
+                "status": "not_required" if status == "pass" else "awaiting_explicit_restart_approval",
+                "blockers": [],
+                "approvalGate": "" if status == "pass" else "explicit_user_deploy_or_restart_approval_required",
+                "safeToExecuteAfterApproval": status != "pass",
+            },
             {
                 "name": "deployed_browser_probe",
                 "path": "/evidence/deployed-chummer-browser-probe.receipt.json",
@@ -124,10 +148,10 @@ def test_verifier_require_gold_rejects_pass_chain_with_stale_stage_blockers(tmp_
     module = load_module()
     payload = proof_payload(status="pass")
     payload["blockedStages"] = ["completion_matrix"]
-    payload["stages"][0]["blockers"] = ["owner_playback_e2e_verified"]
-    payload["stages"][4]["blockedRows"] = ["deployed_user_login_read_listen_watch"]
-    payload["stages"][4]["blockedHardGates"] = ["gold_audit_completion_claim_allowed"]
-    payload["stages"][5]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    payload["stages"][2]["blockers"] = ["owner_playback_e2e_verified"]
+    payload["stages"][6]["blockedRows"] = ["deployed_user_login_read_listen_watch"]
+    payload["stages"][6]["blockedHardGates"] = ["gold_audit_completion_claim_allowed"]
+    payload["stages"][7]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt, require_gold=True)
@@ -159,7 +183,7 @@ def test_verifier_rejects_pass_chain_with_blocked_rollups_even_without_require_g
     payload["progress"]["blockedStages"] = ["requirement_coverage"]
     payload["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
     payload["progress"]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
-    payload["stages"][5]["status"] = "blocked"
+    payload["stages"][7]["status"] = "blocked"
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -174,7 +198,7 @@ def test_verifier_rejects_pass_chain_with_blocked_rollups_even_without_require_g
 def test_verifier_require_gold_rejects_pass_chain_with_non_pass_stage(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="pass")
-    payload["stages"][2]["status"] = "blocked"
+    payload["stages"][4]["status"] = "blocked"
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt, require_gold=True)
@@ -257,8 +281,8 @@ def test_verifier_rejects_missing_normalized_chain_status(tmp_path: Path) -> Non
 def test_verifier_rejects_blocked_chain_without_owner_playback_blockers(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][0]["blockers"] = ["missing_deployed_identity_token"]
-    payload["stages"][1]["blockers"] = ["deployed_browser_probe_not_pass"]
+    payload["stages"][2]["blockers"] = ["missing_deployed_identity_token"]
+    payload["stages"][3]["blockers"] = ["deployed_browser_probe_not_pass"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -271,8 +295,8 @@ def test_verifier_rejects_blocked_chain_without_owner_playback_blockers(tmp_path
 def test_verifier_rejects_stage_without_hash_bound_receipt(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][2]["sha256"] = ""
-    payload["stages"][2]["path"] = ""
+    payload["stages"][4]["sha256"] = ""
+    payload["stages"][4]["path"] = ""
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -285,7 +309,7 @@ def test_verifier_rejects_stage_without_hash_bound_receipt(tmp_path: Path) -> No
 def test_verifier_rejects_blocked_chain_when_runsite_stage_is_not_pass(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][3]["status"] = "blocked"
+    payload["stages"][5]["status"] = "blocked"
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -297,7 +321,7 @@ def test_verifier_rejects_blocked_chain_when_runsite_stage_is_not_pass(tmp_path:
 def test_verifier_rejects_completion_matrix_without_gold_audit_hard_gate(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][4]["blockedHardGates"] = []
+    payload["stages"][6]["blockedHardGates"] = []
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -309,7 +333,7 @@ def test_verifier_rejects_completion_matrix_without_gold_audit_hard_gate(tmp_pat
 def test_verifier_rejects_blocked_chain_with_unexpected_requirement_coverage_blocker(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][5]["blockedRequirements"] = ["m4b_premium_audiobook_packaging"]
+    payload["stages"][7]["blockedRequirements"] = ["m4b_premium_audiobook_packaging"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)

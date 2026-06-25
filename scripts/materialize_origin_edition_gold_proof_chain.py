@@ -52,6 +52,8 @@ def load_module(repo_root: Path, relative_path: str, module_name: str):
 def load_modules(repo_root: Path) -> SimpleNamespace:
     return SimpleNamespace(
         deployed_probe=load_module(repo_root, "scripts/materialize_origin_dossier_deployed_browser_probe.py", "origin_deployed_probe"),
+        portal_preflight=load_module(repo_root, "scripts/materialize_origin_dossier_portal_publication_index_preflight.py", "origin_portal_preflight"),
+        portal_restart_plan=load_module(repo_root, "scripts/materialize_origin_dossier_portal_restart_plan.py", "origin_portal_restart_plan"),
         handoff=load_module(repo_root, "scripts/materialize_origin_dossier_deployed_operator_handoff.py", "origin_deployed_handoff"),
         gold_audit=load_module(repo_root, "scripts/audit_origin_dossier_gold_e2e.py", "origin_gold_audit"),
         runsite=load_module(repo_root, "scripts/materialize_origin_edition_runsite_integration_proof.py", "origin_runsite_proof"),
@@ -76,6 +78,8 @@ def stage(name: str, output: Path, payload: dict[str, Any]) -> dict[str, Any]:
         "next_action": payload.get("next_action"),
         "blocking_reason": payload.get("blocking_reason"),
         "progress": payload.get("progress", {}),
+        "approvalGate": payload.get("approvalGate"),
+        "safeToExecuteAfterApproval": payload.get("safeToExecuteAfterApproval"),
     }
 
 
@@ -97,6 +101,16 @@ def run_chain(
     branch = context.branch(evidence_root)
 
     deployed_probe_path = branch / "deployed-chummer-browser-probe.receipt.json"
+    portal_preflight_path = branch / "portal-publication-index-preflight.receipt.json"
+    portal_preflight = modules.portal_preflight.materialize(portal_preflight_path)
+    portal_restart_plan_path = branch / "portal-restart-plan.receipt.json"
+    portal_restart_plan = modules.portal_restart_plan.materialize(
+        portal_restart_plan_path,
+        evidence_root=evidence_root,
+        branch=Path(context.resolved_namespace),
+        preflight=portal_preflight_path,
+    )
+
     deployed_probe = modules.deployed_probe.materialize(
         evidence_root,
         context.base_url,
@@ -107,7 +121,7 @@ def run_chain(
     )
 
     handoff_path = branch / "deployed-operator-handoff.receipt.json"
-    handoff = modules.handoff.materialize(evidence_root, handoff_path, env_file, context)
+    modules.handoff.materialize(evidence_root, handoff_path, env_file, context)
 
     gold_audit_path = evidence_root / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json"
     gold_audit = modules.gold_audit.audit(
@@ -117,6 +131,7 @@ def run_chain(
         deployed_operator_handoff=handoff_path,
         output=gold_audit_path,
     )
+    handoff = modules.handoff.materialize(evidence_root, handoff_path, env_file, context)
 
     runsite_path = branch / "runsite-integration-proof.receipt.json"
     runsite = modules.runsite.materialize(repo_root, ea_root, evidence_root, runsite_path, context)
@@ -128,6 +143,8 @@ def run_chain(
     coverage = modules.coverage.materialize(evidence_root, coverage_path)
 
     stages = [
+        stage("portal_publication_index_preflight", portal_preflight_path, portal_preflight),
+        stage("portal_restart_plan", portal_restart_plan_path, portal_restart_plan),
         stage("deployed_browser_probe", deployed_probe_path, deployed_probe),
         stage("deployed_operator_handoff", handoff_path, handoff),
         stage("gold_gap_audit", gold_audit_path, gold_audit),
@@ -143,7 +160,10 @@ def run_chain(
             if str(requirement).strip()
         }
     )
+    non_blocking_stage_statuses = {"pass", "ready_for_operator_token", "not_required"}
     passed = (
+        all(str(item.get("status") or "") in non_blocking_stage_statuses for item in stages)
+        and
         matrix.get("status") == "pass"
         and matrix.get("goalCompletionClaimAllowed") is True
         and coverage.get("status") == "pass"
@@ -152,7 +172,7 @@ def run_chain(
     blocking_reason = "" if passed else ",".join(
         str(item)
         for item in [
-            *[f"stage:{stage_item['name']}" for stage_item in stages if stage_item.get("status") not in {"pass", "ready_for_operator_token"}],
+            *[f"stage:{stage_item['name']}" for stage_item in stages if stage_item.get("status") not in non_blocking_stage_statuses],
             *[f"requirement:{requirement}" for requirement in blocked_requirements],
         ]
     )
@@ -162,9 +182,9 @@ def run_chain(
         else str(deployed_probe.get("next_action") or handoff.get("next_action") or "Resolve blocked Gold proof stages and rerun the strict verifier.").strip()
     )
     progress = {
-        "passedStages": sum(1 for item in stages if item.get("status") in {"pass", "ready_for_operator_token"}),
+        "passedStages": sum(1 for item in stages if item.get("status") in non_blocking_stage_statuses),
         "totalStages": len(stages),
-        "blockedStages": [item["name"] for item in stages if item.get("status") not in {"pass", "ready_for_operator_token"}],
+        "blockedStages": [item["name"] for item in stages if item.get("status") not in non_blocking_stage_statuses],
         "blockedRequirements": blocked_requirements,
     }
     payload: dict[str, Any] = {

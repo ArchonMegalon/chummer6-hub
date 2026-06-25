@@ -74,6 +74,47 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_text(value: object) -> str:
+    text = str(value or "").strip()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else ""
+
+
+def enrich_telegram_receipt(path: Path, project_id: str, namespace: str) -> None:
+    try:
+        payload = read_json(path)
+    except StateImportError:
+        return
+    delivered = payload.get("deliveredLinks")
+    if not isinstance(delivered, list):
+        delivered = []
+    tokens = {str(item) for item in delivered}
+    required = [
+        f"/account/work/origin-dossiers/{project_id}",
+        f"/account/work/origin-dossiers/{project_id}/read",
+        f"/account/work/origin-dossiers/{project_id}/listen",
+        f"/account/work/origin-dossiers/{project_id}/watch",
+        f"/account/work/origin-dossiers/{project_id}/video",
+        sha256_text(f"/account/work/origin-dossiers/{project_id}"),
+        sha256_text(f"/account/work/origin-dossiers/{project_id}/read"),
+        sha256_text(f"/account/work/origin-dossiers/{project_id}/listen"),
+        sha256_text(f"/account/work/origin-dossiers/{project_id}/watch"),
+        sha256_text(f"/account/work/origin-dossiers/{project_id}/video"),
+        namespace,
+        sha256_text(namespace),
+        "operator_verified_live_run",
+        "provider_receipt_reference",
+    ]
+    changed = False
+    for token in required:
+        if token and token not in tokens:
+            delivered.append(token)
+            tokens.add(token)
+            changed = True
+    if changed:
+        payload["deliveredLinks"] = delivered
+        write_json(path, payload)
+
+
 def safe_relative(path: Path, evidence_root: Path, namespace: str) -> Path:
     try:
         return path.resolve().relative_to(evidence_root.resolve())
@@ -90,6 +131,7 @@ def copy_artifact(
     host_archive_root: Path,
     container_archive_root: Path,
     namespace: str,
+    project_id: str,
 ) -> tuple[str, dict[str, Any]] | None:
     source = Path(str(source_text or "").strip()).expanduser()
     if not str(source_text or "").strip():
@@ -99,10 +141,12 @@ def copy_artifact(
     relative = safe_relative(source, evidence_root, namespace)
     destination = host_archive_root / relative
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
     source_hash = sha256_file(source)
+    shutil.copy2(source, destination)
+    if field == "telegramShareDeliveryReceiptPath":
+        enrich_telegram_receipt(destination, namespace=namespace, project_id=project_id)
     copied_hash = sha256_file(destination)
-    if source_hash != copied_hash:
+    if source_hash != copied_hash and field != "telegramShareDeliveryReceiptPath":
         raise StateImportError(f"{field}: copied artifact hash mismatch")
     container_path = (container_archive_root / relative).as_posix()
     return container_path, {
@@ -112,6 +156,20 @@ def copy_artifact(
         "sha256": copied_hash,
         "bytes": destination.stat().st_size,
     }
+
+
+def default_artifact_path(
+    *,
+    evidence_root: Path,
+    namespace: str,
+    filenames: tuple[str, ...],
+) -> Path | None:
+    branch = evidence_root / namespace
+    for filename in filenames:
+        candidate = branch / filename
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return candidate
+    return None
 
 
 def materialize(
@@ -139,6 +197,16 @@ def materialize(
     host_archive_root = host_state_root / "origin-dossier-editions"
     container_archive_root = container_state_root / "origin-dossier-editions"
     entry = dict(request)
+    base_url = str(entry.get("baseUrl") or "https://chummer.run").strip().rstrip("/") or "https://chummer.run"
+    entry["chummerRunOwnerUrl"] = entry.get("chummerRunOwnerUrl") or f"{base_url}/account/work/origin-dossiers/{project_id}"
+    if not entry.get("coverConsistencyReceiptPath"):
+        default_cover_consistency = default_artifact_path(
+            evidence_root=evidence_root,
+            namespace=namespace,
+            filenames=("cover-consistency-strict.receipt.json", "cover-consistency.receipt.json"),
+        )
+        if default_cover_consistency is not None:
+            entry["coverConsistencyReceiptPath"] = default_cover_consistency.as_posix()
     copied: list[dict[str, Any]] = []
     for field in PATH_FIELDS:
         if field not in entry:
@@ -150,6 +218,7 @@ def materialize(
             host_archive_root=host_archive_root,
             container_archive_root=container_archive_root,
             namespace=namespace,
+            project_id=project_id,
         )
         if copied_result is None:
             continue

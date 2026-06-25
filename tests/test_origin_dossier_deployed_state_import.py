@@ -33,6 +33,23 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
     book = write(evidence / "origin.chummer.run/Case/Ari/Ghost/dossier/ebook.epub", b"epub bytes")
     cover = write(evidence / "origin.chummer.run/Case/Ari/Ghost/cover.jpg", b"cover bytes")
     video = write(evidence / "origin.chummer.run/Case/Ari/Ghost/movie/movie.mp4", b"video bytes")
+    cover_consistency = write(evidence / "origin.chummer.run/Case/Ari/Ghost/cover-consistency-strict.receipt.json", '{"operation":"origin_edition_cover_consistency"}')
+    telegram = write(
+        evidence / "origin.chummer.run/Case/Ari/Ghost/audiobook/telegram.receipt.json",
+        json.dumps(
+            {
+                "operation": "telegram_share_delivery",
+                "provider": "EA Telegram",
+                "status": "delivered",
+                "deliveredLinks": [
+                    "/account/work/origin-dossiers/case-ari-ghost",
+                    "/account/work/origin-dossiers/case-ari-ghost/read",
+                    "/account/work/origin-dossiers/case-ari-ghost/listen",
+                    "/account/work/origin-dossiers/case-ari-ghost/video",
+                ],
+            }
+        ),
+    )
     receipt = write(evidence / "provider.receipt.json", '{"operation":"provider_manuscript_import"}')
     live_import = evidence / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
     live_import.write_text(
@@ -49,6 +66,7 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
                     "storySceneCoverPath": str(cover),
                     "dossierVideoPath": str(video),
                     "providerManuscriptReceiptPath": str(receipt),
+                    "telegramShareDeliveryReceiptPath": str(telegram),
                     "audiobookshelfShareUrl": "https://audio.chummer.run/share/ghost-audio",
                     "audiobookshelfDossierShareUrl": "https://audio.chummer.run/share/ghost-dossier",
                     "audiobookshelfAudiobookShareUrl": "https://audio.chummer.run/share/ghost-audio",
@@ -82,10 +100,18 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
     assert result["restartRequiredForExistingContainer"] is True
     assert entry["subjectId"] == "subject.origin-edition.51dc324fd03a0fb6"
     assert entry["ownerSubjectId"] == entry["subjectId"]
+    assert entry["chummerRunOwnerUrl"] == "https://chummer.run/account/work/origin-dossiers/case-ari-ghost"
     assert entry["bookArtifactPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["storySceneCoverPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["dossierVideoPath"].startswith("/app/state/origin-dossier-editions/")
+    assert entry["coverConsistencyReceiptPath"].startswith("/app/state/origin-dossier-editions/")
+    assert entry["telegramShareDeliveryReceiptPath"].startswith("/app/state/origin-dossier-editions/")
     assert Path(str(entry["bookArtifactPath"]).replace("/app/state", str(host_state))).is_file()
+    assert Path(str(entry["coverConsistencyReceiptPath"]).replace("/app/state", str(host_state))).read_text(encoding="utf-8") == cover_consistency.read_text(encoding="utf-8")
+    copied_telegram = json.loads(Path(str(entry["telegramShareDeliveryReceiptPath"]).replace("/app/state", str(host_state))).read_text(encoding="utf-8"))
+    assert "/account/work/origin-dossiers/case-ari-ghost/watch" in copied_telegram["deliveredLinks"]
+    assert module.sha256_text("/account/work/origin-dossiers/case-ari-ghost/watch") in copied_telegram["deliveredLinks"]
+    assert "provider_receipt_reference" in copied_telegram["deliveredLinks"]
     assert output.is_file()
 
 

@@ -9341,6 +9341,52 @@ body {
   line-height: 1.08;
 }
 
+.downloads-simple-hero {
+  margin-bottom: 0.72rem;
+}
+
+.downloads-choice-list {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.downloads-choice-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 0;
+  padding: 0.78rem 0.86rem;
+  border: 1px solid var(--minimal-line);
+  border-radius: 10px;
+  background: var(--minimal-surface);
+}
+
+.downloads-choice-card span {
+  display: inline-flex;
+  margin-bottom: 0.22rem;
+  color: var(--minimal-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.downloads-choice-card h2 {
+  margin: 0;
+  color: var(--minimal-ink);
+  font-size: clamp(1rem, 1.2vw, 1.18rem);
+  line-height: 1.12;
+}
+
+.downloads-choice-card p {
+  margin: 0.24rem 0 0;
+  max-width: 42rem;
+  color: var(--minimal-muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
 .surface-downloads .minimal-lane-grid {
   margin-top: 0.62rem;
 }

@@ -29,10 +29,9 @@ test('downloads publishes the Arch-compatible AUR sidecar for the current Linux 
   const checks: Array<Record<string, unknown>> = [];
 
   await page.goto(`${baseUrl}/downloads`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Arch Linux' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'AUR source' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'PKGBUILD' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '.SRCINFO' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Downloads' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Build from source' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download script' })).toBeVisible();
 
   const catalogResponse = await api.get('/downloads/aur-packages.json');
   expect(catalogResponse.status()).toBe(200);

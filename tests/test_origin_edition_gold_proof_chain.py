@@ -56,6 +56,18 @@ def fake_modules(
     seen_contexts = seen_contexts if seen_contexts is not None else {}
     coverage_pass = matrix_pass if coverage_pass is None else coverage_pass
 
+    def portal_preflight(output, **_kwargs):
+        calls.append("portal_preflight")
+        payload = {"status": "pass", "restartRequiredForExistingContainer": False, "blockers": [], "next_action": "preflight pass", "blocking_reason": ""}
+        write_json(output, payload)
+        return payload
+
+    def portal_restart_plan(output, **_kwargs):
+        calls.append("portal_restart_plan")
+        payload = {"status": "not_required", "blockers": [], "next_action": "restart not required", "blocking_reason": ""}
+        write_json(output, payload)
+        return payload
+
     def deployed_probe(evidence_root, base_url, project_id, output, env_file, context=None):
         calls.append("deployed_probe")
         seen_contexts["deployed_probe"] = context
@@ -106,6 +118,8 @@ def fake_modules(
         return payload
 
     return SimpleNamespace(
+        portal_preflight=SimpleNamespace(materialize=portal_preflight),
+        portal_restart_plan=SimpleNamespace(materialize=portal_restart_plan),
         deployed_probe=SimpleNamespace(materialize=deployed_probe),
         handoff=SimpleNamespace(materialize=handoff),
         gold_audit=SimpleNamespace(audit=gold_audit),
@@ -193,13 +207,13 @@ def test_gold_proof_chain_blocks_when_completion_matrix_blocks_and_keeps_env_sec
     )
     serialized = output.read_text(encoding="utf-8")
 
-    assert calls == ["deployed_probe", "handoff", "gold_audit", "runsite", "matrix", "coverage"]
+    assert calls == ["portal_preflight", "portal_restart_plan", "deployed_probe", "handoff", "gold_audit", "handoff", "runsite", "matrix", "coverage"]
     assert result["status"] == "blocked"
     assert result["updated_at"]
     assert result["next_action"] == "probe done"
     assert "stage:completion_matrix" in result["blocking_reason"]
     assert "requirement:deployed_owner_read_listen_watch_canon" in result["blocking_reason"]
-    assert result["progress"]["totalStages"] == 6
+    assert result["progress"]["totalStages"] == 8
     assert result["progress"]["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
     assert result["goalCompletionClaimAllowed"] is False
     assert result["stages"][-2]["blockedRows"] == ["deployed_user_login_read_listen_watch"]
