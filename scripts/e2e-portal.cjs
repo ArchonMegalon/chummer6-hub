@@ -118,13 +118,22 @@ const checks = [
   },
   {
     url: `${baseUrl}/blazor/`,
-    required: false,
     label: 'delegated-blazor',
     assert: (text, response) =>
       /\/blazor\/?$/.test(response.url)
-      && (text.includes('Published browser surface') || text.includes('Published browser client'))
-      && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
-      && hasBlazorBaseHref(text)
+      && (
+        (
+          (text.includes('Published browser surface') || text.includes('Published browser client'))
+          && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
+          && hasBlazorBaseHref(text)
+        )
+        || (
+          text.includes('Browser preview is not ready right now.')
+          && text.includes('Download Chummer')
+          && text.includes('href="/downloads"')
+          && text.includes('href="/status"')
+        )
+      )
   },
   {
     url: `${baseUrl}/avalonia/`,

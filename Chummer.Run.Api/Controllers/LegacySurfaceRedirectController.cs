@@ -78,21 +78,82 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         }
         outbound.Headers.Referrer = upstream;
 
-        using HttpResponseMessage response = await client.SendAsync(
-            outbound,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
-
-        if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
+        HttpResponseMessage response;
+        try
         {
-            return Redirect(RewriteUpstreamLocation(response.Headers.Location, upstream, localBasePath));
+            response = await client.SendAsync(
+                outbound,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            return BrowserSurfaceUnavailable(localBasePath);
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return BrowserSurfaceUnavailable(localBasePath);
         }
 
-        Response.StatusCode = (int)response.StatusCode;
-        CopyHeaders(response);
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await stream.CopyToAsync(Response.Body, cancellationToken).ConfigureAwait(false);
-        return new EmptyResult();
+        using (response)
+        {
+            if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
+            {
+                return Redirect(RewriteUpstreamLocation(response.Headers.Location, upstream, localBasePath));
+            }
+
+            if ((int)response.StatusCode >= 500)
+            {
+                return BrowserSurfaceUnavailable(localBasePath);
+            }
+
+            Response.StatusCode = (int)response.StatusCode;
+            CopyHeaders(response);
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            await stream.CopyToAsync(Response.Body, cancellationToken).ConfigureAwait(false);
+            return new EmptyResult();
+        }
+    }
+
+    private ContentResult BrowserSurfaceUnavailable(string localBasePath)
+    {
+        string surfaceName = string.Equals(localBasePath, "/blazor", StringComparison.OrdinalIgnoreCase)
+            ? "Browser preview"
+            : "Desktop preview";
+        string html = $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <meta name="robots" content="noindex,nofollow">
+                <title>{{surfaceName}} - Chummer</title>
+                <style>
+                    :root { color-scheme: dark; background: #11110f; color: #f1eee7; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+                    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #11110f; }
+                    main { width: min(520px, 100%); }
+                    a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+                    h1 { margin: 0 0 12px; font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.02; letter-spacing: 0; }
+                    p { margin: 0 0 22px; color: #c9c0b3; line-height: 1.55; }
+                    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+                    .button { border: 1px solid #f1eee7; border-radius: 6px; padding: 10px 14px; text-decoration: none; font-weight: 700; }
+                    .muted { border-color: #4b473f; color: #c9c0b3; }
+                </style>
+            </head>
+            <body>
+                <main>
+                    <h1>{{surfaceName}} is not ready right now.</h1>
+                    <p>The downloadable Chummer client is the current stable path. The browser surface will come back when its service is healthy.</p>
+                    <div class="actions">
+                        <a class="button" href="/downloads">Download Chummer</a>
+                        <a class="button muted" href="/status">Status</a>
+                    </div>
+                </main>
+            </body>
+            </html>
+            """;
+
+        return Content(html, "text/html");
     }
 
     private void CopyHeaders(HttpResponseMessage response)
