@@ -29,6 +29,34 @@ REQUIRED_CONTEXT_ARGUMENTS = (
     "--namespace ",
     "--base-url ",
 )
+REQUIRED_DEPLOYED_PROBE_FLAGS = (
+    "logged_in_browser_verified",
+    "selected_face_cover_visible",
+    "read_tab_visible",
+    "listen_tab_visible",
+    "watch_tab_visible",
+    "canon_audit_tab_visible",
+    "read_gate_verified",
+    "chummer_run_listen_gate_verified",
+    "watch_gate_verified",
+    "cover_route_verified",
+    "book_route_verified",
+    "watch_artifact_nonempty",
+    "cover_artifact_nonempty",
+    "book_artifact_nonempty",
+    "audiobook_share_url_trusted",
+    "dossier_share_url_trusted",
+    "audiobook_share_reachable",
+    "dossier_share_reachable",
+    "owner_playback_e2e_verified",
+    "unauthenticated_detail_redirect_verified",
+    "unauthenticated_read_redirect_verified",
+    "unauthenticated_listen_redirect_verified",
+    "unauthenticated_book_redirect_verified",
+    "unauthenticated_cover_redirect_verified",
+    "unauthenticated_video_redirect_verified",
+    "all_private_routes_login_protected",
+)
 FORBIDDEN_VALUE_MARKERS = (
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
@@ -126,6 +154,15 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     current = payload.get("currentEvidence") if isinstance(payload.get("currentEvidence"), dict) else {}
     required_flags = current.get("deployedProbeRequiredFlags") if isinstance(current.get("deployedProbeRequiredFlags"), dict) else {}
     missing_flags = current.get("deployedProbeMissingRequiredFlags") if isinstance(current.get("deployedProbeMissingRequiredFlags"), list) else []
+    required_flag_keys = set(required_flags)
+    expected_flag_keys = set(REQUIRED_DEPLOYED_PROBE_FLAGS)
+    if required_flag_keys != expected_flag_keys:
+        missing_required = sorted(expected_flag_keys - required_flag_keys)
+        extra_required = sorted(required_flag_keys - expected_flag_keys)
+        if missing_required:
+            issues.append(f"deployed_probe_required_flags_missing:{missing_required}")
+        if extra_required:
+            issues.append(f"deployed_probe_required_flags_unexpected:{extra_required}")
     if not str(current.get("deployedProbeNextAction") or "").strip():
         issues.append("deployed_probe_next_action_missing")
     if status != "pass" and not str(current.get("deployedProbeBlockingReason") or "").strip():
