@@ -907,6 +907,9 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Nightly" in downloads
     assert "Windows" in downloads
     assert "Linux" in downloads
+    assert "Build from source" in downloads
+    assert "Local build script. No sudo. Updates default to notify." in downloads
+    assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
     assert "Nightly currently matches Stable" in downloads
     assert "There is no newer Nightly available" in downloads
