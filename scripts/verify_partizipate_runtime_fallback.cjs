@@ -47,9 +47,9 @@ async function main() {
 
   const page = await context.newPage();
   try {
-    const response = await page.goto(`${baseUrl}/partizipate`, { waitUntil: 'domcontentloaded' });
-    assert(response, '/partizipate should return a response.');
-    assert.equal(response.status(), 200, '/partizipate should return 200.');
+    const response = await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
+    assert(response, '/participate should return a response.');
+    assert.equal(response.status(), 200, '/participate should return 200.');
 
     const fallback = page.locator('[data-participate-board-fallback]');
     const frame = page.locator('#participate-board');
@@ -59,13 +59,13 @@ async function main() {
     assert.equal(await frame.isHidden(), true, 'embedded board should be hidden after vendor error copy appears.');
 
     const visibleText = await page.locator('body').innerText();
-    assert.equal(visibleText.includes('Participate is not loading'), true, 'fallback should explain the state.');
-    assert.equal(visibleText.includes('The public board is unavailable right now.'), true, 'fallback should give the next action.');
+    assert.equal(visibleText.includes('The board is unavailable'), true, 'fallback should explain the state.');
+    assert.equal(visibleText.includes('Try again shortly.'), true, 'fallback should give the next action.');
     assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(visibleText), false, 'vendor error copy must not be visible.');
 
     console.log(JSON.stringify({
       status: 'pass',
-      url: `${baseUrl}/partizipate`,
+      url: `${baseUrl}/participate`,
       mode: 'runtime_fallback',
     }));
   } finally {

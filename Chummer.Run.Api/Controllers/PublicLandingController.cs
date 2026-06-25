@@ -2128,7 +2128,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipatePage(cancellationToken).ConfigureAwait(false);
+        => await ParticipateBoardProxyCore(
+            string.Empty,
+            cancellationToken,
+            localOrigin: "/partizipate",
+            localBaseHref: "/partizipate/",
+            fallbackPath: "/partizipate").ConfigureAwait(false);
 
     [HttpGet("/participate")]
     [Produces("text/html")]
@@ -2186,7 +2191,12 @@ public sealed class PublicLandingController : Controller
             var value when value.StartsWith("board/", StringComparison.OrdinalIgnoreCase) => value["board/".Length..],
             _ => raw
         };
-        return await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(targetPath), cancellationToken).ConfigureAwait(false);
+        return await ParticipateBoardProxyCore(
+            NormalizeParticipateBoardPath(targetPath),
+            cancellationToken,
+            localOrigin: "/partizipate",
+            localBaseHref: "/partizipate/",
+            fallbackPath: "/partizipate").ConfigureAwait(false);
     }
 
     [HttpGet("/participate/{**boardPath}")]
@@ -2217,12 +2227,17 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ParticipateBoardRootLoadingImageProxy(CancellationToken cancellationToken)
         => await ParticipateBoardRootResourceProxy("loading.svg", null, cancellationToken).ConfigureAwait(false);
 
-    private async Task<IActionResult> ParticipateBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
+    private async Task<IActionResult> ParticipateBoardProxyCore(
+        string? boardPath,
+        CancellationToken cancellationToken,
+        string localOrigin = "/participate/board",
+        string localBaseHref = "/participate/board/",
+        string fallbackPath = "/participate")
     {
         Uri? upstream = ResolveProductLiftHostedBoardUri();
         if (upstream is null)
         {
-            return ParticipateBoardUnavailable();
+            return ParticipateBoardUnavailable(fallbackPath);
         }
 
         string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
@@ -2243,7 +2258,7 @@ public sealed class PublicLandingController : Controller
 
             if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
             {
-                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/participate", "/participate/board");
+                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, fallbackPath, localOrigin);
                 return Redirect(redirected);
             }
 
@@ -2253,7 +2268,7 @@ public sealed class PublicLandingController : Controller
                 string html = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
                 {
-                    return ParticipateBoardUnavailable();
+                    return ParticipateBoardUnavailable(fallbackPath);
                 }
 
                 string rewritten = RewriteHostedBoardHtml(
@@ -2261,21 +2276,21 @@ public sealed class PublicLandingController : Controller
                     upstream,
                     ResolveParticipateBoardHomeHref(),
                     ResolveParticipateSupporterHref(),
-                    localOrigin: "/participate/board",
-                    localBaseHref: "/participate/board/",
+                    localOrigin,
+                    localBaseHref,
                     railTitle: "Chummer Participate",
                     railNavLabel: "Participate actions",
                     firstLinkHref: "/roadmap",
                     firstLinkLabel: "Roadmap",
-                    secondLinkHref: "/participate",
+                    secondLinkHref: fallbackPath,
                     secondLinkLabel: "Board",
-                    failureTitle: "Participate is not loading",
-                    failureSummary: "Try again shortly. Use Support for private or blocked issues.",
+                    failureTitle: "The board is unavailable",
+                    failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
                     failurePrimaryHref: "/roadmap",
                     failurePrimaryLabel: "Roadmap",
                     failureSecondaryHref: "/contact#support-intake",
                     failureSecondaryLabel: "Support",
-                    failureReturnHref: "/participate",
+                    failureReturnHref: fallbackPath,
                     failureReturnLabel: "Retry");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
@@ -2287,12 +2302,12 @@ public sealed class PublicLandingController : Controller
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Participate board proxy could not reach upstream board.");
-            return ParticipateBoardUnavailable();
+            return ParticipateBoardUnavailable(fallbackPath);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Participate board proxy timed out.");
-            return ParticipateBoardUnavailable();
+            return ParticipateBoardUnavailable(fallbackPath);
         }
     }
 
@@ -2369,16 +2384,16 @@ public sealed class PublicLandingController : Controller
             : relativePath;
     }
 
-    private ContentResult ParticipateBoardUnavailable()
+    private ContentResult ParticipateBoardUnavailable(string returnHref = "/participate")
         => HostedBoardUnavailable(
-            "Participate is not loading",
+            "The board is unavailable",
             "Try again shortly.",
             "Use Support for account, install, or private details.",
             "/roadmap",
             "Roadmap",
             "/contact#support-intake",
             "Support",
-            "/participate",
+            returnHref,
             "Retry");
 
     private ContentResult HostedBoardUnavailable(
@@ -3050,8 +3065,8 @@ document.addEventListener('DOMContentLoaded', function () {
             firstLinkLabel: "Roadmap",
             secondLinkHref: "/participate",
             secondLinkLabel: "Board",
-            failureTitle: "Participate is not loading",
-            failureSummary: "Try again shortly. Use Support for private or blocked issues.",
+            failureTitle: "The board is unavailable",
+            failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
             failurePrimaryHref: "/roadmap",
             failurePrimaryLabel: "Roadmap",
             failureSecondaryHref: "/contact#support-intake",

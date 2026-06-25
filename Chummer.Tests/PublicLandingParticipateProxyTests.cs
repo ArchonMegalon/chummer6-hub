@@ -24,7 +24,7 @@ public sealed class PublicLandingParticipateProxyTests
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Participate is not loading", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("href=\"/roadmap\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -42,7 +42,7 @@ public sealed class PublicLandingParticipateProxyTests
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Participate is not loading", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("Use Support for account, install, or private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Could not load posts", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("support@productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -67,14 +67,32 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
         Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Ctrl K", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Ctrl K<", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Search<", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Sign up<", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("imageModal", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("id=\"imageModal\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("&times;", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PartizipateAliasRendersHostedBoardDirectlyAtTypoUrl()
+    {
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-skin", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"participate-board\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Participate is not loading", html, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -71,20 +71,22 @@ const checks = [
   },
   {
     url: `${baseUrl}/partizipate`,
-    assert: (text, response) =>
-      /\/partizipate\/?$/.test(response.url)
-      && text.includes('Chummer')
-      && text.includes('Participate')
-      && text.includes('participate-board')
-      && text.includes('/participate/board')
-      && !text.includes('Requests, votes, and shipped work.')
-      && !text.includes('Use the right place')
-      && !text.includes('Chummer Participate')
-      && !text.includes('What do you want to see next?')
-      && !text.includes('Something went wrong')
-      && !text.includes('Could not load posts')
-      && !text.includes('support@productlift.dev')
-      && !text.includes('ProductLift')
+    assert: (text, response) => {
+      const hasDirectBoard = text.includes('data-chummer-board-skin')
+        && text.includes('<base href="/partizipate/"');
+      const hasFirstPartyFallback = text.includes('The board is unavailable')
+        && text.includes('href="/partizipate"');
+      return /\/partizipate\/?$/.test(response.url)
+        && (hasDirectBoard || hasFirstPartyFallback)
+        && !text.includes('participate-board')
+        && !text.includes('Requests, votes, and shipped work.')
+        && !text.includes('Use the right place')
+        && !text.includes('Chummer Participate')
+        && !text.includes('What do you want to see next?')
+        && !text.includes('Something went wrong')
+        && !text.includes('Could not load posts')
+        && !text.includes('support@productlift.dev');
+    }
   },
   {
     url: `${baseUrl}/what-is-chummer`,

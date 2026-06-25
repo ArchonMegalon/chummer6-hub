@@ -253,7 +253,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-board-failure", rewritten, StringComparison.Ordinal);
-        Assert.Contains("Participate is not loading", rewritten, StringComparison.Ordinal);
+        Assert.Contains("The board is unavailable", rewritten, StringComparison.Ordinal);
         Assert.Contains("Try again shortly.", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
