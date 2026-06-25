@@ -449,6 +449,13 @@ class StackConfigSmokeTests(unittest.TestCase):
                 self.assertIn("CHUMMER_MACOS_PUBLIC_SHELF_ENABLED", script_text)
                 self.assertIn("is_public_artifact()", script_text)
 
+    def test_s3_release_publisher_uploads_windows_bootstrap_payload_sidecar(self):
+        script_path = REPO_ROOT / "scripts" / "publish-download-bundle-s3.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("-name 'chummer-*-win-*-payload.zip'", script_text)
+        self.assertIn("-name 'chummer-*-win-*-payload.zip.json'", script_text)
+
     def test_shared_release_publish_scripts_support_public_startup_smoke_override_and_canonical_release_proof_origin(self):
         generate_paths = [
             REPO_ROOT.parent / "chummer-presentation" / "scripts" / "generate-releases-manifest.sh",

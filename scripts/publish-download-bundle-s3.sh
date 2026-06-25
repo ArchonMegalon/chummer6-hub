@@ -87,7 +87,8 @@ done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
   -name 'chummer-*-installer.pkg' -o \
   -name 'chummer-*-installer.dmg' -o \
   -name 'chummer-*-installer.msix' -o \
-  -name 'chummer-*-win-*-payload.zip' \
+  -name 'chummer-*-win-*-payload.zip' -o \
+  -name 'chummer-*-win-*-payload.zip.json' \
 \) | sort)
 
 copy_target() {
