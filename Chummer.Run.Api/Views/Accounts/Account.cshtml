@@ -15,7 +15,7 @@
     {
         "participation" => "Participation",
         "support" => "Support",
-        "access" => "Devices & access",
+        "access" => "Installs",
         "work" => "Work",
         "settings" => "Settings",
         "advanced" => "Advanced account details",
@@ -25,7 +25,7 @@
     {
         "participation" => "Return to followed work, contribution history, and optional public recognition from one account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
-        "access" => "Keep linked installs, access rights, and claimed copies in one place.",
+        "access" => "See installed copies, pending setup, and install help without the internal machinery.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
         "advanced" => "Account identifiers and deeper account details stay behind the advanced page.",
@@ -592,12 +592,12 @@
     }
 
     var accountRailHeadline = showAccessSection
-        ? "Devices and access stay the main recovery place"
+        ? "Installs stay here"
         : showSupportSection
             ? "Support and account return stay attached to this account"
             : installRailHeading;
     var accountRailSummary = showAccessSection
-        ? "Reconnect, replacement, recovery, and active access requests stay here after the installer or app does the real work. Keep the browser step secondary."
+        ? "Use this page to see linked copies, pending setup, and help for an affected install. The app or installer still does the actual linking."
         : showSupportSection
             ? "Tracked support stays attached to the affected install so release status, closure, and recovery never split across separate surfaces."
             : installRailSummary;
@@ -1124,28 +1124,28 @@
             {
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
-                    <h2>Devices &amp; access</h2>
-                    <p>Keep linked installs, release access, and download continuity in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
+                    <h2>Installs</h2>
+                    <p>Linked copies, pending setup, and install help stay in one place. Technical details are still available, but they do not lead the page.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
-                        <span class="tag">Current install path</span>
+                    <span class="tag">Current install</span>
                     <h3>@installRailHeading</h3>
                     <p>@installRailSummary</p>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
-                            <span>Recommended for this install</span>
+                            <span>Recommended</span>
                             <strong>@TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open downloads to confirm the current guided installer path.")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Who can get it now</span>
+                            <span>Available to</span>
                             <strong>@TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open downloads to confirm live access.")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Fix availability</span>
+                            <span>Fixes</span>
                             <strong>@TrustRowValue(Model.SignedInTrustStatus, "Fix availability", "Open downloads to confirm whether the current linked install already has the fix.")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Current caution</span>
+                            <span>Note</span>
                             <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Use the current release page when you need the newest caution before you continue this install.")</strong>
                         </div>
                         @if (leadInstallation is not null)
@@ -1159,14 +1159,14 @@
                         {
                             <div class="settings-summary-row">
                                 <span>Access right</span>
-                                <strong>Active until @leadGrant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                <strong>Until @leadGrant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                             </div>
                         }
                         @if (leadPendingClaim is not null)
                         {
                             <div class="settings-summary-row">
-                                <span>Recovery reserve</span>
-                                <strong>@PublicText(leadPendingClaim.ArtifactLabel) · use the pending code only if that device explicitly opens in recovery mode.</strong>
+                                <span>Pending setup</span>
+                                <strong>@PublicText(leadPendingClaim.ArtifactLabel) · finish from the Chummer app if it asks for the code.</strong>
                             </div>
                         }
                         @if (leadInstallRailSupport is not null)
@@ -1181,7 +1181,7 @@
                         <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
                         <a class="button-like button-like--secondary" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                     </div>
-                    <p class="muted-copy">Devices &amp; access is the main recovery path after the installer or app does the real work. Recovery codes stay below as a reserve option, not the first instruction.</p>
+                    <p class="muted-copy">Recovery codes stay below as a reserve option. They are not the normal way to set up Chummer.</p>
                 </article>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -1189,33 +1189,29 @@
                         <strong>@Model.InstallLinking.RecentReceipts.Count</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Waiting to finish on another device</span>
+                        <span>Pending setup</span>
                         <strong>@Model.InstallLinking.PendingClaimTickets.Count</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Claimed installs</span>
+                        <span>Linked copies</span>
                         <strong>@claimedInstallations</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Access rights</span>
+                        <span>Active access</span>
                         <strong>@activeAccessRights</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Cross-device recovery</span>
-                            <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} files · {restoreEntitlementCount} entitlements")</strong>
+                        <span>Recovery backup</span>
+                        <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Not started" : $"{restoreArtifactCount} file(s) · {restoreEntitlementCount} access item(s)")</strong>
                     </div>
                     @if (entitlementSyncReceipts is not null)
                     {
                         <div class="settings-summary-row">
-                            <span>Account access status</span>
-                            <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Check details before continuing")</strong>
+                            <span>Status</span>
+                            <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Needs a look")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Account recovery path</span>
-                            <strong>@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Blocking sync conflicts</span>
+                            <span>Problems</span>
                             <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
                         </div>
                     }
@@ -1223,18 +1219,18 @@
                 @if (entitlementSyncReceipts is not null)
                 {
                     <details class="details-drawer">
-                        <summary>Account sync history</summary>
+                        <summary>Connection details</summary>
                         <div class="settings-summary-list">
                             <div class="settings-summary-row">
-                                <span>Status summary</span>
+                                <span>Status</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.Summary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Details</span>
+                                <span>History</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ProvenanceSummary)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Conflict summary</span>
+                                <span>Problems</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.ConflictSummary)</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1242,7 +1238,7 @@
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Recovery summary</span>
+                                <span>Recovery</span>
                                 <strong>@PublicText(entitlementSyncReceipts.ReceiptStatus.RecoverySummary)</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1250,19 +1246,19 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Access history</span>
+                                <span>Access updates</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncProvenanceCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Access conflicts</span>
+                                <span>Access problems</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Stale history</span>
+                                <span>Stale items</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Ready history</span>
+                                <span>Ready items</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.SafeToContinueWithReceiptCount</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1270,7 +1266,7 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.RefreshBeforeContinueCount</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Blocking conflicts</span>
+                                <span>Blocking problems</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
                             </div>
                         </div>
@@ -1321,7 +1317,7 @@
                         }
                         @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No account sync history is attached to this account right now.</p>
+                            <p class="muted-copy">No connection history is attached right now.</p>
                         }
                         else
                         {
@@ -1347,7 +1343,7 @@
                         }
                         @if (entitlementSyncReceipts.ConflictReceipts.Count == 0)
                         {
-                            <p class="muted-copy">No account sync problems are active for this account right now.</p>
+                            <p class="muted-copy">No connection problems are active right now.</p>
                         }
                         else
                         {
@@ -1379,7 +1375,7 @@
                 }
                 @if (Model.InstallLinking.RecentReceipts.Count == 0)
                 {
-                    <p class="muted-copy">No account-linked downloads yet. Start from the recommended installer while signed in if you want this account attached to the next copy you install.</p>
+                    <p class="muted-copy">No linked downloads yet. Start from the recommended installer while signed in if you want Chummer to remember this copy.</p>
                 }
                 else
                 {
@@ -1396,7 +1392,7 @@
                 @if (claimedInstallations > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Linked installs</summary>
+                        <summary>Linked copies</summary>
                         <div class="settings-summary-list">
                             @foreach (var installation in Model.InstallLinking.ClaimedInstallations!)
                             {
@@ -1411,7 +1407,7 @@
                 @if (activeAccessRights > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Access rights</summary>
+                        <summary>Active access</summary>
                         <div class="settings-summary-list">
                             @foreach (var grant in Model.InstallLinking.ActiveGrants!)
                             {
@@ -1426,8 +1422,8 @@
                 @if (pendingClaims > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Finish on another device (Recovery mode only)</summary>
-                        <p class="muted-copy">Enter each code in Chummer if it opens in recovery mode on the already-downloaded device. Do not redeem claim codes in a browser tab.</p>
+                        <summary>Pending setup codes</summary>
+                        <p class="muted-copy">Enter a code only when the Chummer app asks for it on the already-downloaded device. Do not use these codes in a browser tab.</p>
                         <div class="settings-summary-list">
                             @foreach (var ticket in Model.InstallLinking.PendingClaimTickets)
                             {

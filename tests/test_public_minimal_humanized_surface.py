@@ -811,6 +811,27 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
         assert forbidden not in entry
 
 
+def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() -> None:
+    account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+
+    assert '"access" => "Installs"' in account
+    assert "Linked copies, pending setup, and install help stay in one place." in account
+    assert "<summary>Connection details</summary>" in account
+    assert "Recovery codes stay below as a reserve option. They are not the normal way to set up Chummer." in account
+    assert "Pending setup codes" in account
+
+    for forbidden in (
+        "<h2>Devices &amp; access</h2>",
+        "<summary>Account sync history</summary>",
+        "<span>Account access status</span>",
+        "<span>Account recovery path</span>",
+        "<span>Blocking sync conflicts</span>",
+        "Technical claim details stay available, but they do not need to be the first thing you read.",
+        "Do not redeem claim codes in a browser tab.",
+    ):
+        assert forbidden not in account
+
+
 def test_downloads_surface_hides_account_handoff_noise() -> None:
     downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
 
