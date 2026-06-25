@@ -1116,7 +1116,7 @@ public_routes:
   placeholder_requirements: receipt-backed optional-acceleration contract only
 auth_routes:
 - path: /login
-  title: Sign in
+  title: Open Chummer
   audience: public
   purpose: guest_auth_entry
   requires_auth: false
@@ -1125,7 +1125,7 @@ auth_routes:
   placeholder_allowed: false
   placeholder_requirements: first-wave auth entry
 - path: /signup
-  title: Create account
+  title: Claim your copy
   audience: public
   purpose: guest_auth_entry
   requires_auth: false
