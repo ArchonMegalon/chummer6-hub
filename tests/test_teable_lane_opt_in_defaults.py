@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_auxiliary_teable_lanes_are_opt_in_by_default() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    public_edge_compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
 
     assert "CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED=false" in env_example
     assert "CHUMMER_TEABLE_HEYY_SCAM_CHAT_RECONCILE_ENABLED=false" in env_example
@@ -15,6 +16,18 @@ def test_auxiliary_teable_lanes_are_opt_in_by_default() -> None:
     assert "CHUMMER_TEABLE_KARMA_FORGE_RECONCILE_ENABLED=false" in env_example
     assert "CHUMMER_TEABLE_BLACK_LEDGER_ENABLED=false" in env_example
     assert "CHUMMER_TEABLE_BLACK_LEDGER_RECONCILE_ENABLED=false" in env_example
+
+    for snippet in (
+        "CHUMMER_TEABLE_USERS_ENABLED: ${CHUMMER_TEABLE_USERS_ENABLED:-false}",
+        "CHUMMER_TEABLE_USERS_RECONCILE_ENABLED: ${CHUMMER_TEABLE_USERS_RECONCILE_ENABLED:-false}",
+        "CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED: ${CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED:-false}",
+        "CHUMMER_TEABLE_HEYY_SCAM_CHAT_RECONCILE_ENABLED: ${CHUMMER_TEABLE_HEYY_SCAM_CHAT_RECONCILE_ENABLED:-false}",
+        "CHUMMER_TEABLE_KARMA_FORGE_ENABLED: ${CHUMMER_TEABLE_KARMA_FORGE_ENABLED:-false}",
+        "CHUMMER_TEABLE_KARMA_FORGE_RECONCILE_ENABLED: ${CHUMMER_TEABLE_KARMA_FORGE_RECONCILE_ENABLED:-false}",
+        "CHUMMER_TEABLE_BLACK_LEDGER_ENABLED: ${CHUMMER_TEABLE_BLACK_LEDGER_ENABLED:-false}",
+        "CHUMMER_TEABLE_BLACK_LEDGER_RECONCILE_ENABLED: ${CHUMMER_TEABLE_BLACK_LEDGER_RECONCILE_ENABLED:-false}",
+    ):
+        assert snippet in public_edge_compose
 
 
 def test_auxiliary_teable_services_default_disabled_in_source() -> None:
