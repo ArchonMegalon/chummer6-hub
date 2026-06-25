@@ -38,7 +38,7 @@
                 ? "Return to Account for your return path, devices, and history."
                 : accessPosture?.AccountValueSummary ?? "The download file does not change. An account helps keep return path and linked installs together.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
-            Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
+            Label = Model.Chrome.Authenticated ? "Open account" : "Claim your copy",
             Highlights = new[] { "Linked installs", "Device return", "Recovery" }
         },
         new
@@ -71,7 +71,7 @@
         {
             return authenticated
                 ? new TrustPageActionViewModel("Open account", "/account", "secondary")
-                : new TrustPageActionViewModel("Create account", "/signup?next=/home", "secondary");
+                : new TrustPageActionViewModel("Claim your copy", "/signup?next=/home", "secondary");
         }
 
         if (combined.Contains("install", StringComparison.Ordinal)

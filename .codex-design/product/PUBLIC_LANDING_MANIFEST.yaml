@@ -16,10 +16,10 @@ hero_ctas:
   href: /now
   emphasis: secondary
 guest_shell_actions:
-- label: Sign in
+- label: Open Chummer
   href: /login?next=/home
   emphasis: secondary
-- label: Create account
+- label: Claim your copy
   href: /signup?next=/home
   emphasis: primary
 secondary_highlights:

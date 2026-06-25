@@ -30,11 +30,11 @@ trust_pages:
         bullets:
           - "Stable is the calm default."
           - "Nightly is the newest published build."
-          - "Create an account only when you want saved help history or recovery."
+          - "Claim your copy only when you want saved help history or recovery."
       - id: sign-in-recovery
         eyebrow: "Sign-in or account recovery"
         heading: "Use Account for recovery"
-        body: "Sign in when you want help history, recovery, and install return tied to your account."
+        body: "Open Chummer with an account when you want help history, recovery, and install return kept together."
         bullets:
           - "Guest use is allowed."
           - "Account help keeps follow-up in one place."
@@ -169,7 +169,7 @@ faq_pages:
       - label: "Open support"
         href: "/contact#support-intake"
         tone: secondary
-      - label: "Create account"
+      - label: "Claim your copy"
         href: "/signup?next=/home"
         tone: ghost
     sections:

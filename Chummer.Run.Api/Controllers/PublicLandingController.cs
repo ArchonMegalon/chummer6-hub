@@ -6114,7 +6114,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         else
         {
-            actions.Add(new TrustPageActionViewModel("Create account for saved history", "/signup?next=%2Faccount%2Fsupport", "primary"));
+            actions.Add(new TrustPageActionViewModel("Claim your copy", "/signup?next=%2Faccount%2Fsupport", "primary"));
         }
 
         actions.Add(new TrustPageActionViewModel("Return to help", "/help", "secondary"));
@@ -10938,7 +10938,7 @@ Boundary:
                 : "Send one clear problem here. You can create an account later if you want saved history inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
-            AccountSupportLabel: authenticated ? "Open account support" : "Create account for saved history",
+            AccountSupportLabel: authenticated ? "Open account support" : "Claim your copy",
             InstallAccessHref: installRail.ReturnHref ?? "/account/access",
             InstallAccessLabel: installRail.ReturnLabel ?? "Open Devices and access",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),
