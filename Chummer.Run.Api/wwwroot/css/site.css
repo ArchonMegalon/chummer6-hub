@@ -5978,6 +5978,168 @@ body.shell-authenticated {
   }
 }
 
+/* Auth top-level override. The file contains legacy auth blocks above. */
+.surface-auth.surface-minimal {
+  min-height: 100svh;
+  background: #171716;
+  color: #f3eadb;
+}
+
+.surface-auth.surface-minimal .site-header {
+  position: static;
+  border: 0;
+  background: transparent;
+}
+
+.surface-auth.surface-minimal .site-header__inner--auth {
+  width: min(420px, calc(100% - 32px));
+  min-height: auto;
+  margin: 0 auto;
+  padding: 20px 0 0;
+}
+
+.surface-auth.surface-minimal .site-brand__surface {
+  display: none;
+}
+
+.surface-auth.surface-minimal .site-main {
+  min-height: calc(100svh - 60px);
+  display: grid;
+  place-items: start center;
+  padding: clamp(2rem, 9svh, 5.5rem) 16px 40px;
+}
+
+.surface-auth.surface-minimal .auth-entry {
+  width: min(420px, 100%);
+  display: block;
+  margin: 0;
+  border: 1px solid rgba(243, 234, 219, 0.13);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1f1f1d;
+  box-shadow: none;
+}
+
+.surface-auth.surface-minimal .auth-entry__story {
+  display: none;
+}
+
+.surface-auth.surface-minimal .auth-panel--entry {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: clamp(22px, 5vw, 30px);
+  border: 0;
+  background: transparent;
+  color: #f3eadb;
+}
+
+.surface-auth.surface-minimal .auth-panel__mode-row {
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.surface-auth.surface-minimal .action-pill {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(243, 234, 219, 0.72);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro {
+  display: grid;
+  gap: 7px;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro h1,
+.surface-auth.surface-minimal .auth-panel__intro h2 {
+  margin: 0;
+  color: #f3eadb;
+  letter-spacing: 0;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro h1 {
+  font-size: clamp(1.75rem, 7vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro h2 {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro p,
+.surface-auth.surface-minimal .muted-copy,
+.surface-auth.surface-minimal .privacy-note {
+  margin: 0;
+  color: rgba(243, 234, 219, 0.68);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.surface-auth.surface-minimal .eyebrow {
+  margin: 0;
+  color: rgba(243, 234, 219, 0.54);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.surface-auth.surface-minimal .auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.surface-auth.surface-minimal .field {
+  display: grid;
+  gap: 7px;
+}
+
+.surface-auth.surface-minimal .field label {
+  color: rgba(243, 234, 219, 0.76);
+  font-size: 0.88rem;
+}
+
+.surface-auth.surface-minimal .field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(243, 234, 219, 0.16);
+  border-radius: 7px;
+  background: #151514;
+  color: #f3eadb;
+}
+
+.surface-auth.surface-minimal .button-like {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 7px;
+}
+
+.surface-auth.surface-minimal .auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: rgba(243, 234, 219, 0.45);
+  font-size: 0.82rem;
+}
+
+.surface-auth.surface-minimal .auth-divider::before,
+.surface-auth.surface-minimal .auth-divider::after {
+  content: "";
+  border-top: 1px solid rgba(243, 234, 219, 0.12);
+}
+
+.surface-auth.surface-minimal .auth-divider span {
+  background: transparent;
+  color: inherit;
+}
+
 /* Final minimal auth composition. */
 .route-login.surface-minimal,
 .route-signup.surface-minimal {
@@ -9773,162 +9935,164 @@ body {
 
 }
 
-/* Minimal account entry surface. Keep this last so it overrides older auth art direction. */
-.route-login,
-.route-signup {
-  background:
-    radial-gradient(circle at 50% 0, rgba(139, 129, 112, 0.12), transparent 34%),
-    #151515;
+/* Auth top-level override. The file contains legacy auth blocks above. */
+.surface-auth.surface-minimal {
+  min-height: 100svh;
+  background: #171716;
+  color: #f3eadb;
 }
 
-.route-login .site-main,
-.route-signup .site-main {
-  min-height: calc(100svh - 76px);
-  display: grid;
-  place-items: center;
-  padding: clamp(1.25rem, 4vw, 3rem) 1rem 4rem;
-}
-
-.route-login .auth-entry,
-.route-signup .auth-entry {
-  width: min(760px, 100%);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 0.86fr) minmax(300px, 1fr);
-  gap: 0;
-  border: 1px solid rgba(235, 228, 211, 0.12);
-  border-radius: 18px;
-  overflow: hidden;
-  background: #1b1b1a;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-}
-
-.route-login .auth-entry__story--visual,
-.route-signup .auth-entry__story--visual {
-  min-height: auto;
-  padding: clamp(1.35rem, 4vw, 2rem);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: clamp(2.5rem, 10vw, 6rem);
-  border-radius: 0;
-  background: #151515;
-  color: #f2ead8;
-}
-
-.route-login .auth-entry .hero-brand,
-.route-signup .auth-entry .hero-brand {
-  margin: 0;
-  color: #f2ead8;
-  font-size: clamp(2.1rem, 6vw, 3.8rem);
-  line-height: 0.96;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.route-login .auth-entry__copy,
-.route-signup .auth-entry__copy {
-  max-width: 23rem;
-  color: rgba(242, 234, 216, 0.72);
-  font-size: 0.98rem;
-  line-height: 1.55;
-}
-
-.route-login .auth-panel--entry,
-.route-signup .auth-panel--entry {
-  margin: 0;
-  padding: clamp(1.25rem, 4vw, 2rem);
-  gap: 1rem;
-  align-content: center;
+.surface-auth.surface-minimal .site-header {
+  position: static;
   border: 0;
-  border-left: 1px solid rgba(235, 228, 211, 0.1);
-  border-radius: 0;
-  background: #20201f;
-  color: #f2ead8;
+  background: transparent;
 }
 
-.route-login .auth-panel__mode-row,
-.route-signup .auth-panel__mode-row {
+.surface-auth.surface-minimal .site-header__inner--auth {
+  width: min(420px, calc(100% - 32px));
+  min-height: auto;
+  margin: 0 auto;
+  padding: 20px 0 0;
+}
+
+.surface-auth.surface-minimal .site-brand__surface {
+  display: none;
+}
+
+.surface-auth.surface-minimal .site-main {
+  min-height: calc(100svh - 60px);
+  display: grid;
+  place-items: start center;
+  padding: clamp(2rem, 9svh, 5.5rem) 16px 40px;
+}
+
+.surface-auth.surface-minimal .auth-entry {
+  width: min(420px, 100%);
+  display: block;
+  margin: 0;
+  border: 1px solid rgba(243, 234, 219, 0.13);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1f1f1d;
+  box-shadow: none;
+}
+
+.surface-auth.surface-minimal .auth-entry__story {
+  display: none;
+}
+
+.surface-auth.surface-minimal .auth-panel--entry {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: clamp(22px, 5vw, 30px);
+  border: 0;
+  background: transparent;
+  color: #f3eadb;
+}
+
+.surface-auth.surface-minimal .auth-panel__mode-row {
   justify-content: flex-start;
-  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.route-login .auth-panel__intro,
-.route-signup .auth-panel__intro {
-  gap: 0.35rem;
+.surface-auth.surface-minimal .action-pill {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(243, 234, 219, 0.72);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
-.route-login .auth-panel__intro h3,
-.route-signup .auth-panel__intro h3 {
-  color: #f2ead8;
-  font-size: clamp(1.3rem, 3vw, 1.75rem);
-  line-height: 1.12;
+.surface-auth.surface-minimal .auth-panel__intro {
+  display: grid;
+  gap: 7px;
+}
+
+.surface-auth.surface-minimal .auth-panel__intro h1,
+.surface-auth.surface-minimal .auth-panel__intro h2 {
+  margin: 0;
+  color: #f3eadb;
   letter-spacing: 0;
 }
 
-.route-login .auth-panel__intro p,
-.route-signup .auth-panel__intro p,
-.route-login .muted-copy,
-.route-signup .muted-copy,
-.route-login .privacy-note,
-.route-signup .privacy-note {
-  color: rgba(242, 234, 216, 0.64);
+.surface-auth.surface-minimal .auth-panel__intro h1 {
+  font-size: clamp(1.75rem, 7vw, 2.25rem);
+  line-height: 1.05;
 }
 
-.route-login .auth-form,
-.route-signup .auth-form {
-  gap: 0.75rem;
+.surface-auth.surface-minimal .auth-panel__intro h2 {
+  font-size: 1rem;
+  line-height: 1.25;
 }
 
-.route-login .field label,
-.route-signup .field label {
-  color: rgba(242, 234, 216, 0.74);
-}
-
-.route-login .field input,
-.route-signup .field input {
-  min-height: 48px;
-  border-color: rgba(235, 228, 211, 0.16);
-  background: #161615;
-  color: #f2ead8;
-}
-
-.route-login .field input::placeholder,
-.route-signup .field input::placeholder {
-  color: rgba(242, 234, 216, 0.38);
-}
-
-.route-login .auth-divider::before,
-.route-signup .auth-divider::before {
-  border-top-color: rgba(235, 228, 211, 0.13);
-}
-
-.route-login .auth-divider span,
-.route-signup .auth-divider span {
-  background: #20201f;
-  color: rgba(242, 234, 216, 0.5);
-}
-
-.route-login .privacy-note,
-.route-signup .privacy-note {
+.surface-auth.surface-minimal .auth-panel__intro p,
+.surface-auth.surface-minimal .muted-copy,
+.surface-auth.surface-minimal .privacy-note {
   margin: 0;
-  font-size: 0.86rem;
+  color: rgba(243, 234, 219, 0.68);
+  font-size: 0.94rem;
+  line-height: 1.45;
 }
 
-@media (max-width: 720px) {
-  .route-login .auth-entry,
-  .route-signup .auth-entry {
-    grid-template-columns: 1fr;
-  }
+.surface-auth.surface-minimal .eyebrow {
+  margin: 0;
+  color: rgba(243, 234, 219, 0.54);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
 
-  .route-login .auth-entry__story--visual,
-  .route-signup .auth-entry__story--visual {
-    gap: 1.6rem;
-  }
+.surface-auth.surface-minimal .auth-form {
+  display: grid;
+  gap: 12px;
+}
 
-  .route-login .auth-panel--entry,
-  .route-signup .auth-panel--entry {
-    border-left: 0;
-    border-top: 1px solid rgba(235, 228, 211, 0.1);
-  }
+.surface-auth.surface-minimal .field {
+  display: grid;
+  gap: 7px;
+}
+
+.surface-auth.surface-minimal .field label {
+  color: rgba(243, 234, 219, 0.76);
+  font-size: 0.88rem;
+}
+
+.surface-auth.surface-minimal .field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(243, 234, 219, 0.16);
+  border-radius: 7px;
+  background: #151514;
+  color: #f3eadb;
+}
+
+.surface-auth.surface-minimal .button-like {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 7px;
+}
+
+.surface-auth.surface-minimal .auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: rgba(243, 234, 219, 0.45);
+  font-size: 0.82rem;
+}
+
+.surface-auth.surface-minimal .auth-divider::before,
+.surface-auth.surface-minimal .auth-divider::after {
+  content: "";
+  border-top: 1px solid rgba(243, 234, 219, 0.12);
+}
+
+.surface-auth.surface-minimal .auth-divider span {
+  background: transparent;
+  color: inherit;
 }
