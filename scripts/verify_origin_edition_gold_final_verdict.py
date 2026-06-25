@@ -75,6 +75,12 @@ def verify(verdict_path: Path, proof_chain_path: Path, coverage_path: Path) -> t
     wrong_verdict = BLOCKED_VERDICT if verdict == READY_VERDICT else READY_VERDICT
     if f"Verdict: `{wrong_verdict}`" in text:
         issues.append(f"contradictory_verdict_present:{wrong_verdict}")
+    next_action = str(proof_chain.get("next_action") or "").strip()
+    if next_action and next_action not in text:
+        issues.append("next_action_missing")
+    blocking_reason = str(proof_chain.get("blocking_reason") or "").strip()
+    if blocking_reason and blocking_reason not in text:
+        issues.append("blocking_reason_missing")
     for requirement in blocked_requirements:
         if f"`{requirement}`" not in text:
             issues.append(f"blocked_requirement_missing:{requirement}")

@@ -79,6 +79,17 @@ def blocked_requirement_lines(blocked: list[str]) -> list[str]:
     return [f"- `{item}`" for item in blocked]
 
 
+def progress_lines(proof_chain: dict[str, Any]) -> list[str]:
+    progress = proof_chain.get("progress") if isinstance(proof_chain.get("progress"), dict) else {}
+    if not progress:
+        return ["- No proof-chain progress summary was recorded."]
+    return [
+        f"- Passed stages: `{progress.get('passedStages')}` / `{progress.get('totalStages')}`",
+        f"- Blocked stages: `{json.dumps(progress.get('blockedStages', []), sort_keys=True)}`",
+        f"- Blocking reason: `{proof_chain.get('blocking_reason') or ''}`",
+    ]
+
+
 def materialize(evidence_root: Path, output: Path, context: OriginEditionContext | None = None) -> dict[str, Any]:
     evidence_root = evidence_root.resolve()
     context = context or OriginEditionContext.default()
@@ -106,7 +117,8 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
     ]
 
     next_action = (
-        "Set a short-lived real owner session token in the local operator environment, rerun the deployed browser proof "
+        str(proof_chain.get("next_action") or "").strip()
+        or "Set a short-lived real owner session token in the local operator environment, rerun the deployed browser proof "
         "chain, then rerun the strict Gold verifier. Do not claim completion until the owner can read, listen, watch, "
         "and review Canon Audit behind login."
         if not ready
@@ -128,6 +140,10 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "## Blocked Requirements",
         "",
         *blocked_requirement_lines(blocked_requirements),
+        "",
+        "## Proof Progress",
+        "",
+        *progress_lines(proof_chain),
         "",
         "## Proof Chain Stages",
         "",
@@ -155,6 +171,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "finalVerdict": verdict,
         "goalCompletionClaimAllowed": ready,
         "blockedRequirements": blocked_requirements,
+        "nextAction": next_action,
         "output": output.as_posix(),
     }
 
