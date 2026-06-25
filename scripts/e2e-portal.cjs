@@ -106,13 +106,15 @@ const checks = [
     url: `${baseUrl}/hub`,
     assert: (text, response) =>
       response.url.endsWith('/login?next=%2Faccount')
-      && text.includes('Sign in')
+      && text.includes('Open Chummer')
+      && text.includes('Keep this copy attached to your account.')
   },
   {
     url: `${baseUrl}/hub/`,
     assert: (text, response) =>
       response.url.endsWith('/login?next=%2Faccount')
-      && text.includes('Sign in')
+      && text.includes('Open Chummer')
+      && text.includes('Keep this copy attached to your account.')
   },
   {
     url: `${baseUrl}/blazor/`,
