@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_edition_gold_final_verdict.py"
 
 
 def load_module():
+    seed_origin_context_env()
     spec = importlib.util.spec_from_file_location("origin_edition_gold_final_verdict", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -16,9 +21,45 @@ def load_module():
     return module
 
 
+def seed_origin_context_env() -> None:
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_PROJECT_ID", "varga-mira-kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Varga")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Mira")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
+
+
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def clear_origin_context_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_materialize_without_explicit_context_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    clear_origin_context_env(monkeypatch)
+
+    with pytest.raises(ValueError, match="explicit Origin Edition context required"):
+        module.materialize(tmp_path, tmp_path / "verdict.md")
 
 
 def seed_artifacts(root: Path, *, ready: bool) -> None:
@@ -121,6 +162,8 @@ def test_final_verdict_blocks_until_deployed_owner_requirement_is_proved(tmp_pat
     assert "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN" in text
     assert "stage:deployed_browser_probe" in text
     assert "Passed stages: `2` / `6`" in text
+    assert f"Proof chain SHA-256: `{sha256_file(tmp_path / 'ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json')}`" in text
+    assert f"Requirement coverage SHA-256: `{sha256_file(tmp_path / 'ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json')}`" in text
 
 
 def test_final_verdict_passes_when_proof_chain_and_coverage_pass(tmp_path: Path) -> None:

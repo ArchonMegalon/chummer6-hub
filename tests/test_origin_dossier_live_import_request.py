@@ -91,9 +91,11 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "Rain struck the clinic glass while the runner learned what a debt really costs.\n",
     )
     book = write_artifact(root, "book.pdf", b"%PDF-1.7\nreal provider finished book\n")
+    ebook = write_artifact(root, "ebook.epub", b"PK\x03\x04real provider finished ebook\n")
     cover = write_artifact(root, "story-scene-cover.png", b"\x89PNG\r\nselected face story scene render\n")
     audio = write_artifact(root, "audiobook.m4b", b"M4B real Unmixr narration bytes\n")
     video = write_artifact(root, "dossier-film.mp4", b"MP4 real dossier scene trailer bytes\n")
+    movie_poster = write_artifact(root, "movie-poster.jpg", cover.read_bytes())
 
     source_receipt = write_receipt(
         root,
@@ -156,6 +158,18 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         artifacts=[book],
         external=True,
     )
+    ebook_dossier_receipt = write_receipt(
+        root,
+        "ebook-audiobookshelf-dossier.receipt.json",
+        operation="audiobookshelf_dossier_import",
+        provider="Audiobookshelf",
+        artifacts=[ebook],
+        tokens=[dossier_share_url],
+        external=True,
+    )
+    ebook_dossier_payload = json.loads(ebook_dossier_receipt.read_text(encoding="utf-8"))
+    ebook_dossier_payload["audiobookshelfDossierShareUrl"] = dossier_share_url
+    write_json(ebook_dossier_receipt, ebook_dossier_payload)
     cover_receipt = write_receipt(
         root,
         "story-scene-cover.receipt.json",
@@ -340,6 +354,7 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "givenName": "Mira",
         "runnerName": "Kestrel",
         "originEditionNamespace": "origin.chummer.run/Varga/Mira/Kestrel",
+        "baseUrl": "https://chummer.run",
         "audiobookshelfShareUrl": audiobook_share_url,
         "audiobookshelfDossierShareUrl": dossier_share_url,
         "audiobookshelfAudiobookShareUrl": audiobook_share_url,
@@ -352,10 +367,13 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "canonAuditReceiptPath": str(canon_receipt),
         "bookArtifactPath": str(book),
         "bookArtifactReceiptPath": str(book_receipt),
+        "ebookArtifactPath": str(ebook),
+        "ebookAudiobookshelfImportReceiptPath": str(ebook_dossier_receipt),
         "storySceneCoverPath": str(cover),
         "storySceneCoverReceiptPath": str(cover_receipt),
         "audiobookPath": str(audio),
         "dossierVideoPath": str(video),
+        "moviePosterPath": str(movie_poster),
         "dossierVideoReceiptPath": str(video_receipt),
         "eaAudiobookJobReceiptPath": str(ea_job_receipt),
         "eaM4bProviderImportReceiptPath": str(ea_m4b_provider_receipt),
@@ -371,6 +389,7 @@ def build_valid_fixture(tmp_path: Path) -> tuple[Path, dict[str, Path | str]]:
         "eaLiveReceipt": ea_live_receipt,
         "finalBundleReceipt": final_bundle_receipt,
         "coverReceipt": cover_receipt,
+        "ebookDossierReceipt": ebook_dossier_receipt,
         "humanizerQualityReceipt": humanizer_quality_receipt,
         "audiobookShareUrl": audiobook_share_url,
         "dossierShareUrl": dossier_share_url,
@@ -392,6 +411,9 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     assert request["undetectableHumanizerApplied"] is True
     assert Path(request["humanizerQualityReceiptPath"]).is_file()
     assert request["storySceneCoverUsesSelectedCharacterFace"] is True
+    assert Path(request["moviePosterPath"]).is_file()
+    assert Path(request["dossierVideoPosterPath"]).is_file()
+    assert result["evidence"]["moviePosterSha256"] == result["evidence"]["storySceneCoverSha256"]
     assert request["audiobookshelfPlaybackVerified"] is True
     assert request["telegramShareDelivered"] is True
     assert request["familyName"] == "Varga"
@@ -402,6 +424,10 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     assert request["audiobookshelfAudiobookShareUrl"] == "https://audio.chummer.run/share/origin-live-gold-audiobook"
     assert request["missingGoldRequirements"] == []
     assert result["evidence"]["humanizerQualityReceiptSha256"] == sha256(Path(request["humanizerQualityReceiptPath"]))
+    assert Path(request["ebookArtifactPath"]).is_file()
+    assert Path(request["ebookAudiobookshelfImportReceiptPath"]).is_file()
+    assert result["evidence"]["ebookArtifactSha256"] == sha256(Path(request["ebookArtifactPath"]))
+    assert result["evidence"]["ebookAudiobookshelfImportReceiptSha256"] == sha256(Path(request["ebookAudiobookshelfImportReceiptPath"]))
     assert Path(request["m4bProviderImportReceiptPath"]).is_file()
     assert Path(request["audiobookshelfImportReceiptPath"]).is_file()
     assert Path(request["telegramShareDeliveryReceiptPath"]).is_file()
@@ -409,6 +435,130 @@ def test_materializes_chummer_import_request_from_live_origin_dossier_evidence(t
     assert "/origin.chummer.run/Varga/Mira/Kestrel/audiobook/" in request["audiobookshelfImportReceiptPath"].replace("\\", "/")
     assert "/origin.chummer.run/Varga/Mira/Kestrel/audiobook/" in request["telegramShareDeliveryReceiptPath"].replace("\\", "/")
     assert result["evidence"]["eaM4bProviderImportReceiptSha256"] == sha256(Path(request["m4bProviderImportReceiptPath"]))
+    telegram_receipt = json.loads(Path(request["telegramShareDeliveryReceiptPath"]).read_text(encoding="utf-8"))
+    assert "/account/work/origin-dossiers/origin-live-gold/video" in telegram_receipt["deliveredLinks"]
+    assert "/account/work/origin-dossiers/origin-live-gold/watch" not in telegram_receipt["deliveredLinks"]
+    assert telegram_receipt["linkBundleSha256"]["open_in_chummer"] == sha256_text("/account/work/origin-dossiers/origin-live-gold")
+    assert telegram_receipt["linkBundleSha256"]["read"] == sha256_text("/account/work/origin-dossiers/origin-live-gold/read")
+    assert telegram_receipt["linkBundleSha256"]["listen"] == sha256_text("/account/work/origin-dossiers/origin-live-gold/listen")
+    assert telegram_receipt["linkBundleSha256"]["watch"] == sha256_text("/account/work/origin-dossiers/origin-live-gold/video")
+    assert sha256_text("/account/work/origin-dossiers/origin-live-gold/watch") not in telegram_receipt["deliveredLinks"]
+
+
+def test_rejects_missing_ebook_dossier_import_receipt(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload.pop("ebookAudiobookshelfImportReceiptPath", None)
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="ebookAudiobookshelfImportReceiptPath"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_uses_book_artifact_as_legacy_ebook_artifact_when_ebook_path_is_absent(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    ebook_path = payload["ebookArtifactPath"]
+    legacy_book_receipt = write_receipt(
+        tmp_path / "origin-live",
+        "legacy-ebook-as-book.receipt.json",
+        operation="book_artifact_import",
+        provider="Inkfluence",
+        artifacts=[Path(ebook_path)],
+        external=True,
+    )
+    payload["bookArtifactPath"] = ebook_path
+    payload["bookArtifactReceiptPath"] = str(legacy_book_receipt)
+    payload.pop("ebookArtifactPath", None)
+    write_json(manifest, payload)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    request = result["importRequest"]
+    assert request["ebookArtifactPath"] == request["bookArtifactPath"]
+    assert result["evidence"]["ebookArtifactSha256"] == result["evidence"]["bookArtifactSha256"]
+
+
+def test_uses_default_movie_poster_path_when_manifest_omits_poster_path(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    namespace = payload["originEditionNamespace"]
+    cover_path = Path(payload["storySceneCoverPath"])
+    default_poster = Path(payload["sourcePacketPath"]).parent / namespace / "movie" / "poster.jpg"
+    default_poster.parent.mkdir(parents=True, exist_ok=True)
+    default_poster.write_bytes(cover_path.read_bytes())
+    payload.pop("moviePosterPath", None)
+    payload.pop("dossierVideoPosterPath", None)
+    write_json(manifest, payload)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    request = result["importRequest"]
+    assert request["moviePosterPath"] == str(default_poster)
+    assert request["dossierVideoPosterPath"] == str(default_poster)
+    assert result["evidence"]["moviePosterSha256"] == result["evidence"]["storySceneCoverSha256"]
+
+
+def test_rejects_movie_poster_that_does_not_match_story_scene_cover(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    poster = Path(payload["moviePosterPath"])
+    poster.write_bytes(b"different poster bytes")
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="movie poster must match"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_missing_chummer_base_url(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload.pop("baseUrl", None)
+    payload.pop("chummerBaseUrl", None)
+    payload.pop("originEditionBaseUrl", None)
+    write_json(manifest, payload)
+
+    with pytest.raises(module.ValidationError, match="baseUrl"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_accepts_explicit_base_url_override_when_manifest_omits_base_url(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload.pop("baseUrl", None)
+    payload.pop("chummerBaseUrl", None)
+    payload.pop("originEditionBaseUrl", None)
+    write_json(manifest, payload)
+
+    result = module.materialize(
+        manifest,
+        tmp_path / "out.json",
+        base_url_override="https://chummer.run",
+    )
+
+    request = result["importRequest"]
+    assert request["baseUrl"] == "https://chummer.run"
+    assert request["bookArtifactUrl"] == "https://chummer.run/account/work/origin-dossiers/origin-live-gold/book"
+    assert request["dossierVideoUrl"] == "https://chummer.run/account/work/origin-dossiers/origin-live-gold/video"
+    assert request["storySceneCoverUrl"] == "https://chummer.run/account/work/origin-dossiers/origin-live-gold/cover"
+
+
+def test_rejects_ebook_dossier_import_share_mismatch(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["ebookDossierReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["audiobookshelfDossierShareUrl"] = "https://audio.chummer.run/share/wrong-dossier"
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="dossier share URL does not match manifest"):
+        module.materialize(manifest, tmp_path / "out.json")
 
 
 def test_materializes_import_request_with_internal_chummer_originbookengine_manuscript(tmp_path: Path) -> None:
@@ -528,6 +678,13 @@ def test_accepts_live_audiobookshelf_host_for_dossier_and_audiobook_shares(tmp_p
     ea_live_receipt = json.loads(Path(paths["eaLiveReceipt"]).read_text(encoding="utf-8"))
     ea_live_receipt["selected_delivery"]["public_share_host"] = "audiobookshelf.girschele.com"
     write_json(Path(paths["eaLiveReceipt"]), ea_live_receipt)
+    ebook_dossier_receipt = json.loads(Path(paths["ebookDossierReceipt"]).read_text(encoding="utf-8"))
+    ebook_dossier_receipt["audiobookshelfDossierShareUrl"] = live_dossier_share_url
+    ebook_dossier_receipt["deliveredLinks"] = [
+        live_dossier_share_url if token == str(paths["dossierShareUrl"]) else token
+        for token in ebook_dossier_receipt["deliveredLinks"]
+    ]
+    write_json(Path(paths["ebookDossierReceipt"]), ebook_dossier_receipt)
 
     result = module.materialize(manifest, tmp_path / "out.json")
 
@@ -641,7 +798,66 @@ def test_rejects_non_approved_audiobook_provider(tmp_path: Path) -> None:
     receipt["render"]["provider"] = "edge_tts"
     write_json(receipt_path, receipt)
 
-    with pytest.raises(module.ValidationError, match="Inkfluence or Unmixr"):
+    with pytest.raises(module.ValidationError, match="premium audio provider registry"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_rejects_disguised_audiobook_provider_substring(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaJobReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["render"]["provider"] = "NotUnmixr Account 02"
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="premium audio provider registry"):
+        module.materialize(manifest, tmp_path / "out.json")
+
+
+def test_accepts_configured_audiobook_provider_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "premiumvoice")
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    receipt_path = Path(paths["eaJobReceipt"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["render"]["provider"] = "PremiumVoice Account 04"
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    assert result["status"] == "pass"
+    assert result["audiobookProvider"] == "PremiumVoice Account 04"
+
+
+def test_accepts_configured_manuscript_provider_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "guided memoir lane")
+    module = load_module()
+    manifest, paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    receipt_path = Path(payload["providerManuscriptReceiptPath"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["provider"] = "Guided Memoir Lane 02"
+    receipt["deliveredLinks"] = [
+        token.replace("Inkfluence", "Guided Memoir Lane 02")
+        for token in receipt.get("deliveredLinks", [])
+    ]
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(manifest, tmp_path / "out.json")
+
+    assert result["status"] == "pass"
+
+
+def test_rejects_disguised_manuscript_provider_substring(tmp_path: Path) -> None:
+    module = load_module()
+    manifest, _paths = build_valid_fixture(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    receipt_path = Path(payload["providerManuscriptReceiptPath"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["provider"] = "FakeInkfluenceProxy"
+    write_json(receipt_path, receipt)
+
+    with pytest.raises(module.ValidationError, match="manuscript provider registry"):
         module.materialize(manifest, tmp_path / "out.json")
 
 

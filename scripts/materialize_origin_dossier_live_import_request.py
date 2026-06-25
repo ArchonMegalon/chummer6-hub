@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from origin_edition_context import OriginEditionContext
 from origin_edition_provider_config import is_trusted_audiobookshelf_share, origin_owner_url
+from origin_edition_provider_registry import OriginProviderCapabilityRegistry
 
 
 CONTRACT_NAME = "chummer.origin_dossier_live_artifact_import_request.v1"
@@ -21,8 +22,7 @@ EA_LIVE_DELIVERY_CONTRACT_NAME = "ea.telegram_audiobook_live_delivery_receipt.v1
 EA_M4B_PROVIDER_IMPORT_CONTRACT_NAME = "ea.origin_m4b_provider_import_gate.v1"
 HUMANIZER_QUALITY_CONTRACT_NAME = "chummer.origin_dossier.humanizer_quality_gate.v1"
 DEFAULT_OUTPUT_NAME = "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
-APPROVED_MANUSCRIPT_PROVIDERS = ("inkfluence", "youbooks", "first book", "firstbook", "chummer originbookengine")
-APPROVED_AUDIO_PROVIDERS = ("inkfluence", "unmixr")
+PROVIDER_REGISTRY = OriginProviderCapabilityRegistry.from_env()
 FAKE_MARKERS = (
     "stub",
     "fallback",
@@ -101,6 +101,13 @@ def _require_file(value: object, field: str) -> Path:
     if path.stat().st_size <= 0:
         raise ValidationError(f"{field}: file is empty: {path}")
     return path
+
+
+def _require_file_relative_to(value: object, field: str, base_dir: Path) -> Path:
+    text = str(value or "").strip()
+    if text and not Path(text).expanduser().is_absolute():
+        value = str(base_dir / text)
+    return _require_file(value, field)
 
 
 def _json_text(value: object) -> str:
@@ -193,8 +200,7 @@ def _owner_path(project_id: str, artifact_kind: str | None = None) -> str:
 
 
 def _provider_allowed(provider: str, allowed: tuple[str, ...]) -> bool:
-    lowered = provider.lower()
-    return any(token in lowered for token in allowed)
+    return OriginProviderCapabilityRegistry(manuscript_provider_tokens=allowed).manuscript_provider_allowed(provider)
 
 
 def _validate_receipt(
@@ -243,8 +249,8 @@ def _validate_provider_manuscript_receipt(path: Path, manuscript_hash: str) -> N
         artifact_hashes=(manuscript_hash,),
         external=not internal_chummer_origin,
     )
-    if not _provider_allowed(_json_text(receipt), APPROVED_MANUSCRIPT_PROVIDERS):
-        raise ValidationError("providerManuscriptReceiptPath: provider must be Inkfluence, Youbooks, First Book, or Chummer OriginBookEngine")
+    if not PROVIDER_REGISTRY.manuscript_provider_allowed(receipt.get("provider")):
+        raise ValidationError("providerManuscriptReceiptPath: provider is not in the configured Origin manuscript provider registry")
 
 
 def _validate_humanizer_quality_receipt(path: Path, manuscript_hash: str) -> None:
@@ -320,8 +326,8 @@ def _validate_audio_job_receipt(path: Path, audiobook_hash: str, share_url: str)
     imported = receipt.get("audiobookshelf_import") if isinstance(receipt.get("audiobookshelf_import"), dict) else {}
     privacy = receipt.get("privacy") if isinstance(receipt.get("privacy"), dict) else {}
     provider = _string(render.get("provider"))
-    if not _provider_allowed(provider, APPROVED_AUDIO_PROVIDERS):
-        raise ValidationError("eaAudiobookJobReceiptPath: audio provider must be Inkfluence or Unmixr")
+    if not PROVIDER_REGISTRY.audio_provider_allowed(provider):
+        raise ValidationError("eaAudiobookJobReceiptPath: audio provider is not in the configured Origin premium audio provider registry")
     if assembly.get("output_file_ready") is not True:
         raise ValidationError("eaAudiobookJobReceiptPath: assembled audiobook is not ready")
     if audiobook_hash not in {_string(assembly.get("output_file_sha256")), _string(imported.get("target_file_sha256"))}:
@@ -397,6 +403,22 @@ def _validate_m4b_provider_import_receipt(
         raise ValidationError("eaM4bProviderImportReceiptPath: provider credential/token exposure flag is not false")
     if not _contains_token(receipt, "provider_m4b_verified") or not _contains_token(receipt, "m4b_cover_embedded"):
         raise ValidationError("eaM4bProviderImportReceiptPath: provider M4B/cover verification tokens missing")
+
+
+def _validate_dossier_audiobookshelf_import_receipt(path: Path, *, ebook_hash: str, share_url: str) -> None:
+    receipt = _validate_receipt(
+        path=path,
+        label="ebookAudiobookshelfImportReceiptPath",
+        operation="audiobookshelf_dossier_import",
+        provider_token="Audiobookshelf",
+        artifact_hashes=(ebook_hash,),
+        required_tokens=(share_url,),
+        external=True,
+    )
+    if _string(receipt.get("audiobookshelfDossierShareUrl")) != share_url:
+        raise ValidationError("ebookAudiobookshelfImportReceiptPath: dossier share URL does not match manifest")
+    if not _trusted_audiobookshelf_share_url(share_url):
+        raise ValidationError("ebookAudiobookshelfImportReceiptPath: dossier share URL is not trusted")
 
 
 def _validate_live_delivery_receipt(
@@ -506,12 +528,24 @@ def _materialize_normalized_receipts(
         "provider": "EA Telegram",
         "status": "delivered",
         "deliveredAtUtc": generated_at,
+        "linkBundleSha256": {
+            "open_in_chummer": hashlib.sha256(_owner_path(project_id).encode("utf-8")).hexdigest(),
+            "read": hashlib.sha256(_owner_path(project_id, "read").encode("utf-8")).hexdigest(),
+            "listen": hashlib.sha256(_owner_path(project_id, "listen").encode("utf-8")).hexdigest(),
+            "watch": hashlib.sha256(_owner_path(project_id, "video").encode("utf-8")).hexdigest(),
+            "origin_namespace": hashlib.sha256(origin_namespace.encode("utf-8")).hexdigest(),
+        },
         "deliveredLinks": [
             _owner_path(project_id),
             _owner_path(project_id, "read"),
             _owner_path(project_id, "listen"),
-            _owner_path(project_id, "watch"),
+            _owner_path(project_id, "video"),
+            hashlib.sha256(_owner_path(project_id).encode("utf-8")).hexdigest(),
+            hashlib.sha256(_owner_path(project_id, "read").encode("utf-8")).hexdigest(),
+            hashlib.sha256(_owner_path(project_id, "listen").encode("utf-8")).hexdigest(),
+            hashlib.sha256(_owner_path(project_id, "video").encode("utf-8")).hexdigest(),
             origin_namespace,
+            hashlib.sha256(origin_namespace.encode("utf-8")).hexdigest(),
             dossier_share_url,
             audiobook_share_url,
             LIVE_TOKEN,
@@ -530,8 +564,9 @@ def _materialize_normalized_receipts(
     return audiobook_receipt_path, telegram_receipt_path
 
 
-def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[str, Any]:
+def materialize(manifest_path: Path, output_path: Path | None = None, *, base_url_override: str | None = None) -> dict[str, Any]:
     manifest = _read_json(manifest_path)
+    manifest_dir = manifest_path.resolve().parent
     _reject_fake_markers(manifest, "manifest")
     project_id = _string(manifest.get("projectId"))
     if not project_id:
@@ -552,57 +587,81 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         raise ValidationError("originEditionNamespace is required")
     if not origin_namespace.lower().startswith("origin.chummer.run/"):
         raise ValidationError("originEditionNamespace must start with origin.chummer.run/")
+    base_url = _string(base_url_override) or _string(manifest.get("baseUrl") or manifest.get("chummerBaseUrl") or manifest.get("originEditionBaseUrl"))
+    if not base_url:
+        raise ValidationError("baseUrl, chummerBaseUrl, or originEditionBaseUrl is required")
     context = OriginEditionContext.from_env(
         project_id=project_id,
         family_name=family_name,
         given_name=given_name,
         runner_name=runner_name,
         namespace=origin_namespace,
-        base_url=_string(manifest.get("baseUrl") or manifest.get("chummerBaseUrl") or manifest.get("originEditionBaseUrl")),
+        base_url=base_url,
+        require_explicit=True,
     )
     base_url = context.base_url
 
-    source_packet = _require_file(manifest.get("sourcePacketPath"), "sourcePacketPath")
-    source_receipt = _require_file(manifest.get("sourcePacketReceiptPath"), "sourcePacketReceiptPath")
-    provider_manuscript = _require_file(manifest.get("providerManuscriptPath"), "providerManuscriptPath")
-    provider_receipt = _require_file(manifest.get("providerManuscriptReceiptPath"), "providerManuscriptReceiptPath")
-    humanizer_receipt = _require_file(manifest.get("humanizerReceiptPath"), "humanizerReceiptPath")
-    humanizer_quality_receipt = _require_file(
+    source_packet = _require_file_relative_to(manifest.get("sourcePacketPath"), "sourcePacketPath", manifest_dir)
+    source_receipt = _require_file_relative_to(manifest.get("sourcePacketReceiptPath"), "sourcePacketReceiptPath", manifest_dir)
+    provider_manuscript = _require_file_relative_to(manifest.get("providerManuscriptPath"), "providerManuscriptPath", manifest_dir)
+    provider_receipt = _require_file_relative_to(manifest.get("providerManuscriptReceiptPath"), "providerManuscriptReceiptPath", manifest_dir)
+    humanizer_receipt = _require_file_relative_to(manifest.get("humanizerReceiptPath"), "humanizerReceiptPath", manifest_dir)
+    humanizer_quality_receipt = _require_file_relative_to(
         manifest.get("humanizerQualityReceiptPath"),
         "humanizerQualityReceiptPath",
+        manifest_dir,
     )
-    canon_receipt = _require_file(manifest.get("canonAuditReceiptPath"), "canonAuditReceiptPath")
-    book_artifact = _require_file(manifest.get("bookArtifactPath"), "bookArtifactPath")
-    book_receipt = _require_file(manifest.get("bookArtifactReceiptPath"), "bookArtifactReceiptPath")
-    cover_artifact = _require_file(manifest.get("storySceneCoverPath"), "storySceneCoverPath")
-    cover_receipt = _require_file(manifest.get("storySceneCoverReceiptPath"), "storySceneCoverReceiptPath")
-    audiobook_artifact = _require_file(manifest.get("audiobookPath"), "audiobookPath")
-    video_artifact = _require_file(manifest.get("dossierVideoPath"), "dossierVideoPath")
-    video_receipt = _require_file(manifest.get("dossierVideoReceiptPath"), "dossierVideoReceiptPath")
-    final_no_fallback_receipt = _require_file(
+    canon_receipt = _require_file_relative_to(manifest.get("canonAuditReceiptPath"), "canonAuditReceiptPath", manifest_dir)
+    book_artifact = _require_file_relative_to(manifest.get("bookArtifactPath"), "bookArtifactPath", manifest_dir)
+    book_receipt = _require_file_relative_to(manifest.get("bookArtifactReceiptPath"), "bookArtifactReceiptPath", manifest_dir)
+    ebook_artifact = _require_file_relative_to(manifest.get("ebookArtifactPath") or manifest.get("bookArtifactPath"), "ebookArtifactPath", manifest_dir)
+    ebook_dossier_receipt = _require_file_relative_to(
+        manifest.get("ebookAudiobookshelfImportReceiptPath")
+        or f"{origin_namespace}/dossier/audiobookshelf-dossier-import.receipt.json",
+        "ebookAudiobookshelfImportReceiptPath",
+        manifest_dir,
+    )
+    cover_artifact = _require_file_relative_to(manifest.get("storySceneCoverPath"), "storySceneCoverPath", manifest_dir)
+    cover_receipt = _require_file_relative_to(manifest.get("storySceneCoverReceiptPath"), "storySceneCoverReceiptPath", manifest_dir)
+    audiobook_artifact = _require_file_relative_to(manifest.get("audiobookPath"), "audiobookPath", manifest_dir)
+    video_artifact = _require_file_relative_to(manifest.get("dossierVideoPath"), "dossierVideoPath", manifest_dir)
+    movie_poster_artifact = _require_file_relative_to(
+        manifest.get("moviePosterPath")
+        or manifest.get("dossierVideoPosterPath")
+        or f"{origin_namespace}/movie/poster.jpg",
+        "moviePosterPath",
+        manifest_dir,
+    )
+    video_receipt = _require_file_relative_to(manifest.get("dossierVideoReceiptPath"), "dossierVideoReceiptPath", manifest_dir)
+    final_no_fallback_receipt = _require_file_relative_to(
         manifest.get(
             "finalNoFallbackNoSentinelAuditReceiptPath",
             f"{origin_namespace}/final-no-fallback-no-sentinel-audit.receipt.json",
         ),
         "finalNoFallbackNoSentinelAuditReceiptPath",
+        manifest_dir,
     )
-    ea_job_receipt = _require_file(manifest.get("eaAudiobookJobReceiptPath"), "eaAudiobookJobReceiptPath")
-    ea_m4b_provider_receipt = _require_file(
+    ea_job_receipt = _require_file_relative_to(manifest.get("eaAudiobookJobReceiptPath"), "eaAudiobookJobReceiptPath", manifest_dir)
+    ea_m4b_provider_receipt = _require_file_relative_to(
         manifest.get("eaM4bProviderImportReceiptPath"),
         "eaM4bProviderImportReceiptPath",
+        manifest_dir,
     )
-    ea_live_delivery_receipt = _require_file(
+    ea_live_delivery_receipt = _require_file_relative_to(
         manifest.get("eaTelegramLiveDeliveryReceiptPath"),
         "eaTelegramLiveDeliveryReceiptPath",
+        manifest_dir,
     )
 
     source_hash = _sha256_file(source_packet)
     manuscript_hash = _sha256_file(provider_manuscript)
     accepted_manuscript_hash = _accepted_humanized_manuscript_hash(humanizer_receipt, manuscript_hash)
     book_hash = _sha256_file(book_artifact)
+    ebook_hash = _sha256_file(ebook_artifact)
     cover_hash = _sha256_file(cover_artifact)
     audiobook_hash = _sha256_file(audiobook_artifact)
     video_hash = _sha256_file(video_artifact)
+    movie_poster_hash = _sha256_file(movie_poster_artifact)
 
     _validate_receipt(
         path=source_receipt,
@@ -638,7 +697,14 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         artifact_hashes=(book_hash,),
         external=True,
     )
+    _validate_dossier_audiobookshelf_import_receipt(
+        ebook_dossier_receipt,
+        ebook_hash=ebook_hash,
+        share_url=dossier_share_url,
+    )
     _validate_cover_receipt(cover_receipt, cover_hash, project_id, accepted_manuscript_hash)
+    if movie_poster_hash != cover_hash:
+        raise ValidationError("moviePosterPath: movie poster must match the selected story-scene cover hash")
     _validate_receipt(
         path=video_receipt,
         label="dossierVideoReceiptPath",
@@ -679,6 +745,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
     owner_url = origin_owner_url(base_url, project_id)
     import_request = {
         "projectId": project_id,
+        "baseUrl": base_url,
         "title": _string(manifest.get("title")) or "Origin Dossier",
         "runnerAlias": _string(manifest.get("runnerAlias")) or "Runner",
         "familyName": family_name,
@@ -708,12 +775,16 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
         "humanizerQualityReceiptPath": str(humanizer_quality_receipt),
         "bookArtifactPath": str(book_artifact),
         "bookArtifactReceiptPath": str(book_receipt),
+        "ebookArtifactPath": str(ebook_artifact),
+        "ebookAudiobookshelfImportReceiptPath": str(ebook_dossier_receipt),
         "storySceneCoverPath": str(cover_artifact),
         "storySceneCoverReceiptPath": str(cover_receipt),
         "audiobookPath": str(audiobook_artifact),
         "m4bProviderImportReceiptPath": str(ea_m4b_provider_receipt),
         "audiobookshelfImportReceiptPath": str(audiobook_receipt),
         "dossierVideoPath": str(video_artifact),
+        "moviePosterPath": str(movie_poster_artifact),
+        "dossierVideoPosterPath": str(movie_poster_artifact),
         "dossierVideoReceiptPath": str(video_receipt),
         "telegramShareDeliveryReceiptPath": str(telegram_receipt),
         "finalNoFallbackNoSentinelAuditReceiptPath": str(final_no_fallback_receipt),
@@ -737,9 +808,12 @@ def materialize(manifest_path: Path, output_path: Path | None = None) -> dict[st
             "acceptedHumanizedManuscriptSha256": accepted_manuscript_hash,
             "humanizerQualityReceiptSha256": _sha256_file(humanizer_quality_receipt),
             "bookArtifactSha256": book_hash,
+            "ebookArtifactSha256": ebook_hash,
+            "ebookAudiobookshelfImportReceiptSha256": _sha256_file(ebook_dossier_receipt),
             "storySceneCoverSha256": cover_hash,
             "audiobookSha256": audiobook_hash,
             "dossierVideoSha256": video_hash,
+            "moviePosterSha256": movie_poster_hash,
             "eaAudiobookJobReceiptSha256": _sha256_file(ea_job_receipt),
             "eaM4bProviderImportReceiptSha256": _sha256_file(ea_m4b_provider_receipt),
             "eaTelegramLiveDeliveryReceiptSha256": _sha256_file(ea_live_delivery_receipt),
@@ -756,10 +830,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Materialize a Chummer Origin Dossier live artifact import request.")
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--output", "--out", dest="output", type=Path)
+    parser.add_argument("--base-url", help="Explicit Chummer public base URL when the manifest intentionally omits it.")
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
     try:
-        result = materialize(args.manifest, args.output)
+        result = materialize(args.manifest, args.output, base_url_override=args.base_url)
     except ValidationError as exc:
         print(json.dumps({"contractName": CONTRACT_NAME, "status": "failed", "error": str(exc)}, sort_keys=True))
         return 1

@@ -88,6 +88,35 @@ def test_verifier_accepts_gold_coverage_when_require_gold(tmp_path: Path) -> Non
     assert issues == []
 
 
+def test_verifier_rejects_pass_coverage_without_completion_claim(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "coverage.json"
+    payload = coverage_payload(ready=True)
+    payload["goalCompletionClaimAllowed"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path)
+
+    assert ok is False
+    assert "pass_coverage_goal_completion_not_allowed" in issues
+
+
+def test_verifier_rejects_pass_coverage_with_blocked_rollups(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "coverage.json"
+    payload = coverage_payload(ready=True)
+    payload["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    payload["progress"]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    write_json(path, payload)
+
+    ok, issues = module.verify(path)
+
+    assert ok is False
+    assert "blocked_requirement_mismatch:['deployed_owner_read_listen_watch_canon']:[]" in issues
+    assert "pass_coverage_has_blocked_requirements" in issues
+    assert "pass_coverage_has_progress_blocked_requirements" in issues
+
+
 def test_verifier_rejects_unexpected_blocked_requirement(tmp_path: Path) -> None:
     module = load_module()
     path = tmp_path / "coverage.json"

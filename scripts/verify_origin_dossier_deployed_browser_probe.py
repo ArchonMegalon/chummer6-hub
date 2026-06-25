@@ -16,10 +16,16 @@ from origin_edition_provider_config import origin_owner_url
 CONTRACT_NAME = "chummer.origin_edition.deployed_browser_probe.v1"
 REQUIRED_PASS_FLAGS = (
     "logged_in_browser_verified",
+    "selected_face_cover_marker_visible",
+    "selected_face_cover_alt_visible",
+    "selected_face_cover_route_visible",
     "selected_face_cover_visible",
     "read_tab_visible",
+    "read_section_visible",
     "listen_tab_visible",
+    "listen_section_visible",
     "watch_tab_visible",
+    "watch_section_visible",
     "canon_audit_tab_visible",
     "canon_audit_section_visible",
     "chummer_canon_owner_visible",
@@ -62,6 +68,9 @@ PRIVATE_ROUTE_FLAGS = (
 )
 FORBIDDEN_VALUE_MARKERS = (
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
+    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN=",
+    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER=",
+    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER=",
     "Bearer ",
     "Cookie:",
     "secret-token",
@@ -90,6 +99,11 @@ def read_json(path: Path) -> dict[str, Any]:
 def sha256_text(value: object) -> str:
     text = str(value or "").strip()
     return hashlib.sha256(text.encode("utf-8")).hexdigest() if text else ""
+
+
+def valid_sha256(value: object) -> bool:
+    text = str(value or "")
+    return len(text) == 64 and all(char in "0123456789abcdef" for char in text.lower())
 
 
 def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
@@ -155,7 +169,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     if owner_auth.get("tokenValueStoredInReceipt") is not False:
         issues.append("owner_auth_token_value_stored")
     mode = owner_auth.get("mode")
-    if mode not in {"cookie", "bearer"}:
+    if mode not in {"cookie", "bearer", "cookie_header", "authorization_header"}:
         issues.append(f"unexpected_owner_auth_mode:{mode}")
     if mode == "cookie" and not str(owner_auth.get("cookieName") or "").strip():
         issues.append("cookie_auth_missing_cookie_name")
@@ -182,8 +196,8 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     else:
         if "owner_playback_e2e_verified" not in blockers:
             issues.append("blocked_probe_missing_owner_playback_blocker")
-        if "missing_deployed_identity_token" in blockers and owner_auth.get("tokenSha256"):
-            issues.append("missing_token_blocker_with_token_hash")
+        if "missing_deployed_owner_session" in blockers and owner_auth.get("tokenSha256"):
+            issues.append("missing_owner_session_blocker_with_token_hash")
 
     url_hashes = payload.get("url_hashes") if isinstance(payload.get("url_hashes"), dict) else {}
     for key in ("owner", "read", "book", "listen", "watch", "cover", "audiobookshelf_redirect", "audiobookshelf_dossier_redirect"):
@@ -229,6 +243,88 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
         if raw_value and sha256_text(raw_value) != url_hashes.get(key):
             issues.append(f"raw_share_hash_mismatch:{field}")
 
+    response_hashes = payload.get("response_sha256") if isinstance(payload.get("response_sha256"), dict) else {}
+    expected_hashes = payload.get("expected_import_sha256") if isinstance(payload.get("expected_import_sha256"), dict) else {}
+    redirect_hashes = payload.get("redirect_location_sha256") if isinstance(payload.get("redirect_location_sha256"), dict) else {}
+    expected_redirect_hashes = payload.get("expected_redirect_location_sha256") if isinstance(payload.get("expected_redirect_location_sha256"), dict) else {}
+    response_body_sizes = payload.get("response_body_sizes") if isinstance(payload.get("response_body_sizes"), dict) else {}
+    http_statuses = payload.get("http_statuses") if isinstance(payload.get("http_statuses"), dict) else {}
+    redirect_gate_flags = {
+        "read": "read_gate_verified",
+        "listen": "chummer_run_listen_gate_verified",
+    }
+    for route, flag in redirect_gate_flags.items():
+        status_code = http_statuses.get(route)
+        actual_hash = str(redirect_hashes.get(route) or "")
+        expected_hash = str(expected_redirect_hashes.get(route) or "")
+        gate_claimed = payload.get(flag) is True
+        if (passed or gate_claimed) and not valid_sha256(actual_hash):
+            issues.append(f"redirect_location_sha_invalid:{route}")
+        if not valid_sha256(expected_hash):
+            issues.append(f"expected_redirect_location_sha_invalid:{route}")
+        if gate_claimed and status_code not in {302, 303, 307, 308}:
+            issues.append(f"redirect_gate_flag_not_backed_by_status:{route}")
+        if gate_claimed and actual_hash != expected_hash:
+            issues.append(f"redirect_gate_flag_not_backed_by_location:{route}")
+        if passed and actual_hash != expected_hash:
+            issues.append(f"pass_probe_redirect_location_mismatch:{route}")
+    nonempty_artifact_flags = {
+        "cover": "cover_artifact_nonempty",
+        "book": "book_artifact_nonempty",
+        "watch": "watch_artifact_nonempty",
+    }
+    for artifact, flag in nonempty_artifact_flags.items():
+        size = response_body_sizes.get(artifact)
+        if payload.get(flag) is True and (not isinstance(size, int) or size <= 0):
+            issues.append(f"nonempty_flag_not_backed_by_body_size:{artifact}")
+        if passed and (not isinstance(size, int) or size <= 0):
+            issues.append(f"pass_probe_empty_response_body:{artifact}")
+    share_flags = {
+        "audiobook_share": "audiobook_share_reachable",
+        "dossier_share": "dossier_share_reachable",
+    }
+    for share, flag in share_flags.items():
+        status_code = http_statuses.get(share)
+        size = response_body_sizes.get(share)
+        if payload.get(flag) is True and status_code != 200:
+            issues.append(f"share_reachable_flag_not_backed_by_status:{share}")
+        if payload.get(flag) is True and (not isinstance(size, int) or size <= 0):
+            issues.append(f"share_reachable_flag_not_backed_by_body_size:{share}")
+        if passed and status_code != 200:
+            issues.append(f"pass_probe_share_status_not_200:{share}")
+        if passed and (not isinstance(size, int) or size <= 0):
+            issues.append(f"pass_probe_share_body_empty:{share}")
+    route_status_expectations = {
+        "cover": ("cover_route_verified", 200),
+        "book": ("book_route_verified", 200),
+        "watch": ("watch_gate_verified", 200),
+    }
+    for route, (flag, expected_status) in route_status_expectations.items():
+        status_key = "watch" if route == "watch" else route
+        status_code = http_statuses.get(status_key)
+        if payload.get(flag) is True and status_code != expected_status:
+            issues.append(f"route_flag_not_backed_by_status:{route}")
+    artifact_hash_fields = {
+        "cover": "cover_sha_matches_import",
+        "book": "book_sha_matches_import",
+        "watch": "video_sha_matches_import",
+    }
+    for artifact, flag in artifact_hash_fields.items():
+        expected_hash = str(expected_hashes.get(artifact) or "")
+        response_hash = str(response_hashes.get(artifact) or "")
+        if not valid_sha256(expected_hash):
+            issues.append(f"expected_import_sha_invalid:{artifact}")
+        if response_hash and not valid_sha256(response_hash):
+            issues.append(f"response_sha_invalid:{artifact}")
+        declared_match = payload.get(flag) is True
+        actual_match = bool(response_hash) and response_hash == expected_hash
+        if declared_match and not actual_match:
+            issues.append(f"artifact_hash_match_flag_not_backed:{artifact}")
+        if actual_match and not declared_match:
+            issues.append(f"artifact_hashes_match_but_flag_false:{artifact}")
+        if passed and not actual_match:
+            issues.append(f"pass_probe_artifact_hash_mismatch:{artifact}")
+
     return not issues, issues
 
 
@@ -237,7 +333,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--probe",
         type=Path,
-        default=deployed_browser_probe_from_env(),
     )
     parser.add_argument("--require-pass", action="store_true")
     return parser.parse_args()
@@ -245,7 +340,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    ok, issues = verify(args.probe, require_pass=args.require_pass)
+    probe = args.probe or deployed_browser_probe_from_env()
+    ok, issues = verify(probe, require_pass=args.require_pass)
     if not ok:
         for issue in issues:
             print(issue, file=sys.stderr)

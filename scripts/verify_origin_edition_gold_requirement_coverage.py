@@ -129,6 +129,17 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
 
     if blocked_requirements != computed_blocked:
         issues.append(f"blocked_requirement_mismatch:{blocked_requirements}:{computed_blocked}")
+    progress_blocked_requirements = progress.get("blockedRequirements") if isinstance(progress.get("blockedRequirements"), list) else []
+    progress_blocked_requirements = [str(item) for item in progress_blocked_requirements]
+    if progress_blocked_requirements != blocked_requirements:
+        issues.append(f"progress_blocked_requirement_mismatch:{progress_blocked_requirements}:{blocked_requirements}")
+    if coverage_status == "pass":
+        if payload.get("goalCompletionClaimAllowed") is not True:
+            issues.append("pass_coverage_goal_completion_not_allowed")
+        if blocked_requirements:
+            issues.append("pass_coverage_has_blocked_requirements")
+        if progress_blocked_requirements:
+            issues.append("pass_coverage_has_progress_blocked_requirements")
 
     if require_gold:
         if coverage_status != "pass":
@@ -159,7 +170,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--coverage",
         type=Path,
-        default=gold_requirement_coverage_from_env(),
     )
     parser.add_argument("--require-gold", action="store_true")
     return parser.parse_args()
@@ -167,7 +177,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    ok, issues = verify(args.coverage, require_gold=args.require_gold)
+    coverage = args.coverage or gold_requirement_coverage_from_env()
+    ok, issues = verify(coverage, require_gold=args.require_gold)
     if not ok:
         for issue in issues:
             print(issue, file=sys.stderr)

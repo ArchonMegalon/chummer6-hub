@@ -31,7 +31,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("minimal-hero", view, StringComparison.Ordinal);
         Assert.Contains("minimal-hero__visual--screenshot", view, StringComparison.Ordinal);
         Assert.Contains("/media/product/chummer-desktop-runner.png", view, StringComparison.Ordinal);
-        Assert.Contains("/media/promo/chummer6-flagship-promo.mp4", view, StringComparison.Ordinal);
+        Assert.Contains("/media/promo/every-wonder-horizon-promo.mp4", view, StringComparison.Ordinal);
         Assert.Contains("A Shadowrun character manager for clean sheets and faster tables.", view, StringComparison.Ordinal);
         Assert.Contains("@publicPlatformSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows and Linux.", view, StringComparison.Ordinal);
@@ -187,7 +187,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("What is moving next.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current work, public requests, and shipped changes.", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Maintenance first.", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Participate", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Current work", roadmapView, StringComparison.Ordinal);
@@ -1011,8 +1011,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
-        Assert.Contains("Claiming only connects this copy to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("Use the same copy. Add recovery and support history.", controller, StringComparison.Ordinal);
+        Assert.Contains("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Claim your copy\"", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Open Chummer\"", controller, StringComparison.Ordinal);
         Assert.Contains("<h1 id=\"auth-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
@@ -1046,7 +1046,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Keep Chummer open while the browser connects this copy.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);

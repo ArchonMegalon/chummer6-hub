@@ -43,6 +43,7 @@ def seed_matrix(root: Path, *, deployed_pass: bool = False) -> None:
         {
             "contractName": "chummer.origin_edition.gold_completion_matrix.v1",
             "status": "pass" if deployed_pass else "blocked",
+            "goalCompletionClaimAllowed": deployed_pass,
             "hardGates": hard_gates,
             "rows": rows,
         },
@@ -92,6 +93,26 @@ def test_requirement_coverage_passes_when_all_matrix_rows_and_hard_gates_pass(tm
     assert result["blockedRequirements"] == []
 
 
+def test_requirement_coverage_does_not_depend_on_stale_previous_proof_chain_claim(tmp_path: Path) -> None:
+    module = load_module()
+    seed_matrix(tmp_path, deployed_pass=True)
+    write_json(
+        tmp_path / "ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json",
+        {
+            "contractName": "chummer.origin_edition.gold_proof_chain.v1",
+            "status": "blocked",
+            "goalCompletionClaimAllowed": False,
+            "next_action": "stale previous blocker",
+        },
+    )
+
+    result = module.materialize(tmp_path, tmp_path / "coverage.json")
+
+    assert result["status"] == "pass"
+    assert result["goalCompletionClaimAllowed"] is True
+    assert result["blockedRequirements"] == []
+
+
 def test_requirement_coverage_blocks_missing_required_receipt_row(tmp_path: Path) -> None:
     module = load_module()
     seed_matrix(tmp_path, deployed_pass=True)
@@ -106,3 +127,14 @@ def test_requirement_coverage_blocks_missing_required_receipt_row(tmp_path: Path
     assert result["status"] == "blocked"
     assert "m4b_premium_audiobook_packaging" in result["blockedRequirements"]
     assert audiobook["missingRows"] == ["m4b_premium_narration_import_verified"]
+
+
+def test_requirement_coverage_uses_configured_provider_language_for_m4b_audio(tmp_path: Path) -> None:
+    module = load_module()
+    seed_matrix(tmp_path, deployed_pass=True)
+
+    result = module.materialize(tmp_path, tmp_path / "coverage.json")
+    audiobook = next(item for item in result["requirements"] if item["id"] == "m4b_premium_audiobook_packaging")
+
+    assert "configured verified premium narration provider" in audiobook["label"]
+    assert "Inkfluence or Unmixr" not in audiobook["label"]

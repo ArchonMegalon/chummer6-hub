@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_edition_runsite_integration_proof.py"
@@ -10,11 +13,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_module():
+    seed_origin_context_env()
     spec = importlib.util.spec_from_file_location("origin_edition_runsite_integration_proof", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def seed_origin_context_env() -> None:
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_PROJECT_ID", "varga-mira-kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Varga")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Mira")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
 
 
 def write_json(path: Path, payload: dict) -> Path:
@@ -27,6 +39,26 @@ def write_text(path: Path, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def clear_origin_context_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_runsite_proof_without_explicit_context_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    clear_origin_context_env(monkeypatch)
+
+    with pytest.raises(ValueError, match="explicit Origin Edition context required"):
+        module.materialize(REPO_ROOT, tmp_path, tmp_path, tmp_path / "runsite.json")
 
 
 def seed_ea_inventory(root: Path) -> Path:
@@ -45,6 +77,7 @@ def seed_ea_inventory(root: Path) -> Path:
             "EA_CREZLO_LOGIN_EMAIL=operator@example.test",
             "PANO2VR_LICENSE_KEY=redacted-test-key",
             "UNMIXR_API_KEY=redacted-test-key",
+            "UNMIXR_VOICE_ID=voice-test",
             "YOUBOOKS_ACCOUNT_EMAILS=one@example.test,two@example.test",
             "",
         ]
@@ -145,7 +178,47 @@ def test_runsite_integration_proof_uses_origin_edition_context_namespace(tmp_pat
     assert result["deployedOperatorHandoff"]["path"] == f"{namespace}/deployed-operator-handoff.receipt.json"
 
 
-def test_runsite_integration_proof_blocks_missing_ea_inventory_signal(tmp_path: Path) -> None:
+def test_origin_gold_capabilities_allow_covered_audio_when_optional_provider_missing() -> None:
+    module = load_module()
+
+    capabilities = module.origin_gold_capability_signals(
+        {
+            "unmixr": False,
+            "inkfluence": True,
+            "firstBook": False,
+            "youbooks": False,
+            "crezloTours": False,
+            "pano2vr": False,
+        }
+    )
+
+    assert capabilities["provider_inventory_present"] is True
+    assert capabilities["manuscript_or_edition_provider_available"] is True
+    assert capabilities["premium_audio_provider_available"] is True
+    assert capabilities["optional_overflow_accounts_do_not_block"] is True
+
+
+def test_origin_gold_capabilities_block_when_audio_lane_missing() -> None:
+    module = load_module()
+
+    capabilities = module.origin_gold_capability_signals(
+        {
+            "unmixr": False,
+            "inkfluence": False,
+            "firstBook": True,
+            "youbooks": True,
+            "crezloTours": True,
+            "pano2vr": True,
+        }
+    )
+
+    assert capabilities["provider_inventory_present"] is True
+    assert capabilities["manuscript_or_edition_provider_available"] is True
+    assert capabilities["premium_audio_provider_available"] is False
+    assert capabilities["optional_overflow_accounts_do_not_block"] is True
+
+
+def test_runsite_integration_proof_reports_raw_provider_signals_separately_from_capabilities(tmp_path: Path) -> None:
     module = load_module()
     seed_evidence(tmp_path)
     ea_root = seed_ea_inventory(tmp_path / "ea")
@@ -163,6 +236,105 @@ def test_runsite_integration_proof_blocks_missing_ea_inventory_signal(tmp_path: 
 
     result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
 
-    assert result["status"] == "blocked"
-    assert "newest_ltd_and_env_inputs_inspected" in result["blockedChecks"]
     assert result["inventoryInspection"]["newestProviderInventorySignals"]["unmixr"] is False
+    assert "originGoldCapabilitySignals" in result["inventoryInspection"]
+
+
+def test_provider_inventory_detects_aliased_unmixr_account_pair(tmp_path: Path) -> None:
+    module = load_module()
+    ea_root = tmp_path / "ea"
+    local_env = tmp_path / "local.env"
+    write_text(ea_root / "LTDs.md", "| Unmixr AI | owned |\n")
+    write_text(
+        ea_root / ".env",
+        "\n".join(
+            [
+                "UNMIXR_ACCOUNT_TIBOR_API_KEY=redacted-test-key",
+                "UNMIXR_ACCOUNT_TIBOR_VOICE_ID=voice-test",
+                "",
+            ]
+        ),
+    )
+    write_text(local_env, "")
+
+    signals = module.provider_inventory_signals(
+        (ea_root / "LTDs.md").read_text(encoding="utf-8"),
+        ea_root / ".env",
+        (ea_root / ".env").read_text(encoding="utf-8"),
+        local_env,
+    )
+
+    assert signals["unmixr"] is True
+    assert module.origin_gold_capability_signals(signals)["premium_audio_provider_available"] is True
+
+
+def test_provider_inventory_rejects_incomplete_aliased_unmixr_account(tmp_path: Path) -> None:
+    module = load_module()
+    ea_root = tmp_path / "ea"
+    local_env = tmp_path / "local.env"
+    write_text(ea_root / "LTDs.md", "| Unmixr AI | owned |\n")
+    write_text(ea_root / ".env", "UNMIXR_ACCOUNT_TIBOR_API_KEY=redacted-test-key\n")
+    write_text(local_env, "")
+
+    signals = module.provider_inventory_signals(
+        (ea_root / "LTDs.md").read_text(encoding="utf-8"),
+        ea_root / ".env",
+        (ea_root / ".env").read_text(encoding="utf-8"),
+        local_env,
+    )
+
+    assert signals["unmixr"] is False
+    assert signals["unmixrApiConfigured"] is True
+    assert signals["configuredAudioProvider"] is False
+    assert module.origin_gold_capability_signals(signals)["premium_audio_provider_available"] is False
+
+
+def test_runsite_integration_proof_reports_unmixr_accounts_missing_voice_ids_without_leaking_values(tmp_path: Path) -> None:
+    module = load_module()
+    seed_evidence(tmp_path)
+    ea_root = tmp_path / "ea"
+    write_text(ea_root / "LTDs.md", "| Unmixr AI | owned |\n| Inkfluence | owned |\n")
+    write_text(
+        ea_root / ".env",
+        "\n".join(
+            [
+                "UNMIXR_ACCOUNT_NEW_ONE_API_KEY=secret-api-one",
+                "UNMIXR_ACCOUNT_NEW_ONE_VOICE_ID=",
+                "UNMIXR_ACCOUNT_READY_API_KEY=secret-api-ready",
+                "UNMIXR_ACCOUNT_READY_VOICE_ID=secret-voice-ready",
+                "CHUMMER_EA_INKFLUENCE_BASE_URL=https://inkfluence.example.invalid",
+                "",
+            ]
+        ),
+    )
+
+    result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
+
+    inventory = result["inventoryInspection"]
+    assert inventory["newestProviderInventorySignals"]["unmixr"] is True
+    assert inventory["newestProviderInventorySignals"]["unmixrApiConfigured"] is True
+    assert "ready" in inventory["unmixrVoiceReadyAccounts"]
+    assert "new_one" in inventory["unmixrAccountsMissingVoiceId"]
+    serialized = (tmp_path / "runsite-proof.json").read_text(encoding="utf-8")
+    assert "secret-api-one" not in serialized
+    assert "secret-api-ready" not in serialized
+    assert "secret-voice-ready" not in serialized
+
+
+def test_runsite_integration_proof_uses_configured_provider_tokens_for_capabilities(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "memoirforge")
+    monkeypatch.setenv("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "voiceforge")
+    module = load_module()
+    seed_evidence(tmp_path)
+    ea_root = tmp_path / "ea"
+    write_text(ea_root / "LTDs.md", "| MemoirForge | owned |\n| VoiceForge | owned |\n")
+    write_text(ea_root / ".env", "MEMOIRFORGE_ACCOUNT_EMAILS=one@example.test\nVOICEFORGE_API_KEY=redacted-test-key\n")
+
+    result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
+
+    signals = result["inventoryInspection"]["newestProviderInventorySignals"]
+    capabilities = result["inventoryInspection"]["originGoldCapabilitySignals"]
+    assert signals["configuredManuscriptProvider"] is True
+    assert signals["configuredAudioProvider"] is True
+    assert capabilities["manuscript_or_edition_provider_available"] is True
+    assert capabilities["premium_audio_provider_available"] is True

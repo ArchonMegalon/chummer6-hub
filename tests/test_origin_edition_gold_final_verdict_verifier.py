@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,6 +20,14 @@ def load_module():
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
@@ -70,6 +79,11 @@ def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
                 "- `rawSessionTokenExposed`: `false`",
                 "- `envValuesExposed`: `false`",
                 "- `deploymentPerformed`: `false`",
+                "## Source Artifacts",
+                f"- Proof chain: `{proof_chain.as_posix()}`",
+                f"- Proof chain SHA-256: `{sha256_file(proof_chain)}`",
+                f"- Requirement coverage: `{coverage.as_posix()}`",
+                f"- Requirement coverage SHA-256: `{sha256_file(coverage)}`",
             ]
         ),
         encoding="utf-8",
@@ -110,6 +124,30 @@ def test_verifier_rejects_ready_text_for_blocked_proof(tmp_path: Path) -> None:
     assert "contradictory_verdict_present:ORIGIN_EDITION_GOLD_READY" in issues
 
 
+def test_verifier_rejects_ready_text_when_proof_chain_has_stale_blocked_rollups(tmp_path: Path) -> None:
+    module = load_module()
+    verdict, proof_chain, coverage = seed(tmp_path, ready=True)
+    proof = json.loads(proof_chain.read_text(encoding="utf-8"))
+    proof["blockedStages"] = ["requirement_coverage"]
+    proof["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    write_json(proof_chain, proof)
+    lines = verdict.read_text(encoding="utf-8").splitlines()
+    lines = [
+        f"- Proof chain SHA-256: `{sha256_file(proof_chain)}`"
+        if line.startswith("- Proof chain SHA-256:")
+        else line
+        for line in lines
+    ]
+    verdict.write_text("\n".join(lines), encoding="utf-8")
+
+    ok, issues = module.verify(verdict, proof_chain, coverage)
+
+    assert ok is False
+    assert "verdict_text_mismatch:ORIGIN_EDITION_GOLD_BLOCKED" in issues
+    assert "contradictory_verdict_present:ORIGIN_EDITION_GOLD_READY" in issues
+    assert "blocked_requirement_missing:deployed_owner_read_listen_watch_canon" in issues
+
+
 def test_verifier_rejects_secret_marker_in_verdict(tmp_path: Path) -> None:
     module = load_module()
     verdict, proof_chain, coverage = seed(tmp_path, ready=False)
@@ -141,3 +179,18 @@ def test_verifier_rejects_missing_next_action_from_verdict(tmp_path: Path) -> No
 
     assert ok is False
     assert "next_action_missing" in issues
+
+
+def test_verifier_rejects_stale_source_artifact_hashes(tmp_path: Path) -> None:
+    module = load_module()
+    verdict, proof_chain, coverage = seed(tmp_path, ready=False)
+    text = verdict.read_text(encoding="utf-8")
+    text = text.replace(f"Proof chain SHA-256: `{sha256_file(proof_chain)}`", "Proof chain SHA-256: `" + "0" * 64 + "`")
+    text = text.replace(f"Requirement coverage SHA-256: `{sha256_file(coverage)}`", "Requirement coverage SHA-256: `" + "1" * 64 + "`")
+    verdict.write_text(text, encoding="utf-8")
+
+    ok, issues = module.verify(verdict, proof_chain, coverage)
+
+    assert ok is False
+    assert "proof_chain_sha_missing_or_stale" in issues
+    assert "requirement_coverage_sha_missing_or_stale" in issues

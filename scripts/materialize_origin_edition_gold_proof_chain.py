@@ -93,7 +93,7 @@ def run_chain(
     ea_root = ea_root.resolve()
     evidence_root = evidence_root.resolve()
     modules = modules or load_modules(repo_root)
-    context = context or OriginEditionContext.default()
+    context = context or OriginEditionContext.from_env(require_explicit=True)
     branch = context.branch(evidence_root)
 
     deployed_probe_path = branch / "deployed-chummer-browser-probe.receipt.json"
@@ -143,7 +143,12 @@ def run_chain(
             if str(requirement).strip()
         }
     )
-    passed = matrix.get("status") == "pass" and matrix.get("goalCompletionClaimAllowed") is True
+    passed = (
+        matrix.get("status") == "pass"
+        and matrix.get("goalCompletionClaimAllowed") is True
+        and coverage.get("status") == "pass"
+        and coverage.get("goalCompletionClaimAllowed") is True
+    )
     blocking_reason = "" if passed else ",".join(
         str(item)
         for item in [
@@ -231,6 +236,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     payload = run_chain(
         repo_root=args.repo_root,

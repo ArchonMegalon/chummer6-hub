@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_edition_gold_proof_chain.py"
 
 
 def load_module():
+    seed_origin_context_env()
     spec = importlib.util.spec_from_file_location("origin_edition_gold_proof_chain", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -17,13 +21,40 @@ def load_module():
     return module
 
 
+def seed_origin_context_env() -> None:
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_PROJECT_ID", "varga-mira-kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Varga")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Mira")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
+
+
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def fake_modules(calls: list[str], *, matrix_pass: bool, seen_contexts: dict[str, object] | None = None) -> SimpleNamespace:
+def clear_origin_context_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def fake_modules(
+    calls: list[str],
+    *,
+    matrix_pass: bool,
+    coverage_pass: bool | None = None,
+    seen_contexts: dict[str, object] | None = None,
+) -> SimpleNamespace:
     seen_contexts = seen_contexts if seen_contexts is not None else {}
+    coverage_pass = matrix_pass if coverage_pass is None else coverage_pass
 
     def deployed_probe(evidence_root, base_url, project_id, output, env_file, context=None):
         calls.append("deployed_probe")
@@ -67,9 +98,9 @@ def fake_modules(calls: list[str], *, matrix_pass: bool, seen_contexts: dict[str
     def coverage(evidence_root, output):
         calls.append("coverage")
         payload = {
-            "status": "pass" if matrix_pass else "blocked",
-            "goalCompletionClaimAllowed": matrix_pass,
-            "blockedRequirements": [] if matrix_pass else ["deployed_owner_read_listen_watch_canon"],
+            "status": "pass" if coverage_pass else "blocked",
+            "goalCompletionClaimAllowed": coverage_pass,
+            "blockedRequirements": [] if coverage_pass else ["deployed_owner_read_listen_watch_canon"],
         }
         write_json(output, payload)
         return payload
@@ -82,6 +113,21 @@ def fake_modules(calls: list[str], *, matrix_pass: bool, seen_contexts: dict[str
         matrix=SimpleNamespace(materialize=matrix),
         coverage=SimpleNamespace(materialize=coverage),
     )
+
+
+def test_run_chain_without_explicit_context_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    clear_origin_context_env(monkeypatch)
+
+    with pytest.raises(ValueError, match="explicit Origin Edition context required"):
+        module.run_chain(
+            repo_root=Path("."),
+            ea_root=tmp_path,
+            evidence_root=tmp_path,
+            env_file=None,
+            output=tmp_path / "proof.json",
+            modules=fake_modules([], matrix_pass=True),
+        )
 
 
 def test_gold_proof_chain_uses_origin_edition_context_for_branch_and_project(tmp_path: Path) -> None:
@@ -186,6 +232,44 @@ def test_gold_proof_chain_passes_only_when_completion_matrix_allows_claim(tmp_pa
     assert result["blockedRequirements"] == []
 
 
+def test_gold_proof_chain_blocks_when_matrix_passes_but_requirement_coverage_blocks(tmp_path: Path) -> None:
+    module = load_module()
+
+    result = module.run_chain(
+        repo_root=tmp_path,
+        ea_root=tmp_path,
+        evidence_root=tmp_path,
+        env_file=None,
+        output=tmp_path / "chain.json",
+        modules=fake_modules([], matrix_pass=True, coverage_pass=False),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["finalVerdict"] == "ORIGIN_EDITION_GOLD_BLOCKED"
+    assert result["goalCompletionClaimAllowed"] is False
+    assert result["blockedStages"] == ["requirement_coverage"]
+    assert result["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
+    assert result["blocking_reason"] == "stage:requirement_coverage,requirement:deployed_owner_read_listen_watch_canon"
+
+
+def test_gold_proof_chain_blocking_reason_lists_each_blocked_stage_once(tmp_path: Path) -> None:
+    module = load_module()
+
+    result = module.run_chain(
+        repo_root=tmp_path,
+        ea_root=tmp_path,
+        evidence_root=tmp_path,
+        env_file=None,
+        output=tmp_path / "chain.json",
+        modules=fake_modules([], matrix_pass=False),
+    )
+
+    parts = result["blocking_reason"].split(",")
+    stage_parts = [part for part in parts if part.startswith("stage:")]
+    assert stage_parts == ["stage:completion_matrix", "stage:requirement_coverage"]
+    assert len(stage_parts) == len(set(stage_parts))
+
+
 def test_main_can_materialize_honest_blocked_chain_without_claiming_gold(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
 
@@ -206,6 +290,16 @@ def test_main_can_materialize_honest_blocked_chain_without_claiming_gold(tmp_pat
             "materialize_origin_edition_gold_proof_chain.py",
             "--evidence-root",
             str(tmp_path),
+            "--project-id",
+            "varga-mira-kestrel",
+            "--family-name",
+            "Varga",
+            "--given-name",
+            "Mira",
+            "--runner-name",
+            "Kestrel",
+            "--base-url",
+            "https://chummer.run",
             "--allow-blocked",
         ],
     )
@@ -236,6 +330,16 @@ def test_main_without_allow_blocked_keeps_non_gold_exit_nonzero(tmp_path: Path, 
             "materialize_origin_edition_gold_proof_chain.py",
             "--evidence-root",
             str(tmp_path),
+            "--project-id",
+            "varga-mira-kestrel",
+            "--family-name",
+            "Varga",
+            "--given-name",
+            "Mira",
+            "--runner-name",
+            "Kestrel",
+            "--base-url",
+            "https://chummer.run",
         ],
     )
 

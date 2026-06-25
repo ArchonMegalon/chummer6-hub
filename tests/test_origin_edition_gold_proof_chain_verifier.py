@@ -140,6 +140,37 @@ def test_verifier_require_gold_rejects_pass_chain_with_stale_stage_blockers(tmp_
     assert "gold_stage_has_blocked_requirements:requirement_coverage" in issues
 
 
+def test_verifier_rejects_pass_chain_without_completion_claim_even_without_require_gold(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="pass")
+    payload["goalCompletionClaimAllowed"] = False
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "pass_chain_goal_completion_not_allowed" in issues
+
+
+def test_verifier_rejects_pass_chain_with_blocked_rollups_even_without_require_gold(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="pass")
+    payload["blockedStages"] = ["requirement_coverage"]
+    payload["progress"]["blockedStages"] = ["requirement_coverage"]
+    payload["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    payload["progress"]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    payload["stages"][5]["status"] = "blocked"
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "pass_chain_has_blocked_stages" in issues
+    assert "pass_chain_has_progress_blocked_stages" in issues
+    assert "pass_chain_has_blocked_requirements" in issues
+    assert "pass_chain_has_progress_blocked_requirements" in issues
+
+
 def test_verifier_require_gold_rejects_pass_chain_with_non_pass_stage(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="pass")

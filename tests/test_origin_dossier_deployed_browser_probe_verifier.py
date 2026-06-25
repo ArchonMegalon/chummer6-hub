@@ -29,12 +29,21 @@ def module_sha256(value: str) -> str:
 def probe_payload(*, status: str = "blocked") -> dict:
     passed = status == "pass"
     blockers = [] if passed else ["missing_deployed_identity_token", "owner_playback_e2e_verified"]
+    cover_sha = "b" * 64
+    book_sha = "c" * 64
+    video_sha = "d" * 64
     flags = {
         "logged_in_browser_verified": passed,
+        "selected_face_cover_marker_visible": passed,
+        "selected_face_cover_alt_visible": passed,
+        "selected_face_cover_route_visible": passed,
         "selected_face_cover_visible": passed,
         "read_tab_visible": passed,
+        "read_section_visible": passed,
         "listen_tab_visible": passed,
+        "listen_section_visible": passed,
         "watch_tab_visible": passed,
+        "watch_section_visible": passed,
         "canon_audit_tab_visible": passed,
         "canon_audit_section_visible": passed,
         "chummer_canon_owner_visible": passed,
@@ -112,6 +121,40 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "audiobookshelf_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/audio"),
             "audiobookshelf_dossier_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book"),
         },
+        "response_sha256": {
+            "cover": cover_sha if passed else "",
+            "book": book_sha if passed else "",
+            "watch": video_sha if passed else "",
+        },
+        "redirect_location_sha256": {
+            "read": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book") if passed else "",
+            "listen": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/audio") if passed else "",
+        },
+        "expected_redirect_location_sha256": {
+            "read": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book"),
+            "listen": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/audio"),
+        },
+        "response_body_sizes": {
+            "cover": 10 if passed else 0,
+            "book": 10 if passed else 0,
+            "watch": 10 if passed else 0,
+            "audiobook_share": 100 if passed else 0,
+            "dossier_share": 100 if passed else 0,
+        },
+        "http_statuses": {
+            "cover": 200 if passed else None,
+            "book": 200 if passed else None,
+            "watch": 200 if passed else None,
+            "read": 302 if passed else None,
+            "listen": 302 if passed else None,
+            "audiobook_share": 200 if passed else None,
+            "dossier_share": 200 if passed else None,
+        },
+        "expected_import_sha256": {
+            "cover": cover_sha,
+            "book": book_sha,
+            "watch": video_sha,
+        },
         **flags,
     }
 
@@ -172,12 +215,85 @@ def test_verifier_rejects_pass_probe_with_empty_owner_video_artifact(tmp_path: P
     path = tmp_path / "probe.json"
     payload = probe_payload(status="pass")
     payload["watch_artifact_nonempty"] = False
+    payload["response_body_sizes"]["watch"] = 0
     write_json(path, payload)
 
     ok, issues = module.verify(path, require_pass=True)
 
     assert ok is False
     assert "pass_flag_not_true:watch_artifact_nonempty" in issues
+    assert "pass_probe_empty_response_body:watch" in issues
+
+
+def test_verifier_rejects_nonempty_flag_without_response_body_size(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["response_body_sizes"]["book"] = 0
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "nonempty_flag_not_backed_by_body_size:book" in issues
+    assert "pass_probe_empty_response_body:book" in issues
+
+
+def test_verifier_rejects_share_reachable_flag_without_http_evidence(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["http_statuses"]["audiobook_share"] = 503
+    payload["response_body_sizes"]["audiobook_share"] = 0
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "share_reachable_flag_not_backed_by_status:audiobook_share" in issues
+    assert "share_reachable_flag_not_backed_by_body_size:audiobook_share" in issues
+    assert "pass_probe_share_status_not_200:audiobook_share" in issues
+    assert "pass_probe_share_body_empty:audiobook_share" in issues
+
+
+def test_verifier_rejects_route_flag_without_http_status(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["http_statuses"]["cover"] = 404
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "route_flag_not_backed_by_status:cover" in issues
+
+
+def test_verifier_rejects_read_gate_without_redirect_status(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["http_statuses"]["read"] = 200
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "redirect_gate_flag_not_backed_by_status:read" in issues
+
+
+def test_verifier_rejects_listen_gate_without_expected_redirect_location(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["redirect_location_sha256"]["listen"] = "0" * 64
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "redirect_gate_flag_not_backed_by_location:listen" in issues
+    assert "pass_probe_redirect_location_mismatch:listen" in issues
 
 
 def test_verifier_rejects_pass_probe_with_missing_canon_audit_content(tmp_path: Path) -> None:
@@ -204,6 +320,35 @@ def test_verifier_rejects_pass_probe_with_mismatched_video_hash(tmp_path: Path) 
 
     assert ok is False
     assert "pass_flag_not_true:video_sha_matches_import" in issues
+
+
+def test_verifier_rejects_hash_match_flag_not_backed_by_response_hash(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["response_sha256"]["watch"] = "0" * 64
+    payload["video_sha_matches_import"] = True
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "artifact_hash_match_flag_not_backed:watch" in issues
+    assert "pass_probe_artifact_hash_mismatch:watch" in issues
+
+
+def test_verifier_rejects_matching_hash_when_match_flag_false(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["book_sha_matches_import"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "artifact_hashes_match_but_flag_false:book" in issues
+    assert "pass_flag_not_true:book_sha_matches_import" in issues
 
 
 def test_verifier_rejects_missing_normalized_status_contract(tmp_path: Path) -> None:

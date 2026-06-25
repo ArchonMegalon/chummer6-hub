@@ -11,8 +11,8 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class OriginDossierPublicationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly IReadOnlyList<string> ApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
-    private static readonly IReadOnlyList<string> ApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
+    private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
+    private static readonly IReadOnlyList<string> DefaultApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
     private static readonly IReadOnlyList<string> DefaultTrustedAudiobookshelfHosts = ["audio.chummer.run", "audiobookshelf.chummer.run", "audiobookshelf.girschele.com"];
     private const string SelectedCharacterFaceProofToken = "selected_character_face";
     private const string ApprovedSourcePacketToken = "approved_source_packet";
@@ -388,6 +388,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
         AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry.AudiobookPath, entry.AudiobookshelfImportReceiptPath), "Audiobookshelf import receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.DossierVideoPath), "dossier video artifact path");
+        AddIfMissing(missing, HasArchivedArtifact(entry.MoviePosterPath), "movie poster artifact path");
         AddIfMissing(missing, HasArtifactReceipt(entry.DossierVideoPath, entry.DossierVideoReceiptPath, "dossier_video_import", null, ExternalProviderReceiptTokens()), "dossier video receipt path");
         AddIfMissing(missing, entry.TelegramShareDelivered, "Telegram share delivery");
         AddIfMissing(
@@ -421,7 +422,7 @@ public sealed class OriginDossierPublicationService
     private static bool IsChummerRunOwnerUrl(OriginDossierPublicationIndexEntry entry)
         => IsHttpUrl(entry.ChummerRunOwnerUrl)
             && Uri.TryCreate(entry.ChummerRunOwnerUrl, UriKind.Absolute, out Uri? uri)
-            && uri.Host.Contains("chummer.run", StringComparison.OrdinalIgnoreCase)
+            && IsTrustedChummerHost(uri)
             && string.Equals(uri.AbsolutePath, BuildOwnerPath(entry, null), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsChummerRunArtifactUrl(
@@ -430,19 +431,34 @@ public sealed class OriginDossierPublicationService
         string artifactKind)
         => IsHttpUrl(url)
             && Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
-            && uri.Host.Contains("chummer.run", StringComparison.OrdinalIgnoreCase)
+            && IsTrustedChummerHost(uri)
             && string.Equals(uri.AbsolutePath, BuildOwnerPath(entry, artifactKind), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsHttpUrl(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
-            && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
+            && ((string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                    && IsTrustedChummerHost(uri))
+                || (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                    && uri.IsLoopback));
+
+    private static bool IsTrustedChummerHost(Uri uri)
+    {
+        if (uri.IsLoopback)
+        {
+            return true;
+        }
+
+        string host = uri.Host.TrimEnd('.');
+        return string.Equals(host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".chummer.run", StringComparison.OrdinalIgnoreCase);
+    }
 
     private bool IsTrustedAudiobookshelfShareUrl(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
             && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
             && ResolveTrustedAudiobookshelfHosts().Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
-            && uri.AbsolutePath.Contains("/share/", StringComparison.OrdinalIgnoreCase);
+            && (uri.AbsolutePath.StartsWith("/share/", StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.StartsWith("/audiobookshelf/share/", StringComparison.OrdinalIgnoreCase));
 
     private IReadOnlySet<string> ResolveTrustedAudiobookshelfHosts()
     {
@@ -457,6 +473,25 @@ public sealed class OriginDossierPublicationService
             .Select(static host => host.Trim().ToLowerInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<string> ResolveApprovedProviderTokens(
+        string envKey,
+        string configKey,
+        IReadOnlyList<string> defaultTokens)
+    {
+        string? configured = _configuration[envKey] ?? _configuration[configKey];
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return defaultTokens;
+        }
+
+        string[] tokens = configured
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static token => !string.IsNullOrWhiteSpace(token))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return tokens.Length == 0 ? defaultTokens : tokens;
     }
 
     private static bool HasRealPath(string? path)
@@ -545,14 +580,14 @@ public sealed class OriginDossierPublicationService
         return HasReceiptFile(receiptPath, expectedOperation, expectedProviderToken, tokens);
     }
 
-    private static bool HasProviderManuscriptReceipt(string? artifactPath, string? receiptPath)
+    private bool HasProviderManuscriptReceipt(string? artifactPath, string? receiptPath)
     {
         if (!HasArtifactReceipt(artifactPath, receiptPath, "provider_manuscript_import", null, ExternalProviderReceiptTokens()))
         {
             return false;
         }
 
-        return ReceiptContainsAnyToken(receiptPath, ApprovedManuscriptProviderTokens);
+        return ReceiptProviderMatchesAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "OriginDossier:ManuscriptProviderTokens", DefaultApprovedManuscriptProviderTokens));
     }
 
     private static bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
@@ -585,14 +620,14 @@ public sealed class OriginDossierPublicationService
             ]);
     }
 
-    private static bool HasAudiobookshelfImportReceipt(string? audiobookPath, string? receiptPath)
+    private bool HasAudiobookshelfImportReceipt(string? audiobookPath, string? receiptPath)
     {
         if (!HasArtifactReceipt(audiobookPath, receiptPath, "audiobookshelf_import", "Audiobookshelf", ExternalProviderReceiptTokens()))
         {
             return false;
         }
 
-        return ReceiptContainsAnyToken(receiptPath, ApprovedAudiobookProviderTokens);
+        return ReceiptContainsAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "OriginDossier:AudioProviderTokens", DefaultApprovedAudiobookProviderTokens));
     }
 
     private static bool HasAudiobookshelfDossierImportReceipt(string? ebookPath, string? receiptPath)
@@ -790,7 +825,7 @@ public sealed class OriginDossierPublicationService
         string token = expectedProviderToken;
         return TryGetString(root, "provider", out string? provider)
             && provider is not null
-            && provider.Contains(token, StringComparison.OrdinalIgnoreCase);
+            && ContainsTokenWithBoundary(provider, token);
     }
 
     private static bool ReceiptHasVerifiedStatus(JsonElement root)
@@ -831,7 +866,83 @@ public sealed class OriginDossierPublicationService
     private static bool ReceiptContainsAnyToken(JsonElement element, IReadOnlyList<string> tokens)
         => tokens
             .Where(static token => !string.IsNullOrWhiteSpace(token))
-            .Any(token => ReceiptContainsToken(element, token));
+            .Any(token => ReceiptContainsProviderToken(element, token));
+
+    private static bool ReceiptProviderMatchesAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
+    {
+        if (!HasArchivedArtifact(receiptPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            return TryGetString(document.RootElement, "provider", out string? provider)
+                && provider is not null
+                && tokens
+                    .Where(static token => !string.IsNullOrWhiteSpace(token))
+                    .Any(token => ContainsTokenWithBoundary(provider, token));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ReceiptContainsProviderToken(JsonElement element, string token)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => ContainsTokenWithBoundary(element.GetString(), token),
+            JsonValueKind.Object => element.EnumerateObject().Any(property =>
+                ContainsTokenWithBoundary(property.Name, token)
+                || ReceiptContainsProviderToken(property.Value, token)),
+            JsonValueKind.Array => element.EnumerateArray().Any(item => ReceiptContainsProviderToken(item, token)),
+            _ => false
+        };
+    }
+
+    private static bool ContainsTokenWithBoundary(string? value, string token)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> haystack = value.AsSpan();
+        ReadOnlySpan<char> needle = token.AsSpan().Trim();
+        int start = 0;
+        while (start <= haystack.Length - needle.Length)
+        {
+            int index = haystack[start..].IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            int absoluteIndex = start + index;
+            int afterIndex = absoluteIndex + needle.Length;
+            bool beforeBoundary = absoluteIndex == 0 || !char.IsLetterOrDigit(haystack[absoluteIndex - 1]);
+            bool afterBoundary = afterIndex >= haystack.Length || !char.IsLetterOrDigit(haystack[afterIndex]);
+            if (beforeBoundary && afterBoundary)
+            {
+                return true;
+            }
+
+            start = absoluteIndex + 1;
+        }
+
+        return false;
+    }
 
     private static bool TryGetString(JsonElement root, string propertyName, out string? value)
     {
@@ -1025,7 +1136,12 @@ public sealed class OriginDossierPublicationService
             BuildOwnerPath(entry, "read"),
             BuildOwnerPath(entry, "listen"),
             BuildOwnerPath(entry, "watch"),
+            Sha256Text(BuildOwnerPath(entry, null)),
+            Sha256Text(BuildOwnerPath(entry, "read")),
+            Sha256Text(BuildOwnerPath(entry, "listen")),
+            Sha256Text(BuildOwnerPath(entry, "watch")),
             BuildOriginEditionNamespace(entry),
+            Sha256Text(BuildOriginEditionNamespace(entry)),
             OperatorVerifiedLiveRunToken,
             ProviderReceiptReferenceToken
         ];
@@ -1055,6 +1171,9 @@ public sealed class OriginDossierPublicationService
             ? path
             : $"{path}/{Uri.EscapeDataString(artifactKind.Trim().ToLowerInvariant())}";
     }
+
+    private static string Sha256Text(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private static bool HasOriginEditionNamespace(OriginDossierPublicationIndexEntry entry)
     {

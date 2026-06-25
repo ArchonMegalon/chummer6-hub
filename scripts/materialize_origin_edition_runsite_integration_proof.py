@@ -6,11 +6,13 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from origin_edition_context import OriginEditionContext
+from origin_edition_provider_registry import OriginProviderCapabilityRegistry
 
 
 CONTRACT_NAME = "chummer.origin_edition.runsite_integration_proof.v1"
@@ -40,14 +42,119 @@ def read_json(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def env_key_present(path: Path, key: str) -> bool:
+def env_assignments(path: Path) -> dict[str, str]:
     if not path.is_file():
-        return False
-    prefix = f"{key}="
+        return {}
+    assignments: dict[str, str] = {}
     for line in read_text(path).splitlines():
         stripped = line.strip()
-        if stripped.startswith(prefix):
-            return bool(stripped.split("=", 1)[1].strip())
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        if key:
+            assignments[key] = value.strip()
+    return assignments
+
+
+def env_key_present(path: Path, key: str) -> bool:
+    return bool(env_assignments(path).get(key, "").strip())
+
+
+def _compact(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def _key_matches_token(key: str, token: str) -> bool:
+    compact_key = _compact(key)
+    compact_token = _compact(token)
+    return bool(compact_token and compact_token in compact_key)
+
+
+def _has_nonempty_matching_env_key(assignments: dict[str, str], token: str) -> bool:
+    credential_markers = ("API_KEY", "TOKEN", "EMAIL", "USERNAME", "BASE_URL", "ACCOUNT_EMAILS")
+    return any(
+        value.strip()
+        and _key_matches_token(key, token)
+        and any(marker in key.upper() for marker in credential_markers)
+        for key, value in assignments.items()
+    )
+
+
+def _unmixr_account_available(*assignment_sets: dict[str, str]) -> bool:
+    return bool(_unmixr_voice_ready_aliases(*assignment_sets))
+
+
+def _unmixr_account_api_available(*assignment_sets: dict[str, str]) -> bool:
+    assignments = _merged_assignments(*assignment_sets)
+    if assignments.get("UNMIXR_API_KEY", "").strip():
+        return True
+    return any(
+        value.strip() and re.fullmatch(r"UNMIXR_ACCOUNT_.+_API_KEY", key)
+        for key, value in assignments.items()
+    )
+
+
+def _unmixr_voice_ready_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    assignments = _merged_assignments(*assignment_sets)
+    ready: list[str] = []
+    if assignments.get("UNMIXR_API_KEY", "").strip() and assignments.get("UNMIXR_VOICE_ID", "").strip():
+        ready.append("default")
+    for alias in _unmixr_account_aliases(assignments):
+        if (
+            assignments.get(f"UNMIXR_ACCOUNT_{alias}_API_KEY", "").strip()
+            and assignments.get(f"UNMIXR_ACCOUNT_{alias}_VOICE_ID", "").strip()
+        ):
+            ready.append(alias.lower())
+    return ready
+
+
+def _unmixr_voice_missing_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    assignments = _merged_assignments(*assignment_sets)
+    missing: list[str] = []
+    if assignments.get("UNMIXR_API_KEY", "").strip() and not assignments.get("UNMIXR_VOICE_ID", "").strip():
+        missing.append("default")
+    for alias in _unmixr_account_aliases(assignments):
+        if (
+            assignments.get(f"UNMIXR_ACCOUNT_{alias}_API_KEY", "").strip()
+            and not assignments.get(f"UNMIXR_ACCOUNT_{alias}_VOICE_ID", "").strip()
+        ):
+            missing.append(alias.lower())
+    return missing
+
+
+def _merged_assignments(*assignment_sets: dict[str, str]) -> dict[str, str]:
+    assignments: dict[str, str] = {}
+    for source in assignment_sets:
+        assignments.update(source)
+    return assignments
+
+
+def _unmixr_account_aliases(assignments: dict[str, str]) -> set[str]:
+    aliases: set[str] = set()
+    for key, value in assignments.items():
+        if not value.strip():
+            continue
+        match = re.fullmatch(r"UNMIXR_ACCOUNT_(.+)_API_KEY", key)
+        if match:
+            aliases.add(match.group(1))
+    return aliases
+
+
+def configured_provider_available(
+    inventory_text: str,
+    assignments: dict[str, str],
+    tokens: tuple[str, ...],
+    *,
+    strict_provider_tokens: tuple[str, ...] = (),
+) -> bool:
+    strict = {_compact(token) for token in strict_provider_tokens}
+    for token in tokens:
+        compact_token = _compact(token)
+        if not compact_token or compact_token in strict:
+            continue
+        if token.lower() in inventory_text and _has_nonempty_matching_env_key(assignments, token):
+            return True
     return False
 
 
@@ -87,6 +194,43 @@ def check_file_contains(name: str, path: Path, needles: list[str], root: Path) -
     item["status"] = "pass" if not missing else "missing_expected_content"
     item["missing"] = missing
     return item
+
+
+def provider_inventory_signals(ltd_text: str, ea_env: Path, ea_env_text: str, local_env: Path) -> dict[str, bool]:
+    registry = OriginProviderCapabilityRegistry.from_env()
+    provider_inventory_text = f"{ltd_text}\n{ea_env_text}".lower()
+    ea_assignments = env_assignments(ea_env)
+    return {
+        "crezloTours": "Crezlo Tours" in ltd_text and "EA_CREZLO_LOGIN_EMAIL" in ea_env_text,
+        "pano2vr": "Pano2VR" in ltd_text and "PANO2VR_LICENSE_KEY" in ea_env_text,
+        "unmixr": "Unmixr AI" in ltd_text and _unmixr_account_available(ea_assignments),
+        "unmixrApiConfigured": "Unmixr AI" in ltd_text and _unmixr_account_api_available(ea_assignments),
+        "youbooks": "YouBooks" in ltd_text and "YOUBOOKS_ACCOUNT_EMAILS" in ea_env_text,
+        "firstBook": "First Book ai" in ltd_text,
+        "inkfluence": env_key_present(local_env, "CHUMMER_EA_INKFLUENCE_BASE_URL"),
+        "configuredManuscriptProvider": configured_provider_available(
+            provider_inventory_text,
+            ea_assignments,
+            registry.manuscript_provider_tokens,
+        ),
+        "configuredAudioProvider": configured_provider_available(
+            provider_inventory_text,
+            ea_assignments,
+            registry.audio_provider_tokens,
+            strict_provider_tokens=("unmixr",),
+        ),
+    }
+
+
+def origin_gold_capability_signals(provider_signals: dict[str, bool]) -> dict[str, bool]:
+    manuscript_providers = ("inkfluence", "youbooks", "firstBook", "configuredManuscriptProvider")
+    audio_providers = ("unmixr", "inkfluence", "configuredAudioProvider")
+    return {
+        "provider_inventory_present": any(provider_signals.values()),
+        "manuscript_or_edition_provider_available": any(provider_signals.get(provider) is True for provider in manuscript_providers),
+        "premium_audio_provider_available": any(provider_signals.get(provider) is True for provider in audio_providers),
+        "optional_overflow_accounts_do_not_block": True,
+    }
 
 
 def receipt_status(name: str, path: Path, root: Path, expected_status: str = "pass") -> dict[str, Any]:
@@ -137,7 +281,7 @@ def materialize(
     repo_root = repo_root.resolve()
     ea_root = ea_root.resolve()
     evidence_root = evidence_root.resolve()
-    context = context or OriginEditionContext.default()
+    context = context or OriginEditionContext.from_env(require_explicit=True)
     branch = context.branch(evidence_root)
     checks: list[dict[str, Any]] = []
 
@@ -248,6 +392,9 @@ def materialize(
     ltds = ea_root / "LTDs.md"
     ltd_text = read_text(ltds) if ltds.is_file() else ""
     ea_env_text = read_text(ea_env) if ea_env.is_file() else ""
+    ea_assignments = env_assignments(ea_env)
+    provider_signals = provider_inventory_signals(ltd_text, ea_env, ea_env_text, local_env)
+    capability_signals = origin_gold_capability_signals(provider_signals)
     inventory = {
         "runsiteEnvInspected": local_env.is_file(),
         "eaEnvInspected": ea_env.is_file(),
@@ -266,14 +413,10 @@ def materialize(
                 "RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY",
             ]
         },
-        "newestProviderInventorySignals": {
-            "crezloTours": "Crezlo Tours" in ltd_text and "EA_CREZLO_LOGIN_EMAIL" in ea_env_text,
-            "pano2vr": "Pano2VR" in ltd_text and "PANO2VR_LICENSE_KEY" in ea_env_text,
-            "unmixr": "Unmixr AI" in ltd_text and env_key_present(ea_env, "UNMIXR_API_KEY"),
-            "youbooks": "YouBooks" in ltd_text and "YOUBOOKS_ACCOUNT_EMAILS" in ea_env_text,
-            "firstBook": "First Book ai" in ltd_text,
-            "inkfluence": env_key_present(local_env, "CHUMMER_EA_INKFLUENCE_BASE_URL"),
-        },
+        "newestProviderInventorySignals": provider_signals,
+        "unmixrVoiceReadyAccounts": _unmixr_voice_ready_aliases(ea_assignments),
+        "unmixrAccountsMissingVoiceId": _unmixr_voice_missing_aliases(ea_assignments),
+        "originGoldCapabilitySignals": capability_signals,
     }
     checks.append(
         {
@@ -284,7 +427,7 @@ def materialize(
             and inventory["eaEnvInspected"]
             and inventory["ltdInventoryInspected"]
             and all(inventory["rybbitRunKeysPresent"].values())
-            and all(inventory["newestProviderInventorySignals"].values())
+            and all(inventory["originGoldCapabilitySignals"].values())
             else "missing_expected_inventory_signal",
         }
     )
@@ -332,7 +475,7 @@ def materialize(
         inventory["runsiteEnvInspected"]
         and inventory["eaEnvInspected"]
         and inventory["ltdInventoryInspected"]
-        and all(inventory["newestProviderInventorySignals"].values())
+        and all(inventory["originGoldCapabilitySignals"].values())
     )
     env_inspected = inventory["runsiteEnvInspected"] and inventory["eaEnvInspected"]
     runsite_handoff_verified = check_statuses.get("runsite_handoff_constraints") == "pass"
@@ -404,6 +547,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     output = args.output or context.branch(args.evidence_root) / "runsite-integration-proof.receipt.json"
     payload = materialize(args.repo_root, args.ea_root, args.evidence_root, output, context)

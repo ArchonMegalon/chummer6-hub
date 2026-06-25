@@ -22,8 +22,11 @@ DEFAULT_EVIDENCE_ROOT = Path("/docker/chummercomplete/.tmp/origin-dossier-fresh-
 DEFAULT_COOKIE_NAME = "chummer_hub_access_token"
 E2E_ENV_KEYS = {
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN",
+    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN",
     "CHUMMER_DEPLOYED_E2E_AUTH_MODE",
     "CHUMMER_DEPLOYED_E2E_COOKIE_NAME",
+    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
+    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
 }
 
 
@@ -57,7 +60,40 @@ def cookie_name() -> str:
     return os.environ.get("CHUMMER_DEPLOYED_E2E_COOKIE_NAME", DEFAULT_COOKIE_NAME).strip() or DEFAULT_COOKIE_NAME
 
 
-def attach_owner_auth(session: requests.Session, token: str, base_url: str) -> dict[str, Any]:
+def owner_session_token() -> str:
+    return (
+        os.environ.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "").strip()
+        or os.environ.get("CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN", "").strip()
+    )
+
+
+def attach_owner_auth(session: requests.Session, base_url: str) -> tuple[bool, dict[str, Any]]:
+    cookie_header = os.environ.get("CHUMMER_DEPLOYED_E2E_COOKIE_HEADER", "").strip()
+    authorization_header = os.environ.get("CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER", "").strip()
+    if cookie_header:
+        session.headers.update({"Cookie": cookie_header})
+        return True, {
+            "mode": "cookie_header",
+            "cookieName": None,
+            "tokenSha256": sha256_text(cookie_header),
+            "tokenValueStoredInReceipt": False,
+        }
+    if authorization_header:
+        session.headers.update({"Authorization": authorization_header})
+        return True, {
+            "mode": "authorization_header",
+            "cookieName": None,
+            "tokenSha256": sha256_text(authorization_header),
+            "tokenValueStoredInReceipt": False,
+        }
+    token = owner_session_token()
+    if not token:
+        return False, {
+            "mode": auth_mode(),
+            "cookieName": cookie_name() if auth_mode() == "cookie" else None,
+            "tokenSha256": "",
+            "tokenValueStoredInReceipt": False,
+        }
     mode = auth_mode()
     name = cookie_name()
     if mode == "bearer":
@@ -65,7 +101,7 @@ def attach_owner_auth(session: requests.Session, token: str, base_url: str) -> d
     else:
         domain = (base_url.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0] or "chummer.run").strip()
         session.cookies.set(name, token, domain=domain, path="/")
-    return {
+    return True, {
         "mode": mode,
         "cookieName": name if mode == "cookie" else None,
         "tokenSha256": sha256_text(token),
@@ -148,19 +184,19 @@ def materialize(
 ) -> dict[str, Any]:
     evidence_root = evidence_root.resolve()
     base_url = base_url.rstrip("/")
-    context = context or OriginEditionContext.from_env(project_id=project_id, base_url=base_url)
+    context = context or OriginEditionContext.from_env(project_id=project_id, base_url=base_url, require_explicit=True)
     loaded_env = load_env_file(env_file)
     imported = read_import_request(evidence_root)
     request = imported["importRequest"]
     live_evidence = imported.get("evidence") if isinstance(imported.get("evidence"), dict) else {}
     expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
-    expected_book_sha = str(live_evidence.get("bookArtifactSha256") or "").strip()
+    expected_book_sha = str(live_evidence.get("ebookArtifactSha256") or live_evidence.get("bookArtifactSha256") or "").strip()
     expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
-    share_url = str(request.get("audiobookshelfShareUrl") or "").strip()
+    share_url = str(request.get("audiobookshelfAudiobookShareUrl") or request.get("audiobookshelfShareUrl") or "").strip()
     dossier_share_url = str(request.get("audiobookshelfDossierShareUrl") or "").strip()
     audiobook_share_url_trusted = is_trusted_audiobookshelf_share(share_url)
     dossier_share_url_trusted = is_trusted_audiobookshelf_share(dossier_share_url)
-    token = os.environ.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "").strip()
+    has_owner_auth = False
     auth_context: dict[str, Any] = {
         "mode": auth_mode(),
         "cookieName": cookie_name() if auth_mode() == "cookie" else None,
@@ -207,24 +243,31 @@ def materialize(
     )
 
     signed = requests.Session()
-    if token:
-        auth_context = attach_owner_auth(signed, token, base_url)
-    detail = get(signed, owner_url) if token else None
-    cover = get(signed, cover_url) if token else None
-    book = get(signed, book_url) if token else None
-    read = get(signed, read_url) if token else None
-    listen = get(signed, listen_url) if token else None
-    video = get(signed, watch_url) if token else None
+    has_owner_auth, auth_context = attach_owner_auth(signed, base_url)
+    detail = get(signed, owner_url) if has_owner_auth else None
+    cover = get(signed, cover_url) if has_owner_auth else None
+    book = get(signed, book_url) if has_owner_auth else None
+    read = get(signed, read_url) if has_owner_auth else None
+    listen = get(signed, listen_url) if has_owner_auth else None
+    video = get(signed, watch_url) if has_owner_auth else None
 
     detail_text = detail.text if detail is not None and status(detail) == 200 else ""
     logged_in = status(detail) == 200 and "data-origin-dossier-detail" in detail_text
-    selected_cover = (
-        "Rendered Origin Dossier story scene cover" in detail_text
-        and ("data-origin-dossier-detail" in detail_text or "origin-edition" in detail_text)
-    )
-    read_tab = 'href="#origin-edition-read"' in detail_text
-    listen_tab = 'href="#origin-edition-listen"' in detail_text
-    watch_tab = 'href="#origin-edition-watch"' in detail_text
+    cover_route = f'{cover_url}"'
+    cover_alt = f'Rendered Origin Dossier story scene cover for {context.runner_name}'
+    selected_cover_marker = 'data-story-scene-cover-uses-selected-character-face="true"' in detail_text
+    selected_cover_alt = cover_alt in detail_text
+    selected_cover_route = cover_route in detail_text
+    selected_cover = selected_cover_marker and selected_cover_alt and selected_cover_route
+    read_link = 'href="#origin-edition-read"' in detail_text
+    listen_link = 'href="#origin-edition-listen"' in detail_text
+    watch_link = 'href="#origin-edition-watch"' in detail_text
+    read_section = 'id="origin-edition-read"' in detail_text and 'data-origin-edition-tab="read"' in detail_text
+    listen_section = 'id="origin-edition-listen"' in detail_text and 'data-origin-edition-tab="listen"' in detail_text
+    watch_section = 'id="origin-edition-watch"' in detail_text and 'data-origin-edition-tab="watch"' in detail_text
+    read_tab = read_link and read_section
+    listen_tab = listen_link and listen_section
+    watch_tab = watch_link and watch_section
     canon_tab = 'href="#origin-edition-canon-audit"' in detail_text
     canon_section = 'id="origin-edition-canon-audit"' in detail_text and 'data-origin-edition-tab="canon-audit"' in detail_text
     chummer_canon_owner = 'data-chummer-owns-canon="true"' in detail_text
@@ -284,19 +327,25 @@ def materialize(
 
     passed = all(
         [
-            token,
+            has_owner_auth,
             owner_playback_e2e,
         ]
     )
     blockers: list[str] = []
-    if not token:
-        blockers.append("missing_deployed_identity_token")
+    if not has_owner_auth:
+        blockers.append("missing_deployed_owner_session")
     checks = {
         "logged_in_browser_verified": logged_in,
+        "selected_face_cover_marker_visible": selected_cover_marker,
+        "selected_face_cover_alt_visible": selected_cover_alt,
+        "selected_face_cover_route_visible": selected_cover_route,
         "selected_face_cover_visible": selected_cover,
         "read_tab_visible": read_tab,
+        "read_section_visible": read_section,
         "listen_tab_visible": listen_tab,
+        "listen_section_visible": listen_section,
         "watch_tab_visible": watch_tab,
+        "watch_section_visible": watch_section,
         "canon_audit_tab_visible": canon_tab,
         "canon_audit_section_visible": canon_section,
         "chummer_canon_owner_visible": chummer_canon_owner,
@@ -331,8 +380,8 @@ def materialize(
     blockers.extend([key for key, value in checks.items() if not value])
     blocking_reason = "" if passed else ",".join(blockers)
     next_action = (
-        "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
-        if not token
+        "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe."
+        if not has_owner_auth
         else "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected."
     )
     progress = {
@@ -401,6 +450,14 @@ def materialize(
             "book": response_sha256(book),
             "watch": response_sha256(video),
         },
+        "redirect_location_sha256": {
+            "read": sha256_text(header(read, "location")),
+            "listen": sha256_text(header(listen, "location")),
+        },
+        "expected_redirect_location_sha256": {
+            "read": sha256_text(dossier_share_url),
+            "listen": sha256_text(share_url),
+        },
         "expected_import_sha256": {
             "cover": expected_cover_sha,
             "book": expected_book_sha,
@@ -437,6 +494,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     output = args.output or context.branch(args.evidence_root) / "deployed-chummer-browser-probe.receipt.json"
     payload = materialize(args.evidence_root, context.base_url, context.project_id, output, args.env_file, context)

@@ -44,6 +44,7 @@ def required_files(namespace: str) -> dict[str, str]:
         "m4b_provider_gate": f"{namespace}/audiobook/m4b-provider-import-gate.receipt.json",
         "cover_consistency": f"{namespace}/cover-consistency-strict.receipt.json",
         "movie": f"{namespace}/movie/movie.mp4",
+        "movie_poster": f"{namespace}/movie/poster.jpg",
         "movie_receipt": f"{namespace}/movie/dossier-video.receipt.json",
     }
 
@@ -53,9 +54,12 @@ LIVE_IMPORT_PATH_FIELDS = {
     "provider_manuscript": "providerManuscriptPath",
     "humanizer_receipt": "humanizerReceiptPath",
     "humanizer_quality_receipt": "humanizerQualityReceiptPath",
-    "ebook": "bookArtifactPath",
+    "cover": "storySceneCoverPath",
+    "ebook": "ebookArtifactPath",
+    "dossier_audiobookshelf_receipt": "ebookAudiobookshelfImportReceiptPath",
     "m4b_provider_gate": "m4bProviderImportReceiptPath",
     "movie": "dossierVideoPath",
+    "movie_poster": "moviePosterPath",
     "movie_receipt": "dossierVideoReceiptPath",
 }
 
@@ -69,6 +73,7 @@ BRANCH_REQUIRED_SURFACES = {
     "real_m4b_artifact": ("audiobook", (".m4b",)),
     "audiobookshelf_audiobook_receipt": ("audiobook", (".json",)),
     "movie": ("movie", (".mp4",)),
+    "movie_poster": ("movie", (".jpg", ".jpeg", ".png", ".webp")),
     "movie_receipt": ("movie", (".json",)),
 }
 
@@ -125,7 +130,11 @@ def _relative_for_receipt(path: Path, root: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
-        return path.as_posix()
+        relative = path.as_posix().lstrip("/")
+        marker = "origin.chummer.run/"
+        if marker in relative:
+            return relative[relative.index(marker) :]
+        return "__outside_evidence_root__"
 
 
 def _path_under_branch(path: Path, root: Path, namespace: str, branch: str, suffixes: tuple[str, ...]) -> bool:
@@ -138,7 +147,11 @@ def _path_under_branch(path: Path, root: Path, namespace: str, branch: str, suff
             relative = relative[relative.index(marker) :]
     expected = namespace if branch == "root" else f"{namespace}/{branch}"
     prefix = expected.rstrip("/") + "/"
-    return relative.startswith(prefix) and relative.lower().endswith(tuple(item.lower() for item in suffixes))
+    if not relative.startswith(prefix) or not relative.lower().endswith(tuple(item.lower() for item in suffixes)):
+        return False
+    if branch == "root":
+        return "/" not in relative[len(prefix) :].strip("/")
+    return True
 
 
 def _contains_reject_marker(value: object) -> bool:
@@ -152,6 +165,18 @@ def _contains_reject_marker(value: object) -> bool:
     return False
 
 
+def _file_reject_marker_findings(path: Path) -> list[str]:
+    try:
+        data = path.read_bytes().lower()
+    except OSError:
+        return []
+    return [
+        marker
+        for marker in REJECT_MARKERS
+        if marker.encode("utf-8") in data
+    ]
+
+
 def _status_pass(payload: dict[str, Any]) -> bool:
     return _string(payload.get("status")).lower() in {"approved", "pass", "verified", "delivered", "published"}
 
@@ -159,7 +184,7 @@ def _status_pass(payload: dict[str, Any]) -> bool:
 def _json_surface(name: str, path: Path, root: Path, *, reject_markers: bool = True) -> dict[str, Any]:
     surface: dict[str, Any] = {
         "name": name,
-        "path": path.relative_to(root).as_posix(),
+        "path": _relative_for_receipt(path, root),
         "required": True,
     }
     if not path.is_file():
@@ -191,7 +216,7 @@ def _json_surface(name: str, path: Path, root: Path, *, reject_markers: bool = T
 def _file_surface(name: str, path: Path, root: Path, *, reject_content_markers: bool = False) -> dict[str, Any]:
     surface: dict[str, Any] = {
         "name": name,
-        "path": path.relative_to(root).as_posix(),
+        "path": _relative_for_receipt(path, root),
         "required": True,
     }
     if not path.is_file():
@@ -202,12 +227,10 @@ def _file_surface(name: str, path: Path, root: Path, *, reject_content_markers: 
         return surface
     surface["sha256"] = _sha256_file(path)
     if reject_content_markers:
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            text = ""
-        if text and _contains_reject_marker(text):
+        marker_findings = _file_reject_marker_findings(path)
+        if marker_findings:
             surface["status"] = "blocked_rejected_marker"
+            surface["markerFindings"] = marker_findings
             return surface
     surface["status"] = "pass"
     return surface
@@ -226,7 +249,7 @@ def _branch_surface(name: str, path: Path, root: Path, namespace: str, branch: s
 
 def audit(root: Path, output: Path | None = None, context: OriginEditionContext | None = None) -> dict[str, Any]:
     root = root.resolve()
-    context = context or OriginEditionContext.from_env()
+    context = context or OriginEditionContext.from_env(require_explicit=True)
     namespace = context.resolved_namespace
     live_request = _live_import_request(root)
     surfaces: list[dict[str, Any]] = []
@@ -241,7 +264,14 @@ def audit(root: Path, output: Path | None = None, context: OriginEditionContext 
         elif path.suffix.lower() == ".json":
             surfaces.append(_json_surface(name, path, root, reject_markers=name != "gap_audit"))
         else:
-            surfaces.append(_file_surface(name, path, root, reject_content_markers=name in {"provider_manuscript"}))
+            surfaces.append(
+                _file_surface(
+                    name,
+                    path,
+                    root,
+                    reject_content_markers=name in {"provider_manuscript", "cover", "ebook", "pdf", "movie"},
+                )
+            )
         if name in BRANCH_REQUIRED_SURFACES:
             branch, suffixes = BRANCH_REQUIRED_SURFACES[name]
             surfaces.append(_branch_surface(name, path, root, namespace, branch, suffixes))
@@ -252,14 +282,20 @@ def audit(root: Path, output: Path | None = None, context: OriginEditionContext 
     live_m4b_path = _resolve_path(root, live_request.get("audiobookPath")) if _string(live_request.get("audiobookPath")) else None
     if live_m4b_path is not None:
         m4b_candidates = [live_m4b_path] if live_m4b_path.is_file() else []
+    m4b_marker_findings = {
+        _relative_for_receipt(path, root): _file_reject_marker_findings(path)
+        for path in m4b_candidates
+    }
+    m4b_rejected = [path for path, findings in m4b_marker_findings.items() if findings]
     surfaces.append(
         {
             "name": "real_m4b_artifact",
             "path": _relative_for_receipt(live_m4b_path, root) if live_m4b_path is not None else f"{namespace}/audiobook/*.m4b",
             "required": True,
-            "status": "pass" if m4b_candidates else "blocked_missing_file",
+            "status": "blocked_rejected_marker" if m4b_rejected else ("pass" if m4b_candidates else "blocked_missing_file"),
             "candidateCount": len(m4b_candidates),
             "candidateSha256": [_sha256_file(path) for path in m4b_candidates],
+            "markerFindings": m4b_marker_findings,
         }
     )
     if live_m4b_path is not None:
@@ -326,6 +362,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     result = audit(args.root, args.output, context)
     print(json.dumps(result, indent=2, sort_keys=True))

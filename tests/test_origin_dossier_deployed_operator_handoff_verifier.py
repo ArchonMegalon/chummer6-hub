@@ -36,6 +36,14 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
         "blocking_reason": "" if pass_state else ",".join(blockers),
         "progress": {"blockerCount": len(blockers)},
         "goalCompletionClaimAllowed": False,
+        "context": {
+            "projectId": "varga-mira-kestrel",
+            "familyName": "Varga",
+            "givenName": "Mira",
+            "runnerName": "Kestrel",
+            "namespace": "origin.chummer.run/Varga/Mira/Kestrel",
+            "baseUrl": "https://chummer.run",
+        },
         "requiredEnv": {
             "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN": {
                 "required": True,
@@ -53,7 +61,7 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
             "python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root /docker/chummercomplete/.tmp/origin-dossier-fresh-gold --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run",
             "python3 scripts/audit_origin_dossier_gold_e2e.py --pretty --require-pass",
             "python3 scripts/materialize_origin_edition_gold_proof_chain.py --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run --allow-blocked",
-            "python3 scripts/materialize_origin_edition_gold_final_verdict.py --allow-blocked",
+            "python3 scripts/materialize_origin_edition_gold_final_verdict.py --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run --allow-blocked",
             "python3 scripts/verify_origin_edition_gold_proof_chain.py --require-gold",
             "python3 scripts/verify_origin_edition_gold_final_verdict.py --verdict /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/FINAL_ORIGIN_EDITION_GOLD_VERDICT.md",
             "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD=1 bash scripts/ai/run_services_verification.sh",
@@ -132,6 +140,29 @@ def test_verifier_rejects_rerun_commands_without_explicit_origin_context(tmp_pat
     assert ok is False
     assert "required_context_argument_missing:--project-id" in issues
     assert "required_context_argument_missing:--namespace" in issues
+    assert "required_context_argument_missing:materialize_origin_edition_gold_final_verdict.py:--project-id" in issues
+
+
+def test_verifier_rejects_final_verdict_materialization_without_explicit_context(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "handoff.json"
+    payload = handoff_payload()
+    payload["requiredCommands"] = [
+        command.replace(
+            " --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run",
+            "",
+        )
+        if "materialize_origin_edition_gold_final_verdict.py" in command
+        else command
+        for command in payload["requiredCommands"]
+    ]
+    write_json(path, payload)
+
+    ok, issues = module.verify(path)
+
+    assert ok is False
+    assert "required_context_argument_missing:materialize_origin_edition_gold_final_verdict.py:--project-id" in issues
+    assert "required_context_argument_missing:materialize_origin_edition_gold_final_verdict.py:--base-url" in issues
 
 
 def test_verifier_rejects_ready_handoff_without_missing_token_blocker(tmp_path: Path) -> None:

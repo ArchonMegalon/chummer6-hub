@@ -24,10 +24,16 @@ E2E_ENV_KEYS = {
 }
 REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "logged_in_browser_verified",
+    "selected_face_cover_marker_visible",
+    "selected_face_cover_alt_visible",
+    "selected_face_cover_route_visible",
     "selected_face_cover_visible",
     "read_tab_visible",
+    "read_section_visible",
     "listen_tab_visible",
+    "listen_section_visible",
     "watch_tab_visible",
+    "watch_section_visible",
     "canon_audit_tab_visible",
     "canon_audit_section_visible",
     "chummer_canon_owner_visible",
@@ -129,7 +135,7 @@ def materialize(
     context: OriginEditionContext | None = None,
 ) -> dict[str, Any]:
     evidence_root = evidence_root.resolve()
-    context = context or OriginEditionContext.default()
+    context = context or OriginEditionContext.from_env(require_explicit=True)
     branch = context.branch(evidence_root)
     loaded_env = load_env_file(env_file)
     deployed_probe = branch / "deployed-chummer-browser-probe.receipt.json"
@@ -152,7 +158,7 @@ def materialize(
         f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
         f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
-        f"python3 scripts/materialize_origin_edition_gold_final_verdict.py --evidence-root {evidence_root_text} --allow-blocked",
+        f"python3 scripts/materialize_origin_edition_gold_final_verdict.py --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
         f"python3 scripts/verify_origin_edition_gold_proof_chain.py --proof-chain {evidence_root_text}/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json --require-gold",
         f"python3 scripts/verify_origin_edition_gold_final_verdict.py --verdict {evidence_root_text}/FINAL_ORIGIN_EDITION_GOLD_VERDICT.md --proof-chain {evidence_root_text}/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json --requirement-coverage {evidence_root_text}/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json",
         "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD=1 bash scripts/ai/run_services_verification.sh",
@@ -197,6 +203,14 @@ def materialize(
         "progress": progress,
         "namespace": context.resolved_namespace,
         "projectId": context.project_id,
+        "context": {
+            "projectId": context.project_id,
+            "familyName": context.family_name,
+            "givenName": context.given_name,
+            "runnerName": context.runner_name,
+            "namespace": context.resolved_namespace,
+            "baseUrl": context.base_url,
+        },
         "deployedOwnerUrl": context.owner_url,
         "requiredEnv": {
             "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD": {
@@ -270,6 +284,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     output = args.output or context.branch(args.evidence_root) / "deployed-operator-handoff.receipt.json"
     payload = materialize(args.evidence_root, output, args.env_file, context)

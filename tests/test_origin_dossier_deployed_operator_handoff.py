@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_dossier_deployed_operator_handoff.py"
 
 
 def load_module():
+    seed_origin_context_env()
     spec = importlib.util.spec_from_file_location("origin_dossier_deployed_operator_handoff", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -16,9 +20,37 @@ def load_module():
     return module
 
 
+def seed_origin_context_env() -> None:
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_PROJECT_ID", "varga-mira-kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Varga")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Mira")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
+
+
 def write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def clear_origin_context_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_operator_handoff_without_explicit_context_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    clear_origin_context_env(monkeypatch)
+
+    with pytest.raises(ValueError, match="explicit Origin Edition context required"):
+        module.materialize(tmp_path, tmp_path / "handoff.json")
 
 
 def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_status: str = "blocked") -> None:
@@ -36,15 +68,21 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
             else "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected.",
             "blocking_reason": "missing_deployed_identity_token" if deployed_status != "pass" else "",
             "progress": {
-                "passedChecks": 21 if deployed_pass else 9,
-                "totalChecks": 21,
+                "passedChecks": 41 if deployed_pass else 9,
+                "totalChecks": 41,
                 "blockedChecks": [] if deployed_pass else ["logged_in_browser_verified", "owner_playback_e2e_verified"],
             },
             "logged_in_browser_verified": deployed_pass,
+            "selected_face_cover_marker_visible": deployed_pass,
+            "selected_face_cover_alt_visible": deployed_pass,
+            "selected_face_cover_route_visible": deployed_pass,
             "selected_face_cover_visible": deployed_pass,
             "read_tab_visible": deployed_pass,
+            "read_section_visible": deployed_pass,
             "listen_tab_visible": deployed_pass,
+            "listen_section_visible": deployed_pass,
             "watch_tab_visible": deployed_pass,
+            "watch_section_visible": deployed_pass,
             "canon_audit_tab_visible": deployed_pass,
             "canon_audit_section_visible": deployed_pass,
             "chummer_canon_owner_visible": deployed_pass,
@@ -104,8 +142,11 @@ def test_handoff_is_ready_for_operator_token_without_exposing_secret_values(tmp_
     assert result["progress"]["blockerCount"] == len(result["blockers"])
     assert result["currentEvidence"]["deployedProbeNextAction"] == result["next_action"]
     assert result["currentEvidence"]["deployedProbeBlockingReason"] == "missing_deployed_identity_token"
-    assert result["currentEvidence"]["deployedProbeProgress"]["totalChecks"] == 21
+    assert result["currentEvidence"]["deployedProbeProgress"]["totalChecks"] == 41
     assert result["goalCompletionClaimAllowed"] is False
+    assert result["context"]["projectId"] == "varga-mira-kestrel"
+    assert result["context"]["namespace"] == "origin.chummer.run/Varga/Mira/Kestrel"
+    assert result["context"]["baseUrl"] == "https://chummer.run"
     assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["presentInCurrentProcess"] is False
     assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["valueStoredInReceipt"] is False
     assert result["requiredEnv"]["CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"]["expectedValueForRelease"] == "1"
@@ -117,6 +158,10 @@ def test_handoff_is_ready_for_operator_token_without_exposing_secret_values(tmp_
     assert "scripts/materialize_origin_edition_gold_proof_chain.py" in serialized
     assert "--allow-blocked" in serialized
     assert "scripts/materialize_origin_edition_gold_final_verdict.py" in serialized
+    assert "scripts/materialize_origin_edition_gold_final_verdict.py --evidence-root" in serialized
+    assert "--project-id varga-mira-kestrel" in serialized
+    assert "--namespace origin.chummer.run/Varga/Mira/Kestrel" in serialized
+    assert "--base-url https://chummer.run" in serialized
     assert "scripts/verify_origin_edition_gold_proof_chain.py" in serialized
     assert "--require-gold" in serialized
     assert "scripts/verify_origin_edition_gold_final_verdict.py" in serialized
@@ -144,7 +189,7 @@ def test_handoff_uses_origin_edition_context_for_namespace_and_commands(tmp_path
             "blockers": ["missing_deployed_identity_token"],
             "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
             "blocking_reason": "missing_deployed_identity_token",
-            "progress": {"passedChecks": 0, "totalChecks": 21, "blockedChecks": ["owner_playback_e2e_verified"]},
+            "progress": {"passedChecks": 0, "totalChecks": 41, "blockedChecks": ["owner_playback_e2e_verified"]},
         },
     )
     write_json(tmp_path / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json", {"status": "blocked", "failedCodes": ["blocked"]})
@@ -156,6 +201,8 @@ def test_handoff_uses_origin_edition_context_for_namespace_and_commands(tmp_path
 
     assert result["namespace"] == "origin.chummer.run/Case/Ari/Ghost"
     assert result["projectId"] == "custom-runner"
+    assert result["context"]["namespace"] == "origin.chummer.run/Case/Ari/Ghost"
+    assert result["context"]["baseUrl"] == "https://staging.chummer.run"
     assert result["deployedOwnerUrl"] == "https://staging.chummer.run/account/work/origin-dossiers/custom-runner"
     assert "origin.chummer.run/Case/Ari/Ghost/deployed-chummer-browser-probe.receipt.json" in serialized
     assert "--project-id custom-runner" in serialized

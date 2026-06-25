@@ -14,8 +14,8 @@ public sealed class ExecutiveAssistantCredentialCatalogService
 
     public ExecutiveAssistantCredentialCatalogResult GetCatalog()
     {
-        ExecutiveAssistantCredentialEntry[] entries =
-        {
+        List<ExecutiveAssistantCredentialEntry> entries =
+        [
             BuildDefaultEntry(),
             BuildNamedEntry(
                 toolId: "blipai.app",
@@ -42,7 +42,8 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             BuildInventoryOnlyEntry("neuronwriter", "candidate", "bounded_source_packet_seo_lane"),
             BuildInventoryOnlyEntry("rafter", "qa", "auxiliary_release_qa_lane"),
             BuildInventoryOnlyEntry("pixefy", "qa", "auxiliary_visual_qa_lane")
-        };
+        ];
+        AppendInventoryOnlyLtdRows(entries);
 
         return new ExecutiveAssistantCredentialCatalogResult(
             DateTimeOffset.UtcNow,
@@ -232,6 +233,11 @@ public sealed class ExecutiveAssistantCredentialCatalogService
         bool hasEaLogin = !string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(GetValue(passwordKey));
         bool hasProviderLogin = !string.IsNullOrWhiteSpace(GetValue(usernameKey)) && !string.IsNullOrWhiteSpace(GetValue(loginPasswordKey));
         bool hasRuntimeVoice = HasUnmixrRuntimeConfiguration();
+        bool hasRuntimeApi = HasUnmixrApiConfiguration();
+        string status = hasRuntimeVoice
+            ? "configured"
+            : hasRuntimeApi ? "api_configured_voice_missing"
+            : hasEaLogin || hasProviderLogin ? "login_only" : "missing";
 
         return new ExecutiveAssistantCredentialEntry(
             ToolId: "unmixr",
@@ -244,7 +250,7 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordConfigured: !string.IsNullOrWhiteSpace(GetValue(passwordKey)),
             PasswordAltConfigured: hasRuntimeVoice,
             MirrorsDefault: true,
-            Status: hasRuntimeVoice ? "configured" : hasEaLogin || hasProviderLogin ? "login_only" : "missing");
+            Status: status);
     }
 
     private bool HasUnmixrRuntimeConfiguration()
@@ -270,6 +276,30 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             string account = key["UNMIXR_ACCOUNT_".Length..^"_API_KEY".Length];
             string voiceKey = $"UNMIXR_ACCOUNT_{account}_VOICE_ID";
             if (!string.IsNullOrWhiteSpace(GetValue(voiceKey)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasUnmixrApiConfiguration()
+    {
+        if (!string.IsNullOrWhiteSpace(GetValue("UNMIXR_API_KEY")))
+        {
+            return true;
+        }
+
+        foreach (string key in _configuration.AsEnumerable().Select(item => item.Key))
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            Match match = Regex.Match(key, @"^UNMIXR_ACCOUNT_[A-Za-z0-9_]+_API_KEY$");
+            if (match.Success && !string.IsNullOrWhiteSpace(GetValue(key)))
             {
                 return true;
             }
@@ -316,6 +346,88 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordAltConfigured: false,
             MirrorsDefault: false,
             Status: status);
+
+    private void AppendInventoryOnlyLtdRows(List<ExecutiveAssistantCredentialEntry> entries)
+    {
+        PathInfo? inventoryPath = ResolveLtdInventoryPath();
+        if (inventoryPath is null)
+        {
+            return;
+        }
+
+        string text;
+        try
+        {
+            text = File.ReadAllText(inventoryPath.Value.FullName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        HashSet<string> existing = entries
+            .Select(static entry => entry.ToolId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (Match match in Regex.Matches(text, @"^###\s+(?<toolId>.+?)\s*$", RegexOptions.CultureInvariant | RegexOptions.Multiline))
+        {
+            string toolId = match.Groups["toolId"].Value.Trim();
+            if (string.IsNullOrWhiteSpace(toolId)
+                || existing.Contains(toolId)
+                || string.Equals(toolId, "default", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            entries.Add(BuildInventoryOnlyEntry(toolId, ReadLtdBlockValue(text, match.Index, "tier") ?? "inventory", ReadLtdBlockValue(text, match.Index, "status") ?? "inventory_only"));
+            existing.Add(toolId);
+        }
+    }
+
+    private PathInfo? ResolveLtdInventoryPath()
+    {
+        string? configured = GetValue("CHUMMER_EA_LTD_INVENTORY_PATH") ?? GetValue("EA:LtdInventoryPath");
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
+        {
+            return new PathInfo(configured);
+        }
+
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "ltds.md");
+            if (File.Exists(candidate))
+            {
+                return new PathInfo(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        directory = new(Directory.GetCurrentDirectory());
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "ltds.md");
+            if (File.Exists(candidate))
+            {
+                return new PathInfo(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private static string? ReadLtdBlockValue(string text, int headingIndex, string key)
+    {
+        int nextHeading = text.IndexOf("\n### ", headingIndex + 1, StringComparison.Ordinal);
+        string block = nextHeading >= 0 ? text[headingIndex..nextHeading] : text[headingIndex..];
+        Match match = Regex.Match(
+            block,
+            @"^-\s+" + Regex.Escape(key) + @":\s+`(?<value>[^`]+)`\s*$",
+            RegexOptions.CultureInvariant | RegexOptions.Multiline);
+        return match.Success ? match.Groups["value"].Value.Trim() : null;
+    }
 
     private string BuildStatus(params string[] keys)
     {
@@ -399,3 +511,5 @@ public sealed record ExecutiveAssistantCredentialEntry(
     bool PasswordAltConfigured,
     bool MirrorsDefault,
     string Status);
+
+internal readonly record struct PathInfo(string FullName);

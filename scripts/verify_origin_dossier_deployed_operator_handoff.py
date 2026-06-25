@@ -29,12 +29,23 @@ REQUIRED_CONTEXT_ARGUMENTS = (
     "--namespace ",
     "--base-url ",
 )
+REQUIRED_CONTEXT_COMMANDS = (
+    "materialize_origin_dossier_deployed_browser_probe.py",
+    "materialize_origin_edition_gold_proof_chain.py",
+    "materialize_origin_edition_gold_final_verdict.py",
+)
 REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "logged_in_browser_verified",
+    "selected_face_cover_marker_visible",
+    "selected_face_cover_alt_visible",
+    "selected_face_cover_route_visible",
     "selected_face_cover_visible",
     "read_tab_visible",
+    "read_section_visible",
     "listen_tab_visible",
+    "listen_section_visible",
     "watch_tab_visible",
+    "watch_section_visible",
     "canon_audit_tab_visible",
     "canon_audit_section_visible",
     "chummer_canon_owner_visible",
@@ -155,10 +166,23 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     for argument in REQUIRED_CONTEXT_ARGUMENTS:
         if argument not in serialized_commands:
             issues.append(f"required_context_argument_missing:{argument.strip()}")
+    for command_name in REQUIRED_CONTEXT_COMMANDS:
+        matching = [str(command) for command in commands if command_name in str(command)]
+        if not matching:
+            continue
+        command_text = "\n".join(matching)
+        for argument in REQUIRED_CONTEXT_ARGUMENTS:
+            if argument not in command_text:
+                issues.append(f"required_context_argument_missing:{command_name}:{argument.strip()}")
     if "--require-gold" not in serialized_commands:
         issues.append("strict_gold_verifier_missing")
     if "--allow-blocked" not in serialized_commands:
         issues.append("blocked_materialization_command_missing")
+
+    context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+    for key in ("projectId", "familyName", "givenName", "runnerName", "namespace", "baseUrl"):
+        if not str(context.get(key) or "").strip():
+            issues.append(f"context_field_missing:{key}")
 
     current = payload.get("currentEvidence") if isinstance(payload.get("currentEvidence"), dict) else {}
     required_flags = current.get("deployedProbeRequiredFlags") if isinstance(current.get("deployedProbeRequiredFlags"), dict) else {}
@@ -206,7 +230,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--handoff",
         type=Path,
-        default=deployed_operator_handoff_from_env(),
     )
     parser.add_argument("--require-pass", action="store_true")
     return parser.parse_args()
@@ -214,7 +237,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    ok, issues = verify(args.handoff, require_pass=args.require_pass)
+    handoff = args.handoff or deployed_operator_handoff_from_env()
+    ok, issues = verify(handoff, require_pass=args.require_pass)
     if not ok:
         for issue in issues:
             print(issue, file=sys.stderr)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import UTC, datetime
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -27,6 +28,14 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{path}: expected JSON object")
     return parsed
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def bool_text(value: object) -> str:
@@ -92,7 +101,7 @@ def progress_lines(proof_chain: dict[str, Any]) -> list[str]:
 
 def materialize(evidence_root: Path, output: Path, context: OriginEditionContext | None = None) -> dict[str, Any]:
     evidence_root = evidence_root.resolve()
-    context = context or OriginEditionContext.default()
+    context = context or OriginEditionContext.from_env(require_explicit=True)
     proof_chain_path = evidence_root / "ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json"
     coverage_path = evidence_root / "ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json"
     proof_chain = read_json(proof_chain_path)
@@ -160,7 +169,9 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "## Source Artifacts",
         "",
         f"- Proof chain: `{proof_chain_path.as_posix()}`",
+        f"- Proof chain SHA-256: `{sha256_file(proof_chain_path)}`",
         f"- Requirement coverage: `{coverage_path.as_posix()}`",
+        f"- Requirement coverage SHA-256: `{sha256_file(coverage_path)}`",
         "",
     ]
 
@@ -203,6 +214,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     output = args.output or args.evidence_root / DEFAULT_VERDICT_NAME
     payload = materialize(args.evidence_root, output, context)

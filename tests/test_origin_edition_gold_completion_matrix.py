@@ -65,6 +65,11 @@ def telegram_origin_link_receipt(
             "contract_name": "ea.telegram_audiobook_live_delivery_receipt.v1",
             "status": status,
             "selected_delivery": {
+                "status": "audiobookshelf_imported",
+                "telegram_delivery_status": "sent",
+                "telegram_delivery_message_id_present": True,
+                "telegram_chat_bound": True,
+                "telegram_message_bound": True,
                 "origin_edition_link_bundle": {
                     "status": "sent",
                     "project_id": project_id,
@@ -120,16 +125,26 @@ def authenticated_route_receipt(
             "anonymousArtifactRedirectVerified": True,
             "all_private_routes_login_protected": True,
             "logged_in_browser_verified": True,
+            "selected_face_cover_marker_visible": True,
+            "selected_face_cover_alt_visible": True,
+            "selected_face_cover_route_visible": True,
             "selected_face_cover_visible": True,
             "read_tab_visible": True,
+            "read_section_visible": True,
             "listen_tab_visible": listen_tab_visible,
+            "listen_section_visible": listen_tab_visible,
             "watch_tab_visible": True,
+            "watch_section_visible": True,
             "canon_audit_tab_visible": True,
+            "canon_audit_content_verified": True,
             "read_gate_verified": True,
             "chummer_run_listen_gate_verified": True,
             "watch_gate_verified": True,
             "coverRouteVerified": True,
             "bookRouteVerified": True,
+            "cover_sha_matches_import": True,
+            "book_sha_matches_import": True,
+            "video_sha_matches_import": True,
             "live_provider_artifacts_verified": True,
             "live_provider_delivery_verified": True,
             "urlHashes": {
@@ -450,6 +465,12 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
                     "firstBook": True,
                     "youbooks": True,
                 },
+                "originGoldCapabilitySignals": {
+                    "provider_inventory_present": True,
+                    "manuscript_or_edition_provider_available": True,
+                    "premium_audio_provider_available": True,
+                    "optional_overflow_accounts_do_not_block": True,
+                },
                 "rybbitRunKeysPresent": {
                     "RYBBIT_CHUMMER_RUN_SITE_ID": True,
                     "RYBBIT_CHUMMER_RUN_SCRIPT_URL": True,
@@ -469,10 +490,16 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             "contractName": "chummer.origin_edition.deployed_browser_probe.v1",
             "status": "pass" if deployed_pass else "blocked",
             "logged_in_browser_verified": deployed_pass,
+            "selected_face_cover_marker_visible": deployed_pass,
+            "selected_face_cover_alt_visible": deployed_pass,
+            "selected_face_cover_route_visible": deployed_pass,
             "selected_face_cover_visible": deployed_pass,
             "read_tab_visible": deployed_pass,
+            "read_section_visible": deployed_pass,
             "listen_tab_visible": deployed_pass,
+            "listen_section_visible": deployed_pass,
             "watch_tab_visible": deployed_pass,
+            "watch_section_visible": deployed_pass,
             "canon_audit_tab_visible": deployed_pass,
             "canon_audit_content_verified": deployed_pass,
             "chummer_canon_owner_visible": deployed_pass,
@@ -528,6 +555,8 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             },
             "importRequest": {
                 "projectId": "varga-mira-kestrel",
+                "baseUrl": "https://chummer.run",
+                "originEditionNamespace": "origin.chummer.run/Varga/Mira/Kestrel",
                 "publicationState": "published_for_owner",
                 "missingGoldRequirements": [],
                 "sourcePacketPath": "approved-sample-runner-canon.json",
@@ -535,6 +564,8 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
                 "canonAuditReceiptPath": "canon-privacy-audit.receipt.json",
                 "providerManuscriptPath": "provider-manuscript-draft.md",
                 "bookArtifactPath": "origin.chummer.run/Varga/Mira/Kestrel/dossier/ebook.epub",
+                "ebookArtifactPath": "origin.chummer.run/Varga/Mira/Kestrel/dossier/ebook.epub",
+                "ebookAudiobookshelfImportReceiptPath": "origin.chummer.run/Varga/Mira/Kestrel/dossier/audiobookshelf-dossier-import.receipt.json",
                 "bookArtifactReceiptPath": "book-artifact-import.receipt.json",
                 "bookArtifactUrl": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/book",
                 "bookArtifactVerified": True,
@@ -575,6 +606,42 @@ def rewrite_seeded_bundle_namespace(root: Path, *, namespace: str, project_id: s
     live_import["importRequest"]["projectId"] = project_id
     live_import["chummerRunOwnerUrl"] = f"https://chummer.run/account/work/origin-dossiers/{project_id}"
     write_json(import_path, live_import)
+
+
+def test_completion_matrix_requires_live_import_origin_namespace(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    import_path = tmp_path / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    live_import = json.loads(import_path.read_text(encoding="utf-8"))
+    live_import["importRequest"].pop("originEditionNamespace", None)
+    write_json(import_path, live_import)
+
+    try:
+        module.materialize(tmp_path, tmp_path / "matrix.json")
+    except ValueError as exc:
+        assert "live import request missing explicit Origin Edition context" in str(exc)
+        assert "originEditionNamespace" in str(exc)
+    else:
+        raise AssertionError("completion matrix accepted missing originEditionNamespace")
+
+
+def test_completion_matrix_requires_live_import_base_url(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    import_path = tmp_path / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    live_import = json.loads(import_path.read_text(encoding="utf-8"))
+    live_import["importRequest"].pop("baseUrl", None)
+    live_import["importRequest"].pop("chummerBaseUrl", None)
+    live_import["importRequest"].pop("originEditionBaseUrl", None)
+    write_json(import_path, live_import)
+
+    try:
+        module.materialize(tmp_path, tmp_path / "matrix.json")
+    except ValueError as exc:
+        assert "live import request missing explicit Origin Edition context" in str(exc)
+        assert "baseUrl" in str(exc)
+    else:
+        raise AssertionError("completion matrix accepted missing baseUrl")
 
 
 def test_completion_matrix_blocks_until_deployed_login_probe_and_gold_audit_pass(tmp_path: Path) -> None:
@@ -745,6 +812,7 @@ def test_completion_matrix_blocks_artifacts_outside_required_origin_branches(tmp
     live_import = json.loads(import_path.read_text(encoding="utf-8"))
     request = live_import["importRequest"]
     request["bookArtifactPath"] = "elsewhere/ebook.epub"
+    request["ebookArtifactPath"] = "elsewhere/ebook.epub"
     request["audiobookPath"] = "elsewhere/kestrel-origin.m4b"
     request["dossierVideoPath"] = "elsewhere/movie.mp4"
     request["m4bProviderImportReceiptPath"] = "elsewhere/m4b-provider-import-gate.receipt.json"
@@ -753,7 +821,7 @@ def test_completion_matrix_blocks_artifacts_outside_required_origin_branches(tmp
     write_json(import_path, live_import)
 
     result = module.materialize(tmp_path, tmp_path / "matrix.json")
-    blocked = {row["id"] for row in result["rows"] if row["status"] == "blocked"}
+    blocked = {row["id"] for row in result["rows"] if row["status"] != "proved"}
 
     assert result["status"] == "blocked"
     assert "ebook_artifact_namespace" in blocked
@@ -762,6 +830,26 @@ def test_completion_matrix_blocks_artifacts_outside_required_origin_branches(tmp
     assert "audiobookshelf_import_receipt_namespace" in blocked
     assert "movie_generation_receipt_namespace" in blocked
     assert "movie_artifact_namespace" in blocked
+
+
+def test_completion_matrix_blocks_missing_explicit_ebook_import_fields(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    import_path = tmp_path / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    live_import = json.loads(import_path.read_text(encoding="utf-8"))
+    request = live_import["importRequest"]
+    request.pop("ebookArtifactPath", None)
+    request.pop("ebookAudiobookshelfImportReceiptPath", None)
+    write_json(import_path, live_import)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    blocked = {row["id"] for row in result["rows"] if row["status"] != "proved"}
+
+    assert result["status"] == "blocked"
+    assert "ebook_artifact_file" in blocked
+    assert "ebook_artifact_namespace" in blocked
+    assert "ebook_audiobookshelf_import_receipt" in blocked
+    assert "ebook_audiobookshelf_import_receipt_namespace" in blocked
 
 
 def test_completion_matrix_blocks_missing_required_cover_surface(tmp_path: Path) -> None:
@@ -868,6 +956,27 @@ def test_completion_matrix_blocks_telegram_origin_link_raw_url_exposure(tmp_path
     assert result["status"] == "blocked"
     assert row["flags"]["raw_urls_not_exposed"] is False
     assert "raw_urls_not_exposed" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_telegram_origin_links_without_message_binding(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/telegram-origin-link-bundle-live.receipt.json"
+    telegram_origin_link_receipt(receipt_path)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["selected_delivery"]["telegram_message_bound"] = False
+    receipt["selected_delivery"]["telegram_delivery_message_id_present"] = False
+    write_json(receipt_path, receipt)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "telegram_origin_links_verified")
+
+    assert result["status"] == "blocked"
+    assert "telegram_origin_links_verified" in result["blockedRows"]
+    assert row["flags"]["telegram_message_bound"] is False
+    assert row["flags"]["telegram_selected_delivery_message_id_present"] is False
+    assert "telegram_message_bound" in row["failedFlags"]
+    assert "telegram_selected_delivery_message_id_present" in row["failedFlags"]
 
 
 def test_completion_matrix_blocks_telegram_origin_link_namespace_hash_mismatch(tmp_path: Path) -> None:
@@ -1084,6 +1193,23 @@ def test_completion_matrix_blocks_when_movie_uses_marker_media(tmp_path: Path) -
     assert "marker_media_not_used" in row["failedFlags"]
 
 
+def test_completion_matrix_accepts_movie_with_generic_approved_premium_narration_flag(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    movie_receipt_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/movie/dossier-video.receipt.json"
+    movie = json.loads(movie_receipt_path.read_text(encoding="utf-8"))
+    movie["storySceneProof"].pop("usesUnmixrNarrationAudio", None)
+    movie["storySceneProof"].pop("usesInkfluenceNarrationAudio", None)
+    movie["storySceneProof"]["usesApprovedPremiumNarrationAudio"] = True
+    write_json(movie_receipt_path, movie)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "chummer_movie_story_scene_playback_verified")
+
+    assert row["status"] == "proved"
+    assert row["flags"]["uses_approved_premium_narration_audio"] is True
+
+
 def test_completion_matrix_blocks_when_pdf_manuscript_hash_mismatches_accepted_text(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -1132,6 +1258,38 @@ def test_completion_matrix_allows_inkfluence_as_approved_premium_audio_provider(
     assert row["flags"]["provider_is_approved_premium_narration_provider"] is True
 
 
+def test_completion_matrix_allows_configured_premium_audio_provider(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "premiumvoice")
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    provider_label = "PremiumVoice Account 04"
+    provider_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/unmixr-provider-m4b.receipt.json"
+    provider = json.loads(provider_path.read_text(encoding="utf-8"))
+    provider["provider"] = provider_label
+    provider["voiceProvider"] = provider_label
+    provider["tokens"] = [
+        token.replace("provider:Unmixr", f"provider:{provider_label}")
+        for token in provider["tokens"]
+    ]
+    write_json(provider_path, provider)
+    gate_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/m4b-provider-import-gate.receipt.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate["tokens"] = [
+        token.replace("provider:Unmixr", f"provider:{provider_label}")
+        for token in gate["tokens"]
+    ]
+    gate["providerReceiptSha256"] = hashlib.sha256(provider_path.read_bytes()).hexdigest()
+    write_json(gate_path, gate)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "m4b_premium_narration_import_verified")
+
+    assert row["status"] == "proved"
+    assert row["approvedAudioProvider"] == provider_label
+    assert row["flags"]["provider_is_approved_premium_narration_provider"] is True
+    assert row["flags"]["tokens_bind_approved_provider_and_cover_and_m4b"] is True
+
+
 def test_completion_matrix_blocks_when_m4b_provider_is_not_approved_premium_provider(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -1156,6 +1314,27 @@ def test_completion_matrix_blocks_when_m4b_provider_is_not_approved_premium_prov
     assert "provider_is_approved_premium_narration_provider" in row["failedFlags"]
 
 
+def test_completion_matrix_blocks_disguised_m4b_provider_substring(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    provider_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/unmixr-provider-m4b.receipt.json"
+    provider = json.loads(provider_path.read_text(encoding="utf-8"))
+    provider["provider"] = "NotUnmixr Account 02"
+    provider["voiceProvider"] = "NotUnmixr Account 02"
+    write_json(provider_path, provider)
+    gate_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/audiobook/m4b-provider-import-gate.receipt.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate["providerReceiptSha256"] = hashlib.sha256(provider_path.read_bytes()).hexdigest()
+    write_json(gate_path, gate)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "m4b_premium_narration_import_verified")
+
+    assert result["status"] == "blocked"
+    assert row["flags"]["provider_is_approved_premium_narration_provider"] is False
+    assert "provider_is_approved_premium_narration_provider" in row["failedFlags"]
+
+
 def test_completion_matrix_blocks_when_local_authenticated_listen_tab_missing(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -1173,6 +1352,25 @@ def test_completion_matrix_blocks_when_local_authenticated_listen_tab_missing(tm
     assert row["status"] == "blocked"
     assert row["flags"]["listen_tab_visible"] is False
     assert "listen_tab_visible" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_local_authenticated_cover_marker_missing(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    route_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/authenticated-chummer-route-live.receipt.json"
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    route["selected_face_cover_marker_visible"] = False
+    write_json(route_path, route)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "local_authenticated_route_tabs_verified")
+
+    assert result["status"] == "blocked"
+    assert "local_authenticated_route_tabs_verified" in result["blockedRows"]
+    assert "local_authenticated_route_tabs_verified" in result["blockedHardGates"]
+    assert row["status"] == "blocked"
+    assert row["flags"]["selected_face_cover_marker_visible"] is False
+    assert "selected_face_cover_marker_visible" in row["failedFlags"]
 
 
 def test_completion_matrix_blocks_when_local_private_artifact_route_is_public(tmp_path: Path) -> None:
@@ -1194,6 +1392,25 @@ def test_completion_matrix_blocks_when_local_private_artifact_route_is_public(tm
     assert row["flags"]["all_private_routes_login_protected"] is False
     assert "anonymous_video_redirect_verified" in row["failedFlags"]
     assert "all_private_routes_login_protected" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_local_authenticated_route_media_hash_mismatches_import(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    route_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/authenticated-chummer-route-live.receipt.json"
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    route["video_sha_matches_import"] = False
+    write_json(route_path, route)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "local_authenticated_route_tabs_verified")
+
+    assert result["status"] == "blocked"
+    assert "local_authenticated_route_tabs_verified" in result["blockedRows"]
+    assert "local_authenticated_route_tabs_verified" in result["blockedHardGates"]
+    assert row["status"] == "blocked"
+    assert row["flags"]["video_sha_matches_import"] is False
+    assert "video_sha_matches_import" in row["failedFlags"]
 
 
 def test_completion_matrix_accepts_local_authenticated_route_on_ephemeral_port(tmp_path: Path) -> None:
@@ -1290,6 +1507,28 @@ def test_completion_matrix_blocks_when_runsite_top_level_handoff_facts_missing(t
     assert "env_inspected_top_level" in row["failedFlags"]
     assert "rybbit_env_only_top_level" in row["failedFlags"]
     assert "secret_values_not_stored" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_origin_gold_provider_capability_missing(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    runsite_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/runsite-integration-proof.receipt.json"
+    runsite = json.loads(runsite_path.read_text(encoding="utf-8"))
+    runsite["inventoryInspection"]["originGoldCapabilitySignals"]["premium_audio_provider_available"] = False
+    write_json(runsite_path, runsite)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "runsite_handoff_constraints_verified")
+
+    assert result["status"] == "blocked"
+    assert row["flags"]["required_origin_gold_provider_capabilities_present"] is False
+    assert "required_origin_gold_provider_capabilities_present" in row["failedFlags"]
+    assert row["requiredOriginGoldCapabilities"] == [
+        "manuscript_or_edition_provider_available",
+        "optional_overflow_accounts_do_not_block",
+        "premium_audio_provider_available",
+        "provider_inventory_present",
+    ]
 
 
 def test_completion_matrix_blocks_when_runsite_secret_values_stored(tmp_path: Path) -> None:

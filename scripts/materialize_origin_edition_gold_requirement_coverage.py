@@ -40,12 +40,12 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
         "ebook_pdf_dossier_packaging",
         "Ebook/PDF dossier package is hash-bound and imported under the Origin dossier branch",
-        ("ebook_import_receipt", "ebook_artifact_file", "ebook_artifact_namespace", "dossier_ebook_pdf_packaging_verified"),
+        ("ebook_import_receipt", "ebook_artifact_file", "ebook_artifact_namespace", "ebook_audiobookshelf_import_receipt", "ebook_audiobookshelf_import_receipt_namespace", "dossier_ebook_pdf_packaging_verified"),
         ("dossier_ebook_pdf_packaging_verified",),
     ),
     (
         "m4b_premium_audiobook_packaging",
-        "M4B audiobook uses verified Inkfluence or Unmixr premium narration, no fallback audio, and the approved cover/manuscript",
+        "M4B audiobook uses a configured verified premium narration provider, no fallback audio, and the approved cover/manuscript",
         ("m4b_provider_receipt", "m4b_artifact_file", "m4b_artifact_namespace", "m4b_premium_narration_import_verified"),
         ("m4b_premium_narration_import_verified", "no_fallback_audio"),
     ),
@@ -170,7 +170,7 @@ def materialize(evidence_root: Path, output: Path) -> dict[str, Any]:
         "generatedAtUtc": now_iso(),
         "updated_at": now_iso(),
         "status": "pass" if passed else "blocked",
-        "goalCompletionClaimAllowed": passed and proof_chain.get("goalCompletionClaimAllowed") is True,
+        "goalCompletionClaimAllowed": passed and matrix.get("goalCompletionClaimAllowed") is True,
         "next_action": next_action,
         "blocking_reason": blocking_reason,
         "progress": progress,

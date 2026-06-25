@@ -12,9 +12,17 @@ DEFAULT_RUNNER_NAME = "Kestrel"
 DEFAULT_BASE_URL = "https://chummer.run"
 
 
+class OriginEditionContextError(ValueError):
+    pass
+
+
 def _clean(value: str | None, fallback: str) -> str:
     text = str(value or "").strip().strip("/")
     return text or fallback
+
+
+def _raw(value: str | None) -> str:
+    return str(value or "").strip().strip("/")
 
 
 @dataclass(frozen=True)
@@ -40,14 +48,38 @@ class OriginEditionContext:
         runner_name: str | None = None,
         base_url: str | None = None,
         namespace: str | None = None,
+        require_explicit: bool = False,
     ) -> "OriginEditionContext":
+        raw_project_id = _raw(project_id or os.environ.get("CHUMMER_ORIGIN_EDITION_PROJECT_ID"))
+        raw_family_name = _raw(family_name or os.environ.get("CHUMMER_ORIGIN_EDITION_FAMILY_NAME"))
+        raw_given_name = _raw(given_name or os.environ.get("CHUMMER_ORIGIN_EDITION_GIVEN_NAME"))
+        raw_runner_name = _raw(runner_name or os.environ.get("CHUMMER_ORIGIN_EDITION_RUNNER_NAME"))
+        raw_base_url = str(base_url or os.environ.get("CHUMMER_ORIGIN_EDITION_BASE_URL") or "").strip().rstrip("/")
+        raw_namespace = _raw(namespace or os.environ.get("CHUMMER_ORIGIN_EDITION_NAMESPACE"))
+        if require_explicit:
+            missing: list[str] = []
+            if not raw_project_id:
+                missing.append("CHUMMER_ORIGIN_EDITION_PROJECT_ID or --project-id")
+            if not raw_base_url:
+                missing.append("CHUMMER_ORIGIN_EDITION_BASE_URL or --base-url")
+            if not raw_namespace:
+                if not raw_family_name:
+                    missing.append("CHUMMER_ORIGIN_EDITION_FAMILY_NAME or --family-name")
+                if not raw_given_name:
+                    missing.append("CHUMMER_ORIGIN_EDITION_GIVEN_NAME or --given-name")
+                if not raw_runner_name:
+                    missing.append("CHUMMER_ORIGIN_EDITION_RUNNER_NAME or --runner-name")
+            if missing:
+                raise OriginEditionContextError(
+                    "explicit Origin Edition context required: " + ", ".join(missing)
+                )
         return cls(
-            project_id=_clean(project_id or os.environ.get("CHUMMER_ORIGIN_EDITION_PROJECT_ID"), DEFAULT_PROJECT_ID),
-            family_name=_clean(family_name or os.environ.get("CHUMMER_ORIGIN_EDITION_FAMILY_NAME"), DEFAULT_FAMILY_NAME),
-            given_name=_clean(given_name or os.environ.get("CHUMMER_ORIGIN_EDITION_GIVEN_NAME"), DEFAULT_GIVEN_NAME),
-            runner_name=_clean(runner_name or os.environ.get("CHUMMER_ORIGIN_EDITION_RUNNER_NAME"), DEFAULT_RUNNER_NAME),
-            base_url=(base_url or os.environ.get("CHUMMER_ORIGIN_EDITION_BASE_URL") or DEFAULT_BASE_URL).strip().rstrip("/"),
-            namespace=_clean(namespace or os.environ.get("CHUMMER_ORIGIN_EDITION_NAMESPACE"), ""),
+            project_id=_clean(raw_project_id, DEFAULT_PROJECT_ID),
+            family_name=_clean(raw_family_name, DEFAULT_FAMILY_NAME),
+            given_name=_clean(raw_given_name, DEFAULT_GIVEN_NAME),
+            runner_name=_clean(raw_runner_name, DEFAULT_RUNNER_NAME),
+            base_url=(raw_base_url or DEFAULT_BASE_URL).strip().rstrip("/"),
+            namespace=_clean(raw_namespace, ""),
         )
 
     @property

@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import pytest
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "origin_edition_context.py"
 
@@ -25,6 +27,22 @@ def test_origin_edition_context_defaults_to_kestrel_gold_fixture(tmp_path: Path)
     assert context.resolved_namespace == "origin.chummer.run/Varga/Mira/Kestrel"
     assert context.branch(tmp_path) == tmp_path / "origin.chummer.run/Varga/Mira/Kestrel"
     assert context.owner_url == "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel"
+
+
+def test_origin_edition_context_strict_mode_requires_live_operator_context(monkeypatch) -> None:
+    module = load_module()
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(module.OriginEditionContextError, match="explicit Origin Edition context required"):
+        module.OriginEditionContext.from_env(require_explicit=True)
 
 
 def test_origin_edition_context_supports_env_and_cli_overrides(tmp_path: Path, monkeypatch) -> None:

@@ -285,6 +285,7 @@ def main() -> int:
         runner_name=args.runner_name,
         namespace=args.namespace,
         base_url=args.base_url,
+        require_explicit=True,
     )
     result = audit(args.edition_root, args.expected_cover_sha256, output, context)
     print(json.dumps(result, indent=2, sort_keys=True))

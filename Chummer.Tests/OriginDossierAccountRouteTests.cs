@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
@@ -32,7 +33,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("~/Views/Accounts/OriginDossier.cshtml", view.ViewName);
         OriginDossierPublicationDetailPageViewModel model = Assert.IsType<OriginDossierPublicationDetailPageViewModel>(view.Model);
         Assert.Equal("origin-route", model.Publication.ProjectId);
-        Assert.True(model.Publication.GoldReady);
+        Assert.True(model.Publication.GoldReady, string.Join(", ", model.Publication.MissingGoldRequirements));
         Assert.Equal("origin.chummer.run/Varga/Mira/Route-Runner", model.Publication.OriginEditionNamespace);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/read", model.Publication.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfShareUrl);
@@ -256,7 +257,7 @@ public sealed class OriginDossierAccountRouteTests
                     AudiobookshelfImportReceiptPath: artifacts.AudiobookshelfImportReceiptPath,
                     DossierVideoPath: artifacts.DossierVideoPath,
                     DossierVideoReceiptPath: artifacts.DossierVideoReceiptPath,
-                    MoviePosterPath: artifacts.StorySceneCoverPath,
+                    MoviePosterPath: artifacts.MoviePosterPath,
                     MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                     MovieStoryboardPath: artifacts.MovieStoryboardPath,
                     TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
@@ -275,6 +276,7 @@ public sealed class OriginDossierAccountRouteTests
             string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG route test story scene cover artifact");
             string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B route test audiobook artifact");
             string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 route test dossier film artifact");
+            string moviePosterPath = WriteArtifact(projectRoot, "movie-poster.png", "PNG route test movie poster artifact");
             string movieSubtitlesPath = WriteArtifact(projectRoot, "subtitles.vtt", "WEBVTT\n\n00:00.000 --> 00:02.000\nRain made the clinic sign stutter.\n");
             string movieStoryboardPath = WriteArtifact(projectRoot, "storyboard.json", """{"sceneId":"clinic-door-rain","shots":["threshold","clinic","sedan"]}""");
 
@@ -365,12 +367,18 @@ public sealed class OriginDossierAccountRouteTests
                         $"/account/work/origin-dossiers/{projectId}/read",
                         $"/account/work/origin-dossiers/{projectId}/listen",
                         $"/account/work/origin-dossiers/{projectId}/watch",
-                        "origin.chummer.run/Varga/Mira/Route-Runner"
+                        Sha256Text($"/account/work/origin-dossiers/{projectId}"),
+                        Sha256Text($"/account/work/origin-dossiers/{projectId}/read"),
+                        Sha256Text($"/account/work/origin-dossiers/{projectId}/listen"),
+                        Sha256Text($"/account/work/origin-dossiers/{projectId}/watch"),
+                        "origin.chummer.run/Varga/Mira/Route-Runner",
+                        Sha256Text("origin.chummer.run/Varga/Mira/Route-Runner")
                     ]),
                 FinalNoFallbackNoSentinelAuditReceiptPath: WriteFinalNoFallbackNoSentinelAuditReceipt(
                     projectRoot,
                     "final-no-fallback-no-sentinel.receipt.json",
                     "origin.chummer.run/Varga/Mira/Route-Runner"),
+                MoviePosterPath: moviePosterPath,
                 MovieSubtitlesPath: movieSubtitlesPath,
                 MovieStoryboardPath: movieStoryboardPath);
         }
@@ -525,6 +533,9 @@ public sealed class OriginDossierAccountRouteTests
             using FileStream stream = File.OpenRead(path);
             return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
         }
+
+        private static string Sha256Text(string value)
+            => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
     }
 
     private sealed record OriginDossierRouteArtifacts(
@@ -545,6 +556,7 @@ public sealed class OriginDossierAccountRouteTests
         string AudiobookshelfImportReceiptPath,
         string DossierVideoPath,
         string DossierVideoReceiptPath,
+        string MoviePosterPath,
         string MovieSubtitlesPath,
         string MovieStoryboardPath,
         string TelegramShareDeliveryReceiptPath,

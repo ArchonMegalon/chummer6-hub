@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
@@ -62,8 +63,8 @@ public sealed class OriginDossierPublicationServiceTests
         var publications = service.ListForAccount("user-1", "subject-1");
 
         Assert.Equal(2, publications.Count);
-        Assert.Contains(publications, publication => publication.ProjectId == "origin-1" && publication.GoldReady);
         OriginDossierPublicationViewModel gold = publications.Single(publication => publication.ProjectId == "origin-1");
+        Assert.True(gold.GoldReady, string.Join(", ", gold.MissingGoldRequirements));
         Assert.Equal("origin.chummer.run/Varga/Mira/Vanta", gold.OriginEditionNamespace);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/read", gold.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/listen", gold.AudiobookshelfShareUrl);
@@ -173,13 +174,13 @@ public sealed class OriginDossierPublicationServiceTests
                 AudiobookshelfImportReceiptPath: artifacts.AudiobookshelfImportReceiptPath,
                 DossierVideoPath: artifacts.DossierVideoPath,
                 DossierVideoReceiptPath: artifacts.DossierVideoReceiptPath,
-                MoviePosterPath: artifacts.StorySceneCoverPath,
+                MoviePosterPath: artifacts.MoviePosterPath,
                 MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                 MovieStoryboardPath: artifacts.MovieStoryboardPath,
                 TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
                 FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath));
 
-        Assert.True(imported.GoldReady);
+        Assert.True(imported.GoldReady, string.Join(", ", imported.MissingGoldRequirements));
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported", imported.ChummerRunOwnerUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/book", imported.BookArtifactUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/read", imported.AudiobookshelfDossierShareUrl);
@@ -197,7 +198,7 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.True(File.Exists(indexPath));
         OriginDossierPublicationViewModel? reloaded = service.GetForAccount("user-1", "subject-1", "origin-imported");
         Assert.NotNull(reloaded);
-        Assert.True(reloaded.GoldReady);
+        Assert.True(reloaded.GoldReady, string.Join(", ", reloaded.MissingGoldRequirements));
     }
 
     [Fact]
@@ -727,6 +728,7 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.AudiobookshelfImportReceiptPath,
             artifacts.DossierVideoPath,
             artifacts.DossierVideoReceiptPath,
+            artifacts.MoviePosterPath,
             artifacts.MovieSubtitlesPath,
             artifacts.MovieStoryboardPath,
             artifacts.TelegramShareDeliveryReceiptPath,
@@ -807,6 +809,7 @@ public sealed class OriginDossierPublicationServiceTests
             ["narrationProvider: Unmixr"],
             artifactPaths: [audiobookPath]);
         string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 dossier film artifact");
+        string moviePosterPath = WriteArtifact(projectRoot, "movie-poster.png", "PNG movie poster artifact");
         string movieSubtitlesPath = WriteArtifact(projectRoot, "subtitles.vtt", "WEBVTT\n\n00:00.000 --> 00:02.000\nOrigin scene.\n");
         string movieStoryboardPath = WriteArtifact(projectRoot, "storyboard.json", """{"sceneId":"clinic-door-rain"}""");
         string dossierVideoReceiptPath = WriteReceipt(
@@ -825,7 +828,12 @@ public sealed class OriginDossierPublicationServiceTests
                 $"/account/work/origin-dossiers/{projectId}/read",
                 $"/account/work/origin-dossiers/{projectId}/listen",
                 $"/account/work/origin-dossiers/{projectId}/watch",
-                "origin.chummer.run/Varga/Mira/Vanta"
+                Sha256Text($"/account/work/origin-dossiers/{projectId}"),
+                Sha256Text($"/account/work/origin-dossiers/{projectId}/read"),
+                Sha256Text($"/account/work/origin-dossiers/{projectId}/listen"),
+                Sha256Text($"/account/work/origin-dossiers/{projectId}/watch"),
+                "origin.chummer.run/Varga/Mira/Vanta",
+                Sha256Text("origin.chummer.run/Varga/Mira/Vanta")
             ]);
         string finalNoFallbackNoSentinelAuditReceiptPath = WriteFinalNoFallbackNoSentinelAuditReceipt(
             projectRoot,
@@ -850,6 +858,7 @@ public sealed class OriginDossierPublicationServiceTests
             audiobookshelfImportReceiptPath,
             dossierVideoPath,
             dossierVideoReceiptPath,
+            moviePosterPath,
             movieSubtitlesPath,
             movieStoryboardPath,
             telegramShareDeliveryReceiptPath,
@@ -999,6 +1008,9 @@ public sealed class OriginDossierPublicationServiceTests
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
+    private static string Sha256Text(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
     private sealed record OriginDossierArtifactPaths(
         string SourcePacketPath,
         string SourcePacketReceiptPath,
@@ -1017,6 +1029,7 @@ public sealed class OriginDossierPublicationServiceTests
         string AudiobookshelfImportReceiptPath,
         string DossierVideoPath,
         string DossierVideoReceiptPath,
+        string MoviePosterPath,
         string MovieSubtitlesPath,
         string MovieStoryboardPath,
         string TelegramShareDeliveryReceiptPath,

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from origin_edition_context import OriginEditionContext
 from origin_edition_provider_config import is_trusted_audiobookshelf_share, origin_owner_url
+from origin_edition_provider_registry import OriginProviderCapabilityRegistry
 
 
 CONTRACT_NAME = "chummer.origin_edition.gold_completion_matrix.v1"
@@ -63,10 +64,7 @@ FORBIDDEN_RECEIPT_SECRET_MARKERS = (
     "audiobookshelf_api_token=",
     "telegram_bot_token=",
 )
-APPROVED_AUDIO_PROVIDERS = {
-    "unmixr": "Unmixr",
-    "inkfluence": "Inkfluence",
-}
+PROVIDER_REGISTRY = OriginProviderCapabilityRegistry.from_env()
 
 
 def now_iso() -> str:
@@ -93,11 +91,7 @@ def string(value: object) -> str:
 
 
 def approved_audio_provider_name(*values: object) -> str:
-    haystack = " ".join(string(value).lower() for value in values if string(value))
-    for token, label in APPROVED_AUDIO_PROVIDERS.items():
-        if token in haystack:
-            return label
-    return ""
+    return PROVIDER_REGISTRY.matched_audio_provider_label(*values)
 
 
 def is_pass(payload: dict[str, Any]) -> bool:
@@ -222,6 +216,11 @@ def telegram_link_bundle_row(path: Path, project_id: str, base_url: str, namespa
     flags = {
         "telegram_receipt_present": path.is_file(),
         "telegram_receipt_status_pass": False,
+        "telegram_selected_delivery_status_imported": False,
+        "telegram_selected_delivery_status_sent": False,
+        "telegram_selected_delivery_message_id_present": False,
+        "telegram_chat_bound": False,
+        "telegram_message_bound": False,
         "project_id_matches": False,
         "telegram_delivery_status_sent": False,
         "telegram_message_id_present": False,
@@ -249,6 +248,11 @@ def telegram_link_bundle_row(path: Path, project_id: str, base_url: str, namespa
     row["sha256"] = sha256_file(path)
     row["reportedStatus"] = payload.get("status")
     flags["telegram_receipt_status_pass"] = string(payload.get("status")).lower() == "pass"
+    flags["telegram_selected_delivery_status_imported"] = string(selected.get("status")) == "audiobookshelf_imported"
+    flags["telegram_selected_delivery_status_sent"] = string(selected.get("telegram_delivery_status")) == "sent"
+    flags["telegram_selected_delivery_message_id_present"] = selected.get("telegram_delivery_message_id_present") is True
+    flags["telegram_chat_bound"] = selected.get("telegram_chat_bound") is True
+    flags["telegram_message_bound"] = selected.get("telegram_message_bound") is True
     flags["project_id_matches"] = string(bundle.get("project_id")) == project_id
     flags["telegram_delivery_status_sent"] = string(bundle.get("telegram_delivery_status")) == "sent"
     flags["telegram_message_id_present"] = bundle.get("telegram_message_id_present") is True
@@ -418,7 +422,7 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
         "env_inspected_top_level": False,
         "rybbit_env_only_top_level": False,
         "secret_values_not_stored": False,
-        "required_provider_inventory_signals_present": False,
+        "required_origin_gold_provider_capabilities_present": False,
         "required_files_passed": False,
         "deployment_not_performed": True,
         "goal_completion_not_claimed": False,
@@ -436,7 +440,7 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
         return row
     payload = read_json(path)
     inventory = payload.get("inventoryInspection") if isinstance(payload.get("inventoryInspection"), dict) else {}
-    provider_signals = inventory.get("newestProviderInventorySignals") if isinstance(inventory.get("newestProviderInventorySignals"), dict) else {}
+    capability_signals = inventory.get("originGoldCapabilitySignals") if isinstance(inventory.get("originGoldCapabilitySignals"), dict) else {}
     rybbit_keys = inventory.get("rybbitRunKeysPresent") if isinstance(inventory.get("rybbitRunKeysPresent"), dict) else {}
     checks = payload.get("checks") if isinstance(payload.get("checks"), list) else []
     check_statuses = {
@@ -457,7 +461,12 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
         "local_authenticated_route_proof",
         "final_no_sentinel_media_audit",
     }
-    required_provider_names = {"unmixr", "inkfluence", "firstBook", "youbooks"}
+    required_capability_names = {
+        "provider_inventory_present",
+        "manuscript_or_edition_provider_available",
+        "premium_audio_provider_available",
+        "optional_overflow_accounts_do_not_block",
+    }
     flags["receipt_passed"] = is_pass(payload)
     flags["integration_eligible"] = payload.get("integrationEligible") is True
     flags["ltd_inventory_inspected"] = inventory.get("ltdInventoryInspected") is True
@@ -474,7 +483,7 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
     flags["env_inspected_top_level"] = payload.get("envInspected") is True
     flags["rybbit_env_only_top_level"] = payload.get("rybbitEnvOnly") is True
     flags["secret_values_not_stored"] = payload.get("secretValuesStored") is False
-    flags["required_provider_inventory_signals_present"] = all(provider_signals.get(key) is True for key in required_provider_names)
+    flags["required_origin_gold_provider_capabilities_present"] = all(capability_signals.get(key) is True for key in required_capability_names)
     flags["required_files_passed"] = all(check_statuses.get(name) == "pass" for name in required_check_names)
     flags["deployment_not_performed"] = payload.get("deploymentPerformed") is not True
     flags["goal_completion_not_claimed"] = payload.get("goalCompletionClaimAllowed") is False
@@ -486,7 +495,7 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
             "failedFlags": failed,
             "sha256": sha256_file(path),
             "requiredChecks": sorted(required_check_names),
-            "requiredProviderSignals": sorted(required_provider_names),
+            "requiredOriginGoldCapabilities": sorted(required_capability_names),
         }
     )
     return row
@@ -662,7 +671,11 @@ def audiobookshelf_share_row(evidence_root: Path, branch: Path, request: dict[st
         if string(request.get("audiobookshelfImportReceiptPath")).startswith("/")
         else evidence_root / string(request.get("audiobookshelfImportReceiptPath"))
     )
-    dossier_receipt_path = branch / "dossier/audiobookshelf-dossier-import.receipt.json"
+    dossier_receipt_path = (
+        Path(string(request.get("ebookAudiobookshelfImportReceiptPath")))
+        if string(request.get("ebookAudiobookshelfImportReceiptPath")).startswith("/")
+        else evidence_root / string(request.get("ebookAudiobookshelfImportReceiptPath"))
+    )
     audiobook_receipt = read_json(audiobook_receipt_path) if audiobook_receipt_path.is_file() else {}
     dossier_receipt = read_json(dossier_receipt_path) if dossier_receipt_path.is_file() else {}
     audiobook_share_url = string(request.get("audiobookshelfAudiobookShareUrl") or request.get("audiobookshelfShareUrl"))
@@ -919,16 +932,26 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "anonymous_artifact_redirect_verified": False,
         "all_private_routes_login_protected": False,
         "logged_in_browser_verified": False,
+        "selected_face_cover_marker_visible": False,
+        "selected_face_cover_alt_visible": False,
+        "selected_face_cover_route_visible": False,
         "selected_face_cover_visible": False,
         "read_tab_visible": False,
+        "read_section_visible": False,
         "listen_tab_visible": False,
+        "listen_section_visible": False,
         "watch_tab_visible": False,
+        "watch_section_visible": False,
         "canon_audit_tab_visible": False,
+        "canon_audit_content_verified": False,
         "read_gate_verified": False,
         "listen_gate_verified": False,
         "watch_gate_verified": False,
         "cover_route_verified": False,
         "book_route_verified": False,
+        "cover_sha_matches_import": False,
+        "book_sha_matches_import": False,
+        "video_sha_matches_import": False,
         "live_provider_artifacts_verified": False,
         "live_provider_delivery_verified": False,
         "local_route_urls_are_private_origin_routes": False,
@@ -981,16 +1004,26 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
     flags["anonymous_artifact_redirect_verified"] = payload.get("anonymousArtifactRedirectVerified") is True
     flags["all_private_routes_login_protected"] = payload.get("all_private_routes_login_protected") is True
     flags["logged_in_browser_verified"] = payload.get("logged_in_browser_verified") is True
+    flags["selected_face_cover_marker_visible"] = payload.get("selected_face_cover_marker_visible") is True
+    flags["selected_face_cover_alt_visible"] = payload.get("selected_face_cover_alt_visible") is True
+    flags["selected_face_cover_route_visible"] = payload.get("selected_face_cover_route_visible") is True
     flags["selected_face_cover_visible"] = payload.get("selected_face_cover_visible") is True
     flags["read_tab_visible"] = payload.get("read_tab_visible") is True
+    flags["read_section_visible"] = payload.get("read_section_visible") is True
     flags["listen_tab_visible"] = payload.get("listen_tab_visible") is True
+    flags["listen_section_visible"] = payload.get("listen_section_visible") is True
     flags["watch_tab_visible"] = payload.get("watch_tab_visible") is True
+    flags["watch_section_visible"] = payload.get("watch_section_visible") is True
     flags["canon_audit_tab_visible"] = payload.get("canon_audit_tab_visible") is True
+    flags["canon_audit_content_verified"] = payload.get("canon_audit_content_verified") is True
     flags["read_gate_verified"] = payload.get("read_gate_verified") is True
     flags["listen_gate_verified"] = payload.get("chummer_run_listen_gate_verified") is True
     flags["watch_gate_verified"] = payload.get("watch_gate_verified") is True
     flags["cover_route_verified"] = payload.get("coverRouteVerified") is True
     flags["book_route_verified"] = payload.get("bookRouteVerified") is True
+    flags["cover_sha_matches_import"] = payload.get("cover_sha_matches_import") is True
+    flags["book_sha_matches_import"] = payload.get("book_sha_matches_import") is True
+    flags["video_sha_matches_import"] = payload.get("video_sha_matches_import") is True
     flags["live_provider_artifacts_verified"] = payload.get("live_provider_artifacts_verified") is True
     flags["live_provider_delivery_verified"] = payload.get("live_provider_delivery_verified") is True
     flags["local_route_urls_are_private_origin_routes"] = all(
@@ -1031,9 +1064,24 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
     live_import = read_json(live_import_path) if live_import_path.is_file() else {}
     request = live_import.get("importRequest") if isinstance(live_import.get("importRequest"), dict) else {}
     live_evidence = live_import.get("evidence") if isinstance(live_import.get("evidence"), dict) else {}
+    base_url = string(request.get("baseUrl") or request.get("chummerBaseUrl") or request.get("originEditionBaseUrl"))
+    if context is None:
+        missing_context = [
+            label
+            for label, value in (
+                ("projectId", string(request.get("projectId"))),
+                ("originEditionNamespace", string(request.get("originEditionNamespace"))),
+                ("baseUrl", base_url),
+            )
+            if not value
+        ]
+        if missing_context:
+            raise ValueError("live import request missing explicit Origin Edition context: " + ", ".join(missing_context))
     context = context or OriginEditionContext.from_env(
         project_id=string(request.get("projectId")),
         namespace=string(request.get("originEditionNamespace")),
+        base_url=base_url,
+        require_explicit=True,
     )
     namespace = context.resolved_namespace
     branch = evidence_root / namespace
@@ -1061,8 +1109,10 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         receipt_row("cover_consistency_receipt", "Cover consistency proof", branch / "cover-consistency-strict.receipt.json"),
         cover_surface_row(branch / "cover-consistency-strict.receipt.json"),
         receipt_row("ebook_import_receipt", "Ebook/PDF packaging and import receipt", evidence_root / "book-artifact-import.receipt.json"),
-        bool_row("ebook_artifact_file", "Ebook artifact exists", artifact_exists(live_import_path, request.get("bookArtifactPath")), string(request.get("bookArtifactPath"))),
-        bool_row("ebook_artifact_namespace", "Ebook artifact is under Origin dossier branch", path_under(request.get("bookArtifactPath"), f"{namespace}/dossier", suffixes=(".epub",)), string(request.get("bookArtifactPath"))),
+        bool_row("ebook_artifact_file", "Ebook artifact exists", artifact_exists(live_import_path, request.get("ebookArtifactPath")), string(request.get("ebookArtifactPath"))),
+        bool_row("ebook_artifact_namespace", "Ebook artifact is under Origin dossier branch", path_under(request.get("ebookArtifactPath"), f"{namespace}/dossier", suffixes=(".epub",)), string(request.get("ebookArtifactPath"))),
+        receipt_row("ebook_audiobookshelf_import_receipt", "Audiobookshelf dossier ebook import receipt", Path(string(request.get("ebookAudiobookshelfImportReceiptPath"))) if string(request.get("ebookAudiobookshelfImportReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("ebookAudiobookshelfImportReceiptPath"))),
+        bool_row("ebook_audiobookshelf_import_receipt_namespace", "Audiobookshelf dossier ebook import receipt is under Origin dossier branch", path_under(request.get("ebookAudiobookshelfImportReceiptPath"), f"{namespace}/dossier", suffixes=(".json",)), string(request.get("ebookAudiobookshelfImportReceiptPath"))),
         dossier_packaging_row(live_import_path, branch, request, live_evidence, context),
         receipt_row("m4b_provider_receipt", "M4B provider narration/import receipt", Path(string(request.get("m4bProviderImportReceiptPath"))) if string(request.get("m4bProviderImportReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("m4bProviderImportReceiptPath"))),
         bool_row("m4b_provider_receipt_namespace", "M4B provider receipt is under Origin audiobook branch", path_under(request.get("m4bProviderImportReceiptPath"), f"{namespace}/audiobook", suffixes=(".json",)), string(request.get("m4bProviderImportReceiptPath"))),
@@ -1093,10 +1143,16 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
 
     deployed_flags = {
         "logged_in_browser_verified": deployed_probe.get("logged_in_browser_verified") is True,
+        "selected_face_cover_marker_visible": deployed_probe.get("selected_face_cover_marker_visible") is True,
+        "selected_face_cover_alt_visible": deployed_probe.get("selected_face_cover_alt_visible") is True,
+        "selected_face_cover_route_visible": deployed_probe.get("selected_face_cover_route_visible") is True,
         "selected_face_cover_visible": deployed_probe.get("selected_face_cover_visible") is True,
         "read_tab_visible": deployed_probe.get("read_tab_visible") is True,
+        "read_section_visible": deployed_probe.get("read_section_visible") is True,
         "listen_tab_visible": deployed_probe.get("listen_tab_visible") is True,
+        "listen_section_visible": deployed_probe.get("listen_section_visible") is True,
         "watch_tab_visible": deployed_probe.get("watch_tab_visible") is True,
+        "watch_section_visible": deployed_probe.get("watch_section_visible") is True,
         "canon_audit_tab_visible": deployed_probe.get("canon_audit_tab_visible") is True,
         "canon_audit_content_verified": deployed_probe.get("canon_audit_content_verified") is True,
         "chummer_canon_owner_visible": deployed_probe.get("chummer_canon_owner_visible") is True,

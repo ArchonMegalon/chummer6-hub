@@ -116,6 +116,19 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
     for marker in FORBIDDEN_VALUE_MARKERS:
         if marker in text:
             issues.append(f"forbidden_secret_marker:{marker}")
+    if status == "pass":
+        if payload.get("goalCompletionClaimAllowed") is not True:
+            issues.append("pass_chain_goal_completion_not_allowed")
+        if top_level_blocked_stages != []:
+            issues.append("pass_chain_has_blocked_stages")
+        if progress_blocked_stages != []:
+            issues.append("pass_chain_has_progress_blocked_stages")
+        blocked_requirements = payload.get("blockedRequirements") if isinstance(payload.get("blockedRequirements"), list) else []
+        progress_blocked_requirements = progress.get("blockedRequirements") if isinstance(progress.get("blockedRequirements"), list) else []
+        if blocked_requirements != []:
+            issues.append("pass_chain_has_blocked_requirements")
+        if progress_blocked_requirements != []:
+            issues.append("pass_chain_has_progress_blocked_requirements")
 
     if require_gold:
         if status != "pass":
@@ -181,7 +194,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--proof-chain",
         type=Path,
-        default=gold_proof_chain_from_env(),
     )
     parser.add_argument("--require-gold", action="store_true")
     return parser.parse_args()
@@ -189,7 +201,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    ok, issues = verify(args.proof_chain, require_gold=args.require_gold)
+    proof_chain = args.proof_chain or gold_proof_chain_from_env()
+    ok, issues = verify(proof_chain, require_gold=args.require_gold)
     if not ok:
         for issue in issues:
             print(issue, file=sys.stderr)

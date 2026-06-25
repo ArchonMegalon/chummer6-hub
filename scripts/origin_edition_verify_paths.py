@@ -14,7 +14,7 @@ def evidence_root_from_env() -> Path:
 
 
 def context_from_env() -> OriginEditionContext:
-    return OriginEditionContext.from_env()
+    return OriginEditionContext.from_env(require_explicit=True)
 
 
 def branch_from_env() -> Path:

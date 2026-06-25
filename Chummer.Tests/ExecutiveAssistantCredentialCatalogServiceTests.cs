@@ -179,6 +179,32 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
     }
 
     [Fact]
+    public void GetCatalog_marks_unmixr_api_configured_until_voice_id_is_configured()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_UNMIXR_TIER"] = "4",
+                ["UNMIXR_ACCOUNT_NEW_TIER4_EMAIL"] = "voice-account@example.invalid",
+                ["UNMIXR_ACCOUNT_NEW_TIER4_API_KEY"] = "generic-unmixr-api-secret",
+                ["UNMIXR_ACCOUNT_NEW_TIER4_VOICE_ID"] = ""
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry unmixr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "unmixr");
+
+        Assert.Equal("4", unmixr.Tier);
+        Assert.False(unmixr.PasswordAltConfigured);
+        Assert.Equal("api_configured_voice_missing", unmixr.Status);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("generic-unmixr-api-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("voice-account@example.invalid", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetCatalog_marks_unmixr_configured_from_generic_account_alias_without_leaking_runtime_secrets()
     {
         IConfiguration configuration = new ConfigurationBuilder()

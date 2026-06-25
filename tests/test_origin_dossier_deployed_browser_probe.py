@@ -3,7 +3,10 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_dossier_deployed_browser_probe.py"
@@ -13,6 +16,7 @@ FAKE_VIDEO_BYTES = b"\x00\x00\x00\x18ftypmp42movie-bytes"
 
 
 def load_module():
+    seed_origin_context_env()
     spec = importlib.util.spec_from_file_location("origin_dossier_deployed_browser_probe", SCRIPT_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -20,11 +24,42 @@ def load_module():
     return module
 
 
+def seed_origin_context_env() -> None:
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_PROJECT_ID", "varga-mira-kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Varga")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Mira")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Kestrel")
+    os.environ.setdefault("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
+
+
+def clear_origin_context_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "CHUMMER_ORIGIN_EDITION_PROJECT_ID",
+        "CHUMMER_ORIGIN_EDITION_FAMILY_NAME",
+        "CHUMMER_ORIGIN_EDITION_GIVEN_NAME",
+        "CHUMMER_ORIGIN_EDITION_RUNNER_NAME",
+        "CHUMMER_ORIGIN_EDITION_BASE_URL",
+        "CHUMMER_ORIGIN_EDITION_NAMESPACE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_deployed_probe_without_explicit_context_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    clear_origin_context_env(monkeypatch)
+
+    with pytest.raises(ValueError, match="explicit Origin Edition context required"):
+        module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", tmp_path / "probe.json")
+
+
 def write_import_request(
     root: Path,
     *,
     audiobook_share_url: str = "https://audiobookshelf.girschele.com/audiobookshelf/share/audio",
     dossier_share_url: str = "https://audiobookshelf.girschele.com/audiobookshelf/share/book",
+    legacy_audiobook_share_url: str | None = None,
+    ebook_sha: str | None = None,
+    legacy_book_sha: str | None = None,
 ) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json").write_text(
@@ -32,11 +67,13 @@ def write_import_request(
             {
                 "evidence": {
                     "storySceneCoverSha256": hashlib.sha256(FAKE_COVER_BYTES).hexdigest(),
-                    "bookArtifactSha256": hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+                    "bookArtifactSha256": legacy_book_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+                    "ebookArtifactSha256": ebook_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
                     "dossierVideoSha256": hashlib.sha256(FAKE_VIDEO_BYTES).hexdigest(),
                 },
                 "importRequest": {
-                    "audiobookshelfShareUrl": audiobook_share_url,
+                    "audiobookshelfShareUrl": legacy_audiobook_share_url if legacy_audiobook_share_url is not None else audiobook_share_url,
+                    "audiobookshelfAudiobookShareUrl": audiobook_share_url,
                     "audiobookshelfDossierShareUrl": dossier_share_url,
                 }
             },
@@ -67,7 +104,11 @@ class FakeSession:
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         if "audiobookshelf.girschele.com/audiobookshelf/share/" in url:
             return FakeResponse(200, {"content-type": "text/html; charset=utf-8"}, "<main>Audiobookshelf share</main>")
-        if not self.has_cookie and not self.headers.get("Authorization", "").startswith("Bearer "):
+        if (
+            not self.has_cookie
+            and not self.headers.get("Authorization")
+            and not self.headers.get("Cookie")
+        ):
             return FakeResponse(302, {"location": "/login?next=%2Faccount%2Fwork"})
         if url.endswith("/cover"):
             return FakeResponse(200, {"content-type": "image/jpeg"}, content=FAKE_COVER_BYTES)
@@ -84,11 +125,16 @@ class FakeSession:
             {"content-type": "text/html"},
             """
             <main data-origin-dossier-detail>
-              <img alt="Rendered Origin Dossier story scene cover for Kestrel">
+              <article data-story-scene-cover-uses-selected-character-face="true">
+                <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Rendered Origin Dossier story scene cover for Kestrel">
+              </article>
               <a href="#origin-edition-read">Read</a>
               <a href="#origin-edition-listen">Listen</a>
               <a href="#origin-edition-watch">Watch</a>
               <a href="#origin-edition-canon-audit">Canon Audit</a>
+              <section id="origin-edition-read" data-origin-edition-tab="read">Read in Audiobookshelf</section>
+              <section id="origin-edition-listen" data-origin-edition-tab="listen">Listen in Audiobookshelf</section>
+              <section id="origin-edition-watch" data-origin-edition-tab="watch">Watch scene movie</section>
               <section id="origin-edition-canon-audit"
                        data-origin-edition-tab="canon-audit"
                        data-chummer-owns-canon="true"
@@ -146,7 +192,9 @@ class MissingCanonAuditContentSession(FakeSession):
                     {"content-type": "text/html"},
                     """
                     <main data-origin-dossier-detail>
-                      <img alt="Rendered Origin Dossier story scene cover for Kestrel">
+                      <article data-story-scene-cover-uses-selected-character-face="true">
+                        <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Rendered Origin Dossier story scene cover for Kestrel">
+                      </article>
                       <a href="#origin-edition-read">Read</a>
                       <a href="#origin-edition-listen">Listen</a>
                       <a href="#origin-edition-watch">Watch</a>
@@ -155,6 +203,36 @@ class MissingCanonAuditContentSession(FakeSession):
                     """,
                 )
         return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
+class MissingReadSectionSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        response = super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+        if response.status_code == 200 and "text/html" in response.headers.get("content-type", ""):
+            response.text = response.text.replace('<section id="origin-edition-read" data-origin-edition-tab="read">Read in Audiobookshelf</section>', "")
+            response.content = response.text.encode("utf-8")
+        return response
+
+
+class MissingSelectedFaceCoverMarkerSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        response = super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+        if response.status_code == 200 and "text/html" in response.headers.get("content-type", ""):
+            response.text = response.text.replace(' data-story-scene-cover-uses-selected-character-face="true"', "")
+            response.content = response.text.encode("utf-8")
+        return response
+
+
+class WrongSelectedFaceCoverRouteSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        response = super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+        if response.status_code == 200 and "text/html" in response.headers.get("content-type", ""):
+            response.text = response.text.replace(
+                "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover",
+                "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/generic-cover",
+            )
+            response.content = response.text.encode("utf-8")
+        return response
 
 
 def test_deployed_probe_fails_closed_without_owner_token(tmp_path: Path, monkeypatch) -> None:
@@ -168,7 +246,7 @@ def test_deployed_probe_fails_closed_without_owner_token(tmp_path: Path, monkeyp
 
     assert result["status"] == "blocked"
     assert result["deployedRouteClaimAllowed"] is False
-    assert "missing_deployed_identity_token" in result["blockers"]
+    assert "missing_deployed_owner_session" in result["blockers"]
     assert result["rawSessionTokenExposed"] is False
     assert result["ownerAuth"]["tokenValueStoredInReceipt"] is False
     assert result["all_private_routes_login_protected"] is True
@@ -179,6 +257,60 @@ def test_deployed_probe_fails_closed_without_owner_token(tmp_path: Path, monkeyp
     assert result["unauthenticated_cover_redirect_verified"] is True
     assert result["unauthenticated_video_redirect_verified"] is True
     assert output.is_file()
+
+
+def test_deployed_probe_accepts_owner_session_token_alias_without_leaking_value(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", raising=False)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN", "secret-owner-session-alias")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "pass"
+    assert result["ownerAuth"]["mode"] == "cookie"
+    assert result["ownerAuth"]["tokenSha256"]
+    assert "secret-owner-session-alias" not in serialized
+
+
+def test_deployed_probe_accepts_cookie_header_without_leaking_value(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", raising=False)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_COOKIE_HEADER", "chummer_hub_access_token=secret-cookie-header")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "pass"
+    assert result["ownerAuth"]["mode"] == "cookie_header"
+    assert result["ownerAuth"]["cookieName"] is None
+    assert result["ownerAuth"]["tokenSha256"]
+    assert "secret-cookie-header" not in serialized
+    assert "chummer_hub_access_token=secret-cookie-header" not in serialized
+
+
+def test_deployed_probe_accepts_authorization_header_without_leaking_value(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", raising=False)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER", "Bearer secret-authorization-header")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "pass"
+    assert result["ownerAuth"]["mode"] == "authorization_header"
+    assert result["ownerAuth"]["tokenSha256"]
+    assert "secret-authorization-header" not in serialized
+    assert "Bearer secret-authorization-header" not in serialized
 
 
 def test_deployed_probe_main_uses_origin_edition_context_for_default_output(tmp_path: Path, monkeypatch) -> None:
@@ -251,6 +383,8 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["logged_in_browser_verified"] is True
     assert result["read_gate_verified"] is True
     assert result["chummer_run_listen_gate_verified"] is True
+    assert result["redirect_location_sha256"]["read"] == result["expected_redirect_location_sha256"]["read"]
+    assert result["redirect_location_sha256"]["listen"] == result["expected_redirect_location_sha256"]["listen"]
     assert result["audiobook_share_url_trusted"] is True
     assert result["dossier_share_url_trusted"] is True
     assert result["audiobook_share_reachable"] is True
@@ -279,6 +413,41 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["unauthenticated_book_redirect_verified"] is True
     assert result["unauthenticated_cover_redirect_verified"] is True
     assert result["unauthenticated_video_redirect_verified"] is True
+
+
+def test_deployed_probe_prefers_explicit_audiobook_share_over_legacy_share(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(
+        tmp_path,
+        audiobook_share_url="https://audiobookshelf.girschele.com/audiobookshelf/share/audio",
+        legacy_audiobook_share_url="https://evil.example/audiobookshelf/share/audio",
+    )
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", tmp_path / "probe.json")
+
+    assert result["status"] == "pass"
+    assert result["audiobookshelf_redirect"] == "https://audiobookshelf.girschele.com/audiobookshelf/share/audio"
+    assert result["audiobook_share_url_trusted"] is True
+    assert result["chummer_run_listen_gate_verified"] is True
+
+
+def test_deployed_probe_prefers_explicit_ebook_hash_over_legacy_book_hash(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(
+        tmp_path,
+        ebook_sha=hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+        legacy_book_sha="0" * 64,
+    )
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", tmp_path / "probe.json")
+
+    assert result["status"] == "pass"
+    assert result["expected_import_sha256"]["book"] == hashlib.sha256(FAKE_BOOK_BYTES).hexdigest()
+    assert result["book_sha_matches_import"] is True
 
 
 def test_deployed_probe_blocks_untrusted_audiobookshelf_share_even_if_redirect_matches(tmp_path: Path, monkeypatch) -> None:
@@ -328,6 +497,61 @@ def test_deployed_probe_blocks_when_audiobookshelf_share_page_is_unreachable(tmp
     assert "audiobook_share_reachable" in result["progress"]["blockedChecks"]
     assert result["http_statuses"]["audiobook_share"] == 503
     assert "secret-session" not in serialized
+
+
+def test_deployed_probe_blocks_when_read_section_is_missing_even_if_link_exists(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", MissingReadSectionSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+
+    assert result["status"] == "blocked"
+    assert result["read_section_visible"] is False
+    assert result["read_tab_visible"] is False
+    assert "read_section_visible" in result["blockers"]
+    assert "read_tab_visible" in result["blockers"]
+    assert "owner_playback_e2e_verified" in result["blockers"]
+
+
+def test_deployed_probe_blocks_generic_cover_without_selected_face_marker(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", MissingSelectedFaceCoverMarkerSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+
+    assert result["status"] == "blocked"
+    assert result["selected_face_cover_marker_visible"] is False
+    assert result["selected_face_cover_alt_visible"] is True
+    assert result["selected_face_cover_route_visible"] is True
+    assert result["selected_face_cover_visible"] is False
+    assert "selected_face_cover_marker_visible" in result["blockers"]
+    assert "selected_face_cover_visible" in result["blockers"]
+    assert "owner_playback_e2e_verified" in result["blockers"]
+
+
+def test_deployed_probe_blocks_cover_that_is_not_canonical_owner_cover_route(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", WrongSelectedFaceCoverRouteSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+
+    assert result["status"] == "blocked"
+    assert result["selected_face_cover_marker_visible"] is True
+    assert result["selected_face_cover_alt_visible"] is True
+    assert result["selected_face_cover_route_visible"] is False
+    assert result["selected_face_cover_visible"] is False
+    assert "selected_face_cover_route_visible" in result["blockers"]
+    assert "selected_face_cover_visible" in result["blockers"]
+    assert "owner_playback_e2e_verified" in result["blockers"]
 
 
 def test_deployed_probe_blocks_when_canon_audit_content_is_missing(tmp_path: Path, monkeypatch) -> None:
