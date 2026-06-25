@@ -122,7 +122,8 @@ public sealed class AccountsController : Controller
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
                 ? "work"
                 : NormalizeAccountSection(section);
-        if (string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(selectedSection, "advanced", StringComparison.OrdinalIgnoreCase))
         {
             return Redirect("/account/billing");
         }
@@ -1483,7 +1484,7 @@ public sealed class AccountsController : Controller
                 "work" => "work",
                 "participation" => "participation",
                 "settings" => "settings",
-                "advanced" => "advanced",
+                "advanced" => "settings",
                 _ => "profile"
             };
 
@@ -1493,8 +1494,8 @@ public sealed class AccountsController : Controller
             new SectionLinkViewModel("profile", "Profile", "/account", string.Equals(currentSection, "profile", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("access", "Devices & access", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Work", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
+            new SectionLinkViewModel("access", "Installs", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Campaigns", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
         };
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
@@ -1508,11 +1509,11 @@ public sealed class AccountsController : Controller
         {
             "participation" => ("Account · Participation", "Followed package work, guided contribution receipts, and privacy-safe recognition settings."),
             "support" => ("Account · Support", "Open, track, and close support without leaving the account surface."),
-            "access" => ("Account · Devices & access", "Linked installs, access rights, and claim handoff in one calmer route."),
-            "work" => ("Account · Work", "Campaign return, shared work, and deeper follow-through when you explicitly need them."),
-            "settings" => ("Account · Settings", "Preferences, linked channels, participation, and help policy outside the customer core."),
-            "advanced" => ("Account · Advanced", "Account identifiers and deeper account details when you explicitly need them."),
-            _ => ("Account", "Profile, sign-in methods, recovery posture, and channel settings.")
+            "access" => ("Account · Installs", "Linked installs, access rights, and claim handoff in one calmer route."),
+            "work" => ("Account · Campaigns", "Campaign return and table context when you explicitly need them."),
+            "settings" => ("Account · Billing", "Membership and billing are handled by the billing provider."),
+            "advanced" => ("Account · Billing", "Membership and billing are handled by the billing provider."),
+            _ => ("Account", "Profile, sign-in methods, recovery posture, and billing entry points.")
         };
 
     [HttpGet("me")]

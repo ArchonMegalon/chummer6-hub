@@ -5,6 +5,29 @@ namespace Chummer.Tests;
 public sealed class AccountBuildLabHandoffViewTests
 {
     [Fact]
+    public void AccountNavigationUsesRealDestinationsInsteadOfFakeSettingsSurfaces()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string controller = File.ReadAllText(controllerPath);
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"work\", \"Campaigns\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("new SectionLinkViewModel(\"advanced\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
+
+        Assert.Contains("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
+        Assert.Contains("\"advanced\" => \"Billing\"", view, StringComparison.Ordinal);
+        Assert.Contains("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"work\" => \"Work\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"advanced\" => \"Advanced account details\"", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AccountWorkDetailRendersPerOutputBuildLabFollowThroughCues()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
@@ -75,7 +98,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("gmLane.SignalCount", view, StringComparison.Ordinal);
         Assert.Contains("gmLane.Summary", view, StringComparison.Ordinal);
         Assert.Contains("GM operations", view, StringComparison.Ordinal);
-        Assert.Contains("Account backbone", view, StringComparison.Ordinal);
+        Assert.Contains("Account support", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues.Count > 0", view, StringComparison.Ordinal);

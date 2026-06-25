@@ -5,10 +5,10 @@
     {
         "participation" => "Account · Participation",
         "support" => "Account · Support",
-        "access" => "Account · Devices & access",
-        "work" => "Account · Work",
-        "settings" => "Account · Settings",
-        "advanced" => "Account · Advanced",
+        "access" => "Account · Installs",
+        "work" => "Account · Campaigns",
+        "settings" => "Account · Billing",
+        "advanced" => "Account · Billing",
         _ => "Account"
     };
     var sectionTitle = Model.CurrentSection switch
@@ -16,26 +16,26 @@
         "participation" => "Participation",
         "support" => "Support",
         "access" => "Installs",
-        "work" => "Work",
-        "settings" => "Settings",
-        "advanced" => "Advanced account details",
+        "work" => "Campaigns",
+        "settings" => "Billing",
+        "advanced" => "Billing",
         _ => "Account"
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Return to followed work, contribution history, and optional public recognition from one account page.",
+        "participation" => "Return to public requests, contribution history, and optional public recognition from one account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
         "access" => "See installed copies, pending setup, and install help without the internal machinery.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
-        "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
-        "advanced" => "Account identifiers and deeper account details stay behind the advanced page.",
-        _ => "Keep sign-in, recovery, devices, support, and account preferences in one product settings surface."
+        "settings" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
+        "advanced" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
+        _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account surface."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the section links.";
+    ViewData["ContextSidebarSummary"] = "Move between profile, installs, support, billing, participation, and campaigns.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
