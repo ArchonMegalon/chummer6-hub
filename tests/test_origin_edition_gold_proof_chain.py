@@ -139,7 +139,7 @@ def test_gold_proof_chain_blocks_when_completion_matrix_blocks_and_keeps_env_sec
     assert result["status"] == "blocked"
     assert result["updated_at"]
     assert result["next_action"] == "probe done"
-    assert "stage:gold_gap_audit" in result["blocking_reason"]
+    assert "stage:completion_matrix" in result["blocking_reason"]
     assert "requirement:deployed_owner_read_listen_watch_canon" in result["blocking_reason"]
     assert result["progress"]["totalStages"] == 6
     assert result["progress"]["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
