@@ -3051,6 +3051,8 @@ def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None
 
 def test_login_view_is_minimal_auth_surface() -> None:
     auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
+    auth_message = read("Chummer.Run.Api/Views/Auth/Message.cshtml")
+    google_merge = read("Chummer.Run.Api/Views/Auth/GoogleMerge.cshtml")
     layout = read("Chummer.Run.Api/Views/Shared/_Layout.cshtml")
     auth_compact = read("Chummer.Run.Api/wwwroot/css/auth-compact.css")
 
@@ -3077,8 +3079,17 @@ def test_login_view_is_minimal_auth_surface() -> None:
         "width: min(18.75rem, 100%);",
         "font-size: 1.24rem;",
         "min-height: 2.25rem;",
+        ".surface-auth.surface-minimal.surface-auth-message",
     ):
         assert expected in auth_compact
+
+    for compact_auth_view in (auth_message, google_merge):
+        assert 'ViewData["SurfaceClass"] = "surface-auth surface-minimal surface-auth-message";' in compact_auth_view
+        assert 'ViewData["HideAuthChrome"] = true;' in compact_auth_view
+        assert "auth-entry--lean" in compact_auth_view
+        assert "auth-shell__story" not in compact_auth_view
+        assert "hero-brand" not in compact_auth_view
+        assert "hero-headline" not in compact_auth_view
 
     for forbidden in (
         "clamp(1.75rem",

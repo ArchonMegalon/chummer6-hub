@@ -2,25 +2,24 @@
 @{
     ViewData["Title"] = "Confirm Google account link";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-auth surface-minimal surface-auth-message";
+    ViewData["HideAuthChrome"] = true;
 }
 
-<section class="auth-stage">
-    <div class="auth-shell">
-        <div class="auth-shell__story">
-            <p class="eyebrow">Confirm account link</p>
-            <h1 class="hero-brand">CHUMMER</h1>
-            <h2 class="hero-headline">This Google email already belongs to an account.</h2>
-            <p>Chummer found <strong>@Model.VerifiedEmail</strong> on an existing account for <strong>@Model.ExistingDisplayName</strong>. Confirm the merge instead of creating a duplicate.</p>
+<section class="auth-entry auth-entry--lean" aria-labelledby="auth-merge-title">
+    <div class="auth-panel auth-panel--entry">
+        <div class="auth-panel__intro auth-panel__intro--masthead">
+            <p class="auth-panel__eyebrow">Confirm account link</p>
+            <h1 id="auth-merge-title">Use the existing account</h1>
+            <p class="auth-panel__hint">Chummer found <strong>@Model.VerifiedEmail</strong> on the account for <strong>@Model.ExistingDisplayName</strong>.</p>
         </div>
-        <div class="auth-panel">
-            <form method="post" action="/auth/google/merge" class="auth-form">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="mergeToken" value="@Model.MergeToken" />
-                <button class="button-like button-like--primary" type="submit">Use existing account</button>
-            </form>
-            <div class="stacked-actions" style="margin-top: 1rem;">
-                <a class="button-like button-like--secondary" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Cancel</a>
-            </div>
+        <form method="post" action="/auth/google/merge" class="auth-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="mergeToken" value="@Model.MergeToken" />
+            <button class="button-like button-like--primary auth-panel__primary" type="submit">Use existing account</button>
+        </form>
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary auth-panel__primary" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Cancel</a>
         </div>
     </div>
 </section>
