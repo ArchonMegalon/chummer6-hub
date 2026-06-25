@@ -6029,17 +6029,17 @@ body.shell-authenticated {
   min-height: calc(100svh - 60px);
   display: grid;
   place-items: start center;
-  padding: clamp(2rem, 9svh, 5.5rem) 16px 40px;
+  padding: 18px 16px 28px;
 }
 
 .surface-auth.surface-minimal .auth-entry {
-  width: min(420px, 100%);
+  width: min(330px, 100%);
   display: block;
   margin: 0;
-  border: 1px solid rgba(243, 234, 219, 0.13);
+  border: 1px solid rgba(243, 234, 219, 0.12);
   border-radius: 10px;
   overflow: hidden;
-  background: #1f1f1d;
+  background: #1b1b19;
   box-shadow: none;
 }
 
@@ -6049,9 +6049,9 @@ body.shell-authenticated {
 
 .surface-auth.surface-minimal .auth-panel--entry {
   display: grid;
-  gap: 18px;
+  gap: 11px;
   margin: 0;
-  padding: clamp(22px, 5vw, 30px);
+  padding: 16px;
   border: 0;
   background: transparent;
   color: #f3eadb;
@@ -6087,7 +6087,7 @@ body.shell-authenticated {
 }
 
 .surface-auth.surface-minimal .auth-panel__intro h1 {
-  font-size: clamp(1.75rem, 7vw, 2.25rem);
+  font-size: 1.5rem;
   line-height: 1.05;
 }
 
@@ -6102,8 +6102,8 @@ body.shell-authenticated {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
   font-family: var(--font-family-base);
-  font-size: 0.94rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .surface-auth.surface-minimal .eyebrow {
@@ -6125,12 +6125,12 @@ body.shell-authenticated {
 
 .surface-auth.surface-minimal .field label {
   color: rgba(243, 234, 219, 0.76);
-  font-size: 0.88rem;
+  font-size: 0.83rem;
 }
 
 .surface-auth.surface-minimal .field input {
   width: 100%;
-  min-height: 46px;
+  min-height: 40px;
   border: 1px solid rgba(243, 234, 219, 0.16);
   border-radius: 7px;
   background: #151514;
@@ -6140,7 +6140,7 @@ body.shell-authenticated {
 .surface-auth.surface-minimal .button-like {
   width: 100%;
   justify-content: center;
-  min-height: 44px;
+  min-height: 40px;
   border-radius: 7px;
 }
 
@@ -6170,6 +6170,8 @@ body.shell-authenticated {
   min-height: 100svh;
   background: #171716;
   color: #f3eadb;
+  display: grid;
+  place-items: start center;
 }
 
 .route-login.surface-minimal .site-header,
@@ -6181,10 +6183,10 @@ body.shell-authenticated {
 
 .route-login.surface-minimal .site-header__inner--auth,
 .route-signup.surface-minimal .site-header__inner--auth {
-  width: min(360px, calc(100% - 32px));
+  width: min(320px, calc(100% - 28px));
   min-height: auto;
-  margin: 0 auto;
-  padding: 18px 0 0;
+  margin: 0 auto 4px;
+  padding: 0;
 }
 
 .route-login.surface-minimal .site-brand,
@@ -6208,38 +6210,40 @@ body.shell-authenticated {
 .route-login.surface-minimal.surface-auth-login .site-main {
   min-height: 100svh;
   display: grid;
-  place-items: center;
-  padding: 0 16px;
+  place-items: start center;
+  padding: 18px 16px;
 }
 
 .route-login.surface-minimal.surface-auth-login .auth-entry {
-  width: min(340px, calc(100% - 32px));
+  width: min(330px, calc(100% - 26px));
   border: 0;
-  background: transparent;
+  background: #1b1b19;
+  border: 1px solid rgba(243, 234, 219, 0.12);
+  border-radius: 10px;
 }
 
 .route-login.surface-minimal.surface-auth-login .auth-panel--entry {
-  padding: 0;
-  gap: 12px;
+  padding: 16px;
+  gap: 11px;
 }
 
 .route-login.surface-minimal .site-main,
 .route-signup.surface-minimal .site-main {
-  min-height: calc(100svh - 60px);
+  min-height: calc(100svh - 48px);
   display: grid;
   place-items: start center;
-  padding: clamp(1.5rem, 7svh, 4rem) 16px 32px;
+  padding: 18px 16px 28px;
 }
 
 .route-login.surface-minimal .auth-entry,
 .route-signup.surface-minimal .auth-entry {
-  width: min(360px, 100%);
+  width: min(330px, 100%);
   display: block;
   margin: 0;
-  border: 1px solid rgba(243, 234, 219, 0.1);
-  border-radius: 8px;
+  border: 1px solid rgba(243, 234, 219, 0.12);
+  border-radius: 10px;
   overflow: hidden;
-  background: #1d1d1b;
+  background: #1b1b19;
   box-shadow: none;
 }
 
@@ -6249,15 +6253,15 @@ body.shell-authenticated {
 }
 
 .route-login.surface-minimal.surface-auth-login .auth-entry.auth-entry--lean {
-  width: min(340px, calc(100% - 32px));
+  width: min(330px, calc(100% - 26px));
 }
 
 .route-login.surface-minimal .auth-panel--entry,
 .route-signup.surface-minimal .auth-panel--entry {
   display: grid;
-  gap: 14px;
+  gap: 11px;
   margin: 0;
-  padding: clamp(20px, 5vw, 26px);
+  padding: 16px;
   border: 0;
   background: transparent;
   color: #f3eadb;
@@ -6318,8 +6322,8 @@ body.shell-authenticated {
 
 .route-login.surface-minimal .auth-panel__intro h1,
 .route-signup.surface-minimal .auth-panel__intro h1 {
-  font-size: clamp(1.42rem, 6vw, 1.85rem);
-  line-height: 1.1;
+  font-size: 1.5rem;
+  line-height: 1.12;
 }
 
 .route-login.surface-minimal .auth-panel__intro h2,
@@ -6340,8 +6344,8 @@ body.shell-authenticated {
 .route-signup.surface-minimal .privacy-note {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
-  font-size: 0.9rem;
-  line-height: 1.4;
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .route-login.surface-minimal .eyebrow,
@@ -6367,13 +6371,13 @@ body.shell-authenticated {
 .route-login.surface-minimal .field label,
 .route-signup.surface-minimal .field label {
   color: rgba(243, 234, 219, 0.76);
-  font-size: 0.88rem;
+  font-size: 0.83rem;
 }
 
 .route-login.surface-minimal .field input,
 .route-signup.surface-minimal .field input {
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   border: 1px solid rgba(243, 234, 219, 0.16);
   border-radius: 6px;
   background: #151514;
@@ -6384,7 +6388,7 @@ body.shell-authenticated {
 .route-signup.surface-minimal .button-like {
   width: 100%;
   justify-content: center;
-  min-height: 42px;
+  min-height: 40px;
   border-radius: 6px;
 }
 
@@ -6395,7 +6399,7 @@ body.shell-authenticated {
   align-items: center;
   gap: 10px;
   color: rgba(243, 234, 219, 0.45);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .route-login.surface-minimal .auth-divider::before,

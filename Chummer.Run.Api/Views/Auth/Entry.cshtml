@@ -4,45 +4,33 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";
     ViewData["HideAuthChrome"] = !Model.CreateAccount;
-    var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
-    var installLinkReturnsToLocalApp = false;
-    static bool IsLoopbackCallbackUri(string candidate)
-    {
-        return Uri.TryCreate(candidate, UriKind.Absolute, out var parsedCallback)
-            && parsedCallback.IsLoopback
-            && (string.Equals(parsedCallback.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(parsedCallback.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
-    }
-
-    if (isInstallLinkReturn)
-    {
-        var parsedNextPath = new Uri($"https://chummer.run{Model.NextPath}", UriKind.Absolute);
-        var nextQuery = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(parsedNextPath.Query);
-        if (nextQuery.TryGetValue("installLinkCallbackUri", out var callbackValues))
-        {
-            var callbackUri = callbackValues.ToString();
-            installLinkReturnsToLocalApp = IsLoopbackCallbackUri(callbackUri);
-        }
-    }
 
     var introCopy = Model.CreateAccount
-        ? "Create an account with email or Google."
-        : "Use your email to sign in.";
+        ? "Use email to create your account."
+        : (string.IsNullOrWhiteSpace(Model.SupportLine) ? "Use your email to continue." : Model.SupportLine);
+    var pageHeading = Model.CreateAccount ? "Get started" : "Sign in";
 }
 
 <section class="auth-entry auth-entry--lean" aria-labelledby="auth-title">
     <div class="auth-panel auth-panel--entry">
         <div class="auth-panel__intro auth-panel__intro--masthead">
-            <h1 id="auth-title">@(Model.CreateAccount ? "Create account" : "Sign in")</h1>
-            <p>@introCopy</p>
+            <h1 id="auth-title">@pageHeading</h1>
+            <p class="auth-panel__hint">@introCopy</p>
         </div>
 
         <form class="auth-form" method="post" action="/auth/email/start">
             @Html.AntiForgeryToken()
             <input type="hidden" name="next" value="@Model.NextPath" />
             <div class="field">
-                <label for="email">Email</label>
-                <input id="email" name="email" type="email" autocomplete="email" placeholder="runner@example.com" required />
+                <label for="email" class="field-label">Email</label>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    placeholder="runner@example.com"
+                    inputmode="email"
+                    required />
             </div>
             <button class="button-like button-like--primary auth-panel__primary" type="submit">Continue</button>
         </form>
@@ -51,11 +39,6 @@
         {
             <div class="auth-divider"><span>or</span></div>
             <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
-        }
-
-        @if (isInstallLinkReturn)
-        {
-            <p class="muted-copy">Keep Chummer open until the browser returns to the app.</p>
         }
     </div>
 </section>
