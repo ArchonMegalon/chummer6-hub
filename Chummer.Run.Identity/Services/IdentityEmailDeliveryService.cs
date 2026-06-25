@@ -474,7 +474,34 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
            || !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]?.Trim());
 
     private bool AllowUnsafeInlinePreviewLinks()
-        => ResolveBool(_configuration["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"], defaultValue: false);
+    {
+        if (!ResolveBool(_configuration["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"], defaultValue: false))
+        {
+            return false;
+        }
+
+        if (!string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"]?.Trim(), "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return IsLoopbackPublicBaseUrl(_configuration["IDENTITY_PUBLIC_BASE_URL"]);
+    }
+
+    private static bool IsLoopbackPublicBaseUrl(string? configured)
+    {
+        var value = string.IsNullOrWhiteSpace(configured)
+            ? "http://localhost:5101"
+            : configured.Trim();
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        return uri.IsLoopback
+            || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase);
+    }
 
     private void RecordTransportResult(IdentityEmailMessage message, IdentityEmailTransportResult result)
     {
