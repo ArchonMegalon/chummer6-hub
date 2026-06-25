@@ -79,6 +79,9 @@ REQUIRED_DEPLOYED_PROBE_FLAGS = (
 )
 FORBIDDEN_VALUE_MARKERS = (
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
+    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN=",
+    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER=",
+    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER=",
     "Bearer ",
     "Cookie:",
     "secret-token",
@@ -141,12 +144,21 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
         issues.append("progress_blocker_count_missing")
 
     required_env = payload.get("requiredEnv") if isinstance(payload.get("requiredEnv"), dict) else {}
-    token_env = required_env.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN") if isinstance(required_env.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"), dict) else {}
+    owner_session_env = required_env.get("deployedOwnerSession") if isinstance(required_env.get("deployedOwnerSession"), dict) else {}
     release_env = required_env.get("CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD") if isinstance(required_env.get("CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"), dict) else {}
-    if token_env.get("required") is not True:
-        issues.append("identity_token_not_marked_required")
-    if token_env.get("valueStoredInReceipt") is not False:
-        issues.append("identity_token_value_stored")
+    if owner_session_env.get("required") is not True:
+        issues.append("owner_session_not_marked_required")
+    accepted_keys = owner_session_env.get("acceptedKeys") if isinstance(owner_session_env.get("acceptedKeys"), list) else []
+    for key in (
+        "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN",
+        "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN",
+        "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
+        "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
+    ):
+        if key not in accepted_keys:
+            issues.append(f"owner_session_accepted_key_missing:{key}")
+    if owner_session_env.get("valueStoredInReceipt") is not False:
+        issues.append("owner_session_value_stored")
     if release_env.get("requiredForRelease") is not True:
         issues.append("release_gold_env_not_required")
     if release_env.get("expectedValueForRelease") != "1":
@@ -209,14 +221,14 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
             issues.append("pass_handoff_has_missing_deployed_flags")
         if any(value is not True for value in required_flags.values()):
             issues.append("pass_handoff_required_flag_not_true")
-        if token_env.get("presentInCurrentProcess") is not True:
-            issues.append("pass_handoff_token_not_present")
+        if owner_session_env.get("presentInCurrentProcess") is not True:
+            issues.append("pass_handoff_owner_session_not_present")
     if status == "ready_for_operator_token":
         blockers = payload.get("blockers") if isinstance(payload.get("blockers"), list) else []
-        if "missing_deployed_identity_token" not in blockers:
-            issues.append("ready_handoff_missing_identity_token_blocker")
-        if token_env.get("presentInCurrentProcess") is not False:
-            issues.append("ready_handoff_token_presence_not_false")
+        if "missing_deployed_owner_session" not in blockers:
+            issues.append("ready_handoff_missing_owner_session_blocker")
+        if owner_session_env.get("presentInCurrentProcess") is not False:
+            issues.append("ready_handoff_owner_session_presence_not_false")
 
     privacy = payload.get("privacy") if isinstance(payload.get("privacy"), dict) else {}
     for key in ("rawCredentialExposed", "rawSessionTokenExposed", "envValuesExposed", "deploymentPerformed"):

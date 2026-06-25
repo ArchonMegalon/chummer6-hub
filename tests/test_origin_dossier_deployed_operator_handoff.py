@@ -62,11 +62,11 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
         branch / "deployed-chummer-browser-probe.receipt.json",
         {
             "status": deployed_status,
-            "blockers": ["missing_deployed_identity_token"] if deployed_status != "pass" else [],
-            "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
+            "blockers": ["missing_deployed_owner_session"] if deployed_status != "pass" else [],
+            "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe."
             if deployed_status != "pass"
             else "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected.",
-            "blocking_reason": "missing_deployed_identity_token" if deployed_status != "pass" else "",
+            "blocking_reason": "missing_deployed_owner_session" if deployed_status != "pass" else "",
             "progress": {
                 "passedChecks": 41 if deployed_pass else 9,
                 "totalChecks": 41,
@@ -119,7 +119,7 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
         root / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json",
         {
             "status": gold_status,
-            "failedCodes": ["browser_deployed_probe_blocked:missing_deployed_identity_token"]
+            "failedCodes": ["browser_deployed_probe_blocked:missing_deployed_owner_session"]
             if gold_status != "pass"
             else [],
         },
@@ -137,23 +137,25 @@ def test_handoff_is_ready_for_operator_token_without_exposing_secret_values(tmp_
 
     assert result["status"] == "ready_for_operator_token"
     assert result["updated_at"]
-    assert result["next_action"] == "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
-    assert "missing_deployed_identity_token" in result["blocking_reason"]
+    assert "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN" in result["next_action"]
+    assert "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER" in result["next_action"]
+    assert "missing_deployed_owner_session" in result["blocking_reason"]
     assert result["progress"]["blockerCount"] == len(result["blockers"])
     assert result["currentEvidence"]["deployedProbeNextAction"] == result["next_action"]
-    assert result["currentEvidence"]["deployedProbeBlockingReason"] == "missing_deployed_identity_token"
+    assert result["currentEvidence"]["deployedProbeBlockingReason"] == "missing_deployed_owner_session"
     assert result["currentEvidence"]["deployedProbeProgress"]["totalChecks"] == 41
     assert result["goalCompletionClaimAllowed"] is False
     assert result["context"]["projectId"] == "varga-mira-kestrel"
     assert result["context"]["namespace"] == "origin.chummer.run/Varga/Mira/Kestrel"
     assert result["context"]["baseUrl"] == "https://chummer.run"
-    assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["presentInCurrentProcess"] is False
-    assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["valueStoredInReceipt"] is False
+    assert result["requiredEnv"]["deployedOwnerSession"]["presentInCurrentProcess"] is False
+    assert result["requiredEnv"]["deployedOwnerSession"]["valueStoredInReceipt"] is False
+    assert "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER" in result["requiredEnv"]["deployedOwnerSession"]["acceptedKeys"]
     assert result["requiredEnv"]["CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"]["expectedValueForRelease"] == "1"
     assert result["requiredEnv"]["CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"]["valueStoredInReceipt"] is False
     assert result["privacy"]["rawSessionTokenExposed"] is False
     assert result["privacy"]["envValuesExposed"] is False
-    assert "missing_deployed_identity_token" in result["blockers"]
+    assert "missing_deployed_owner_session" in result["blockers"]
     assert "--env-file /docker/chummercomplete/chummer.run-services/.env" in serialized
     assert "scripts/materialize_origin_edition_gold_proof_chain.py" in serialized
     assert "--allow-blocked" in serialized
@@ -186,9 +188,9 @@ def test_handoff_uses_origin_edition_context_for_namespace_and_commands(tmp_path
         branch / "deployed-chummer-browser-probe.receipt.json",
         {
             "status": "blocked",
-            "blockers": ["missing_deployed_identity_token"],
-            "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
-            "blocking_reason": "missing_deployed_identity_token",
+            "blockers": ["missing_deployed_owner_session"],
+            "next_action": "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe.",
+            "blocking_reason": "missing_deployed_owner_session",
             "progress": {"passedChecks": 0, "totalChecks": 41, "blockedChecks": ["owner_playback_e2e_verified"]},
         },
     )
@@ -228,8 +230,8 @@ def test_handoff_passes_only_when_deployed_probe_and_gold_audit_pass(tmp_path: P
     assert result["blockers"] == []
     assert result["currentEvidence"]["deployedProbeMissingRequiredFlags"] == []
     assert result["currentEvidence"]["deployedProbeRequiredFlags"]["owner_playback_e2e_verified"] is True
-    assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["presentInCurrentProcess"] is True
-    assert result["requiredEnv"]["CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN"]["valueStoredInReceipt"] is False
+    assert result["requiredEnv"]["deployedOwnerSession"]["presentInCurrentProcess"] is True
+    assert result["requiredEnv"]["deployedOwnerSession"]["valueStoredInReceipt"] is False
     assert result["requiredEnv"]["CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD"]["requiredForRelease"] is True
     assert "super-secret-owner-token" not in serialized
 

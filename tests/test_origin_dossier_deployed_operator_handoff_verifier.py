@@ -24,7 +24,7 @@ def write_json(path: Path, payload: dict) -> None:
 def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
     module = load_module()
     pass_state = status == "pass"
-    blockers = [] if pass_state else ["missing_deployed_identity_token"]
+    blockers = [] if pass_state else ["missing_deployed_owner_session"]
     required_flags = {
         flag: pass_state for flag in module.REQUIRED_DEPLOYED_PROBE_FLAGS
     }
@@ -32,7 +32,7 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
         "contractName": "chummer.origin_edition.deployed_operator_handoff.v1",
         "status": status,
         "updated_at": "2026-06-25T13:00:00Z",
-        "next_action": "Gold proof chain is ready for release handoff." if pass_state else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+        "next_action": "Gold proof chain is ready for release handoff." if pass_state else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe.",
         "blocking_reason": "" if pass_state else ",".join(blockers),
         "progress": {"blockerCount": len(blockers)},
         "goalCompletionClaimAllowed": False,
@@ -45,8 +45,14 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
             "baseUrl": "https://chummer.run",
         },
         "requiredEnv": {
-            "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN": {
+            "deployedOwnerSession": {
                 "required": True,
+                "acceptedKeys": [
+                    "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN",
+                    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN",
+                    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
+                    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
+                ],
                 "presentInCurrentProcess": pass_state,
                 "valueStoredInReceipt": False,
             },
@@ -69,7 +75,7 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
         "currentEvidence": {
             "deployedProbeRequiredFlags": required_flags,
             "deployedProbeMissingRequiredFlags": [] if pass_state else list(required_flags),
-            "deployedProbeNextAction": "Gold proof chain is ready for release handoff." if pass_state else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
+            "deployedProbeNextAction": "Gold proof chain is ready for release handoff." if pass_state else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe.",
             "deployedProbeBlockingReason": "" if pass_state else ",".join(blockers),
             "deployedProbeProgress": {"passedChecks": 2 if pass_state else 0, "totalChecks": 2, "blockedChecks": [] if pass_state else list(required_flags)},
         },
@@ -175,7 +181,7 @@ def test_verifier_rejects_ready_handoff_without_missing_token_blocker(tmp_path: 
     ok, issues = module.verify(path)
 
     assert ok is False
-    assert "ready_handoff_missing_identity_token_blocker" in issues
+    assert "ready_handoff_missing_owner_session_blocker" in issues
 
 
 def test_verifier_rejects_handoff_with_stale_required_probe_flag_set(tmp_path: Path) -> None:

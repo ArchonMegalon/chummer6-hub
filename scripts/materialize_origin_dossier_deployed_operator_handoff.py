@@ -19,8 +19,11 @@ from origin_edition_context import OriginEditionContext
 DEFAULT_EVIDENCE_ROOT = Path("/docker/chummercomplete/.tmp/origin-dossier-fresh-gold")
 E2E_ENV_KEYS = {
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN",
+    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN",
     "CHUMMER_DEPLOYED_E2E_AUTH_MODE",
     "CHUMMER_DEPLOYED_E2E_COOKIE_NAME",
+    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
+    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
 }
 REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "logged_in_browser_verified",
@@ -107,8 +110,16 @@ def load_env_file(path: Path | None) -> dict[str, bool]:
     return loaded
 
 
-def token_present() -> bool:
-    return bool(os.environ.get("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "").strip())
+OWNER_SESSION_ENV_KEYS = (
+    "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN",
+    "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN",
+    "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER",
+    "CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER",
+)
+
+
+def owner_session_present() -> bool:
+    return any(os.environ.get(key, "").strip() for key in OWNER_SESSION_ENV_KEYS)
 
 
 def quote(value: object) -> str:
@@ -154,7 +165,7 @@ def materialize(
     missing_deployed_flags = [flag for flag, passed in deployed_flag_status.items() if not passed]
     origin_context_args = context_args(context)
     required_commands = [
-        "Set CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN in /docker/chummercomplete/chummer.run-services/.env or in the current process.",
+        "Set exactly one deployed owner-session input in /docker/chummercomplete/chummer.run-services/.env or in the current process: CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER.",
         f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
         f"python3 scripts/materialize_origin_edition_gold_proof_chain.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args} --allow-blocked",
@@ -164,15 +175,15 @@ def materialize(
         "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD=1 bash scripts/ai/run_services_verification.sh",
     ]
     blockers = []
-    if not token_present():
-        blockers.append("missing_deployed_identity_token")
+    if not owner_session_present():
+        blockers.append("missing_deployed_owner_session")
     if deployed_payload.get("status") != "pass":
         blockers.append("deployed_browser_probe_not_pass")
     blockers.extend(f"deployed_browser_probe_flag_missing:{flag}" for flag in missing_deployed_flags)
     if gold_payload.get("status") != "pass":
         blockers.append("gold_audit_not_pass")
     ready_for_operator_token = (
-        not token_present()
+        not owner_session_present()
         and "deployed_browser_probe_not_pass" in blockers
         and "gold_audit_not_pass" in blockers
     )
@@ -219,11 +230,12 @@ def materialize(
                 "valueStoredInReceipt": False,
                 "operatorInstruction": "Set to 1 only for release/gold verification so a blocked deployed proof cannot pass CI.",
             },
-            "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN": {
+            "deployedOwnerSession": {
                 "required": True,
-                "presentInCurrentProcess": token_present(),
+                "acceptedKeys": list(OWNER_SESSION_ENV_KEYS),
+                "presentInCurrentProcess": owner_session_present(),
                 "valueStoredInReceipt": False,
-                "operatorInstruction": "Use a short-lived real owner session token only for the probe process; do not commit or paste it into artifacts.",
+                "operatorInstruction": "Use one short-lived real owner session input only for the probe process; do not commit or paste it into artifacts.",
             }
         },
         "envFile": {
