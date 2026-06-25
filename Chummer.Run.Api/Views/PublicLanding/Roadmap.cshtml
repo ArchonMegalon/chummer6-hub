@@ -1,19 +1,8 @@
-@using Chummer.Run.Api.Services
 @model RoadmapPageViewModel
 @{
     ViewData["Title"] = "Roadmap";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-roadmap surface-minimal";
-
-    var milestones = Model.Milestones.Take(4).ToArray();
-    var plannedWork = Model.Horizons
-        .Where(item => PublicSurfaceStatus.IsPreparingNext(item.Card.Badge)
-            || PublicSurfaceStatus.IsDesigningInPublic(item.Card.Badge))
-        .Take(4)
-        .ToArray();
-
-    static string RoadmapText(string? value)
-        => UndetectableHumanizerCopyAdapter.HumanizeRoadmap(value);
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
@@ -23,7 +12,7 @@
             <div class="participate-shell__lead">
                 <p class="eyebrow">Roadmap</p>
                 <h1>Roadmap</h1>
-                <p>Current work and planned work, one page.</p>
+                <p>Public direction, without the project-management noise.</p>
                 <p>Use the changelog for shipped changes.</p>
             </div>
             <div class="participate-actions">
@@ -76,73 +65,46 @@ else
     <section class="minimal-page-hero route-anchor-target roadmap-signal">
         <div>
             <p class="eyebrow">Roadmap</p>
-            <h1>What we are working on</h1>
-            <p>A short maintenance note. Use the changelog for shipped changes.</p>
+            <h1>Maintenance first.</h1>
+            <p>We are spending the current cycle on install reliability, cleaner screens, and fewer support dead ends.</p>
         </div>
     </section>
 
     <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
         <div class="minimal-section__lead">
             <p class="eyebrow">Now</p>
-            <h2 id="roadmap-active-work">Current work</h2>
-            <p>These are the items that are moving right now.</p>
+            <h2 id="roadmap-active-work">Current focus</h2>
+            <p>Short list. No internal labels.</p>
         </div>
-
-        @if (milestones.Length == 0)
-        {
-            <article class="minimal-empty">
-                <h3>No public note yet</h3>
-                <p>Check the changelog for shipped work.</p>
+        <div class="minimal-lane-grid">
+            <article class="minimal-lane-card">
+                <span class="tag">Install</span>
+                <h3>Make setup boring</h3>
+                <p>Smaller installers, visible update progress, and better recovery when something fails.</p>
             </article>
-        }
-        else
-        {
-            <div class="minimal-lane-grid">
-                @foreach (var milestone in milestones)
-                {
-                    <article class="minimal-lane-card">
-                        <span class="tag">@RoadmapText(milestone.StatusLabel)</span>
-                        <h3>@RoadmapText(milestone.Title)</h3>
-                        <p>@RoadmapText(milestone.CasualSummary)</p>
-                    </article>
-                }
-            </div>
-        }
+            <article class="minimal-lane-card">
+                <span class="tag">Desktop</span>
+                <h3>Clean the builder</h3>
+                <p>Readable controls, less duplicated UI, and fewer surprises while creating a runner.</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Web</span>
+                <h3>Keep the site quiet</h3>
+                <p>Downloads, help, account, billing, and public feedback should stay short and clear.</p>
+            </article>
+        </div>
     </section>
-
-    @if (plannedWork.Length > 0)
-    {
-        <section class="minimal-section minimal-section--tight" aria-labelledby="roadmap-planned-work">
-            <div class="minimal-section__lead">
-                <p class="eyebrow">Later</p>
-                <h2 id="roadmap-planned-work">Worth watching</h2>
-                <p>These are larger directions, not release promises.</p>
-            </div>
-            <div class="minimal-lane-grid">
-                @foreach (var item in plannedWork)
-                {
-                    <article class="minimal-lane-card">
-                        <span class="tag">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
-                        <h3>@RoadmapText(item.Card.Title)</h3>
-                        <p>@RoadmapText(item.Card.Summary)</p>
-                        <div class="minimal-actions">
-                            <a class="button-like button-like--ghost" href="@item.Action.Href">@RoadmapText(item.Action.Label)</a>
-                        </div>
-                    </article>
-                }
-            </div>
-        </section>
-    }
 
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <p class="eyebrow">Elsewhere</p>
-            <h2>Use the right page for the right thing.</h2>
-            <p>Participate is for requests. Changelog is for shipped work.</p>
+            <h2>Use the right page.</h2>
+            <p>Participate is for requests. Changelog is for shipped work. Help is for anything blocking you.</p>
         </div>
         <div class="minimal-actions">
             <a class="button-like button-like--primary" href="/partizipate">Participate</a>
             <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
+            <a class="button-like button-like--ghost" href="/help">Open help</a>
         </div>
     </section>
 }

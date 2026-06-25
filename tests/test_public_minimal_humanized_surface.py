@@ -899,14 +899,11 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     preview_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml")
 
     for required in (
-        "static string RoadmapText(string? value)",
-        "@RoadmapText(milestone.StatusLabel)",
-        "@RoadmapText(milestone.Title)",
-        "@RoadmapText(milestone.CasualSummary)",
-        "@RoadmapText(item.Card.Title)",
-        "@RoadmapText(item.Card.Summary)",
-        "@RoadmapText(item.Action.Label)",
-        "PublicSurfaceStatus.DisplayLabel(item.Card.Badge)",
+        "Maintenance first.",
+        "Make setup boring",
+        "Clean the builder",
+        "Keep the site quiet",
+        "No internal labels.",
     ):
         assert required in roadmap
 
@@ -914,7 +911,7 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         '@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))',
         'id="roadmap-board"',
         'src="@Model.HostedBoardHref"',
-        'Current work and planned work, one page.',
+        'Public direction, without the project-management noise.',
         'Use the changelog for shipped changes.',
     ):
         assert required in roadmap
@@ -928,6 +925,16 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         assert required in roadmap_detail
 
     for forbidden in (
+        "static string RoadmapText(string? value)",
+        "@RoadmapText(milestone.StatusLabel)",
+        "@RoadmapText(milestone.Title)",
+        "@RoadmapText(milestone.CasualSummary)",
+        "@RoadmapText(item.Card.Title)",
+        "@RoadmapText(item.Card.Summary)",
+        "@RoadmapText(item.Action.Label)",
+        "PublicSurfaceStatus.DisplayLabel(item.Card.Badge)",
+        "These are the items that are moving right now.",
+        "Already moving",
         "@milestone.StatusLabel",
         "@dependency.StatusLabel",
         "@signalLoop.FollowSettingsLabel",
