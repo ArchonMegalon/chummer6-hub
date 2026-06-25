@@ -181,6 +181,7 @@ public sealed class IdentityController : ControllerBase
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
             return ResolveBool(_configuration["IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS"], defaultValue: false)
+                   && string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"]?.Trim(), "Development", StringComparison.OrdinalIgnoreCase)
                 ? null
                 : Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "emailit webhook secret is not configured.");
         }
