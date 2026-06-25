@@ -805,8 +805,9 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
     assert "Claim your copy" in entry
     assert "Email me a link" in entry
     assert "Use Google" in entry
-    assert "The download stays the same for everyone." in entry
-    assert "The download does not need an account." in entry
+    assert "Use email or Google. The download stays open." in entry
+    assert "Account optional. Useful for linked installs, recovery, and private pages." in entry
+    assert "The download stays open." in entry
     assert "Keep Chummer open while the browser connects this copy." in entry
 
     for forbidden in (

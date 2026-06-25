@@ -38,9 +38,8 @@
 <section class="auth-entry" aria-labelledby="auth-title">
     <div class="auth-entry__panel auth-panel auth-panel--entry">
         <div class="auth-panel__intro auth-panel__intro--masthead">
-            <p class="eyebrow">Chummer</p>
             <h1 id="auth-title">Claim your copy</h1>
-            <p>@(isInstallLinkReturn ? "Connect this install to your account. The download stays the same for everyone." : "Use email or Google if you want Chummer to remember you. The download does not need an account.")</p>
+            <p>@(isInstallLinkReturn ? "Connect this install. The download stays the same." : "Use email or Google. The download stays open.")</p>
         </div>
 
         @if (Model.CreateAccount)
@@ -117,6 +116,6 @@
                 <p class="muted-copy">@Model.GoogleUnavailableReason</p>
             }
         }
-        <p class="privacy-note">No account is needed to download Chummer. Claiming only helps with linked installs, recovery, and private pages.</p>
+        <p class="privacy-note">Account optional. Useful for linked installs, recovery, and private pages.</p>
     </div>
 </section>

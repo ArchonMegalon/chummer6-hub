@@ -60,7 +60,7 @@ def test_auth_entry_uses_account_language_in_public_copy() -> None:
 
     assert "the account area" in auth_entry
     assert 'ViewData["SurfaceClass"] = "surface-auth surface-minimal";' in auth_entry
-    assert "Use email or Google if you want Chummer to remember you. The download does not need an account." in auth_entry
-    assert "No account is needed to download Chummer. Claiming only helps with linked installs, recovery, and private pages." in auth_entry
+    assert "Use email or Google. The download stays open." in auth_entry
+    assert "Account optional. Useful for linked installs, recovery, and private pages." in auth_entry
     assert "the signed-in product" not in auth_entry
     assert "Your signed-in home and account pages for return, recovery, and the next step." not in auth_entry

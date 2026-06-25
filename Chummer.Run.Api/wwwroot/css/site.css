@@ -6181,10 +6181,10 @@ body.shell-authenticated {
 
 .route-login.surface-minimal .site-header__inner--auth,
 .route-signup.surface-minimal .site-header__inner--auth {
-  width: min(420px, calc(100% - 32px));
+  width: min(360px, calc(100% - 32px));
   min-height: auto;
   margin: 0 auto;
-  padding: 20px 0 0;
+  padding: 18px 0 0;
 }
 
 .route-login.surface-minimal .site-brand,
@@ -6202,18 +6202,18 @@ body.shell-authenticated {
   min-height: calc(100svh - 60px);
   display: grid;
   place-items: start center;
-  padding: clamp(2rem, 9svh, 5.5rem) 16px 40px;
+  padding: clamp(1.5rem, 7svh, 4rem) 16px 32px;
 }
 
 .route-login.surface-minimal .auth-entry,
 .route-signup.surface-minimal .auth-entry {
-  width: min(420px, 100%);
+  width: min(360px, 100%);
   display: block;
   margin: 0;
-  border: 1px solid rgba(243, 234, 219, 0.13);
-  border-radius: 10px;
+  border: 1px solid rgba(243, 234, 219, 0.1);
+  border-radius: 8px;
   overflow: hidden;
-  background: #1f1f1d;
+  background: #1d1d1b;
   box-shadow: none;
 }
 
@@ -6225,9 +6225,9 @@ body.shell-authenticated {
 .route-login.surface-minimal .auth-panel--entry,
 .route-signup.surface-minimal .auth-panel--entry {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   margin: 0;
-  padding: clamp(22px, 5vw, 30px);
+  padding: clamp(20px, 5vw, 26px);
   border: 0;
   background: transparent;
   color: #f3eadb;
@@ -6274,7 +6274,7 @@ body.shell-authenticated {
 
 .route-login.surface-minimal .auth-panel__intro--masthead,
 .route-signup.surface-minimal .auth-panel__intro--masthead {
-  gap: 8px;
+  gap: 6px;
 }
 
 .route-login.surface-minimal .auth-panel__intro h1,
@@ -6288,8 +6288,8 @@ body.shell-authenticated {
 
 .route-login.surface-minimal .auth-panel__intro h1,
 .route-signup.surface-minimal .auth-panel__intro h1 {
-  font-size: clamp(1.7rem, 7vw, 2.25rem);
-  line-height: 1.05;
+  font-size: clamp(1.42rem, 6vw, 1.85rem);
+  line-height: 1.1;
 }
 
 .route-login.surface-minimal .auth-panel__intro h2,
@@ -6306,8 +6306,8 @@ body.shell-authenticated {
 .route-signup.surface-minimal .privacy-note {
   margin: 0;
   color: rgba(243, 234, 219, 0.68);
-  font-size: 0.94rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .route-login.surface-minimal .eyebrow,
@@ -6321,7 +6321,7 @@ body.shell-authenticated {
 .route-login.surface-minimal .auth-form,
 .route-signup.surface-minimal .auth-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .route-login.surface-minimal .field,
@@ -6339,9 +6339,9 @@ body.shell-authenticated {
 .route-login.surface-minimal .field input,
 .route-signup.surface-minimal .field input {
   width: 100%;
-  min-height: 46px;
+  min-height: 42px;
   border: 1px solid rgba(243, 234, 219, 0.16);
-  border-radius: 7px;
+  border-radius: 6px;
   background: #151514;
   color: #f3eadb;
 }
@@ -6350,8 +6350,8 @@ body.shell-authenticated {
 .route-signup.surface-minimal .button-like {
   width: 100%;
   justify-content: center;
-  min-height: 44px;
-  border-radius: 7px;
+  min-height: 42px;
+  border-radius: 6px;
 }
 
 .route-login.surface-minimal .auth-divider,
@@ -6359,9 +6359,9 @@ body.shell-authenticated {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: rgba(243, 234, 219, 0.45);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .route-login.surface-minimal .auth-divider::before,
