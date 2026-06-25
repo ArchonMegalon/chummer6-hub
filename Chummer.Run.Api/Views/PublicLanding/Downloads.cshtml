@@ -115,7 +115,8 @@ else
                     var option = platform.Option;
                     if (option is not null)
                     {
-                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-release-lane="stable" data-platform="@platform.PlatformId" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
+                        var installRoute = $"/downloads/install/{Uri.EscapeDataString(option.Artifact.Id)}";
+                        <a class="button-like button-like--primary" href="@option.DispatchHref" data-download-action="download-artifact" data-download-artifact="@option.Artifact.Id" data-download-platform="@platform.PlatformId" data-download-raw-url="@option.DirectFileHref" data-download-install-route="@installRoute" data-download-link-mode="raw-url" data-release-lane="stable" data-platform="@platform.PlatformId" data-analytics-event="downloads_stable_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
                     }
                 }
             </div>
@@ -140,7 +141,8 @@ else
                     var option = platform.Option;
                     if (option is not null)
                     {
-                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-release-lane="nightly" data-platform="@platform.PlatformId" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
+                        var installRoute = $"/downloads/install/{Uri.EscapeDataString(option.Artifact.Id)}";
+                        <a class="button-like button-like--secondary" href="@option.DispatchHref" data-download-action="download-artifact" data-download-artifact="@option.Artifact.Id" data-download-platform="@platform.PlatformId" data-download-raw-url="@option.DirectFileHref" data-download-install-route="@installRoute" data-download-link-mode="raw-url" data-release-lane="nightly" data-platform="@platform.PlatformId" data-analytics-event="downloads_nightly_install" data-analytics-surface="minimal_downloads" data-analytics-label="@platform.PlatformLabel">@platform.PlatformLabel</a>
                     }
                 }
             </div>
