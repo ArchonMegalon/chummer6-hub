@@ -267,17 +267,17 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert 'homepage_open_stable' not in landing
     assert 'homepage_open_nightly' not in landing
     assert 'class="minimal-hero__visual minimal-hero__visual--screenshot"' in landing
-    assert 'href="/media/promo/chummer6-flagship-promo.mp4"' in landing
+    assert 'href="/media/promo/every-wonder-horizon-promo.mp4"' in landing
     assert "/media/product/chummer-desktop-runner.png" in landing
-    assert "/media/promo/chummer6-flagship-promo.mp4" in landing
+    assert "/media/promo/every-wonder-horizon-promo.mp4" in landing
     assert 'data-homepage-section="runner-roster"' in landing
     assert "minimal-runner-rail" in landing
     assert "Kestrel" in landing
     assert "Brick" in landing
     assert "Whisper" in landing
     assert 'href="/login?next=%2Fhome%2Faccess"' in landing
-    assert "/media/promo/chummer6-flagship-promo.webm" not in landing
-    assert "/media/promo/chummer6-flagship-promo.vtt" not in landing
+    assert "/media/promo/every-wonder-horizon-promo.webm" not in landing
+    assert "/media/promo/every-wonder-horizon-promo.vtt" not in landing
     assert 'data-homepage-section="downloads"' not in landing
 
 

@@ -20,7 +20,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     failures.push(`homepage: expected one Download Chummer hero action, found ${heroActions.join(', ')}`);
   }
   const heroImage = desktop.locator('.minimal-hero__visual img');
-  const heroMediaLink = desktop.locator('.minimal-hero__visual[href="/media/promo/chummer6-flagship-promo.mp4"]');
+  const heroMediaLink = desktop.locator('.minimal-hero__visual[href="/media/promo/every-wonder-horizon-promo.mp4"]');
   await expect(heroImage).toBeVisible();
   await expect(heroMediaLink).toHaveCount(1);
   const heroImageLoaded = await heroImage.evaluate((node) => {
@@ -57,7 +57,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     surface: 'home',
     inline_nav_visible: false,
     hero_image_loaded: heroImageLoaded,
-    promo_video_entry: '/media/promo/chummer6-flagship-promo.mp4',
+    promo_video_entry: '/media/promo/every-wonder-horizon-promo.mp4',
     first_viewport_fits: !!heroBox && heroBox.y + heroBox.height <= 768,
     promoted_platforms: homepagePromotedPlatforms,
   });

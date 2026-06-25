@@ -32,14 +32,14 @@ def test_rebuild_flagship_promo_is_reproducible_and_passes_audio_quality() -> No
         pytest.skip("unmixr runtime credentials are required for the promo rebuild e2e")
 
     completed = subprocess.run(
-        [sys.executable, str(REBUILD_SCRIPT), "--only", "chummer6-flagship-promo"],
+        [sys.executable, str(REBUILD_SCRIPT), "--only", "every-wonder-horizon-promo"],
         capture_output=True,
         text=True,
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    mp4 = MEDIA_ROOT / "chummer6-flagship-promo.mp4"
-    receipt = MEDIA_ROOT / "chummer6-flagship-promo.receipt.json"
+    mp4 = MEDIA_ROOT / "every-wonder-horizon-promo.mp4"
+    receipt = MEDIA_ROOT / "every-wonder-horizon-promo.receipt.json"
     assert mp4.is_file()
     assert receipt.is_file()
 

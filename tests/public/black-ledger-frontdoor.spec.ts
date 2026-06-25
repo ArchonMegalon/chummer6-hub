@@ -2,7 +2,7 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const promoVideoPath = '/media/promo/chummer6-flagship-promo.mp4';
+const promoVideoPath = '/media/promo/every-wonder-horizon-promo.mp4';
 
 test('homepage stays product-first while ledger remains off the primary path', async ({ page, request }) => {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });

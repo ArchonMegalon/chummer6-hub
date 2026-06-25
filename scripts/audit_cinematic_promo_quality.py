@@ -295,16 +295,16 @@ def write_text(path: Path, content: str) -> None:
 
 
 def retired_product_trailer() -> dict[str, Any]:
-    receipt_path = PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.receipt.json"
+    receipt_path = PRODUCT_MEDIA_ROOT / "every-wonder-horizon-promo.receipt.json"
     receipt = json.loads(receipt_path.read_text(encoding="utf-8")) if receipt_path.is_file() else {}
     removed_files = [
         RUN_SERVICES_ROOT / public_path.lstrip("/")
         for public_path in receipt.get("removed_files", [])
         if isinstance(public_path, str)
     ]
-    poster_path = PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png"
+    poster_path = PRODUCT_MEDIA_ROOT / "every-wonder-horizon-promo-poster.png"
     return {
-        "asset_id": "chummer6-flagship-promo",
+        "asset_id": "every-wonder-horizon-promo",
         "public_name": "Chummer6 Product Trailer",
         "kind": "product",
         "status": "retired",

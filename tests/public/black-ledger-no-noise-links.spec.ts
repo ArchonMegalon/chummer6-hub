@@ -13,7 +13,7 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   await expect(page.getByText('Black Ledger')).toHaveCount(0);
   await expect(hero.getByRole('link')).toHaveCount(2);
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
-  await expect(hero.locator('.minimal-hero__visual')).toHaveAttribute('href', '/media/promo/chummer6-flagship-promo.mp4');
+  await expect(hero.locator('.minimal-hero__visual')).toHaveAttribute('href', '/media/promo/every-wonder-horizon-promo.mp4');
 
   await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
 

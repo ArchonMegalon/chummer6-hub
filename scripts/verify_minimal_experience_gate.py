@@ -92,12 +92,12 @@ def build_payload(
     product_video_sources = [
         source
         for source in parser.sources
-        if "/media/promo/chummer6-flagship-promo" in source
+        if "/media/promo/every-wonder-horizon-promo" in source
     ]
     product_video_links = [
         link
         for link in parser.links
-        if "/media/promo/chummer6-flagship-promo" in link
+        if "/media/promo/every-wonder-horizon-promo" in link
     ]
     poster_sources = [*parser.video_posters, *parser.images]
     image_urls = [urljoin(f"{normalized_base_url}/", image) for image in parser.images]

@@ -23,7 +23,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         pages = {
             "https://example.invalid/": """
                 <body class="shell-body shell-public">
-                    <a class="minimal-hero__visual" href="/media/promo/chummer6-flagship-promo.mp4">
+                    <a class="minimal-hero__visual" href="/media/promo/every-wonder-horizon-promo.mp4">
                         <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" />
                     </a>
                 </body>
@@ -52,7 +52,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         self.assertEqual(payload["base_url"], "https://example.invalid")
         self.assertFalse(payload["results"][0]["nav_panel_open"])
         self.assertTrue(payload["results"][0]["hero_image_loaded"])
-        self.assertEqual(payload["results"][0]["product_video_links"], ["/media/promo/chummer6-flagship-promo.mp4"])
+        self.assertEqual(payload["results"][0]["product_video_links"], ["/media/promo/every-wonder-horizon-promo.mp4"])
         self.assertEqual(payload["results"][1]["updated_label_count"], 1)
         self.assertEqual(payload["results"][2]["updated_label_count"], 1)
 
@@ -61,7 +61,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         pages = {
             "https://example.invalid/": """
                 <body class="shell-body shell-public">
-                    <a class="minimal-hero__visual" href="/media/promo/chummer6-flagship-promo.mp4">
+                    <a class="minimal-hero__visual" href="/media/promo/every-wonder-horizon-promo.mp4">
                         <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" />
                     </a>
                 </body>

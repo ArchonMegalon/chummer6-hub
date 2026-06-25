@@ -135,7 +135,7 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify the Chummer6 flagship promo is a true 12-scene 90-second reel.")
-    parser.add_argument("--asset", default="chummer6-flagship-promo")
+    parser.add_argument("--asset", default="every-wonder-horizon-promo")
     args = parser.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)

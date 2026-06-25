@@ -470,13 +470,13 @@ def main() -> int:
     magicfit_text = read_text(OUT / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md")
     magicfit_provider = read_json(WORKSPACE / "_completion" / "magicfit_provider" / "MAGICFIT_PROVIDER_VERIFICATION.generated.json")
     magicfit_source = read_json(WORKSPACE / "_completion" / "magicfit_jama6_promo_12_scenes" / "MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json")
-    magicfit_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.receipt.json")
+    magicfit_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.receipt.json")
     checks.append(check("MAGICFIT_PROVIDER_ADAPTER_READY" in magicfit_text and magicfit_provider.get("status") == "verified", "MagicFit provider verdict is backed by verified provider receipt"))
     checks.append(check(magicfit_source.get("status") == "pass" and magicfit_source.get("found_scene_count") == 12, "MagicFit flagship source audit proves 12 scenes"))
-    flagship_poster = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo-poster.png"
-    flagship_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.mp4"
-    flagship_webm = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.webm"
-    flagship_vtt = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.vtt"
+    flagship_poster = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo-poster.png"
+    flagship_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.mp4"
+    flagship_webm = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.webm"
+    flagship_vtt = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.vtt"
     checks.append(check(
         magicfit_receipt.get("status") == "published",
         "Flagship public promo receipt is published",

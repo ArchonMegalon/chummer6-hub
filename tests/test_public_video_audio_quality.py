@@ -3,7 +3,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import wave
 from pathlib import Path
+
+import numpy as np
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "public_video_audio_quality.py"
@@ -41,3 +44,23 @@ def test_public_video_audio_quality_cli_prints_quality_receipt() -> None:
     assert payload["pipeline"] == "public_video_audio_quality"
     assert payload["status"] == "published"
 
+
+def test_public_video_audio_quality_detects_narrowband_beep(tmp_path: Path) -> None:
+    module = _load_module()
+    sample_rate = 16_000
+    duration_seconds = 2.0
+    timeline = np.linspace(0.0, duration_seconds, int(sample_rate * duration_seconds), endpoint=False)
+    samples = (0.35 * np.sin(2 * np.pi * 6200.0 * timeline)).astype(np.float32)
+    pcm = np.clip(samples * 32767, -32768, 32767).astype("<i2")
+    media_path = tmp_path / "beep.wav"
+
+    with wave.open(str(media_path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(pcm.tobytes())
+
+    metrics = module._audio_tone_metrics(media_path)
+
+    assert metrics["status"] == "fail"
+    assert 6190.0 <= metrics["dominant_highband_peak_hz"] <= 6210.0

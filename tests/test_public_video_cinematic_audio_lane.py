@@ -24,7 +24,7 @@ def test_canonical_key_strips_mobile_suffix() -> None:
     module = _load_module()
 
     assert module.canonical_key(Path("glass-tower-compact-promo-mobile.mp4")) == "glass-tower-compact-promo"
-    assert module.canonical_key(Path("chummer6-flagship-promo.webm")) == "chummer6-flagship-promo"
+    assert module.canonical_key(Path("every-wonder-horizon-promo.webm")) == "every-wonder-horizon-promo"
 
 
 def test_tour_manifest_declares_ambient_audio_boundary() -> None:

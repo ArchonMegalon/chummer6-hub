@@ -519,73 +519,6 @@ def build_reel(reel: Reel) -> dict[str, Any]:
     return receipt
 
 
-def flagship_reel() -> Reel:
-    src = WORKSPACE / "_completion" / "magicfit_jama6_promo_12_scenes"
-    clips = [
-        "01_old_way_pain.mp4",
-        "02_chummer6_reveal.mp4",
-        "03_build_runner.mp4",
-        "04_explain_values.mp4",
-        "05_black_ledger_alive.mp4",
-        "06_release_truth.mp4",
-        "07_table_pulse.mp4",
-        "08_world_reacts.mp4",
-        "09_karma_forge.mp4",
-        "10_newsroom.mp4",
-        "11_play_anywhere.mp4",
-        "12_hero_ending.mp4",
-    ]
-    durations = [8, 7, 8, 7, 8, 7, 8, 7, 8, 7, 8, 7]
-    captions = [
-        "Stop losing the run between sheets, tabs, and side notes.",
-        "Chummer6 brings the table back into one command view.",
-        "Build runners with gear, magic, cyberware, and consequences in sight.",
-        "Know why the numbers changed before the dice hit the table.",
-        "Black Ledger lets the city remember what the crew did.",
-        "Prep scenes, NPCs, jobs, handouts, and fallout without rummaging.",
-        "Table Pulse turns rising heat into playable pressure.",
-        "Remote players can still push the run forward.",
-        "Karma Forge keeps house rules table-ready and reversible.",
-        "A field report turns aftermath into the next hook.",
-        "Desktop, tablet, and phone keep the crew in sync.",
-        "When the trace hits 100, the crew is already gone.",
-    ]
-    narration = [
-        "You know this table. Three PDFs open. A runner sheet half finished. The GM asking who actually has the medkit.",
-        "Chummer6 pulls the noise into one command view, so the crew can stop hunting for answers and start the run.",
-        "Build the runner like a runner: gear, magic, cyberware, contacts, limits, and the little choices that get you paid or killed.",
-        "When a number moves, you can follow it. No table argument. No mystery math. Just the sheet doing what it should.",
-        "Then the city answers back. Black Ledger tracks heat, districts, jobs, factions, and the consequences your crew left behind.",
-        "For the GM, prep becomes playable: scenes, NPCs, handouts, opposition, rewards, downtime, and next-session hooks in reach.",
-        "Table Pulse turns pressure into something the table can use: rising heat, hard choices, and moments that feel alive.",
-        "Remote players are still in the run. They can react, answer, vote, and push the story forward without derailing the room.",
-        "Karma Forge keeps house rules from becoming folklore. Try the change, show the impact, roll it back if the table hates it.",
-        "We have a developing situation. The crew is gone, the drones are confused, and one fixer is suddenly unavailable for comment.",
-        "Desktop, tablet, phone, home table or remote night: the campaign stays with the crew.",
-        "Chummer6 is for crews who want the next run ready before the heat cools. Build the runner. Run the table. Let the city remember.",
-    ]
-    scenes = tuple(
-        Scene(
-            src / clip,
-            float(duration),
-            captions[i],
-            narration[i],
-            voice=None,
-            voice_treatment="trailer",
-        )
-        for i, (clip, duration) in enumerate(zip(clips, durations))
-    )
-    return Reel(
-        asset_id="chummer6-flagship-promo",
-        title="Chummer6 Flagship Promo",
-        render_mode="magicfit_fresh_rerender_with_scene_timed_trailer_voiceover",
-        source_claim="12 freshly rerendered MagicFit flagship scene clips with no generated product-name text and scene-timed trailer voiceover",
-        scenes=scenes,
-        voice="en-GB-ThomasNeural",
-        continuous_voiceover=False,
-    )
-
-
 def horizons_reel(asset_id: str, title: str, source_claim: str) -> Reel:
     src = WORKSPACE / "_completion" / "horizons_90s_promo" / "magicfit_clips"
     rows = [
@@ -680,7 +613,6 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     reels = [
-        flagship_reel(),
         every_wonder_reel(),
         horizons_reel(
             "all-horizons-90s-magicfit-promo",
