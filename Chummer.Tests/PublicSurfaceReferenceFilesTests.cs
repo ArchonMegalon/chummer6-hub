@@ -95,7 +95,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/quicksilver", manifest, StringComparison.Ordinal);
         Assert.Contains("/quicksilver/receipts/command-network.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/local-co-processor", manifest, StringComparison.Ordinal);
-        Assert.Contains("/local-co-processor/receipts/optional-acceleration.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/local-co-processor/optional-acceleration", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("- path: /local-co-processor/receipts/optional-acceleration.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/ledger/factions/{factionId}", manifest, StringComparison.Ordinal);
         Assert.Contains("/ledger/factions/{factionId}/promo", manifest, StringComparison.Ordinal);
         Assert.Contains("/ledger/factions/{factionId}/promo.json", manifest, StringComparison.Ordinal);
