@@ -433,7 +433,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "participate-quick-form" not in participate
     assert "@foreach (var lane in Model.Lanes)" not in participate
     assert "@lane.ActionLabel" not in participate
-    assert "Help" in participate
+    assert "Support" in participate
     assert "Support Chummer" in participate
     assert "Current themes" not in participate
     assert "Open in a tab" not in participate
@@ -963,7 +963,7 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         "Make setup boring",
         "Clean the builder",
         "Keep the site quiet",
-        "No internal labels.",
+        "Short list.",
     ):
         assert required in roadmap
 
@@ -971,10 +971,12 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         '@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))',
         'id="roadmap-board"',
         'src="@Model.HostedBoardHref"',
-        'Public direction, without the project-management noise.',
-        'Use the changelog for shipped changes.',
+        'What is moving next.',
+        'Planned work, visible here.',
     ):
         assert required in roadmap
+
+    assert "Use the right place" not in roadmap
 
     for required in (
         "static string RoadmapText(string? value)",
@@ -1719,7 +1721,7 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
         "The account cockpit answers this first",
         "Account flagship coverage",
         "Home can point to the next useful page",
-        "Aftermath stays with this workspace.",
+        "Aftermath stays with this campaign.",
     ):
         assert expected in home
 
@@ -1731,6 +1733,10 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
         "Signed-in flagship coverage",
         "signed-in home view",
         "signed-in reaction fallout",
+        "<span class=\"tag\">Workspace</span>",
+        "Open campaign workspace",
+        "Workspace note:",
+        "Starter workspace",
     ):
         assert forbidden not in home
 
@@ -3010,6 +3016,7 @@ def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None
 def test_login_view_is_minimal_auth_surface() -> None:
     auth_entry = read("Chummer.Run.Api/Views/Auth/Entry.cshtml")
     layout = read("Chummer.Run.Api/Views/Shared/_Layout.cshtml")
+    auth_compact = read("Chummer.Run.Api/wwwroot/css/auth-compact.css")
 
     for expected in (
         'ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";',
@@ -3024,5 +3031,22 @@ def test_login_view_is_minimal_auth_surface() -> None:
     for expected in (
         'var hideAuthChrome = (ViewData["HideAuthChrome"] as bool?) == true;',
         "if (!hideAuthChrome)",
+        'authSurface && minimalSurface',
+        'href="~/css/auth-compact.css"',
     ):
         assert expected in layout
+
+    for expected in (
+        ".route-login.surface-auth.surface-minimal",
+        "width: min(21rem, 100%);",
+        "font-size: 1.42rem;",
+        "min-height: 2.45rem;",
+    ):
+        assert expected in auth_compact
+
+    for forbidden in (
+        "clamp(1.75rem",
+        "width: min(420px",
+        "box-shadow:",
+    ):
+        assert forbidden not in auth_compact

@@ -345,6 +345,10 @@
         </script>
     }
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (authSurface && minimalSurface)
+    {
+        <link rel="stylesheet" href="~/css/auth-compact.css" asp-append-version="true" />
+    }
 </head>
 <body class="@bodyClass" data-route-key="@routeKey" data-surface-class="@surfaceClass">
     <a class="skip-link" href="#main">Skip to content</a>
