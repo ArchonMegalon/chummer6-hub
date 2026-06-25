@@ -168,12 +168,19 @@ def test_verifier_rejects_secret_marker(tmp_path: Path) -> None:
     module = load_module()
     path = tmp_path / "handoff.json"
     write_json(path, handoff_payload())
-    path.write_text(path.read_text(encoding="utf-8") + "\nBearer leaked\n", encoding="utf-8")
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + "\nBearer leaked\napi.telegram.org/bot123\nsecret-session\nUNMIXR_API_KEY=leaked\n",
+        encoding="utf-8",
+    )
 
     ok, issues = module.verify(path)
 
     assert ok is False
     assert "forbidden_secret_marker:Bearer " in issues
+    assert "forbidden_secret_marker:api.telegram.org/bot" in issues
+    assert "forbidden_secret_marker:secret-session" in issues
+    assert "forbidden_secret_marker:UNMIXR_API_KEY=" in issues
 
 
 def test_default_handoff_path_uses_origin_edition_env_context(monkeypatch, tmp_path: Path) -> None:

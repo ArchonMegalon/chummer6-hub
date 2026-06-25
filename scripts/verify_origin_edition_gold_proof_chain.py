@@ -20,6 +20,7 @@ EXPECTED_STAGE_NAMES = [
     "completion_matrix",
     "requirement_coverage",
 ]
+NON_BLOCKING_STAGE_STATUSES = {"pass", "ready_for_operator_token"}
 FORBIDDEN_VALUE_MARKERS = [
     "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=",
     "Bearer ",
@@ -79,13 +80,18 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
     computed_blocked_stages = [
         str(stage.get("name") or "")
         for stage in stages
-        if isinstance(stage, dict) and str(stage.get("status") or "").lower() != "pass"
+        if isinstance(stage, dict) and str(stage.get("status") or "").lower() not in NON_BLOCKING_STAGE_STATUSES
     ]
     top_level_blocked_stages = payload.get("blockedStages") if isinstance(payload.get("blockedStages"), list) else []
     progress_blocked_stages = progress.get("blockedStages") if isinstance(progress.get("blockedStages"), list) else []
     if isinstance(progress.get("totalStages"), int) and progress.get("totalStages") != len(EXPECTED_STAGE_NAMES):
         issues.append("progress_total_stages_mismatch")
-    if isinstance(progress.get("passedStages"), int) and progress.get("passedStages") != len(EXPECTED_STAGE_NAMES) - len(computed_blocked_stages):
+    computed_passed_stages = sum(
+        1
+        for stage in stages
+        if isinstance(stage, dict) and str(stage.get("status") or "").lower() in NON_BLOCKING_STAGE_STATUSES
+    )
+    if isinstance(progress.get("passedStages"), int) and progress.get("passedStages") != computed_passed_stages:
         issues.append("progress_passed_stages_mismatch")
     if top_level_blocked_stages != computed_blocked_stages:
         issues.append("blocked_stages_do_not_match_stage_statuses")

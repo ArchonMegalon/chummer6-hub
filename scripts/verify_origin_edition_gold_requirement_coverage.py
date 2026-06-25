@@ -34,9 +34,17 @@ FORBIDDEN_VALUE_MARKERS = (
     "Cookie:",
     "secret-token",
     "owner-session-token",
+    "secret-session",
+    "secret-bearer-session",
     "super-secret",
     "rangersofB5",
     "api:",
+    "api.telegram.org/bot",
+    "TELEGRAM_BOT_TOKEN=",
+    "EA_TELEGRAM_BOT_TOKEN=",
+    "UNMIXR_API_KEY=",
+    "audiobookshelf_api_token=",
+    "telegram_bot_token=",
 )
 
 

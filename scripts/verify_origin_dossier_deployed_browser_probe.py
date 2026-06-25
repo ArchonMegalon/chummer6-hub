@@ -57,6 +57,12 @@ FORBIDDEN_VALUE_MARKERS = (
     "secret-bearer-session",
     "rangersofB5",
     "api:",
+    "api.telegram.org/bot",
+    "TELEGRAM_BOT_TOKEN=",
+    "EA_TELEGRAM_BOT_TOKEN=",
+    "UNMIXR_API_KEY=",
+    "audiobookshelf_api_token=",
+    "telegram_bot_token=",
 )
 
 
