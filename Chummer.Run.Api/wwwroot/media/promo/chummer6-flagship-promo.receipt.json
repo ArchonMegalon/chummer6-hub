@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-22T14:58:41Z",
+  "generated_at_utc": "2026-06-25T06:23:14Z",
   "status": "published",
   "asset_id": "chummer6-flagship-promo",
   "title": "Chummer6 Flagship Promo",
@@ -11,7 +11,21 @@
   "scene_count": 12,
   "duration_seconds": 90.0,
   "visual_scene_count": 12,
-  "continuous_audio_track": "spoken_narration_plus_low_music_bed",
+  "continuous_audio_track": "spoken_narration_only_beep_repaired",
+  "audio_repair": {
+    "repaired_at_utc": "2026-06-25T06:23:14Z",
+    "reason": "Removed the audible high-band beep/whistle artifact from the public promo audio track.",
+    "method": "Reused the clean prior 90s narration master, normalized it to web playback loudness, and remuxed it onto the current public MP4/WebM video streams.",
+    "clean_audio_source": "/docker/chummercomplete/_completion/telegram_promo_delivery/sendable/chummer6-flagship-promo-90s-audio.mp4",
+    "backup_mp4": "/docker/chummercomplete/_completion/public_video_audio_repair_20260625/chummer6-flagship-promo.before-beep-repair.mp4",
+    "backup_webm": "/docker/chummercomplete/_completion/public_video_audio_repair_20260625/chummer6-flagship-promo.before-beep-repair.webm",
+    "verification": {
+      "pre_repair_5_5khz_to_11khz_p95_ratio": 0.133,
+      "post_repair_5_5khz_to_11khz_p95_ratio": 0.0,
+      "post_repair_mp4_sha256": "2f60df237aa119ecff493b9732b584c077ce0ae3ab7b633222c419282536cdfa",
+      "post_repair_webm_sha256": "aba3463f616d0255f09af7d8d47962f4b4965597a099ef0ead8ceeae8306a258"
+    }
+  },
   "magicfit_claim_allowed": true,
   "magicfit_final_visual_render_claim": true,
   "scene_narration": [
@@ -111,8 +125,8 @@
       }
     ],
     "format": {
-      "duration": "90.000000",
-      "size": "42287882"
+      "duration": "90.100000",
+      "size": "41988946"
     }
   }
 }
