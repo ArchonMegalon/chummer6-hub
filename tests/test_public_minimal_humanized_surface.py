@@ -448,14 +448,16 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "authCandidates" in controller
     assert "node.remove()" in controller
     assert "partizipate-board" in participate
+    assert "data-chummer-board-skin" in participate
     assert "participate-hosted__frame" not in participate
-    assert "Model.SupporterHref" not in participate
+    assert "Model.SupporterHref" in participate
     assert "Fallback form" not in participate
     assert "Join beta waitlist" not in participate
     assert "participate-quick-form" not in participate
     assert "@foreach (var lane in Model.Lanes)" not in participate
     assert "@lane.ActionLabel" not in participate
     assert "Private issue" in participate
+    assert "Supporter" in participate
     assert "Support Chummer" not in participate
     assert "Support Chummer" not in participate
     assert "Current themes" not in participate

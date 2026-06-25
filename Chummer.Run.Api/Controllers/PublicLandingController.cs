@@ -2129,12 +2129,8 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
     {
-        return await ParticipateBoardProxyCore(
-            string.Empty,
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/partizipate").ConfigureAwait(false);
+        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
     }
 
     [HttpGet("/participate")]
@@ -2420,7 +2416,12 @@ public sealed class PublicLandingController : Controller
             return Redirect("/partizipate");
         }
 
-        return await ParticipateBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+        return await ParticipateBoardProxyCore(
+            NormalizeParticipateBoardPath(boardPath),
+            cancellationToken,
+            localOrigin: "/participate",
+            localBaseHref: "/participate/",
+            fallbackPath: "/partizipate").ConfigureAwait(false);
     }
 
     [HttpGet("/participate/board")]
@@ -3367,7 +3368,13 @@ document.addEventListener('DOMContentLoaded', function () {
         BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();
         try
         {
-            return billing?.GetPage().ManageMembershipHref ?? "/account/billing";
+            if (billing is null)
+            {
+                return "/account/billing";
+            }
+
+            _ = billing.GetPage();
+            return "/account/billing/supporter/start";
         }
         catch (InvalidOperationException)
         {

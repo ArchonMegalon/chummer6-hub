@@ -8,6 +8,9 @@
         : Model.FallbackItems;
 }
 
+<style data-chummer-board-skin>
+</style>
+
 <section class="partizipate-board" aria-labelledby="partizipate-title">
     <header class="partizipate-board__header">
         <div>
@@ -44,5 +47,9 @@
         <a class="button-like button-like--primary" href="@Model.RetryHref">Check again</a>
         <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
         <a class="button-like button-like--secondary" href="@Model.SupportHref">Private issue</a>
+        @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
+        {
+            <a class="button-like button-like--ghost" href="@Model.SupporterHref">Supporter</a>
+        }
     </nav>
 </section>

@@ -23,7 +23,7 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertIn('localBaseHref: "/participate/"', controller)
         self.assertIn('ResolveParticipateSupporterHref()', controller)
         self.assertIn('return "/account/billing/supporter/start";', controller)
-        self.assertNotIn('return View("~/Views/PublicLanding/Partizipate.cshtml"', controller)
+        self.assertIn('return View("~/Views/PublicLanding/Partizipate.cshtml", model);', controller)
         self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', controller)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
         self.assertNotIn("Requests, votes, and shipped work.", controller)

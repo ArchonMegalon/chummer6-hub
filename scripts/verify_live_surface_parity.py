@@ -116,6 +116,9 @@ SURFACES = [
             "Authorize Codex access.",
             "OpenAI account in ChatGPT",
             "Requests, votes, and shipped work.",
+            "Something went wrong",
+            "Could not load posts",
+            "Network error while loading tab configuration",
         ],
         "forbidden_html_texts": [
             "chummer6.productlift.dev",
@@ -135,6 +138,9 @@ SURFACES = [
             "Authorize Codex access.",
             "OpenAI account in ChatGPT",
             "Requests, votes, and shipped work.",
+            "Something went wrong",
+            "Could not load posts",
+            "Network error while loading tab configuration",
         ],
         "forbidden_html_texts": [
             "chummer6.productlift.dev",
