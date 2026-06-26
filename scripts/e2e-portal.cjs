@@ -56,7 +56,7 @@ const checks = [
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      text.includes('Choose public feedback for ideas.')
+      text.includes('Discord first. Private form only for logs or account details.')
       && text.includes('Bug report')
   },
   {
@@ -151,8 +151,8 @@ const checks = [
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
       /\/status\/?$/.test(response.url)
-      && text.includes('Chummer is available.')
-      && text.includes('Updated')
+      && text.includes('Current public installer: Linux.')
+      && text.includes('Downloads')
   }
 ];
 
