@@ -182,7 +182,8 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "stableAndNightlyMatch",
         "No newer Nightly right now.",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
-        "var statusLine = $\"Updated {verifiedLabel}. {publicPlatformSummary}\";",
+        "var statusLine = Model.ReleaseExperience.Recommended is null",
+        ": publicPlatformSummary;",
         "@PublicStatusText(statusLine)",
     ):
         assert expected in combined
@@ -945,6 +946,9 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "No sudo. Updates default to notify." in downloads
     assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
+    assert "FirstOrDefault(IsNightly)" in downloads
+    assert "static bool IsNightly(ReleaseOptionViewModel option)" in downloads
+    assert 'value.Contains("nightly", StringComparison.OrdinalIgnoreCase)' in downloads
     assert "No newer Nightly right now." in downloads
     assert "Chummer picks the right installer for this browser." not in downloads
     assert "Nightly currently matches Stable" not in downloads

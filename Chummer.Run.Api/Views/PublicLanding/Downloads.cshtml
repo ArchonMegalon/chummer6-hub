@@ -6,9 +6,9 @@
 
     var release = Model.ReleaseExperience;
     var stable = release.Recommended;
-    var nightly = release.Alternatives.FirstOrDefault()
-        ?? release.OtherPlatforms.FirstOrDefault(option =>
-            stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase));
+    var nightly = release.Alternatives.Concat(release.OtherPlatforms)
+        .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
+        .FirstOrDefault(IsNightly);
     var stableAndNightlyMatch = stable is not null
         && nightly is not null
         && string.Equals(stable.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase);
@@ -46,6 +46,28 @@
         => string.IsNullOrWhiteSpace(option.PlatformLabel)
             ? "Download"
             : $"Download for {option.PlatformLabel}";
+
+    static bool IsNightly(ReleaseOptionViewModel option)
+    {
+        foreach (var value in new[]
+                 {
+                     option.Artifact.Channel,
+                     option.Artifact.ChannelId,
+                     option.Artifact.Id,
+                     option.Artifact.Version,
+                     option.Title,
+                     option.HeadLabel
+                 })
+        {
+            if (!string.IsNullOrWhiteSpace(value)
+                && value.Contains("nightly", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 <section class="minimal-page-hero downloads-simple-hero">
