@@ -3,9 +3,7 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
-    var posts = Model.LoadedFromBoard
-        ? Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href)).ToArray()
-        : Model.FallbackItems;
+    var posts = Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href)).ToArray();
 }
 
 <style data-chummer-board-skin>
@@ -18,39 +16,57 @@
             <h1 id="partizipate-title">@Model.Heading</h1>
         </div>
         <p>@Model.Summary</p>
-        <p class="partizipate-board__meta">@Model.TotalRequestCount items - @Model.SyncedLabel</p>
+        @if (Model.LoadedFromBoard)
+        {
+            <p class="partizipate-board__meta">@Model.TotalRequestCount items - @Model.SyncedLabel</p>
+        }
     </header>
 
-    <div class="partizipate-board__grid" aria-label="Public requests">
-        @foreach (var item in posts)
-        {
-            <article class="partizipate-request">
-                <div class="partizipate-request__score" aria-label="@item.Score votes">
-                    <strong>@item.Score</strong>
-                    <span>votes</span>
-                </div>
-                <div class="partizipate-request__body">
-                    <div class="partizipate-request__topline">
-                        <span>@item.Status</span>
+    @if (Model.LoadedFromBoard)
+    {
+        <div class="partizipate-board__grid" aria-label="Public requests">
+            @foreach (var item in posts)
+            {
+                <article class="partizipate-request">
+                    <div class="partizipate-request__score" aria-label="@item.Score votes">
+                        <strong>@item.Score</strong>
+                        <span>votes</span>
                     </div>
-                    <h2>
-                        @if (!string.IsNullOrWhiteSpace(item.Href))
+                    <div class="partizipate-request__body">
+                        <div class="partizipate-request__topline">
+                            <span>@item.Status</span>
+                        </div>
+                        <h2>
+                            @if (!string.IsNullOrWhiteSpace(item.Href))
+                            {
+                                <a href="@item.Href">@item.Title</a>
+                            }
+                            else
+                            {
+                                @item.Title
+                            }
+                        </h2>
+                        @if (!string.IsNullOrWhiteSpace(item.Summary))
                         {
-                            <a href="@item.Href">@item.Title</a>
+                            <p>@item.Summary</p>
                         }
-                        else
-                        {
-                            @item.Title
-                        }
-                    </h2>
-                    @if (!string.IsNullOrWhiteSpace(item.Summary))
-                    {
-                        <p>@item.Summary</p>
-                    }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+    else
+    {
+        <article class="partizipate-request partizipate-request--empty" role="status">
+            <div class="partizipate-request__body">
+                <div class="partizipate-request__topline">
+                    <span>Unavailable</span>
                 </div>
-            </article>
-        }
-    </div>
+                <h2>The board is unavailable</h2>
+                <p>Try again shortly. Use Discord for normal discussion and support only for private or blocked issues.</p>
+            </div>
+        </article>
+    }
 
     <nav class="partizipate-board__actions" aria-label="Participate actions">
         <a class="button-like button-like--primary" href="@Model.RetryHref">Check again</a>
