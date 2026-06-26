@@ -4272,7 +4272,6 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: true,
             resolveSource: _mediaHorizons.GetRunsitePack,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
-            quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4354,7 +4353,6 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetPropertyquarryProperty,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
-            quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4371,7 +4369,6 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetJackpointBriefing,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
-            quotaAllowanceExhaustedMessage: "Briefing video allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm briefing video allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4388,7 +4385,6 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetRunbookPrimer,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
-            quotaAllowanceExhaustedMessage: "Runbook export allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4404,7 +4400,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface: surface,
             dispatchTarget: "/account/work#aftermath-packages",
             emitRunsiteHeaders: false,
-            quotaAllowanceExhaustedMessage: "Debrief packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4430,7 +4425,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface: surface,
             dispatchTarget: $"/ledger/turns/{requestedTurn}/newsreel.json",
             emitRunsiteHeaders: false,
-            quotaAllowanceExhaustedMessage: "World tick digest allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm world tick digest allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4446,7 +4440,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface: surface,
             dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
             emitRunsiteHeaders: false,
-            quotaAllowanceExhaustedMessage: "Dossier media allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm dossier media allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4458,7 +4451,6 @@ document.addEventListener('DOMContentLoaded', function () {
         MediaArtifactSurfaceDefinition surface,
         string dispatchTarget,
         bool emitRunsiteHeaders,
-        string quotaAllowanceExhaustedMessage,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
         AuthenticatedHubSubject? authenticatedSubject = null)
@@ -4471,7 +4463,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface.CapabilityId,
             dispatchTarget,
             emitRunsiteHeaders,
-            quotaAllowanceExhaustedMessage,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
             authenticatedSubject);
@@ -4483,7 +4474,6 @@ document.addEventListener('DOMContentLoaded', function () {
         HorizonArtifactSurfaceDefinition surface,
         string dispatchTarget,
         bool emitRunsiteHeaders,
-        string quotaAllowanceExhaustedMessage,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
         AuthenticatedHubSubject? authenticatedSubject = null)
@@ -4496,7 +4486,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface.CapabilityId,
             dispatchTarget,
             emitRunsiteHeaders,
-            quotaAllowanceExhaustedMessage,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
             authenticatedSubject);
@@ -4512,7 +4501,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface: surface,
             dispatchTarget: "/participate/karma-forge",
             emitRunsiteHeaders: false,
-            quotaAllowanceExhaustedMessage: "Discovery packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm discovery packet allowance receipt right now.",
             cancellationToken: cancellationToken);
     }
@@ -4525,7 +4513,6 @@ document.addEventListener('DOMContentLoaded', function () {
         bool emitRunsiteHeaders,
         Func<string, MediaArtifactDocument> resolveSource,
         Func<MediaArtifactDocument, string?> resolveDispatchTarget,
-        string quotaAllowanceExhaustedMessage,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken)
     {
@@ -4563,7 +4550,6 @@ document.addEventListener('DOMContentLoaded', function () {
             surface.CapabilityId,
             dispatchTarget,
             emitRunsiteHeaders,
-            quotaAllowanceExhaustedMessage,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
             authenticatedSubject: subject);
@@ -4578,7 +4564,6 @@ document.addEventListener('DOMContentLoaded', function () {
         string artifactKindOrCapabilityId,
         string dispatchTarget,
         bool emitRunsiteHeaders,
-        string quotaAllowanceExhaustedMessage,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
         AuthenticatedHubSubject? authenticatedSubject = null)
@@ -4605,6 +4590,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         ExternalProcessingConsent: true,
                         Email: subject.Email),
                     consumeQuota: true);
+                HorizonArtifactQuotaSnapshot? receiptQuota = receipt.Quota;
 
                 if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
                 {
@@ -4614,35 +4600,23 @@ document.addEventListener('DOMContentLoaded', function () {
                         subject.SubjectId,
                         sourceId,
                         string.Join(", ", receipt.BlockedReasons));
+                    ApplyArtifactDispatchReceiptHeaders(receipt, receiptQuota, emitRunsiteHeaders);
                     if (receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase))
                     {
-                        return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: quotaAllowanceExhaustedMessage);
+                        return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: BuildQuotaAllowanceExhaustedMessage(receipt, receiptQuota));
                     }
 
                     return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"Unable to create a Chummer-owned {operationLabel} request receipt.");
                 }
 
-                HorizonArtifactQuotaSnapshot? receiptQuota = receipt.Quota;
                 if (receipt.QuotaTracked && receiptQuota is null)
                 {
                     _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, subject.SubjectId, sourceId);
                     return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
                 }
 
-                Response.Headers["X-Horizon-Artifact-Quota-Tracked"] = receipt.QuotaTracked ? "true" : "false";
-                if (receiptQuota is not null)
-                {
-                    dispatchQuota = receiptQuota;
-                    Response.Headers["X-Horizon-Artifact-Quota-Limit"] = receiptQuota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
-                    Response.Headers["X-Horizon-Artifact-Quota-Used"] = receiptQuota.WeeklyUsed.ToString(CultureInfo.InvariantCulture);
-                    Response.Headers["X-Horizon-Artifact-Quota-Remaining"] = receiptQuota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
-                    Response.Headers["X-Horizon-Artifact-Allowance-Tier"] = receiptQuota.AllowanceTier;
-                    Response.Headers["X-Horizon-Artifact-Entitlement-Basis"] = receiptQuota.EntitlementBasis;
-                    Response.Headers["X-Horizon-Artifact-Entitlement-Scope"] = receiptQuota.EntitlementScope;
-                }
-
-                Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
-                Response.Headers["X-Horizon-Artifact-Request-Href"] = $"/api/v1/horizons/artifact-requests/me/{Uri.EscapeDataString(receipt.RequestId)}";
+                ApplyArtifactDispatchReceiptHeaders(receipt, receiptQuota, emitRunsiteHeaders);
+                dispatchQuota = receiptQuota;
             }
             catch (BrilliantDirectoriesBillingUnavailableException ex)
             {
@@ -4660,22 +4634,74 @@ document.addEventListener('DOMContentLoaded', function () {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "Shared horizon artifact dispatch service is not available right now.");
         }
 
-        if (emitRunsiteHeaders && dispatchQuota is not null)
-        {
-            Response.Headers["X-Runsite-Tour-Limit"] = dispatchQuota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
-            Response.Headers["X-Runsite-Tour-Remaining"] = dispatchQuota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
-        }
-
         _logger.LogInformation(
             "{Operation} dispatch allowed for {UserId} on {SourceId}; remaining={Remaining}/{Limit}.",
             operationLabel,
             subject.SubjectId,
             sourceId,
-            dispatchQuota?.WeeklyRemaining,
-            dispatchQuota?.WeeklyLimit);
+            dispatchQuota?.WindowRemaining,
+            dispatchQuota?.WindowLimit);
 
         return Redirect(ProtectHorizonArtifactDispatchTarget(dispatchTarget));
     }
+
+    private void ApplyArtifactDispatchReceiptHeaders(
+        HorizonArtifactRequestReceipt receipt,
+        HorizonArtifactQuotaSnapshot? receiptQuota,
+        bool emitRunsiteHeaders)
+    {
+        Response.Headers["X-Horizon-Artifact-Quota-Tracked"] = receipt.QuotaTracked ? "true" : "false";
+        if (receiptQuota is not null)
+        {
+            Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"] = receiptQuota.WindowKind;
+            Response.Headers["X-Horizon-Artifact-Quota-Limit"] = receiptQuota.WindowLimit.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Quota-Used"] = receiptQuota.WindowUsed.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Quota-Remaining"] = receiptQuota.WindowRemaining.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Allowance-Tier"] = receiptQuota.AllowanceTier;
+            Response.Headers["X-Horizon-Artifact-Entitlement-Basis"] = receiptQuota.EntitlementBasis;
+            Response.Headers["X-Horizon-Artifact-Entitlement-Scope"] = receiptQuota.EntitlementScope;
+            if (emitRunsiteHeaders)
+            {
+                Response.Headers["X-Runsite-Tour-Limit"] = receiptQuota.WindowLimit.ToString(CultureInfo.InvariantCulture);
+                Response.Headers["X-Runsite-Tour-Remaining"] = receiptQuota.WindowRemaining.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+        Response.Headers["X-Horizon-Artifact-Request-Href"] = $"/api/v1/horizons/artifact-requests/me/{Uri.EscapeDataString(receipt.RequestId)}";
+    }
+
+    private static string BuildQuotaAllowanceExhaustedMessage(
+        HorizonArtifactRequestReceipt receipt,
+        HorizonArtifactQuotaSnapshot? receiptQuota)
+        => $"{FormatAllowanceLabel(receipt.PublicLabel)} allowance is exhausted for this {DescribeAllowanceWindowPeriod(receiptQuota?.WindowKind)}.";
+
+    private static string DescribeAllowanceWindowPeriod(string? windowKind)
+        => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
+            ? "month"
+            : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
+                ? "week"
+                : "window";
+
+    private static string FormatAllowanceLabel(string? publicLabel)
+    {
+        string normalized = NormalizeRouteToken(publicLabel);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "artifact";
+        }
+
+        return string.Join(
+            ' ',
+            normalized
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(static word => LooksLikeAcronym(word) ? word : word.ToLowerInvariant()));
+    }
+
+    private static bool LooksLikeAcronym(string word)
+        => !string.IsNullOrWhiteSpace(word)
+            && word.Any(char.IsUpper)
+            && !word.Any(char.IsLower);
 
     [HttpGet("/runsites/tour-quota/me")]
     [ProducesResponseType<RunsiteTourQuotaSnapshot>(StatusCodes.Status200OK)]

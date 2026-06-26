@@ -2770,6 +2770,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
         Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("weekly", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
         Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
         Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
         Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
@@ -2783,7 +2784,13 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(second);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("3D tour allowance is exhausted for this week.", details.Detail);
+        string secondRequestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", secondRequestId, StringComparison.Ordinal);
+        Assert.NotEqual(firstRequestId, secondRequestId);
+        Assert.Equal($"/api/v1/horizons/artifact-requests/me/{secondRequestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+        Assert.Equal("weekly", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("runsite", "subject.dispatch", limit: 10);
         Assert.Equal(2, receipts.Count);
         Assert.Contains(receipts, receipt =>
@@ -2856,7 +2863,7 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(eleventh);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("3D tour allowance is exhausted for this week.", details.Detail);
     }
 
     [Fact]
@@ -2917,6 +2924,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
         Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("weekly", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
         Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
         Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
         Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
@@ -2928,7 +2936,7 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(second);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("3D tour allowance is exhausted for this week.", details.Detail);
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("propertyquarry", "subject.dispatch", limit: 10);
         Assert.Equal(2, receipts.Count);
         Assert.Contains(receipts, receipt =>
@@ -3019,7 +3027,7 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(third);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("3D tour allowance is exhausted for this week.", details.Detail);
     }
 
     [Fact]
@@ -3079,7 +3087,7 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(second);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("Briefing video allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("briefing video allowance is exhausted for this week.", details.Detail);
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("jackpoint", "subject.dispatch", limit: 10);
         Assert.Equal(2, receipts.Count);
         Assert.Contains(receipts, receipt =>
@@ -3176,6 +3184,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
         Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("weekly", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
         Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
         Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
         Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
@@ -3185,7 +3194,7 @@ public sealed class PublicLandingDownloadDispatchTests
         ObjectResult problem = Assert.IsType<ObjectResult>(second);
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
-        Assert.Equal("Runbook export allowance is exhausted for this week.", details.Detail);
+        Assert.Equal("formatted export allowance is exhausted for this week.", details.Detail);
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("runbook-press", "subject.dispatch", limit: 10);
         Assert.Equal(2, receipts.Count);
         Assert.Contains(receipts, receipt =>
