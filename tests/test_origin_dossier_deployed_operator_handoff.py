@@ -59,6 +59,17 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
     write_json(root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json", {"status": "pass"})
     write_json(branch / "runsite-integration-proof.receipt.json", {"status": "pass"})
     write_json(
+        branch / "portal-publication-index-preflight.receipt.json",
+        {"status": "blocked", "restartRequiredForExistingContainer": True},
+    )
+    write_json(
+        branch / "portal-restart-plan.receipt.json",
+        {
+            "status": "awaiting_explicit_restart_approval",
+            "approvalGate": "explicit_user_deploy_or_restart_approval_required",
+        },
+    )
+    write_json(
         branch / "deployed-chummer-browser-probe.receipt.json",
         {
             "status": deployed_status,
@@ -144,6 +155,10 @@ def test_handoff_is_ready_for_operator_token_without_exposing_secret_values(tmp_
     assert result["currentEvidence"]["deployedProbeNextAction"] == result["next_action"]
     assert result["currentEvidence"]["deployedProbeBlockingReason"] == "missing_deployed_owner_session"
     assert result["currentEvidence"]["deployedProbeProgress"]["totalChecks"] == 41
+    assert result["currentEvidence"]["portalPublicationIndexPreflightStatus"] == "blocked"
+    assert result["currentEvidence"]["portalPublicationIndexRestartRequired"] is True
+    assert result["currentEvidence"]["portalRestartPlanStatus"] == "awaiting_explicit_restart_approval"
+    assert result["currentEvidence"]["portalRestartPlanApprovalGate"] == "explicit_user_deploy_or_restart_approval_required"
     assert result["goalCompletionClaimAllowed"] is False
     assert result["context"]["projectId"] == "varga-mira-kestrel"
     assert result["context"]["namespace"] == "origin.chummer.run/Varga/Mira/Kestrel"
@@ -157,6 +172,8 @@ def test_handoff_is_ready_for_operator_token_without_exposing_secret_values(tmp_
     assert result["privacy"]["envValuesExposed"] is False
     assert "missing_deployed_owner_session" in result["blockers"]
     assert "--env-file /docker/chummercomplete/chummer.run-services/.env" in serialized
+    assert "scripts/materialize_origin_dossier_portal_publication_index_preflight.py" in serialized
+    assert "scripts/materialize_origin_dossier_portal_restart_plan.py" in serialized
     assert "scripts/materialize_origin_edition_gold_proof_chain.py" in serialized
     assert "--allow-blocked" in serialized
     assert "scripts/materialize_origin_edition_gold_final_verdict.py" in serialized
@@ -184,6 +201,8 @@ def test_handoff_uses_origin_edition_context_for_namespace_and_commands(tmp_path
     branch = tmp_path / "origin.chummer.run/Case/Ari/Ghost"
     write_json(tmp_path / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json", {"status": "pass"})
     write_json(branch / "runsite-integration-proof.receipt.json", {"status": "pass"})
+    write_json(branch / "portal-publication-index-preflight.receipt.json", {"status": "blocked", "restartRequiredForExistingContainer": True})
+    write_json(branch / "portal-restart-plan.receipt.json", {"status": "awaiting_explicit_restart_approval", "approvalGate": "explicit_user_deploy_or_restart_approval_required"})
     write_json(
         branch / "deployed-chummer-browser-probe.receipt.json",
         {
@@ -256,6 +275,35 @@ def test_handoff_blocks_if_deployed_probe_status_passes_without_owner_playback(t
     assert result["currentEvidence"]["deployedProbeMissingRequiredFlags"] == ["owner_playback_e2e_verified"]
     assert result["currentEvidence"]["deployedProbeRequiredFlags"]["owner_playback_e2e_verified"] is False
     assert "super-secret-owner-token" not in serialized
+
+
+def test_handoff_does_not_claim_ready_for_token_when_probe_is_blocked_after_owner_auth(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    seed_handoff_inputs(tmp_path)
+    probe_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-chummer-browser-probe.receipt.json"
+    probe = json.loads(probe_path.read_text(encoding="utf-8"))
+    probe["blockers"] = ["logged_in_browser_verified", "owner_playback_e2e_verified"]
+    probe["blocking_reason"] = "logged_in_browser_verified,owner_playback_e2e_verified"
+    probe["next_action"] = (
+        "Restart/recreate chummer-portal only after explicit deploy approval so "
+        "CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json "
+        "is active, then rerun this probe."
+    )
+    write_json(probe_path, probe)
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", raising=False)
+
+    result = module.materialize(
+        tmp_path,
+        tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-operator-handoff.receipt.json",
+    )
+
+    assert result["status"] == "blocked"
+    assert "missing_deployed_owner_session" in result["blockers"]
+    assert result["currentEvidence"]["deployedProbeBlockers"] == [
+        "logged_in_browser_verified",
+        "owner_playback_e2e_verified",
+    ]
+    assert result["next_action"] == probe["next_action"]
 
 
 def test_handoff_blocks_if_deployed_probe_status_passes_with_untrusted_audiobook_share(tmp_path: Path, monkeypatch) -> None:

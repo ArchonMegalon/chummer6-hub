@@ -160,11 +160,16 @@ def materialize(
     runsite_proof = branch / "runsite-integration-proof.receipt.json"
     live_import = evidence_root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
     deployed_state_import = branch / "deployed-state-import.receipt.json"
+    portal_preflight = branch / "portal-publication-index-preflight.receipt.json"
+    portal_restart_plan = branch / "portal-restart-plan.receipt.json"
     evidence_root_text = evidence_root.as_posix()
     branch_text = branch.as_posix()
 
     deployed_payload = read_json(deployed_probe) if deployed_probe.is_file() else {}
     gold_payload = read_json(gold_audit) if gold_audit.is_file() else {}
+    deployed_probe_blockers = deployed_payload.get("blockers", [])
+    if not isinstance(deployed_probe_blockers, list):
+        deployed_probe_blockers = []
     deployed_flag_status = {
         flag: deployed_payload.get(flag) is True
         for flag in REQUIRED_DEPLOYED_PROBE_FLAGS
@@ -175,6 +180,8 @@ def materialize(
         "Set exactly one deployed owner-session input in /docker/chummercomplete/chummer.run-services/.env or in the current process: CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER.",
         "Preferred operator path when IDENTITY_SERVICE_BASE_URL, IDENTITY_ADMIN_KEY, and one owner resolver are available: eval \"$(python3 scripts/issue_chummer_deployed_owner_session.py --env-file /docker/chummercomplete/chummer.run-services/.env --format env)\". Owner resolvers: CHUMMER_DEPLOYED_E2E_SUBJECT_ID, CHUMMER_DEPLOYED_E2E_OWNER_EMAIL, or CHUMMER_ORIGIN_EDITION_NAMESPACE for deterministic fictional Origin sample proofs.",
         f"python3 scripts/materialize_origin_dossier_deployed_state_import.py --live-import {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data --container-state-root /app/state --output-receipt {branch_text}/deployed-state-import.receipt.json",
+        f"python3 scripts/materialize_origin_dossier_portal_publication_index_preflight.py --output {branch_text}/portal-publication-index-preflight.receipt.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data",
+        f"python3 scripts/materialize_origin_dossier_portal_restart_plan.py --evidence-root {quote(evidence_root_text)} --branch {quote(context.resolved_namespace)} --output {branch_text}/portal-restart-plan.receipt.json",
         "After explicit deploy/restart approval only: recreate or restart chummer-portal so CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json is active.",
         f"python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root {quote(evidence_root_text)} {origin_context_args}",
         f"python3 scripts/audit_origin_dossier_gold_e2e.py --live-import-request {evidence_root_text}/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --ea-delivery-receipt {branch_text}/telegram-origin-link-bundle-live.receipt.json --browser-proof {branch_text}/deployed-chummer-browser-probe.receipt.json --deployed-operator-handoff {branch_text}/deployed-operator-handoff.receipt.json --output {evidence_root_text}/ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json --pretty --require-pass",
@@ -194,17 +201,19 @@ def materialize(
         blockers.append("gold_audit_not_pass")
     ready_for_operator_token = (
         not owner_session_present()
+        and "missing_deployed_owner_session" in deployed_probe_blockers
         and "deployed_browser_probe_not_pass" in blockers
         and "gold_audit_not_pass" in blockers
     )
     status = "ready_for_operator_token" if ready_for_operator_token else ("pass" if not blockers else "blocked")
     deployed_progress = deployed_payload.get("progress") if isinstance(deployed_payload.get("progress"), dict) else {}
-    next_action = (
-        str(deployed_payload.get("next_action") or "").strip()
-        or "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
-        if status == "ready_for_operator_token"
-        else "Resolve deployed Origin Edition blockers and rerun the strict Gold proof chain."
-    )
+    deployed_next_action = str(deployed_payload.get("next_action") or "").strip()
+    if deployed_next_action:
+        next_action = deployed_next_action
+    elif status == "ready_for_operator_token":
+        next_action = "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe."
+    else:
+        next_action = "Resolve deployed Origin Edition blockers and rerun the strict Gold proof chain."
     blocking_reason = "" if status == "pass" else ",".join(blockers)
     progress = {
         "deployedProbe": deployed_progress,
@@ -275,6 +284,12 @@ def materialize(
             "deployedStateImportSha256": sha256_file(deployed_state_import) if deployed_state_import.is_file() else "",
             "deployedStateImportStatus": read_json(deployed_state_import).get("status") if deployed_state_import.is_file() else "",
             "deployedStateImportRestartRequired": read_json(deployed_state_import).get("restartRequiredForExistingContainer") if deployed_state_import.is_file() else None,
+            "portalPublicationIndexPreflightSha256": sha256_file(portal_preflight) if portal_preflight.is_file() else "",
+            "portalPublicationIndexPreflightStatus": read_json(portal_preflight).get("status") if portal_preflight.is_file() else "",
+            "portalPublicationIndexRestartRequired": read_json(portal_preflight).get("restartRequiredForExistingContainer") if portal_preflight.is_file() else None,
+            "portalRestartPlanSha256": sha256_file(portal_restart_plan) if portal_restart_plan.is_file() else "",
+            "portalRestartPlanStatus": read_json(portal_restart_plan).get("status") if portal_restart_plan.is_file() else "",
+            "portalRestartPlanApprovalGate": read_json(portal_restart_plan).get("approvalGate") if portal_restart_plan.is_file() else "",
             "runsiteIntegrationProofSha256": sha256_file(runsite_proof) if runsite_proof.is_file() else "",
             "deployedProbeSha256": sha256_file(deployed_probe) if deployed_probe.is_file() else "",
             "goldAuditSha256": sha256_file(gold_audit) if gold_audit.is_file() else "",
@@ -283,7 +298,7 @@ def materialize(
             "deployedProbeBlockingReason": deployed_payload.get("blocking_reason"),
             "deployedProbeProgress": deployed_progress,
             "goldAuditStatus": gold_payload.get("status"),
-            "deployedProbeBlockers": deployed_payload.get("blockers", []),
+            "deployedProbeBlockers": deployed_probe_blockers,
             "deployedProbeRequiredFlags": deployed_flag_status,
             "deployedProbeMissingRequiredFlags": missing_deployed_flags,
             "goldAuditFailedCodes": gold_payload.get("failedCodes", []),

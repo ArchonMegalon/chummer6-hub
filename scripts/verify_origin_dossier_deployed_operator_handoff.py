@@ -14,6 +14,8 @@ from origin_edition_verify_paths import deployed_operator_handoff_from_env
 CONTRACT_NAME = "chummer.origin_edition.deployed_operator_handoff.v1"
 REQUIRED_COMMAND_SNIPPETS = (
     "materialize_origin_dossier_deployed_state_import.py",
+    "materialize_origin_dossier_portal_publication_index_preflight.py",
+    "materialize_origin_dossier_portal_restart_plan.py",
     "materialize_origin_dossier_deployed_browser_probe.py",
     "audit_origin_dossier_gold_e2e.py",
     "materialize_origin_edition_gold_proof_chain.py",
@@ -215,6 +217,14 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
         issues.append("deployed_probe_blocking_reason_missing")
     if not isinstance(current.get("deployedProbeProgress"), dict):
         issues.append("deployed_probe_progress_missing")
+    if "portalPublicationIndexPreflightStatus" not in current:
+        issues.append("portal_publication_index_preflight_status_missing")
+    if "portalPublicationIndexRestartRequired" not in current:
+        issues.append("portal_publication_index_restart_required_missing")
+    if "portalRestartPlanStatus" not in current:
+        issues.append("portal_restart_plan_status_missing")
+    if "portalRestartPlanApprovalGate" not in current:
+        issues.append("portal_restart_plan_approval_gate_missing")
     if status == "pass":
         if payload.get("blockers") != []:
             issues.append("pass_handoff_has_blockers")

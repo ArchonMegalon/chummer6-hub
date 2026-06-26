@@ -65,6 +65,8 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
         "envFile": {"valuesStoredInReceipt": False},
         "requiredCommands": [
             "python3 scripts/materialize_origin_dossier_deployed_state_import.py --live-import /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data --container-state-root /app/state --output-receipt /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/origin.chummer.run/Varga/Mira/Kestrel/deployed-state-import.receipt.json",
+            "python3 scripts/materialize_origin_dossier_portal_publication_index_preflight.py --output /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/origin.chummer.run/Varga/Mira/Kestrel/portal-publication-index-preflight.receipt.json --host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data",
+            "python3 scripts/materialize_origin_dossier_portal_restart_plan.py --evidence-root /docker/chummercomplete/.tmp/origin-dossier-fresh-gold --branch origin.chummer.run/Varga/Mira/Kestrel --output /docker/chummercomplete/.tmp/origin-dossier-fresh-gold/origin.chummer.run/Varga/Mira/Kestrel/portal-restart-plan.receipt.json",
             "python3 scripts/materialize_origin_dossier_deployed_browser_probe.py --env-file /docker/chummercomplete/chummer.run-services/.env --evidence-root /docker/chummercomplete/.tmp/origin-dossier-fresh-gold --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run",
             "python3 scripts/audit_origin_dossier_gold_e2e.py --pretty --require-pass",
             "python3 scripts/materialize_origin_edition_gold_proof_chain.py --project-id varga-mira-kestrel --family-name Varga --given-name Mira --runner-name Kestrel --namespace origin.chummer.run/Varga/Mira/Kestrel --base-url https://chummer.run --allow-blocked",
@@ -79,6 +81,10 @@ def handoff_payload(*, status: str = "ready_for_operator_token") -> dict:
             "deployedProbeNextAction": "Gold proof chain is ready for release handoff." if pass_state else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe.",
             "deployedProbeBlockingReason": "" if pass_state else ",".join(blockers),
             "deployedProbeProgress": {"passedChecks": 2 if pass_state else 0, "totalChecks": 2, "blockedChecks": [] if pass_state else list(required_flags)},
+            "portalPublicationIndexPreflightStatus": "pass" if pass_state else "blocked",
+            "portalPublicationIndexRestartRequired": False if pass_state else True,
+            "portalRestartPlanStatus": "awaiting_explicit_restart_approval",
+            "portalRestartPlanApprovalGate": "explicit_user_deploy_or_restart_approval_required",
         },
         "blockers": blockers,
         "privacy": {

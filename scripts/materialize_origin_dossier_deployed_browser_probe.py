@@ -140,6 +140,41 @@ def read_import_request(evidence_root: Path) -> dict[str, Any]:
     return parsed
 
 
+def read_deployed_state_import(evidence_root: Path, context: OriginEditionContext) -> dict[str, Any]:
+    path = context.branch(evidence_root) / "deployed-state-import.receipt.json"
+    if not path.is_file():
+        return {
+            "present": False,
+            "status": "",
+            "restartRequiredForExistingContainer": None,
+            "receiptSha256": "",
+        }
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "present": True,
+            "status": "unreadable",
+            "restartRequiredForExistingContainer": None,
+            "receiptSha256": sha256_text(path.as_posix()),
+        }
+    if not isinstance(parsed, dict):
+        return {
+            "present": True,
+            "status": "invalid",
+            "restartRequiredForExistingContainer": None,
+            "receiptSha256": sha256_text(path.as_posix()),
+        }
+    return {
+        "present": True,
+        "status": str(parsed.get("status") or "").strip(),
+        "restartRequiredForExistingContainer": parsed.get("restartRequiredForExistingContainer"),
+        "receiptSha256": sha256_text(path.as_posix()),
+        "publicationIndexSha256": str(parsed.get("publicationIndexSha256") or "").strip(),
+        "copiedArtifactCount": len(parsed.get("copiedArtifacts", [])) if isinstance(parsed.get("copiedArtifacts"), list) else 0,
+    }
+
+
 def get(session: requests.Session, url: str) -> requests.Response | None:
     try:
         return session.get(url, allow_redirects=False, timeout=30)
@@ -189,6 +224,7 @@ def materialize(
     imported = read_import_request(evidence_root)
     request = imported["importRequest"]
     live_evidence = imported.get("evidence") if isinstance(imported.get("evidence"), dict) else {}
+    deployed_state_import = read_deployed_state_import(evidence_root, context)
     expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
     expected_book_sha = str(live_evidence.get("ebookArtifactSha256") or live_evidence.get("bookArtifactSha256") or "").strip()
     expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
@@ -379,11 +415,16 @@ def materialize(
     }
     blockers.extend([key for key, value in checks.items() if not value])
     blocking_reason = "" if passed else ",".join(blockers)
-    next_action = (
-        "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe."
-        if not has_owner_auth
-        else "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected."
-    )
+    if not has_owner_auth:
+        next_action = "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe."
+    elif (
+        status(detail) == 404
+        and deployed_state_import.get("status") == "verified"
+        and deployed_state_import.get("restartRequiredForExistingContainer") is True
+    ):
+        next_action = "Restart/recreate chummer-portal only after explicit deploy approval so CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json is active, then rerun this probe."
+    else:
+        next_action = "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected."
     progress = {
         "passedChecks": sum(1 for value in checks.values() if value),
         "totalChecks": len(checks),
@@ -413,6 +454,7 @@ def materialize(
         "rawCredentialExposed": False,
         "rawSessionTokenExposed": False,
         "ownerAuth": auth_context,
+        "deployedStateImport": deployed_state_import,
         "envFile": {
             "provided": env_file is not None,
             "pathSha256": sha256_text(env_file.as_posix()) if env_file is not None else "",

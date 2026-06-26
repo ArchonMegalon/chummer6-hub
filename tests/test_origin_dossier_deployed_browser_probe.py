@@ -235,6 +235,19 @@ class WrongSelectedFaceCoverRouteSession(FakeSession):
         return response
 
 
+class MissingDeployedPublicationIndexSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if "audiobookshelf.girschele.com/audiobookshelf/share/" in url:
+            return FakeResponse(200, {"content-type": "text/html; charset=utf-8"}, "<main>Audiobookshelf share</main>")
+        if (
+            not self.has_cookie
+            and not self.headers.get("Authorization")
+            and not self.headers.get("Cookie")
+        ):
+            return FakeResponse(302, {"location": "/login?next=%2Faccount%2Fwork"})
+        return FakeResponse(404, {"content-type": "text/plain"}, "not found")
+
+
 def test_deployed_probe_fails_closed_without_owner_token(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     write_import_request(tmp_path)
@@ -655,6 +668,46 @@ def test_deployed_probe_blocks_when_owner_video_hash_does_not_match_import(tmp_p
     assert result["response_sha256"]["watch"] != result["expected_import_sha256"]["watch"]
     assert "video_sha_matches_import" in result["blockers"]
     assert "video_sha_matches_import" in result["progress"]["blockedChecks"]
+    assert "secret-session" not in serialized
+
+
+def test_deployed_probe_points_to_restart_when_state_import_verified_but_route_404(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    branch = tmp_path / "origin.chummer.run" / "Varga" / "Mira" / "Kestrel"
+    branch.mkdir(parents=True, exist_ok=True)
+    (branch / "deployed-state-import.receipt.json").write_text(
+        json.dumps(
+            {
+                "status": "verified",
+                "restartRequiredForExistingContainer": True,
+                "publicationIndexSha256": "a" * 64,
+                "copiedArtifacts": [{}, {}],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.delenv("CHUMMER_DEPLOYED_E2E_AUTH_MODE", raising=False)
+    monkeypatch.setattr(module.requests, "Session", MissingDeployedPublicationIndexSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["http_statuses"]["owner_detail"] == 404
+    assert result["deployedStateImport"]["present"] is True
+    assert result["deployedStateImport"]["status"] == "verified"
+    assert result["deployedStateImport"]["restartRequiredForExistingContainer"] is True
+    assert result["deployedStateImport"]["publicationIndexSha256"] == "a" * 64
+    assert result["deployedStateImport"]["copiedArtifactCount"] == 2
+    assert result["next_action"] == (
+        "Restart/recreate chummer-portal only after explicit deploy approval so "
+        "CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json "
+        "is active, then rerun this probe."
+    )
     assert "secret-session" not in serialized
 
 
