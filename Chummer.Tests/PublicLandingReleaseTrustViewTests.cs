@@ -1182,6 +1182,14 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.", trustView, StringComparison.Ordinal);
+        Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("placeholder=\"Version or build, if visible\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("placeholder=\"Desktop app, if visible\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("authenticated ? \"Open account support\" : \"Save support history\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Installer linked, but first launch did not explain the next step", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("The Linux release installed successfully", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);
     }
 

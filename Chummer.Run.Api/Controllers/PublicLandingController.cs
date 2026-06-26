@@ -11050,7 +11050,7 @@ Boundary:
                 : "Send one clear problem here. You can create an account later if you want saved history inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
-            AccountSupportLabel: authenticated ? "Open account support" : "Claim your copy",
+            AccountSupportLabel: authenticated ? "Open account support" : "Save support history",
             InstallAccessHref: installRail.ReturnHref ?? "/account/access",
             InstallAccessLabel: installRail.ReturnLabel ?? "Open installs",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),

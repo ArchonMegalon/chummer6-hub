@@ -285,15 +285,15 @@ else if (!contactPage)
                 </div>
                 <div class="field">
                     <label for="supportTitle">Title</label>
-                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer linked, but first launch did not explain the next step" value="@Model.SupportIntake.DefaultTitle" required />
+                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer opens, then stops" value="@Model.SupportIntake.DefaultTitle" required />
                 </div>
                 <div class="field">
                     <label for="supportSummary">Short summary</label>
-                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux release installed successfully, but the post-install guidance was unclear." value="@Model.SupportIntake.DefaultSummary" required />
+                    <input id="supportSummary" name="summary" maxlength="280" placeholder="I expected the app to start. It did not." value="@Model.SupportIntake.DefaultSummary" required />
                 </div>
                 <div class="field">
                     <label for="supportDetail">What happened</label>
-                    <textarea id="supportDetail" name="detail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and the fastest way to reproduce it." required>@Model.SupportIntake.DefaultDetail</textarea>
+                    <textarea id="supportDetail" name="detail" rows="6" placeholder="What did you try, what happened, and what should I check first?" required>@Model.SupportIntake.DefaultDetail</textarea>
                 </div>
                 @if (!Model.SupportIntake.Authenticated)
                 {
@@ -314,7 +314,7 @@ else if (!contactPage)
                     </div>
                     <div class="field">
                         <label for="supportVersion">Version</label>
-                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current public build or version number" value="@Model.SupportIntake.DefaultApplicationVersion" />
+                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Version or build, if visible" value="@Model.SupportIntake.DefaultApplicationVersion" />
                     </div>
                     <div class="field">
                         <label for="supportReleaseChannel">Release channel</label>
@@ -322,7 +322,7 @@ else if (!contactPage)
                     </div>
                     <div class="field">
                         <label for="supportHeadId">Desktop head</label>
-                        <input id="supportHeadId" name="headId" maxlength="64" placeholder="avalonia or another shipped head" value="@Model.SupportIntake.DefaultHeadId" />
+                        <input id="supportHeadId" name="headId" maxlength="64" placeholder="Desktop app, if visible" value="@Model.SupportIntake.DefaultHeadId" />
                     </div>
                     <div class="field">
                         <label for="supportInstallationId">Install id</label>
