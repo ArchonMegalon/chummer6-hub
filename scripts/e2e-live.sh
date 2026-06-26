@@ -131,7 +131,7 @@ request_json() {
 }
 
 wait_for_service
-check_get "/api/info" >/dev/null
+check_get "/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour" >/dev/null
 check_get "/api/health" >/dev/null
 check_get "/api/shell/bootstrap" >/dev/null
 check_get "/api/workspaces" >/dev/null

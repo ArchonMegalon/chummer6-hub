@@ -295,7 +295,7 @@ if [[ "$RUNBOOK_MODE" == "refresh-local-api" ]]; then
     exit 1
   fi
 
-  api_probe_url="http://127.0.0.1:${detected_api_port}/api/info"
+  api_probe_url="http://127.0.0.1:${detected_api_port}/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour"
   python3 - "$api_probe_url" <<'PY'
 import sys
 import time
@@ -311,6 +311,11 @@ while time.time() < deadline:
             if 200 <= response.status < 500:
                 print(url)
                 sys.exit(0)
+    except urllib.error.HTTPError as exc:  # pragma: no cover - runbook probe path
+        if 200 <= exc.code < 500:
+            print(url)
+            sys.exit(0)
+        last_error = exc
     except Exception as exc:  # pragma: no cover - runbook probe path
         last_error = exc
     time.sleep(1)
@@ -911,7 +916,7 @@ docker run --rm \
   busybox sh -lc '
 for u in "$U1" "$U2" "$U3" "$U4" "$U5"; do
   echo "--- origin: $u"
-  for p in / /api/health /api/info; do
+  for p in / /api/health '/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour'; do
     echo "GET $p"
     wget -qSO- --timeout=3 "$u$p" -O - 2>&1 || true
     echo
