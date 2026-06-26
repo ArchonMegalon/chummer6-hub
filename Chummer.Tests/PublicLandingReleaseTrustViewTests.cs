@@ -589,7 +589,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("human escalation", trustPage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Browser handoff", trustPage, StringComparison.Ordinal);
 
-        Assert.Contains("Use support for cases with device logs", faq, StringComparison.Ordinal);
+        Assert.Contains("Use support for private problems", faq, StringComparison.Ordinal);
         Assert.Contains("Open support", faq, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", faq, StringComparison.Ordinal);
 

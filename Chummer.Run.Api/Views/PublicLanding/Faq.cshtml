@@ -12,21 +12,21 @@
     {
         new
         {
-            Badge = "Status",
-            Title = "Check current status first",
-            Summary = "Use this when you want the latest update, platform availability, and current release notes in one place.",
+            Badge = "Current app",
+            Title = "What works today",
+            Summary = "Use this when you want the current build, supported platforms, and known limits.",
             Href = "/status",
             Label = "Open status",
-            Highlights = new[] { "Updated", "Platforms", "Current notes" }
+            Highlights = new[] { "Build", "Platforms", "Known limits" }
         },
         new
         {
             Badge = "Downloads",
-            Title = "Open downloads when you want to install",
+            Title = "Install Chummer",
             Summary = accessPosture?.AvailabilitySummary ?? "Downloads shows the current package and setup help without making you dig through a long answer first.",
             Href = "/downloads",
             Label = "Open downloads",
-            Highlights = new[] { "Updated", "Setup help", "Current notes" }
+            Highlights = new[] { "Stable", "Nightly", "Linux source" }
         },
         new
         {
@@ -43,12 +43,12 @@
         },
         new
         {
-            Badge = "Private help",
-            Title = "Use support for cases with device logs",
+            Badge = "Support",
+            Title = "Use support for private problems",
             Summary = "Private issues usually need logs and a direct answer.",
             Href = "/contact",
             Label = "Open support",
-            Highlights = new[] { "Private reply", "No login needed", "Route stays calm" }
+            Highlights = new[] { "Discord first", "Private form", "Logs" }
         }
     };
 
