@@ -11,12 +11,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
-        Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Recommended for this browser</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Linux</span>", view, StringComparison.Ordinal);
         Assert.Contains("Build from source", view, StringComparison.Ordinal);
         Assert.Contains("build-chummer6-linux.sh", view, StringComparison.Ordinal);
-        Assert.Contains("Pick one. Stable for most tables, Nightly for newer builds, source script for Linux.", view, StringComparison.Ordinal);
+        Assert.Contains("Recommended from your browser. Stable, Nightly, or Linux source.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Pick one.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release notes", view, StringComparison.Ordinal);
@@ -93,7 +94,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("id=\"stable\"", view, StringComparison.Ordinal);
         Assert.Contains("id=\"linux-source\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
-        Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Recommended for this browser</span>", view, StringComparison.Ordinal);
         Assert.Contains("The regular build.", view, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
@@ -369,7 +370,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("<h1>Downloads</h1>", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
-        Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
+        Assert.Contains(">Recommended for this browser<", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);

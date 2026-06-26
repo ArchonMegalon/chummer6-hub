@@ -41,7 +41,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Pick one. Stable for most tables, Nightly for newer builds, source script for Linux.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Recommended from your browser. Stable, Nightly, or Linux source.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("<span>Recommended for this browser</span>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("The regular build.", downloadsView, StringComparison.Ordinal);
