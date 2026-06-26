@@ -12,6 +12,10 @@ namespace Chummer.Tests;
 
 public sealed class OriginDossierPublicationServiceTests
 {
+    private const string OriginManuscriptAccountAlias = "INK01_ORIGIN";
+    private const string OriginAudiobookAccountAlias = "UNMIXR_TIBOR_01";
+    private const string OriginTelegramAccountAlias = "EA_TELEGRAM_ORIGIN";
+
     [Fact]
     public void ListForAccountReturnsOnlyOwnedGoldReadyOriginDossierPublication()
     {
@@ -398,6 +402,527 @@ public sealed class OriginDossierPublicationServiceTests
     }
 
     [Fact]
+    public void ListForAccountRequiresConfiguredProviderAccountAliasesBeforeGoldReady()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-strict-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-strict-account-alias");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-strict-account-alias", "Strict Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES"] = "INK01_ORIGIN,YB02_CHUMMER_PRIVATE,FIRSTBOOK_PREMIUM",
+                ["CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES"] = "UNMIXR_TIBOR_01,INK01_ORIGIN"
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsProviderAccountAliasesFromRegistryWithoutDirectAliasEnv()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-registry-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-registry-account-alias");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-registry-account-alias", "Registry Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginManuscriptAccountAlias}}",
+                      "provider": "Inkfluence",
+                      "status": "available",
+                      "roles": ["manuscript", "origin"]
+                    },
+                    {
+                      "accountAlias": "{{OriginAudiobookAccountAlias}}",
+                      "provider": "Unmixr",
+                      "status": "available",
+                      "roles": ["audio", "audiobook", "origin"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsProviderAccountAliasesFromRegistryFilePath()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-registry-path-account-alias.json");
+        string registryPath = Path.Combine(tempRoot, "ea-origin-provider-accounts.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-registry-path-account-alias");
+        File.WriteAllText(
+            registryPath,
+            $$"""
+            {
+              "accounts": [
+                {
+                  "accountAlias": "{{OriginManuscriptAccountAlias}}",
+                  "provider": "Inkfluence",
+                  "status": "available",
+                  "roles": ["manuscript", "origin"]
+                },
+                {
+                  "accountAlias": "{{OriginAudiobookAccountAlias}}",
+                  "provider": "Unmixr",
+                  "status": "available",
+                  "roles": ["audio", "audiobook", "origin"]
+                }
+              ]
+            }
+            """);
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-registry-path-account-alias", "Registry Path Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH"] = registryPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenProviderAccountRegistryFileIsMalformed()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-malformed-registry-account-alias.json");
+        string registryPath = Path.Combine(tempRoot, "ea-origin-provider-accounts.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-malformed-registry-account-alias");
+        File.WriteAllText(registryPath, "{ this is not provider account registry json");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-malformed-registry-account-alias", "Malformed Registry Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH"] = registryPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("provider manuscript account alias", publication.MissingGoldRequirements);
+        Assert.Contains("audiobook provider account alias", publication.MissingGoldRequirements);
+        Assert.Contains("trusted Audiobookshelf share URL", publication.MissingGoldRequirements);
+        Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenRegistryOnlyAccountsAreDisabled()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-disabled-registry-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-disabled-registry-account-alias");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-disabled-registry-account-alias", "Disabled Registry Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginManuscriptAccountAlias}}",
+                      "provider": "Inkfluence",
+                      "status": "disabled",
+                      "roles": ["manuscript", "origin"]
+                    },
+                    {
+                      "accountAlias": "{{OriginAudiobookAccountAlias}}",
+                      "provider": "Unmixr",
+                      "status": "disabled",
+                      "roles": ["audio", "audiobook", "origin"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("provider manuscript account alias", publication.MissingGoldRequirements);
+        Assert.Contains("audiobook provider account alias", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsAudiobookshelfShareHostFromRegistry()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-registry-shelf-host.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-registry-shelf-host");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-registry-shelf-host",
+                            "Registry Shelf",
+                            "Vanta",
+                            artifacts,
+                            audiobookshelfHost: "origin-shelf.example.invalid")
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = """
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "ABS_ORIGIN_01",
+                      "provider": "Audiobookshelf",
+                      "status": "available",
+                      "roles": ["audiobookshelf", "book_share"],
+                      "shareHost": "origin-shelf.example.invalid"
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+        Assert.Equal(
+            "https://origin-shelf.example.invalid/share/origin-registry-shelf-host-audiobook",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-registry-shelf-host", "listen"));
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenRegistryAudiobookshelfShareHostIsDisabled()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-disabled-registry-shelf-host.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-disabled-registry-shelf-host");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-disabled-registry-shelf-host",
+                            "Disabled Registry Shelf",
+                            "Vanta",
+                            artifacts,
+                            audiobookshelfHost: "origin-shelf.example.invalid")
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = """
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "ABS_ORIGIN_01",
+                      "provider": "Audiobookshelf",
+                      "status": "disabled",
+                      "roles": ["audiobookshelf", "book_share"],
+                      "shareHost": "origin-shelf.example.invalid"
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("trusted Audiobookshelf share URL", publication.MissingGoldRequirements);
+        Assert.Contains("trusted Audiobookshelf dossier ebook share URL", publication.MissingGoldRequirements);
+        Assert.Contains("trusted Audiobookshelf audiobook share URL", publication.MissingGoldRequirements);
+        Assert.Null(service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-disabled-registry-shelf-host", "listen"));
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenRegistryAudiobookshelfAccountOnlyHasGenericOriginShareRole()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-generic-share-registry-shelf-host.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-generic-share-registry-shelf-host");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-generic-share-registry-shelf-host",
+                            "Generic Share Registry Shelf",
+                            "Vanta",
+                            artifacts,
+                            audiobookshelfHost: "origin-shelf.example.invalid")
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = """
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "ABS_ORIGIN_01",
+                      "provider": "Audiobookshelf",
+                      "status": "available",
+                      "roles": ["origin_share"],
+                      "shareHost": "origin-shelf.example.invalid"
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("trusted Audiobookshelf share URL", publication.MissingGoldRequirements);
+        Assert.Contains("trusted Audiobookshelf dossier ebook share URL", publication.MissingGoldRequirements);
+        Assert.Contains("trusted Audiobookshelf audiobook share URL", publication.MissingGoldRequirements);
+        Assert.Null(service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-generic-share-registry-shelf-host", "listen"));
+    }
+
+    [Fact]
+    public void ListForAccountRejectsPrivateOriginDossierWhenAssignedProviderAccountAliasIsOutsideConfiguredLane()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-wrong-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-wrong-account-alias");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-wrong-account-alias",
+                            "Wrong Alias",
+                            "Vanta",
+                            artifacts,
+                            providerManuscriptAccountAlias: "INK02_COMMERCIAL",
+                            audiobookProviderAccountAlias: OriginAudiobookAccountAlias)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES"] = "INK01_ORIGIN,YB02_CHUMMER_PRIVATE,FIRSTBOOK_PREMIUM",
+                ["CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES"] = "UNMIXR_TIBOR_01,INK01_ORIGIN"
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("provider manuscript account alias", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRejectsConfiguredAccountAliasWhenReceiptDoesNotBindTheAlias()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-missing-account-alias-receipt-token.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-missing-account-alias-receipt-token");
+        File.WriteAllText(
+            artifacts.ProviderManuscriptReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "provider_manuscript_import",
+                    provider = "Inkfluence",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[] { "operator_verified_live_run", "provider_receipt_reference:Inkfluence:provider_manuscript_import" },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-missing-account-alias-receipt-token", "Missing Alias Receipt", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES"] = OriginManuscriptAccountAlias,
+                ["CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES"] = OriginAudiobookAccountAlias
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("provider manuscript account alias", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRejectsConfiguredAccountAliasWhenReceiptOnlyContainsAliasPrefix()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-spoofed-account-alias-receipt-token.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-spoofed-account-alias-receipt-token");
+        File.WriteAllText(
+            artifacts.ProviderManuscriptReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "provider_manuscript_import",
+                    provider = "Inkfluence",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Inkfluence:provider_manuscript_import",
+                        $"accountAlias: {OriginManuscriptAccountAlias}_FAKE"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-spoofed-account-alias-receipt-token", "Spoofed Alias Receipt", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES"] = OriginManuscriptAccountAlias,
+                ["CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES"] = OriginAudiobookAccountAlias
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("provider manuscript account alias", publication.MissingGoldRequirements);
+    }
+
+
+    [Fact]
     public void ListForAccountRequiresApprovedSourcePacketWithExternalProcessingConsent()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
@@ -602,6 +1127,51 @@ public sealed class OriginDossierPublicationServiceTests
     }
 
     [Fact]
+    public void ListForAccountRequiresAudiobookshelfReceiptsToBindOriginTaxonomy()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-wrong-audiobookshelf-taxonomy.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-wrong-audiobookshelf-taxonomy");
+        File.WriteAllText(
+            artifacts.AudiobookshelfImportReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "audiobookshelf_import",
+                    provider = "Audiobookshelf",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    originEditionNamespace = "origin.chummer.run/Varga/Mira/Vanta",
+                    libraryPath = "origin.chummer.run/Varga/Mira/Vanta/dossier",
+                    deliveredLinks = new[] { "operator_verified_live_run", "provider_receipt_reference:Audiobookshelf:audiobookshelf_import", "narrationProvider: Unmixr", $"accountAlias: {OriginAudiobookAccountAlias}" },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.AudiobookPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-wrong-audiobookshelf-taxonomy", "Wrong Taxonomy", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("Audiobookshelf import receipt path", publication.MissingGoldRequirements);
+    }
+
+
+    [Fact]
     public void ListForAccountRequiresTelegramReceiptToContainOwnerAndListenLinks()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
@@ -641,6 +1211,272 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.False(publication.GoldReady);
         Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
     }
+
+    [Fact]
+    public void ListForAccountRequiresTelegramReceiptFromEaAdapterNotTokenOnlyFile()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-token-only-telegram.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-token-only-telegram");
+        File.WriteAllText(
+            artifacts.TelegramShareDeliveryReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "telegram_share_delivery",
+                    provider = "EA Telegram",
+                    status = "delivered",
+                    deliveredAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "/account/work/origin-dossiers/origin-token-only-telegram",
+                        "/account/work/origin-dossiers/origin-token-only-telegram/read",
+                        "/account/work/origin-dossiers/origin-token-only-telegram/listen",
+                        "/account/work/origin-dossiers/origin-token-only-telegram/watch",
+                        Sha256Text("/account/work/origin-dossiers/origin-token-only-telegram"),
+                        Sha256Text("/account/work/origin-dossiers/origin-token-only-telegram/read"),
+                        Sha256Text("/account/work/origin-dossiers/origin-token-only-telegram/listen"),
+                        Sha256Text("/account/work/origin-dossiers/origin-token-only-telegram/watch"),
+                        "origin.chummer.run/Varga/Mira/Vanta",
+                        Sha256Text("origin.chummer.run/Varga/Mira/Vanta"),
+                        "operator_verified_live_run",
+                        "provider_receipt_reference"
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-token-only-telegram", "Token Only Telegram", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsTelegramDeliveryAliasFromRegistry()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-registry-telegram.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-registry-telegram");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-registry-telegram", "Registry Telegram", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginTelegramAccountAlias}}",
+                      "provider": "Telegram",
+                      "status": "available",
+                      "roles": ["telegram", "telegram_delivery", "origin_share"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenRegistryTelegramAccountOnlyHasGenericOriginShareRole()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-generic-share-registry-telegram.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-generic-share-registry-telegram");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-generic-share-registry-telegram", "Generic Share Registry Telegram", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginTelegramAccountAlias}}",
+                      "provider": "Telegram",
+                      "status": "available",
+                      "roles": ["origin_share"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountPublishesNonSampleRunnerWithRegistryRoutedGoldArtifacts()
+    {
+        const string projectId = "origin-case-ari-ghost";
+        const string familyName = "Case";
+        const string givenName = "Ari";
+        const string runnerName = "Ghost";
+        const string originNamespace = "origin.chummer.run/Case/Ari/Ghost";
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-non-sample-registry-gold.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(
+            tempRoot,
+            projectId,
+            runnerName,
+            originNamespace);
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-ghost",
+                            "subject-ghost",
+                            projectId,
+                            "Ghost Origin Dossier",
+                            runnerName,
+                            artifacts,
+                            familyName: familyName,
+                            givenName: givenName,
+                            runnerName: runnerName)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginManuscriptAccountAlias}}",
+                      "provider": "Inkfluence",
+                      "status": "available",
+                      "roles": ["manuscript", "origin"]
+                    },
+                    {
+                      "accountAlias": "{{OriginAudiobookAccountAlias}}",
+                      "provider": "Unmixr",
+                      "status": "available",
+                      "roles": ["audio", "audiobook", "origin"]
+                    },
+                    {
+                      "accountAlias": "ABS_ORIGIN_01",
+                      "provider": "Audiobookshelf",
+                      "status": "available",
+                      "roles": ["audiobookshelf", "book_share"],
+                      "shareHost": "audio.chummer.run"
+                    },
+                    {
+                      "accountAlias": "{{OriginTelegramAccountAlias}}",
+                      "provider": "Telegram",
+                      "status": "available",
+                      "roles": ["telegram", "telegram_delivery", "origin_share"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-ghost", "subject-ghost"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+        Assert.Equal(originNamespace, publication.OriginEditionNamespace);
+        Assert.Equal($"https://chummer.run/account/work/origin-dossiers/{projectId}/read", publication.AudiobookshelfDossierShareUrl);
+        Assert.Equal($"https://chummer.run/account/work/origin-dossiers/{projectId}/listen", publication.AudiobookshelfAudiobookShareUrl);
+        Assert.Equal($"https://audio.chummer.run/share/{projectId}-dossier", service.GetAudiobookshelfShareForAccount("user-ghost", "subject-ghost", projectId, "read"));
+        Assert.Equal($"https://audio.chummer.run/share/{projectId}-audiobook", service.GetAudiobookshelfShareForAccount("user-ghost", "subject-ghost", projectId, "listen"));
+    }
+
+    [Fact]
+    public void ListForAccountFailsClosedWhenRegistryTelegramDeliveryAccountIsDisabled()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-disabled-registry-telegram.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-disabled-registry-telegram");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-disabled-registry-telegram", "Disabled Registry Telegram", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginTelegramAccountAlias}}",
+                      "provider": "Telegram",
+                      "status": "disabled",
+                      "roles": ["telegram", "telegram_delivery", "origin_share"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("Telegram share delivery receipt path", publication.MissingGoldRequirements);
+    }
+
 
     [Fact]
     public void ListForAccountRequiresPassingFinalNoFallbackNoSentinelAuditBeforeGoldReady()
@@ -683,7 +1519,13 @@ public sealed class OriginDossierPublicationServiceTests
         string title,
         string runnerAlias,
         OriginDossierArtifactPaths artifacts,
-        string? audiobookshelfShareUrl = null)
+        string? audiobookshelfShareUrl = null,
+        string? providerManuscriptAccountAlias = OriginManuscriptAccountAlias,
+        string? audiobookProviderAccountAlias = OriginAudiobookAccountAlias,
+        string audiobookshelfHost = "audio.chummer.run",
+        string familyName = "Varga",
+        string givenName = "Mira",
+        string? runnerName = null)
         => new
         {
             ownerUserId,
@@ -691,16 +1533,16 @@ public sealed class OriginDossierPublicationServiceTests
             projectId,
             title,
             runnerAlias,
-            familyName = "Varga",
-            givenName = "Mira",
-            runnerName = runnerAlias,
-            originEditionNamespace = $"origin.chummer.run/Varga/Mira/{runnerAlias}",
+            familyName,
+            givenName,
+            runnerName = runnerName ?? runnerAlias,
+            originEditionNamespace = $"origin.chummer.run/{familyName}/{givenName}/{runnerName ?? runnerAlias}",
             publicationState = "published_for_owner",
             chummerRunOwnerUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}",
             bookArtifactUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/book",
-            audiobookshelfShareUrl = audiobookshelfShareUrl ?? $"https://audio.chummer.run/share/{projectId}-audiobook",
-            audiobookshelfDossierShareUrl = $"https://audio.chummer.run/share/{projectId}-dossier",
-            audiobookshelfAudiobookShareUrl = audiobookshelfShareUrl ?? $"https://audio.chummer.run/share/{projectId}-audiobook",
+            audiobookshelfShareUrl = audiobookshelfShareUrl ?? $"https://{audiobookshelfHost}/share/{projectId}-audiobook",
+            audiobookshelfDossierShareUrl = $"https://{audiobookshelfHost}/share/{projectId}-dossier",
+            audiobookshelfAudiobookShareUrl = audiobookshelfShareUrl ?? $"https://{audiobookshelfHost}/share/{projectId}-audiobook",
             dossierVideoUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/video",
             storySceneCoverUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/cover",
             providerAuthoredManuscriptImported = true,
@@ -716,6 +1558,7 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.CanonAuditReceiptPath,
             artifacts.ProviderManuscriptPath,
             artifacts.ProviderManuscriptReceiptPath,
+            providerManuscriptAccountAlias,
             artifacts.HumanizerReceiptPath,
             artifacts.BookArtifactPath,
             artifacts.BookArtifactReceiptPath,
@@ -726,6 +1569,7 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.CoverConsistencyReceiptPath,
             artifacts.AudiobookPath,
             artifacts.AudiobookshelfImportReceiptPath,
+            audiobookProviderAccountAlias,
             artifacts.DossierVideoPath,
             artifacts.DossierVideoReceiptPath,
             artifacts.MoviePosterPath,
@@ -735,11 +1579,15 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.FinalNoFallbackNoSentinelAuditReceiptPath
         };
 
-    private static OriginDossierArtifactPaths CreateGoldArtifacts(string tempRoot, string projectId)
+    private static OriginDossierArtifactPaths CreateGoldArtifacts(
+        string tempRoot,
+        string projectId,
+        string runnerAlias = "Vanta",
+        string originEditionNamespace = "origin.chummer.run/Varga/Mira/Vanta")
     {
         string projectRoot = Path.Combine(tempRoot, projectId);
         Directory.CreateDirectory(projectRoot);
-        string sourcePacketPath = WriteArtifact(projectRoot, "approved-source-packet.json", """{"runnerAlias":"Vanta","approvedForExternalProcessing":true}""");
+        string sourcePacketPath = WriteArtifact(projectRoot, "approved-source-packet.json", $$"""{"runnerAlias":"{{runnerAlias}}","approvedForExternalProcessing":true}""");
         string sourcePacketReceiptPath = WriteReceipt(
             projectRoot,
             "approved-source-packet.receipt.json",
@@ -753,6 +1601,7 @@ public sealed class OriginDossierPublicationServiceTests
             "provider-manuscript.receipt.json",
             "provider_manuscript_import",
             "Inkfluence",
+            [$"accountAlias: {OriginManuscriptAccountAlias}"],
             artifactPaths: [providerManuscriptPath]);
         string humanizerReceiptPath = WriteReceipt(
             projectRoot,
@@ -780,7 +1629,11 @@ public sealed class OriginDossierPublicationServiceTests
             "audiobookshelf-dossier-import.receipt.json",
             "audiobookshelf_dossier_import",
             "Audiobookshelf",
-            [$"dossierShare: https://audio.chummer.run/share/{projectId}-dossier"],
+            [
+                $"dossierShare: https://audio.chummer.run/share/{projectId}-dossier",
+                $"originEditionNamespace: {originEditionNamespace}",
+                $"originTaxonomy: {originEditionNamespace}/dossier"
+            ],
             artifactPaths: [ebookArtifactPath]);
         string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG story scene cover artifact");
         string storySceneCoverReceiptPath = WriteReceipt(
@@ -791,14 +1644,14 @@ public sealed class OriginDossierPublicationServiceTests
             [
                 $"/account/work/origin-dossiers/{projectId}",
                 $"/account/work/origin-dossiers/{projectId}/cover",
-                "origin.chummer.run/Varga/Mira/Vanta",
+                originEditionNamespace,
                 "selected_character_face"
             ],
             artifactPaths: [storySceneCoverPath]);
         string coverConsistencyReceiptPath = WriteCoverConsistencyReceipt(
             projectRoot,
             "cover-consistency.receipt.json",
-            "origin.chummer.run/Varga/Mira/Vanta",
+            originEditionNamespace,
             ComputeSha256(storySceneCoverPath));
         string audiobookPath = WriteArtifact(projectRoot, "audiobook.m4b", "M4B audiobook artifact");
         string audiobookshelfImportReceiptPath = WriteReceipt(
@@ -806,7 +1659,12 @@ public sealed class OriginDossierPublicationServiceTests
             "audiobookshelf-import.receipt.json",
             "audiobookshelf_import",
             "Audiobookshelf",
-            ["narrationProvider: Unmixr"],
+            [
+                "narrationProvider: Unmixr",
+                $"accountAlias: {OriginAudiobookAccountAlias}",
+                $"originEditionNamespace: {originEditionNamespace}",
+                $"originTaxonomy: {originEditionNamespace}/audiobook"
+            ],
             artifactPaths: [audiobookPath]);
         string dossierVideoPath = WriteArtifact(projectRoot, "dossier-film.mp4", "MP4 dossier film artifact");
         string moviePosterPath = WriteArtifact(projectRoot, "movie-poster.png", "PNG movie poster artifact");
@@ -818,27 +1676,15 @@ public sealed class OriginDossierPublicationServiceTests
             "dossier_video_import",
             "video_lane",
             artifactPaths: [dossierVideoPath]);
-        string telegramShareDeliveryReceiptPath = WriteReceipt(
+        string telegramShareDeliveryReceiptPath = WriteTelegramShareDeliveryReceipt(
             projectRoot,
             "telegram-share.receipt.json",
-            "telegram_share_delivery",
-            "EA Telegram",
-            [
-                $"/account/work/origin-dossiers/{projectId}",
-                $"/account/work/origin-dossiers/{projectId}/read",
-                $"/account/work/origin-dossiers/{projectId}/listen",
-                $"/account/work/origin-dossiers/{projectId}/watch",
-                Sha256Text($"/account/work/origin-dossiers/{projectId}"),
-                Sha256Text($"/account/work/origin-dossiers/{projectId}/read"),
-                Sha256Text($"/account/work/origin-dossiers/{projectId}/listen"),
-                Sha256Text($"/account/work/origin-dossiers/{projectId}/watch"),
-                "origin.chummer.run/Varga/Mira/Vanta",
-                Sha256Text("origin.chummer.run/Varga/Mira/Vanta")
-            ]);
+            projectId,
+            originEditionNamespace);
         string finalNoFallbackNoSentinelAuditReceiptPath = WriteFinalNoFallbackNoSentinelAuditReceipt(
             projectRoot,
             "final-no-fallback-no-sentinel.receipt.json",
-            "origin.chummer.run/Varga/Mira/Vanta");
+            originEditionNamespace);
 
         return new OriginDossierArtifactPaths(
             sourcePacketPath,
@@ -901,6 +1747,73 @@ public sealed class OriginDossierPublicationServiceTests
                     artifactSha256 = (artifactPaths ?? Array.Empty<string>())
                         .Select(ComputeSha256)
                         .ToArray()
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        return path;
+    }
+
+    private static string WriteTelegramShareDeliveryReceipt(
+        string projectRoot,
+        string fileName,
+        string projectId,
+        string originEditionNamespace)
+    {
+        string path = Path.Combine(projectRoot, fileName);
+        string ownerPath = $"/account/work/origin-dossiers/{projectId}";
+        string readPath = $"{ownerPath}/read";
+        string listenPath = $"{ownerPath}/listen";
+        string watchPath = $"{ownerPath}/watch";
+        File.WriteAllText(
+            path,
+            JsonSerializer.Serialize(
+                new
+                {
+                    contractName = "ea.telegram_audiobook_live_delivery_receipt.v1",
+                    operation = "telegram_share_delivery",
+                    provider = "EA Telegram",
+                    adapter = "ExecutiveAssistantChannelMessagingService",
+                    accountAlias = OriginTelegramAccountAlias,
+                    status = "delivered",
+                    deliveredAtUtc = DateTimeOffset.UtcNow,
+                    telegramMessageIdHashedByEa = true,
+                    rawTelegramChatIdIncluded = false,
+                    selected_delivery = new
+                    {
+                        telegram_delivery_status = "sent",
+                        telegram_delivery_message_id_present = true,
+                        telegram_chat_bound = true,
+                        telegram_message_bound = true,
+                        origin_edition_link_bundle = new
+                        {
+                            status = "sent",
+                            project_id = projectId,
+                            origin_namespace_sha256 = Sha256Text(originEditionNamespace),
+                            telegram_delivery_status = "sent",
+                            telegram_message_id_present = true,
+                            all_required_links_present = true,
+                            raw_urls_exposed = false,
+                            open_in_chummer_url_sha256 = Sha256Text(ownerPath),
+                            read_url_sha256 = Sha256Text(readPath),
+                            listen_url_sha256 = Sha256Text(listenPath),
+                            watch_url_sha256 = Sha256Text(watchPath)
+                        }
+                    },
+                    deliveredLinks = new[]
+                    {
+                        ownerPath,
+                        readPath,
+                        listenPath,
+                        watchPath,
+                        Sha256Text(ownerPath),
+                        Sha256Text(readPath),
+                        Sha256Text(listenPath),
+                        Sha256Text(watchPath),
+                        originEditionNamespace,
+                        Sha256Text(originEditionNamespace),
+                        $"accountAlias: {OriginTelegramAccountAlias}",
+                        "operator_verified_live_run",
+                        "provider_receipt_reference"
+                    }
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
         return path;

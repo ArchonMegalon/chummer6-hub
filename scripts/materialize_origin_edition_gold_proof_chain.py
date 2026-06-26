@@ -108,7 +108,9 @@ def run_chain(
         portal_restart_plan_path,
         evidence_root=evidence_root,
         branch=Path(context.resolved_namespace),
+        env_file=env_file,
         preflight=portal_preflight_path,
+        context=context,
     )
 
     deployed_probe = modules.deployed_probe.materialize(

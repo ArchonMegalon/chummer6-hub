@@ -62,8 +62,10 @@ def fake_modules(
         write_json(output, payload)
         return payload
 
-    def portal_restart_plan(output, **_kwargs):
+    def portal_restart_plan(output, **kwargs):
         calls.append("portal_restart_plan")
+        seen_contexts["portal_restart_plan"] = kwargs.get("context")
+        seen_contexts["portal_restart_plan_env_file"] = kwargs.get("env_file")
         payload = {"status": "not_required", "blockers": [], "next_action": "restart not required", "blocking_reason": ""}
         write_json(output, payload)
         return payload
@@ -185,6 +187,7 @@ def test_gold_proof_chain_uses_origin_edition_context_for_branch_and_project(tmp
     assert seen["project_id"] == "custom-runner"
     assert seen["deployed_output"] == tmp_path / "origin.chummer.run/Case/Ari/Ghost/deployed-chummer-browser-probe.receipt.json"
     assert seen_contexts["deployed_probe"] is context
+    assert seen_contexts["portal_restart_plan"] is context
     assert seen_contexts["handoff"] is context
     assert seen_contexts["runsite"] is context
     assert seen_contexts["matrix"] is context

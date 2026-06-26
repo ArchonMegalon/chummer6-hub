@@ -139,6 +139,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "",
         f"Generated UTC: `{now_iso()}`",
         f"Namespace: `{proof_chain.get('namespace') or context.resolved_namespace}`",
+        f"Project ID: `{proof_chain.get('projectId') or context.project_id}`",
         f"Verdict: `{verdict}`",
         f"Goal completion claim allowed: `{bool_text(ready)}`",
         "",

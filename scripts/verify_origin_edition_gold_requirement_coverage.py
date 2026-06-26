@@ -13,7 +13,7 @@ from origin_edition_verify_paths import gold_requirement_coverage_from_env
 
 CONTRACT_NAME = "chummer.origin_edition.gold_requirement_coverage.v1"
 EXPECTED_REQUIREMENTS = (
-    "approved_sample_runner_canon_only",
+    "approved_runner_canon_only",
     "provider_story_and_humanizer_pipeline",
     "canon_privacy_audit",
     "cover_consistency_all_surfaces",

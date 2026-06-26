@@ -360,6 +360,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasSourcePacketReceipt(entry.SourcePacketPath, entry.SourcePacketReceiptPath), "approved source packet receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.ProviderManuscriptPath), "provider manuscript artifact path");
         AddIfMissing(missing, HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath), "provider manuscript receipt path");
+        AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.ProviderManuscriptAccountAlias, entry.ProviderManuscriptReceiptPath, "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES", "OriginDossier:ManuscriptAccountAliases"), "provider manuscript account alias");
         AddIfMissing(
             missing,
             HasArtifactReceipt(
@@ -373,7 +374,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasArchivedArtifact(entry.BookArtifactPath), "book artifact path");
         AddIfMissing(missing, HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, ExternalProviderReceiptTokens()), "book artifact receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.EbookArtifactPath), "ebook artifact path");
-        AddIfMissing(missing, HasAudiobookshelfDossierImportReceipt(entry.EbookArtifactPath, entry.EbookAudiobookshelfImportReceiptPath), "Audiobookshelf dossier ebook import receipt path");
+        AddIfMissing(missing, HasAudiobookshelfDossierImportReceipt(entry), "Audiobookshelf dossier ebook import receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "story scene cover artifact path");
         AddIfMissing(
             missing,
@@ -386,18 +387,15 @@ public sealed class OriginDossierPublicationService
             "story scene cover receipt path");
         AddIfMissing(missing, HasCoverConsistencyReceipt(entry), "cover consistency receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
-        AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry.AudiobookPath, entry.AudiobookshelfImportReceiptPath), "Audiobookshelf import receipt path");
+        AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry), "Audiobookshelf import receipt path");
+        AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.AudiobookProviderAccountAlias, entry.AudiobookshelfImportReceiptPath, "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES", "OriginDossier:AudioAccountAliases"), "audiobook provider account alias");
         AddIfMissing(missing, HasArchivedArtifact(entry.DossierVideoPath), "dossier video artifact path");
         AddIfMissing(missing, HasArchivedArtifact(entry.MoviePosterPath), "movie poster artifact path");
         AddIfMissing(missing, HasArtifactReceipt(entry.DossierVideoPath, entry.DossierVideoReceiptPath, "dossier_video_import", null, ExternalProviderReceiptTokens()), "dossier video receipt path");
         AddIfMissing(missing, entry.TelegramShareDelivered, "Telegram share delivery");
         AddIfMissing(
             missing,
-            HasReceiptFile(
-                entry.TelegramShareDeliveryReceiptPath,
-                "telegram_share_delivery",
-                "Telegram",
-                RequiredTelegramDeliveryTokens(entry)),
+            HasTelegramShareDeliveryReceipt(entry),
             "Telegram share delivery receipt path");
         AddIfMissing(missing, HasFinalNoFallbackNoSentinelReceipt(entry), "final no-fallback/no-sentinel audit receipt path");
         AddIfMissing(missing, !ContainsFakeMarker(entry), "no generated placeholder artifact markers");
@@ -462,13 +460,20 @@ public sealed class OriginDossierPublicationService
 
     private IReadOnlySet<string> ResolveTrustedAudiobookshelfHosts()
     {
-        string? configured = _configuration["CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS"]
-            ?? _configuration["OriginDossier:AudiobookshelfTrustedHosts"];
-        IEnumerable<string> hosts = string.IsNullOrWhiteSpace(configured)
-            ? DefaultTrustedAudiobookshelfHosts
-            : configured
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(static host => !string.IsNullOrWhiteSpace(host));
+        IReadOnlyList<string> configuredHosts = OriginDossierProviderAccountRegistry.ResolveHosts(
+            _configuration,
+            "CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS",
+            "OriginDossier:AudiobookshelfTrustedHosts",
+            "audiobookshelf");
+        IEnumerable<string> hosts = configuredHosts.Count > 0
+            ? configuredHosts
+            : OriginDossierProviderAccountRegistry.HasConfiguredHostSource(
+                _configuration,
+                "CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS",
+                "OriginDossier:AudiobookshelfTrustedHosts",
+                "audiobookshelf")
+                ? Array.Empty<string>()
+                : DefaultTrustedAudiobookshelfHosts;
         return hosts
             .Select(static host => host.Trim().ToLowerInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -493,6 +498,13 @@ public sealed class OriginDossierPublicationService
             .ToArray();
         return tokens.Length == 0 ? defaultTokens : tokens;
     }
+
+    private IReadOnlyList<string> ResolveConfiguredProviderAccountAliases(string envKey, string configKey)
+        => OriginDossierProviderAccountRegistry.ResolveAliases(
+            _configuration,
+            envKey,
+            configKey,
+            ProviderAccountRegistryRole(envKey));
 
     private static bool HasRealPath(string? path)
         => !string.IsNullOrWhiteSpace(path)
@@ -590,6 +602,23 @@ public sealed class OriginDossierPublicationService
         return ReceiptProviderMatchesAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "OriginDossier:ManuscriptProviderTokens", DefaultApprovedManuscriptProviderTokens));
     }
 
+    private bool HasProviderAccountAliasReceipt(string? accountAlias, string? receiptPath, string envKey, string configKey)
+    {
+        IReadOnlyList<string> configuredAliases = ResolveConfiguredProviderAccountAliases(envKey, configKey);
+        if (configuredAliases.Count == 0)
+        {
+            return !OriginDossierProviderAccountRegistry.HasConfiguredAliasSource(_configuration, envKey, configKey, ProviderAccountRegistryRole(envKey));
+        }
+
+        string? cleanAlias = CleanNullable(accountAlias);
+        return cleanAlias is not null
+            && configuredAliases.Any(alias => Matches(alias, cleanAlias))
+            && ReceiptContainsAccountAlias(receiptPath, cleanAlias);
+    }
+
+    private static string ProviderAccountRegistryRole(string envKey)
+        => envKey.Contains("AUDIO", StringComparison.OrdinalIgnoreCase) ? "audio" : "manuscript";
+
     private static bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
         => HasArtifactReceipt(
             sourcePacketPath,
@@ -620,18 +649,20 @@ public sealed class OriginDossierPublicationService
             ]);
     }
 
-    private bool HasAudiobookshelfImportReceipt(string? audiobookPath, string? receiptPath)
+    private bool HasAudiobookshelfImportReceipt(OriginDossierPublicationIndexEntry entry)
     {
-        if (!HasArtifactReceipt(audiobookPath, receiptPath, "audiobookshelf_import", "Audiobookshelf", ExternalProviderReceiptTokens()))
+        if (!HasArtifactReceipt(entry.AudiobookPath, entry.AudiobookshelfImportReceiptPath, "audiobookshelf_import", "Audiobookshelf", ExternalProviderReceiptTokens()))
         {
             return false;
         }
 
-        return ReceiptContainsAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "OriginDossier:AudioProviderTokens", DefaultApprovedAudiobookProviderTokens));
+        return ReceiptContainsAnyToken(entry.AudiobookshelfImportReceiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "OriginDossier:AudioProviderTokens", DefaultApprovedAudiobookProviderTokens))
+            && ReceiptContainsOriginTaxonomy(entry.AudiobookshelfImportReceiptPath, BuildOriginEditionNamespace(entry), "audiobook");
     }
 
-    private static bool HasAudiobookshelfDossierImportReceipt(string? ebookPath, string? receiptPath)
-        => HasArtifactReceipt(ebookPath, receiptPath, "audiobookshelf_dossier_import", "Audiobookshelf", ExternalProviderReceiptTokens());
+    private static bool HasAudiobookshelfDossierImportReceipt(OriginDossierPublicationIndexEntry entry)
+        => HasArtifactReceipt(entry.EbookArtifactPath, entry.EbookAudiobookshelfImportReceiptPath, "audiobookshelf_dossier_import", "Audiobookshelf", ExternalProviderReceiptTokens())
+            && ReceiptContainsOriginTaxonomy(entry.EbookAudiobookshelfImportReceiptPath, BuildOriginEditionNamespace(entry), "dossier");
 
     private static bool HasCoverConsistencyReceipt(OriginDossierPublicationIndexEntry entry)
     {
@@ -743,6 +774,123 @@ public sealed class OriginDossierPublicationService
         }
     }
 
+    private bool HasTelegramShareDeliveryReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        if (!HasReceiptFile(
+                entry.TelegramShareDeliveryReceiptPath,
+                "telegram_share_delivery",
+                "Telegram",
+                RequiredTelegramDeliveryTokens(entry)))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.TelegramShareDeliveryReceiptPath!, Encoding.UTF8));
+            JsonElement root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && ReceiptHasEaTelegramAdapterProof(root, entry)
+                && TelegramDeliveryAliasAllowed(entry.TelegramShareDeliveryReceiptPath);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private bool TelegramDeliveryAliasAllowed(string? receiptPath)
+    {
+        IReadOnlyList<string> configuredAliases = OriginDossierProviderAccountRegistry.ResolveAliases(
+            _configuration,
+            "CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES",
+            "OriginDossier:TelegramAccountAliases",
+            "telegram");
+        if (configuredAliases.Count == 0)
+        {
+            return !OriginDossierProviderAccountRegistry.HasConfiguredAliasSource(
+                _configuration,
+                "CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES",
+                "OriginDossier:TelegramAccountAliases",
+                "telegram");
+        }
+
+        return configuredAliases.Any(alias => ReceiptContainsAccountAlias(receiptPath, alias));
+    }
+
+    private static bool ReceiptHasEaTelegramAdapterProof(JsonElement root, OriginDossierPublicationIndexEntry entry)
+    {
+        string projectId = Clean(entry.ProjectId, "origin-dossier");
+        string originNamespace = BuildOriginEditionNamespace(entry);
+        JsonElement linkBundle = ResolveTelegramLinkBundle(root);
+        return ReceiptHasEaTelegramContract(root)
+            && TryGetString(root, "adapter", out string? adapter)
+            && string.Equals(adapter, "ExecutiveAssistantChannelMessagingService", StringComparison.OrdinalIgnoreCase)
+            && TryGetBoolean(root, "telegramMessageIdHashedByEa", out bool messageIdHashed)
+            && messageIdHashed
+            && TryGetBoolean(root, "rawTelegramChatIdIncluded", out bool rawChatIncluded)
+            && !rawChatIncluded
+            && TryGetString(linkBundle, "project_id", out string? bundleProjectId)
+            && string.Equals(bundleProjectId, projectId, StringComparison.OrdinalIgnoreCase)
+            && TryGetString(linkBundle, "origin_namespace_sha256", out string? namespaceHash)
+            && string.Equals(namespaceHash, Sha256Text(originNamespace), StringComparison.OrdinalIgnoreCase)
+            && TryGetString(linkBundle, "open_in_chummer_url_sha256", out string? ownerHash)
+            && string.Equals(ownerHash, Sha256Text(BuildOwnerPath(entry, null)), StringComparison.OrdinalIgnoreCase)
+            && TryGetString(linkBundle, "read_url_sha256", out string? readHash)
+            && string.Equals(readHash, Sha256Text(BuildOwnerPath(entry, "read")), StringComparison.OrdinalIgnoreCase)
+            && TryGetString(linkBundle, "listen_url_sha256", out string? listenHash)
+            && string.Equals(listenHash, Sha256Text(BuildOwnerPath(entry, "listen")), StringComparison.OrdinalIgnoreCase)
+            && TryGetString(linkBundle, "watch_url_sha256", out string? watchHash)
+            && string.Equals(watchHash, Sha256Text(BuildOwnerPath(entry, "watch")), StringComparison.OrdinalIgnoreCase)
+            && TryGetBoolean(linkBundle, "all_required_links_present", out bool allRequiredLinksPresent)
+            && allRequiredLinksPresent
+            && TryGetBoolean(linkBundle, "raw_urls_exposed", out bool rawUrlsExposed)
+            && !rawUrlsExposed
+            && TryGetString(linkBundle, "telegram_delivery_status", out string? deliveryStatus)
+            && string.Equals(deliveryStatus, "sent", StringComparison.OrdinalIgnoreCase)
+            && TryGetBoolean(linkBundle, "telegram_message_id_present", out bool messagePresent)
+            && messagePresent;
+    }
+
+    private static bool ReceiptHasEaTelegramContract(JsonElement root)
+        => (TryGetString(root, "contractName", out string? contractName)
+                && string.Equals(contractName, "ea.telegram_audiobook_live_delivery_receipt.v1", StringComparison.OrdinalIgnoreCase))
+            || (TryGetString(root, "contract_name", out string? snakeContractName)
+                && string.Equals(snakeContractName, "ea.telegram_audiobook_live_delivery_receipt.v1", StringComparison.OrdinalIgnoreCase));
+
+    private static JsonElement ResolveTelegramLinkBundle(JsonElement root)
+    {
+        if (root.TryGetProperty("selected_delivery", out JsonElement selected)
+            && selected.ValueKind == JsonValueKind.Object
+            && selected.TryGetProperty("origin_edition_link_bundle", out JsonElement selectedBundle)
+            && selectedBundle.ValueKind == JsonValueKind.Object)
+        {
+            return selectedBundle;
+        }
+
+        if (root.TryGetProperty("origin_edition_link_bundle", out JsonElement bundle)
+            && bundle.ValueKind == JsonValueKind.Object)
+        {
+            return bundle;
+        }
+
+        if (root.TryGetProperty("linkBundle", out JsonElement camelBundle)
+            && camelBundle.ValueKind == JsonValueKind.Object)
+        {
+            return camelBundle;
+        }
+
+        return root;
+    }
+
     private static bool ReceiptContainsAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
     {
         if (!HasArchivedArtifact(receiptPath))
@@ -768,6 +916,161 @@ public sealed class OriginDossierPublicationService
             return false;
         }
     }
+
+    private static bool ReceiptContainsToken(string? receiptPath, string token)
+    {
+        if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            return ReceiptContainsToken(document.RootElement, token);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ReceiptContainsAccountAlias(string? receiptPath, string accountAlias)
+    {
+        if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(accountAlias))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            return ReceiptContainsAccountAlias(document.RootElement, accountAlias.Trim());
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ReceiptContainsAccountAlias(JsonElement element, string accountAlias)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => StringIsAccountAliasToken(element.GetString(), accountAlias),
+            JsonValueKind.Object => element.EnumerateObject().Any(property =>
+                (PropertyIsAccountAlias(property.Name) && StringIsExact(property.Value, accountAlias))
+                || ReceiptContainsAccountAlias(property.Value, accountAlias)),
+            JsonValueKind.Array => element.EnumerateArray().Any(item => ReceiptContainsAccountAlias(item, accountAlias)),
+            _ => false
+        };
+    }
+
+    private static bool PropertyIsAccountAlias(string propertyName)
+        => string.Equals(propertyName, "accountAlias", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "account_alias", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "assignedAccountAlias", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "providerAccountAlias", StringComparison.OrdinalIgnoreCase);
+
+    private static bool StringIsExact(JsonElement element, string expected)
+        => element.ValueKind == JsonValueKind.String
+            && string.Equals(element.GetString()?.Trim(), expected, StringComparison.OrdinalIgnoreCase);
+
+    private static bool StringIsAccountAliasToken(string? value, string accountAlias)
+    {
+        string text = value?.Trim() ?? string.Empty;
+        return string.Equals(text, accountAlias, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, $"accountAlias: {accountAlias}", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, $"account_alias: {accountAlias}", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, $"assignedAccountAlias: {accountAlias}", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, $"providerAccountAlias: {accountAlias}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ReceiptContainsOriginTaxonomy(string? receiptPath, string originNamespace, string shelfKind)
+    {
+        if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(originNamespace) || string.IsNullOrWhiteSpace(shelfKind))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            string taxonomy = $"{originNamespace.Trim().TrimEnd('/')}/{shelfKind.Trim().Trim('/')}";
+            return ReceiptContainsExactNamespace(document.RootElement, originNamespace.Trim())
+                && ReceiptContainsExactTaxonomy(document.RootElement, taxonomy);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ReceiptContainsExactNamespace(JsonElement element, string originNamespace)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => string.Equals(element.GetString()?.Trim(), originNamespace, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.GetString()?.Trim(), $"originEditionNamespace: {originNamespace}", StringComparison.OrdinalIgnoreCase),
+            JsonValueKind.Object => element.EnumerateObject().Any(property =>
+                (PropertyIsOriginNamespace(property.Name) && StringIsExact(property.Value, originNamespace))
+                || ReceiptContainsExactNamespace(property.Value, originNamespace)),
+            JsonValueKind.Array => element.EnumerateArray().Any(item => ReceiptContainsExactNamespace(item, originNamespace)),
+            _ => false
+        };
+    }
+
+    private static bool ReceiptContainsExactTaxonomy(JsonElement element, string taxonomy)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => string.Equals(element.GetString()?.Trim(), taxonomy, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.GetString()?.Trim(), $"originTaxonomy: {taxonomy}", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.GetString()?.Trim(), $"libraryPath: {taxonomy}", StringComparison.OrdinalIgnoreCase),
+            JsonValueKind.Object => element.EnumerateObject().Any(property =>
+                (PropertyIsOriginTaxonomy(property.Name) && StringIsExact(property.Value, taxonomy))
+                || ReceiptContainsExactTaxonomy(property.Value, taxonomy)),
+            JsonValueKind.Array => element.EnumerateArray().Any(item => ReceiptContainsExactTaxonomy(item, taxonomy)),
+            _ => false
+        };
+    }
+
+    private static bool PropertyIsOriginNamespace(string propertyName)
+        => string.Equals(propertyName, "originEditionNamespace", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "origin_edition_namespace", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "namespace", StringComparison.OrdinalIgnoreCase);
+
+    private static bool PropertyIsOriginTaxonomy(string propertyName)
+        => string.Equals(propertyName, "originTaxonomy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "origin_taxonomy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "libraryPath", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "library_path", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "relativePath", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(propertyName, "relative_path", StringComparison.OrdinalIgnoreCase);
 
     private static string? TryComputeSha256(string? path)
     {
@@ -1102,6 +1405,7 @@ public sealed class OriginDossierPublicationService
             CanonAuditReceiptPath = CleanNullable(request.CanonAuditReceiptPath),
             ProviderManuscriptPath = CleanNullable(request.ProviderManuscriptPath),
             ProviderManuscriptReceiptPath = CleanNullable(request.ProviderManuscriptReceiptPath),
+            ProviderManuscriptAccountAlias = CleanNullable(request.ProviderManuscriptAccountAlias),
             HumanizerReceiptPath = CleanNullable(request.HumanizerReceiptPath),
             BookArtifactPath = CleanNullable(request.BookArtifactPath),
             BookArtifactReceiptPath = CleanNullable(request.BookArtifactReceiptPath),
@@ -1112,6 +1416,7 @@ public sealed class OriginDossierPublicationService
             CoverConsistencyReceiptPath = CleanNullable(request.CoverConsistencyReceiptPath),
             AudiobookPath = CleanNullable(request.AudiobookPath),
             AudiobookshelfImportReceiptPath = CleanNullable(request.AudiobookshelfImportReceiptPath),
+            AudiobookProviderAccountAlias = CleanNullable(request.AudiobookProviderAccountAlias),
             DossierVideoPath = CleanNullable(request.DossierVideoPath),
             DossierVideoReceiptPath = CleanNullable(request.DossierVideoReceiptPath),
             MoviePosterPath = CleanNullable(request.MoviePosterPath),
@@ -1266,6 +1571,7 @@ internal sealed class OriginDossierPublicationIndexEntry
     public bool RequiresAuthenticatedChummerRunUser { get; init; } = true;
     public string? ProviderManuscriptPath { get; init; }
     public string? ProviderManuscriptReceiptPath { get; init; }
+    public string? ProviderManuscriptAccountAlias { get; init; }
     public string? HumanizerReceiptPath { get; init; }
     public string? BookArtifactPath { get; init; }
     public string? BookArtifactReceiptPath { get; init; }
@@ -1276,6 +1582,7 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? CoverConsistencyReceiptPath { get; init; }
     public string? AudiobookPath { get; init; }
     public string? AudiobookshelfImportReceiptPath { get; init; }
+    public string? AudiobookProviderAccountAlias { get; init; }
     public string? DossierVideoPath { get; init; }
     public string? DossierVideoReceiptPath { get; init; }
     public string? MoviePosterPath { get; init; }

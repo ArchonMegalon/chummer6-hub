@@ -144,6 +144,25 @@ def test_verifier_require_gold_accepts_clean_pass_chain(tmp_path: Path) -> None:
     assert issues == []
 
 
+def test_verifier_rejects_proof_chain_for_wrong_origin_context(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="pass")
+    payload["projectId"] = "varga-mira-kestrel"
+    payload["namespace"] = "origin.chummer.run/Varga/Mira/Kestrel"
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(
+        receipt,
+        require_gold=True,
+        expected_project_id="case-ari-ghost",
+        expected_namespace="origin.chummer.run/Case/Ari/Ghost",
+    )
+
+    assert ok is False
+    assert "expected_project_id_mismatch" in issues
+    assert "expected_namespace_mismatch" in issues
+
+
 def test_verifier_require_gold_rejects_pass_chain_with_stale_stage_blockers(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="pass")

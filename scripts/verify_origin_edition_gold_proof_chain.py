@@ -50,7 +50,13 @@ def load_json(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
+def verify(
+    path: Path,
+    *,
+    require_gold: bool = False,
+    expected_project_id: str | None = None,
+    expected_namespace: str | None = None,
+) -> tuple[bool, list[str]]:
     issues: list[str] = []
     if not path.is_file():
         return False, [f"missing proof-chain receipt: {path}"]
@@ -58,6 +64,10 @@ def verify(path: Path, *, require_gold: bool = False) -> tuple[bool, list[str]]:
     payload = load_json(path)
     if payload.get("contractName") != CONTRACT_NAME:
         issues.append("contract_name_mismatch")
+    if expected_project_id and str(payload.get("projectId") or "").strip() != expected_project_id.strip():
+        issues.append("expected_project_id_mismatch")
+    if expected_namespace and str(payload.get("namespace") or "").strip() != expected_namespace.strip():
+        issues.append("expected_namespace_mismatch")
     status = str(payload.get("status") or "").lower()
     if not str(payload.get("updated_at") or "").strip():
         issues.append("updated_at_missing")
@@ -198,13 +208,20 @@ def parse_args() -> argparse.Namespace:
         type=Path,
     )
     parser.add_argument("--require-gold", action="store_true")
+    parser.add_argument("--project-id")
+    parser.add_argument("--namespace")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     proof_chain = args.proof_chain or gold_proof_chain_from_env()
-    ok, issues = verify(proof_chain, require_gold=args.require_gold)
+    ok, issues = verify(
+        proof_chain,
+        require_gold=args.require_gold,
+        expected_project_id=args.project_id,
+        expected_namespace=args.namespace,
+    )
     if not ok:
         for issue in issues:
             print(issue, file=sys.stderr)

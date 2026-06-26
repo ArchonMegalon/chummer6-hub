@@ -258,7 +258,7 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
     ebook_sha = sha256_bytes(ebook_bytes)
     pdf_sha = sha256_bytes(pdf_bytes)
     source_packet = {
-        "contractName": "chummer.origin_dossier.approved_sample_runner_canon.v1",
+        "contractName": "chummer.origin_dossier.approved_runner_canon.v1",
         "runnerAlias": "Kestrel",
         "privacyClassification": "operator_owned_fictional_sample",
         "externalProcessingConsent": True,
@@ -291,7 +291,7 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             "tokens": [
                 "approved_source_packet",
                 "external_processing_consent",
-                "approved_sample_runner_canon_only",
+                "approved_runner_canon_only",
                 "privacy_review_passed",
             ]
         },
@@ -309,7 +309,7 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
                 "canon_audit_passed",
                 "hard_conflicts:0",
                 "privacy_findings:0",
-                "approved_sample_runner_canon_only",
+                "approved_runner_canon_only",
                 "no_provider_created_facts_entered_canon",
             ],
         },

@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-25T17:58:57Z",
+  "generated_at_utc": "2026-06-25T18:35:59Z",
   "status": "published",
   "asset_id": "chummer6-flagship-promo",
   "title": "Chummer6 Product Spine Promo",
@@ -24,6 +24,7 @@
     "master_chain": "highpass=f=65,acompressor=threshold=-24dB:ratio=1.35:attack=18:release=220:makeup=1.1,alimiter=limit=0.89,loudnorm=I=-17:LRA=10:TP=-1.5",
     "natural_voice_timing_preserved": true
   },
+  "continuous_narration_policy": "forced_for_flagship_reels",
   "magicfit_claim_allowed": true,
   "magicfit_final_visual_render_claim": true,
   "scene_narration": [

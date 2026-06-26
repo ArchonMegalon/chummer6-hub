@@ -575,7 +575,7 @@ def test_materializes_import_request_with_internal_chummer_originbookengine_manu
             "completedAtUtc": now_iso(),
             "artifactSha256": [sha256(Path(payload["providerManuscriptPath"]))],
             "tokens": [
-                "approved_sample_runner_canon_only",
+                "approved_runner_canon_only",
                 "no_provider_created_facts_entered_canon",
                 "internal_standard_origin_dossier_generation",
             ],

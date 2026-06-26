@@ -14,8 +14,8 @@ CONTRACT_NAME = "chummer.origin_edition.gold_requirement_coverage.v1"
 
 REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
-        "approved_sample_runner_canon_only",
-        "Approved fictional sample runner canon packet, consent, and Chummer canon authority",
+        "approved_runner_canon_only",
+        "Approved runner canon packet, consent, privacy classification, and Chummer canon authority",
         ("chummer_canon_authority_verified", "source_packet_integrity_and_consent_verified"),
         ("approved_sources_only", "source_packet_integrity_and_consent_verified"),
     ),

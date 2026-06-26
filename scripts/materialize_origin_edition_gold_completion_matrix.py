@@ -275,19 +275,33 @@ def tokens(payload: dict[str, Any]) -> set[str]:
     return {string(value) for value in values}
 
 
+def is_approved_runner_canon_contract(source_packet: dict[str, Any]) -> bool:
+    return string(source_packet.get("contractName")) == "chummer.origin_dossier.approved_runner_canon.v1"
+
+
+def is_allowed_origin_privacy_class(source_packet: dict[str, Any]) -> bool:
+    return string(source_packet.get("privacyClassification")) in {
+        "runner_private",
+        "private",
+        "campaign_safe",
+        "public_safe",
+        "operator_owned_fictional_sample",
+    }
+
+
 def canon_authority_row(source_packet_path: Path, source_receipt_path: Path, canon_receipt_path: Path) -> dict[str, Any]:
     flags = {
         "source_packet_present": source_packet_path.is_file(),
         "source_receipt_present": source_receipt_path.is_file(),
         "canon_receipt_present": canon_receipt_path.is_file(),
-        "contract_is_approved_sample_runner_canon": False,
+        "contract_is_approved_runner_canon": False,
         "external_processing_consented_in_packet": False,
         "chummer_owns_facts": False,
         "prohibits_provider_created_canon": False,
         "source_packet_approved": False,
         "external_processing_consented": False,
         "source_privacy_review_passed": False,
-        "approved_sample_runner_canon_only": False,
+        "approved_runner_canon_only": False,
         "canon_audit_passed": False,
         "hard_conflicts_zero": False,
         "privacy_findings_zero": False,
@@ -314,16 +328,16 @@ def canon_authority_row(source_packet_path: Path, source_receipt_path: Path, can
         row["sourceReceiptSha256"] = sha256_file(source_receipt_path)
     if canon_receipt_path.is_file():
         row["canonReceiptSha256"] = sha256_file(canon_receipt_path)
-    flags["contract_is_approved_sample_runner_canon"] = string(source_packet.get("contractName")) == "chummer.origin_dossier.approved_sample_runner_canon.v1"
+    flags["contract_is_approved_runner_canon"] = is_approved_runner_canon_contract(source_packet)
     flags["external_processing_consented_in_packet"] = source_packet.get("externalProcessingConsent") is True
     flags["chummer_owns_facts"] = string(source_packet.get("canonOwnsFacts")) == "Chummer"
     flags["prohibits_provider_created_canon"] = "Do not make provider-created facts canonical." in prohibited_text
     flags["source_packet_approved"] = "approved_source_packet" in source_tokens and is_pass(source_payload)
     flags["external_processing_consented"] = "external_processing_consent" in source_tokens
     flags["source_privacy_review_passed"] = "privacy_review_passed" in source_tokens
-    flags["approved_sample_runner_canon_only"] = (
-        "approved_sample_runner_canon_only" in source_tokens
-        and "approved_sample_runner_canon_only" in canon_tokens
+    flags["approved_runner_canon_only"] = (
+        "approved_runner_canon_only" in source_tokens
+        and "approved_runner_canon_only" in canon_tokens
     )
     flags["canon_audit_passed"] = "canon_audit_passed" in canon_tokens and is_pass(canon_payload)
     flags["hard_conflicts_zero"] = (
@@ -376,12 +390,12 @@ def source_packet_integrity_row(live_import_path: Path, request: dict[str, Any],
         "canon_receipt_present": canon_receipt_path.is_file(),
         "canon_receipt_verified": is_pass(canon_receipt),
         "canon_audit_includes_source_packet_sha": contains_value(canon_receipt.get("artifactSha256"), expected_source_sha),
-        "contract_is_approved_sample_runner_canon": string(source_packet.get("contractName")) == "chummer.origin_dossier.approved_sample_runner_canon.v1",
-        "fictional_operator_sample": string(source_packet.get("privacyClassification")) == "operator_owned_fictional_sample",
+        "contract_is_approved_runner_canon": is_approved_runner_canon_contract(source_packet),
+        "allowed_origin_privacy_class": is_allowed_origin_privacy_class(source_packet),
         "external_processing_consented_in_packet": source_packet.get("externalProcessingConsent") is True,
         "external_processing_consented_in_receipt": "external_processing_consent" in source_tokens,
         "chummer_owns_facts": string(source_packet.get("canonOwnsFacts")) == "Chummer",
-        "approved_sample_runner_canon_only": "approved_sample_runner_canon_only" in source_tokens and "approved_sample_runner_canon_only" in canon_tokens,
+        "approved_runner_canon_only": "approved_runner_canon_only" in source_tokens and "approved_runner_canon_only" in canon_tokens,
         "privacy_review_passed": "privacy_review_passed" in source_tokens and canon_receipt.get("privacyFindings") == 0,
         "hard_conflicts_zero": canon_receipt.get("hardConflicts") == 0,
         "no_provider_created_facts_canonical": "no_provider_created_facts_entered_canon" in canon_tokens,
@@ -394,7 +408,7 @@ def source_packet_integrity_row(live_import_path: Path, request: dict[str, Any],
     failed = [key for key, passed in flags.items() if not passed]
     return {
         "id": "source_packet_integrity_and_consent_verified",
-        "label": "Approved sample runner source packet is hash-bound, consented, fictional, Chummer-owned, and canon-audited",
+        "label": "Approved runner source packet is hash-bound, consented, privacy-classed, Chummer-owned, and canon-audited",
         "status": "proved" if not failed else "blocked",
         "evidence": "source_packet_approval_and_canon_audit_receipts",
         "flags": flags,
@@ -1092,8 +1106,8 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
     gold_audit = read_json(gold_audit_path) if gold_audit_path.is_file() else {}
 
     rows: list[dict[str, Any]] = [
-        receipt_row("approved_canon_packet_receipt", "Approved sample runner canon/source packet receipt", evidence_root / "source-packet-approval.receipt.json"),
-        bool_row("approved_canon_packet_file", "Approved sample runner canon packet file exists", artifact_exists(live_import_path, request.get("sourcePacketPath")), string(request.get("sourcePacketPath"))),
+        receipt_row("approved_canon_packet_receipt", "Approved runner canon/source packet receipt", evidence_root / "source-packet-approval.receipt.json"),
+        bool_row("approved_canon_packet_file", "Approved runner canon packet file exists", artifact_exists(live_import_path, request.get("sourcePacketPath")), string(request.get("sourcePacketPath"))),
         canon_authority_row(
             Path(string(request.get("sourcePacketPath"))) if string(request.get("sourcePacketPath")).startswith("/") else live_import_path.parent / string(request.get("sourcePacketPath") or "approved-sample-runner-canon.json"),
             Path(string(request.get("sourcePacketReceiptPath"))) if string(request.get("sourcePacketReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("sourcePacketReceiptPath") or "source-packet-approval.receipt.json"),

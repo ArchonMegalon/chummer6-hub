@@ -273,9 +273,24 @@ done
 ORIGIN_EDITION_EVIDENCE_ROOT="${CHUMMER_ORIGIN_EDITION_EVIDENCE_ROOT:-$ROOT_DIR/../.tmp/origin-dossier-fresh-gold}"
 ORIGIN_EDITION_ENV_FILE="${CHUMMER_ORIGIN_EDITION_ENV_FILE:-$ROOT_DIR/.env}"
 ORIGIN_EDITION_REQUIRE_GOLD="${CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD:-0}"
+ORIGIN_EDITION_PROJECT_ID="${CHUMMER_ORIGIN_EDITION_PROJECT_ID:-varga-mira-kestrel}"
 ORIGIN_EDITION_NAMESPACE="${CHUMMER_ORIGIN_EDITION_NAMESPACE:-origin.chummer.run/Varga/Mira/Kestrel}"
+ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH="${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-$ROOT_DIR/.state/origin-provider-accounts.json}"
 ORIGIN_EDITION_BRANCH="$ORIGIN_EDITION_EVIDENCE_ROOT/$ORIGIN_EDITION_NAMESPACE"
 if [ -f "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json" ]; then
+  if [ -f "$ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH" ]; then
+    python3 scripts/verify_origin_provider_account_registry.py \
+      --registry "$ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH" \
+      --output "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_PROVIDER_ACCOUNT_REGISTRY_VERIFICATION.generated.json" \
+      --require-all-roles >/dev/null
+  else
+    echo "skip Origin provider account registry verification: registry file not present at $ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH"
+  fi
+  python3 scripts/audit_origin_edition_final_bundle.py \
+    --root "$ORIGIN_EDITION_EVIDENCE_ROOT" \
+    --output "$ORIGIN_EDITION_BRANCH/final-no-fallback-no-sentinel-audit.receipt.json" \
+    --project-id "$ORIGIN_EDITION_PROJECT_ID" \
+    --namespace "$ORIGIN_EDITION_NAMESPACE" >/dev/null
   python3 scripts/materialize_origin_edition_gold_proof_chain.py \
     --env-file "$ORIGIN_EDITION_ENV_FILE" \
     --evidence-root "$ORIGIN_EDITION_EVIDENCE_ROOT" \
@@ -291,6 +306,8 @@ if [ -f "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.genera
     --coverage "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json" >/dev/null
   ORIGIN_EDITION_VERIFY_ARGS=(
     --proof-chain "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json"
+    --project-id "$ORIGIN_EDITION_PROJECT_ID"
+    --namespace "$ORIGIN_EDITION_NAMESPACE"
   )
   if [ "$ORIGIN_EDITION_REQUIRE_GOLD" = "1" ] || [ "$ORIGIN_EDITION_REQUIRE_GOLD" = "true" ]; then
     ORIGIN_EDITION_VERIFY_ARGS+=(--require-gold)

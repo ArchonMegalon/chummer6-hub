@@ -93,6 +93,8 @@ def verify(verdict_path: Path, proof_chain_path: Path, coverage_path: Path) -> t
     proof_chain_sha = sha256_file(proof_chain_path)
     coverage_sha = sha256_file(coverage_path)
     verdict, ready, blocked_requirements = expected_verdict(proof_chain, coverage)
+    proof_namespace = str(proof_chain.get("namespace") or "").strip()
+    proof_project_id = str(proof_chain.get("projectId") or "").strip()
 
     if f"Proof chain: `{proof_chain_path.as_posix()}`" not in text:
         issues.append("proof_chain_source_path_missing")
@@ -105,6 +107,10 @@ def verify(verdict_path: Path, proof_chain_path: Path, coverage_path: Path) -> t
 
     if f"Verdict: `{verdict}`" not in text:
         issues.append(f"verdict_text_mismatch:{verdict}")
+    if proof_namespace and f"Namespace: `{proof_namespace}`" not in text:
+        issues.append("proof_namespace_missing_or_mismatched")
+    if proof_project_id and f"Project ID: `{proof_project_id}`" not in text:
+        issues.append("proof_project_id_missing_or_mismatched")
     completion_text = "true" if ready else "false"
     if f"Goal completion claim allowed: `{completion_text}`" not in text:
         issues.append(f"goal_completion_text_mismatch:{completion_text}")

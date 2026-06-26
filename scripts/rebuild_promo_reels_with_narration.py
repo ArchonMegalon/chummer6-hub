@@ -25,6 +25,7 @@ WORKSPACE = Path("/docker/chummercomplete")
 PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 OUT = WORKSPACE / "_completion" / "promo_video_rework_20260602"
 CONTINUOUS_MASTER_DIR = WORKSPACE / "_completion" / "promo_audio_continuous_20260602"
+FLAGSHIP_CONTINUOUS_NARRATION_ASSETS = frozenset({"chummer6-flagship-promo"})
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
@@ -300,6 +301,19 @@ def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
     )
 
 
+def enforce_narration_policy(reel: Reel) -> Reel:
+    if reel.asset_id not in FLAGSHIP_CONTINUOUS_NARRATION_ASSETS:
+        return reel
+    if reel.continuous_voiceover and reel.preserve_natural_voice_timing:
+        return reel
+    return replace(
+        reel,
+        continuous_voiceover=True,
+        preserve_natural_voice_timing=True,
+        render_mode=f"{reel.render_mode}|forced_continuous_narration_for_flagship_asset",
+    )
+
+
 def make_video_segment(scene: Scene, output: Path) -> None:
     source_duration = duration(scene.clip)
     if source_duration <= 0:
@@ -379,6 +393,7 @@ def concat_segments(video_segments: list[Path], audio_segments: list[Path], outp
 
 
 def build_reel(reel: Reel) -> dict[str, Any]:
+    reel = enforce_narration_policy(reel)
     work = OUT / reel.asset_id
     segments = work / "segments"
     work.mkdir(parents=True, exist_ok=True)
@@ -520,6 +535,7 @@ def build_reel(reel: Reel) -> dict[str, Any]:
             "master_chain": PREMIUM_NARRATION_MASTER,
             "natural_voice_timing_preserved": reel.preserve_natural_voice_timing,
         },
+        "continuous_narration_policy": "forced_for_flagship_reels" if reel.asset_id in FLAGSHIP_CONTINUOUS_NARRATION_ASSETS else "default",
         "magicfit_claim_allowed": True,
         "magicfit_final_visual_render_claim": True,
         "scene_narration": [

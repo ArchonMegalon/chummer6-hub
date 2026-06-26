@@ -80,6 +80,7 @@ def seed_artifacts(root: Path, *, ready: bool) -> None:
                 "blockedStages": [] if ready else ["deployed_browser_probe", "gold_gap_audit", "completion_matrix", "requirement_coverage"],
             },
             "namespace": "origin.chummer.run/Varga/Mira/Kestrel",
+            "projectId": "varga-mira-kestrel",
             "privacy": {
                 "deploymentPerformed": False,
                 "envValuesExposed": False,
@@ -208,4 +209,28 @@ def test_final_verdict_namespace_fallback_uses_supplied_context(tmp_path: Path) 
     text = (tmp_path / "verdict.md").read_text(encoding="utf-8")
 
     assert "Namespace: `origin.chummer.run/Case/Ari/Ghost`" in text
+    assert "Project ID: `case-ari-ghost`" in text
+    assert "origin.chummer.run/Varga/Mira/Kestrel" not in text
+
+
+def test_final_verdict_renders_non_sample_project_and_namespace_from_proof_chain(tmp_path: Path) -> None:
+    module = load_module()
+    seed_artifacts(tmp_path, ready=True)
+    proof_chain = json.loads((tmp_path / "ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json").read_text(encoding="utf-8"))
+    proof_chain["namespace"] = "origin.chummer.run/Case/Ari/Ghost"
+    proof_chain["projectId"] = "case-ari-ghost"
+    write_json(tmp_path / "ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json", proof_chain)
+    context = module.OriginEditionContext.from_env(
+        project_id="case-ari-ghost",
+        family_name="Case",
+        given_name="Ari",
+        runner_name="Ghost",
+    )
+
+    result = module.materialize(tmp_path, tmp_path / "verdict.md", context)
+    text = (tmp_path / "verdict.md").read_text(encoding="utf-8")
+
+    assert result["status"] == "pass"
+    assert "Namespace: `origin.chummer.run/Case/Ari/Ghost`" in text
+    assert "Project ID: `case-ari-ghost`" in text
     assert "origin.chummer.run/Varga/Mira/Kestrel" not in text

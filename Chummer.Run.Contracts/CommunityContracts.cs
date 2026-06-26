@@ -100,7 +100,9 @@ public sealed record OriginDossierPublicationImportRequest(
     string? MoviePosterPath = null,
     string? MovieSubtitlesPath = null,
     string? MovieStoryboardPath = null,
-    string? FinalNoFallbackNoSentinelAuditReceiptPath = null);
+    string? FinalNoFallbackNoSentinelAuditReceiptPath = null,
+    string? ProviderManuscriptAccountAlias = null,
+    string? AudiobookProviderAccountAlias = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,
@@ -128,6 +130,35 @@ public sealed record OriginDossierPublicationImportResultDto(
     string? OriginEditionNamespace = null,
     string? AudiobookshelfDossierShareUrl = null,
     string? AudiobookshelfAudiobookShareUrl = null);
+
+public sealed record OriginDossierProviderCreditReservationRequest(
+    string? UserId,
+    string? Email,
+    string? ProjectId,
+    string? BookKind,
+    string? PrivacyClassification,
+    string? Provider,
+    string? ProviderAccountAlias,
+    int CreditsRequested,
+    bool SourcePacketApproved,
+    bool ExternalProcessingConsent,
+    bool ChronologyValidated,
+    bool OutlineApproved,
+    bool VoiceSampleApproved,
+    bool CanonPreflightPassed,
+    bool HumanReviewAssigned);
+
+public sealed record OriginDossierProviderCreditReservationResult(
+    string Status,
+    bool ProviderBurnAllowed,
+    string? ReservationId,
+    string? UserId,
+    string? ProjectId,
+    string? Provider,
+    string? ProviderAccountAlias,
+    int CreditsReserved,
+    IReadOnlyList<string> BlockedRequirements,
+    DateTimeOffset CheckedAtUtc);
 
 public sealed record GroupRoleDto(
     string Role,

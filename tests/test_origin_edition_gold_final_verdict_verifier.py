@@ -40,6 +40,8 @@ def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
         {
             "status": "pass" if ready else "blocked",
             "goalCompletionClaimAllowed": ready,
+            "namespace": "origin.chummer.run/Case/Ari/Ghost",
+            "projectId": "case-ari-ghost",
             "next_action": "Gold proof chain is ready for release handoff. Keep the artifacts archived outside providers."
             if ready
             else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
@@ -64,6 +66,8 @@ def seed(root: Path, *, ready: bool) -> tuple[Path, Path, Path]:
         "\n".join(
             [
                 "# Origin Edition Gold Verdict",
+                "Namespace: `origin.chummer.run/Case/Ari/Ghost`",
+                "Project ID: `case-ari-ghost`",
                 f"Verdict: `{'ORIGIN_EDITION_GOLD_READY' if ready else 'ORIGIN_EDITION_GOLD_BLOCKED'}`",
                 f"Goal completion claim allowed: `{'true' if ready else 'false'}`",
                 "## Blocked Requirements",
@@ -122,6 +126,21 @@ def test_verifier_rejects_ready_text_for_blocked_proof(tmp_path: Path) -> None:
     assert ok is False
     assert "verdict_text_mismatch:ORIGIN_EDITION_GOLD_BLOCKED" in issues
     assert "contradictory_verdict_present:ORIGIN_EDITION_GOLD_READY" in issues
+
+
+def test_verifier_rejects_verdict_from_different_origin_context(tmp_path: Path) -> None:
+    module = load_module()
+    verdict, proof_chain, coverage = seed(tmp_path, ready=True)
+    text = verdict.read_text(encoding="utf-8")
+    text = text.replace("Namespace: `origin.chummer.run/Case/Ari/Ghost`", "Namespace: `origin.chummer.run/Varga/Mira/Kestrel`")
+    text = text.replace("Project ID: `case-ari-ghost`", "Project ID: `varga-mira-kestrel`")
+    verdict.write_text(text, encoding="utf-8")
+
+    ok, issues = module.verify(verdict, proof_chain, coverage)
+
+    assert ok is False
+    assert "proof_namespace_missing_or_mismatched" in issues
+    assert "proof_project_id_missing_or_mismatched" in issues
 
 
 def test_verifier_rejects_ready_text_when_proof_chain_has_stale_blocked_rollups(tmp_path: Path) -> None:

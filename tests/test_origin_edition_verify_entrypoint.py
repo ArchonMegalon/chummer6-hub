@@ -12,9 +12,13 @@ def test_run_services_verification_wires_origin_edition_proof_chain() -> None:
     assert "ORIGIN_EDITION_EVIDENCE_ROOT" in script
     assert "ORIGIN_EDITION_ENV_FILE" in script
     assert "ORIGIN_EDITION_REQUIRE_GOLD" in script
+    assert "ORIGIN_EDITION_PROJECT_ID" in script
     assert "ORIGIN_EDITION_NAMESPACE" in script
+    assert "ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH" in script
     assert 'ORIGIN_EDITION_BRANCH="$ORIGIN_EDITION_EVIDENCE_ROOT/$ORIGIN_EDITION_NAMESPACE"' in script
     assert "CHUMMER_ORIGIN_EDITION_REQUIRE_GOLD" in script
+    assert "scripts/verify_origin_provider_account_registry.py" in script
+    assert "scripts/audit_origin_edition_final_bundle.py" in script
     assert "scripts/materialize_origin_edition_gold_proof_chain.py" in script
     assert "scripts/materialize_origin_edition_gold_final_verdict.py" in script
     assert "scripts/verify_origin_dossier_deployed_browser_probe.py" in script
@@ -24,9 +28,16 @@ def test_run_services_verification_wires_origin_edition_proof_chain() -> None:
     assert "scripts/verify_origin_edition_gold_final_verdict.py" in script
     assert "--allow-blocked >/dev/null" in script
     assert "FINAL_ORIGIN_EDITION_GOLD_VERDICT.md" in script or "materialize_origin_edition_gold_final_verdict.py" in script
+    assert '--registry "$ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH"' in script
+    assert '--output "$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_PROVIDER_ACCOUNT_REGISTRY_VERIFICATION.generated.json"' in script
+    assert "--require-all-roles >/dev/null" in script
+    assert '--root "$ORIGIN_EDITION_EVIDENCE_ROOT"' in script
+    assert '--output "$ORIGIN_EDITION_BRANCH/final-no-fallback-no-sentinel-audit.receipt.json"' in script
     assert '--probe "$ORIGIN_EDITION_BRANCH/deployed-chummer-browser-probe.receipt.json"' in script
     assert '--handoff "$ORIGIN_EDITION_BRANCH/deployed-operator-handoff.receipt.json"' in script
     assert "--proof-chain \"$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json\"" in script
+    assert '--project-id "$ORIGIN_EDITION_PROJECT_ID"' in script
+    assert '--namespace "$ORIGIN_EDITION_NAMESPACE"' in script
     assert "--requirement-coverage \"$ORIGIN_EDITION_EVIDENCE_ROOT/ORIGIN_EDITION_GOLD_REQUIREMENT_COVERAGE.generated.json\"" in script
     assert "ORIGIN_EDITION_VERIFY_ARGS+=(--require-gold)" in script
     origin_hook = script.split("ORIGIN_EDITION_EVIDENCE_ROOT=", 1)[1].split("bash scripts/ai/build_r1_cleanroom.sh", 1)[0]
@@ -45,6 +56,14 @@ def test_env_example_documents_origin_edition_gold_without_committing_session_se
     assert "CHUMMER_ORIGIN_EDITION_RUNNER_NAME=Kestrel" in env_example
     assert "CHUMMER_ORIGIN_EDITION_NAMESPACE=origin.chummer.run/Varga/Mira/Kestrel" in env_example
     assert "CHUMMER_ORIGIN_EDITION_BASE_URL=https://chummer.run" in env_example
+    assert "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH=.state/origin-provider-accounts.json" in env_example
+    assert "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY=\n" in env_example
+    assert "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES=\n" in env_example
+    assert "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES=\n" in env_example
+    assert "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES=\n" in env_example
+    assert "CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES=\n" in env_example
+    assert "CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORE_PATH=.state/origin-provider-credit-reservations.json" in env_example
+    assert "CHUMMER_ORIGIN_MAX_ACTIVE_PROVIDER_RESERVATIONS=5" in env_example
     assert "CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN=\n" in env_example
     assert "CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN=\n" in env_example
     assert "CHUMMER_DEPLOYED_E2E_COOKIE_HEADER=\n" in env_example
@@ -54,3 +73,5 @@ def test_env_example_documents_origin_edition_gold_without_committing_session_se
     assert "Keep owner-session values operator-local; never commit populated values." in env_example
     assert "secret-token" not in env_example
     assert "owner-session-token" not in env_example
+    assert "rangersofB5" not in env_example
+    assert "api.telegram.org/bot" not in env_example
