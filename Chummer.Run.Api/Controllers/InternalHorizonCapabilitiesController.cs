@@ -44,6 +44,10 @@ public sealed class InternalHorizonCapabilitiesController : ControllerBase
     [HttpPost("/api/internal/horizons/artifact-requests")]
     [IgnoreAntiforgeryToken]
     [ProducesResponseType<HorizonArtifactRequestReceipt>(StatusCodes.Status200OK)]
+    [ProducesResponseType<HorizonArtifactRequestReceipt>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<HorizonArtifactRequestReceipt>(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<HorizonArtifactRequestReceipt> BuildArtifactRequest([FromBody] HorizonArtifactRequestCreateRequest? request)
     {
         ActionResult? denied = RequireInternalAutomationAuth();
@@ -59,7 +63,19 @@ public sealed class InternalHorizonCapabilitiesController : ControllerBase
 
         try
         {
-            return Ok(_artifactRequests.BuildRequest(request, consumeQuota: true));
+            HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(request, consumeQuota: true);
+            if (string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(receipt);
+            }
+
+            return receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase)
+                ? StatusCode(StatusCodes.Status429TooManyRequests, receipt)
+                : StatusCode(StatusCodes.Status400BadRequest, receipt);
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (KeyNotFoundException ex)
         {

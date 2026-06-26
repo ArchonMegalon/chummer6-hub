@@ -1993,10 +1993,12 @@ public sealed class PublicLandingDownloadDispatchTests
                 ExternalProcessingConsent: true));
 
         HorizonArtifactRequestReceipt acceptedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(accepted.Result).Value);
-        HorizonArtifactRequestReceipt exhaustedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(exhausted.Result).Value);
+        ObjectResult exhaustedProblem = Assert.IsType<ObjectResult>(exhausted.Result);
+        HorizonArtifactRequestReceipt exhaustedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(exhaustedProblem.Value);
         Assert.Equal("accepted", acceptedReceipt.Status);
         Assert.True(acceptedReceipt.QuotaTracked);
         Assert.Equal(0, acceptedReceipt.Quota?.WeeklyRemaining);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, exhaustedProblem.StatusCode);
         Assert.Equal("blocked", exhaustedReceipt.Status);
         Assert.Contains("artifact allowance", exhaustedReceipt.BlockedReasons);
     }
