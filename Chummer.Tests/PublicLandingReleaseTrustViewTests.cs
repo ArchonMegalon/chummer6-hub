@@ -1244,7 +1244,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord first. Keep the form for private details.", trustView, StringComparison.Ordinal);
         Assert.Contains("Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);

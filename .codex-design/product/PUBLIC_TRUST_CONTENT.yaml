@@ -5,7 +5,7 @@ trust_pages:
   - id: help
     eyebrow: "Help"
     heading: "Get help without guessing"
-    intro: "Pick the closest path. Keep public ideas, private bugs, and downloads separate."
+    intro: "Pick the closest path."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -123,7 +123,7 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact Chummer"
-    intro: "For normal questions, reach me on Discord in the Chummer5 server. Use the form only for private install trouble, crashes, logs, or account detail."
+    intro: "Discord for normal questions. Use the form only for crashes, logs, install trouble, or account detail."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:

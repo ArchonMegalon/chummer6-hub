@@ -207,8 +207,8 @@
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Choose the right help path</h2>
-            <p>Pick the closest one.</p>
+            <h2>Start here</h2>
+            <p>Pick the closest path.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -252,9 +252,8 @@ else if (!contactPage)
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Contact paths</h2>
-            <p>Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.</p>
-            <p>Public requests belong on <a class="inline-link" href="/participate">Participate</a>.</p>
+            <h2>Contact</h2>
+            <p>Discord first. Keep the form for private details.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -271,7 +270,7 @@ else if (!contactPage)
 
     <section class="minimal-section minimal-section--tight" id="support-intake">
         <details class="details-drawer minimal-help-card" id="private-support-form">
-            <summary>Private form</summary>
+            <summary>Private message</summary>
             <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
@@ -281,7 +280,7 @@ else if (!contactPage)
             {
                 <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
             }
-            <p class="muted-copy">One problem per message keeps the reply clear.</p>
+            <p class="muted-copy">One problem per message.</p>
 
             <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
@@ -352,12 +351,24 @@ else if (!contactPage)
                         <input id="supportAttachments" name="attachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
                     </div>
                 </details>
-                <div class="stacked-actions">
+                <div class="minimal-actions">
                     <button class="button-like button-like--primary" type="submit">Send support request</button>
-                    <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>
-                    <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>
                 </div>
             </form>
+            <p class="muted-copy">
+                Public requests belong on <a class="inline-link" href="/participate">Participate</a>.
+                @if (Model.SupportIntake.Authenticated
+                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportHref)
+                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportLabel))
+                {
+                    <text> Signed-in history stays in <a class="inline-link" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>.</text>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessHref)
+                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessLabel))
+                {
+                    <text> Setup recovery stays in <a class="inline-link" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>.</text>
+                }
+            </p>
             @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailHref)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
                 && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
