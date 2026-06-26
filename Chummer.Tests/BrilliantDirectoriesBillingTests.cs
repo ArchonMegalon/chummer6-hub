@@ -343,6 +343,81 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public void DirectMyFirstBookQuotaApisResolveStoredAccountEmailWhenSharedHorizonQuotaIsAvailable()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateControllerWithAccountContext(service, "joschi.grey@posteo.de", subjectId: "sub-admin");
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "email:joschi.grey@posteo.de",
+                MemberId: "manual-lifetime-joschi-grey-posteo-de",
+                Email: "joschi.grey@posteo.de",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "lifetime",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 25, 12, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
+
+        ActionResult<MyFirstBookQuotaSnapshotDto> lookup = controller.MyFirstBookQuota(user.UserId);
+        MyFirstBookQuotaSnapshotDto firstQuota = Assert.IsType<MyFirstBookQuotaSnapshotDto>(Assert.IsType<OkObjectResult>(lookup.Result).Value);
+        Assert.Equal(user.UserId, firstQuota.UserId);
+        Assert.Equal("supporter", firstQuota.PlanKey);
+        Assert.True(firstQuota.SupporterActive);
+        Assert.Equal(2, firstQuota.MonthlyLimit);
+        Assert.Equal(2, firstQuota.MonthlyRemaining);
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> firstConsume = controller.ConsumeMyFirstBookQuota(user.UserId);
+        ActionResult<MyFirstBookQuotaConsumeResultDto> secondConsume = controller.ConsumeMyFirstBookQuota(user.UserId);
+        ActionResult<MyFirstBookQuotaConsumeResultDto> thirdConsume = controller.ConsumeMyFirstBookQuota(user.UserId);
+
+        MyFirstBookQuotaConsumeResultDto firstConsumePayload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(Assert.IsType<OkObjectResult>(firstConsume.Result).Value);
+        MyFirstBookQuotaConsumeResultDto secondConsumePayload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(Assert.IsType<OkObjectResult>(secondConsume.Result).Value);
+        ObjectResult thirdProblem = Assert.IsType<ObjectResult>(thirdConsume.Result);
+
+        Assert.Equal(1, firstConsumePayload.Quota.MonthlyRemaining);
+        Assert.Equal(0, secondConsumePayload.Quota.MonthlyRemaining);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, thirdProblem.StatusCode);
+    }
+
+    [Fact]
+    public void DirectMyFirstBookQuotaApisAcceptExplicitEmailOverrideForUnlinkedFutureUser()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "email:joschi.grey@posteo.de",
+                MemberId: "manual-lifetime-joschi-grey-posteo-de",
+                Email: "joschi.grey@posteo.de",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "lifetime",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 25, 12, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
+
+        ActionResult<MyFirstBookQuotaSnapshotDto> lookup = controller.MyFirstBookQuota("usr-created-later", "JOSCHI.GREY@POSTEO.DE");
+        MyFirstBookQuotaSnapshotDto quota = Assert.IsType<MyFirstBookQuotaSnapshotDto>(Assert.IsType<OkObjectResult>(lookup.Result).Value);
+
+        Assert.Equal("usr-created-later", quota.UserId);
+        Assert.Equal("supporter", quota.PlanKey);
+        Assert.True(quota.SupporterActive);
+        Assert.Equal(2, quota.MonthlyLimit);
+        Assert.Equal(2, quota.MonthlyRemaining);
+    }
+
+    [Fact]
     public async Task SignedInMyFirstBookQuotaEndpointReturnsCurrentUserQuota()
     {
         BrilliantDirectoriesBillingService service = CreateService();
@@ -873,5 +948,34 @@ public sealed class BrilliantDirectoriesBillingTests
         };
 
         return (controller, ensured!);
+    }
+
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User) CreateControllerWithAccountContext(
+        BrilliantDirectoriesBillingService service,
+        string email,
+        string subjectId = "sub-auth")
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(root, "horizon-artifact-usage.json")
+            })
+            .Build();
+        CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+        AccountService accounts = new(communityStore);
+        HubUserDto ensured = accounts.EnsureUser(subjectId, "Runner", email);
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactQuotaService horizonQuota = new(new HorizonArtifactUsageStore(configuration), capabilities, service);
+        BrilliantDirectoriesBillingController controller = new(service, accounts: accounts, horizonArtifactQuota: horizonQuota)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        return (controller, ensured);
     }
 }

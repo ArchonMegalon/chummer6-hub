@@ -87,12 +87,12 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpGet("/api/billing/myfirstbook-quota/{userId}")]
     [ProducesResponseType<MyFirstBookQuotaSnapshotDto>(StatusCodes.Status200OK)]
-    public ActionResult<MyFirstBookQuotaSnapshotDto> MyFirstBookQuota([FromRoute] string userId)
+    public ActionResult<MyFirstBookQuotaSnapshotDto> MyFirstBookQuota([FromRoute] string userId, [FromQuery] string? email = null)
     {
         try
         {
             _billing.EnsureAuthorized(BillingSecretHeader());
-            return Ok(ResolveCurrentMyFirstBookQuotaProjection(userId, email: null));
+            return Ok(ResolveCurrentMyFirstBookQuotaProjection(userId, ResolveKnownAccountEmail(userId, email)));
         }
         catch (UnauthorizedAccessException)
         {
@@ -131,12 +131,12 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpPost("/api/billing/myfirstbook-quota/{userId}/consume")]
     [ProducesResponseType<MyFirstBookQuotaConsumeResultDto>(StatusCodes.Status200OK)]
-    public ActionResult<MyFirstBookQuotaConsumeResultDto> ConsumeMyFirstBookQuota([FromRoute] string userId)
+    public ActionResult<MyFirstBookQuotaConsumeResultDto> ConsumeMyFirstBookQuota([FromRoute] string userId, [FromQuery] string? email = null)
     {
         try
         {
             _billing.EnsureAuthorized(BillingSecretHeader());
-            return Ok(ConsumeCurrentOriginAuthoringAllowance(userId, email: null));
+            return Ok(ConsumeCurrentOriginAuthoringAllowance(userId, ResolveKnownAccountEmail(userId, email)));
         }
         catch (UnauthorizedAccessException)
         {
@@ -455,6 +455,17 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     private string? BillingSecretHeader()
         => HttpContext?.Request.Headers["X-Chummer-Billing-Secret"].ToString();
+
+    private string? ResolveKnownAccountEmail(string userId, string? email)
+    {
+        string? explicitEmail = TrimToNull(email);
+        if (!string.IsNullOrWhiteSpace(explicitEmail))
+        {
+            return explicitEmail;
+        }
+
+        return TrimToNull(_accounts?.GetById(userId)?.Email);
+    }
 
     private HorizonArtifactAllowanceViewModel ResolveCurrentOriginAuthoringAllowanceProjection(string userId, string? email)
     {
