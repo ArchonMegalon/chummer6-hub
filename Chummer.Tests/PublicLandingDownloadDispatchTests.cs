@@ -1626,6 +1626,16 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void HorizonArtifactDispatchNoLongerCarriesRunsiteOnlyQuotaFallback()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+
+        Assert.DoesNotContain("allowLegacyRunsiteQuotaFallback", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("else if (allowLegacyRunsiteQuotaFallback)", controller, StringComparison.Ordinal);
+        Assert.Contains("Shared horizon artifact dispatch service is not available right now.", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task KarmaForgePageIncludesPublicSafeDiscoveryCapability()
     {
         using Fixture fixture = new(configureSettings: settings =>

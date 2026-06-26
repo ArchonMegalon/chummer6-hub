@@ -4102,7 +4102,6 @@ document.addEventListener('DOMContentLoaded', function () {
             horizonId: "runsite",
             artifactKindOrCapabilityId: "tour",
             emitRunsiteHeaders: true,
-            allowLegacyRunsiteQuotaFallback: true,
             resolveSource: _mediaHorizons.GetRunsitePack,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
@@ -4172,7 +4171,6 @@ document.addEventListener('DOMContentLoaded', function () {
             horizonId: "propertyquarry",
             artifactKindOrCapabilityId: "tour",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetPropertyquarryProperty,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
@@ -4188,7 +4186,6 @@ document.addEventListener('DOMContentLoaded', function () {
             horizonId: "jackpoint",
             artifactKindOrCapabilityId: "briefing_video",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetJackpointBriefing,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Briefing video allowance is exhausted for this week.",
@@ -4204,7 +4201,6 @@ document.addEventListener('DOMContentLoaded', function () {
             horizonId: "runbook-press",
             artifactKindOrCapabilityId: "document_export",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetRunbookPrimer,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Runbook export allowance is exhausted for this week.",
@@ -4222,7 +4218,6 @@ document.addEventListener('DOMContentLoaded', function () {
             artifactKindOrCapabilityId: "debrief_packet",
             dispatchTarget: "/account/work#aftermath-packages",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             quotaAllowanceExhaustedMessage: "Debrief packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4249,7 +4244,6 @@ document.addEventListener('DOMContentLoaded', function () {
             artifactKindOrCapabilityId: "world_tick_digest",
             dispatchTarget: $"/ledger/turns/{requestedTurn}/newsreel.json",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             quotaAllowanceExhaustedMessage: "World tick digest allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm world tick digest allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4266,7 +4260,6 @@ document.addEventListener('DOMContentLoaded', function () {
             artifactKindOrCapabilityId: "dossier_media",
             dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             quotaAllowanceExhaustedMessage: "Dossier media allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm dossier media allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4282,7 +4275,6 @@ document.addEventListener('DOMContentLoaded', function () {
             artifactKindOrCapabilityId: "discovery_packet",
             dispatchTarget: "/participate/karma-forge",
             emitRunsiteHeaders: false,
-            allowLegacyRunsiteQuotaFallback: false,
             quotaAllowanceExhaustedMessage: "Discovery packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm discovery packet allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4294,7 +4286,6 @@ document.addEventListener('DOMContentLoaded', function () {
         string horizonId,
         string artifactKindOrCapabilityId,
         bool emitRunsiteHeaders,
-        bool allowLegacyRunsiteQuotaFallback,
         Func<string, MediaArtifactDocument> resolveSource,
         Func<MediaArtifactDocument, string?> resolveDispatchTarget,
         string quotaAllowanceExhaustedMessage,
@@ -4335,7 +4326,6 @@ document.addEventListener('DOMContentLoaded', function () {
             artifactKindOrCapabilityId,
             dispatchTarget,
             emitRunsiteHeaders,
-            allowLegacyRunsiteQuotaFallback,
             quotaAllowanceExhaustedMessage,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
@@ -4351,7 +4341,6 @@ document.addEventListener('DOMContentLoaded', function () {
         string artifactKindOrCapabilityId,
         string dispatchTarget,
         bool emitRunsiteHeaders,
-        bool allowLegacyRunsiteQuotaFallback,
         string quotaAllowanceExhaustedMessage,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
@@ -4428,23 +4417,6 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 _logger.LogWarning(ex, "{Operation} dispatch denied for {UserId} on {SourceId} due unexpected request handling error.", operationLabel, subject.SubjectId, sourceId);
                 return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: $"Unable to process {operationLabel} request right now.");
-            }
-        }
-        else if (allowLegacyRunsiteQuotaFallback)
-        {
-            try
-            {
-                runsiteQuota = _runsiteTourQuota.ConsumeTour(subject.SubjectId, email: subject.Email);
-            }
-            catch (BrilliantDirectoriesBillingUnavailableException ex)
-            {
-                _logger.LogWarning(ex, "{Operation} dispatch failed because billing is unavailable for {UserId}/{SourceId}.", operationLabel, subject.SubjectId, sourceId);
-                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "{Operation} dispatch denied for {UserId} on {SourceId} due quota enforcement.", operationLabel, subject.SubjectId, sourceId);
-                return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: ex.Message);
             }
         }
         else
