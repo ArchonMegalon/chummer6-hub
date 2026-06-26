@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -25,22 +26,33 @@ public sealed class OriginDossierPublicationService
     private const string ProviderReceiptReferenceToken = "provider_receipt_reference";
     private readonly IConfiguration _configuration;
     private readonly HorizonCapabilityService? _capabilities;
+    private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly ILogger<OriginDossierPublicationService> _logger;
 
     public OriginDossierPublicationService(
         IConfiguration configuration,
         HorizonCapabilityService? capabilities,
         ILogger<OriginDossierPublicationService> logger)
+        : this(configuration, capabilities, null, logger)
+    {
+    }
+
+    public OriginDossierPublicationService(
+        IConfiguration configuration,
+        HorizonCapabilityService? capabilities,
+        MediaArtifactHorizonsService? mediaHorizons,
+        ILogger<OriginDossierPublicationService> logger)
     {
         _configuration = configuration;
         _capabilities = capabilities;
+        _mediaHorizons = mediaHorizons;
         _logger = logger;
     }
 
     public OriginDossierPublicationService(
         IConfiguration configuration,
         ILogger<OriginDossierPublicationService> logger)
-        : this(configuration, null, logger)
+        : this(configuration, null, null, logger)
     {
     }
 
@@ -352,7 +364,15 @@ public sealed class OriginDossierPublicationService
     }
 
     private SharedArtifactSurfaceRoutesViewModel? BuildSharedArtifacts()
-        => _capabilities?.BuildSharedArtifactSurfaceRoutesViewModel("origin-dossier", "dossier_media");
+    {
+        if (_capabilities is null)
+        {
+            return null;
+        }
+
+        MediaArtifactSurfaceDefinition surface = GetOriginDossierSurface();
+        return _capabilities.BuildSharedArtifactSurfaceRoutesViewModel(surface.HorizonId, surface.CapabilityId);
+    }
 
     private PublicHorizonCapabilityViewModel? BuildPublicArtifactCapability(string projectId)
     {
@@ -361,14 +381,27 @@ public sealed class OriginDossierPublicationService
             return null;
         }
 
+        MediaArtifactSurfaceDefinition surface = GetOriginDossierSurface();
         return _capabilities.BuildPublicCapabilityViewModel(
-            "origin-dossier",
-            "dossier_media",
-            $"origin-dossier:{projectId}:media",
+            surface.HorizonId,
+            surface.CapabilityId,
+            BuildOriginDossierSourceRef(projectId, "media"),
             visibility: "private") with
         {
             PublicVisible = true
         };
+    }
+
+    private MediaArtifactSurfaceDefinition GetOriginDossierSurface()
+        => _mediaHorizons?.GetSurface("origin-dossier")
+            ?? new MediaArtifactSurfaceDefinition("origin-dossier", "origin-dossier-media");
+
+    private string BuildOriginDossierSourceRef(string projectId, string sourceId)
+    {
+        MediaArtifactSurfaceDefinition surface = GetOriginDossierSurface();
+        string normalizedProjectId = Clean(projectId, "origin-dossier");
+        return _mediaHorizons?.BuildSourceRef(surface, $"{normalizedProjectId}:{sourceId}")
+            ?? $"{surface.HorizonId}:{normalizedProjectId}:{sourceId}";
     }
 
     private IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)

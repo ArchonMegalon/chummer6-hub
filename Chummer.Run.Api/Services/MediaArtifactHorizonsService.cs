@@ -39,6 +39,7 @@ public sealed class MediaArtifactHorizonsService
         new Dictionary<string, MediaArtifactSurfaceDefinition>(StringComparer.OrdinalIgnoreCase)
         {
             ["jackpoint"] = new("jackpoint", "jackpoint-briefing-video"),
+            ["origin-dossier"] = new("origin-dossier", "origin-dossier-media"),
             ["propertyquarry"] = new("propertyquarry", "propertyquarry-tour"),
             ["runbook-press"] = new("runbook-press", "runbook-export"),
             ["runsite"] = new("runsite", "runsite-tour")
@@ -240,6 +241,9 @@ public sealed class MediaArtifactHorizonsService
             ? surface
             : throw new KeyNotFoundException($"Unknown media artifact horizon '{horizonId}'.");
     }
+
+    public string BuildSourceRef(MediaArtifactSurfaceDefinition surface, string sourceId)
+        => $"{surface.HorizonId}:{sourceId.Trim()}";
 
     public string BuildDocumentMarkdown(MediaArtifactDocument document, string horizonLabel, string boundary)
     {

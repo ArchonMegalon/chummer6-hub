@@ -3909,6 +3909,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> TablePulsePage(CancellationToken cancellationToken)
     {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("table-pulse", "debrief_packet");
         TrustPageViewModel model = await BuildHorizonPreviewPageModel(
             pageId: "table-pulse",
             title: "TABLE PULSE",
@@ -3963,20 +3964,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Private aftermath recaps are real now",
                 "Live play and aftermath stay separate on purpose"
             ],
-            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(
-                "table-pulse",
-                "debrief_packet"),
+            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(surface),
             horizonCapability: BuildPublicHorizonCapability(
-                "table-pulse",
-                "debrief_packet",
-                "table-pulse:live-and-aftermath"));
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, "live-and-aftermath")));
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
     [HttpGet("/table-pulse/receipts/live-and-aftermath.json")]
     [Produces("application/json")]
     public IActionResult TablePulseReceiptJson()
-        => Ok(new
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("table-pulse", "debrief_packet");
+        return Ok(new
         {
             Horizon = "table_pulse",
             Status = "shipped_mvp",
@@ -4005,12 +4005,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 "no_player_scoring",
                 "no_public_surveillance"
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("table-pulse", "debrief_packet"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             ArtifactCapability = BuildPublicHorizonCapability(
-                "table-pulse",
-                "debrief_packet",
-                "table-pulse:live-and-aftermath")
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, "live-and-aftermath"))
         });
+    }
 
     [HttpGet("/origin-dossier")]
     [Produces("text/html")]
@@ -4395,18 +4395,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/table-pulse/debrief")]
     public async Task<IActionResult> TablePulseDebriefDispatch(CancellationToken cancellationToken)
-        => await DispatchResolvedHorizonArtifactAsync(
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("table-pulse", "debrief_packet");
+        return await DispatchResolvedHorizonArtifactAsync(
             operationLabel: "table pulse debrief",
             dispatchRoute: "/table-pulse/debrief",
             sourceId: "live-and-aftermath",
-            sourceRef: "table-pulse:live-and-aftermath",
-            horizonId: "table-pulse",
-            artifactKindOrCapabilityId: "debrief_packet",
+            surface: surface,
             dispatchTarget: "/account/work#aftermath-packages",
             emitRunsiteHeaders: false,
             quotaAllowanceExhaustedMessage: "Debrief packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     [HttpGet("/ledger/turns/{turn}/digest")]
     public async Task<IActionResult> BlackLedgerDigestDispatch([FromRoute] string turn, CancellationToken cancellationToken)
@@ -4421,13 +4422,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "world_tick_digest");
         return await DispatchResolvedHorizonArtifactAsync(
             operationLabel: "black ledger digest",
             dispatchRoute: $"/ledger/turns/{Uri.EscapeDataString(turn)}/digest",
-            sourceId: $"turn-{requestedTurn}",
-            sourceRef: $"black-ledger:turn-{requestedTurn}:digest",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "world_tick_digest",
+            sourceId: $"turn-{requestedTurn}:digest",
+            surface: surface,
             dispatchTarget: $"/ledger/turns/{requestedTurn}/newsreel.json",
             emitRunsiteHeaders: false,
             quotaAllowanceExhaustedMessage: "World tick digest allowance is exhausted for this week.",
@@ -4476,20 +4476,46 @@ document.addEventListener('DOMContentLoaded', function () {
             cancellationToken,
             authenticatedSubject);
 
+    private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
+        string operationLabel,
+        string dispatchRoute,
+        string sourceId,
+        HorizonArtifactSurfaceDefinition surface,
+        string dispatchTarget,
+        bool emitRunsiteHeaders,
+        string quotaAllowanceExhaustedMessage,
+        string fallbackQuotaUnavailableMessage,
+        CancellationToken cancellationToken,
+        AuthenticatedHubSubject? authenticatedSubject = null)
+        => await DispatchResolvedHorizonArtifactAsync(
+            operationLabel,
+            dispatchRoute,
+            sourceId,
+            _horizonCapabilities.BuildSourceRef(surface, sourceId),
+            surface.HorizonId,
+            surface.CapabilityId,
+            dispatchTarget,
+            emitRunsiteHeaders,
+            quotaAllowanceExhaustedMessage,
+            fallbackQuotaUnavailableMessage,
+            cancellationToken,
+            authenticatedSubject);
+
     [HttpGet("/participate/karma-forge/discovery")]
     public async Task<IActionResult> KarmaForgeDiscoveryPacketDispatch(CancellationToken cancellationToken)
-        => await DispatchResolvedHorizonArtifactAsync(
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("karma-forge", "discovery_packet");
+        return await DispatchResolvedHorizonArtifactAsync(
             operationLabel: "karma forge discovery packet",
             dispatchRoute: "/participate/karma-forge/discovery",
             sourceId: "public-intake",
-            sourceRef: "karma-forge:public-intake",
-            horizonId: "karma-forge",
-            artifactKindOrCapabilityId: "discovery_packet",
+            surface: surface,
             dispatchTarget: "/participate/karma-forge",
             emitRunsiteHeaders: false,
             quotaAllowanceExhaustedMessage: "Discovery packet allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm discovery packet allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     private async Task<IActionResult> DispatchHorizonArtifactAsync(
         string operationLabel,
@@ -5456,7 +5482,9 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/participate/karma-forge/receipts/discovery-network.json")]
     [Produces("application/json")]
     public IActionResult KarmaForgeReceiptJson()
-        => Ok(new
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("karma-forge", "discovery_packet");
+        return Ok(new
         {
             Horizon = "karma-forge",
             Status = "shipped_mvp",
@@ -5467,11 +5495,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 SubmittedReceiptHrefTemplate = "/participate/karma-forge/submitted/{submissionId}",
                 Summary = "KARMA FORGE keeps house-rule demand intake first-party and routes discovery packets through shared Chummer-owned artifact receipts."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("karma-forge", "discovery_packet"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             ArtifactCapability = BuildPublicHorizonCapability(
-                "karma-forge",
-                "discovery_packet",
-                "karma-forge:public-intake"),
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, "public-intake")),
             Boundary = new
             {
                 RulesTruth = "not_claimed",
@@ -5479,6 +5506,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 RoadmapTruth = "separate"
             }
         });
+    }
 
     [HttpPost("/participate/karma-forge")]
     [ValidateAntiForgeryToken]
@@ -5654,13 +5682,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
-        string sourceRef = $"black-ledger:turn-{requestedTurn}:newsroom";
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "newsroom_bulletin");
+        string sourceRef = _horizonCapabilities.BuildSourceRef(surface, $"turn-{requestedTurn}:newsroom");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger newsroom bulletin",
             currentPath: $"/ledger/turns/{requestedTurn}/newsreel.json",
-            sourceRef: sourceRef,
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "newsroom_bulletin",
+            surface: surface,
+            sourceId: $"turn-{requestedTurn}:newsroom",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5669,11 +5697,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return Ok(briefing with
         {
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "newsroom_bulletin"),
-            ArtifactCapability = BuildPublicHorizonCapability(
-                "black-ledger",
-                "newsroom_bulletin",
-                sourceRef)
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(surface, sourceRef)
         });
     }
 
@@ -5706,12 +5731,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "newsroom_bulletin");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger newsroom bulletin",
             currentPath: $"/ledger/newsroom/{episodeId}",
-            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "newsroom_bulletin",
+            surface: surface,
+            sourceId: $"turn-{requestedTurn}:newsroom",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5738,12 +5763,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "newsroom_bulletin");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger newsroom transcript",
             currentPath: $"/ledger/newsroom/{episodeId}/transcript",
-            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "newsroom_bulletin",
+            surface: surface,
+            sourceId: $"turn-{requestedTurn}:newsroom",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5763,12 +5788,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "newsroom_bulletin");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger newsroom receipt packet",
             currentPath: $"/ledger/newsroom/{episodeId}/receipts",
-            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "newsroom_bulletin",
+            surface: surface,
+            sourceId: $"turn-{requestedTurn}:newsroom",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5777,15 +5802,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(requestedTurn, null);
         ApplyNoStoreHeaders(Response.Headers);
-        return packet is null || packet.ToTurn != requestedTurn
+            return packet is null || packet.ToTurn != requestedTurn
             ? NotFound()
             : Ok(packet with
             {
-                SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "newsroom_bulletin"),
+                SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
                 ArtifactCapability = BuildPublicHorizonCapability(
-                    "black-ledger",
-                    "newsroom_bulletin",
-                    $"black-ledger:turn-{requestedTurn}:newsroom")
+                    surface,
+                    _horizonCapabilities.BuildSourceRef(surface, $"turn-{requestedTurn}:newsroom"))
             });
     }
 
@@ -5852,12 +5876,12 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> LedgerFactionPromoPage([FromRoute] string factionId, CancellationToken cancellationToken)
     {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "faction_promo");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger faction promo",
             currentPath: $"/ledger/factions/{factionId}/promo",
-            sourceRef: $"black-ledger:faction-{factionId}:promo",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "faction_promo",
+            surface: surface,
+            sourceId: $"faction-{factionId}:promo",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5880,12 +5904,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "faction_promo");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger faction promo",
             currentPath: $"/ledger/factions/{promo.FactionId}/promo.json",
-            sourceRef: $"black-ledger:faction-{promo.FactionId}:promo",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "faction_promo",
+            surface: surface,
+            sourceId: $"faction-{promo.FactionId}:promo",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -5932,11 +5956,10 @@ document.addEventListener('DOMContentLoaded', function () {
             poster_href = publicPromo.PosterHref,
             video_mp4_href = publicPromo.VideoMp4Href,
             video_webm_href = publicPromo.VideoWebmHref,
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "faction_promo"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             artifact_capability = BuildPublicHorizonCapability(
-                "black-ledger",
-                "faction_promo",
-                $"black-ledger:faction-{publicPromo.FactionId}:promo")
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, $"faction-{publicPromo.FactionId}:promo"))
         });
     }
 
@@ -5950,12 +5973,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "faction_promo");
         IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
             operationLabel: "black ledger faction promo captions",
             currentPath: $"/ledger/factions/{promo.FactionId}/promo.vtt",
-            sourceRef: $"black-ledger:faction-{promo.FactionId}:promo",
-            horizonId: "black-ledger",
-            artifactKindOrCapabilityId: "faction_promo",
+            surface: surface,
+            sourceId: $"faction-{promo.FactionId}:promo",
             cancellationToken: cancellationToken);
         if (receiptFailure is not null)
         {
@@ -6122,15 +6145,15 @@ document.addEventListener('DOMContentLoaded', function () {
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             string? factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId;
             BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(1, factionId);
+            HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "world_tick_digest");
             return packet is null
                 ? NotFound()
                 : Ok(packet with
                 {
-                    SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "world_tick_digest"),
+                    SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
                     ArtifactCapability = BuildPublicHorizonCapability(
-                        "black-ledger",
-                        "world_tick_digest",
-                        $"black-ledger:turn-{packet.ToTurn}:validation")
+                        surface,
+                        _horizonCapabilities.BuildSourceRef(surface, $"turn-{packet.ToTurn}:validation"))
                 });
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -11034,6 +11057,20 @@ Boundary:
     private async Task<IActionResult?> TryCreatePublicArtifactReceiptAsync(
         string operationLabel,
         string currentPath,
+        HorizonArtifactSurfaceDefinition surface,
+        string sourceId,
+        CancellationToken cancellationToken)
+        => await TryCreatePublicArtifactReceiptAsync(
+            operationLabel,
+            currentPath,
+            _horizonCapabilities.BuildSourceRef(surface, sourceId),
+            surface.HorizonId,
+            surface.CapabilityId,
+            cancellationToken);
+
+    private async Task<IActionResult?> TryCreatePublicArtifactReceiptAsync(
+        string operationLabel,
+        string currentPath,
         string sourceRef,
         string horizonId,
         string artifactKindOrCapabilityId,
@@ -11120,6 +11157,12 @@ Boundary:
 
     private string AppendPublicArtifactMetadataJson(
         string json,
+        HorizonArtifactSurfaceDefinition surface,
+        string sourceRef)
+        => AppendPublicArtifactMetadataJson(json, surface.HorizonId, surface.CapabilityId, sourceRef);
+
+    private string AppendPublicArtifactMetadataJson(
+        string json,
         string horizonId,
         string artifactKindOrCapabilityId,
         string sourceRef)
@@ -11134,6 +11177,11 @@ Boundary:
         payload["shared_artifacts"] = BuildSharedArtifactSurfaceRoutesNode(horizonId, artifactKindOrCapabilityId);
         return payload.ToJsonString(PublicJsonContentOptions);
     }
+
+    private JsonObject BuildPublicArtifactCapabilityNode(
+        HorizonArtifactSurfaceDefinition surface,
+        string sourceRef)
+        => BuildPublicArtifactCapabilityNode(surface.HorizonId, surface.CapabilityId, sourceRef);
 
     private JsonObject BuildPublicArtifactCapabilityNode(
         string horizonId,
@@ -11852,6 +11900,7 @@ Boundary:
     {
         request ??= new KarmaForgeSubmissionRequest();
         subject ??= await TryGetOptionalPublicSurfaceSubjectAsync("/participate/karma-forge", cancellationToken);
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("karma-forge", "discovery_packet");
 
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
@@ -11870,9 +11919,8 @@ Boundary:
             CanonicalLane: _karmaForge.CanonicalLane,
             EntryLane: _karmaForge.EntryLane,
             DiscoveryCapability: BuildPublicHorizonCapability(
-                "karma-forge",
-                "discovery_packet",
-                "karma-forge:public-intake"),
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, "public-intake")),
             Dashboard: _karmaForge.GetDashboardSummary(),
             DiscoverySteps: _karmaForge.GetDiscoverySteps(),
             ExternalStages: _karmaForge.GetExternalStageProjections(),
@@ -11919,9 +11967,7 @@ Boundary:
                 .ToArray(),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
-                "karma-forge",
-                "discovery_packet"));
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(surface));
     }
 
     private async Task<NowPageViewModel> BuildNowPageModel(
@@ -12018,6 +12064,7 @@ Boundary:
         KarmaForgeSubmissionProjection submission,
         CancellationToken cancellationToken)
     {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("karma-forge", "discovery_packet");
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "KARMA FORGE request saved",
@@ -12057,9 +12104,8 @@ Boundary:
             ReporterNextAction: submission.ReporterNextAction,
             ConsentSummary: submission.ConsentSummary,
             DiscoveryCapability: BuildPublicHorizonCapability(
-                "karma-forge",
-                "discovery_packet",
-                $"karma-forge:{submission.SubmissionId}"),
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, submission.SubmissionId)),
             ExternalStages: submission.Packet.Source.ExternalStages,
             JourneyProofEventRefs: submission.Packet.Source.JourneyProofEventRefs,
             Highlights:
@@ -12077,9 +12123,7 @@ Boundary:
             ImpactHypothesisJson: JsonSerializer.Serialize(submission.ImpactHypothesis, jsonOptions),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
-                "karma-forge",
-                "discovery_packet"));
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(surface));
     }
 
     private PublicHorizonCapabilityViewModel BuildPublicHorizonCapability(
@@ -12095,6 +12139,12 @@ Boundary:
         string visibility = "public_safe")
         => BuildPublicHorizonCapability(surface.HorizonId, surface.CapabilityId, sourceRef, visibility);
 
+    private PublicHorizonCapabilityViewModel BuildPublicHorizonCapability(
+        HorizonArtifactSurfaceDefinition surface,
+        string sourceRef,
+        string visibility = "public_safe")
+        => BuildPublicHorizonCapability(surface.HorizonId, surface.CapabilityId, sourceRef, visibility);
+
     private JsonObject BuildSharedArtifactSurfaceRoutesNode(string horizonId, string artifactKindOrCapabilityId)
         => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesJsonNode(horizonId, artifactKindOrCapabilityId);
 
@@ -12102,6 +12152,9 @@ Boundary:
         => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesViewModel(horizonId, artifactKindOrCapabilityId);
 
     private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(MediaArtifactSurfaceDefinition surface)
+        => BuildSharedArtifactSurfaceRoutes(surface.HorizonId, surface.CapabilityId);
+
+    private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(HorizonArtifactSurfaceDefinition surface)
         => BuildSharedArtifactSurfaceRoutes(surface.HorizonId, surface.CapabilityId);
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
@@ -16266,6 +16319,7 @@ echo "Help: ${HELP_URL}"
             : string.Equals(currentSection, "factions", StringComparison.OrdinalIgnoreCase) && selectedFaction is null ? $"Black Ledger factions · {worldTitle}"
             : worldTitle;
 
+        HorizonArtifactSurfaceDefinition digestSurface = _horizonCapabilities.GetSurface("black-ledger", "world_tick_digest");
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 selectedFaction?.PublicName ?? "Black Ledger",
@@ -16294,14 +16348,11 @@ echo "Help: ${HELP_URL}"
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Latest bulletin", $"/ledger/turns/{newsTurn}/digest", "secondary"),
             DigestCapability: BuildPublicHorizonCapability(
-                "black-ledger",
-                "world_tick_digest",
-                $"black-ledger:turn-{newsTurn}:digest"),
+                digestSurface,
+                _horizonCapabilities.BuildSourceRef(digestSurface, $"turn-{newsTurn}:digest")),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
-                "black-ledger",
-                "world_tick_digest"));
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(digestSurface));
     }
 
     private async Task<IActionResult> BuildLedgerFactionWorkspacePage(

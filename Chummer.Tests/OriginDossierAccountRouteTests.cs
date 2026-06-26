@@ -353,7 +353,7 @@ public sealed class OriginDossierAccountRouteTests
                     projectRoot,
                     "story-scene-cover.receipt.json",
                     "selected_face_scene_render",
-                    "rendered_cover_lane",
+                    "Magicfit",
                     [
                         $"/account/work/origin-dossiers/{projectId}",
                         $"/account/work/origin-dossiers/{projectId}/cover",
@@ -395,7 +395,7 @@ public sealed class OriginDossierAccountRouteTests
                     projectRoot,
                     "dossier-film.receipt.json",
                     "dossier_video_import",
-                    "video_lane",
+                    "Magicfit",
                     artifactPaths: [dossierVideoPath]),
                 TelegramShareDeliveryReceiptPath: WriteTelegramShareReceipt(
                     projectRoot,

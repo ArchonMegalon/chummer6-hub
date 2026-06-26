@@ -248,6 +248,23 @@ public sealed class HorizonCapabilityService
             ?? throw new KeyNotFoundException($"Unknown horizon capability '{horizonId}/{artifactKindOrCapabilityId}'.");
     }
 
+    public HorizonArtifactSurfaceDefinition GetSurface(string horizonId, string artifactKindOrCapabilityId)
+    {
+        HorizonCapabilityDefinition capability = GetCapability(horizonId, artifactKindOrCapabilityId);
+        return new HorizonArtifactSurfaceDefinition(capability.HorizonId, capability.CapabilityId);
+    }
+
+    public string BuildSourceRef(string horizonId, string artifactKindOrCapabilityId, string sourceId)
+        => BuildSourceRef(GetSurface(horizonId, artifactKindOrCapabilityId), sourceId);
+
+    public string BuildSourceRef(HorizonArtifactSurfaceDefinition surface, string sourceId)
+    {
+        string normalizedSourceId = Clean(sourceId);
+        return string.IsNullOrWhiteSpace(normalizedSourceId)
+            ? surface.HorizonId
+            : $"{surface.HorizonId}:{normalizedSourceId}";
+    }
+
     public HorizonCapabilityHealthSnapshot GetHealth(string horizonId, string artifactKindOrCapabilityId, bool publicSafe = false)
     {
         HorizonCapabilityDefinition capability = GetCapability(horizonId, artifactKindOrCapabilityId);
@@ -410,6 +427,10 @@ public sealed record HorizonCapabilityDefinition(
     string CostClass,
     bool Enabled = true,
     bool QuotaTracked = true);
+
+public sealed record HorizonArtifactSurfaceDefinition(
+    string HorizonId,
+    string CapabilityId);
 
 public sealed record HorizonCapabilityHealthSnapshot(
     string HorizonId,
