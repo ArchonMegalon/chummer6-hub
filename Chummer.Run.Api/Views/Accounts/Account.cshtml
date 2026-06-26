@@ -2253,14 +2253,6 @@
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                    <span>Current update</span>
-                                    <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Current area</span>
-                                    <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
-                                </div>
-                                    <div class="settings-summary-row">
                                         <span>Recent reconnects</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreProvenanceCount</strong>
                                     </div>
@@ -2308,7 +2300,6 @@
                                         {
                                             <li>
                                                 <strong>@surface.Label:</strong> @PublicText(surface.Status.Summary)
-                                                <span>@surface.Status.LeadReceiptId</span>
                                                 <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
                                                 <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>@surface.Status.RecoverySummary</span>

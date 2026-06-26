@@ -135,6 +135,11 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("HumanizeStatus(device.Status, \"Status\")", view, StringComparison.Ordinal);
         Assert.Contains("Cache freshness", view, StringComparison.Ordinal);
         Assert.Contains("Offline actionability", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Current update</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Current area</span>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@surface.Status.LeadReceiptId", view, StringComparison.Ordinal);
     }
 
     [Fact]
