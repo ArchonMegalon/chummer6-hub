@@ -14,7 +14,8 @@ test('runbook public route stays available and surfaces primer export action', a
   expect(primerPayload.style).toBe('Primer');
   expect(primerPayload.tour_action_href).toBe('/runbook/primers/new-runner-primer/export');
   expect(primerPayload.tour_action_label).toBe('Export Primer');
-  expect(primerPayload.tour_href).toBe('/media/horizons/runbook-press-90s-deepdive.mp4');
+  expect(primerPayload.tour_href).toBe('/runbook/primers/new-runner-primer/export');
+  expect(primerPayload.tour_open_in_new_tab).toBe(false);
 
   await page.goto(`${baseUrl}/runbook`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'RUNBOOK PRESS', exact: true })).toBeVisible();

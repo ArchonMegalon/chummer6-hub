@@ -643,8 +643,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", payload.RootElement.GetProperty("tour_action_href").GetString());
         Assert.Equal("Open 3D Tour", payload.RootElement.GetProperty("tour_action_label").GetString());
         Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
-        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", payload.RootElement.GetProperty("tour_href").GetString());
-        Assert.True(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
         Assert.Equal("3D Tour", payload.RootElement.GetProperty("tour_label").GetString());
     }
 
@@ -661,7 +661,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/jackpoint/briefings/emerald-sprawl-briefing/video", payload.RootElement.GetProperty("tour_action_href").GetString());
         Assert.Equal("Open Briefing Video", payload.RootElement.GetProperty("tour_action_label").GetString());
         Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
-        Assert.Equal("/media/horizons/jackpoint-90s-deepdive.mp4", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.Equal("/jackpoint/briefings/emerald-sprawl-briefing/video", payload.RootElement.GetProperty("tour_href").GetString());
         Assert.Equal("Briefing Video", payload.RootElement.GetProperty("artifact_capability").GetProperty("public_label").GetString());
     }
 
@@ -678,7 +678,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/runbook/primers/new-runner-primer/export", payload.RootElement.GetProperty("tour_action_href").GetString());
         Assert.Equal("Export Primer", payload.RootElement.GetProperty("tour_action_label").GetString());
         Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
-        Assert.Equal("/media/horizons/runbook-press-90s-deepdive.mp4", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.Equal("/runbook/primers/new-runner-primer/export", payload.RootElement.GetProperty("tour_href").GetString());
     }
 
     [Fact]
@@ -694,8 +694,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", payload.RootElement.GetProperty("tour_action_href").GetString());
         Assert.Equal("Open 3D Tour", payload.RootElement.GetProperty("tour_action_label").GetString());
         Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
-        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", payload.RootElement.GetProperty("tour_href").GetString());
-        Assert.True(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
         Assert.Equal("3D Tour", payload.RootElement.GetProperty("tour_label").GetString());
     }
 
@@ -786,12 +786,13 @@ public sealed class PublicLandingDownloadDispatchTests
         MediaArtifactHorizonsService mediaHorizons = new(configuration);
         MediaArtifactDocument firstPack = mediaHorizons.GetRunsitePack("redmond-dockyard-pack");
 
-        Assert.Equal("https://3dvista.example.test/tour/abc", firstPack.TourHref);
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", firstPack.TourHref);
         Assert.Equal("3DVista Tour", firstPack.TourLabel);
         Assert.False(firstPack.TourOpenInNewTab);
         Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", firstPack.TourActionHref);
         Assert.Equal("Launch 3DVista", firstPack.TourActionLabel);
         Assert.False(firstPack.TourActionOpenInNewTab);
+        Assert.Equal("https://3dvista.example.test/tour/abc", firstPack.DispatchTargetHref);
     }
 
     [Fact]
@@ -810,12 +811,13 @@ public sealed class PublicLandingDownloadDispatchTests
         MediaArtifactHorizonsService mediaHorizons = new(configuration);
         MediaArtifactDocument firstProperty = mediaHorizons.GetPropertyquarryProperty("northbound-research-lab");
 
-        Assert.Equal("https://3dvista.example.test/tour/pq", firstProperty.TourHref);
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", firstProperty.TourHref);
         Assert.Equal("3DVista Property Tour", firstProperty.TourLabel);
         Assert.False(firstProperty.TourOpenInNewTab);
         Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", firstProperty.TourActionHref);
         Assert.Equal("Open Property 3DVista", firstProperty.TourActionLabel);
         Assert.False(firstProperty.TourActionOpenInNewTab);
+        Assert.Equal("https://3dvista.example.test/tour/pq", firstProperty.DispatchTargetHref);
     }
 
     [Fact]
@@ -834,10 +836,11 @@ public sealed class PublicLandingDownloadDispatchTests
         MediaArtifactHorizonsService mediaHorizons = new(configuration);
         MediaArtifactDocument firstPack = mediaHorizons.GetRunsitePack("redmond-dockyard-pack");
 
-        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstPack.TourHref);
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", firstPack.TourHref);
         Assert.Equal("3D Tour", firstPack.TourLabel);
         Assert.Equal("Open 3D Tour", firstPack.TourActionLabel);
-        Assert.True(firstPack.TourOpenInNewTab);
+        Assert.False(firstPack.TourOpenInNewTab);
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstPack.DispatchTargetHref);
     }
 
     [Fact]

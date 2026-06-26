@@ -9,11 +9,9 @@ public sealed class MediaArtifactHorizonsService
     private const string DefaultRunsiteTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
     private const string DefaultRunsiteTourLabel = "3D Tour";
     private const string DefaultRunsiteTourActionLabel = "Open 3D Tour";
-    private const bool DefaultRunsiteTourOpenInNewTab = true;
     private const string DefaultPropertyquarryTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
     private const string DefaultPropertyquarryTourLabel = "3D Tour";
     private const string DefaultPropertyquarryTourActionLabel = "Open 3D Tour";
-    private const bool DefaultPropertyquarryTourOpenInNewTab = true;
 
     private static readonly IReadOnlyList<MediaArtifactDocument> JackpointBriefings =
     [
@@ -25,11 +23,13 @@ public sealed class MediaArtifactHorizonsService
             "/jackpoint/briefings/emerald-sprawl-briefing.json",
             ["Objective pressure", "Contact posture", "No GM-private spoilers"],
             "Dossier",
-            TourHref: "/media/horizons/jackpoint-90s-deepdive.mp4",
+            TourHref: "/jackpoint/briefings/emerald-sprawl-briefing/video",
             TourLabel: "Briefing Video",
+            TourOpenInNewTab: false,
             TourActionHref: "/jackpoint/briefings/emerald-sprawl-briefing/video",
             TourActionLabel: "Open Briefing Video",
-            TourActionOpenInNewTab: false),
+            TourActionOpenInNewTab: false,
+            DispatchTargetHref: "/media/horizons/jackpoint-90s-deepdive.mp4"),
         new(
             "dockyard-contact-dossier",
             "Dockyard contact dossier",
@@ -38,11 +38,13 @@ public sealed class MediaArtifactHorizonsService
             "/jackpoint/briefings/dockyard-contact-dossier.json",
             ["Dossier card", "Player-safe contact notes", "Follow-up hook"],
             "Dossier",
-            TourHref: "/media/horizons/jackpoint-90s-deepdive.mp4",
+            TourHref: "/jackpoint/briefings/dockyard-contact-dossier/video",
             TourLabel: "Briefing Video",
+            TourOpenInNewTab: false,
             TourActionHref: "/jackpoint/briefings/dockyard-contact-dossier/video",
             TourActionLabel: "Open Briefing Video",
-            TourActionOpenInNewTab: false)
+            TourActionOpenInNewTab: false,
+            DispatchTargetHref: "/media/horizons/jackpoint-90s-deepdive.mp4")
     ];
 
     private static readonly IReadOnlyList<MediaArtifactDocument> BaseRunsitePacks =
@@ -103,11 +105,13 @@ public sealed class MediaArtifactHorizonsService
             "/runbook/primers/new-runner-primer.json",
             ["First-session primer", "Ready rail", "Support rail"],
             "Primer",
-            TourHref: "/media/horizons/runbook-press-90s-deepdive.mp4",
+            TourHref: "/runbook/primers/new-runner-primer/export",
             TourLabel: "Primer Export",
+            TourOpenInNewTab: false,
             TourActionHref: "/runbook/primers/new-runner-primer/export",
             TourActionLabel: "Export Primer",
-            TourActionOpenInNewTab: false),
+            TourActionOpenInNewTab: false,
+            DispatchTargetHref: "/media/horizons/runbook-press-90s-deepdive.mp4"),
         new(
             "gm-first-night-primer",
             "GM first-night primer",
@@ -116,11 +120,13 @@ public sealed class MediaArtifactHorizonsService
             "/runbook/primers/gm-first-night-primer.json",
             ["Table-open sequence", "Consequence sweep", "Next-screen posture"],
             "Primer",
-            TourHref: "/media/horizons/runbook-press-90s-deepdive.mp4",
+            TourHref: "/runbook/primers/gm-first-night-primer/export",
             TourLabel: "Primer Export",
+            TourOpenInNewTab: false,
             TourActionHref: "/runbook/primers/gm-first-night-primer/export",
             TourActionLabel: "Export Primer",
-            TourActionOpenInNewTab: false)
+            TourActionOpenInNewTab: false,
+            DispatchTargetHref: "/media/horizons/runbook-press-90s-deepdive.mp4")
     ];
 
     private readonly IReadOnlyList<MediaArtifactDocument> _runsitePacks;
@@ -134,33 +140,33 @@ public sealed class MediaArtifactHorizonsService
         string resolvedRunsiteTourHref = ResolveRunsiteTourHref(configuration);
         string resolvedRunsiteTourLabel = ResolveRunsiteTourLabel(configuration);
         string resolvedRunsiteTourActionLabel = ResolveRunsiteTourActionLabel(configuration, resolvedRunsiteTourLabel);
-        bool resolvedRunsiteTourOpenInNewTab = ResolveRunsiteTourOpenInNewTab(configuration);
         string resolvedPropertyquarryTourHref = ResolvePropertyquarryTourHref(configuration);
         string resolvedPropertyquarryTourLabel = ResolvePropertyquarryTourLabel(configuration);
         string resolvedPropertyquarryTourActionLabel = ResolvePropertyquarryTourActionLabel(configuration, resolvedPropertyquarryTourLabel);
-        bool resolvedPropertyquarryTourOpenInNewTab = ResolvePropertyquarryTourOpenInNewTab(configuration);
 
         _runsitePacks = BaseRunsitePacks
             .Select(item => item with
             {
-                TourHref = resolvedRunsiteTourHref,
+                TourHref = $"/runsites/packs/{item.Id}/tour",
                 TourLabel = resolvedRunsiteTourLabel,
                 TourActionHref = $"/runsites/packs/{item.Id}/tour",
                 TourActionLabel = resolvedRunsiteTourActionLabel,
                 TourActionOpenInNewTab = false,
-                TourOpenInNewTab = resolvedRunsiteTourOpenInNewTab
+                TourOpenInNewTab = false,
+                DispatchTargetHref = resolvedRunsiteTourHref
             })
             .ToArray();
 
         _propertyquarryProperties = BasePropertyquarryProperties
             .Select(item => item with
             {
-                TourHref = resolvedPropertyquarryTourHref,
+                TourHref = $"/propertyquarry/properties/{item.Id}/tour",
                 TourLabel = resolvedPropertyquarryTourLabel,
                 TourActionHref = $"/propertyquarry/properties/{item.Id}/tour",
                 TourActionLabel = resolvedPropertyquarryTourActionLabel,
                 TourActionOpenInNewTab = false,
-                TourOpenInNewTab = resolvedPropertyquarryTourOpenInNewTab
+                TourOpenInNewTab = false,
+                DispatchTargetHref = resolvedPropertyquarryTourHref
             })
             .ToArray();
     }
@@ -328,22 +334,6 @@ public sealed class MediaArtifactHorizonsService
         return configuredActionLabel ?? $"Open {fallbackLabel}";
     }
 
-    private static bool ResolvePropertyquarryTourOpenInNewTab(IConfiguration? configuration)
-        => bool.TryParse(FirstConfiguredValue(
-                configuration?["PropertyquarryTour:OpenInNewTab"],
-                configuration?["PropertyquarryTour:SourceOpenInNewTab"]),
-            out bool openInNewTab)
-            ? openInNewTab
-            : DefaultPropertyquarryTourOpenInNewTab;
-
-    private static bool ResolveRunsiteTourOpenInNewTab(IConfiguration? configuration)
-        => bool.TryParse(FirstConfiguredValue(
-                configuration?["RunsiteTour:OpenInNewTab"],
-                configuration?["RunsiteTour:SourceOpenInNewTab"]),
-            out bool openInNewTab)
-            ? openInNewTab
-            : DefaultRunsiteTourOpenInNewTab;
-
     private static string? FirstConfiguredValue(params string?[] values)
         => values
             .Select(static item => string.IsNullOrWhiteSpace(item) ? null : item.Trim())
@@ -363,4 +353,5 @@ public sealed record MediaArtifactDocument(
     bool TourOpenInNewTab = true,
     string? TourActionHref = null,
     string? TourActionLabel = null,
-    bool TourActionOpenInNewTab = false);
+    bool TourActionOpenInNewTab = false,
+    string? DispatchTargetHref = null);

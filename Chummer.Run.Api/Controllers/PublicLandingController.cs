@@ -4008,7 +4008,7 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: true,
             allowLegacyRunsiteQuotaFallback: true,
             resolveSource: _mediaHorizons.GetRunsitePack,
-            resolveDispatchTarget: static document => document.TourHref,
+            resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4078,7 +4078,7 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetPropertyquarryProperty,
-            resolveDispatchTarget: static document => document.TourHref,
+            resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4094,7 +4094,7 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetJackpointBriefing,
-            resolveDispatchTarget: static _ => "/media/horizons/jackpoint-90s-deepdive.mp4",
+            resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Briefing video allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm briefing video allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -4110,7 +4110,7 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders: false,
             allowLegacyRunsiteQuotaFallback: false,
             resolveSource: _mediaHorizons.GetRunbookPrimer,
-            resolveDispatchTarget: static _ => "/media/horizons/runbook-press-90s-deepdive.mp4",
+            resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Runbook export allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
             cancellationToken: cancellationToken);

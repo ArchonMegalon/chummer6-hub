@@ -2,7 +2,6 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const expectedTourHref = process.env.EXPECT_RUNSITE_TOUR_HREF?.trim();
 const expectedTourLabel = process.env.EXPECT_RUNSITE_TOUR_LABEL?.trim();
 const expectedTourActionLabel = process.env.EXPECT_RUNSITE_TOUR_ACTION_LABEL?.trim();
 
@@ -30,9 +29,8 @@ test('runsite public route stays available and points at the signed-in prep benc
   expect(packPayload.tour_action_href).toBe('/runsites/packs/redmond-dockyard-pack/tour');
   expect(packPayload.tour_action_label).toBe(expectedTourActionLabel ?? 'Open 3D Tour');
   expect(packPayload.tour_action_open_in_new_tab).toBe(false);
-  if (expectedTourHref) {
-    expect(packPayload.tour_href).toBe(expectedTourHref);
-  }
+  expect(packPayload.tour_href).toBe('/runsites/packs/redmond-dockyard-pack/tour');
+  expect(packPayload.tour_open_in_new_tab).toBe(false);
   if (expectedTourLabel) {
     expect(packPayload.tour_label).toBe(expectedTourLabel);
   }

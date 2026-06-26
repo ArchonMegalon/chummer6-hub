@@ -2,7 +2,6 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const expectedTourHref = process.env.EXPECT_PROPERTYQUARRY_TOUR_HREF?.trim();
 const expectedTourLabel = process.env.EXPECT_PROPERTYQUARRY_TOUR_LABEL?.trim();
 const expectedTourActionLabel = process.env.EXPECT_PROPERTYQUARRY_TOUR_ACTION_LABEL?.trim();
 
@@ -33,9 +32,8 @@ test('propertyquarry public route stays available and points at the signed-in pr
   expect(firstPropertyPayload.tour_action_href).toBe('/propertyquarry/properties/northbound-research-lab/tour');
   expect(firstPropertyPayload.tour_action_label).toBe(expectedTourActionLabel ?? 'Open 3D Tour');
   expect(firstPropertyPayload.tour_action_open_in_new_tab).toBe(false);
-  if (expectedTourHref) {
-    expect(firstPropertyPayload.tour_href).toBe(expectedTourHref);
-  }
+  expect(firstPropertyPayload.tour_href).toBe('/propertyquarry/properties/northbound-research-lab/tour');
+  expect(firstPropertyPayload.tour_open_in_new_tab).toBe(false);
   if (expectedTourLabel) {
     expect(firstPropertyPayload.tour_label).toBe(expectedTourLabel);
   }
