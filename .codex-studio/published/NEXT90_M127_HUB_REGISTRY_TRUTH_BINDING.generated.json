@@ -26,7 +26,7 @@
     "var registryTruthBindings = new RegistryTruthBindingService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new RegistryTruthBindingContext(",
     "campaign spine registry truth bindings should keep downloads on the registry-backed shelf.",
     "campaign spine registry truth bindings should keep install help on the registry-backed status lane.",
-    "campaign spine registry truth bindings should keep account-aware guidance on the Devices & access rail.",
+    "campaign spine registry truth bindings should keep account-aware guidance on the Installs rail.",
     "campaign spine registry truth bindings should keep support recovery on the install continuation support rail.",
     "campaign spine registry truth bindings should keep the public release shelf on the registry-backed current-release route."
   ]

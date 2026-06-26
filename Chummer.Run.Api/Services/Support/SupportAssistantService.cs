@@ -345,12 +345,12 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (ShouldUseRulesTruth(tokens))
         {
-            Add("open_home", "Open home", "/home", "Review the current rules setup, campaign workspace, and answer path.");
+            Add("open_home", "Open home", "/home", "Review the current rule environment, campaign workspace, and grounded answer path.");
         }
 
         if (ShouldUseBuildJourneyTruth(tokens))
         {
-            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return path.");
+            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");
         }
 
         return actions.Values.ToList();

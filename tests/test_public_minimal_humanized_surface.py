@@ -456,8 +456,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller
-    assert "localOrigin: \"/partizipate\"" in controller
-    assert "localBaseHref: \"/partizipate/\"" in controller
+    assert "localOrigin: \"/participate\"" in controller
+    assert "localBaseHref: \"/participate/\"" in controller
     assert "data-chummer-board-skin" in participate
     assert "data-chummer-board-skin" in controller
     assert "participate-hosted__frame" not in participate

@@ -2144,25 +2144,28 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(
-            boardPath: string.Empty,
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+        _ = cancellationToken;
+        string target = $"/participate{Request.QueryString}";
+        return Redirect(target);
+    }
 
     [HttpGet("/participate")]
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        await Task.CompletedTask.ConfigureAwait(false);
-        return Redirect("/partizipate");
+        return await ParticipateBoardProxyCore(
+            boardPath: string.Empty,
+            cancellationToken,
+            localOrigin: "/participate",
+            localBaseHref: "/participate/",
+            fallbackPath: "/participate").ConfigureAwait(false);
     }
 
-    private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken, string currentPath = "/partizipate")
+    private async Task<FirstPartyParticipateBoardViewModel> BuildFirstPartyParticipateBoardAsync(CancellationToken cancellationToken, string currentPath = "/participate")
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken).ConfigureAwait(false);
-        currentPath = string.Equals(currentPath, "/participate", StringComparison.OrdinalIgnoreCase) ? "/participate" : "/partizipate";
         ParticipateItemViewModel[] fallbackItems =
         [
             new(8, "Mobile companion app for dice rolling", "Quick access for rolling dice pools and checking modifiers at the table.", "Open"),
@@ -2435,17 +2438,13 @@ public sealed class PublicLandingController : Controller
             : $"Synced {syncedAtUtc.UtcDateTime:HH:mm} UTC";
 
     [HttpGet("/partizipate/{**boardPath}")]
-    public async Task<IActionResult> ParticipateBoardProxyLegacyAlias(string? boardPath, CancellationToken cancellationToken)
+    public Task<IActionResult> ParticipateBoardProxyLegacyAlias(string? boardPath, CancellationToken cancellationToken)
     {
+        _ = cancellationToken;
         string raw = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return await ParticipateBoardProxyCore(
-                boardPath: string.Empty,
-                cancellationToken,
-                localOrigin: "/partizipate",
-                localBaseHref: "/partizipate/",
-                fallbackPath: "/partizipate").ConfigureAwait(false);
+            return Task.FromResult<IActionResult>(Redirect($"/participate{Request.QueryString}"));
         }
 
         string targetPath = raw switch
@@ -2454,12 +2453,8 @@ public sealed class PublicLandingController : Controller
             var value when value.StartsWith("board/", StringComparison.OrdinalIgnoreCase) => value["board/".Length..],
             _ => raw
         };
-        return await ParticipateBoardProxyCore(
-            NormalizeParticipateBoardPath(targetPath),
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+        string pathPrefix = string.IsNullOrWhiteSpace(targetPath) ? string.Empty : $"/{targetPath}";
+        return Task.FromResult<IActionResult>(Redirect($"/participate{pathPrefix}{Request.QueryString}"));
     }
 
     [HttpGet("/participate/{**boardPath}")]
@@ -2467,7 +2462,7 @@ public sealed class PublicLandingController : Controller
     {
         if (string.IsNullOrWhiteSpace(boardPath))
         {
-            return Redirect("/partizipate");
+            return Redirect($"/participate{Request.QueryString}");
         }
 
         return await ParticipateBoardProxyCore(
@@ -2475,7 +2470,7 @@ public sealed class PublicLandingController : Controller
             cancellationToken,
             localOrigin: "/participate",
             localBaseHref: "/participate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+            fallbackPath: "/participate").ConfigureAwait(false);
     }
 
     [HttpGet("/participate/board")]
@@ -3753,7 +3748,7 @@ document.addEventListener('DOMContentLoaded', function () {
             actions:
             [
                 new TrustPageActionViewModel("Open live notifications", "/account/ledger/notifications", "primary"),
-                new TrustPageActionViewModel("Open aftermath", "/account/work#aftermath-packages", "secondary"),
+                new TrustPageActionViewModel("Open aftermath", "/table-pulse/debrief", "secondary"),
                 new TrustPageActionViewModel("Open Black Ledger", "/ledger", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -3857,7 +3852,7 @@ document.addEventListener('DOMContentLoaded', function () {
             [
                 new TrustPageActionViewModel("Open the story booklet", "/docs/origin-dossier-the-name-she-chose", "primary"),
                 new TrustPageActionViewModel("Read the book-studio design", "/docs/origin-book-studio", "secondary"),
-                new TrustPageActionViewModel("Watch the narrated overview", "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4", "secondary"),
+                new TrustPageActionViewModel("Watch the narrated overview", "/origin-dossier/media", "secondary"),
                 new TrustPageActionViewModel("Download the booklet PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -4120,6 +4115,82 @@ document.addEventListener('DOMContentLoaded', function () {
             fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
             cancellationToken: cancellationToken);
 
+    [HttpGet("/table-pulse/debrief")]
+    public async Task<IActionResult> TablePulseDebriefDispatch(CancellationToken cancellationToken)
+        => await DispatchResolvedHorizonArtifactAsync(
+            operationLabel: "table pulse debrief",
+            dispatchRoute: "/table-pulse/debrief",
+            sourceId: "live-and-aftermath",
+            sourceRef: "table-pulse:live-and-aftermath",
+            horizonId: "table-pulse",
+            artifactKindOrCapabilityId: "debrief_packet",
+            dispatchTarget: "/account/work#aftermath-packages",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            quotaAllowanceExhaustedMessage: "Debrief packet allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
+    [HttpGet("/ledger/turns/{turn}/digest")]
+    public async Task<IActionResult> BlackLedgerDigestDispatch([FromRoute] string turn, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(turn, out int requestedTurn) || requestedTurn < 0)
+        {
+            return NotFound();
+        }
+
+        if (_blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn) is null)
+        {
+            return NotFound();
+        }
+
+        return await DispatchResolvedHorizonArtifactAsync(
+            operationLabel: "black ledger digest",
+            dispatchRoute: $"/ledger/turns/{Uri.EscapeDataString(turn)}/digest",
+            sourceId: $"turn-{requestedTurn}",
+            sourceRef: $"black-ledger:turn-{requestedTurn}:digest",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "world_tick_digest",
+            dispatchTarget: $"/ledger/turns/{requestedTurn}/newsreel.json",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            quotaAllowanceExhaustedMessage: "World tick digest allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm world tick digest allowance receipt right now.",
+            cancellationToken: cancellationToken);
+    }
+
+    [HttpGet("/origin-dossier/media")]
+    public async Task<IActionResult> OriginDossierMediaDispatch(CancellationToken cancellationToken)
+        => await DispatchResolvedHorizonArtifactAsync(
+            operationLabel: "origin dossier media",
+            dispatchRoute: "/origin-dossier/media",
+            sourceId: "public-story-packet",
+            sourceRef: "origin-dossier:public-story-packet",
+            horizonId: "origin-dossier",
+            artifactKindOrCapabilityId: "dossier_media",
+            dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            quotaAllowanceExhaustedMessage: "Dossier media allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm dossier media allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
+    [HttpGet("/participate/karma-forge/discovery")]
+    public async Task<IActionResult> KarmaForgeDiscoveryPacketDispatch(CancellationToken cancellationToken)
+        => await DispatchResolvedHorizonArtifactAsync(
+            operationLabel: "karma forge discovery packet",
+            dispatchRoute: "/participate/karma-forge/discovery",
+            sourceId: "public-intake",
+            sourceRef: "karma-forge:public-intake",
+            horizonId: "karma-forge",
+            artifactKindOrCapabilityId: "discovery_packet",
+            dispatchTarget: "/participate/karma-forge",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            quotaAllowanceExhaustedMessage: "Discovery packet allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm discovery packet allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
     private async Task<IActionResult> DispatchHorizonArtifactAsync(
         string operationLabel,
         string dispatchRoute,
@@ -4159,6 +4230,44 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
+        return await DispatchResolvedHorizonArtifactAsync(
+            operationLabel,
+            dispatchRoute,
+            sourceId,
+            $"{horizonId}:{sourceId}",
+            horizonId,
+            artifactKindOrCapabilityId,
+            dispatchTarget,
+            emitRunsiteHeaders,
+            allowLegacyRunsiteQuotaFallback,
+            quotaAllowanceExhaustedMessage,
+            fallbackQuotaUnavailableMessage,
+            cancellationToken,
+            authenticatedSubject: subject);
+    }
+
+    private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
+        string operationLabel,
+        string dispatchRoute,
+        string sourceId,
+        string sourceRef,
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string dispatchTarget,
+        bool emitRunsiteHeaders,
+        bool allowLegacyRunsiteQuotaFallback,
+        string quotaAllowanceExhaustedMessage,
+        string fallbackQuotaUnavailableMessage,
+        CancellationToken cancellationToken,
+        AuthenticatedHubSubject? authenticatedSubject = null)
+    {
+        AuthenticatedHubSubject? subject = authenticatedSubject ?? await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            _logger.LogInformation("{Operation} dispatch rejected because no authenticated user was present for {SourceId}.", operationLabel, sourceId);
+            return Redirect($"/login?next={Uri.EscapeDataString(dispatchRoute)}");
+        }
+
         RunsiteTourQuotaSnapshot? runsiteQuota = null;
         if (_artifactRequests is not null)
         {
@@ -4169,7 +4278,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         HorizonId: horizonId,
                         ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
                         UserId: subject.SubjectId,
-                        SourceRef: $"{horizonId}:{sourceId}",
+                        SourceRef: sourceRef,
                         Visibility: "private",
                         ExternalProcessingConsent: true,
                         Email: subject.Email),
@@ -4202,6 +4311,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     runsiteQuota = new RunsiteTourQuotaSnapshot(
                         receipt.Quota.UserId,
                         receipt.Quota.SupporterActive,
+                        receipt.Quota.AllowanceTier,
+                        receipt.Quota.EntitlementBasis,
+                        receipt.Quota.EntitlementScope,
                         receipt.Quota.WeeklyLimit,
                         receipt.Quota.WeeklyUsed,
                         receipt.Quota.WeeklyRemaining,
@@ -4734,7 +4846,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
                 AftermathHref = "/account/work#aftermath-packages",
-                Summary = "Runner Passport keeps account identity connected to the Table Pulse inbox, leader command, and aftermath return path."
+                Summary = "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
             },
             Boundary = new
             {
@@ -15438,7 +15550,7 @@ echo "Help: ${HELP_URL}"
                 : mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Latest bulletin", "/ledger/newsroom", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Latest bulletin", $"/ledger/turns/{newsTurn}/digest", "secondary"),
             DigestCapability: BuildPublicHorizonCapability(
                 "black-ledger",
                 "world_tick_digest",

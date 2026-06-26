@@ -168,7 +168,7 @@
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "This campaign is not attached to live continuity yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout status here."
+        ? "Table Pulse Live is armed on this workspace and ready for command packets, but this campaign is not yet attached to live continuity."
         : selectedWorkspaceLeadConsequence is not null
             ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} consequence cue(s) on this campaign, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
             : "Table Pulse Live is armed on this campaign even before the next reaction resolves, so the next inbox update can return through carry-forward, memory, and Table Pulse Aftermath on the same path.";
@@ -3396,10 +3396,10 @@
                                     <label for="creatorPublicationSubmitNotes">@(correctionResubmission ? "Correction notes" : "Publish notes")</label>
                                     <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="@(correctionResubmission
                                         // .Replace( M115 source marker: State what changed so this corrected packet can re-enter governed decision flow without losing provenance or lineage. )
-                                        ? "State what changed so this corrected publication can be checked without losing its history."
+                                        ? "State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage."
                                         : "Explain why this publication is ready to move forward.")"></textarea>
                                     <div class="stacked-actions">
-                                        <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit corrections" : "Send forward")</button>
+                                        <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit corrected packet" : "Send forward")</button>
                                     </div>
                                 </form>
                             }

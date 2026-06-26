@@ -27,9 +27,7 @@
                 ? "Ready now"
                 : "Limited release";
 
-    var publicationPostureTitle = publicationRouteReviewRequired
-        ? "Why this page stays brief"
-        : "What this page covers";
+    var publicationPostureTitle = "Why this publication is live";
     var publicationPostureCopy = publicationRouteReviewRequired
         ? "This page keeps the useful parts together while broader comparison copy stays short."
         : "This page keeps the publication, its status, and the next useful links together.";
@@ -126,7 +124,7 @@
         <span class="tag">Gallery</span>
         <h2>Stay in the gallery for story, background, or comparison.</h2>
         <p>Use this page for the publication itself. Downloads, help, and your saved pages keep their own jobs.</p>
-        <a class="button-like button-like--ghost" href="@Model.BackHref">Back to gallery</a>
+        <a class="button-like button-like--ghost" href="@Model.BackHref">Back to publication discovery</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Downloads</span>
@@ -172,6 +170,7 @@
         <p class="eyebrow">Shared publication</p>
         <h2 class="editorial-title">@publicationPostureTitle</h2>
         <p class="editorial-copy">@publicationPostureCopy</p>
+        <p class="editorial-copy">This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.</p>
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)</p>
@@ -182,6 +181,10 @@
         <article class="trust-rail">
             <span class="tag">Type</span>
             <p>@HumanizeStatus(Model.Publication.Kind, "Publication")</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Trust</span>
+            <p>@PublicPublicationText(Model.Publication.TrustSummary, "Trust posture is still forming.")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Origin</span>
@@ -228,7 +231,7 @@
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ModerationSummary))
         {
             <article class="trust-rail">
-                <span class="tag">Decision notes</span>
+                <span class="tag">Moderation</span>
                 <p>@PublicPublicationText(Model.Publication.ModerationSummary)</p>
             </article>
         }
@@ -261,7 +264,7 @@
     <h2 class="editorial-title">Move on once this is clear.</h2>
     <p class="editorial-copy">Go back for related work, open Downloads for the app, or open Help for support.</p>
     <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to gallery</a>
+        <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to publication discovery</a>
         <a class="cta-link cta-link--secondary" href="/artifacts">Open saved pages</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>

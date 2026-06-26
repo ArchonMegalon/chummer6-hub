@@ -21,6 +21,7 @@
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .Where(option => nightly is null || !string.Equals(option.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .ToArray();
+    var showLinuxSourcePrimary = true;
     var hasOtherDownloads = true;
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
@@ -167,12 +168,15 @@ else
                         <h2>Build from source</h2>
                         <p>No sudo. Updates default to notify.</p>
                     </div>
-                    <a class="button-like button-like--ghost"
-                       href="@sourceScriptHref"
-                       download
-                       data-analytics-event="downloads_linux_source_script"
-                       data-analytics-surface="minimal_downloads"
-                       data-analytics-label="build-chummer6-linux.sh">Download script</a>
+                    @if (showLinuxSourcePrimary)
+                    {
+                        <a class="button-like button-like--ghost"
+                           href="@sourceScriptHref"
+                           download
+                           data-analytics-event="downloads_linux_source_script"
+                           data-analytics-surface="minimal_downloads"
+                           data-analytics-label="build-chummer6-linux.sh">Download script</a>
+                    }
                 </article>
 
                 @foreach (var option in otherPlatformOptions)

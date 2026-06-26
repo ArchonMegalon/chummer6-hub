@@ -18,11 +18,10 @@
     var updateSummary = string.IsNullOrWhiteSpace(Model.ReleaseExperience.UpdatePostureSummary)
         ? "Updates are available from Downloads."
         : Model.ReleaseExperience.UpdatePostureSummary.Trim();
-    var statusLine = $"{publicPlatformSummary} {updateSummary}";
-    if (Model.ReleaseExperience.Recommended is null)
-    {
-        statusLine = "Downloads are paused.";
-    }
+    var statusLine = Model.ReleaseExperience.Recommended is null
+        ? "Downloads are paused."
+        : publicPlatformSummary;
+    statusLine = $"{statusLine} {updateSummary}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }

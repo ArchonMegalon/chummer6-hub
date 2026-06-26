@@ -2704,7 +2704,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ModerationSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication moderation posture directly from the shared projection.");
     Assert(accountSource.Contains("/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish", StringComparison.Ordinal), "account publication detail should keep an explicit publish route on the same governed account rail.");
-    Assert(accountSource.Contains("Resubmit corrections", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");
+    Assert(accountSource.Contains("Resubmit corrected packet", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("Open public publication", StringComparison.Ordinal), "account publication detail should expose the public inspect route alongside private moderation status once the publication is live.");
     Assert(accountSource.Contains("Publication kind", StringComparison.Ordinal), "account publication detail should surface the shared publication kind on the governed detail lane.");
@@ -2841,8 +2841,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
-    Assert(publicControllerSource.Contains("localOrigin: \"/partizipate\"", StringComparison.Ordinal), "participate should serve the hosted board through the first-party typo URL users were given.");
-    Assert(publicControllerSource.Contains("localBaseHref: \"/partizipate/\"", StringComparison.Ordinal), "participate should rewrite hosted board links under the first-party typo URL.");
+    Assert(publicControllerSource.Contains("localOrigin: \"/participate\"", StringComparison.Ordinal), "participate should serve the hosted board through the first-party route.");
+    Assert(publicControllerSource.Contains("localBaseHref: \"/participate/\"", StringComparison.Ordinal), "participate should rewrite hosted board links under the first-party route.");
     Assert(publicControllerSource.Contains("data-chummer-board-skin", StringComparison.Ordinal), "participate should skin the hosted board inside Chummer instead of copying a static list.");
     Assert(publicControllerSource.Contains("RemoveHostedBoardAuthLinks", StringComparison.Ordinal), "participate should remove hosted auth chrome from the whitelabel board.");
     var surface = landing.LoadSurface();

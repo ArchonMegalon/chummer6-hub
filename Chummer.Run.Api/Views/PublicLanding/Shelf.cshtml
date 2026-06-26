@@ -129,7 +129,7 @@
         "campaign" => "Stay on the shared crew and continuity page for campaign-owned files, prep notes, Table Pulse Aftermath return cues, and replay next steps.",
         "creator" => "Inspect creator-linked history, confidence, availability, and next steps for published or publication-ready work.",
         "public" => "Inspect published shared-publication pages so discoverable creator work and publication detail stay together while you are signed in.",
-        _ => "When you are signed in, your library keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together instead of splitting them into separate stories."
+        _ => "the detail view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication history together instead of scattering them into separate routes."
     };
 
     string PublicationAvailabilityLabel(bool discoverable)
@@ -288,6 +288,7 @@
         <div class="continuity-band__copy">
             <p class="eyebrow">Your library</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
+            <h3>Same return view</h3>
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
             <div class="stacked-actions">
                 @foreach (var view in new[] { "all", "personal", "campaign", "creator", "public" })
@@ -301,7 +302,7 @@
             <article class="continuity-band__fact">
                 <span>Visible recap cards</span>
                 <strong>@signedInRecapShelf.Length</strong>
-                <p>Aftermath, replay, and Table Pulse Aftermath return items that stay in this account view.</p>
+                <p>Table Pulse Aftermath return items that stay in this account view.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Visible creator cards</span>

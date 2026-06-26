@@ -25,8 +25,9 @@ test('black ledger newsreel packet stays route-backed and professional', async (
   await page.goto(`${baseUrl}/ledger/turns/1`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('body')).toContainText('command map');
   await expect(page.locator('#newsreel-player video')).toBeVisible();
-  await expect(page.locator('body')).toContainText(/First-party (anchor package|synthetic score bed with ducked narration)/i);
+  await expect(page.locator('body')).toContainText(/(First-party|Chummer) (anchor package|synthetic score bed with ducked narration)/i);
   await expect(page.locator('body')).toContainText('Turn 0 -> Turn 1');
+  await expect(page.getByLabel('Black Ledger actions').getByRole('link', { name: 'Latest bulletin' })).toHaveAttribute('href', '/ledger/turns/1/digest');
 
   writeJsonArtifact('BLACK_LEDGER_NEWSREEL_PARITY.generated.json', {
     generated_at_utc: new Date().toISOString(),

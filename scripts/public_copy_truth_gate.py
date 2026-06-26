@@ -31,8 +31,8 @@ FORBIDDEN_HTML_PHRASES = (
     "proof-bound",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "localOrigin: \"/partizipate\"",
-    "localBaseHref: \"/partizipate/\"",
+    "localOrigin: \"/participate\"",
+    "localBaseHref: \"/participate/\"",
     "data-chummer-board-skin",
     "Short requests, clear bugs, useful ideas.",
     "Chummer follow-up is not visible here yet.",

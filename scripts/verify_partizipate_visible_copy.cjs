@@ -11,7 +11,7 @@ for (let index = 0; index < args.length; index += 1) {
 }
 
 baseUrl = baseUrl.replace(/\/+$/, '');
-const url = `${baseUrl}/partizipate`;
+const url = `${baseUrl}/participate`;
 
 const forbidden = [
   new RegExp('AI' + '-powered', 'i'),

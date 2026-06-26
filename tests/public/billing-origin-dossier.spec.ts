@@ -102,6 +102,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   await expect(dossierPage.locator('body')).toContainText('The sheet stays authoritative');
   await expect(dossierPage.getByRole('link', { name: 'Open the story booklet' })).toBeVisible();
   await expect(dossierPage.getByRole('link', { name: 'Read the book-studio design' })).toBeVisible();
+  await expect(dossierPage.getByRole('link', { name: 'Watch the narrated overview' })).toHaveAttribute('href', '/origin-dossier/media');
   await dossierPage.close();
 
   const storyPage = await openPublicPage(browser, '/docs/origin-dossier-the-name-she-chose');

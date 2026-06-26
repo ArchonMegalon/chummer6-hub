@@ -24,6 +24,7 @@ test('table pulse public route keeps live and aftermath rails separate', async (
   await expect(page.locator('body')).toContainText('Live pressure stays in the account inbox.');
   await expect(page.locator('body')).toContainText('Workspace aftermath recaps stay attached.');
   await expect(page.locator('body')).toContainText('No player surveillance or public trust scoring.');
+  await expect(page.getByRole('link', { name: 'Open aftermath' })).toHaveAttribute('href', '/table-pulse/debrief');
 
   writeJsonArtifact('TABLE_PULSE_PUBLIC_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

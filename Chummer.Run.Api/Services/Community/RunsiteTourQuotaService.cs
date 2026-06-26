@@ -38,6 +38,9 @@ public sealed class RunsiteTourQuotaService
         => new(
             snapshot.UserId,
             snapshot.SupporterActive,
+            snapshot.AllowanceTier,
+            snapshot.EntitlementBasis,
+            snapshot.EntitlementScope,
             snapshot.WeeklyLimit,
             snapshot.WeeklyUsed,
             snapshot.WeeklyRemaining,
@@ -48,6 +51,9 @@ public sealed class RunsiteTourQuotaService
 public sealed record RunsiteTourQuotaSnapshot(
     string UserId,
     bool SupporterActive,
+    string AllowanceTier,
+    string EntitlementBasis,
+    string EntitlementScope,
     int WeeklyLimit,
     int WeeklyUsed,
     int WeeklyRemaining,

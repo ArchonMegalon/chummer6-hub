@@ -4,6 +4,8 @@ import importlib.util
 import json
 import threading
 import unittest
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -56,13 +58,13 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             )
             return
 
-        if self.path == "/participate":
+        if self.path == "/partizipate":
             self.send_response(302)
-            self.send_header("Location", "/partizipate")
+            self.send_header("Location", "/participate")
             self.end_headers()
             return
 
-        if self.path == "/partizipate":
+        if self.path == "/participate":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
@@ -139,11 +141,27 @@ class LiveSurfaceParityTests(unittest.TestCase):
         participate = next(item for item in payload["results"] if item["path"] == "/participate")
         self.assertEqual(200, participate["status_code"])
         self.assertFalse(participate["cross_origin_redirect"])
-        self.assertEqual([f"{self.base_url}/partizipate"], participate["redirect_chain"])
-        self.assertTrue(participate["final_url"].endswith("/partizipate"))
+        self.assertEqual([], participate["redirect_chain"])
+        self.assertEqual(f"{self.base_url}/participate", participate["final_url"])
         self.assertEqual([], participate["missing_required_texts"])
         self.assertEqual([], participate["missing_required_html_texts"])
         self.assertEqual([], participate["forbidden_html_hits"])
+
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ARG001
+                return None
+
+        typo_redirect = urllib.request.build_opener(_NoRedirect())
+        try:
+            response = typo_redirect.open(f"{self.base_url}/partizipate", timeout=10)
+        except urllib.error.HTTPError as exc:
+            status_code = exc.code
+            location = exc.headers.get("Location")
+        else:
+            status_code = getattr(response, "status", 200)
+            location = response.headers.get("Location")
+        self.assertEqual(302, status_code)
+        self.assertEqual("/participate", location)
 
         board = next(item for item in payload["results"] if item["path"] == "/participate/board")
         self.assertEqual(200, board["status_code"])

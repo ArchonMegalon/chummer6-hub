@@ -135,28 +135,6 @@ SURFACES = [
         ],
     },
     {
-        "path": "/partizipate",
-        "required_texts": [],
-        "required_html_texts": [
-            "data-chummer-board-skin",
-        ],
-        "forbidden_texts": [
-            "ProductLift",
-            "Log in",
-            "Sign up",
-            "Sign in",
-            "Authorize Codex access.",
-            "OpenAI account in ChatGPT",
-            "Requests, votes, and shipped work.",
-            "Something went wrong",
-            "Could not load posts",
-            "Network error while loading tab configuration",
-        ],
-        "forbidden_html_texts": [
-            "chummer6.productlift.dev",
-        ],
-    },
-    {
         "path": "/participate/board",
         "required_texts": [
             "Participate - Chummer.run",

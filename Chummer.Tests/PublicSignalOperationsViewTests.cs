@@ -18,7 +18,7 @@ public sealed class PublicSignalOperationsViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
+        Assert.Contains("localOrigin: \"/participate\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);

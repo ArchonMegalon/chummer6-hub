@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-26T05:33:52Z",
-  "base_url": "http://127.0.0.1:41559",
-  "status": "pass",
-  "verdict": "LIVE_SURFACE_PARITY_READY",
+  "generated_at_utc": "2026-06-26T14:44:10Z",
+  "base_url": "https://chummer.run",
+  "status": "fail",
+  "verdict": "LIVE_SURFACE_PARITY_NOT_READY",
   "results": [
     {
       "path": "/",
-      "url": "http://127.0.0.1:41559/",
-      "final_url": "http://127.0.0.1:41559/",
+      "url": "https://chummer.run/",
+      "final_url": "https://chummer.run/",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -47,8 +47,8 @@
     },
     {
       "path": "/downloads",
-      "url": "http://127.0.0.1:41559/downloads",
-      "final_url": "http://127.0.0.1:41559/downloads",
+      "url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/downloads",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -93,8 +93,8 @@
     },
     {
       "path": "/status",
-      "url": "http://127.0.0.1:41559/status",
-      "final_url": "http://127.0.0.1:41559/status",
+      "url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/status",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -107,7 +107,10 @@
         "Help"
       ],
       "required_html_texts": [],
-      "missing_required_texts": [],
+      "missing_required_texts": [
+        "Chummer is available.",
+        "Updated"
+      ],
       "missing_required_html_texts": [],
       "forbidden_texts": [
         "Current release",
@@ -141,59 +144,25 @@
         "Account and quick actions"
       ],
       "forbidden_html_texts": [],
-      "forbidden_hits": [],
+      "forbidden_hits": [
+        "Current release"
+      ],
       "forbidden_html_hits": [],
       "required_final_url_prefix": null,
       "final_url_matches": true,
-      "status": "pass"
+      "status": "fail"
     },
     {
       "path": "/participate",
-      "url": "http://127.0.0.1:41559/participate",
-      "final_url": "http://127.0.0.1:41559/partizipate",
+      "url": "https://chummer.run/participate",
+      "final_url": "https://chummer.run/partizipate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:41559/partizipate"
+        "https://chummer.run/partizipate"
       ],
-      "required_texts": [],
-      "required_html_texts": [
-        "data-chummer-board-skin"
-      ],
-      "missing_required_texts": [],
-      "missing_required_html_texts": [],
-      "forbidden_texts": [
-        "ProductLift",
-        "Log in",
-        "Sign up",
-        "Sign in",
-        "Authorize Codex access.",
-        "OpenAI account in ChatGPT",
-        "Requests, votes, and shipped work.",
-        "Something went wrong",
-        "Could not load posts",
-        "Network error while loading tab configuration"
-      ],
-      "forbidden_html_texts": [
-        "chummer6.productlift.dev"
-      ],
-      "forbidden_hits": [],
-      "forbidden_html_hits": [],
-      "required_final_url_prefix": null,
-      "final_url_matches": true,
-      "status": "pass"
-    },
-    {
-      "path": "/partizipate",
-      "url": "http://127.0.0.1:41559/partizipate",
-      "final_url": "http://127.0.0.1:41559/partizipate",
-      "redirect_location": null,
-      "redirect_target_url": null,
-      "cross_origin_redirect": false,
-      "status_code": 200,
-      "redirect_chain": [],
       "required_texts": [],
       "required_html_texts": [
         "data-chummer-board-skin"
@@ -223,8 +192,8 @@
     },
     {
       "path": "/participate/board",
-      "url": "http://127.0.0.1:41559/participate/board",
-      "final_url": "http://127.0.0.1:41559/participate/board",
+      "url": "https://chummer.run/participate/board",
+      "final_url": "https://chummer.run/participate/board",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -264,14 +233,14 @@
     },
     {
       "path": "/ledger",
-      "url": "http://127.0.0.1:41559/ledger",
-      "final_url": "http://127.0.0.1:41559/ledger/map",
+      "url": "https://chummer.run/ledger",
+      "final_url": "https://chummer.run/ledger/map",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:41559/ledger/map"
+        "https://chummer.run/ledger/map"
       ],
       "required_texts": [
         "Black Ledger command map",
@@ -303,13 +272,15 @@
     },
     {
       "path": "/ledger/newsroom",
-      "url": "http://127.0.0.1:41559/ledger/newsroom",
-      "final_url": "http://127.0.0.1:41559/ledger/newsroom",
+      "url": "https://chummer.run/ledger/newsroom",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
-      "redirect_chain": [],
+      "redirect_chain": [
+        "https://chummer.run/ledger/newsroom/turn-2-newsreel"
+      ],
       "required_texts": [
         "Black Ledger Newsroom",
         "Transcript",
@@ -329,5 +300,8 @@
       "status": "pass"
     }
   ],
-  "failures": []
+  "failures": [
+    "/status: missing required text: Chummer is available., Updated",
+    "/status: contains forbidden text: Current release"
+  ]
 }

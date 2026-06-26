@@ -9,15 +9,18 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class InternalHorizonCapabilitiesController : ControllerBase
 {
     private readonly HorizonCapabilityService _capabilities;
+    private readonly HorizonArtifactQuotaService _quota;
     private readonly HorizonArtifactRequestService _artifactRequests;
     private readonly IConfiguration _configuration;
 
     public InternalHorizonCapabilitiesController(
         HorizonCapabilityService capabilities,
+        HorizonArtifactQuotaService quota,
         HorizonArtifactRequestService artifactRequests,
         IConfiguration configuration)
     {
         _capabilities = capabilities;
+        _quota = quota;
         _artifactRequests = artifactRequests;
         _configuration = configuration;
     }
@@ -82,6 +85,47 @@ public sealed class InternalHorizonCapabilitiesController : ControllerBase
             HorizonId: string.IsNullOrWhiteSpace(horizonId) ? null : horizonId.Trim(),
             UserId: string.IsNullOrWhiteSpace(userId) ? null : userId.Trim(),
             Receipts: receipts));
+    }
+
+    [HttpGet("/api/internal/horizons/quotas")]
+    [ProducesResponseType<HorizonArtifactQuotaCatalog>(StatusCodes.Status200OK)]
+    public ActionResult<HorizonArtifactQuotaCatalog> ListQuotas(
+        [FromQuery] string userId,
+        [FromQuery] string? email = null,
+        [FromQuery] string? horizonId = null,
+        [FromQuery] string? artifactKindOrCapabilityId = null,
+        [FromQuery] bool publicVisibleOnly = false)
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        try
+        {
+            IReadOnlyList<HorizonArtifactQuotaSnapshot> quotas = _quota.ListQuotas(
+                new HorizonArtifactQuotaCatalogRequest(
+                    UserId: userId,
+                    HorizonId: horizonId,
+                    ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
+                    Email: email,
+                    PublicVisibleOnly: publicVisibleOnly));
+            return Ok(new HorizonArtifactQuotaCatalog(
+                UserId: string.IsNullOrWhiteSpace(userId) ? string.Empty : userId.Trim(),
+                HorizonId: string.IsNullOrWhiteSpace(horizonId) ? null : horizonId.Trim(),
+                ArtifactKindOrCapabilityId: string.IsNullOrWhiteSpace(artifactKindOrCapabilityId) ? null : artifactKindOrCapabilityId.Trim(),
+                PublicVisibleOnly: publicVisibleOnly,
+                Quotas: quotas));
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: ex.Message);
+        }
     }
 
     private ActionResult? RequireInternalAutomationAuth()

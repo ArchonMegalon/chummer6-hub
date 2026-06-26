@@ -82,21 +82,26 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
-    public async Task ParticipatePageRedirectsToVisiblePartizipateUrl()
+    public async Task ParticipatePageRendersCanonicalParticipateBoard()
     {
-        var controller = CreateController(new HostedBoardPostsHttpClientFactory());
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/partizipate", redirect.Url);
+        ContentResult contentResult = Assert.IsType<ContentResult>(result);
+        string html = contentResult.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
+        Assert.Contains("rel=\"canonical\" href=\"/participate\"", html, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/participate/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PartizipateAliasRendersHostedBoardAtVisibleTypoUrl()
+    public async Task PartizipateAliasRedirectsToCanonicalParticipateUrl()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -105,18 +110,12 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        string html = content.Content ?? string.Empty;
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
-        Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProductLift", html, StringComparison.OrdinalIgnoreCase);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate", redirect.Url);
     }
 
     [Fact]
-    public async Task PartizipateCatchAllEmptyPathUsesHostedBoardProxy()
+    public async Task PartizipateLegacyAliasEmptyPathRedirectsToCanonicalParticipate()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -125,14 +124,8 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipateBoardProxyLegacyAlias(string.Empty, CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        string html = content.Content ?? string.Empty;
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate", redirect.Url);
     }
 
     [Fact]

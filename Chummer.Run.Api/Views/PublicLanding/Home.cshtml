@@ -821,6 +821,7 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">@leadAftermathRouteLabel</a>
+                                                        <p class="muted-copy">Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace.</p>
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.BuildHandoffId))
                                                         {
                                                             <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(leadAftermathCreatorPublication.BuildHandoffId)}")">Open build path for @PublicText(leadAftermathCreatorPublication.Title)</a>

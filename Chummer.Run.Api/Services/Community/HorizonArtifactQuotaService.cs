@@ -100,6 +100,47 @@ public sealed class HorizonArtifactQuotaService
         }
     }
 
+    public IReadOnlyList<HorizonArtifactQuotaSnapshot> ListQuotas(
+        HorizonArtifactQuotaCatalogRequest request,
+        DateTimeOffset? now = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string userId = RequireValue(request.UserId, "A user id is required before checking artifact allowance.");
+        string? normalizedHorizonId = CleanOrNull(request.HorizonId);
+        string? normalizedSelector = CleanOrNull(request.ArtifactKindOrCapabilityId);
+        DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        DateTimeOffset weekStartUtc = GetWeekStartUtc(effectiveNow);
+        DateTimeOffset weekEndUtc = weekStartUtc.AddDays(7);
+        bool supporterActive = _billing.GetMyFirstBookQuota(userId, effectiveNow, request.Email).SupporterActive;
+
+        HorizonCapabilityDefinition[] capabilities = _capabilities.ListCapabilities()
+            .Where(capability =>
+                (normalizedHorizonId is null || string.Equals(capability.HorizonId, normalizedHorizonId, StringComparison.OrdinalIgnoreCase))
+                && (normalizedSelector is null
+                    || string.Equals(capability.ArtifactKind, normalizedSelector, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(capability.CapabilityId, normalizedSelector, StringComparison.OrdinalIgnoreCase))
+                && (!request.PublicVisibleOnly || capability.PublicVisible))
+            .OrderBy(capability => capability.HorizonId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(capability => capability.CapabilityId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        lock (_store.Gate)
+        {
+            return capabilities
+                .Select(capability =>
+                {
+                    int weeklyLimit = supporterActive ? capability.SupporterWeeklyLimit : capability.FreeWeeklyLimit;
+                    int weeklyUsed = _store.Entries.FirstOrDefault(item => Matches(item, userId, capability, weekStartUtc))
+                        is HorizonArtifactUsageLedgerEntry entry
+                        ? entry.Used
+                        : 0;
+                    return BuildSnapshot(userId, capability, supporterActive, weeklyLimit, weeklyUsed, weekStartUtc, weekEndUtc);
+                })
+                .ToArray();
+        }
+    }
+
     private static HorizonArtifactQuotaSnapshot BuildSnapshot(
         string userId,
         HorizonCapabilityDefinition capability,
@@ -108,18 +149,24 @@ public sealed class HorizonArtifactQuotaService
         int weeklyUsed,
         DateTimeOffset weekStartUtc,
         DateTimeOffset weekEndUtc)
-        => new(
+    {
+        string allowanceTier = supporterActive ? "supporter" : "free";
+        return new(
             userId,
             capability.HorizonId,
             capability.CapabilityId,
             capability.ArtifactKind,
             capability.PublicLabel,
             supporterActive,
+            allowanceTier,
+            $"{allowanceTier}_weekly_allowance",
+            "account",
             weeklyLimit,
             weeklyUsed,
             Math.Max(0, weeklyLimit - weeklyUsed),
             weekStartUtc,
             weekEndUtc);
+    }
 
     private static bool Matches(
         HorizonArtifactUsageLedgerEntry item,
@@ -142,6 +189,9 @@ public sealed class HorizonArtifactQuotaService
 
     private static string RequireValue(string value, string message)
         => string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value.Trim();
+
+    private static string? CleanOrNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public sealed record HorizonArtifactQuotaRequest(
@@ -150,6 +200,20 @@ public sealed record HorizonArtifactQuotaRequest(
     string ArtifactKindOrCapabilityId,
     string? Email = null);
 
+public sealed record HorizonArtifactQuotaCatalogRequest(
+    string UserId,
+    string? HorizonId = null,
+    string? ArtifactKindOrCapabilityId = null,
+    string? Email = null,
+    bool PublicVisibleOnly = false);
+
+public sealed record HorizonArtifactQuotaCatalog(
+    string UserId,
+    string? HorizonId,
+    string? ArtifactKindOrCapabilityId,
+    bool PublicVisibleOnly,
+    IReadOnlyList<HorizonArtifactQuotaSnapshot> Quotas);
+
 public sealed record HorizonArtifactQuotaSnapshot(
     string UserId,
     string HorizonId,
@@ -157,6 +221,9 @@ public sealed record HorizonArtifactQuotaSnapshot(
     string ArtifactKind,
     string PublicLabel,
     bool SupporterActive,
+    string AllowanceTier,
+    string EntitlementBasis,
+    string EntitlementScope,
     int WeeklyLimit,
     int WeeklyUsed,
     int WeeklyRemaining,
