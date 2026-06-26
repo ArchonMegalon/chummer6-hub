@@ -1213,7 +1213,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Version or build, if visible\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Desktop app, if visible\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("authenticated ? \"Open account support\" : \"Save support history\"", controller, StringComparison.Ordinal);
+        Assert.Contains("authenticated ? \"Open account support\" : \"Open private form\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Use Discord for everything that does not need private details.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Save support history", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("saved support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Installer linked, but first launch did not explain the next step", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("The Linux release installed successfully", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);

@@ -11297,10 +11297,10 @@ Boundary:
             Heading: "Private help",
             Intro: authenticated
                 ? "Send one clear problem here, or open account support when you want the full saved history."
-                : "Send one clear problem here. You can create an account later if you want saved history inside Chummer.",
+                : "Send one clear problem here. Use Discord for everything that does not need private details.",
             Authenticated: authenticated,
-            AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
-            AccountSupportLabel: authenticated ? "Open account support" : "Save support history",
+            AccountSupportHref: authenticated ? "/account/support" : "#private-support-form",
+            AccountSupportLabel: authenticated ? "Open account support" : "Open private form",
             InstallAccessHref: installRail.ReturnHref ?? "/downloads",
             InstallAccessLabel: installRail.ReturnLabel ?? "Open downloads",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),
@@ -11309,7 +11309,7 @@ Boundary:
             Options:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download link is the problem."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Bug report", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Bug report", "Use this for broken behavior, bad routing, regressions, or cases that need private logs."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Public feedback should start on the feedback page. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
             DefaultKind: overrides.Kind,
