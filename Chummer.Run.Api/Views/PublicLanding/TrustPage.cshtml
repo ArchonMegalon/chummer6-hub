@@ -32,6 +32,11 @@
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
         if (string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase))
         {
+            if (helpPage || contactPage)
+            {
+                return "/downloads";
+            }
+
             return guestPreviewHref;
         }
 

@@ -30,6 +30,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'Choose the right help path' in trust_page
     assert 'Start with the closest match.' in trust_page
     assert 'minimal-help-card__list' in trust_page
+    assert 'if (helpPage || contactPage)' in trust_page
+    assert 'return "/downloads";' in trust_page
     assert 'aria-label="Quick notes"' in trust_page
     assert 'route-choice-grid--compact' in trust_page
     assert 'Choose one' in trust_page

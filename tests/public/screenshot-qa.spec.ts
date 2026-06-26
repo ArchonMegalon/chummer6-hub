@@ -26,7 +26,7 @@ const supportingSurfaces = [
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Current release', 'The build, platforms, and current state in one place.', 'Open downloads', 'Open help'],
+    requiredText: ['Chummer is available.', 'Updated', 'Downloads', 'Help'],
   },
   {
     id: 'ledger-map',
