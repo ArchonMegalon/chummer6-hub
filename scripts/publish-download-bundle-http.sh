@@ -486,13 +486,38 @@ verify_route() {
 }
 
 build_default_verify_routes() {
-  cat <<EOF
-$PUBLIC_BASE_URL/downloads/
-$PUBLIC_BASE_URL/downloads/install/avalonia-linux-x64-installer
-$PUBLIC_BASE_URL/downloads/install/avalonia-win-x64-installer
-$PUBLIC_BASE_URL/downloads/files/chummer-avalonia-linux-x64-installer.deb
-$PUBLIC_BASE_URL/downloads/files/chummer-avalonia-win-x64-installer.exe
-EOF
+  python3 - "$MANIFEST_PATH" "$PUBLIC_BASE_URL" <<'PY'
+import json
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+manifest_path = Path(sys.argv[1])
+base_url = str(sys.argv[2]).rstrip("/")
+routes = [f"{base_url}/downloads/"]
+
+try:
+    payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+except Exception:
+    print("\n".join(routes))
+    raise SystemExit(0)
+
+for row in payload.get("downloads") or payload.get("artifacts") or []:
+    if not isinstance(row, dict) or row.get("disabled") is True:
+        continue
+    artifact_id = str(row.get("id") or row.get("artifactId") or "").strip()
+    if artifact_id:
+        routes.append(f"{base_url}/downloads/install/{artifact_id}")
+    file_name = str(row.get("fileName") or "").strip()
+    if not file_name:
+        url = str(row.get("url") or row.get("downloadUrl") or "").strip()
+        if url:
+            file_name = Path(urlparse(url).path).name
+    if file_name:
+        routes.append(f"{base_url}/downloads/files/{file_name}")
+
+print("\n".join(dict.fromkeys(routes)))
+PY
 }
 
 resolve_release_proof_path() {

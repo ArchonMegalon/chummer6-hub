@@ -554,6 +554,17 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(', script_text)
         self.assertIn('canonicalize_bundle_release_channel_registries\n\nupload_files=()', script_text)
 
+    def test_http_release_upload_verifies_manifest_artifacts_not_hardcoded_platforms(self):
+        script_path = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        function_body = script_text.split("build_default_verify_routes() {", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn('payload.get("downloads") or payload.get("artifacts")', function_body)
+        self.assertIn('if not isinstance(row, dict) or row.get("disabled") is True:', function_body)
+        self.assertIn('routes.append(f"{base_url}/downloads/install/{artifact_id}")', function_body)
+        self.assertNotIn("avalonia-win-x64-installer", function_body)
+        self.assertNotIn("chummer-avalonia-win-x64-installer.exe", function_body)
+
     def test_mac_bootstrap_verifies_local_canonical_manifest_before_live_publish_check(self):
         bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
         bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
