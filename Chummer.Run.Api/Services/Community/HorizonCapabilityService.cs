@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+using Chummer.Run.Api.ViewModels;
 using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services.Community;
@@ -264,6 +266,101 @@ public sealed class HorizonCapabilityService
             capability.SupporterWeeklyLimit,
             capability.CostClass,
             capability.QuotaTracked);
+    }
+
+    public PublicHorizonCapabilityViewModel BuildPublicCapabilityViewModel(
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string sourceRef,
+        string visibility = "public_safe")
+    {
+        HorizonCapabilityHealthSnapshot health = GetHealth(horizonId, artifactKindOrCapabilityId, publicSafe: true);
+        return new PublicHorizonCapabilityViewModel(
+            HorizonId: health.HorizonId,
+            CapabilityId: health.CapabilityId,
+            ArtifactKind: health.ArtifactKind,
+            PublicLabel: health.PublicLabel,
+            CapabilitySlot: health.CapabilitySlot,
+            Status: health.Status,
+            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
+            RequiresAuthentication: health.RequiresAuthentication,
+            PublicVisible: health.PublicVisible,
+            QuotaTracked: health.QuotaTracked,
+            SourceRef: sourceRef,
+            Visibility: visibility);
+    }
+
+    public JsonObject BuildPublicCapabilityJsonNode(
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string sourceRef,
+        string visibility = "public_safe")
+    {
+        PublicHorizonCapabilityViewModel capability = BuildPublicCapabilityViewModel(
+            horizonId,
+            artifactKindOrCapabilityId,
+            sourceRef,
+            visibility);
+        return new JsonObject
+        {
+            ["horizon_id"] = capability.HorizonId,
+            ["capability_id"] = capability.CapabilityId,
+            ["artifact_kind"] = capability.ArtifactKind,
+            ["public_label"] = capability.PublicLabel,
+            ["capability_slot"] = capability.CapabilitySlot,
+            ["status"] = capability.Status,
+            ["request_supported"] = capability.RequestSupported,
+            ["requires_authentication"] = capability.RequiresAuthentication,
+            ["public_visible"] = capability.PublicVisible,
+            ["quota_tracked"] = capability.QuotaTracked,
+            ["source_ref"] = capability.SourceRef,
+            ["visibility"] = capability.Visibility
+        };
+    }
+
+    public SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutesViewModel(
+        string horizonId,
+        string artifactKindOrCapabilityId)
+    {
+        HorizonCapabilityDefinition capability = GetCapability(horizonId, artifactKindOrCapabilityId);
+        string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
+        string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
+        bool publicReceiptEligible = capability.PublicVisible && !capability.RequiresAuthentication;
+        return new SharedArtifactSurfaceRoutesViewModel(
+            PublicCapabilityCatalogHref: "/api/v1/public/horizons/capabilities",
+            PublicCapabilityHealthHref: capability.PublicVisible
+                ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            PublicRequestReceiptDetailHrefTemplate: publicReceiptEligible
+                ? "/api/v1/public/horizons/artifact-requests/{requestId}"
+                : null,
+            SignedInCapabilityCatalogHref: capability.RequiresAuthentication
+                ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            SignedInQuotaCatalogHref: capability.RequiresAuthentication && capability.QuotaTracked
+                ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            SignedInRequestReceiptHref: capability.RequiresAuthentication || publicReceiptEligible
+                ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            SignedInRequestReceiptDetailHrefTemplate: capability.RequiresAuthentication || publicReceiptEligible
+                ? "/api/v1/horizons/artifact-requests/me/{requestId}"
+                : null);
+    }
+
+    public JsonObject BuildSharedArtifactSurfaceRoutesJsonNode(string horizonId, string artifactKindOrCapabilityId)
+    {
+        SharedArtifactSurfaceRoutesViewModel routes = BuildSharedArtifactSurfaceRoutesViewModel(horizonId, artifactKindOrCapabilityId);
+        return new JsonObject
+        {
+            ["public_capability_catalog_href"] = routes.PublicCapabilityCatalogHref,
+            ["public_capability_health_href"] = routes.PublicCapabilityHealthHref,
+            ["public_request_receipt_detail_href_template"] = routes.PublicRequestReceiptDetailHrefTemplate,
+            ["signed_in_capability_catalog_href"] = routes.SignedInCapabilityCatalogHref,
+            ["signed_in_quota_catalog_href"] = routes.SignedInQuotaCatalogHref,
+            ["signed_in_request_receipt_href"] = routes.SignedInRequestReceiptHref,
+            ["signed_in_request_receipt_detail_href_template"] = routes.SignedInRequestReceiptDetailHrefTemplate
+        };
     }
 
     private HorizonCapabilityDefinition ApplyConfiguration(HorizonCapabilityDefinition capability)

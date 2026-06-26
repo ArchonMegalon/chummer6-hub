@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services.Community;
 using Microsoft.Extensions.Configuration;
 
@@ -282,6 +283,7 @@ public sealed class MediaArtifactHorizonsService
                 tour_action_href = document.TourActionHref,
                 tour_action_label = document.TourActionLabel,
                 tour_action_open_in_new_tab = document.TourActionOpenInNewTab,
+                shared_artifacts = BuildSharedArtifactRoutes(horizonId),
                 artifact_capability = BuildPublicArtifactCapability(horizonId, document),
                 boundary,
                 status = "live",
@@ -289,29 +291,27 @@ public sealed class MediaArtifactHorizonsService
             },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
-    private object? BuildPublicArtifactCapability(string horizonId, MediaArtifactDocument document)
+    private JsonObject? BuildSharedArtifactRoutes(string horizonId)
     {
         if (_capabilities is null || !TryResolveArtifactKind(horizonId, out string normalizedHorizonId, out string artifactKind))
         {
             return null;
         }
 
-        HorizonCapabilityHealthSnapshot health = _capabilities.GetHealth(normalizedHorizonId, artifactKind, publicSafe: true);
-        return new
+        return _capabilities.BuildSharedArtifactSurfaceRoutesJsonNode(normalizedHorizonId, artifactKind);
+    }
+
+    private JsonObject? BuildPublicArtifactCapability(string horizonId, MediaArtifactDocument document)
+    {
+        if (_capabilities is null || !TryResolveArtifactKind(horizonId, out string normalizedHorizonId, out string artifactKind))
         {
-            horizon_id = health.HorizonId,
-            capability_id = health.CapabilityId,
-            artifact_kind = health.ArtifactKind,
-            public_label = health.PublicLabel,
-            capability_slot = health.CapabilitySlot,
-            status = health.Status,
-            request_supported = string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
-            requires_authentication = health.RequiresAuthentication,
-            public_visible = health.PublicVisible,
-            quota_tracked = health.QuotaTracked,
-            source_ref = $"{health.HorizonId}:{document.Id}",
-            visibility = "public_safe"
-        };
+            return null;
+        }
+
+        return _capabilities.BuildPublicCapabilityJsonNode(
+            normalizedHorizonId,
+            artifactKind,
+            $"{normalizedHorizonId}:{document.Id}");
     }
 
     private static bool TryResolveArtifactKind(string horizonId, out string normalizedHorizonId, out string artifactKind)

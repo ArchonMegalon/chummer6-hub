@@ -10969,24 +10969,7 @@ Boundary:
         string horizonId,
         string artifactKindOrCapabilityId,
         string sourceRef)
-    {
-        PublicHorizonCapabilityViewModel capability = BuildPublicHorizonCapability(horizonId, artifactKindOrCapabilityId, sourceRef);
-        return new JsonObject
-        {
-            ["horizon_id"] = capability.HorizonId,
-            ["capability_id"] = capability.CapabilityId,
-            ["artifact_kind"] = capability.ArtifactKind,
-            ["public_label"] = capability.PublicLabel,
-            ["capability_slot"] = capability.CapabilitySlot,
-            ["status"] = capability.Status,
-            ["request_supported"] = capability.RequestSupported,
-            ["requires_authentication"] = capability.RequiresAuthentication,
-            ["public_visible"] = capability.PublicVisible,
-            ["quota_tracked"] = capability.QuotaTracked,
-            ["source_ref"] = capability.SourceRef,
-            ["visibility"] = capability.Visibility
-        };
-    }
+        => _horizonCapabilities.BuildPublicCapabilityJsonNode(horizonId, artifactKindOrCapabilityId, sourceRef);
 
     private static bool IsKnownCommunityCreatorDocumentId(IReadOnlyList<CommunityCreatorDocument> documents, string? documentId)
     {
@@ -11921,68 +11904,13 @@ Boundary:
         string artifactKindOrCapabilityId,
         string sourceRef,
         string visibility = "public_safe")
-    {
-        HorizonCapabilityHealthSnapshot health = _horizonCapabilities.GetHealth(horizonId, artifactKindOrCapabilityId, publicSafe: true);
-        return new PublicHorizonCapabilityViewModel(
-            HorizonId: health.HorizonId,
-            CapabilityId: health.CapabilityId,
-            ArtifactKind: health.ArtifactKind,
-            PublicLabel: health.PublicLabel,
-            CapabilitySlot: health.CapabilitySlot,
-            Status: health.Status,
-            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
-            RequiresAuthentication: health.RequiresAuthentication,
-            PublicVisible: health.PublicVisible,
-            QuotaTracked: health.QuotaTracked,
-            SourceRef: sourceRef,
-            Visibility: visibility);
-    }
+        => _horizonCapabilities.BuildPublicCapabilityViewModel(horizonId, artifactKindOrCapabilityId, sourceRef, visibility);
 
     private JsonObject BuildSharedArtifactSurfaceRoutesNode(string horizonId, string artifactKindOrCapabilityId)
-    {
-        SharedArtifactSurfaceRoutesViewModel routes = ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
-        return new JsonObject
-        {
-            ["public_capability_catalog_href"] = routes.PublicCapabilityCatalogHref,
-            ["public_capability_health_href"] = routes.PublicCapabilityHealthHref,
-            ["public_request_receipt_detail_href_template"] = routes.PublicRequestReceiptDetailHrefTemplate,
-            ["signed_in_capability_catalog_href"] = routes.SignedInCapabilityCatalogHref,
-            ["signed_in_quota_catalog_href"] = routes.SignedInQuotaCatalogHref,
-            ["signed_in_request_receipt_href"] = routes.SignedInRequestReceiptHref,
-            ["signed_in_request_receipt_detail_href_template"] = routes.SignedInRequestReceiptDetailHrefTemplate
-        };
-    }
+        => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesJsonNode(horizonId, artifactKindOrCapabilityId);
 
     private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
-        => ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
-
-    private SharedArtifactSurfaceRoutesViewModel ResolveSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
-    {
-        HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
-        string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
-        string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
-        bool publicReceiptEligible = capability.PublicVisible && !capability.RequiresAuthentication;
-        return new SharedArtifactSurfaceRoutesViewModel(
-            PublicCapabilityCatalogHref: "/api/v1/public/horizons/capabilities",
-            PublicCapabilityHealthHref: capability.PublicVisible
-                ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
-                : null,
-            PublicRequestReceiptDetailHrefTemplate: publicReceiptEligible
-                ? "/api/v1/public/horizons/artifact-requests/{requestId}"
-                : null,
-            SignedInCapabilityCatalogHref: capability.RequiresAuthentication
-                ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
-                : null,
-            SignedInQuotaCatalogHref: capability.RequiresAuthentication && capability.QuotaTracked
-                ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
-                : null,
-            SignedInRequestReceiptHref: capability.RequiresAuthentication || publicReceiptEligible
-                ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
-                : null,
-            SignedInRequestReceiptDetailHrefTemplate: capability.RequiresAuthentication || publicReceiptEligible
-                ? "/api/v1/horizons/artifact-requests/me/{requestId}"
-                : null);
-    }
+        => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesViewModel(horizonId, artifactKindOrCapabilityId);
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
         PublicLandingSurfaceDto surface,

@@ -356,23 +356,14 @@ public sealed class OriginDossierPublicationService
             return null;
         }
 
-        HorizonCapabilityHealthSnapshot health = _capabilities.GetHealth(
+        return _capabilities.BuildPublicCapabilityViewModel(
             "origin-dossier",
             "dossier_media",
-            publicSafe: true);
-        return new PublicHorizonCapabilityViewModel(
-            HorizonId: health.HorizonId,
-            CapabilityId: health.CapabilityId,
-            ArtifactKind: health.ArtifactKind,
-            PublicLabel: health.PublicLabel,
-            CapabilitySlot: health.CapabilitySlot,
-            Status: health.Status,
-            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
-            RequiresAuthentication: true,
-            PublicVisible: true,
-            QuotaTracked: health.QuotaTracked,
-            SourceRef: $"origin-dossier:{projectId}:media",
-            Visibility: "private");
+            $"origin-dossier:{projectId}:media",
+            visibility: "private") with
+        {
+            PublicVisible = true
+        };
     }
 
     private IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)

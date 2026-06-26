@@ -1027,6 +1027,42 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void RunsitePackJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNSITE_CAPABILITY_RUNSITE_TOUR_ENABLED"] = "true";
+        });
+
+        IActionResult result = fixture.Controller.RunsitePackJson("redmond-dockyard-pack");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("runsite", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("runsite-tour", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("tour", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("3D Tour", capability.GetProperty("public_label").GetString());
+        Assert.Equal("explorable_location", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("available", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.True(capability.GetProperty("requires_authentication").GetBoolean());
+        Assert.True(capability.GetProperty("public_visible").GetBoolean());
+        Assert.True(capability.GetProperty("quota_tracked").GetBoolean());
+        Assert.Equal("runsite:redmond-dockyard-pack", capability.GetProperty("source_ref").GetString());
+        Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void JackpointBriefingJsonIncludesPublicSafeSharedCapabilityMetadata()
     {
         using Fixture fixture = new();
@@ -1035,6 +1071,14 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=jackpoint&artifactKindOrCapabilityId=jackpoint-briefing-video", sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=jackpoint&artifactKindOrCapabilityId=jackpoint-briefing-video", sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=jackpoint&artifactKindOrCapabilityId=jackpoint-briefing-video", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("jackpoint", capability.GetProperty("horizon_id").GetString());
         Assert.Equal("jackpoint-briefing-video", capability.GetProperty("capability_id").GetString());
@@ -1060,6 +1104,14 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("propertyquarry", capability.GetProperty("horizon_id").GetString());
         Assert.Equal("propertyquarry-tour", capability.GetProperty("capability_id").GetString());
@@ -1085,6 +1137,14 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("runbook-press", capability.GetProperty("horizon_id").GetString());
         Assert.Equal("runbook-export", capability.GetProperty("capability_id").GetString());
