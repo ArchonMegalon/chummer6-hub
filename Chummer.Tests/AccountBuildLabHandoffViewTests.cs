@@ -27,6 +27,10 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("\"advanced\" => \"Advanced account details\"", view, StringComparison.Ordinal);
         Assert.Contains("Open campaigns on the web", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Open work on the web", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("showSettingsSection", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Help and policy", view, StringComparison.Ordinal);
+        Assert.Contains("var showChannelsSection = showProfileSection;", view, StringComparison.Ordinal);
+        Assert.Contains("var showParticipationSettings = showParticipationPage;", view, StringComparison.Ordinal);
     }
 
     [Fact]

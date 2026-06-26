@@ -79,9 +79,6 @@
         : $"{openSupportCases} tracked support case(s), current app notes, and downloads stay in one account view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
-    var showChannelsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase)
-        || telegramChannel is not null
-        || whatsappChannel is not null;
     var participationRecognition = Model.ParticipationRecognition;
     var participationSession = Model.ParticipationSession;
     var participationReceipts = (Model.ParticipationReceipts ?? Array.Empty<Chummer.Run.Contracts.Ledger.ContributionReceiptDto>()).Take(6).ToArray();
@@ -114,8 +111,8 @@
     var showSupportSection = string.Equals(Model.CurrentSection, "support", StringComparison.OrdinalIgnoreCase);
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
-    var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
-    var showParticipationSettings = showParticipationPage || showSettingsSection;
+    var showChannelsSection = showProfileSection;
+    var showParticipationSettings = showParticipationPage;
     var showInlineAccountStatus = showAccessSection || showSupportSection;
     var showAccountStatusDrawer = Model.SignedInTrustStatus is not null && !showInlineAccountStatus;
     var selectedSupportCase = Model.SelectedSupportCase;
@@ -635,7 +632,7 @@
         </div>
     }
 
-    @if (showProfileSection || showSettingsSection)
+    @if (showProfileSection)
     {
         <section class="editorial-block">
             <details class="details-drawer">
@@ -808,7 +805,7 @@
             </details>
             }
 
-            @if (showSettingsSection && showChannelsSection)
+            @if (showChannelsSection)
             {
                 <details class="details-drawer">
                     <summary>Messaging</summary>
@@ -1366,7 +1363,7 @@
             </section>
             }
 
-            @if (showWorkSection || showSettingsSection)
+            @if (showWorkSection)
             {
             <div class="stacked-copy">
 
@@ -4474,7 +4471,7 @@
             </details>
             }
 
-            @if (showSettingsSection)
+            @if (showProfileSection)
             {
             <details class="details-drawer">
                 <summary>Privacy</summary>
@@ -4637,25 +4634,6 @@
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
-            </details>
-            }
-
-            @if (showSettingsSection)
-            {
-            <details class="details-drawer">
-                <summary>Help and policy</summary>
-                <section class="settings-section" data-account-panel id="help-policy">
-                    <div class="settings-section__header">
-                        <h2>Help and policy</h2>
-                        <p>When you need support, privacy, or account-use guidance, use the Chummer pages instead of guessing.</p>
-                    </div>
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--secondary" href="/help">Open help</a>
-                        <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
-                        <a class="button-like button-like--ghost" href="/terms">Read terms</a>
-                        <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
-                    </div>
-                </section>
             </details>
             }
             </div>
