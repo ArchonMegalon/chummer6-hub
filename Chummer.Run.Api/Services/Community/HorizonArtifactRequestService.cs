@@ -34,6 +34,11 @@ public sealed class HorizonArtifactRequestService
         List<string> blocked = [.. Validate(request, capability, requireEnabledCapability, requireRequestingUser)];
         HorizonArtifactQuotaSnapshot? quota = null;
         bool quotaTracked = capability.QuotaTracked;
+        HorizonArtifactQuotaRequest quotaRequest = new(
+            UserId: request.UserId,
+            HorizonId: capability.HorizonId,
+            ArtifactKindOrCapabilityId: capability.CapabilityId,
+            Email: request.Email);
         if (consumeQuota && quotaTracked && blocked.Count == 0)
         {
             if (_quota is null)
@@ -44,17 +49,12 @@ public sealed class HorizonArtifactRequestService
             {
                 try
                 {
-                    quota = _quota.Consume(
-                        new HorizonArtifactQuotaRequest(
-                            UserId: request.UserId,
-                            HorizonId: capability.HorizonId,
-                            ArtifactKindOrCapabilityId: capability.CapabilityId,
-                            Email: request.Email),
-                        createdAtUtc);
+                    quota = _quota.Consume(quotaRequest, createdAtUtc);
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("allowance", StringComparison.OrdinalIgnoreCase))
                 {
                     blocked.Add("artifact allowance");
+                    quota = TryReadQuotaSnapshot(_quota, quotaRequest, createdAtUtc);
                 }
             }
         }
@@ -176,6 +176,21 @@ public sealed class HorizonArtifactRequestService
         if (!condition)
         {
             blocked.Add(requirement);
+        }
+    }
+
+    private static HorizonArtifactQuotaSnapshot? TryReadQuotaSnapshot(
+        HorizonArtifactQuotaService quota,
+        HorizonArtifactQuotaRequest request,
+        DateTimeOffset createdAtUtc)
+    {
+        try
+        {
+            return quota.GetQuota(request, createdAtUtc);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 

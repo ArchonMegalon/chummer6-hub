@@ -1603,7 +1603,11 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal(0, accepted.Quota.WeeklyRemaining);
         Assert.Equal("blocked", exhausted.Status);
         Assert.Contains("artifact allowance", exhausted.BlockedReasons);
-        Assert.Null(exhausted.Quota);
+        Assert.NotNull(exhausted.Quota);
+        Assert.Equal("weekly", exhausted.Quota!.WindowKind);
+        Assert.Equal(1, exhausted.Quota.WeeklyLimit);
+        Assert.Equal(1, exhausted.Quota.WeeklyUsed);
+        Assert.Equal(0, exhausted.Quota.WeeklyRemaining);
     }
 
     [Fact]
@@ -2262,6 +2266,49 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task HorizonArtifactQuotaMeEndpointReturnsMonthlyOriginDossierAllowance()
+    {
+        using Fixture fixture = new(authenticated: true);
+        var controller = new HorizonArtifactQuotasController(
+            fixture.HorizonArtifactQuota,
+            fixture.Identity,
+            NullLogger<HorizonArtifactQuotasController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        ActionResult<HorizonArtifactQuotaCatalog> result = await controller.MyQuotas(
+            horizonId: "origin-dossier",
+            artifactKindOrCapabilityId: "premium_authoring_credit",
+            cancellationToken: CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        HorizonArtifactQuotaCatalog catalog = Assert.IsType<HorizonArtifactQuotaCatalog>(ok.Value);
+        HorizonArtifactQuotaSnapshot quota = Assert.Single(catalog.Quotas);
+        Assert.Equal("subject.dispatch", catalog.UserId);
+        Assert.Equal("origin-dossier", catalog.HorizonId);
+        Assert.False(catalog.PublicVisibleOnly);
+        Assert.Equal("origin-dossier-premium-authoring", quota.CapabilityId);
+        Assert.Equal("premium_authoring_credit", quota.ArtifactKind);
+        Assert.Equal("free", quota.AllowanceTier);
+        Assert.Equal("free_monthly_origin_authoring_allowance", quota.EntitlementBasis);
+        Assert.Equal("account", quota.EntitlementScope);
+        Assert.Equal("monthly", quota.WindowKind);
+        Assert.Equal(1, quota.WindowLimit);
+        Assert.Equal(0, quota.WindowUsed);
+        Assert.Equal(1, quota.WindowRemaining);
+
+        string serialized = JsonSerializer.Serialize(catalog);
+        Assert.DoesNotContain("First Book ai", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("BrilliantDirectories", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Brilliant Directories", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task HorizonArtifactRequestMeEndpointRequiresAuthentication()
     {
         using Fixture fixture = new(authenticated: false);
@@ -2726,7 +2773,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(receipts, receipt =>
             receipt.Status == "blocked"
             && receipt.SourceRef == "runsite:everett-switchyard-pack"
-            && receipt.BlockedReasons.Contains("artifact allowance"));
+            && receipt.BlockedReasons.Contains("artifact allowance")
+            && receipt.Quota?.WeeklyRemaining == 0);
     }
 
     [Fact]
@@ -2870,7 +2918,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(receipts, receipt =>
             receipt.Status == "blocked"
             && receipt.SourceRef == "propertyquarry:shoreline-automation-factory"
-            && receipt.BlockedReasons.Contains("artifact allowance"));
+            && receipt.BlockedReasons.Contains("artifact allowance")
+            && receipt.Quota?.WeeklyRemaining == 0);
     }
 
     [Fact]
@@ -3020,7 +3069,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(receipts, receipt =>
             receipt.Status == "blocked"
             && receipt.SourceRef == "jackpoint:dockyard-contact-dossier"
-            && receipt.BlockedReasons.Contains("artifact allowance"));
+            && receipt.BlockedReasons.Contains("artifact allowance")
+            && receipt.Quota?.WeeklyRemaining == 0);
     }
 
     [Fact]
@@ -3125,7 +3175,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(receipts, receipt =>
             receipt.Status == "blocked"
             && receipt.SourceRef == "runbook-press:gm-first-night-primer"
-            && receipt.BlockedReasons.Contains("artifact allowance"));
+            && receipt.BlockedReasons.Contains("artifact allowance")
+            && receipt.Quota?.WeeklyRemaining == 0);
     }
 
     [Fact]
