@@ -21,7 +21,7 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
-        Assert.Contains("Public ideas go to Participate. Private problems stay here.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal contact. Private form for logs or account details.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short privacy summary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short rules summary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);
@@ -37,7 +37,7 @@ public sealed class TrustPageFlagshipViewTests
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string trustView = File.ReadAllText(trustViewPath);
 
-        int routeChoiceIndex = trustView.IndexOf("Public ideas go to Participate. Private problems stay here.", StringComparison.Ordinal);
+        int routeChoiceIndex = trustView.IndexOf("Discord for normal contact. Private form for logs or account details.", StringComparison.Ordinal);
         int formIndex = trustView.IndexOf("<form class=\"settings-form\"", StringComparison.Ordinal);
 
         Assert.True(routeChoiceIndex >= 0, "contact support view should show the routing choices before the form");

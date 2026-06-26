@@ -35,7 +35,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'aria-label="Quick notes"' in trust_page
     assert 'route-choice-grid--compact' in trust_page
     assert 'Choose one' in trust_page
-    assert 'Public ideas go to Participate. Private problems stay here.' in trust_page
+    assert 'Discord for normal contact. Private form for logs or account details.' in trust_page
+    assert 'Public ideas go to Participate. Private problems stay here.' not in trust_page
     assert 'Send support request' in trust_page
     assert 'other routes below' not in trust_page
 
