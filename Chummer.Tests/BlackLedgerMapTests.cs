@@ -102,12 +102,15 @@ public sealed class BlackLedgerMapTests
     {
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
 
-        Assert.Contains("PublicFacingCopyHumanizer.Clean(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
+        Assert.Contains("UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<strong>Read dispatches</strong>", view, StringComparison.Ordinal);
         Assert.Contains("<strong>Open newsroom</strong>", view, StringComparison.Ordinal);
         Assert.Contains("Optional viewer exports.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Optional external viewer links stay here. The live board stays on this command map.", view, StringComparison.Ordinal);
         Assert.Contains("Turn 1 board", view, StringComparison.Ordinal);
+        Assert.Contains("Awakened pressure", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("MysAd Density", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Logos, backdrops, score ledgers", view, StringComparison.Ordinal);
     }
 
     [Fact]

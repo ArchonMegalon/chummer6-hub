@@ -38,7 +38,7 @@
     {
         "glass-tower-compact" => ["Permit Leverage", "Public Trust", "Contract Capture", "Debt Shield"],
         "rust-market-syndicate" => ["Debt Heat", "Gear Flow", "Favor Load", "Recovery Work"],
-        "ashline-circle" => ["MysAd Density", "Magic Pressure", "Signal Clarity", "Drain Risk"],
+        "ashline-circle" => ["Awakened pressure", "Magic pressure", "Signal clarity", "Drain risk"],
         "neon-docks-union" => ["Route Control", "Drone Load", "Cargo Pressure", "Maintenance Debt"],
         "ghostline-network" => ["Intel Confidence", "Rumor Noise", "Signal Discipline", "Exposure Risk"],
         "barrens-free-wardens" => ["Closeout Witnesses", "Survival Pressure", "Public Trust", "Attrition Risk"],
@@ -54,7 +54,7 @@
         "Gear Flow" => "Cargo continuity and safer routes improve it.",
         "Favor Load" => "Debt calls and emergency bargains raise it.",
         "Recovery Work" => "Closeouts and rebuild actions lift it.",
-        "MysAd Density" => "Arcana incidents and source turbulence move it.",
+        "Awakened pressure" => "Arcana incidents and volatile magic move it.",
         "Magic Pressure" => "Ritual noise and conflict arcs raise it.",
         "Signal Clarity" => "Clean routing and calm districts improve it.",
         "Drain Risk" => "Escalation and volatility increase it.",
@@ -153,16 +153,16 @@
                 data-signal-secondary="faction motion tracked"
                 data-signal-tertiary="dispatch board armed"
                 data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
-                data-primary-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)"
+                data-primary-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.PrimaryAction.Label)"
                 data-primary-href="@Model.PrimaryAction.Href"
-                data-secondary-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)"
+                data-secondary-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)"
                 data-secondary-href="@Model.SecondaryAction.Href"></div>
         </div>
     }
     <div class="ledger-flagship__copy">
-        <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)</p>
-        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
-        <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
+        <p class="eyebrow">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.Eyebrow)</p>
+        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.Heading)</h1>
+        <p class="page-copy">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.Intro)</p>
         <p class="ledger-flagship__support">Watch the city breathe, see which bloc is leaning on which district, and lift a hook straight into the next scene.</p>
         <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
             <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
@@ -173,18 +173,18 @@
         <section class="ledger-flagship__briefing" aria-label="Command briefing">
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Lead dispatch</span>
-                <strong>@(leadDispatch is null ? "Dispatch queue open" : UndetectableHumanizerCopyAdapter.Humanize(leadDispatch.Title))</strong>
-                <p>@(leadDispatch is null ? "Public hooks are ready for the next turn." : UndetectableHumanizerCopyAdapter.Humanize(leadDispatch.Summary))</p>
+                <strong>@(leadDispatch is null ? "Dispatch queue open" : UndetectableHumanizerCopyAdapter.HumanizeLedger(leadDispatch.Title))</strong>
+                <p>@(leadDispatch is null ? "Public hooks are ready for the next turn." : UndetectableHumanizerCopyAdapter.HumanizeLedger(leadDispatch.Summary))</p>
             </article>
             <article class="ledger-flagship__briefing-card">
                 <span class="tag">Focus faction</span>
-                <strong>@(selectedFaction is null ? "Ashline Circle" : UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.PublicName))</strong>
+                <strong>@(selectedFaction is null ? "Ashline Circle" : UndetectableHumanizerCopyAdapter.HumanizeLedger(selectedFaction.PublicName))</strong>
                 <p>@(selectedFaction is null ? "Start on the board, then drop into the faction file that is actually moving the city." : introLine(selectedFaction.Id))</p>
             </article>
         </section>
         <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
-            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)</a>
-            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)">@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)</a>
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.PrimaryAction.Label)">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.PrimaryAction.Label)</a>
+            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)</a>
             <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
         <div class="trust-claim__details ledger-flagship__boundary">
@@ -209,9 +209,9 @@
             <strong>Open newsroom</strong>
             <p>Latest dispatches, table hooks, and the current bulletin.</p>
         </a>
-        <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)">
+        <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(accountCtaLabel)">
             <span class="tag">Faction workspace</span>
-            <strong>@UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)</strong>
+            <strong>@UndetectableHumanizerCopyAdapter.HumanizeLedger(accountCtaLabel)</strong>
             <p>Step from the public map into the faction workspace in your account.</p>
         </a>
     </nav>
@@ -223,12 +223,12 @@
     <section class="editorial-block editorial-block--focused" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
             <p class="eyebrow">Command map</p>
-            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.World.PublicName)</h2>
+            <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.World.PublicName)</h2>
             @if (!string.IsNullOrWhiteSpace(Model.World.TurnHeadline))
             {
-                <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.World.TurnHeadline)</p>
+                <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.World.TurnHeadline)</p>
             }
-            <p class="muted-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.World.MapNote)</p>
+            <p class="muted-copy">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.World.MapNote)</p>
         </div>
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
@@ -237,7 +237,7 @@
                     <span>@(selectedTurn >= 2 ? "Turn 2 board" : "Turn 1 board")</span>
                     <span>@worldDistricts.Length districts</span>
                     <span>@liveConfidence confidence</span>
-                    <span>@(leadDispatch is null ? "Dispatch queue open" : UndetectableHumanizerCopyAdapter.Humanize(leadDispatch.Title))</span>
+                    <span>@(leadDispatch is null ? "Dispatch queue open" : UndetectableHumanizerCopyAdapter.HumanizeLedger(leadDispatch.Title))</span>
                 </div>
                 <div class="ledger-command-map__globe">
                     <div
@@ -332,11 +332,11 @@
                                             <span class="tag">@beat.ActorKind</span>
                                             <h4>@beat.BeatLabel</h4>
                                             <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
-                                            <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.Humanize(beat.VisualHook)</p>
-                                            <p>@UndetectableHumanizerCopyAdapter.Humanize(beat.ActionSummary)</p>
-                                            <p class="ledger-newsreel-broadcast__action-stakes">@UndetectableHumanizerCopyAdapter.Humanize(beat.Stakes)</p>
-                                            <p class="ledger-newsreel-broadcast__action-stakes">@UndetectableHumanizerCopyAdapter.Humanize(beat.ConsequenceLine)</p>
-                                            <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.Humanize(beat.ProofNote)</p>
+                                            <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.VisualHook)</p>
+                                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ActionSummary)</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.Stakes)</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ConsequenceLine)</p>
+                                            <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ProofNote)</p>
                                         </article>
                                     }
                                 </div>
@@ -345,10 +345,10 @@
                         <article class="route-choice-card">
                             <span class="tag">@newsreelBroadcast.PackageLabel</span>
                             <h3>Broadcast mix</h3>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(newsreelBroadcast.AudioPosture)</p>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(newsreelBroadcast.MusicPosture)</p>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(newsreelBroadcast.PublicSafetyNote)</p>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(newsreelBroadcast.ReconstructionNote)</p>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.AudioPosture)</p>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.MusicPosture)</p>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.PublicSafetyNote)</p>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.ReconstructionNote)</p>
                             <div class="route-choice-card__details">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch page</a>
                                 <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
@@ -393,9 +393,9 @@
                     @foreach (var dispatch in latestDispatches)
                     {
                         <article class="ledger-dispatch-strip__item">
-                            <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)</span>
-                            <h3>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)</h3>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)</p>
+                            <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Type)</span>
+                            <h3>@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Title)</h3>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Summary)</p>
                             <a class="editorial-strip__action" href="@dispatch.Href">Dispatch detail</a>
                         </article>
                     }
@@ -406,11 +406,11 @@
         <section class="workflow-band workflow-band--compact">
             <div class="workflow-band__lead">
                 <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
-                <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.StatusLabel)</h2>
-                <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.Summary)</p>
+                <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.NewsreelStatus.StatusLabel)</h2>
+                <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.NewsreelStatus.Summary)</p>
             </div>
             <div class="trust-claim__details">
-                <span>Scope: @UndetectableHumanizerCopyAdapter.Humanize(Model.NewsreelStatus.ScopeLabel)</span>
+                <span>Scope: @UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.NewsreelStatus.ScopeLabel)</span>
                 <span>Delivery: Chummer email</span>
                             <span>Updates: @Model.NewsreelStatus.ReceiptCount</span>
             </div>
@@ -420,7 +420,7 @@
     <section class="editorial-block" id="ledger-factions">
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction files</p>
-            <h2 class="editorial-title">Logos, backdrops, score ledgers, and Chummer motion intros.</h2>
+            <h2 class="editorial-title">Faction files, pressure scores, and Chummer motion intros.</h2>
             <p class="editorial-copy">Faction pages show pressure, not private people.</p>
         </div>
         <div class="faction-profile-grid">
@@ -432,8 +432,8 @@
                     <div class="faction-profile-card__hero" style="background-image:url('@backgroundHref(faction.Id)')">
                         <img class="faction-profile-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
                         <div class="faction-profile-card__hero-copy">
-                            <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(faction.Type)</span>
-                            <h3>@UndetectableHumanizerCopyAdapter.Humanize(faction.PublicName)</h3>
+                            <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(faction.Type)</span>
+                            <h3>@UndetectableHumanizerCopyAdapter.HumanizeLedger(faction.PublicName)</h3>
                             <p>@introLine(faction.Id)</p>
                         </div>
                     </div>
@@ -441,7 +441,7 @@
                         @foreach (var ledger in ledgers)
                         {
                             <article class="score-ledger">
-                                <span class="score-ledger__label">@UndetectableHumanizerCopyAdapter.Humanize(ledger.Label)</span>
+                                <span class="score-ledger__label">@UndetectableHumanizerCopyAdapter.HumanizeLedger(ledger.Label)</span>
                                 <strong>@ledger.CurrentValue</strong>
                                 <small>@ledger.Delta · @ledger.Trend</small>
                             </article>
@@ -468,7 +468,7 @@
                 <img class="faction-detail-hero__logo" src="@logoHref(selectedFaction.Id)" alt="@($"{selectedFaction.PublicName} logo")" loading="lazy" />
                 <div class="faction-detail-hero__copy">
                     <p class="eyebrow">Faction profile</p>
-                    <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.PublicName)</h2>
+                    <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.HumanizeLedger(selectedFaction.PublicName)</h2>
                     <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
                     <p class="muted-copy">This page explains pressure, not people.</p>
                     <div class="trust-claim__details">
@@ -477,7 +477,7 @@
                         <span>Pressure visible</span>
                     </div>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--primary" href="@accountCtaHref">@UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)</a>
+                        <a class="button-like button-like--primary" href="@accountCtaHref">@UndetectableHumanizerCopyAdapter.HumanizeLedger(accountCtaLabel)</a>
                         <a class="button-like button-like--secondary" href="/ledger/factions/@slug/promo">Open faction video</a>
                     </div>
                 </div>
@@ -487,7 +487,7 @@
                 @foreach (var ledger in ledgers)
                 {
                     <article class="route-choice-card">
-                        <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(ledger.Label)</span>
+                        <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(ledger.Label)</span>
                         <h3>@ledger.CurrentValue</h3>
                         <p>Delta since last turn: @ledger.Delta</p>
                         <p>Trend: @ledger.Trend</p>
@@ -502,7 +502,7 @@
                 <article class="route-choice-card">
                     <span class="tag">Named roles</span>
                     <h3>Named roles</h3>
-                    <p>Leader: @UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FactionLeader) · GM: @UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.FieldGm) · Intel: @UndetectableHumanizerCopyAdapter.Humanize(selectedFaction.IntelProvider)</p>
+                    <p>Leader: @UndetectableHumanizerCopyAdapter.HumanizeLedger(selectedFaction.FactionLeader) · GM: @UndetectableHumanizerCopyAdapter.HumanizeLedger(selectedFaction.FieldGm) · Intel: @UndetectableHumanizerCopyAdapter.HumanizeLedger(selectedFaction.IntelProvider)</p>
                 </article>
                 <article class="route-choice-card">
                     <span class="tag">District pressure</span>
@@ -526,9 +526,9 @@
                     @foreach (var dispatch in Model.Dispatches.Take(3))
                     {
                         <article class="route-choice-card">
-                            <span class="tag">@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Type)</span>
-                            <h3>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Title)</h3>
-                            <p>@UndetectableHumanizerCopyAdapter.Humanize(dispatch.Summary)</p>
+                            <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Type)</span>
+                            <h3>@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Title)</h3>
+                            <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(dispatch.Summary)</p>
                             <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                         </article>
                     }

@@ -105,6 +105,28 @@ public static class UndetectableHumanizerCopyAdapter
         ("records", "updates"),
     ];
 
+    private static readonly (string Source, string Target)[] LedgerRules =
+    [
+        ("MysAd Density", "Awakened pressure"),
+        ("MysAd", "Awakened"),
+        ("proof routing", "status routing"),
+        ("proof", "status"),
+        ("receipts", "details"),
+        ("receipt", "detail"),
+        ("SourceReceipt", "turn detail"),
+        ("source receipt", "turn detail"),
+        ("clean room", "review desk"),
+        ("package truth", "package status"),
+        ("source-clarity", "source clarity"),
+        ("operator", "maintainer"),
+        ("provider", "service"),
+        ("artifact", "file"),
+        ("generated", "prepared"),
+        ("flagship seeded", "current"),
+        ("preseeded", "current"),
+        ("seeded", "current"),
+    ];
+
     public static string Humanize(string? value)
         => PublicFacingCopyHumanizer.Clean(value);
 
@@ -131,6 +153,24 @@ public static class UndetectableHumanizerCopyAdapter
 
     public static string HumanizePackage(string? value)
         => Humanize(ApplyRules(value, PackageRules));
+
+    public static string HumanizeLedger(string? value)
+    {
+        string cleaned = Humanize(ApplyRules(value, LedgerRules));
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\bledger[_ -]?tick[_ -]?\d+(?:[_ -][a-z0-9]+)*\b",
+            "current turn",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(50));
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\bledger[_ -]?dispatch[_ -][a-z0-9_-]+\b",
+            "current dispatch",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase,
+            TimeSpan.FromMilliseconds(50));
+        return cleaned;
+    }
 
     public static string HumanizeStatusLabel(string? value, string fallback = "Not connected")
     {
