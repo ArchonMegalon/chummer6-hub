@@ -6333,16 +6333,7 @@ document.addEventListener('DOMContentLoaded', function () {
         Uri? upstream = ResolveProductLiftHostedRoadmapUri();
         if (upstream is null)
         {
-            return HostedBoardUnavailable(
-                "Roadmap unavailable",
-                "Try again shortly.",
-                "Use Participate for requests or the changelog for shipped work.",
-                "/participate",
-                "Participate",
-                "/changelog",
-                "Open changelog",
-                fallbackPath,
-                "Retry");
+            return RedirectToParticipateFallback();
         }
 
         string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
@@ -6373,16 +6364,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 string html = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
                 {
-                    return HostedBoardUnavailable(
-                        "Roadmap temporarily unavailable",
-                        "Try again shortly.",
-                        "Use the changelog for shipped work or Participate for new requests.",
-                        "/changelog",
-                        "Open changelog",
-                        "/participate",
-                        "Participate",
-                        fallbackPath,
-                        "Back to roadmap");
+                    return RedirectToParticipateFallback();
                 }
 
                 string rewritten = RewriteHostedBoardHtml(
@@ -6424,32 +6406,17 @@ document.addEventListener('DOMContentLoaded', function () {
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Roadmap board proxy could not reach upstream roadmap.");
-            return HostedBoardUnavailable(
-                "Roadmap temporarily unavailable",
-                "Try again shortly.",
-                "Use the changelog for shipped work or Participate for new requests.",
-                "/changelog",
-                "Open changelog",
-                "/participate",
-                "Participate",
-                "/roadmap",
-                "Back to roadmap");
+            return RedirectToParticipateFallback();
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Roadmap board proxy timed out.");
-            return HostedBoardUnavailable(
-                "Roadmap temporarily unavailable",
-                "Try again shortly.",
-                "Use the changelog for shipped work or Participate for new requests.",
-                "/changelog",
-                "Open changelog",
-                "/participate",
-                "Participate",
-                "/roadmap",
-                "Back to roadmap");
+            return RedirectToParticipateFallback();
         }
     }
+
+    private RedirectResult RedirectToParticipateFallback()
+        => Redirect($"/participate{Request.QueryString}");
 
     [HttpGet("/changelog")]
     [Produces("text/html")]

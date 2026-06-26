@@ -133,14 +133,22 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Roadmap temporarily unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Try again shortly.", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("href=\"/changelog\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("href=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RoadmapPageFallsBackToParticipateWhenDedicatedRoadmapUrlIsMissing()
+    {
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: null);
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.RoadmapPage(CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate", redirect.Url);
     }
 
     [Fact]
@@ -200,13 +208,13 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.False(controller.Response.Headers.ContainsKey("Set-Cookie"));
     }
 
-    private static PublicLandingController CreateController(IHttpClientFactory httpClientFactory)
+    private static PublicLandingController CreateController(IHttpClientFactory httpClientFactory, string? roadmapUrl = "https://ideas.example.test/roadmap")
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://ideas.example.test/feedback",
-                ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = "https://ideas.example.test/roadmap",
+                ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = roadmapUrl,
                 ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                 ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = "/tmp/public-landing-participate-billing-store.json",
