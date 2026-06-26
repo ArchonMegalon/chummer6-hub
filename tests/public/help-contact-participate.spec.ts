@@ -61,7 +61,7 @@ test('help, contact, and participate keep public and private paths clear', async
 
   const contactPage = await openPublicPage(browser, '/contact');
   await expect(contactPage.getByRole('heading', { name: 'Contact Chummer' })).toBeVisible();
-  await expect(contactPage.locator('body')).toContainText('Discord for normal contact. Private form for logs or account details.');
+  await expect(contactPage.locator('body')).toContainText('Discord first. Private form only for logs or account details.');
   await expect(contactPage.locator('body')).not.toContainText('Public ideas go to Participate. Private problems stay here.');
   await expect(contactPage.getByRole('link', { name: 'Open Discord' })).toBeVisible();
   await expect(contactPage.getByRole('link', { name: 'Open private form' })).toBeVisible();

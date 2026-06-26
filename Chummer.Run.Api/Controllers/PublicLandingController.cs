@@ -6170,7 +6170,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord for normal questions, private form for logs or account detail.", "/contact", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord first. Private form only for logs or account details.", "/contact", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));
@@ -6324,7 +6324,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         catch (ArgumentException ex)
         {
-            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord for normal questions, private form for logs or account detail.", "/contact", cancellationToken);
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord first. Private form only for logs or account details.", "/contact", cancellationToken);
             var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
             var model = _trustContent.BuildContactPage(chrome) with
             {
