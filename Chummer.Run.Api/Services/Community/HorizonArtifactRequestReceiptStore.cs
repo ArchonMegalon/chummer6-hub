@@ -42,6 +42,21 @@ public sealed class HorizonArtifactRequestReceiptStore
         }
     }
 
+    public HorizonArtifactRequestReceipt? FindByRequestId(string requestId)
+    {
+        string normalizedRequestId = Clean(requestId);
+        if (string.IsNullOrWhiteSpace(normalizedRequestId))
+        {
+            return null;
+        }
+
+        lock (Gate)
+        {
+            return Receipts.FirstOrDefault(receipt =>
+                string.Equals(receipt.RequestId, normalizedRequestId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     public void Append(HorizonArtifactRequestReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);

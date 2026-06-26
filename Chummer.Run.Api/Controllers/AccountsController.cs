@@ -367,6 +367,7 @@ public sealed class AccountsController : Controller
                 }
 
                 Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+                Response.Headers["X-Horizon-Artifact-Request-Href"] = $"/api/v1/horizons/artifact-requests/me/{Uri.EscapeDataString(receipt.RequestId)}";
             }
 
             if (string.Equals(artifactKind, "read", StringComparison.OrdinalIgnoreCase)

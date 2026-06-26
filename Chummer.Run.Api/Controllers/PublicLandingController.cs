@@ -4452,6 +4452,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+                Response.Headers["X-Horizon-Artifact-Request-Href"] = $"/api/v1/horizons/artifact-requests/me/{Uri.EscapeDataString(receipt.RequestId)}";
             }
             catch (BrilliantDirectoriesBillingUnavailableException ex)
             {
@@ -10797,6 +10798,7 @@ Boundary:
             if (HttpContext?.Response?.Headers is { } responseHeaders)
             {
                 responseHeaders["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+                responseHeaders["X-Horizon-Artifact-Request-Href"] = $"/api/v1/public/horizons/artifact-requests/{Uri.EscapeDataString(receipt.RequestId)}";
             }
             return null;
         }
@@ -11754,6 +11756,9 @@ Boundary:
         return new
         {
             PublicCapabilityCatalogHref = "/api/v1/public/horizons/capabilities",
+            PublicCapabilityHealthHref = capability.PublicVisible
+                ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
             SignedInCapabilityCatalogHref = capability.RequiresAuthentication
                 ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
@@ -11762,6 +11767,9 @@ Boundary:
                 : null,
             SignedInRequestReceiptHref = capability.RequiresAuthentication
                 ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}"
+                : null,
+            SignedInRequestReceiptDetailHrefTemplate = capability.RequiresAuthentication
+                ? "/api/v1/horizons/artifact-requests/me/{requestId}"
                 : null
         };
     }

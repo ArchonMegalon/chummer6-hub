@@ -85,6 +85,30 @@ public sealed class HorizonArtifactRequestService
         int limit = 50)
         => _receipts?.ListRecent(horizonId, userId, limit) ?? Array.Empty<HorizonArtifactRequestReceipt>();
 
+    public HorizonArtifactRequestReceipt? FindReceipt(string requestId)
+        => _receipts?.FindByRequestId(requestId);
+
+    public HorizonArtifactRequestReceipt? FindReceiptForUser(string requestId, string userId)
+    {
+        HorizonArtifactRequestReceipt? receipt = FindReceipt(requestId);
+        string normalizedUserId = Clean(userId);
+        return receipt is not null
+            && !string.IsNullOrWhiteSpace(normalizedUserId)
+            && string.Equals(receipt.RequestedByUserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
+            ? receipt
+            : null;
+    }
+
+    public HorizonArtifactRequestReceipt? FindAcceptedPublicSafeReceipt(string requestId)
+    {
+        HorizonArtifactRequestReceipt? receipt = FindReceipt(requestId);
+        return receipt is not null
+            && string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase)
+            && IsPublicSafeVisibility(receipt.Visibility)
+            ? receipt
+            : null;
+    }
+
     private static IReadOnlyList<string> Validate(
         HorizonArtifactRequestCreateRequest request,
         HorizonCapabilityDefinition capability,
@@ -123,6 +147,9 @@ public sealed class HorizonArtifactRequestService
             || normalized.Equals("campaign_safe", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("public_safe", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsPublicSafeVisibility(string? value)
+        => Clean(value).Equals("public_safe", StringComparison.OrdinalIgnoreCase);
 
     private static void AddIfMissing(List<string> blocked, bool condition, string requirement)
     {
