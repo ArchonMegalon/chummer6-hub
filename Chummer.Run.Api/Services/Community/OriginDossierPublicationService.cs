@@ -23,14 +23,24 @@ public sealed class OriginDossierPublicationService
     private const string OperatorVerifiedLiveRunToken = "operator_verified_live_run";
     private const string ProviderReceiptReferenceToken = "provider_receipt_reference";
     private readonly IConfiguration _configuration;
+    private readonly HorizonCapabilityService? _capabilities;
     private readonly ILogger<OriginDossierPublicationService> _logger;
 
     public OriginDossierPublicationService(
         IConfiguration configuration,
+        HorizonCapabilityService? capabilities,
         ILogger<OriginDossierPublicationService> logger)
     {
         _configuration = configuration;
+        _capabilities = capabilities;
         _logger = logger;
+    }
+
+    public OriginDossierPublicationService(
+        IConfiguration configuration,
+        ILogger<OriginDossierPublicationService> logger)
+        : this(configuration, null, logger)
+    {
     }
 
     public IReadOnlyList<OriginDossierPublicationViewModel> ListForAccount(string userId, string subjectId)
@@ -335,7 +345,33 @@ public sealed class OriginDossierPublicationService
                 : null,
             AudiobookshelfAudiobookShareUrl: IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl)
                 ? BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "listen")
-                : null);
+                : null,
+            ArtifactCapability: BuildPublicArtifactCapability(projectId));
+    }
+
+    private PublicHorizonCapabilityViewModel? BuildPublicArtifactCapability(string projectId)
+    {
+        if (_capabilities is null)
+        {
+            return null;
+        }
+
+        HorizonCapabilityHealthSnapshot health = _capabilities.GetHealth(
+            "origin-dossier",
+            "dossier_media",
+            publicSafe: true);
+        return new PublicHorizonCapabilityViewModel(
+            HorizonId: health.HorizonId,
+            CapabilityId: health.CapabilityId,
+            ArtifactKind: health.ArtifactKind,
+            PublicLabel: health.PublicLabel,
+            CapabilitySlot: health.CapabilitySlot,
+            Status: health.Status,
+            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
+            RequiresAuthentication: true,
+            PublicVisible: true,
+            SourceRef: $"origin-dossier:{projectId}:media",
+            Visibility: "private");
     }
 
     private IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)

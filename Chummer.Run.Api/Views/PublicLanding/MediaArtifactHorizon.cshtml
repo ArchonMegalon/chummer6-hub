@@ -69,6 +69,10 @@
                 <h3>@UndetectableHumanizerCopyAdapter.Humanize(document.Label)</h3>
                 <p>@UndetectableHumanizerCopyAdapter.Humanize(document.Summary)</p>
                 <div class="route-choice-card__details">
+                    @if (!string.IsNullOrWhiteSpace(document.Style))
+                    {
+                        <span>Style: @UndetectableHumanizerCopyAdapter.Humanize(document.Style)</span>
+                    }
                     @foreach (var highlight in document.Highlights)
                     {
                         <span>@UndetectableHumanizerCopyAdapter.Humanize(highlight)</span>
@@ -76,6 +80,29 @@
                 </div>
                 <div class="stacked-actions">
                     <a class="button-like button-like--secondary" href="@document.MarkdownRoute">Open notes</a>
+                    @{
+                        var tourHref = !string.IsNullOrWhiteSpace(document.TourActionHref)
+                            ? document.TourActionHref
+                            : document.TourHref;
+                        var tourLabel = !string.IsNullOrWhiteSpace(document.TourActionLabel)
+                            ? document.TourActionLabel
+                            : (!string.IsNullOrWhiteSpace(document.TourLabel) ? document.TourLabel : "Open 3D tour");
+                        bool openInNewTab = string.IsNullOrWhiteSpace(document.TourActionHref)
+                            ? document.TourOpenInNewTab
+                            : document.TourActionOpenInNewTab;
+                        bool hasTourHref = !string.IsNullOrWhiteSpace(tourHref);
+                    }
+                    @if (hasTourHref)
+                    {
+                        @if (openInNewTab)
+                        {
+                            <a class="button-like button-like--primary" href="@tourHref" target="_blank" rel="noopener noreferrer">@UndetectableHumanizerCopyAdapter.Humanize(tourLabel)</a>
+                        }
+                        else
+                        {
+                            <a class="button-like button-like--primary" href="@tourHref">@UndetectableHumanizerCopyAdapter.Humanize(tourLabel)</a>
+                        }
+                    }
                 </div>
             </article>
         }

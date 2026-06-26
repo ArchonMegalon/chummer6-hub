@@ -28,6 +28,9 @@ public sealed class PublicLandingDownloadDispatchTests
     private static string ComputeSha256Hex(string value)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
+    private static string NormalizeHorizonCapabilityEnvToken(string value)
+        => new(value.Select(static c => char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : '_').ToArray());
+
     [Fact]
     public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
     {
@@ -389,6 +392,45 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("Turn 0 -> Turn 1", payload.RootElement.GetProperty("TransitionLabel").GetString());
         Assert.Contains("Turn 0", payload.RootElement.GetProperty("TransitionNarrative").GetString(), StringComparison.Ordinal);
         Assert.True(payload.RootElement.GetProperty("NewsreelBullets").GetArrayLength() > 0);
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("black-ledger", capability.GetProperty("HorizonId").GetString());
+        Assert.Equal("black-ledger-digest", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("world_tick_digest", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("World Tick Digest", capability.GetProperty("PublicLabel").GetString());
+        Assert.Equal("outbound_digest", capability.GetProperty("CapabilitySlot").GetString());
+        Assert.Equal("disabled", capability.GetProperty("Status").GetString());
+        Assert.Equal("black-ledger:turn-1:newsreel", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BlackLedgerPageIncludesPublicSafeDigestCapabilityMetadata()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_BLACK_LEDGER_CAPABILITY_BLACK_LEDGER_DIGEST_ENABLED"] = "true";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/ledger/map";
+
+        IActionResult result = await fixture.Controller.LedgerMapPage(turn: 1, mode: null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        BlackLedgerHubPageViewModel model = Assert.IsType<BlackLedgerHubPageViewModel>(view.Model);
+        Assert.NotNull(model.DigestCapability);
+        Assert.Equal("black-ledger", model.DigestCapability!.HorizonId);
+        Assert.Equal("black-ledger-digest", model.DigestCapability.CapabilityId);
+        Assert.Equal("available", model.DigestCapability.Status);
+        Assert.True(model.DigestCapability.RequestSupported);
+        Assert.Equal("black-ledger:turn-1:digest", model.DigestCapability.SourceRef);
+        Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(model.DigestCapability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(model.DigestCapability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(model.DigestCapability), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -443,6 +485,104 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("LiveRail").GetProperty("NotificationsHref").GetString());
         Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
         Assert.Equal(2, payload.RootElement.GetProperty("AftermathRail").GetProperty("ApiRoutes").GetArrayLength());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("table-pulse", capability.GetProperty("HorizonId").GetString());
+        Assert.Equal("table-pulse-debrief", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("debrief_packet", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("Debrief Packet", capability.GetProperty("PublicLabel").GetString());
+        Assert.Equal("post_session_coaching", capability.GetProperty("CapabilitySlot").GetString());
+        Assert.Equal("disabled", capability.GetProperty("Status").GetString());
+        Assert.Equal("table-pulse:live-and-aftermath", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("hedy", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Nonverbia", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TablePulsePageIncludesPublicSafeCapabilityMetadata()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_TABLE_PULSE_CAPABILITY_TABLE_PULSE_DEBRIEF_ENABLED"] = "true";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/table-pulse";
+
+        IActionResult result = await fixture.Controller.TablePulsePage(CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        TrustPageViewModel model = Assert.IsType<TrustPageViewModel>(view.Model);
+        Assert.NotNull(model.HorizonCapability);
+        Assert.Equal("table-pulse", model.HorizonCapability!.HorizonId);
+        Assert.Equal("table-pulse-debrief", model.HorizonCapability.CapabilityId);
+        Assert.Equal("available", model.HorizonCapability.Status);
+        Assert.True(model.HorizonCapability.RequestSupported);
+        Assert.Equal("table-pulse:live-and-aftermath", model.HorizonCapability.SourceRef);
+        Assert.DoesNotContain("hedy", JsonSerializer.Serialize(model.HorizonCapability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Nonverbia", JsonSerializer.Serialize(model.HorizonCapability), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task OriginDossierPageIncludesPublicSafeDossierMediaCapability()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_ORIGIN_DOSSIER_CAPABILITY_ORIGIN_DOSSIER_MEDIA_ENABLED"] = "true";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/origin-dossier";
+
+        IActionResult result = await fixture.Controller.OriginDossierPage(CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        TrustPageViewModel model = Assert.IsType<TrustPageViewModel>(view.Model);
+        Assert.NotNull(model.HorizonCapability);
+        Assert.Equal("origin-dossier", model.HorizonCapability!.HorizonId);
+        Assert.Equal("origin-dossier-media", model.HorizonCapability.CapabilityId);
+        Assert.Equal("dossier_media", model.HorizonCapability.ArtifactKind);
+        Assert.Equal("Dossier Media", model.HorizonCapability.PublicLabel);
+        Assert.Equal("approved_origin_media", model.HorizonCapability.CapabilitySlot);
+        Assert.Equal("available", model.HorizonCapability.Status);
+        Assert.True(model.HorizonCapability.RequestSupported);
+        Assert.Equal("origin-dossier:public-story-packet", model.HorizonCapability.SourceRef);
+        string serialized = JsonSerializer.Serialize(model.HorizonCapability);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Soundmadeseen", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task OriginDossierDocumentPageIncludesPublicSafeDossierMediaCapability()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_ORIGIN_DOSSIER_CAPABILITY_ORIGIN_DOSSIER_MEDIA_ENABLED"] = "true";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/docs/origin-dossier-the-name-she-chose";
+
+        IActionResult result = await fixture.Controller.DocumentPortalDetailPage("origin-dossier-the-name-she-chose", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        TrustPageViewModel model = Assert.IsType<TrustPageViewModel>(view.Model);
+        Assert.NotNull(model.HorizonCapability);
+        Assert.Equal("origin-dossier-media", model.HorizonCapability!.CapabilityId);
+        Assert.Equal("available", model.HorizonCapability.Status);
+        Assert.Equal("origin-dossier:document:origin-dossier-the-name-she-chose", model.HorizonCapability.SourceRef);
+        string serialized = JsonSerializer.Serialize(model.HorizonCapability);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Soundmadeseen", serialized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -481,6 +621,797 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/jackpoint/open", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/publications", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationIndexApiHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/publications/{publicationId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationDetailApiHrefTemplate").GetString());
+    }
+
+    [Fact]
+    public void RunsitePackJsonIncludesStyleAndTourActionFields()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.RunsitePackJson("redmond-dockyard-pack");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("Research Lab", payload.RootElement.GetProperty("style").GetString());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", payload.RootElement.GetProperty("tour_action_href").GetString());
+        Assert.Equal("Open 3D Tour", payload.RootElement.GetProperty("tour_action_label").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.True(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
+        Assert.Equal("3D Tour", payload.RootElement.GetProperty("tour_label").GetString());
+    }
+
+    [Fact]
+    public void JackpointBriefingJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.JackpointBriefingJson("emerald-sprawl-briefing");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("jackpoint", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("jackpoint-briefing-video", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("briefing_video", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("Briefing Video", capability.GetProperty("public_label").GetString());
+        Assert.Equal("presenter_video", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("disabled", capability.GetProperty("status").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("jackpoint:emerald-sprawl-briefing", capability.GetProperty("source_ref").GetString());
+        Assert.False(capability.TryGetProperty("internal_provider_lane", out _));
+        Assert.DoesNotContain("vidBoard", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunsitePacksCanUseWhiteLabeledTourConfig()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RunsiteTour:Href"] = "https://3dvista.example.test/tour/abc",
+                ["RunsiteTour:Label"] = "3DVista Tour",
+                ["RunsiteTour:ActionLabel"] = "Launch 3DVista",
+                ["RunsiteTour:OpenInNewTab"] = "false"
+            })
+            .Build();
+
+        MediaArtifactHorizonsService mediaHorizons = new(configuration);
+        MediaArtifactDocument firstPack = mediaHorizons.GetRunsitePack("redmond-dockyard-pack");
+
+        Assert.Equal("https://3dvista.example.test/tour/abc", firstPack.TourHref);
+        Assert.Equal("3DVista Tour", firstPack.TourLabel);
+        Assert.False(firstPack.TourOpenInNewTab);
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", firstPack.TourActionHref);
+        Assert.Equal("Launch 3DVista", firstPack.TourActionLabel);
+        Assert.False(firstPack.TourActionOpenInNewTab);
+    }
+
+    [Fact]
+    public void RunsitePacksIgnoreBlankWhiteLabelConfigAndKeepDefaults()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RunsiteTour:Href"] = "  ",
+                ["RunsiteTour:Label"] = "",
+                ["RunsiteTour:ActionLabel"] = " \t ",
+                ["RunsiteTour:OpenInNewTab"] = "not-bool"
+            })
+            .Build();
+
+        MediaArtifactHorizonsService mediaHorizons = new(configuration);
+        MediaArtifactDocument firstPack = mediaHorizons.GetRunsitePack("redmond-dockyard-pack");
+
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstPack.TourHref);
+        Assert.Equal("3D Tour", firstPack.TourLabel);
+        Assert.Equal("Open 3D Tour", firstPack.TourActionLabel);
+        Assert.True(firstPack.TourOpenInNewTab);
+    }
+
+    [Fact]
+    public void RunsitePacksExposeDistinctStyles()
+    {
+        using Fixture fixture = new();
+
+        IActionResult firstPackResult = fixture.Controller.RunsitePackJson("redmond-dockyard-pack");
+        IActionResult secondPackResult = fixture.Controller.RunsitePackJson("everett-switchyard-pack");
+
+        using JsonDocument firstPackPayload = JsonDocument.Parse(Assert.IsType<ContentResult>(firstPackResult).Content ?? "{}");
+        using JsonDocument secondPackPayload = JsonDocument.Parse(Assert.IsType<ContentResult>(secondPackResult).Content ?? "{}");
+        string? firstStyle = firstPackPayload.RootElement.GetProperty("style").GetString();
+        string? secondStyle = secondPackPayload.RootElement.GetProperty("style").GetString();
+        Assert.Equal("Research Lab", firstStyle);
+        Assert.Equal("Office Building", secondStyle);
+        Assert.NotEqual(firstStyle, secondStyle);
+    }
+
+    [Fact]
+    public void HorizonCapabilityHealthPublicSafeDoesNotExposeProviderLane()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+
+        HorizonCapabilityHealthSnapshot internalHealth = capabilities.GetHealth("runsite", "tour", publicSafe: false);
+        HorizonCapabilityHealthSnapshot publicSafeHealth = capabilities.GetHealth("runsite", "tour", publicSafe: true);
+
+        Assert.Equal("available", internalHealth.Status);
+        Assert.Contains("Matterport", internalHealth.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(publicSafeHealth.InternalProviderLane);
+        Assert.Equal("3D Tour", publicSafeHealth.PublicLabel);
+        Assert.Equal(1, publicSafeHealth.FreeWeeklyLimit);
+        Assert.Equal(10, publicSafeHealth.SupporterWeeklyLimit);
+    }
+
+    [Fact]
+    public void EnvironmentExampleDocumentsEveryBuiltInHorizonCapabilityOverride()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        string envExample = File.ReadAllText(Path.Combine(RepoPaths.Root, ".env.example"));
+
+        foreach (HorizonCapabilityDefinition capability in capabilities.ListCapabilities())
+        {
+            string envPrefix =
+                $"CHUMMER_HORIZON_{NormalizeHorizonCapabilityEnvToken(capability.HorizonId)}_CAPABILITY_{NormalizeHorizonCapabilityEnvToken(capability.CapabilityId)}";
+
+            Assert.Contains($"{envPrefix}_ENABLED=", envExample, StringComparison.Ordinal);
+            Assert.Contains($"{envPrefix}_FREE_WEEKLY_LIMIT=", envExample, StringComparison.Ordinal);
+            Assert.Contains($"{envPrefix}_SUPPORTER_WEEKLY_LIMIT=", envExample, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelBlocksDisabledCapabilityAndMissingConsent()
+    {
+        using Fixture fixture = new();
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(fixture.Configuration));
+
+        HorizonArtifactRequestReceipt receipt = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "jackpoint",
+                ArtifactKindOrCapabilityId: "briefing_video",
+                UserId: "subject.dispatch",
+                SourceRef: "jackpoint:emerald-sprawl-briefing",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: false),
+            new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("blocked", receipt.Status);
+        Assert.Equal("jackpoint", receipt.HorizonId);
+        Assert.Equal("briefing_video", receipt.ArtifactKind);
+        Assert.Contains("capability enabled", receipt.BlockedReasons);
+        Assert.Contains("external processing consent", receipt.BlockedReasons);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelAcceptsEnabledJackpointCapabilityWithConsent()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_ENABLED"] = "true"
+            })
+            .Build();
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(configuration));
+
+        HorizonArtifactRequestReceipt receipt = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "jackpoint",
+                ArtifactKindOrCapabilityId: "briefing_video",
+                UserId: "subject.dispatch",
+                SourceRef: "jackpoint:emerald-sprawl-briefing",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("jackpoint-briefing-video", receipt.CapabilityId);
+        Assert.Empty(receipt.BlockedReasons);
+        Assert.StartsWith("horizon-artifact-", receipt.RequestId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelBlocksCrossHorizonSourceRef()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_ENABLED"] = "true"
+            })
+            .Build();
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(configuration));
+
+        HorizonArtifactRequestReceipt receipt = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "jackpoint",
+                ArtifactKindOrCapabilityId: "briefing_video",
+                UserId: "subject.dispatch",
+                SourceRef: "runbook-press:wrong-horizon-source",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("blocked", receipt.Status);
+        Assert.Contains("horizon source reference", receipt.BlockedReasons);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelCanConsumeGenericRunbookQuota()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        HorizonArtifactRequestService requests = new(capabilities, quota);
+        DateTimeOffset now = new(2026, 6, 26, 10, 0, 0, TimeSpan.Zero);
+
+        HorizonArtifactRequestReceipt accepted = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.runbook",
+                SourceRef: "runbook-press:new-runner-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true,
+                Email: "runbook@example.test"),
+            now,
+            consumeQuota: true);
+
+        HorizonArtifactRequestReceipt exhausted = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.runbook",
+                SourceRef: "runbook-press:gm-first-night-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true,
+                Email: "runbook@example.test"),
+            now.AddMinutes(1),
+            consumeQuota: true);
+
+        Assert.Equal("accepted", accepted.Status);
+        Assert.Equal("runbook-export", accepted.CapabilityId);
+        Assert.NotNull(accepted.Quota);
+        Assert.Equal(1, accepted.Quota!.WeeklyLimit);
+        Assert.Equal(1, accepted.Quota.WeeklyUsed);
+        Assert.Equal(0, accepted.Quota.WeeklyRemaining);
+        Assert.Equal("blocked", exhausted.Status);
+        Assert.Contains("artifact allowance", exhausted.BlockedReasons);
+        Assert.Null(exhausted.Quota);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelDoesNotConsumeQuotaForCrossHorizonSourceRef()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        HorizonArtifactRequestService requests = new(capabilities, quota);
+        DateTimeOffset now = new(2026, 6, 26, 10, 0, 0, TimeSpan.Zero);
+
+        HorizonArtifactRequestReceipt blocked = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.runbook-source-ref",
+                SourceRef: "jackpoint:wrong-horizon-source",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            now,
+            consumeQuota: true);
+        HorizonArtifactRequestReceipt accepted = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.runbook-source-ref",
+                SourceRef: "runbook-press:correct-horizon-source",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            now.AddMinutes(1),
+            consumeQuota: true);
+
+        Assert.Equal("blocked", blocked.Status);
+        Assert.Contains("horizon source reference", blocked.BlockedReasons);
+        Assert.Null(blocked.Quota);
+        Assert.Equal("accepted", accepted.Status);
+        Assert.Equal(1, accepted.Quota?.WeeklyUsed);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestReceiptsPersistAcrossStoreReloads()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        HorizonArtifactRequestReceiptStore store = new(fixture.Configuration);
+        HorizonArtifactRequestService requests = new(capabilities, quota, store);
+        DateTimeOffset now = new(2026, 6, 26, 10, 0, 0, TimeSpan.Zero);
+
+        HorizonArtifactRequestReceipt accepted = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.receipts",
+                SourceRef: "runbook-press:persistent-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            now,
+            consumeQuota: true);
+        HorizonArtifactRequestReceipt blocked = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "jackpoint",
+                ArtifactKindOrCapabilityId: "briefing_video",
+                UserId: "subject.receipts",
+                SourceRef: "jackpoint:blocked-briefing",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: false),
+            now.AddMinutes(1),
+            consumeQuota: true);
+
+        HorizonArtifactRequestReceiptStore reloaded = new(fixture.Configuration);
+        IReadOnlyList<HorizonArtifactRequestReceipt> recent = reloaded.ListRecent(userId: "subject.receipts", limit: 10);
+
+        Assert.Equal(2, recent.Count);
+        Assert.Contains(recent, receipt => receipt.RequestId == accepted.RequestId && receipt.Status == "accepted");
+        Assert.Contains(recent, receipt => receipt.RequestId == blocked.RequestId && receipt.Status == "blocked");
+        Assert.All(recent, receipt =>
+        {
+            string serialized = JsonSerializer.Serialize(receipt);
+            Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
+    public void InternalHorizonCapabilitiesEndpointRequiresTokenAndCanReturnPublicSafeHealth()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["FLEET_INTERNAL_API_TOKEN"] = "test-internal-token"
+            })
+            .Build();
+        HorizonCapabilityService capabilities = new(configuration);
+        var controller = new InternalHorizonCapabilitiesController(
+            capabilities,
+            new HorizonArtifactRequestService(capabilities),
+            configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<HorizonCapabilityHealthCatalog> denied = controller.ListCapabilities(publicSafe: true);
+        ObjectResult deniedProblem = Assert.IsType<ObjectResult>(denied.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, deniedProblem.StatusCode);
+
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer test-internal-token";
+        ActionResult<HorizonCapabilityHealthCatalog> result = controller.ListCapabilities(publicSafe: true);
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        HorizonCapabilityHealthCatalog catalog = Assert.IsType<HorizonCapabilityHealthCatalog>(ok.Value);
+        HorizonCapabilityHealthSnapshot runsiteTour = Assert.Single(catalog.Capabilities, item => item.CapabilityId == "runsite-tour");
+        Assert.True(catalog.PublicSafe);
+        Assert.Null(runsiteTour.InternalProviderLane);
+        Assert.Equal("available", runsiteTour.Status);
+        Assert.Equal(1, runsiteTour.FreeWeeklyLimit);
+        Assert.Equal(10, runsiteTour.SupporterWeeklyLimit);
+    }
+
+    [Fact]
+    public void PublicHorizonCapabilitiesEndpointReturnsOnlyPublicSafeVisibleHealth()
+    {
+        using Fixture fixture = new();
+        PublicHorizonCapabilitiesController controller = new(new HorizonCapabilityService(fixture.Configuration));
+
+        ActionResult<HorizonCapabilityHealthCatalog> result = controller.ListCapabilities();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        HorizonCapabilityHealthCatalog catalog = Assert.IsType<HorizonCapabilityHealthCatalog>(ok.Value);
+        Assert.True(catalog.PublicSafe);
+        Assert.All(catalog.Capabilities, capability =>
+        {
+            Assert.True(capability.PublicVisible);
+            Assert.Null(capability.InternalProviderLane);
+        });
+        Assert.Contains(catalog.Capabilities, capability =>
+            capability.HorizonId == "runsite"
+            && capability.CapabilityId == "runsite-tour"
+            && capability.Status == "available");
+        Assert.Contains(catalog.Capabilities, capability =>
+            capability.HorizonId == "runsite"
+            && capability.CapabilityId == "runsite-map"
+            && capability.Status == "disabled");
+
+        string serialized = JsonSerializer.Serialize(catalog);
+        Assert.DoesNotContain("Matterport", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("AvoMap", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HorizonCapabilityHealthExposesConfiguredQuotaLimitsWithoutProviderLane()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true",
+                ["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "3",
+                ["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_SUPPORTER_WEEKLY_LIMIT"] = "12"
+            })
+            .Build();
+        HorizonCapabilityService capabilities = new(configuration);
+
+        HorizonCapabilityHealthSnapshot health = capabilities.GetHealth("runbook-press", "document_export", publicSafe: true);
+
+        Assert.Equal("available", health.Status);
+        Assert.Null(health.InternalProviderLane);
+        Assert.Equal(3, health.FreeWeeklyLimit);
+        Assert.Equal(12, health.SupporterWeeklyLimit);
+        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(health), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Documentation.AI", JsonSerializer.Serialize(health), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void InternalHorizonArtifactRequestEndpointConsumesGenericQuota()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["FLEET_INTERNAL_API_TOKEN"] = "test-internal-token";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        var controller = new InternalHorizonCapabilitiesController(
+            capabilities,
+            new HorizonArtifactRequestService(capabilities, quota),
+            fixture.Configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer test-internal-token";
+
+        ActionResult<HorizonArtifactRequestReceipt> accepted = controller.BuildArtifactRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.internal-runbook",
+                SourceRef: "runbook-press:new-runner-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true));
+        ActionResult<HorizonArtifactRequestReceipt> exhausted = controller.BuildArtifactRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.internal-runbook",
+                SourceRef: "runbook-press:gm-first-night-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true));
+
+        HorizonArtifactRequestReceipt acceptedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(accepted.Result).Value);
+        HorizonArtifactRequestReceipt exhaustedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(exhausted.Result).Value);
+        Assert.Equal("accepted", acceptedReceipt.Status);
+        Assert.Equal(0, acceptedReceipt.Quota?.WeeklyRemaining);
+        Assert.Equal("blocked", exhaustedReceipt.Status);
+        Assert.Contains("artifact allowance", exhaustedReceipt.BlockedReasons);
+    }
+
+    [Fact]
+    public void InternalHorizonArtifactRequestEndpointListsPersistedReceipts()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["FLEET_INTERNAL_API_TOKEN"] = "test-internal-token";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "2";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        HorizonArtifactRequestReceiptStore store = new(fixture.Configuration);
+        var controller = new InternalHorizonCapabilitiesController(
+            capabilities,
+            new HorizonArtifactRequestService(capabilities, quota, store),
+            fixture.Configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer test-internal-token";
+        _ = controller.BuildArtifactRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runbook-press",
+                ArtifactKindOrCapabilityId: "document_export",
+                UserId: "subject.internal-receipts",
+                SourceRef: "runbook-press:persistent-internal-primer",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true));
+
+        ActionResult<HorizonArtifactRequestReceiptCatalog> result = controller.ListArtifactRequests(
+            horizonId: "runbook-press",
+            userId: "subject.internal-receipts",
+            limit: 5);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        HorizonArtifactRequestReceiptCatalog catalog = Assert.IsType<HorizonArtifactRequestReceiptCatalog>(ok.Value);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(catalog.Receipts);
+        Assert.Equal("runbook-press", catalog.HorizonId);
+        Assert.Equal("subject.internal-receipts", catalog.UserId);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("runbook-press:persistent-internal-primer", receipt.SourceRef);
+        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(catalog), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Documentation.AI", JsonSerializer.Serialize(catalog), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task KarmaForgePageIncludesPublicSafeDiscoveryCapability()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_KARMA_FORGE_CAPABILITY_KARMA_FORGE_DISCOVERY_ENABLED"] = "true";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/participate/karma-forge";
+
+        IActionResult result = await fixture.Controller.KarmaForgePage(track: null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        KarmaForgeIntakePageViewModel model = Assert.IsType<KarmaForgeIntakePageViewModel>(view.Model);
+        Assert.Equal("karma-forge", model.DiscoveryCapability.HorizonId);
+        Assert.Equal("karma-forge-discovery", model.DiscoveryCapability.CapabilityId);
+        Assert.Equal("discovery_packet", model.DiscoveryCapability.ArtifactKind);
+        Assert.Equal("Discovery Packet", model.DiscoveryCapability.PublicLabel);
+        Assert.Equal("demand_validation", model.DiscoveryCapability.CapabilitySlot);
+        Assert.Equal("available", model.DiscoveryCapability.Status);
+        Assert.True(model.DiscoveryCapability.RequestSupported);
+        Assert.Equal("karma-forge:public-intake", model.DiscoveryCapability.SourceRef);
+    }
+
+    [Fact]
+    public async Task KarmaForgeSubmittedPageIncludesPublicSafeDiscoveryCapabilitySourceRef()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/participate/karma-forge/submitted/sample-submission-id";
+
+        IActionResult result = await fixture.Controller.KarmaForgeSubmittedPage("sample-submission-id", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        KarmaForgeSubmittedPageViewModel model = Assert.IsType<KarmaForgeSubmittedPageViewModel>(view.Model);
+        Assert.Equal("karma-forge", model.DiscoveryCapability.HorizonId);
+        Assert.Equal("karma-forge-discovery", model.DiscoveryCapability.CapabilityId);
+        Assert.Equal("disabled", model.DiscoveryCapability.Status);
+        Assert.False(model.DiscoveryCapability.RequestSupported);
+        Assert.Equal("karma-forge:sample-submission-id", model.DiscoveryCapability.SourceRef);
+        Assert.DoesNotContain("Icanpreneur", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Deftform", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MetaSurvey", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunsiteTourDispatchUnauthenticatedRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Frunsites%2Fpacks%2Fredmond-dockyard-pack%2Ftour", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RunsiteTourDispatchUnknownPackReturnsNotFound()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteTourDispatch("not-a-pack", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RunsiteTourDispatchEnforcesFreeWeeklyQuota()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult first = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
+        var firstRedirect = Assert.IsType<RedirectResult>(first);
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstRedirect.Url);
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Runsite-Tour-Limit"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Runsite-Tour-Remaining"].ToString());
+        Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
+
+        IActionResult second = await fixture.Controller.RunsiteTourDispatch("everett-switchyard-pack", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("runsite", "subject.dispatch", limit: 10);
+        Assert.Equal(2, receipts.Count);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "accepted"
+            && receipt.SourceRef == "runsite:redmond-dockyard-pack"
+            && receipt.Quota?.WeeklyUsed == 1);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "blocked"
+            && receipt.SourceRef == "runsite:everett-switchyard-pack"
+            && receipt.BlockedReasons.Contains("artifact allowance"));
+    }
+
+    [Fact]
+    public async Task RunsiteTourDispatchPersistsSharedArtifactReceiptWithoutDoubleConsumingQuota()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
+
+        Assert.IsType<RedirectResult>(result);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runsite", "subject.dispatch", limit: 10));
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("runsite-tour", receipt.CapabilityId);
+        Assert.Equal("tour", receipt.ArtifactKind);
+        Assert.Equal("runsite:redmond-dockyard-pack", receipt.SourceRef);
+        Assert.Equal("private", receipt.Visibility);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(1, receipt.Quota!.WeeklyUsed);
+        Assert.Equal(0, receipt.Quota.WeeklyRemaining);
+    }
+
+    [Fact]
+    public async Task RunsiteTourDispatchEnforcesSupporterWeeklyQuota()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        fixture.Billing.SyncMember(
+            new Chummer.Run.Contracts.Billing.BrilliantDirectoriesMemberSyncRequest(
+                UserId: "subject.dispatch",
+                MemberId: "supporter-membership",
+                Email: "dispatch@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        for (int i = 0; i < 10; i++)
+        {
+            IActionResult result = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
+            Assert.IsType<RedirectResult>(result);
+        }
+
+        IActionResult eleventh = await fixture.Controller.RunsiteTourDispatch("everett-switchyard-pack", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(eleventh);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+    }
+
+    [Fact]
+    public async Task RunsiteTourQuotaMeRequiresAuthentication()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RunsiteTourQuota(CancellationToken.None);
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task RunsiteTourQuotaMeReturnsCurrentUserAllowance()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteTourQuota(CancellationToken.None);
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var quota = Assert.IsType<RunsiteTourQuotaSnapshot>(ok.Value);
+        Assert.False(quota.SupporterActive);
+        Assert.Equal(1, quota.WeeklyLimit);
+        Assert.Equal(0, quota.WeeklyUsed);
+        Assert.Equal(1, quota.WeeklyRemaining);
+    }
+
+    [Fact]
+    public void RunsiteTourQuotaPersistsUsageAndResetsByWeek()
+    {
+        using Fixture fixture = new();
+        var firstCapabilities = new HorizonCapabilityService(fixture.Configuration);
+        var firstService = new RunsiteTourQuotaService(
+            new HorizonArtifactQuotaService(new HorizonArtifactUsageStore(fixture.Configuration), firstCapabilities, fixture.Billing),
+            firstCapabilities);
+        DateTimeOffset firstWeek = new(2026, 6, 24, 10, 0, 0, TimeSpan.Zero);
+
+        RunsiteTourQuotaSnapshot consumed = firstService.ConsumeTour("subject.persist", firstWeek, "persist@example.com");
+
+        Assert.Equal(1, consumed.WeeklyUsed);
+        Assert.Equal(0, consumed.WeeklyRemaining);
+
+        var reloadedCapabilities = new HorizonCapabilityService(fixture.Configuration);
+        var reloadedService = new RunsiteTourQuotaService(
+            new HorizonArtifactQuotaService(new HorizonArtifactUsageStore(fixture.Configuration), reloadedCapabilities, fixture.Billing),
+            reloadedCapabilities);
+        RunsiteTourQuotaSnapshot sameWeek = reloadedService.GetQuota("subject.persist", firstWeek.AddDays(1), "persist@example.com");
+        Assert.Equal(1, sameWeek.WeeklyUsed);
+        Assert.Equal(0, sameWeek.WeeklyRemaining);
+
+        RunsiteTourQuotaSnapshot nextWeek = reloadedService.GetQuota("subject.persist", firstWeek.AddDays(7), "persist@example.com");
+        Assert.Equal(0, nextWeek.WeeklyUsed);
+        Assert.Equal(1, nextWeek.WeeklyRemaining);
     }
 
     [Fact]
@@ -562,6 +1493,12 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(
             payload.RootElement.GetProperty("Links").EnumerateArray().Select(item => item.GetString()),
             item => string.Equals(item, "/account/ledger/factions/ashline-circle/leader-briefing", StringComparison.Ordinal));
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("black-ledger-digest", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("black-ledger:turn-1:validation", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -618,7 +1555,10 @@ public sealed class PublicLandingDownloadDispatchTests
     {
         private readonly string _root;
 
-        public Fixture(bool authenticated = false, string? runtimeManifestJson = null)
+        public Fixture(
+            bool authenticated = false,
+            string? runtimeManifestJson = null,
+            Action<Dictionary<string, string?>>? configureSettings = null)
         {
             _root = Path.Combine(Path.GetTempPath(), "public-landing-dispatch-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(_root, "downloads");
@@ -855,13 +1795,22 @@ public sealed class PublicLandingDownloadDispatchTests
                 ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20",
                 ["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"] = "24",
                 ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24",
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(_root, "billing.json"),
+                ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(_root, "myfirstbook-usage-store.json"),
+                ["CHUMMER_RUNSITE_TOUR_USAGE_STORE_PATH"] = Path.Combine(_root, "runsite-tour-usage-store.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(_root, "horizon-artifact-request-receipts.json"),
+                ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = "https://billing.example.test/supporter",
+                ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
+                ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(_root, "karma-forge-store.json"),
                 ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.example"
             };
             if (!string.IsNullOrWhiteSpace(runtimeManifestJson))
             {
                 settings["CHUMMER_RELEASE_REGISTRY_CURRENT_URL"] = "https://registry.local/api/v1/registry/release-channel/current";
             }
+
+            configureSettings?.Invoke(settings);
 
             Configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(settings)
@@ -871,7 +1820,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 ? null
                 : new HttpClient(new StaticJsonHandler(runtimeManifestJson));
             ManifestService = new PublicReleaseManifestService(Configuration, runtimeManifestClient);
-            ReleaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
+            PublicCanonFileLoader canon = new(Configuration);
+            ReleaseSelection = new ReleaseSelectionService(canon);
             HubIdentityClient identity = new(
                 new HttpClient(new IdentityHandler(authenticated))
                 {
@@ -879,6 +1829,13 @@ public sealed class PublicLandingDownloadDispatchTests
                 },
                 Configuration,
                 NullLogger<HubIdentityClient>.Instance);
+            PublicLandingService landing = new(canon, new PublicActionResolver());
+            PublicNavigationService navigation = new(canon, new PublicRouteCatalogService(canon));
+            HubPageChromeService chrome = new(landing, navigation, ManifestService, ReleaseSelection, new HttpContextAccessor());
+            PublicTrustPulseService trustPulse = new(
+                new WeeklyProductPulseArtifactService(Configuration, NullLogger<WeeklyProductPulseArtifactService>.Instance),
+                Configuration,
+                NullLogger<PublicTrustPulseService>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(communityStore);
             WorkspaceLifecyclePolicyService workspaceLifecycle = new(Configuration);
@@ -903,6 +1860,14 @@ public sealed class PublicLandingDownloadDispatchTests
                 BlackLedgerFactions,
                 NullLogger<BlackLedgerAdvisoryService>.Instance);
             AnarchyPreviewService anarchyPreview = new(blackLedgerDispatches);
+            BrilliantDirectoriesBillingStore brilliantDirectoriesBillingStore = new(Configuration);
+            MyFirstBookUsageStore myFirstBookUsageStore = new(Configuration);
+            BrilliantDirectoriesBillingService brilliantDirectoriesBilling = new(brilliantDirectoriesBillingStore, myFirstBookUsageStore, Configuration);
+            HorizonCapabilityService horizonCapabilities = new(Configuration);
+            HorizonArtifactQuotaService horizonArtifactQuota = new(new HorizonArtifactUsageStore(Configuration), horizonCapabilities, brilliantDirectoriesBilling);
+            ArtifactRequestReceipts = new HorizonArtifactRequestReceiptStore(Configuration);
+            HorizonArtifactRequestService artifactRequests = new(horizonCapabilities, horizonArtifactQuota, ArtifactRequestReceipts);
+            RunsiteTourQuotaService runsiteTourQuota = new(horizonArtifactQuota, horizonCapabilities);
             ParticipationOperatorNotificationService participationNotifications = new(
                 new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
                 communityStore,
@@ -925,8 +1890,9 @@ public sealed class PublicLandingDownloadDispatchTests
             PublicCreatorPublicationDiscoveryService publicCreatorDiscovery = new(Accounts, campaignSpine, draftService);
             CommunityCreatorHorizonsService communityCreatorHorizons = new(communityStore, InstallLinkingStore, publicCreatorDiscovery);
             WaveEightHorizonsService waveEightHorizons = new(communityStore, anarchyPreview);
+            MediaArtifactHorizonsService mediaHorizons = new(Configuration, horizonCapabilities);
             Controller = new PublicLandingController(
-                landing: null!,
+                landing: landing,
                 flipLinkDocumentPortal: new FlipLinkDocumentPortalService(Configuration),
                 flagshipCoverage: null!,
                 releases: ManifestService,
@@ -938,34 +1904,35 @@ public sealed class PublicLandingDownloadDispatchTests
                 links: null!,
                 experience: null!,
                 participationNotifications: participationNotifications,
-	                installLinking: InstallLinking,
-	                campaignSpine: campaignSpine,
-	                workspaceServerPlane: null!,
-	                readyForTonight: null!,
-	                knowledgeFabric: null!,
-	                nexusPan: null!,
-	                mediaHorizons: null!,
-		                communityCreatorHorizons: communityCreatorHorizons,
-		                waveEightHorizons: waveEightHorizons,
-		                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
-                        buildGhostConcierge: buildGhostConcierge,
-		                blackLedgerStats: blackLedgerStats,
-		                blackLedgerDispatches: blackLedgerDispatches,
-                        blackLedgerTickNews: blackLedgerTickNews,
-		                blackLedgerFactions: BlackLedgerFactions,
-                        blackLedgerAdvisories: blackLedgerAdvisories,
-                        blackLedgerBriefings: blackLedgerBriefings,
-                        beHumanEventAdapterPosture: new BeHumanEventAdapterPostureService(Configuration),
-                        gmSessionVenues: gmSessionVenues,
-	                anarchyPreview: anarchyPreview,
+                runsiteTourQuota: runsiteTourQuota,
+                installLinking: InstallLinking,
+                campaignSpine: campaignSpine,
+                workspaceServerPlane: null!,
+                readyForTonight: null!,
+                knowledgeFabric: null!,
+                nexusPan: null!,
+                mediaHorizons: mediaHorizons,
+                communityCreatorHorizons: communityCreatorHorizons,
+                waveEightHorizons: waveEightHorizons,
+                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
+                buildGhostConcierge: buildGhostConcierge,
+                blackLedgerStats: blackLedgerStats,
+                blackLedgerDispatches: blackLedgerDispatches,
+                blackLedgerTickNews: blackLedgerTickNews,
+                blackLedgerFactions: BlackLedgerFactions,
+                blackLedgerAdvisories: blackLedgerAdvisories,
+                blackLedgerBriefings: blackLedgerBriefings,
+                beHumanEventAdapterPosture: new BeHumanEventAdapterPostureService(Configuration),
+                gmSessionVenues: gmSessionVenues,
+                anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: publicCreatorDiscovery,
-                chrome: null!,
+                chrome: chrome,
                 trustContent: null!,
                 privacyBoundaries: null!,
                 signalProjection: null!,
                 signalOperations: null!,
-                trustPulse: null!,
+                trustPulse: trustPulse,
                 signedInTrustStatus: null!,
                 supportCases: null!,
                 supportPresentation: null!,
@@ -976,7 +1943,9 @@ public sealed class PublicLandingDownloadDispatchTests
                 windowsProofInstallers: new WindowsProofInstallerService(Configuration),
                 aurPackages: new AurPackageCatalogService(Configuration),
                 webHostEnvironment: null!,
-                logger: NullLogger<PublicLandingController>.Instance);
+                logger: NullLogger<PublicLandingController>.Instance,
+                artifactRequests: artifactRequests);
+            Billing = brilliantDirectoriesBilling;
         }
 
         public IConfiguration Configuration { get; }
@@ -998,6 +1967,8 @@ public sealed class PublicLandingDownloadDispatchTests
         public BlackLedgerFactionOnboardingService BlackLedgerFactions { get; }
 
         public PublicLandingController Controller { get; }
+        public BrilliantDirectoriesBillingService Billing { get; }
+        public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts { get; }
 
         private sealed class IdentityHandler : HttpMessageHandler
         {

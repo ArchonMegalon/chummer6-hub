@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
@@ -39,6 +40,17 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfAudiobookShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/cover", model.Publication.StorySceneCoverUrl);
+        Assert.NotNull(model.Publication.ArtifactCapability);
+        Assert.Equal("origin-dossier", model.Publication.ArtifactCapability!.HorizonId);
+        Assert.Equal("origin-dossier-media", model.Publication.ArtifactCapability.CapabilityId);
+        Assert.Equal("dossier_media", model.Publication.ArtifactCapability.ArtifactKind);
+        Assert.Equal("origin-dossier:origin-route:media", model.Publication.ArtifactCapability.SourceRef);
+        Assert.Equal("private", model.Publication.ArtifactCapability.Visibility);
+        string serialized = JsonSerializer.Serialize(model.Publication.ArtifactCapability);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Soundmadeseen", serialized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

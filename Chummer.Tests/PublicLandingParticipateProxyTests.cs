@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -170,7 +171,10 @@ public sealed class PublicLandingParticipateProxyTests
             {
                 ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://ideas.example.test/feedback",
                 ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
-                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = "/tmp/public-landing-participate-billing-store.json",
+                ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-myfirstbook-usage-store.json",
+                ["CHUMMER_RUNSITE_TOUR_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-runsite-tour-usage-store.json"
             })
             .Build();
         var canon = new PublicCanonFileLoader(configuration);
@@ -195,6 +199,7 @@ public sealed class PublicLandingParticipateProxyTests
             links: null!,
             experience: null!,
             participationNotifications: null!,
+            runsiteTourQuota: BuildRunsiteTourQuota(configuration),
             installLinking: null!,
             campaignSpine: null!,
             workspaceServerPlane: null!,
@@ -244,6 +249,17 @@ public sealed class PublicLandingParticipateProxyTests
                 }
             }
         };
+    }
+
+    private static RunsiteTourQuotaService BuildRunsiteTourQuota(IConfiguration configuration)
+    {
+        BrilliantDirectoriesBillingService billing = new(
+            new BrilliantDirectoriesBillingStore(configuration),
+            new MyFirstBookUsageStore(configuration),
+            configuration);
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactQuotaService quota = new(new HorizonArtifactUsageStore(configuration), capabilities, billing);
+        return new RunsiteTourQuotaService(quota, capabilities);
     }
 
     private sealed class ThrowingHttpClientFactory : IHttpClientFactory

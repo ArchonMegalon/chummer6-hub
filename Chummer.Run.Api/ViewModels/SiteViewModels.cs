@@ -519,7 +519,8 @@ public sealed record BlackLedgerWorldTurnBriefingViewModel(
     IReadOnlyList<string> NewsreelBullets,
     IReadOnlyList<string> ValidationChecks,
     string ValidationJsonHref,
-    BlackLedgerNewsreelBroadcastViewModel? Broadcast = null);
+    BlackLedgerNewsreelBroadcastViewModel? Broadcast = null,
+    PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record BlackLedgerActionBeatViewModel(
     string BeatId,
@@ -578,7 +579,8 @@ public sealed record BlackLedgerWorldTickValidationPacketViewModel(
     int ToTurn,
     string Summary,
     IReadOnlyList<string> Checks,
-    IReadOnlyList<string> Links);
+    IReadOnlyList<string> Links,
+    PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record BlackLedgerFactionPromoArtifactViewModel(
     string FactionId,
@@ -691,6 +693,7 @@ public sealed record BlackLedgerHubPageViewModel(
     BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
+    PublicHorizonCapabilityViewModel? DigestCapability = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -1019,6 +1022,7 @@ public sealed record KarmaForgeIntakePageViewModel(
     string Intro,
     string CanonicalLane,
     string EntryLane,
+    PublicHorizonCapabilityViewModel DiscoveryCapability,
     KarmaForgeDashboardSummary Dashboard,
     IReadOnlyList<string> DiscoverySteps,
     IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
@@ -1085,6 +1089,7 @@ public sealed record KarmaForgeSubmittedPageViewModel(
     string CandidateDecisionMeaning,
     string ReporterNextAction,
     string ConsentSummary,
+    PublicHorizonCapabilityViewModel DiscoveryCapability,
     IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
     IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs,
     IReadOnlyList<string> Highlights,
@@ -1097,6 +1102,19 @@ public sealed record KarmaForgeSubmittedPageViewModel(
     string ImpactHypothesisJson,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record PublicHorizonCapabilityViewModel(
+    string HorizonId,
+    string CapabilityId,
+    string ArtifactKind,
+    string PublicLabel,
+    string CapabilitySlot,
+    string Status,
+    bool RequestSupported,
+    bool RequiresAuthentication,
+    bool PublicVisible,
+    string SourceRef,
+    string Visibility);
 
 public sealed record StatusPageViewModel(
     SiteChromeViewModel Chrome,
@@ -1351,7 +1369,8 @@ public sealed record TrustPageViewModel(
     SupportIntakeViewModel? SupportIntake = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
-    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
+    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null,
+    PublicHorizonCapabilityViewModel? HorizonCapability = null);
 
 public sealed record FaqEntryViewModel(
     string Question,
@@ -2009,7 +2028,14 @@ public sealed record MediaArtifactCardViewModel(
     string Summary,
     string MarkdownRoute,
     string JsonRoute,
-    IReadOnlyList<string> Highlights);
+    IReadOnlyList<string> Highlights,
+    string? Style = null,
+    string? TourHref = null,
+    string? TourLabel = null,
+    bool TourOpenInNewTab = true,
+    string? TourActionHref = null,
+    string? TourActionLabel = null,
+    bool TourActionOpenInNewTab = false);
 
 public sealed record MediaArtifactHorizonPageViewModel(
     SiteChromeViewModel Chrome,
@@ -2200,7 +2226,8 @@ public sealed record OriginDossierPublicationViewModel(
     string? RunnerName = null,
     string? OriginEditionNamespace = null,
     string? AudiobookshelfDossierShareUrl = null,
-    string? AudiobookshelfAudiobookShareUrl = null);
+    string? AudiobookshelfAudiobookShareUrl = null,
+    PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record OriginDossierPublicationDetailPageViewModel(
     SiteChromeViewModel Chrome,

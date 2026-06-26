@@ -1,9 +1,16 @@
 using System.Text.Json;
+using Chummer.Run.Api.Services.Community;
+using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services;
 
 public sealed class MediaArtifactHorizonsService
 {
+    private const string DefaultRunsiteTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultRunsiteTourLabel = "3D Tour";
+    private const string DefaultRunsiteTourActionLabel = "Open 3D Tour";
+    private const bool DefaultRunsiteTourOpenInNewTab = true;
+
     private static readonly IReadOnlyList<MediaArtifactDocument> JackpointBriefings =
     [
         new(
@@ -22,7 +29,7 @@ public sealed class MediaArtifactHorizonsService
             ["Dossier card", "Player-safe contact notes", "Follow-up hook"])
     ];
 
-    private static readonly IReadOnlyList<MediaArtifactDocument> RunsitePacks =
+    private static readonly IReadOnlyList<MediaArtifactDocument> BaseRunsitePacks =
     [
         new(
             "redmond-dockyard-pack",
@@ -30,14 +37,16 @@ public sealed class MediaArtifactHorizonsService
             "Runsite packet with entry vectors, heat clocks, and exit posture kept in one handoff.",
             "/runsites/packs/redmond-dockyard-pack.md",
             "/runsites/packs/redmond-dockyard-pack.json",
-            ["Entry vectors", "Threat clocks", "Exit posture"]),
+            ["Entry vectors", "Threat clocks", "Exit posture"],
+            "Research Lab"),
         new(
             "everett-switchyard-pack",
             "Everett switchyard pack",
             "Spatial-prep packet for switchyard pressure with player-safe lane separation.",
             "/runsites/packs/everett-switchyard-pack.md",
             "/runsites/packs/everett-switchyard-pack.json",
-            ["Site card", "Pressure lane", "Player-safe split"])
+            ["Site card", "Pressure lane", "Player-safe split"],
+            "Office Building")
     ];
 
     private static readonly IReadOnlyList<MediaArtifactDocument> RunbookPrimers =
@@ -58,12 +67,37 @@ public sealed class MediaArtifactHorizonsService
             ["Table-open sequence", "Consequence sweep", "Next-screen posture"])
     ];
 
+    private readonly IReadOnlyList<MediaArtifactDocument> _runsitePacks;
+    private readonly HorizonCapabilityService? _capabilities;
+
+    public MediaArtifactHorizonsService(IConfiguration? configuration = null, HorizonCapabilityService? capabilities = null)
+    {
+        _capabilities = capabilities;
+
+        string resolvedRunsiteTourHref = ResolveRunsiteTourHref(configuration);
+        string resolvedRunsiteTourLabel = ResolveRunsiteTourLabel(configuration);
+        string resolvedRunsiteTourActionLabel = ResolveRunsiteTourActionLabel(configuration, resolvedRunsiteTourLabel);
+        bool resolvedRunsiteTourOpenInNewTab = ResolveRunsiteTourOpenInNewTab(configuration);
+
+        _runsitePacks = BaseRunsitePacks
+            .Select(item => item with
+            {
+                TourHref = resolvedRunsiteTourHref,
+                TourLabel = resolvedRunsiteTourLabel,
+                TourActionHref = $"/runsites/packs/{item.Id}/tour",
+                TourActionLabel = resolvedRunsiteTourActionLabel,
+                TourActionOpenInNewTab = false,
+                TourOpenInNewTab = resolvedRunsiteTourOpenInNewTab
+            })
+            .ToArray();
+    }
+
     public IReadOnlyList<MediaArtifactDocument> ListJackpointBriefings() => JackpointBriefings;
-    public IReadOnlyList<MediaArtifactDocument> ListRunsitePacks() => RunsitePacks;
+    public IReadOnlyList<MediaArtifactDocument> ListRunsitePacks() => _runsitePacks;
     public IReadOnlyList<MediaArtifactDocument> ListRunbookPrimers() => RunbookPrimers;
 
     public MediaArtifactDocument GetJackpointBriefing(string id) => GetById(JackpointBriefings, id, "JACKPOINT briefing");
-    public MediaArtifactDocument GetRunsitePack(string id) => GetById(RunsitePacks, id, "RUNSITE pack");
+    public MediaArtifactDocument GetRunsitePack(string id) => GetById(_runsitePacks, id, "RUNSITE pack");
     public MediaArtifactDocument GetRunbookPrimer(string id) => GetById(RunbookPrimers, id, "RUNBOOK primer");
 
     public string BuildDocumentMarkdown(MediaArtifactDocument document, string horizonLabel, string boundary)
@@ -81,6 +115,22 @@ public sealed class MediaArtifactHorizonsService
         };
         lines.AddRange(document.Highlights.Select(item => $"- {item}"));
         lines.Add(string.Empty);
+        if (!string.IsNullOrWhiteSpace(document.Style))
+        {
+            lines.Add("## Style");
+            lines.Add(string.Empty);
+            lines.Add(document.Style);
+            lines.Add(string.Empty);
+        }
+
+        if (!string.IsNullOrWhiteSpace(document.TourLabel) && !string.IsNullOrWhiteSpace(document.TourHref))
+        {
+            lines.Add("## 3D Tour");
+            lines.Add(string.Empty);
+            lines.Add($"{document.TourLabel}: {document.TourHref}");
+            lines.Add(string.Empty);
+        }
+
         lines.Add("## Boundary");
         lines.Add(string.Empty);
         lines.Add(boundary);
@@ -100,15 +150,99 @@ public sealed class MediaArtifactHorizonsService
                 document.MarkdownRoute,
                 document.JsonRoute,
                 highlights = document.Highlights,
+                style = document.Style,
+                tour_href = document.TourHref,
+                tour_label = document.TourLabel,
+                tour_open_in_new_tab = document.TourOpenInNewTab,
+                tour_action_href = document.TourActionHref,
+                tour_action_label = document.TourActionLabel,
+                tour_action_open_in_new_tab = document.TourActionOpenInNewTab,
+                artifact_capability = BuildPublicArtifactCapability(horizonId, document),
                 boundary,
                 status = "live",
                 generated_at_utc = DateTimeOffset.UtcNow
             },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
+    private object? BuildPublicArtifactCapability(string horizonId, MediaArtifactDocument document)
+    {
+        if (_capabilities is null || !TryResolveArtifactKind(horizonId, out string normalizedHorizonId, out string artifactKind))
+        {
+            return null;
+        }
+
+        HorizonCapabilityHealthSnapshot health = _capabilities.GetHealth(normalizedHorizonId, artifactKind, publicSafe: true);
+        return new
+        {
+            horizon_id = health.HorizonId,
+            capability_id = health.CapabilityId,
+            artifact_kind = health.ArtifactKind,
+            public_label = health.PublicLabel,
+            capability_slot = health.CapabilitySlot,
+            status = health.Status,
+            request_supported = string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
+            requires_authentication = health.RequiresAuthentication,
+            public_visible = health.PublicVisible,
+            source_ref = $"{health.HorizonId}:{document.Id}",
+            visibility = "public_safe"
+        };
+    }
+
+    private static bool TryResolveArtifactKind(string horizonId, out string normalizedHorizonId, out string artifactKind)
+    {
+        normalizedHorizonId = NormalizeHorizonId(horizonId);
+        artifactKind = normalizedHorizonId switch
+        {
+            "jackpoint" => "briefing_video",
+            "runbook-press" => "document_export",
+            "runsite" => "tour",
+            _ => string.Empty
+        };
+        return !string.IsNullOrWhiteSpace(artifactKind);
+    }
+
+    private static string NormalizeHorizonId(string horizonId)
+        => string.Equals(horizonId, "runbook_press", StringComparison.OrdinalIgnoreCase)
+            ? "runbook-press"
+            : horizonId.Trim();
+
     private static MediaArtifactDocument GetById(IReadOnlyList<MediaArtifactDocument> documents, string id, string label)
         => documents.FirstOrDefault(item => string.Equals(item.Id, id?.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Unknown {label} '{id}'.");
+
+    private static string ResolveRunsiteTourHref(IConfiguration? configuration)
+        => FirstConfiguredValue(
+            configuration?["RunsiteTour:Href"],
+            configuration?["RunsiteTour:SourceHref"])
+            ?? DefaultRunsiteTourHref;
+
+    private static string ResolveRunsiteTourLabel(IConfiguration? configuration)
+        => FirstConfiguredValue(
+            configuration?["RunsiteTour:Label"],
+            configuration?["RunsiteTour:SourceLabel"])
+            ?? DefaultRunsiteTourLabel;
+
+    private static string ResolveRunsiteTourActionLabel(IConfiguration? configuration, string fallbackLabel)
+    {
+        string? configuredActionLabel = FirstConfiguredValue(
+            configuration?["RunsiteTour:ActionLabel"],
+            configuration?["RunsiteTour:OpenLabel"],
+            configuration?["RunsiteTour:ButtonLabel"]);
+        return configuredActionLabel ?? $"Open {fallbackLabel}";
+    }
+
+    private static bool ResolveRunsiteTourOpenInNewTab(IConfiguration? configuration)
+        => bool.TryParse(FirstConfiguredValue(
+                configuration?["RunsiteTour:OpenInNewTab"],
+                configuration?["RunsiteTour:SourceOpenInNewTab"]),
+            out bool openInNewTab)
+            ? openInNewTab
+            : DefaultRunsiteTourOpenInNewTab;
+
+    private static string? FirstConfiguredValue(params string?[] values)
+        => values
+            .Select(static item => string.IsNullOrWhiteSpace(item) ? null : item.Trim())
+            .FirstOrDefault(static item => item is not null);
 }
 
 public sealed record MediaArtifactDocument(
@@ -117,4 +251,11 @@ public sealed record MediaArtifactDocument(
     string Summary,
     string MarkdownRoute,
     string JsonRoute,
-    IReadOnlyList<string> Highlights);
+    IReadOnlyList<string> Highlights,
+    string? Style = null,
+    string? TourHref = null,
+    string? TourLabel = null,
+    bool TourOpenInNewTab = true,
+    string? TourActionHref = null,
+    string? TourActionLabel = null,
+    bool TourActionOpenInNewTab = false);

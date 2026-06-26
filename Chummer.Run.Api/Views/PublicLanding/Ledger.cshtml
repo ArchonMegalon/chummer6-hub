@@ -20,6 +20,7 @@
     var newsreelBroadcast = worldTurnBriefing?.Broadcast;
     var accountCtaHref = Model.Chrome.Authenticated ? "/account/ledger/onboarding" : "/login?next=%2Faccount%2Fledger%2Fonboarding";
     var accountCtaLabel = Model.Chrome.Authenticated ? "Open onboarding" : "Join a faction";
+    var digestCapability = Model.DigestCapability;
 
     Func<string, string> factionSlug = id => id.Replace('_', '-');
     Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
@@ -169,6 +170,10 @@
             <span><strong>@worldFactions.Length</strong> factions</span>
             <span><strong>@activeHeat</strong> heat</span>
             <span><strong>@(pressureDelta >= 0 ? "+" : string.Empty)@pressureDelta</strong> pressure</span>
+            @if (digestCapability is not null)
+            {
+                <span><strong>@UndetectableHumanizerCopyAdapter.HumanizeLedger(digestCapability.PublicLabel)</strong> @UndetectableHumanizerCopyAdapter.HumanizeLedger(digestCapability.Status)</span>
+            }
         </div>
         <section class="ledger-flagship__briefing" aria-label="Command briefing">
             <article class="ledger-flagship__briefing-card">

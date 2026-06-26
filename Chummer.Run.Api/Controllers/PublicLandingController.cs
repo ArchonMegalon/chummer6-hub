@@ -49,6 +49,9 @@ public sealed class PublicLandingController : Controller
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
     private readonly ParticipationOperatorNotificationService _participationNotifications;
+    private readonly RunsiteTourQuotaService _runsiteTourQuota;
+    private readonly HorizonArtifactRequestService? _artifactRequests;
+    private readonly HorizonCapabilityService _horizonCapabilities;
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
@@ -108,6 +111,7 @@ public sealed class PublicLandingController : Controller
         IdentityLinkService links,
         UserExperienceService experience,
         ParticipationOperatorNotificationService participationNotifications,
+        RunsiteTourQuotaService runsiteTourQuota,
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
@@ -147,7 +151,9 @@ public sealed class PublicLandingController : Controller
         AurPackageCatalogService aurPackages,
         IHttpClientFactory httpClientFactory,
         IWebHostEnvironment webHostEnvironment,
-        ILogger<PublicLandingController> logger)
+        ILogger<PublicLandingController> logger,
+        HorizonArtifactRequestService? artifactRequests = null,
+        HorizonCapabilityService? horizonCapabilities = null)
     {
         _landing = landing;
         _flipLinkDocumentPortal = flipLinkDocumentPortal;
@@ -161,6 +167,9 @@ public sealed class PublicLandingController : Controller
         _links = links;
         _experience = experience;
         _participationNotifications = participationNotifications;
+        _runsiteTourQuota = runsiteTourQuota;
+        _artifactRequests = artifactRequests;
+        _horizonCapabilities = horizonCapabilities ?? new HorizonCapabilityService(configuration);
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
@@ -220,6 +229,7 @@ public sealed class PublicLandingController : Controller
         IdentityLinkService links,
         UserExperienceService experience,
         ParticipationOperatorNotificationService participationNotifications,
+        RunsiteTourQuotaService runsiteTourQuota,
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
@@ -258,7 +268,9 @@ public sealed class PublicLandingController : Controller
         WindowsProofInstallerService windowsProofInstallers,
         AurPackageCatalogService aurPackages,
         IWebHostEnvironment webHostEnvironment,
-        ILogger<PublicLandingController> logger)
+        ILogger<PublicLandingController> logger,
+        HorizonArtifactRequestService? artifactRequests = null,
+        HorizonCapabilityService? horizonCapabilities = null)
         : this(
             landing,
             flipLinkDocumentPortal,
@@ -272,6 +284,7 @@ public sealed class PublicLandingController : Controller
             links,
             experience,
             participationNotifications,
+            runsiteTourQuota,
             installLinking,
             campaignSpine,
             workspaceServerPlane,
@@ -311,7 +324,9 @@ public sealed class PublicLandingController : Controller
             aurPackages,
             httpClientFactory: null!,
             webHostEnvironment,
-            logger)
+            logger,
+            artifactRequests,
+            horizonCapabilities)
     {
     }
 
@@ -3747,7 +3762,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Live heat updates are real now",
                 "Private aftermath recaps are real now",
                 "Live play and aftermath stay separate on purpose"
-            ]);
+            ],
+            horizonCapability: BuildPublicHorizonCapability(
+                "table-pulse",
+                "debrief_packet",
+                "table-pulse:live-and-aftermath"));
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
@@ -3782,7 +3801,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 "no_automatic_world_changes",
                 "no_player_scoring",
                 "no_public_surveillance"
-            }
+            },
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "table-pulse",
+                "debrief_packet",
+                "table-pulse:live-and-aftermath")
         });
 
     [HttpGet("/origin-dossier")]
@@ -3843,7 +3866,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Story before media",
                 "Approved canon stays bounded",
                 "The sheet remains authoritative"
-            ]);
+            ],
+            horizonCapability: BuildPublicHorizonCapability(
+                "origin-dossier",
+                "dossier_media",
+                "origin-dossier:public-story-packet"));
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
@@ -3929,8 +3956,9 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult RunsiteReceiptJson()
     {
         IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons?.ListRunsitePacks() ?? Array.Empty<MediaArtifactDocument>();
-        string firstPackMarkdownHref = packs.FirstOrDefault()?.MarkdownRoute ?? "/runsites/packs/redmond-dockyard-pack.md";
-        string firstPackJsonHref = packs.FirstOrDefault()?.JsonRoute ?? "/runsites/packs/redmond-dockyard-pack.json";
+        MediaArtifactDocument? firstPack = packs.FirstOrDefault();
+        string firstPackMarkdownHref = firstPack?.MarkdownRoute ?? "/runsites/packs/redmond-dockyard-pack.md";
+        string firstPackJsonHref = firstPack?.JsonRoute ?? "/runsites/packs/redmond-dockyard-pack.json";
         return Ok(new
         {
             Horizon = "runsite",
@@ -3973,6 +4001,140 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("application/json")]
     public IActionResult RunsitePackJson([FromRoute] string packId)
         => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunsitePack(packId), "runsite", "Spatial-prep guide only. This route does not claim a full overlay, VTT, or tactical control stack."), "application/json");
+
+    [HttpGet("/runsites/packs/{packId}/tour")]
+    public async Task<IActionResult> RunsiteTourDispatch([FromRoute] string packId, CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            _logger.LogInformation("Runsite tour dispatch rejected because no authenticated user was present for {PackId}.", packId);
+            return Redirect($"/login?next={Uri.EscapeDataString($"/runsites/packs/{packId}/tour")}");
+        }
+
+        MediaArtifactDocument pack;
+        try
+        {
+            pack = _mediaHorizons.GetRunsitePack(packId);
+        }
+        catch (KeyNotFoundException)
+        {
+            _logger.LogWarning("Runsite tour dispatch requested unknown pack {PackId}.", packId);
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(pack.TourHref))
+        {
+            _logger.LogInformation("Runsite tour dispatch skipped because {PackId} has no configured tour href.", packId);
+            return NotFound();
+        }
+
+        RunsiteTourQuotaSnapshot quota;
+        try
+        {
+            if (_artifactRequests is not null)
+            {
+                HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
+                    new HorizonArtifactRequestCreateRequest(
+                        HorizonId: "runsite",
+                        ArtifactKindOrCapabilityId: "tour",
+                        UserId: subject.SubjectId,
+                        SourceRef: $"runsite:{packId}",
+                        Visibility: "private",
+                        ExternalProcessingConsent: true,
+                        Email: subject.Email),
+                    consumeQuota: true);
+                if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Runsite tour dispatch denied for {UserId} on {PackId}; blocked reasons: {BlockedReasons}.",
+                        subject.SubjectId,
+                        packId,
+                        string.Join(", ", receipt.BlockedReasons));
+                    if (receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase))
+                    {
+                        return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: "3D-tour allowance is exhausted for this week.");
+                    }
+
+                    return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Unable to create a Chummer-owned 3D-tour request receipt.");
+                }
+
+                if (receipt.Quota is null)
+                {
+                    _logger.LogWarning("Runsite tour dispatch accepted without quota receipt for {UserId} on {PackId}.", subject.SubjectId, packId);
+                    return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Unable to confirm 3D-tour allowance receipt right now.");
+                }
+
+                quota = new RunsiteTourQuotaSnapshot(
+                    receipt.Quota.UserId,
+                    receipt.Quota.SupporterActive,
+                    receipt.Quota.WeeklyLimit,
+                    receipt.Quota.WeeklyUsed,
+                    receipt.Quota.WeeklyRemaining,
+                    receipt.Quota.WindowStartUtc,
+                    receipt.Quota.WindowEndUtc);
+                Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+            }
+            else
+            {
+                quota = _runsiteTourQuota.ConsumeTour(subject.SubjectId, email: subject.Email);
+            }
+
+            Response.Headers["X-Runsite-Tour-Limit"] = quota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Runsite-Tour-Remaining"] = quota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Runsite tour dispatch failed because billing is unavailable for {UserId}/{PackId}.", subject.SubjectId, packId);
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Runsite tour dispatch denied for {UserId} on {PackId} due quota enforcement.", subject.SubjectId, packId);
+            return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Runsite tour dispatch failed unexpectedly for {UserId} on {PackId}.", subject.SubjectId, packId);
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Unable to process 3D-tour dispatch right now.");
+        }
+
+        _logger.LogInformation(
+            "Runsite tour dispatch allowed for {UserId} on {PackId}; supporter={SupporterActive}, remaining={WeeklyRemaining}/{WeeklyLimit}.",
+            subject.SubjectId,
+            packId,
+            quota.SupporterActive,
+            quota.WeeklyRemaining,
+            quota.WeeklyLimit);
+
+        return Redirect(pack.TourHref);
+    }
+
+    [HttpGet("/runsites/tour-quota/me")]
+    [ProducesResponseType<RunsiteTourQuotaSnapshot>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RunsiteTourQuota(CancellationToken cancellationToken = default)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Sign in before checking 3D-tour allowance.");
+        }
+
+        try
+        {
+            return Ok(_runsiteTourQuota.GetQuota(subject.SubjectId, email: subject.Email));
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: ex.Message);
+        }
+    }
 
     [HttpGet("/roadmap/runsite")]
     public IActionResult RunsiteRoadmapAlias()
@@ -4778,7 +4940,13 @@ document.addEventListener('DOMContentLoaded', function () {
         BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
         return briefing is null
             ? NotFound()
-            : Ok(briefing);
+            : Ok(briefing with
+            {
+                ArtifactCapability = BuildPublicHorizonCapability(
+                    "black-ledger",
+                    "world_tick_digest",
+                    $"black-ledger:turn-{requestedTurn}:newsreel")
+            });
     }
 
     [HttpGet("/ledger/newsroom")]
@@ -4847,7 +5015,13 @@ document.addEventListener('DOMContentLoaded', function () {
         ApplyNoStoreHeaders(Response.Headers);
         return packet is null || packet.ToTurn != requestedTurn
             ? NotFound()
-            : Ok(packet);
+            : Ok(packet with
+            {
+                ArtifactCapability = BuildPublicHorizonCapability(
+                    "black-ledger",
+                    "world_tick_digest",
+                    $"black-ledger:turn-{requestedTurn}:validation")
+            });
     }
 
     [HttpGet("/ledger/turns/{turn}/dispatches")]
@@ -5138,7 +5312,15 @@ document.addEventListener('DOMContentLoaded', function () {
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             string? factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId;
             BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(1, factionId);
-            return packet is null ? NotFound() : Ok(packet);
+            return packet is null
+                ? NotFound()
+                : Ok(packet with
+                {
+                    ArtifactCapability = BuildPublicHorizonCapability(
+                        "black-ledger",
+                        "world_tick_digest",
+                        $"black-ledger:turn-{packet.ToTurn}:validation")
+                });
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -6819,19 +7001,20 @@ document.addEventListener('DOMContentLoaded', function () {
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/runsites", cancellationToken);
         IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons.ListRunsitePacks();
+        string firstPackMarkdownHref = packs.FirstOrDefault()?.MarkdownRoute ?? "/runsites/packs/redmond-dockyard-pack.md";
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runsites",
             title: "RUNSITE",
             description: "Site cards, threat clocks, prep paths, and Chummer runsite notes.",
             eyebrow: "Prep",
             heading: "RUNSITE",
-            intro: "RUNSITE keeps prep packs readable in public, while workspace prep, runboard continuity, and prep-library launch stay on account pages.",
+            intro: "RUNSITE keeps prep packs readable in public, and each runsite keeps its own scene style for quick orientation with optional 3D tours.",
             boundaryLine: "Spatial-prep guide only. This page does not promise tactical overlays, live map control, or full VTT integration.",
-            summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
+            summaryPoints: ["Site cards", "Threat clocks", "Scene styles", "Signed-in prep bench"],
             documents: packs,
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUNSITE" : "Open RUNSITE", subject is null ? "/login?next=%2Faccount%2Frunsites" : "/account/runsites", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open prep overview", "/runsites/prep-network", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open first runsite", packs[0].MarkdownRoute, "ghost"),
+            tertiaryAction: new TrustPageActionViewModel("Open first runsite", firstPackMarkdownHref, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildRunsiteConnectedLanePacket(subject));
     }
@@ -7288,7 +7471,20 @@ document.addEventListener('DOMContentLoaded', function () {
             Intro: intro,
             BoundaryLine: boundaryLine,
             SummaryPoints: summaryPoints,
-            Documents: documents.Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            Documents: documents.Select(item => new MediaArtifactCardViewModel(
+                item.Id,
+                item.Label,
+                item.Summary,
+                item.MarkdownRoute,
+                item.JsonRoute,
+                item.Highlights,
+                item.Style,
+                item.TourHref,
+                item.TourLabel,
+                item.TourOpenInNewTab,
+                item.TourActionHref,
+                item.TourActionLabel,
+                item.TourActionOpenInNewTab)).ToArray(),
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
             TertiaryAction: tertiaryAction,
@@ -7599,6 +7795,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {
         if (subject is null)
         {
+            string firstPackJsonHref = _mediaHorizons.ListRunsitePacks().FirstOrDefault()?.JsonRoute ?? "/runsites/packs/redmond-dockyard-pack.json";
             BlackLedgerFollowThroughCueViewModel[] guestCues =
             [
                 new(
@@ -7609,7 +7806,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 new(
                     Label: "Public runsite pack",
                     Summary: $"{_mediaHorizons.ListRunsitePacks().Count} inspectable runsite pack(s) are already readable without opening the signed-in prep path.",
-                    Href: "/runsites/packs/redmond-dockyard-pack.json",
+                    Href: firstPackJsonHref,
                     StatusLabel: "Public"),
                 new(
                     Label: "Prep details",
@@ -10403,7 +10600,8 @@ Boundary:
         IReadOnlyList<TrustPageSectionViewModel> sections,
         IReadOnlyList<TrustPageActionViewModel> actions,
         CancellationToken cancellationToken,
-        IReadOnlyList<string>? summaryPoints = null)
+        IReadOnlyList<string>? summaryPoints = null,
+        PublicHorizonCapabilityViewModel? horizonCapability = null)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
@@ -10431,7 +10629,8 @@ Boundary:
                 .ToArray(),
             SummaryPoints: PublicFacingCopyHumanizer.CleanLines(summaryPoints),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            HorizonCapability: horizonCapability);
     }
 
     private async Task<TrustPageViewModel> BuildDocumentPortalHomePageModel(CancellationToken cancellationToken)
@@ -10576,7 +10775,13 @@ Boundary:
                 "First-party route published",
                 "External viewer optional",
                 "Fallback PDF is current"
-            ]);
+            ],
+            horizonCapability: string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                ? BuildPublicHorizonCapability(
+                    "origin-dossier",
+                    "dossier_media",
+                    $"origin-dossier:document:{document.Slug}")
+                : null);
 
     private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
@@ -10644,6 +10849,10 @@ Boundary:
             Intro: "Turn one table pain into a clear Chummer request before it drifts into generic feedback, unsupported roadmap claims, or implementation guesswork.",
             CanonicalLane: _karmaForge.CanonicalLane,
             EntryLane: _karmaForge.EntryLane,
+            DiscoveryCapability: BuildPublicHorizonCapability(
+                "karma-forge",
+                "discovery_packet",
+                "karma-forge:public-intake"),
             Dashboard: _karmaForge.GetDashboardSummary(),
             DiscoverySteps: _karmaForge.GetDiscoverySteps(),
             ExternalStages: _karmaForge.GetExternalStageProjections(),
@@ -10824,6 +11033,10 @@ Boundary:
             CandidateDecisionMeaning: submission.Candidate.CandidateDecisionMeaning,
             ReporterNextAction: submission.ReporterNextAction,
             ConsentSummary: submission.ConsentSummary,
+            DiscoveryCapability: BuildPublicHorizonCapability(
+                "karma-forge",
+                "discovery_packet",
+                $"karma-forge:{submission.SubmissionId}"),
             ExternalStages: submission.Packet.Source.ExternalStages,
             JourneyProofEventRefs: submission.Packet.Source.JourneyProofEventRefs,
             Highlights:
@@ -10841,6 +11054,27 @@ Boundary:
             ImpactHypothesisJson: JsonSerializer.Serialize(submission.ImpactHypothesis, jsonOptions),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private PublicHorizonCapabilityViewModel BuildPublicHorizonCapability(
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string sourceRef,
+        string visibility = "public_safe")
+    {
+        HorizonCapabilityHealthSnapshot health = _horizonCapabilities.GetHealth(horizonId, artifactKindOrCapabilityId, publicSafe: true);
+        return new PublicHorizonCapabilityViewModel(
+            HorizonId: health.HorizonId,
+            CapabilityId: health.CapabilityId,
+            ArtifactKind: health.ArtifactKind,
+            PublicLabel: health.PublicLabel,
+            CapabilitySlot: health.CapabilitySlot,
+            Status: health.Status,
+            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
+            RequiresAuthentication: health.RequiresAuthentication,
+            PublicVisible: health.PublicVisible,
+            SourceRef: sourceRef,
+            Visibility: visibility);
     }
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
@@ -15032,6 +15266,10 @@ echo "Help: ${HELP_URL}"
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Latest bulletin", "/ledger/newsroom", "secondary"),
+            DigestCapability: BuildPublicHorizonCapability(
+                "black-ledger",
+                "world_tick_digest",
+                $"black-ledger:turn-{newsTurn}:digest"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }

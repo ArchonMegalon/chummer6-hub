@@ -144,6 +144,14 @@
                 }
             </div>
         }
+        @if (!policyPage && !(helpPage || contactPage) && Model.HorizonCapability is not null)
+        {
+            <div class="trust-claim__details">
+                <span>@PublicText(Model.HorizonCapability.PublicLabel)</span>
+                <span>@PublicText(Model.HorizonCapability.CapabilitySlot.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</span>
+                <span>@PublicText(Model.HorizonCapability.Status)</span>
+            </div>
+        }
     </div>
     @if (!(helpPage || contactPage))
     {

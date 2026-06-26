@@ -2175,6 +2175,10 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
             ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
+            ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(tempRoot, "billing-store.json"),
+            ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(tempRoot, "myfirstbook-usage-store.json"),
+            ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-usage-store.json"),
+            ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-request-receipts.json"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
             ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "true",
@@ -2572,6 +2576,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
     Assert(!homeSource.Contains("story-guide-tail", StringComparison.Ordinal), "home should use quieter release-footnote sections instead of the older full-width CTA band.");
     var accountsControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "AccountsController.cs"));
+    var publicControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
@@ -2987,6 +2992,14 @@ async Task VerifyPublicLandingProjectionAsync()
         configuration,
         answerlyPolicy,
         new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate()));
+    BrilliantDirectoriesBillingStore billingStore = new(configuration);
+    MyFirstBookUsageStore myFirstBookUsage = new(configuration);
+    BrilliantDirectoriesBillingService billing = new(billingStore, myFirstBookUsage, configuration);
+    HorizonCapabilityService horizonCapabilities = new(configuration);
+    HorizonArtifactQuotaService horizonArtifactQuota = new(new HorizonArtifactUsageStore(configuration), horizonCapabilities, billing);
+    HorizonArtifactRequestReceiptStore horizonArtifactRequestReceipts = new(configuration);
+    HorizonArtifactRequestService horizonArtifactRequests = new(horizonCapabilities, horizonArtifactQuota, horizonArtifactRequestReceipts);
+    RunsiteTourQuotaService runsiteTourQuota = new(horizonArtifactQuota, horizonCapabilities);
     var packageCatalog = new PublicPackageCatalogService();
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
     var communityCreatorHorizons = new CommunityCreatorHorizonsService(store, installLinkingStore, publicCreatorDiscovery);
@@ -3008,14 +3021,14 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
     var aurPackages = new AurPackageCatalogService(configuration);
-    var controller = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3195,6 +3208,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedRoadmapDetailModel = authenticatedRoadmapDetailView?.Model as FeatureDetailPageViewModel;
     Assert(authenticatedRoadmapDetailModel?.TrustPulse is not null, "authenticated roadmap detail should keep the weekly public trust pulse visible.");
     Assert(authenticatedRoadmapDetailModel?.SignedInStatus is not null, "authenticated roadmap detail should project the shared signed-in trust status.");
+    authenticatedLandingController.ControllerContext = AuthenticatedControllerContext("subject-token");
+    var runsiteTourDispatch = await authenticatedLandingController.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None) as RedirectResult;
+    Assert(runsiteTourDispatch is not null && string.Equals(runsiteTourDispatch.Url, "https://my.matterport.com/show/?m=ax2JhiPGk5P", StringComparison.Ordinal), "authenticated runsite tour dispatch should redirect to the configured tour provider only after Chummer accepts the request.");
+    Assert(authenticatedLandingController.Response.Headers.TryGetValue("X-Horizon-Artifact-Request-Id", out var runsiteArtifactRequestId)
+        && runsiteArtifactRequestId.ToString().StartsWith("horizon-artifact-", StringComparison.Ordinal), "runsite tour dispatch should expose the Chummer-owned artifact request id header.");
+    HorizonArtifactRequestReceipt runsiteTourReceipt = AssertSingle(horizonArtifactRequestReceipts.ListRecent("runsite", "subject.demo", limit: 5), "runsite tour dispatch should persist exactly one shared artifact request receipt for the signed-in subject.");
+    Assert(string.Equals(runsiteTourReceipt.Status, "accepted", StringComparison.Ordinal), "runsite tour dispatch receipt should be accepted.");
+    Assert(string.Equals(runsiteTourReceipt.SourceRef, "runsite:redmond-dockyard-pack", StringComparison.Ordinal), "runsite tour dispatch receipt should bind to the runsite source ref.");
+    Assert(runsiteTourReceipt.Quota?.WeeklyUsed == 1 && runsiteTourReceipt.Quota.WeeklyRemaining == 0, "runsite tour dispatch should consume exactly one weekly allowance through the shared artifact request path.");
     var authenticatedArtifactDetailView = await authenticatedLandingController.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
     var authenticatedArtifactDetailModel = authenticatedArtifactDetailView?.Model as FeatureDetailPageViewModel;
     Assert(authenticatedArtifactDetailModel?.TrustPulse is not null, "authenticated artifact detail should keep the weekly public trust pulse visible.");
@@ -5750,7 +5772,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -7851,6 +7873,16 @@ void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+T AssertSingle<T>(IReadOnlyList<T> items, string message)
+{
+    if (items.Count != 1)
+    {
+        throw new InvalidOperationException($"{message} Count: {items.Count}.");
+    }
+
+    return items[0];
 }
 
 async Task VerifyHostedBoundedContextCoverageWorkflowAsync()

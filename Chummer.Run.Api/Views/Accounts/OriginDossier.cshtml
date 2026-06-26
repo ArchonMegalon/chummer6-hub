@@ -88,6 +88,17 @@
                     <span>Telegram share</span>
                     <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
                 </div>
+                @if (publication.ArtifactCapability is not null)
+                {
+                    <div class="settings-summary-row">
+                        <span>@Clean(publication.ArtifactCapability.PublicLabel)</span>
+                        <strong>@Clean(publication.ArtifactCapability.Status)</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Capability slot</span>
+                        <strong>@Clean(publication.ArtifactCapability.CapabilitySlot.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</strong>
+                    </div>
+                }
             </div>
             @if (publication.MissingGoldRequirements.Count > 0)
             {

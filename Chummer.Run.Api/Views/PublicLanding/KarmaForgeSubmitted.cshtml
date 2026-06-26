@@ -56,6 +56,10 @@
             <span class="tag">Consent</span>
             <p>@SanitizePublicText(Model.ConsentSummary)</p>
         </article>
+        <article class="trust-rail">
+            <span class="tag">@SanitizePublicText(Model.DiscoveryCapability.PublicLabel)</span>
+            <p>@SanitizePublicText(Model.DiscoveryCapability.CapabilitySlot.Replace("_", " ", StringComparison.OrdinalIgnoreCase)) · @SanitizePublicText(Model.DiscoveryCapability.Status)</p>
+        </article>
     </div>
 </section>
 

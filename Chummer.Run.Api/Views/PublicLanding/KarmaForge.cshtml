@@ -148,6 +148,10 @@
             <span class="tag">Core gap</span>
             <p>@Model.Dashboard.CoreRulesetGapCount request(s) look like core ruleset work.</p>
         </article>
+        <article class="trust-rail">
+            <span class="tag">@SanitizePublicText(Model.DiscoveryCapability.PublicLabel)</span>
+            <p>@SanitizePublicText(Model.DiscoveryCapability.CapabilitySlot.Replace("_", " ", StringComparison.OrdinalIgnoreCase)) · @SanitizePublicText(Model.DiscoveryCapability.Status)</p>
+        </article>
     </div>
 </section>
 
