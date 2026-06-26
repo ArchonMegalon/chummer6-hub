@@ -160,6 +160,26 @@ public sealed record OriginDossierProviderCreditReservationResult(
     IReadOnlyList<string> BlockedRequirements,
     DateTimeOffset CheckedAtUtc);
 
+public sealed record SubscribrWebhookRequest(
+    string? EventId,
+    string? EventType,
+    string? ProviderScriptId,
+    string? ProviderChannelId,
+    string? ProviderIdeaId,
+    string? PacketPath,
+    string? MarkdownExportPath);
+
+public sealed record SubscribrWebhookResult(
+    string EventId,
+    string Status,
+    string SignatureStatus,
+    string ReplayStatus,
+    string ValidationStatus,
+    string? PacketId,
+    string? ReceiptPath,
+    string? RejectionReason,
+    DateTimeOffset ProcessedAtUtc);
+
 public sealed record GroupRoleDto(
     string Role,
     string DisplayName,

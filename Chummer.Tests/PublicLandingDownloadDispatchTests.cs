@@ -462,6 +462,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", model.DigestCapability.Status);
         Assert.True(model.DigestCapability.RequestSupported);
         Assert.Equal("black-ledger:turn-1:digest", model.DigestCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         Assert.Equal("/ledger/turns/1/digest", model.SecondaryAction.Href);
         Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(model.DigestCapability), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(model.DigestCapability), StringComparison.OrdinalIgnoreCase);
@@ -598,6 +606,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", model.HorizonCapability.Status);
         Assert.True(model.HorizonCapability.RequestSupported);
         Assert.Equal("table-pulse:live-and-aftermath", model.HorizonCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=table-pulse&artifactKindOrCapabilityId=table-pulse-debrief", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=table-pulse&artifactKindOrCapabilityId=table-pulse-debrief", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=table-pulse&artifactKindOrCapabilityId=table-pulse-debrief", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         Assert.Contains(model.Actions, action =>
             action.Label == "Open aftermath"
             && action.Href == "/table-pulse/debrief");
@@ -631,6 +647,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", model.HorizonCapability.Status);
         Assert.True(model.HorizonCapability.RequestSupported);
         Assert.Equal("origin-dossier:public-story-packet", model.HorizonCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         Assert.Contains("story packet", model.Intro, StringComparison.Ordinal);
         Assert.Contains("sheet stays authoritative", model.Intro, StringComparison.Ordinal);
         TrustPageSectionViewModel boundarySection = Assert.Single(model.Sections, section => section.Id == "origin_boundary");
@@ -670,6 +694,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("origin-dossier-media", model.HorizonCapability!.CapabilityId);
         Assert.Equal("available", model.HorizonCapability.Status);
         Assert.Equal("origin-dossier:document:origin-dossier-the-name-she-chose", model.HorizonCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         string serialized = JsonSerializer.Serialize(model.HorizonCapability);
         Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
@@ -2577,6 +2609,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", model.DiscoveryCapability.Status);
         Assert.True(model.DiscoveryCapability.RequestSupported);
         Assert.Equal("karma-forge:public-intake", model.DiscoveryCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
     }
 
     [Fact]
@@ -2598,6 +2638,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("disabled", model.DiscoveryCapability.Status);
         Assert.False(model.DiscoveryCapability.RequestSupported);
         Assert.Equal("karma-forge:sample-submission-id", model.DiscoveryCapability.SourceRef);
+        Assert.NotNull(model.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         Assert.DoesNotContain("Icanpreneur", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Deftform", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("MetaSurvey", JsonSerializer.Serialize(model.DiscoveryCapability), StringComparison.OrdinalIgnoreCase);
