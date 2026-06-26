@@ -3640,13 +3640,13 @@ public sealed class VerificationEntryPointTests
         string accountViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string accountView = File.ReadAllText(accountViewPath);
 
-        Assert.Contains("Decision history", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent decisions", accountView, StringComparison.Ordinal);
         Assert.Contains("PublicationDecisionOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("PublicationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationOutcomeSummary", accountView, StringComparison.Ordinal);
         Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent prep starts", accountView, StringComparison.Ordinal);
-        Assert.Contains("Recent travel prefetch history", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent travel staging", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent aftermath recap packages and replay outputs", accountView, StringComparison.Ordinal);
     }
 

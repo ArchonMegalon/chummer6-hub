@@ -75,8 +75,8 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current public release, member downloads, and help stay in one account view."
-        : $"{openSupportCases} tracked support case(s), current public release status, and member downloads stay in one account view.";
+        ? "Current app, downloads, and help stay in one account view."
+        : $"{openSupportCases} tracked support case(s), current app notes, and downloads stay in one account view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase)
@@ -660,7 +660,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Linked install path</span>
                             <strong>@accountRailInstallSummary</strong>
-                            <p>The download stays the same for everyone; the account-aware piece is account return, install history, and support history.</p>
+                            <p>The download stays the same for everyone; the account only keeps linked copies and support in reach.</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
@@ -699,7 +699,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Linked install path</span>
                     <strong>@accountRailInstallSummary</strong>
-                    <p>The download stays the same for everyone; the account-aware piece is account return, install history, and support history.</p>
+                    <p>The download stays the same for everyone; the account only keeps linked copies and support in reach.</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
@@ -720,7 +720,7 @@
             @if (showAccountStatusDrawer)
             {
                 <details class="details-drawer">
-                    <summary>Release and access status</summary>
+                    <summary>Account state</summary>
                     @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInTrustStatus)
                 </details>
             }
@@ -874,7 +874,7 @@
             <section id="support" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Support</h2>
-                    <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Visible status stays attached to the case instead of disappearing into email.</p>
+                    <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Progress stays attached to the case instead of disappearing into email.</p>
                 </div>
                 @if (selectedSupportCase is not null)
                 {
@@ -888,7 +888,7 @@
                                 <strong>@selectedSupportCase.CaseId</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Status</span>
+                                <span>State</span>
                                 <strong>@(selectedSupportCaseSummary?.StatusLabel ?? HumanizeStatus(selectedSupportCase.Status, "New"))</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1219,7 +1219,7 @@
                 @if (Model.InstallLinking.RecentReceipts.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Download history</summary>
+                        <summary>Recent downloads</summary>
                         <div class="settings-summary-list">
                             @foreach (var receipt in Model.InstallLinking.RecentReceipts.Take(5))
                             {
@@ -1332,7 +1332,7 @@
                     @if (Model.CampaignSpine.Restore.RecentArtifacts.Count > 0)
                     {
                         <details class="details-drawer">
-                            <summary>Files and reconnect history</summary>
+                            <summary>Files and reconnect</summary>
                             <ul class="muted-copy">
                                 @foreach (var artifact in Model.CampaignSpine.Restore.RecentArtifacts)
                                 {
@@ -1455,7 +1455,7 @@
                             <article>
                                 <h3>@(hasLinkedDesktop ? "Fallback" : "Onboarding")</h3>
                                 <p>@(hasLinkedDesktop
-                                    ? "If the desktop app does not answer, stay on this account path and reopen from the browser or devices page."
+                                    ? "If the desktop app does not answer, stay on this account path and reopen from the browser or Installs."
                                     : "This account does not have a linked desktop copy yet, so clicks should take you into install and claim first.")</p>
                                 <div class="stacked-actions">
                                     <a class="button-like button-like--secondary" href="@launcherSecondaryHref">@launcherSecondaryLabel</a>
@@ -1639,7 +1639,7 @@
                         <strong>@(recapProjectionCount == 0 ? "None yet" : recapProjectionCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Restore conflicts</span>
+                        <span>Reconnect problems</span>
                         <strong>@(restoreConflicts == 0 ? "None" : restoreConflicts.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1655,7 +1655,7 @@
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Legacy migration history</span>
+                        <span>Imported Chummer5 files</span>
                         <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1710,7 +1710,7 @@
                                 </div>
                             }
                             <div class="settings-summary-row">
-                                <span>Support status</span>
+                                <span>Support</span>
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign.")</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1738,7 +1738,7 @@
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.CampaignSummary.RestoreSummary))
                             {
-                                <p><strong>Restore status:</strong> @PublicText(selectedWorkspaceServerPlane.CampaignSummary.RestoreSummary)</p>
+                                <p><strong>Reconnect:</strong> @PublicText(selectedWorkspaceServerPlane.CampaignSummary.RestoreSummary)</p>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Summary))
                             {
@@ -1854,19 +1854,19 @@
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore history</span>
+                                        <span>Recent reconnects</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} update(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore conflicts</span>
+                                        <span>Reconnect problems</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "No active conflicts" : $"{selectedWorkspaceServerPlane.RestoreConflictReceipts.Count} conflict(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore status summary</span>
+                                        <span>Reconnect summary</span>
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Check details before continuing")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore recovery path</span>
+                                        <span>Recovery path</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
@@ -1905,7 +1905,7 @@
                                         <strong>@(selectedWorkspaceServerPlane.ChangePackets.Count == 0 ? "No recent update" : $"{selectedWorkspaceServerPlane.ChangePackets[0].Label} · {selectedWorkspaceServerPlane.ChangePackets[0].Summary}")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Transfer history</span>
+                                        <span>Recent moves</span>
                                         <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} move(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2124,7 +2124,7 @@
                             @if (selectedWorkspaceServerPlane.RosterTransfers.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Roster transfer history</summary>
+                                    <summary>Roster moves</summary>
                                     <ul class="muted-copy">
                                         @foreach (var transfer in selectedWorkspaceServerPlane.RosterTransfers)
                                         {
@@ -2145,18 +2145,18 @@
                                 && selectedWorkspaceRosterTransferPlan.TargetGroups.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Move roster state</summary>
+                                    <summary>Move roster</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Movable dossiers</span>
                                             <strong>@selectedWorkspaceRosterTransferPlan.DossierOptions.Count</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Target groups</span>
+                                            <span>Move to</span>
                                             <strong>@selectedWorkspaceRosterTransferPlan.TargetGroups.Count</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Original campaign</span>
+                                            <span>Move from</span>
                                             <strong>@selectedWorkspaceRosterTransferPlan.SourceCampaignName</strong>
                                         </div>
                                     </div>
@@ -2189,7 +2189,7 @@
                                             <input id="rosterTransferCampaignTitle" placeholder="Use the target group's active campaign or create a transfer campaign" />
                                         </div>
                                         <div class="field">
-                                            <label for="rosterTransferNote">Move note</label>
+                                            <label for="rosterTransferNote">Move reason</label>
                                             <textarea id="rosterTransferNote" rows="3" placeholder="Why is this dossier moving between rosters, campaigns, or owners?"></textarea>
                                         </div>
                                         <button class="button-like button-like--secondary" type="submit">Transfer roster state</button>
@@ -2212,14 +2212,14 @@
                                 </ul>
                             </details>
                             <details class="details-drawer">
-                                <summary>Restore history and conflicts</summary>
+                                <summary>Reconnect and conflicts</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
-                                        <span>Restore status</span>
+                                        <span>Reconnect</span>
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Details</span>
+                                        <span>Notes</span>
                                         <strong>@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.ProvenanceSummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2231,7 +2231,7 @@
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.StalenessPosture, "Current")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Conflict status</span>
+                                        <span>Conflicts</span>
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ConflictPosture, "No active conflicts")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2239,7 +2239,7 @@
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverabilityPosture, "Recoverable")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Continue status</span>
+                                        <span>Continue</span>
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Safe to continue")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2263,11 +2263,11 @@
                                     <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
                                 </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore history</span>
+                                        <span>Recent reconnects</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreProvenanceCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Access history</span>
+                                        <span>Linked-copy updates</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncProvenanceCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2275,7 +2275,7 @@
                                         <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Workspace restore conflicts</span>
+                                        <span>Campaign reconnect conflicts</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreConflictCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2287,11 +2287,11 @@
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreConflictReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Ready history</span>
+                                        <span>Ready updates</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Needs refresh</span>
+                                        <span>Needs update</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RefreshBeforeContinueCount</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2314,7 +2314,7 @@
                                                 <span>Next: @PublicText(surface.Status.LeadRecoveryHint)</span>
                                                 <span>Updated: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>@surface.Status.RecoverySummary</span>
-                                                <span>Needs refresh: @surface.Status.RefreshBeforeContinueCount</span>
+                                                <span>Needs update: @surface.Status.RefreshBeforeContinueCount</span>
                                                 <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
                                                 @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
                                                 {
@@ -2345,7 +2345,7 @@
                                 }
                                 @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
                                 {
-                                    <p class="muted-copy">No restore history is attached to this campaign yet.</p>
+                                    <p class="muted-copy">No reconnect notes are attached to this campaign yet.</p>
                                 }
                                 else
                                 {
@@ -2354,12 +2354,12 @@
                                         {
                                             var recovery = selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault(item => string.Equals(item.ReceiptId, receipt.ReceiptId, StringComparison.Ordinal));
                                             <li>
-                                                <strong>Restore note:</strong>
+                                                <strong>Reconnect note:</strong>
                                                 @PublicText(receipt.Summary)
                                                 <span>From @HumanizeStatus(receipt.Authority, "Chummer")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.Proof))
                                                 {
-                                                    <span>Details: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
+                                                    <span>Notes: @PublicFacingCopyHumanizer.Clean(receipt.Proof)</span>
                                                 }
                                                 <span>Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.RecoveryHint))
@@ -2452,11 +2452,11 @@
                                 <summary>GM prep and travel</summary>
                                 <div class="settings-summary-list">
                                 <div class="settings-summary-row">
-                                    <span>Prep sets</span>
+                                    <span>Prep kits</span>
                                     <strong>@selectedWorkspaceServerPlane.PrepLibrary.Packets.Count</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>GM operations status</span>
+                                    <span>GM tools</span>
                                     <strong>@HumanizeStatus(selectedWorkspaceServerPlane.GmOperations.Status, "Status")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -2492,7 +2492,7 @@
                                     <strong>@(selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount == 0 ? "None" : $"{selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount} stale")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Travel prefetch history</span>
+                                    <span>Travel staging</span>
                                     <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "Nothing staged yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -2501,7 +2501,7 @@
                                 </div>
                             </div>
                             <p><strong>GM prep:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.Summary)</p>
-                            <p><strong>Link status:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.BindingSummary)</p>
+                            <p><strong>Linked prep:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.BindingSummary)</p>
                             <p><strong>GM operations:</strong> @selectedWorkspaceServerPlane.GmOperations.Summary</p>
                             <p><strong>Account support:</strong> @selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary</p>
                             @if (selectedWorkspaceServerPlane.GmOperations.LaneCues.Count > 0)
@@ -2547,7 +2547,7 @@
                                         </select>
                                     </div>
                                     <div class="field">
-                                        <label for="travelPrefetchNote">Travel note</label>
+                                        <label for="travelPrefetchNote">Travel reason</label>
                                         <textarea id="travelPrefetchNote" rows="3" placeholder="Why are you staging this travel-safe prefetch set?"></textarea>
                                     </div>
                                     <div id="travelPrefetchPreview" class="settings-summary-list" hidden></div>
@@ -2570,7 +2570,7 @@
                             {
                                 <form id="prepLaunchForm" class="settings-form">
                                     <div class="field">
-                                        <label for="prepLaunchPacket">Prep set</label>
+                                        <label for="prepLaunchPacket">Prep kit</label>
                                         <select id="prepLaunchPacket" required>
                                             @foreach (var packet in selectedWorkspaceServerPlane.PrepLibrary.Packets)
                                             {
@@ -2595,7 +2595,7 @@
                                         </div>
                                     }
                                     <div class="field">
-                                        <label for="prepLaunchNote">Prep note</label>
+                                        <label for="prepLaunchNote">Prep reason</label>
                                         <textarea id="prepLaunchNote" rows="3" placeholder="Why are you starting this prep set now?"></textarea>
                                     </div>
                                     <div id="prepLaunchTargetPreview" class="settings-summary-list" hidden></div>
@@ -2681,7 +2681,7 @@
                             @if (selectedWorkspaceTravelPrefetches.Count > 0)
                             {
                                 <details class="details-drawer" id="travel-prefetches">
-                                    <summary>Recent travel prefetch history</summary>
+                                    <summary>Recent travel staging</summary>
                                     <ul class="muted-copy">
                                         @foreach (var receipt in selectedWorkspaceTravelPrefetches)
                                         {
@@ -2722,7 +2722,7 @@
                                         <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No packages yet" : $"{selectedWorkspaceAftermathPackages.Count} package(s)")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Publication status</span>
+                                        <span>Publication</span>
                                         <strong>@PublicText(selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary)</strong>
                                     </div>
                                 </div>
@@ -2730,7 +2730,7 @@
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
-                                        <summary>Recap files</summary>
+                                        <summary>Recaps</summary>
                                         <ul class="muted-copy">
                                             @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
                                             {
@@ -2834,7 +2834,7 @@
                                             <input id="aftermathPackageTitle" maxlength="128" placeholder="Generated from run and package kind by default" />
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageNote">Package note</label>
+                                            <label for="aftermathPackageNote">Package reason</label>
                                             <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session continuity should stay grounded in this package?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
@@ -2962,7 +2962,7 @@
                             @if (selectedBuildLabHandoff.RuleEnvironmentDiff is not null)
                             {
                                 <div class="settings-summary-row">
-                                    <span>Rules status</span>
+                                    <span>Rules</span>
                                     <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.Status</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -3074,7 +3074,7 @@
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                         {
-                                            <span> Details: @PublicText(output.ProvenanceSummary)</span>
+                                            <span> Notes: @PublicText(output.ProvenanceSummary)</span>
                                         }
                                         <span> Output type: @BuildLabOutputLaneLabel(output.Kind)</span>
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
@@ -3083,7 +3083,7 @@
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                         {
-                                            <span> Publication status: @HumanizeStatus(output.PublicationState, "Ready") · @HumanizeStatus(output.TrustBand, "Current")</span>
+                                            <span> Publication: @HumanizeStatus(output.PublicationState, "Ready") · @HumanizeStatus(output.TrustBand, "Current")</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                         {
@@ -3154,7 +3154,7 @@
                                 <strong>@selectedRulesNavigatorAnswer.AfterSummary</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Details</span>
+                                <span>Notes</span>
                                 <strong>@selectedRulesNavigatorAnswer.ProvenanceLabel</strong>
                             </div>
                         </div>
@@ -3188,7 +3188,7 @@
                         }
                         @if (selectedRulesNavigatorAnswer.EvidenceLines.Count > 0)
                         {
-                            <p><strong>Details:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3).Select(line => PublicText(line)))</p>
+                            <p><strong>Notes:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3).Select(line => PublicText(line)))</p>
                         }
                         @if (selectedRulesNavigatorAnswer.Diffs is { Count: > 0 })
                         {
@@ -3208,7 +3208,7 @@
                 else if (selectedCreatorPublication is not null)
                 {
                     <article class="app-action-card app-action-card--primary" id="publication-@selectedCreatorPublication.PublicationId">
-                        <span class="tag">Publication status</span>
+                        <span class="tag">Publication</span>
                         <h3>@selectedCreatorPublication.Title</h3>
                         <p>@selectedCreatorPublication.Summary</p>
                         <div class="settings-summary-list">
@@ -3217,7 +3217,7 @@
                                 <strong>@HumanizeStatus(selectedCreatorPublication.Kind, "Publication")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Details</span>
+                                <span>Notes</span>
                                 <strong>@selectedCreatorPublication.ProvenanceSummary</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -3227,7 +3227,7 @@
                             @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.TrustSummary))
                             {
                                 <div class="settings-summary-row">
-                                    <span>Trust status</span>
+                                    <span>Trust</span>
                                     <strong>@PublicText(selectedCreatorPublication.TrustSummary)</strong>
                                 </div>
                             }
@@ -3302,7 +3302,7 @@
                                     <strong>@selectedCreatorPublicationDraftDetail.Draft.DraftId</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Draft status</span>
+                                    <span>Draft</span>
                                     <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -3310,7 +3310,7 @@
                                     <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.ProjectKind, "Publication")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Review status</span>
+                                    <span>Review</span>
                                     <strong>@HumanizeStatus(selectedCreatorPublicationReceipt?.ReviewState, "Not required")</strong>
                                 </div>
                                 @if (selectedCreatorPublicationDraftDetail.Moderation is not null)
@@ -3320,14 +3320,14 @@
                                         <strong>@selectedCreatorPublicationDraftDetail.Moderation.CaseId</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Case status</span>
+                                        <span>Case</span>
                                         <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Moderation.State, "Pending")</strong>
                                     </div>
                                 }
                                 @if (selectedCreatorPublicationReceipt is not null)
                                 {
                                     <div class="settings-summary-row">
-                                        <span>Publication status</span>
+                                        <span>Publication</span>
                                         <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -3335,7 +3335,7 @@
                                         <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.Visibility, "Campaign-shared")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Published file</span>
+                                        <span>Public file</span>
                                         <strong>@selectedCreatorPublicationReceipt.Artifact.Kind · @selectedCreatorPublicationReceipt.Artifact.ArtifactId · @selectedCreatorPublicationReceipt.Artifact.Version</strong>
                                     </div>
                                     @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
@@ -3355,10 +3355,10 @@
                                 }
                             </div>
                             <details class="details-drawer">
-                                <summary>Decision history</summary>
+                                <summary>Recent decisions</summary>
                                 <ul class="muted-copy">
                                     <li>
-                                        <strong>Draft status:</strong> @HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")
+                                        <strong>Draft:</strong> @HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")
                                         <span> · @PublicationDecisionOutcomeSummary(selectedCreatorPublicationReceipt?.PublicationStatus, selectedCreatorPublicationReceipt?.ReviewState, selectedCreatorPublicationDraftDetail.Moderation?.State)</span>
                                     </li>
                                     @if (selectedCreatorPublicationDraftDetail.Moderation is not null)
@@ -3370,10 +3370,10 @@
                                     @if (selectedCreatorPublicationReceipt is not null)
                                     {
                                         <li>
-                                            <strong>Review status:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.ReviewState, "Not required")
+                                            <strong>Review:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.ReviewState, "Not required")
                                         </li>
                                         <li>
-                                            <strong>Publication status:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")
+                                            <strong>Publication:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")
                                             @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
                                             {
                                                 <span> · published @FormatUtc(selectedCreatorPublicationReceipt.PublishedAtUtc.Value)</span>
@@ -3633,7 +3633,7 @@
                                         <li><strong>@downtimeBrief.Title:</strong> @downtimeBrief.Summary</li>
                                         @if (downtimeBrief.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Details:</strong> @PublicText(downtimeBrief.EvidenceLines[0])</li>
+                                            <li><strong>Notes:</strong> @PublicText(downtimeBrief.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3649,7 +3649,7 @@
                                         <li><strong>Next:</strong> @workspace.NextSessionCarryForward.NextSafeAction</li>
                                         @if (workspace.NextSessionCarryForward.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Details:</strong> @PublicText(workspace.NextSessionCarryForward.EvidenceLines[0])</li>
+                                            <li><strong>Notes:</strong> @PublicText(workspace.NextSessionCarryForward.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3665,7 +3665,7 @@
                                         <li><strong>Next:</strong> @workspace.CampaignMemory.NextSafeAction</li>
                                         @if (workspace.CampaignMemory.EvidenceLines.Count > 0)
                                         {
-                                            <li><strong>Details:</strong> @PublicText(workspace.CampaignMemory.EvidenceLines[0])</li>
+                                            <li><strong>Notes:</strong> @PublicText(workspace.CampaignMemory.EvidenceLines[0])</li>
                                         }
                                     </ul>
                                 </details>
@@ -3711,7 +3711,7 @@
                             @if (workspace.RecapShelf.Count > 0)
                             {
                                 <details class="details-drawer">
-                                    <summary>Recap files</summary>
+                                    <summary>Recaps</summary>
                                     <ul class="muted-copy">
                                         @foreach (var item in workspace.RecapShelf)
                                         {
@@ -3727,7 +3727,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                                                 {
-                                                    <span> Details: @PublicText(item.ProvenanceSummary)</span>
+                                                    <span> Notes: @PublicText(item.ProvenanceSummary)</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
                                                 {
@@ -3836,11 +3836,11 @@
                                                 <strong>@consequence.Label</strong>: @HumanizeStatus(consequence.State, "Tracked"). @consequence.Summary
                                                 @if (consequence.EvidenceLines.Count > 0)
                                                 {
-                                                    <span> Details: @PublicText(consequence.EvidenceLines[0])</span>
+                                                    <span> Notes: @PublicText(consequence.EvidenceLines[0])</span>
                                                 }
                                                 @if (consequence.Receipts.Count > 0)
                                                 {
-                                                    <span> Details: @HumanizeStatus(consequence.Receipts[0].SourceKind, "Update")</span>
+                                                    <span> Notes: @HumanizeStatus(consequence.Receipts[0].SourceKind, "Update")</span>
                                                 }
                                             </li>
                                         }
@@ -3903,7 +3903,7 @@
                                     {
                                         foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
                                         {
-                                            <span> Hint: @sourceHintLine</span>
+                                            <span> Note: @sourceHintLine</span>
                                         }
                                     }
                                     @if (handoff.RuleEnvironmentDiff is not null)
@@ -3949,7 +3949,7 @@
                                 <li>
                                     <strong><a class="inline-link" href="@RulesDetailHref(answer.EntryId)">@answer.Question</a></strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
-                                    <span> Details: @PublicText(answer.ProvenanceLabel).</span>
+                                    <span> Notes: @PublicText(answer.ProvenanceLabel).</span>
                                     @if (answer.Studio is not null)
                                     {
                                         <span> Lifecycle: @answer.Studio.CurrentStageLabel -> @answer.Studio.PromotionTargetLabel.</span>
@@ -3957,7 +3957,7 @@
                                     }
                                     @if (answer.EvidenceLines.Count > 0)
                                     {
-                                        <span> Details: @PublicText(answer.EvidenceLines[0]).</span>
+                                        <span> Notes: @PublicText(answer.EvidenceLines[0]).</span>
                                     }
                                     @if (answer.SupportReuseHints.Count > 0)
                                     {
@@ -3971,7 +3971,7 @@
                 @if (Model.CampaignSpine.MigrationReceipts.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Legacy migration history</summary>
+                        <summary>Imported Chummer5 files</summary>
                         <ul class="muted-copy">
                             @foreach (var receipt in Model.CampaignSpine.MigrationReceipts)
                             {
@@ -3992,7 +3992,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Details: @PublicText(publication.ProvenanceSummary). Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Status: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @PublicText(publication.DiscoverySummary) Available: @(publication.Discoverable ? "Available" : "Not shared yet"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Notes: @PublicText(publication.ProvenanceSummary). Visibility: @HumanizeStatus(publication.Visibility, "Shared"). State: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @PublicText(publication.DiscoverySummary) Available: @(publication.Discoverable ? "Available" : "Not shared yet"). Publication: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                     {
                                         <span> Status: @publication.TrustSummary</span>
@@ -4112,7 +4112,7 @@
                                     <strong>@op.SeasonEventSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Publication status</span>
+                                    <span>Publication</span>
                                     <strong>@op.ArtifactPublicationSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -4183,7 +4183,7 @@
                                 <summary>Season and event activity</summary>
                                 <ul class="muted-copy">
                                     <li>@op.SeasonEventSummary</li>
-                                    <li>Publication status: @op.ArtifactPublicationSummary</li>
+                                    <li>Publication: @op.ArtifactPublicationSummary</li>
                                     <li>Support path: @op.SupportEscalationSummary</li>
                                     @if (op.RecentEventSummaries.Count == 0)
                                     {
@@ -4395,7 +4395,7 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Current release</span>
                                         <div class="app-rail__copy">
-                                            <h3>Current release status</h3>
+                                            <h3>Current app</h3>
                                             <p>Point members to the live release, current recommendation, and known caution state without translating repo status by hand.</p>
                                         </div>
                                         <a class="inline-link" href="/now">Open current release</a>
@@ -4411,7 +4411,7 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Help &amp; trust</span>
                                         <div class="app-rail__copy">
-                                            <h3>Help and privacy</h3>
+                                            <h3>Help</h3>
                                             <p>Help, contact, and privacy guidance stay on the same Chummer surface so organizers can point members to the real recovery path.</p>
                                         </div>
                                         <a class="inline-link" href="/help">Open help and trust</a>
@@ -4489,7 +4489,7 @@
                             <strong>@HumanizeStatus(Model.User.Visibility, "Private")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Recovery status</span>
+                            <span>Recovery</span>
                             <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
                         </div>
                     </div>
@@ -4582,7 +4582,7 @@
                         {
                             <article class="compact-rail__item">
                                 <div class="compact-rail__copy">
-                                    <h3>Participation update</h3>
+                                    <h3>Participation</h3>
                                     <p>@receipt.RouteSummary</p>
                                     <p><strong>@receipt.PackageId</strong> · @receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
                                 </div>
@@ -4811,8 +4811,8 @@
       ? scenes.find((item) => item.SceneId === sceneSelect.value) || scenes[0]
       : null;
     const rows = [
-      ["Prep set", packet?.Title || "Select a prep set"],
-      ["Binding status", packet?.BindingSummary || "This set stays reusable."],
+      ["Prep kit", packet?.Title || "Select a prep kit"],
+      ["Linked prep", packet?.BindingSummary || "This set stays reusable."],
       ["Target", run ? `${run.Title}${scene ? ` / ${scene.Title}` : ""}` : "Campaign-wide launch"],
       ["Search terms", Array.isArray(packet?.SearchTerms) && packet.SearchTerms.length > 0 ? packet.SearchTerms.slice(0, 4).join(", ") : "Prep metadata"]
     ];
@@ -4843,7 +4843,7 @@
     const rows = [
       ["Device", device ? `${device.DeviceRole} · ${device.Platform} / ${device.HeadId} / ${device.Channel}` : "Select a claimed device"],
       ["Status", device?.Status ? ui.humanizeStatus(device.Status, "Needs attention") : "Needs attention"],
-      ["Restore status", device?.Summary || "Travel data will be staged against the claimed device."],
+      ["Travel data", device?.Summary || "Travel data will be staged against the claimed device."],
       ["Prefetch inventory", travelPrefetchInventorySummary || "Prefetch inventory stays on the shared campaign."]
     ];
 
@@ -4919,7 +4919,7 @@
       ["Run scope", run ? `${run.Title} · ${ui.humanizeStatus(run.Status, "Active")}` : "Campaign-wide aftermath"],
       ["Package kind", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Aftermath package")],
       ["Package title", titleInput.value.trim() || defaultAftermathTitle()],
-      ["Package status", defaultAftermathPackagePosture(run, kindSelect.value)]
+      ["Package", defaultAftermathPackagePosture(run, kindSelect.value)]
     ];
 
     preview.hidden = false;

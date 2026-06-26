@@ -80,7 +80,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner coverage", view, StringComparison.Ordinal);
         Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
-        Assert.Contains("Hint:", view, StringComparison.Ordinal);
+        Assert.Contains("Note:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.Summary", view, StringComparison.Ordinal);
         Assert.Contains("More next steps:", view, StringComparison.Ordinal);
         Assert.DoesNotContain("More outputs:", view, StringComparison.Ordinal);

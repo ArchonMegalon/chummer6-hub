@@ -900,7 +900,7 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
     assert "See linked copies, setup codes, downloads, and install help." in account
     assert "<summary>Connection details</summary>" in account
     assert "Recovery codes are only for the already-downloaded app when it asks for one." in account
-    assert "<summary>Download history</summary>" in account
+    assert "<summary>Recent downloads</summary>" in account
     assert "<summary>Access grants</summary>" in account
     assert "<summary>Recovery backup</summary>" in account
     assert "Pending setup codes" in account
@@ -1502,44 +1502,85 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
         "Operator watchouts",
         "No reviewed season or event records are attached yet.",
         "The internal continuity bridge recorded a participation event.",
+        "Release and access status",
+        "Download history",
+        "Files and reconnect history",
+        "Restore conflicts",
+        "Ready history",
+        "Needs refresh",
+        "Participation update",
+        "Restore note",
+        "Details:",
+        "Recap files",
+        "Restore status",
+        "Move roster state",
+        "Prep set",
+        "GM operations status",
+        "Binding status",
+        "Package status",
+        "Current release status",
+        "Help and privacy",
+        "Recovery status",
+        "Restore history",
+        "Access history",
+        "Legacy migration history",
+        "Published file",
+        "Target groups",
+        "Original campaign",
+        "Move note",
+        "Travel note",
+        "Prep note",
+        "Package note",
+        "Hint:",
+        "Workspace restore conflicts",
+        "Publication status",
+        "Decision history",
+        "Draft status",
+        "Review status",
+        "Case status",
+        "Trust status",
     ):
         assert forbidden not in account
 
     assert "The download stays the same for everyone" in account
-    assert "Restore conflicts" in account
-    assert "Ready history" in account
-    assert "Needs refresh" in account
-    assert "Participation update" in account
-    assert "Restore note" in account
-    assert "Details:" in account
-    assert "Recap files" in account
-    assert "Restore status" in account
-    assert "Move roster state" in account
-    assert "Prep set" in account
-    assert "GM operations status" in account
-    assert "Binding status" in account
-    assert "Package status" in account
-    assert "Current release status" in account
-    assert "Help and privacy" in account
-    assert "Recovery status" in account
+    assert "the account only keeps linked copies and support in reach" in account
+    assert "Account state" in account
+    assert "Recent downloads" in account
+    assert "Files and reconnect" in account
+    assert "Reconnect problems" in account
+    assert "Ready updates" in account
+    assert "Needs update" in account
+    assert "Participation" in account
+    assert "Reconnect note" in account
+    assert "Notes:" in account
+    assert "Recaps" in account
+    assert "Reconnect" in account
+    assert "Move roster" in account
+    assert "Prep kits" in account
+    assert "GM tools" in account
+    assert "Linked prep" in account
+    assert "Package" in account
+    assert "Current app" in account
+    assert "Help" in account
+    assert "Recovery" in account
     assert "PublicText(" in account
     assert "Save consent to continue this access request." in account
     assert "Not resumable from this action." in account
-    assert "Restore history" in account
-    assert "Access history" in account
-    assert "Legacy migration history" in account
-    assert "Published file" in account
-    assert "Details: @PublicText(output.ProvenanceSummary)" in account
-    assert "Details: @PublicText(item.ProvenanceSummary)" in account
-    assert "Details: @PublicText(answer.ProvenanceLabel)" in account
-    assert "Details: @PublicText(publication.ProvenanceSummary)" in account
-    assert "Target groups" in account
-    assert "Original campaign" in account
-    assert "Move note" in account
-    assert "Travel note" in account
-    assert "Prep note" in account
-    assert "Package note" in account
-    assert "Hint: @sourceHintLine" in account
+    assert "Recent reconnects" in account
+    assert "Linked-copy updates" in account
+    assert "Imported Chummer5 files" in account
+    assert "Public file" in account
+    assert "Notes: @PublicText(output.ProvenanceSummary)" in account
+    assert "Notes: @PublicText(item.ProvenanceSummary)" in account
+    assert "Notes: @PublicText(answer.ProvenanceLabel)" in account
+    assert "Notes: @PublicText(publication.ProvenanceSummary)" in account
+    assert "Move to" in account
+    assert "Move from" in account
+    assert "Move reason" in account
+    assert "Travel reason" in account
+    assert "Prep reason" in account
+    assert "Package reason" in account
+    assert "Note: @sourceHintLine" in account
     assert "You do not currently manage a campaign" in account
     assert "No season or event activity is attached yet." in account
     assert "A participation event was saved." in account
@@ -3042,9 +3083,9 @@ def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
     feedback = read("Chummer.Run.Api/Views/PublicLanding/FeedbackOperationsDetail.cshtml")
     humanizer = read("Chummer.Run.Api/Services/PublicFacingCopyHumanizer.cs")
 
-    assert "Restore note:" in account
+    assert "Reconnect note:" in account
     assert "Restore update:" not in account
-    assert "Details: @PublicFacingCopyHumanizer.Clean(receipt.Proof)" in account
+    assert "Notes: @PublicFacingCopyHumanizer.Clean(receipt.Proof)" in account
     assert "Observed: @receipt.ObservedAtUtc" not in account
     assert "State: @HumanizeStatus(receipt.StalenessPosture" not in account
     assert "Status: @HumanizeStatus(receipt.ConflictPosture" not in account
