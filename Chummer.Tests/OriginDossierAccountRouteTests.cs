@@ -46,6 +46,14 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("dossier_media", model.Publication.ArtifactCapability.ArtifactKind);
         Assert.Equal("origin-dossier:origin-route:media", model.Publication.ArtifactCapability.SourceRef);
         Assert.Equal("private", model.Publication.ArtifactCapability.Visibility);
+        Assert.NotNull(model.Publication.SharedArtifacts);
+        Assert.Equal("/api/v1/public/horizons/capabilities", model.Publication.SharedArtifacts!.PublicCapabilityCatalogHref);
+        Assert.Null(model.Publication.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Null(model.Publication.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInCapabilityCatalogHref);
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInRequestReceiptHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.Publication.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         string serialized = JsonSerializer.Serialize(model.Publication.ArtifactCapability);
         Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);

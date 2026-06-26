@@ -346,8 +346,12 @@ public sealed class OriginDossierPublicationService
             AudiobookshelfAudiobookShareUrl: IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl)
                 ? BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "listen")
                 : null,
+            SharedArtifacts: BuildSharedArtifacts(),
             ArtifactCapability: BuildPublicArtifactCapability(projectId));
     }
+
+    private SharedArtifactSurfaceRoutesViewModel? BuildSharedArtifacts()
+        => _capabilities?.BuildSharedArtifactSurfaceRoutesViewModel("origin-dossier", "dossier_media");
 
     private PublicHorizonCapabilityViewModel? BuildPublicArtifactCapability(string projectId)
     {

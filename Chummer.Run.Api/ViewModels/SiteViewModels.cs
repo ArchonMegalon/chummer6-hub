@@ -2240,6 +2240,7 @@ public sealed record OriginDossierPublicationViewModel(
     string? OriginEditionNamespace = null,
     string? AudiobookshelfDossierShareUrl = null,
     string? AudiobookshelfAudiobookShareUrl = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null,
     PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record OriginDossierPublicationDetailPageViewModel(
