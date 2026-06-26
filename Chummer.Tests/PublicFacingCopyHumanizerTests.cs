@@ -106,6 +106,18 @@ public sealed class PublicFacingCopyHumanizerTests
     }
 
     [Theory]
+    [InlineData("Clean proof routing now determines which factions keep initiative.", "Clean status routing now determines which factions keep initiative.")]
+    [InlineData("Receipt clean room", "detail review desk")]
+    [InlineData("ledger_tick_0002_flagship_seeded", "current turn")]
+    [InlineData("MysAd Density", "Awakened pressure")]
+    public void UndetectableHumanizerCopyAdapter_HumanizeLedger_AppliesPublicLedgerPreset(string source, string expected)
+    {
+        string cleaned = UndetectableHumanizerCopyAdapter.HumanizeLedger(source);
+
+        Assert.Equal(expected, cleaned);
+    }
+
+    [Theory]
     [InlineData("pending_verification", "Confirmation sent")]
     [InlineData("campaign_approved", "Campaign-approved")]
     [InlineData("review", "Needs attention")]

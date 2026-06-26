@@ -329,9 +329,9 @@
                                     @foreach (var beat in newsreelBroadcast.ActionBeats.Take(4))
                                     {
                                         <article class="ledger-newsreel-broadcast__action-card">
-                                            <span class="tag">@beat.ActorKind</span>
-                                            <h4>@beat.BeatLabel</h4>
-                                            <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
+                                            <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ActorKind)</span>
+                                            <h4>@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.BeatLabel)</h4>
+                                            <p class="ledger-newsreel-broadcast__action-actor">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ActorLabel)</p>
                                             <p class="ledger-newsreel-broadcast__action-detail">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.VisualHook)</p>
                                             <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.ActionSummary)</p>
                                             <p class="ledger-newsreel-broadcast__action-stakes">@UndetectableHumanizerCopyAdapter.HumanizeLedger(beat.Stakes)</p>
@@ -343,7 +343,7 @@
                             </article>
                         }
                         <article class="route-choice-card">
-                            <span class="tag">@newsreelBroadcast.PackageLabel</span>
+                            <span class="tag">@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.PackageLabel)</span>
                             <h3>Broadcast mix</h3>
                             <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.AudioPosture)</p>
                             <p>@UndetectableHumanizerCopyAdapter.HumanizeLedger(newsreelBroadcast.MusicPosture)</p>
@@ -362,7 +362,7 @@
                             <ul class="ledger-newsreel-broadcast__list">
                                 @foreach (var line in newsreelBroadcast.Rundown)
                                 {
-                                    <li>@line</li>
+                                    <li>@UndetectableHumanizerCopyAdapter.HumanizeLedger(line)</li>
                                 }
                             </ul>
                         </article>
@@ -372,7 +372,7 @@
                             <ul class="ledger-newsreel-broadcast__list">
                                 @foreach (var line in newsreelBroadcast.TickerItems)
                                 {
-                                    <li>@line</li>
+                                    <li>@UndetectableHumanizerCopyAdapter.HumanizeLedger(line)</li>
                                 }
                             </ul>
                         </article>
