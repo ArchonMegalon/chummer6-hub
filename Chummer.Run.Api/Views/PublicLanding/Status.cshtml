@@ -3,11 +3,7 @@
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
-    var releaseAvailabilityLabel = IsReleaseAvailable(Model.Manifest.ProofStatus)
-        ? "Available"
-        : "Unavailable";
     var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
-    var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);
     var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
         .Where(static platform => platform.PubliclyAvailable)
         .Select(static platform => platform.PlatformLabel)
@@ -20,43 +16,18 @@
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
-    var compactReleaseSummary = releaseSummaryText.StartsWith("Updated ", StringComparison.OrdinalIgnoreCase)
-        ? publicPlatformSummary
-        : releaseSummaryText;
-    var availabilityText = $"{releaseAvailabilityLabel}. {compactReleaseSummary}";
+    var statusLine = $"Updated {verifiedLabel}. {publicPlatformSummary}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
-@functions {
-    private static bool IsReleaseAvailable(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var normalized = value.Trim();
-        return normalized.Contains("pass", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("ready", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("available", StringComparison.OrdinalIgnoreCase);
-    }
-}
-
 <section class="minimal-page-hero">
     <div>
-        <h1>Chummer is available.</h1>
-        <p>@PublicStatusText(availabilityText)</p>
-    </div>
-    <div class="minimal-status-pill" aria-label="Updated">
-        <span>Updated</span>
-        <strong>@verifiedLabel</strong>
-    </div>
-</section>
-
-<section class="minimal-section minimal-section--tight minimal-section--single-action" data-status-surface="decision-surface">
-    <div class="minimal-actions" aria-label="Status next actions">
-        <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
-        <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>
+        <h1>Status</h1>
+        <p>@PublicStatusText(statusLine)</p>
+        <div class="minimal-actions" aria-label="Status next actions">
+            <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
+            <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>
+        </div>
     </div>
 </section>

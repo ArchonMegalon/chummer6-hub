@@ -19,7 +19,7 @@
         : Model.Sections
             .Select(section => new PublicNavigationLink(section.Heading, $"#{section.Id}"))
             .ToArray();
-    var deferSupportPanels = helpPage || contactPage;
+    var hideSupportPanels = helpPage || contactPage;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
@@ -156,14 +156,14 @@
     }
 </section>
 
-@if (Model.SignedInStatus is not null && !deferSupportPanels)
+@if (Model.SignedInStatus is not null && !hideSupportPanels)
 {
     <section class="release-footnote">
         @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
     </section>
 }
 
-@if (Model.PrivacyBoundary is not null && !deferSupportPanels)
+@if (Model.PrivacyBoundary is not null && !hideSupportPanels)
 {
     @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
 }
@@ -200,7 +200,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Choose the right help path</h2>
-            <p>Pick one.</p>
+            <p>Pick the closest one.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -209,15 +209,6 @@
                     <span>@PublicText(choice.Badge)</span>
                     <h3>@PublicText(choice.Title)</h3>
                     <p>@PublicText(choice.Summary)</p>
-                    @if (choice.Details.Length > 0)
-                    {
-                        <ul class="minimal-help-card__list" aria-label="Quick notes">
-                            @foreach (var item in choice.Details)
-                            {
-                                <li>@PublicText(item)</li>
-                            }
-                        </ul>
-                    }
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
                 </article>
             }
@@ -254,7 +245,7 @@ else if (!contactPage)
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Choose one</h2>
-            <p>Discord for normal contact. Private form for logs or account details.</p>
+            <p>Discord first. Private form only for logs or account details.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -263,12 +254,6 @@ else if (!contactPage)
                     <span class="tag">@PublicText(choice.Badge)</span>
                     <h3>@PublicText(choice.Title)</h3>
                     <p>@PublicText(choice.Summary)</p>
-                    <div class="route-choice-card__details">
-                        @foreach (var item in choice.Details)
-                        {
-                            <span>@PublicText(item)</span>
-                        }
-                    </div>
                     <a class="editorial-strip__action" href="@choice.Href">@PublicText(choice.Label)</a>
                 </article>
             }
@@ -372,7 +357,7 @@ else if (!contactPage)
     </section>
 }
 
-@if (Model.SignedInStatus is not null && deferSupportPanels)
+@if (Model.SignedInStatus is not null && !hideSupportPanels)
 {
     <section class="release-footnote">
         @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)

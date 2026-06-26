@@ -28,18 +28,19 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
     assert 'Choose the right help path' in trust_page
-    assert 'Pick one.' in trust_page
+    assert 'Pick the closest one.' in trust_page
     assert 'Start with the closest match.' not in trust_page
-    assert 'minimal-help-card__list' in trust_page
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
-    assert 'aria-label="Quick notes"' in trust_page
     assert 'route-choice-grid--compact' in trust_page
     assert 'Choose one' in trust_page
-    assert 'Discord for normal contact. Private form for logs or account details.' in trust_page
+    assert 'Discord first. Private form only for logs or account details.' in trust_page
     assert 'Public ideas go to Participate. Private problems stay here.' not in trust_page
     assert 'Send support request' in trust_page
     assert 'other routes below' not in trust_page
+    assert 'minimal-help-card__list' not in trust_page
+    assert 'aria-label="Quick notes"' not in trust_page
+    assert 'route-choice-card__details' not in trust_page
 
 
 def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
@@ -181,9 +182,8 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "stableAndNightlyMatch",
         "No newer Nightly right now.",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
-        "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
-        "var availabilityText = $\"{releaseAvailabilityLabel}. {compactReleaseSummary}\";",
-        "@PublicStatusText(availabilityText)",
+        "var statusLine = $\"Updated {verifiedLabel}. {publicPlatformSummary}\";",
+        "@PublicStatusText(statusLine)",
     ):
         assert expected in combined
 
@@ -192,6 +192,9 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "<p>@package.Summary</p>",
         "<p>@platform.Summary</p>",
         "<p>@Model.ReleaseSummary</p>",
+        "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
+        "var availabilityText = $\"{releaseAvailabilityLabel}. {compactReleaseSummary}\";",
+        "@PublicStatusText(availabilityText)",
     ):
         assert forbidden not in combined
 
