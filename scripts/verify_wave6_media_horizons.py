@@ -20,6 +20,11 @@ TARGETS = {
         "/runsites/packs/redmond-dockyard-pack.md",
         "/runsites/packs/redmond-dockyard-pack.json",
     ],
+    "PROPERTYQUARRY_ROUTE_PROOF.generated.json": [
+        "/propertyquarry",
+        "/propertyquarry/properties/northbound-research-lab.md",
+        "/propertyquarry/properties/northbound-research-lab.json",
+    ],
     "RUNBOOK_PRESS_PRIMER_E2E.generated.json": [
         "/runbook",
         "/runbook/primers/new-runner-primer.md",

@@ -139,6 +139,10 @@
             <h2>Membership</h2>
             <p class="note">Supporter checkout is unavailable right now. Free access stays the same.</p>
             <div class="action-row">
+                @if (!hasUserId)
+                {
+                    <a class="button" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                }
                 <a class="button button--primary" href="/downloads">Downloads</a>
             </div>
         </section>

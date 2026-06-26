@@ -41,6 +41,7 @@ public sealed class AccountsController : Controller
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
+    private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
 
@@ -70,7 +71,8 @@ public sealed class AccountsController : Controller
         SignedInTrustStatusService signedInTrustStatus,
         OriginDossierPublicationService originDossierPublications,
         ILogger<AccountsController> logger,
-        HorizonArtifactRequestService? artifactRequests = null)
+        HorizonArtifactRequestService? artifactRequests = null,
+        MediaArtifactHorizonsService? mediaHorizons = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -97,6 +99,7 @@ public sealed class AccountsController : Controller
         _signedInTrustStatus = signedInTrustStatus;
         _originDossierPublications = originDossierPublications;
         _artifactRequests = artifactRequests;
+        _mediaHorizons = mediaHorizons;
         _logger = logger;
     }
 
@@ -124,7 +127,7 @@ public sealed class AccountsController : Controller
             && string.IsNullOrWhiteSpace(caseId)
             && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId))
         {
-            return Redirect("/account/billing");
+            return Redirect("/account/access");
         }
 
         var selectedSection = !string.IsNullOrWhiteSpace(caseId)
@@ -837,6 +840,87 @@ public sealed class AccountsController : Controller
         }
     }
 
+    [HttpGet("/account/propertyquarry/{propertyId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PropertyquarryPropertyPage(
+        [FromRoute] string propertyId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/propertyquarry/{Uri.EscapeDataString(propertyId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            MediaArtifactDocument property = GetPropertyquarryPropertyOrThrow(propertyId);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? _campaignSpine.GetAccountSummary(user, installLinking).Workspaces.FirstOrDefault();
+            return Redirect(BuildPropertyquarryPrepSearchAccountHref(property.Label, leadWorkspace?.WorkspaceId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "PROPERTYQUARRY detail route is unavailable because the media horizon catalog is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "PROPERTYQUARRY detail route could not confirm the signed-in identity.");
+            return Redirect("/propertyquarry");
+        }
+    }
+
+    [HttpGet("/account/propertyquarry")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PropertyquarryDeskPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/propertyquarry")}");
+        }
+
+        return await OpenPropertyquarryDesk(cancellationToken);
+    }
+
+    [HttpGet("/account/propertyquarry/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenPropertyquarryDesk(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+            MediaArtifactDocument? leadProperty = _mediaHorizons?.ListPropertyquarryProperties().FirstOrDefault();
+            return Redirect(leadProperty is null
+                ? "/account/work"
+                : $"/account/propertyquarry/{Uri.EscapeDataString(leadProperty.Id)}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "PROPERTYQUARRY desk is unavailable because the media horizon catalog is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/propertyquarry/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "PROPERTYQUARRY desk could not confirm the signed-in identity.");
+            return Redirect("/propertyquarry");
+        }
+    }
+
     [HttpGet("/account/run-control/{runId}")]
     [Produces("text/html")]
     public async Task<IActionResult> RunControlRunPage(
@@ -1532,10 +1616,10 @@ public sealed class AccountsController : Controller
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountCoreSections(string currentSection)
         => new[]
         {
-            new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Installs", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Campaigns", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
+            new SectionLinkViewModel("work", "Campaigns", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase))
         };
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
@@ -1547,13 +1631,31 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
-            "participation" => ("Account · Participation", "Public feedback, participation history, and recognition."),
-            "support" => ("Account · Support", "Tracked support and the next step."),
-            "access" => ("Account · Installs", "Linked installs, setup codes, downloads, and recovery."),
+            "participation" => ("Account · Participation", "Public feedback and recognition."),
+            "support" => ("Account · Support", "Tracked cases and the next step."),
+            "access" => ("Account · Installs", "Linked installs, downloads, and recovery."),
             "work" => ("Account · Campaigns", "Characters, groups, and campaigns."),
-            "settings" => ("Account · Billing", "Billing opens through the billing provider."),
-            _ => ("Account", "Installs, support, billing, and campaigns.")
+            "settings" => ("Account · Billing", "Supporter and billing."),
+            _ => ("Account", "Installs, campaigns, support, and billing.")
         };
+
+    private MediaArtifactDocument GetPropertyquarryPropertyOrThrow(string propertyId)
+    {
+        if (_mediaHorizons is null)
+        {
+            throw new InvalidOperationException("PROPERTYQUARRY routes require the media artifact horizon catalog.");
+        }
+
+        return _mediaHorizons.GetPropertyquarryProperty(propertyId);
+    }
+
+    private static string BuildPropertyquarryPrepSearchAccountHref(string propertyLabel, string? workspaceId = null)
+    {
+        string escapedQuery = Uri.EscapeDataString(propertyLabel);
+        return string.IsNullOrWhiteSpace(workspaceId)
+            ? $"/account/work?prepQuery={escapedQuery}"
+            : $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
+    }
 
     [HttpGet("me")]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]

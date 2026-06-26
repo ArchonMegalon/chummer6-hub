@@ -1521,6 +1521,111 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task HorizonArtifactRequestMeEndpointRequiresAuthentication()
+    {
+        using Fixture fixture = new(authenticated: false);
+        var controller = new HorizonArtifactRequestsController(
+            new HorizonArtifactRequestService(new HorizonCapabilityService(fixture.Configuration), fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts),
+            fixture.Identity,
+            NullLogger<HorizonArtifactRequestsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<HorizonArtifactRequestReceiptCatalog> result = await controller.MyArtifactRequests(cancellationToken: CancellationToken.None);
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task HorizonArtifactRequestMeEndpointReturnsSignedInCrossHorizonReceipts()
+    {
+        using Fixture fixture = new(authenticated: true);
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactRequestService requests = new(capabilities, fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts);
+        DateTimeOffset now = new(2026, 6, 26, 12, 0, 0, TimeSpan.Zero);
+
+        _ = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                UserId: "subject.dispatch",
+                SourceRef: "runsite:redmond-dockyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true,
+                Email: "dispatch@example.com"),
+            now,
+            consumeQuota: true);
+        _ = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "propertyquarry",
+                ArtifactKindOrCapabilityId: "tour",
+                UserId: "subject.dispatch",
+                SourceRef: "propertyquarry:northbound-research-lab",
+                Visibility: "private",
+                ExternalProcessingConsent: true,
+                Email: "dispatch@example.com"),
+            now.AddMinutes(1),
+            consumeQuota: true);
+        _ = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                UserId: "subject.dispatch",
+                SourceRef: "runsite:everett-switchyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true,
+                Email: "dispatch@example.com"),
+            now.AddMinutes(2),
+            consumeQuota: true);
+
+        var controller = new HorizonArtifactRequestsController(
+            requests,
+            fixture.Identity,
+            NullLogger<HorizonArtifactRequestsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        ActionResult<HorizonArtifactRequestReceiptCatalog> filteredResult = await controller.MyArtifactRequests(
+            horizonId: "runsite",
+            limit: 10,
+            cancellationToken: CancellationToken.None);
+        OkObjectResult filteredOk = Assert.IsType<OkObjectResult>(filteredResult.Result);
+        HorizonArtifactRequestReceiptCatalog filteredCatalog = Assert.IsType<HorizonArtifactRequestReceiptCatalog>(filteredOk.Value);
+        Assert.Equal("subject.dispatch", filteredCatalog.UserId);
+        Assert.Equal("runsite", filteredCatalog.HorizonId);
+        Assert.Equal(2, filteredCatalog.Receipts.Count);
+        Assert.Equal("runsite:everett-switchyard-pack", filteredCatalog.Receipts[0].SourceRef);
+        Assert.Equal("blocked", filteredCatalog.Receipts[0].Status);
+        Assert.Equal("runsite:redmond-dockyard-pack", filteredCatalog.Receipts[1].SourceRef);
+        Assert.Equal("accepted", filteredCatalog.Receipts[1].Status);
+
+        ActionResult<HorizonArtifactRequestReceiptCatalog> allResult = await controller.MyArtifactRequests(
+            limit: 10,
+            cancellationToken: CancellationToken.None);
+        OkObjectResult allOk = Assert.IsType<OkObjectResult>(allResult.Result);
+        HorizonArtifactRequestReceiptCatalog allCatalog = Assert.IsType<HorizonArtifactRequestReceiptCatalog>(allOk.Value);
+        Assert.Equal(3, allCatalog.Receipts.Count);
+        Assert.Contains(allCatalog.Receipts, receipt => receipt.HorizonId == "propertyquarry" && receipt.SourceRef == "propertyquarry:northbound-research-lab");
+
+        string serialized = JsonSerializer.Serialize(allCatalog);
+        Assert.DoesNotContain("Matterport", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("BrilliantDirectories", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task KarmaForgePageIncludesPublicSafeDiscoveryCapability()
     {
         using Fixture fixture = new(configureSettings: settings =>

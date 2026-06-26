@@ -6,6 +6,26 @@ const identityToken = process.env.CHUMMER_E2E_IDENTITY_TOKEN?.trim() || '';
 const boardSentinel = process.env.CHUMMER_E2E_BOARD_SENTINEL?.trim() || 'board sentinel';
 const boardBaseUrl = process.env.CHUMMER_E2E_BOARD_BASE_URL?.trim() || '';
 
+test('guest billing and account entry stay first-party', async ({ request }) => {
+  const guestBilling = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
+  expect(guestBilling.status()).toBe(200);
+  const guestBillingText = await guestBilling.text();
+  expect(guestBillingText).toContain('Same app.');
+  expect(guestBillingText).toContain('Origin books: 1/month free. 2/month supporter.');
+  expect(guestBillingText).toContain('Continue with email');
+  expect(guestBillingText).not.toContain('/auth/google/start?next=');
+
+  const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
+  expect([302, 303, 307, 308]).toContain(guestAccount.status());
+  const guestAccountLocation = guestAccount.headers()['location'] || '';
+  expect(guestAccountLocation).toBe('/account/access');
+
+  const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
+  expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
+  const guestSupporterStartLocation = guestSupporterStart.headers()['location'] || '';
+  expect(guestSupporterStartLocation).toBe('/account/billing');
+});
+
 test('billing and participate stay first-party for guests and signed-in users', async ({ request, browser }) => {
   test.setTimeout(90_000);
 
@@ -32,6 +52,11 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
   const guestSupporterStartLocation = guestSupporterStart.headers()['location'] || '';
   expect(guestSupporterStartLocation).toBe('/account/billing');
+
+  const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
+  expect([302, 303, 307, 308]).toContain(guestAccount.status());
+  const guestAccountLocation = guestAccount.headers()['location'] || '';
+  expect(guestAccountLocation).toBe('/account/access');
 
   test.skip(!identityToken, 'signed-in billing verification needs CHUMMER_E2E_IDENTITY_TOKEN');
 
@@ -135,6 +160,8 @@ test('billing and participate stay first-party for guests and signed-in users', 
     guest_participate_public_wrapper: true,
     guest_supporter_start_status: guestSupporterStart.status(),
     guest_supporter_start_location: guestSupporterStartLocation,
+    guest_account_status: guestAccount.status(),
+    guest_account_location: guestAccountLocation,
     signed_in_supporter_checkout_status: signedInSupporterCheckout.status(),
     signed_in_supporter_checkout_location: signedInSupporterLocation,
     signed_in_supporter_direct_status: signedInSupporterDirect.status(),

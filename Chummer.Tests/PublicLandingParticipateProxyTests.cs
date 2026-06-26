@@ -116,6 +116,8 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("rel=\"canonical\" href=\"/roadmap\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/roadmap/board/\" />", html, StringComparison.Ordinal);
         Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
+        Assert.Contains("What is next?", html, StringComparison.Ordinal);
+        Assert.Contains("Planned work and what moved recently.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Participate - Chummer.run", html, StringComparison.Ordinal);
         Assert.DoesNotContain("What should Chummer do next?", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
@@ -134,6 +136,7 @@ public sealed class PublicLandingParticipateProxyTests
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
         Assert.Contains("Roadmap temporarily unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Try again shortly.", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("href=\"/changelog\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);

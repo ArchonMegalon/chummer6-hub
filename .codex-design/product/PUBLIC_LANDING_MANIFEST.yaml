@@ -349,6 +349,24 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party named prep network receipt
+- path: /propertyquarry
+  title: PROPERTYQUARRY
+  audience: public
+  purpose: product_surface
+  requires_auth: false
+  guest_fallback: /propertyquarry
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party property packet surface only
+- path: /propertyquarry/property-network
+  title: PROPERTYQUARRY property details
+  audience: public
+  purpose: product_surface_detail
+  requires_auth: false
+  guest_fallback: /propertyquarry
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party named property network receipt
 - path: /runbook
   title: RUNBOOK PRESS
   audience: public
@@ -1431,6 +1449,33 @@ registered_routes:
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: signed-in RUNSITE workspace prep route
+- path: /account/propertyquarry
+  title: Account PROPERTYQUARRY
+  audience: registered
+  purpose: signed_in_horizon
+  requires_auth: true
+  guest_fallback: /login?next=/account/propertyquarry
+  must_exist: true
+  placeholder_allowed: true
+  placeholder_requirements: signed-in PROPERTYQUARRY property desk redirect or empty-state route
+- path: /account/propertyquarry/open
+  title: Account PROPERTYQUARRY open
+  audience: registered
+  purpose: signed_in_horizon
+  requires_auth: true
+  guest_fallback: /login?next=/account/propertyquarry/open
+  must_exist: true
+  placeholder_allowed: true
+  placeholder_requirements: signed-in PROPERTYQUARRY property desk redirect route
+- path: /account/propertyquarry/{propertyId}
+  title: Account PROPERTYQUARRY property
+  audience: registered
+  purpose: signed_in_horizon
+  requires_auth: true
+  guest_fallback: /login?next=/account/propertyquarry/{propertyId}
+  must_exist: true
+  placeholder_allowed: true
+  placeholder_requirements: signed-in PROPERTYQUARRY prep search route
 - path: /account/run-control
   title: Account RUN CONTROL
   audience: registered

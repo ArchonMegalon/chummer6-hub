@@ -21,18 +21,18 @@
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Public feedback, contribution history, and recognition.",
-        "support" => "Tracked support and the next step.",
-        "access" => "Linked installs, setup codes, downloads, and recovery.",
+        "participation" => "Public feedback and recognition.",
+        "support" => "Tracked cases and the next step.",
+        "access" => "Linked installs, downloads, and recovery.",
         "work" => "Characters, groups, and campaigns.",
-        "settings" => "Billing opens through the billing provider.",
-        _ => "Installs, support, billing, and campaigns."
+        "settings" => "Supporter and billing.",
+        _ => "Installs, campaigns, support, and billing."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Installs, support, billing, participation, and campaigns.";
+    ViewData["ContextSidebarSummary"] = "Installs, campaigns, support, billing, and participation.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))

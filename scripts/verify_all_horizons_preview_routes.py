@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DESIGN = ROOT.parent / "chummer-design" / "products" / "chummer"
+DESIGN = ROOT / ".codex-design" / "product"
 CONTROLLER = ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 MANIFEST = DESIGN / "PUBLIC_LANDING_MANIFEST.yaml"
 COMPLETION = ROOT.parent / "_completion" / "all_horizons_missed_potential"
@@ -19,6 +19,7 @@ ROUTES = [
     ("/rules", "knowledge_fabric", "shipped_mvp"),
     ("/jackpoint", "jackpoint", "shipped_mvp"),
     ("/runsites", "runsite", "shipped_mvp"),
+    ("/propertyquarry", "propertyquarry", "shipped_mvp"),
     ("/runbook", "runbook_press", "shipped_mvp"),
     ("/table-pulse", "table_pulse", "shipped_mvp"),
     ("/community", "community_hub", "shipped_mvp"),
@@ -93,6 +94,7 @@ def main() -> int:
         "- Knowledge Fabric shipped MVP\n"
         "- JACKPOINT shipped MVP\n"
         "- RUNSITE shipped MVP\n"
+        "- PROPERTYQUARRY shipped MVP\n"
         "- RUNBOOK PRESS shipped MVP\n"
         "- TABLE PULSE shipped MVP\n"
         "- Community Hub shipped MVP\n"
@@ -124,6 +126,7 @@ def main() -> int:
         "MOBILE_PWA_E2E.generated.json": "nexus_pan",
         "JACKPOINT_BRIEFING_E2E.generated.json": "jackpoint",
         "RUNSITE_PACKET_E2E.generated.json": "runsite",
+        "PROPERTYQUARRY_ROUTE_PROOF.generated.json": "propertyquarry",
         "RUNBOOK_PRESS_PRIMER_E2E.generated.json": "runbook_press",
         "TABLE_PULSE_AFTERMATH_E2E.generated.json": "table_pulse",
         "COMMUNITY_OPEN_RUN_E2E.generated.json": "community_hub",

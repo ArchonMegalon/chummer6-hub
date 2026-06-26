@@ -898,6 +898,27 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void PropertyquarryUsesNamedPublicReceiptSignedInDeskAndTypedPrepAliases()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/propertyquarry\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/propertyquarry/receipts/property-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("PROPERTYQUARRY keeps inspectable property packets readable in public", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/propertyquarry\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/propertyquarry/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/propertyquarry/{propertyId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/property-workspaces/{propertyId}\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/property-continuity/{propertyId}\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunControlUsesNamedPublicReceiptSignedInDeskAndTypedControlRoutes()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");

@@ -6255,7 +6255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {
             return HostedBoardUnavailable(
                 "Roadmap unavailable",
-                "ProductLift owns the roadmap, and it is not configured on this host right now.",
+                "Try again shortly.",
                 "Use Participate for requests or the changelog for shipped work.",
                 "/participate",
                 "Participate",
@@ -6295,7 +6295,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 {
                     return HostedBoardUnavailable(
                         "Roadmap temporarily unavailable",
-                        "The hosted roadmap did not respond. The first-party route is still working.",
+                        "Try again shortly.",
                         "Use the changelog for shipped work or Participate for new requests.",
                         "/changelog",
                         "Open changelog",
@@ -6321,13 +6321,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     canonicalHref: canonicalHref ?? localOrigin,
                     assetProxyBasePath: "/roadmap/provider-assets",
                     pageTitle: "Roadmap - Chummer.run",
-                    hostedHeadingReplacement: null,
-                    hostedSummaryReplacement: null,
-                    hostedPrimaryActionReplacement: null,
-                    hostedLeadReplacement: null,
+                    hostedHeadingReplacement: "What is next?",
+                    hostedSummaryReplacement: "Planned work and what moved recently.",
+                    hostedPrimaryActionReplacement: "Open item",
+                    hostedLeadReplacement: "Roadmap follows shipped work.",
                     applyFeedbackPolish: false,
                     failureTitle: "Roadmap temporarily unavailable",
-                    failureSummary: "The hosted roadmap did not respond. Use the changelog for shipped work or Participate for new requests.",
+                    failureSummary: "Try again shortly. Use the changelog for shipped work or Participate for new requests.",
                     failurePrimaryHref: "/changelog",
                     failurePrimaryLabel: "Open changelog",
                     failureSecondaryHref: "/participate",
@@ -6346,7 +6346,7 @@ document.addEventListener('DOMContentLoaded', function () {
             _logger.LogWarning(ex, "Roadmap board proxy could not reach upstream roadmap.");
             return HostedBoardUnavailable(
                 "Roadmap temporarily unavailable",
-                "The hosted roadmap did not respond. The first-party route is still working.",
+                "Try again shortly.",
                 "Use the changelog for shipped work or Participate for new requests.",
                 "/changelog",
                 "Open changelog",
@@ -6360,7 +6360,7 @@ document.addEventListener('DOMContentLoaded', function () {
             _logger.LogWarning(ex, "Roadmap board proxy timed out.");
             return HostedBoardUnavailable(
                 "Roadmap temporarily unavailable",
-                "The hosted roadmap did not respond. The first-party route is still working.",
+                "Try again shortly.",
                 "Use the changelog for shipped work or Participate for new requests.",
                 "/changelog",
                 "Open changelog",

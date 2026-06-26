@@ -23,6 +23,7 @@ public sealed class CampaignSpineController : ControllerBase
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly LocalReleaseProofArtifactService _localReleaseProof;
+    private readonly MediaArtifactHorizonsService? _mediaHorizons;
 
     public CampaignSpineController(
         HubIdentityClient identity,
@@ -31,7 +32,8 @@ public sealed class CampaignSpineController : ControllerBase
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         CampaignFederationOrchestrationService campaignFederation,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        MediaArtifactHorizonsService? mediaHorizons = null)
     {
         _identity = identity;
         _accounts = accounts;
@@ -42,6 +44,7 @@ public sealed class CampaignSpineController : ControllerBase
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
+        _mediaHorizons = mediaHorizons;
     }
 
     [HttpGet("me")]
@@ -737,6 +740,140 @@ public sealed class CampaignSpineController : ControllerBase
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             return Ok(_campaignSpine.GetWorkspaceDigests(user, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/property-workspaces/{propertyId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> GetMyPropertyquarryWorkspace([FromRoute] string propertyId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            MediaArtifactDocument property = GetPropertyquarryPropertyOrThrow(propertyId);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+
+            return Ok(new
+            {
+                horizon = "propertyquarry",
+                status = "shipped_mvp",
+                property = new
+                {
+                    property.Id,
+                    property.Label,
+                    property.Style,
+                    property.Summary,
+                    property.MarkdownRoute,
+                    property.JsonRoute,
+                    accountHref = $"/account/propertyquarry/{Uri.EscapeDataString(property.Id)}",
+                    prepSearchAccountHref = BuildPropertyquarryPrepSearchAccountHref(property.Label, leadWorkspace?.WorkspaceId),
+                    publicTourHref = property.TourActionHref ?? property.TourHref
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/propertyquarry",
+                    accountRedirectHref = "/account/propertyquarry/open",
+                    accountWorkspaceHrefTemplate = "/account/propertyquarry/{propertyId}",
+                    workspaceIndexApiHref = "/api/v1/campaign-spine/me/workspace-digests",
+                    continuityApiHrefTemplate = "/api/v1/campaign-spine/me/property-continuity/{propertyId}"
+                },
+                selectedWorkspace = leadWorkspace is null ? null : new
+                {
+                    leadWorkspace.WorkspaceId,
+                    leadWorkspace.CampaignId,
+                    leadWorkspace.CampaignName,
+                    leadWorkspace.ReturnSummary,
+                    leadWorkspace.NextSafeAction,
+                    accountHref = BuildPropertyquarryPrepSearchAccountHref(property.Label, leadWorkspace.WorkspaceId),
+                    workspaceApiHref = $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    prepLibraryApiHref = BuildPropertyquarryPrepLibraryApiHref(leadWorkspace.WorkspaceId, property.Label)
+                },
+                boundary = new
+                {
+                    tacticalAuthority = "not_claimed",
+                    prepTruth = "workspace_prep_library_search",
+                    propertyTruth = "player_safe_property_packet_only"
+                }
+            });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/property-continuity/{propertyId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> GetMyPropertyquarryContinuity([FromRoute] string propertyId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            MediaArtifactDocument property = GetPropertyquarryPropertyOrThrow(propertyId);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+            string prepSearchAccountHref = BuildPropertyquarryPrepSearchAccountHref(property.Label, leadWorkspace?.WorkspaceId);
+
+            return Ok(new
+            {
+                horizon = "propertyquarry",
+                status = "shipped_mvp",
+                property = new
+                {
+                    property.Id,
+                    property.Label,
+                    property.Style,
+                    accountHref = $"/account/propertyquarry/{Uri.EscapeDataString(property.Id)}",
+                    prepSearchAccountHref
+                },
+                continuity = new
+                {
+                    workspaceCount = summary.Workspaces.Count,
+                    runCount = summary.Runs.Count,
+                    searchQuery = property.Label,
+                    workspaceAvailable = leadWorkspace is not null,
+                    workspaceAccountHref = prepSearchAccountHref,
+                    workspaceApiHref = leadWorkspace is null ? null : $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    prepLibraryApiHref = leadWorkspace is null ? null : BuildPropertyquarryPrepLibraryApiHref(leadWorkspace.WorkspaceId, property.Label),
+                    nextSafeAction = leadWorkspace?.NextSafeAction,
+                    returnSummary = leadWorkspace?.ReturnSummary
+                },
+                boundary = new
+                {
+                    providerTruth = "not_exposed",
+                    hiddenPropertyTruth = "not_claimed",
+                    continuityTruth = "workspace_and_run_receipts"
+                }
+            });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (HubRequestAuthException ex)
         {
@@ -1835,6 +1972,27 @@ public sealed class CampaignSpineController : ControllerBase
             BuildRouteReceiptPayload(routeReceipt),
             null);
     }
+
+    private MediaArtifactDocument GetPropertyquarryPropertyOrThrow(string propertyId)
+    {
+        if (_mediaHorizons is null)
+        {
+            throw new InvalidOperationException("PROPERTYQUARRY campaign-spine routes require the media artifact horizon catalog.");
+        }
+
+        return _mediaHorizons.GetPropertyquarryProperty(propertyId);
+    }
+
+    private static string BuildPropertyquarryPrepSearchAccountHref(string propertyLabel, string? workspaceId = null)
+    {
+        string escapedQuery = Uri.EscapeDataString(propertyLabel);
+        return string.IsNullOrWhiteSpace(workspaceId)
+            ? $"/account/work?prepQuery={escapedQuery}"
+            : $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
+    }
+
+    private static string BuildPropertyquarryPrepLibraryApiHref(string workspaceId, string propertyLabel)
+        => $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(workspaceId)}/prep-library?queryText={Uri.EscapeDataString(propertyLabel)}";
 
     private static EditionStudioHeadSummary[] BuildEditionStudioHeadSummaries(AccountCampaignSummary summary)
     {

@@ -1443,10 +1443,10 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
-    assert "Installs, support, billing, participation, and campaigns." in account
-    assert "Tracked support and the next step." in account
+    assert "Installs, campaigns, support, billing, and participation." in account
+    assert "Tracked cases and the next step." in account
     assert "Characters, groups, and campaigns." in account
-    assert "Billing opens through the billing provider." in account
+    assert "Supporter and billing." in account
     assert "Start here" in account
     assert "Finish setup on that device" in account
     assert "Use the linked install first" in account

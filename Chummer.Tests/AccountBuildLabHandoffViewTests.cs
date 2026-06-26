@@ -14,6 +14,7 @@ public sealed class AccountBuildLabHandoffViewTests
 
         Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account/access\")", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
@@ -24,7 +25,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
 
         Assert.Contains("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
-        Assert.Contains("Installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
+        Assert.Contains("Installs, campaigns, support, billing, and participation.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);

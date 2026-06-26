@@ -88,6 +88,11 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/alice/receipts/build-ghost.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/table-pulse", manifest, StringComparison.Ordinal);
         Assert.Contains("/table-pulse/receipts/live-and-aftermath.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/propertyquarry", manifest, StringComparison.Ordinal);
+        Assert.Contains("/propertyquarry/property-network", manifest, StringComparison.Ordinal);
+        Assert.Contains("/account/propertyquarry", manifest, StringComparison.Ordinal);
+        Assert.Contains("/account/propertyquarry/open", manifest, StringComparison.Ordinal);
+        Assert.Contains("/account/propertyquarry/{propertyId}", manifest, StringComparison.Ordinal);
         Assert.Contains("/onramp", manifest, StringComparison.Ordinal);
         Assert.Contains("/onramp/receipts/guided-starter.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/edition-studio", manifest, StringComparison.Ordinal);
