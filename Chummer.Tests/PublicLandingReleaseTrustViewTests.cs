@@ -198,6 +198,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current focus", roadmapView, StringComparison.Ordinal);
         Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Recent changes", changelogView, StringComparison.Ordinal);
+        Assert.Contains("<span>Release notes</span>", changelogView, StringComparison.Ordinal);
+        Assert.Contains("<strong>Current app</strong>", changelogView, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Updated</span>", changelogView, StringComparison.Ordinal);
+        Assert.DoesNotContain("verifiedLabel", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
     }
 

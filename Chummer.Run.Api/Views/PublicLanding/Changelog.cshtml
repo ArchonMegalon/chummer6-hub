@@ -11,8 +11,6 @@
     var shippedNow = Model.AvailableToday.Take(4).ToArray();
     var stillCaution = Model.Inspectable.Take(4).ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
-
     string ContextualPreviewHref(string? href)
     {
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
@@ -38,8 +36,8 @@
         <p>Use this page when you want to see what changed and where to go next.</p>
     </div>
     <div class="minimal-status-pill">
-        <span>Updated</span>
-        <strong>@verifiedLabel</strong>
+        <span>Release notes</span>
+        <strong>Current app</strong>
     </div>
 </section>
 
