@@ -18,7 +18,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     private readonly AccountService? _accounts;
     private readonly ILogger<BrilliantDirectoriesBillingController> _logger;
     private readonly HubPageChromeService? _chrome;
-    private readonly HorizonArtifactQuotaService? _horizonArtifactQuota;
+    private readonly OriginAuthoringAllowanceProjectionService _originAuthoringAllowance;
 
     public BrilliantDirectoriesBillingController(
         BrilliantDirectoriesBillingService billing,
@@ -26,14 +26,16 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         AccountService? accounts = null,
         ILogger<BrilliantDirectoriesBillingController>? logger = null,
         HubPageChromeService? chrome = null,
-        HorizonArtifactQuotaService? horizonArtifactQuota = null)
+        HorizonArtifactQuotaService? horizonArtifactQuota = null,
+        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null)
     {
         _billing = billing;
         _identity = identity;
         _accounts = accounts;
         _logger = logger ?? NullLogger<BrilliantDirectoriesBillingController>.Instance;
         _chrome = chrome;
-        _horizonArtifactQuota = horizonArtifactQuota;
+        _originAuthoringAllowance = originAuthoringAllowance
+            ?? new OriginAuthoringAllowanceProjectionService(billing, horizonArtifactQuota);
     }
 
     [HttpGet("/account/billing")]
@@ -51,7 +53,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             var page = _billing.GetPage();
             var quota = string.IsNullOrWhiteSpace(resolvedUserId)
                 ? null
-                : ResolveCurrentOriginAuthoringAllowanceProjection(resolvedUserId, resolvedEmail);
+                : _originAuthoringAllowance.GetAllowance(resolvedUserId, resolvedEmail);
             return View(
                 "~/Views/Billing/Membership.cshtml",
                 BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
@@ -92,7 +94,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         try
         {
             _billing.EnsureAuthorized(BillingSecretHeader());
-            return Ok(ResolveCurrentMyFirstBookQuotaProjection(userId, ResolveKnownAccountEmail(userId, email)));
+            return Ok(_originAuthoringAllowance.GetLegacyQuota(userId, ResolveKnownAccountEmail(userId, email)));
         }
         catch (UnauthorizedAccessException)
         {
@@ -136,7 +138,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         try
         {
             _billing.EnsureAuthorized(BillingSecretHeader());
-            return Ok(ConsumeCurrentOriginAuthoringAllowance(userId, ResolveKnownAccountEmail(userId, email)));
+            return Ok(_originAuthoringAllowance.ConsumeLegacyQuota(userId, ResolveKnownAccountEmail(userId, email)));
         }
         catch (UnauthorizedAccessException)
         {
@@ -467,105 +469,9 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         return TrimToNull(_accounts?.GetById(userId)?.Email);
     }
 
-    private HorizonArtifactAllowanceViewModel ResolveCurrentOriginAuthoringAllowanceProjection(string userId, string? email)
-    {
-        if (_horizonArtifactQuota is not null)
-        {
-            HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.GetQuota(
-                new HorizonArtifactQuotaRequest(
-                    UserId: userId,
-                    HorizonId: "origin-dossier",
-                    ArtifactKindOrCapabilityId: "premium_authoring_credit",
-                    Email: email));
-            return MapOriginAuthoringAllowance(quota);
-        }
-
-        return MapOriginAuthoringAllowance(_billing.GetMyFirstBookQuota(userId, email: email));
-    }
-
     private MyFirstBookQuotaSnapshotDto ResolveCurrentMyFirstBookQuotaProjection(string userId, string? email)
-    {
-        if (_horizonArtifactQuota is not null)
-        {
-            HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.GetQuota(
-                new HorizonArtifactQuotaRequest(
-                    UserId: userId,
-                    HorizonId: "origin-dossier",
-                    ArtifactKindOrCapabilityId: "premium_authoring_credit",
-                    Email: email));
-            return MapOriginAuthoringQuota(quota);
-        }
-
-        return _billing.GetMyFirstBookQuota(userId, email: email);
-    }
+        => _originAuthoringAllowance.GetLegacyQuota(userId, email);
 
     private MyFirstBookQuotaConsumeResultDto ConsumeCurrentOriginAuthoringAllowance(string userId, string? email)
-    {
-        if (_horizonArtifactQuota is not null)
-        {
-            HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.Consume(
-                new HorizonArtifactQuotaRequest(
-                    UserId: userId,
-                    HorizonId: "origin-dossier",
-                    ArtifactKindOrCapabilityId: "premium_authoring_credit",
-                    Email: email));
-            return new MyFirstBookQuotaConsumeResultDto(
-                "consumed",
-                MapOriginAuthoringQuota(quota));
-        }
-
-        return _billing.ConsumeMyFirstBookQuota(userId, email: email);
-    }
-
-    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(HorizonArtifactQuotaSnapshot quota)
-        => new(
-            HorizonId: quota.HorizonId,
-            CapabilityId: quota.CapabilityId,
-            ArtifactKind: quota.ArtifactKind,
-            PublicLabel: quota.PublicLabel,
-            SupporterActive: quota.SupporterActive,
-            AllowanceTier: quota.AllowanceTier,
-            AllowanceTierLabel: quota.SupporterActive
-                ? BrilliantDirectoriesBillingConstants.SupporterPlanName
-                : BrilliantDirectoriesBillingConstants.FreePlanName,
-            WindowKind: quota.WindowKind,
-            WindowLimit: quota.WindowLimit,
-            WindowUsed: quota.WindowUsed,
-            WindowRemaining: quota.WindowRemaining,
-            WindowStartUtc: quota.WindowStartUtc,
-            WindowEndUtc: quota.WindowEndUtc);
-
-    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(MyFirstBookQuotaSnapshotDto quota)
-        => new(
-            HorizonId: "origin-dossier",
-            CapabilityId: "origin-dossier-premium-authoring",
-            ArtifactKind: "premium_authoring_credit",
-            PublicLabel: "Premium Authoring Credit",
-            SupporterActive: quota.SupporterActive,
-            AllowanceTier: quota.SupporterActive
-                ? BrilliantDirectoriesBillingConstants.SupporterPlanKey
-                : BrilliantDirectoriesBillingConstants.FreePlanKey,
-            AllowanceTierLabel: quota.PlanName,
-            WindowKind: "monthly",
-            WindowLimit: quota.MonthlyLimit,
-            WindowUsed: quota.MonthlyUsed,
-            WindowRemaining: quota.MonthlyRemaining,
-            WindowStartUtc: quota.WindowStartUtc,
-            WindowEndUtc: quota.WindowEndUtc);
-
-    private static MyFirstBookQuotaSnapshotDto MapOriginAuthoringQuota(HorizonArtifactQuotaSnapshot quota)
-        => new(
-            UserId: quota.UserId,
-            PlanKey: quota.SupporterActive
-                ? BrilliantDirectoriesBillingConstants.SupporterPlanKey
-                : BrilliantDirectoriesBillingConstants.FreePlanKey,
-            PlanName: quota.SupporterActive
-                ? BrilliantDirectoriesBillingConstants.SupporterPlanName
-                : BrilliantDirectoriesBillingConstants.FreePlanName,
-            SupporterActive: quota.SupporterActive,
-            MonthlyLimit: quota.WindowLimit,
-            MonthlyUsed: quota.WindowUsed,
-            MonthlyRemaining: quota.WindowRemaining,
-            WindowStartUtc: quota.WindowStartUtc,
-            WindowEndUtc: quota.WindowEndUtc);
+        => _originAuthoringAllowance.ConsumeLegacyQuota(userId, email);
 }

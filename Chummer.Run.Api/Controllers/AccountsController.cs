@@ -44,8 +44,7 @@ public sealed class AccountsController : Controller
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
-    private readonly BrilliantDirectoriesBillingService? _billing;
-    private readonly HorizonArtifactQuotaService? _horizonArtifactQuota;
+    private readonly OriginAuthoringAllowanceProjectionService _originAuthoringAllowance;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
@@ -79,7 +78,8 @@ public sealed class AccountsController : Controller
         ILogger<AccountsController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
         MediaArtifactHorizonsService? mediaHorizons = null,
-        HorizonArtifactQuotaService? horizonArtifactQuota = null)
+        HorizonArtifactQuotaService? horizonArtifactQuota = null,
+        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -105,8 +105,8 @@ public sealed class AccountsController : Controller
         _privacyBoundaries = privacyBoundaries;
         _signedInTrustStatus = signedInTrustStatus;
         _originDossierPublications = originDossierPublications;
-        _billing = billing;
-        _horizonArtifactQuota = horizonArtifactQuota;
+        _originAuthoringAllowance = originAuthoringAllowance
+            ?? new OriginAuthoringAllowanceProjectionService(billing, horizonArtifactQuota);
         _artifactRequests = artifactRequests;
         _mediaHorizons = mediaHorizons;
         _logger = logger;
@@ -283,7 +283,7 @@ public sealed class AccountsController : Controller
         int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
         int pendingClaimCount = installLinking.PendingClaimTickets.Count;
         bool hasLinkedInstall = linkedInstallCount > 0;
-        HorizonArtifactAllowanceViewModel? allowance = TryResolveOriginAuthoringAllowanceProjection(user);
+        HorizonArtifactAllowanceViewModel? allowance = _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email);
 
         string membershipLabel = allowance?.AllowanceTier switch
             {
@@ -357,79 +357,12 @@ public sealed class AccountsController : Controller
             ]);
     }
 
-    private HorizonArtifactAllowanceViewModel? TryResolveOriginAuthoringAllowanceProjection(HubUserDto user)
-    {
-        if (_horizonArtifactQuota is not null)
-        {
-            try
-            {
-                HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.GetQuota(
-                    new HorizonArtifactQuotaRequest(
-                        UserId: user.UserId,
-                        HorizonId: "origin-dossier",
-                        ArtifactKindOrCapabilityId: "premium_authoring_credit",
-                        Email: user.Email));
-                return MapOriginAuthoringAllowance(quota);
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
-
-        if (_billing is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return MapOriginAuthoringAllowance(_billing.GetMyFirstBookQuota(user.UserId, email: user.Email));
-        }
-        catch (BrilliantDirectoriesBillingUnavailableException)
-        {
-            return null;
-        }
-    }
-
     private static string DescribeAllowanceWindowPeriod(string? windowKind)
         => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
             ? "month"
             : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
                 ? "week"
                 : "window";
-
-    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(HorizonArtifactQuotaSnapshot quota)
-        => new(
-            HorizonId: quota.HorizonId,
-            CapabilityId: quota.CapabilityId,
-            ArtifactKind: quota.ArtifactKind,
-            PublicLabel: quota.PublicLabel,
-            SupporterActive: quota.SupporterActive,
-            AllowanceTier: quota.AllowanceTier,
-            AllowanceTierLabel: quota.SupporterActive ? "Supporter" : "Free",
-            WindowKind: quota.WindowKind,
-            WindowLimit: quota.WindowLimit,
-            WindowUsed: quota.WindowUsed,
-            WindowRemaining: quota.WindowRemaining,
-            WindowStartUtc: quota.WindowStartUtc,
-            WindowEndUtc: quota.WindowEndUtc);
-
-    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(MyFirstBookQuotaSnapshotDto quota)
-        => new(
-            HorizonId: "origin-dossier",
-            CapabilityId: "origin-dossier-premium-authoring",
-            ArtifactKind: "premium_authoring_credit",
-            PublicLabel: "Premium Authoring Credit",
-            SupporterActive: quota.SupporterActive,
-            AllowanceTier: quota.SupporterActive ? "supporter" : "free",
-            AllowanceTierLabel: quota.PlanName,
-            WindowKind: "monthly",
-            WindowLimit: quota.MonthlyLimit,
-            WindowUsed: quota.MonthlyUsed,
-            WindowRemaining: quota.MonthlyRemaining,
-            WindowStartUtc: quota.WindowStartUtc,
-            WindowEndUtc: quota.WindowEndUtc);
 
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
     [Produces("text/html")]

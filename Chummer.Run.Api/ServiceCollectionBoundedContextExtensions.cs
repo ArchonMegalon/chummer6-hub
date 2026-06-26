@@ -85,6 +85,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<HorizonArtifactAccessTokenService>();
         services.AddSingleton<HorizonArtifactUsageStore>();
         services.AddSingleton<HorizonArtifactQuotaService>();
+        services.AddSingleton<OriginAuthoringAllowanceProjectionService>();
         services.AddSingleton<HorizonArtifactRequestReceiptStore>();
         services.AddSingleton<HorizonArtifactRequestService>();
         services.AddSingleton<SubscribrWebhookStore>();
