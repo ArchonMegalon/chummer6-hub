@@ -1073,7 +1073,7 @@ public sealed class AccountsController : Controller
             return Redirect($"/login?next={Uri.EscapeDataString(requestedPath)}");
         }
 
-        return Redirect($"/account/advanced?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}");
+        return Redirect($"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}");
     }
 
     [HttpGet("/account/passport")]

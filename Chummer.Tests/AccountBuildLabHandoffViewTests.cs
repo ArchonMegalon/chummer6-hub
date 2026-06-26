@@ -15,6 +15,8 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"work\", \"Campaigns\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"profile\"", controller, StringComparison.Ordinal);
