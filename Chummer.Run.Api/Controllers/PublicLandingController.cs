@@ -11941,11 +11941,15 @@ Boundary:
         HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
         string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
         string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
+        bool publicReceiptEligible = capability.PublicVisible && !capability.RequiresAuthentication;
         return new
         {
             PublicCapabilityCatalogHref = "/api/v1/public/horizons/capabilities",
             PublicCapabilityHealthHref = capability.PublicVisible
                 ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            PublicRequestReceiptDetailHrefTemplate = publicReceiptEligible
+                ? "/api/v1/public/horizons/artifact-requests/{requestId}"
                 : null,
             SignedInCapabilityCatalogHref = capability.RequiresAuthentication
                 ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"

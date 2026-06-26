@@ -693,6 +693,7 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
@@ -1278,7 +1279,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "briefing_video",
                 UserId: "subject.dispatch",
                 SourceRef: "jackpoint:emerald-sprawl-briefing",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: false),
             new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
 
@@ -1306,7 +1307,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "briefing_video",
                 UserId: "subject.dispatch",
                 SourceRef: "jackpoint:emerald-sprawl-briefing",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true),
             new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
 
@@ -1314,6 +1315,26 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("jackpoint-briefing-video", receipt.CapabilityId);
         Assert.Empty(receipt.BlockedReasons);
         Assert.StartsWith("horizon-artifact-", receipt.RequestId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HorizonArtifactRequestModelAllowsPublicSafeVisibilityForAuthenticatedCapability()
+    {
+        using Fixture fixture = new();
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(fixture.Configuration));
+
+        HorizonArtifactRequestReceipt receipt = requests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                UserId: "subject.dispatch",
+                SourceRef: "runsite:redmond-dockyard-pack",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true),
+            new DateTimeOffset(2026, 6, 26, 10, 5, 0, TimeSpan.Zero));
+
+        Assert.Equal("accepted", receipt.Status);
+        Assert.DoesNotContain("public receipt eligibility", receipt.BlockedReasons);
     }
 
     [Fact]
@@ -1333,7 +1354,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "briefing_video",
                 UserId: "subject.dispatch",
                 SourceRef: "runbook-press:wrong-horizon-source",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true),
             new DateTimeOffset(2026, 6, 26, 10, 0, 0, TimeSpan.Zero));
 
@@ -1363,7 +1384,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.runbook",
                 SourceRef: "runbook-press:new-runner-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true,
                 Email: "runbook@example.test"),
             now,
@@ -1375,7 +1396,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.runbook",
                 SourceRef: "runbook-press:gm-first-night-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true,
                 Email: "runbook@example.test"),
             now.AddMinutes(1),
@@ -1414,7 +1435,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.runbook-source-ref",
                 SourceRef: "jackpoint:wrong-horizon-source",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true),
             now,
             consumeQuota: true);
@@ -1424,7 +1445,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.runbook-source-ref",
                 SourceRef: "runbook-press:correct-horizon-source",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true),
             now.AddMinutes(1),
             consumeQuota: true);
@@ -1462,7 +1483,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.receipts",
                 SourceRef: "runbook-press:persistent-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true),
             now,
             consumeQuota: true);
@@ -1472,7 +1493,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "briefing_video",
                 UserId: "subject.receipts",
                 SourceRef: "jackpoint:blocked-briefing",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: false),
             now.AddMinutes(1),
             consumeQuota: true);
@@ -1740,7 +1761,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.internal-runbook",
                 SourceRef: "runbook-press:new-runner-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true));
         ActionResult<HorizonArtifactRequestReceipt> exhausted = controller.BuildArtifactRequest(
             new HorizonArtifactRequestCreateRequest(
@@ -1748,7 +1769,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.internal-runbook",
                 SourceRef: "runbook-press:gm-first-night-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true));
 
         HorizonArtifactRequestReceipt acceptedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(accepted.Result).Value);
@@ -1834,7 +1855,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 ArtifactKindOrCapabilityId: "document_export",
                 UserId: "subject.internal-receipts",
                 SourceRef: "runbook-press:persistent-internal-primer",
-                Visibility: "public_safe",
+                Visibility: "private",
                 ExternalProcessingConsent: true));
 
         ActionResult<HorizonArtifactRequestReceiptCatalog> result = controller.ListArtifactRequests(
@@ -2107,6 +2128,77 @@ public sealed class PublicLandingDownloadDispatchTests
                 Email: "dispatch@example.com"),
             new DateTimeOffset(2026, 6, 26, 12, 0, 0, TimeSpan.Zero),
             consumeQuota: false);
+
+        var controller = new HorizonArtifactRequestsController(
+            requests,
+            fixture.Identity,
+            NullLogger<HorizonArtifactRequestsController>.Instance);
+
+        ActionResult<PublicHorizonArtifactRequestReceipt> result = controller.PublicArtifactRequest(receipt.RequestId);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public void PublicHorizonArtifactRequestEndpointDoesNotExposeNonPublicCapabilityEvenWhenMarkedPublicSafe()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        var receipt = new HorizonArtifactRequestReceipt(
+            RequestId: "horizon-artifact-runbook-public-safe-forged",
+            Status: "accepted",
+            HorizonId: "runbook-press",
+            CapabilityId: "runbook-export",
+            ArtifactKind: "document_export",
+            PublicLabel: "Formatted Export",
+            CapabilitySlot: "document_render",
+            SourceRef: "runbook-press:new-runner-primer",
+            RequestedByUserId: "subject.runbook",
+            Visibility: "public_safe",
+            ExternalProcessingConsent: true,
+            BlockedReasons: Array.Empty<string>(),
+            CreatedAtUtc: new DateTimeOffset(2026, 6, 26, 12, 15, 0, TimeSpan.Zero),
+            QuotaTracked: true,
+            Quota: null);
+        fixture.ArtifactRequestReceipts.Append(receipt);
+        HorizonArtifactRequestService requests = new(capabilities, fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts);
+
+        var controller = new HorizonArtifactRequestsController(
+            requests,
+            fixture.Identity,
+            NullLogger<HorizonArtifactRequestsController>.Instance);
+
+        ActionResult<PublicHorizonArtifactRequestReceipt> result = controller.PublicArtifactRequest(receipt.RequestId);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public void PublicHorizonArtifactRequestEndpointDoesNotExposeAuthenticatedCapabilityEvenWhenMarkedPublicSafe()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        var receipt = new HorizonArtifactRequestReceipt(
+            RequestId: "horizon-artifact-runsite-public-safe-forged",
+            Status: "accepted",
+            HorizonId: "runsite",
+            CapabilityId: "runsite-tour",
+            ArtifactKind: "tour",
+            PublicLabel: "3D Tour",
+            CapabilitySlot: "explorable_location",
+            SourceRef: "runsite:redmond-dockyard-pack",
+            RequestedByUserId: "subject.runsite-public-flag",
+            Visibility: "public_safe",
+            ExternalProcessingConsent: true,
+            BlockedReasons: Array.Empty<string>(),
+            CreatedAtUtc: new DateTimeOffset(2026, 6, 26, 12, 30, 0, TimeSpan.Zero),
+            QuotaTracked: true,
+            Quota: null);
+        fixture.ArtifactRequestReceipts.Append(receipt);
+        HorizonArtifactRequestService requests = new(capabilities, fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts);
 
         var controller = new HorizonArtifactRequestsController(
             requests,
@@ -2989,6 +3081,7 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runsite", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());

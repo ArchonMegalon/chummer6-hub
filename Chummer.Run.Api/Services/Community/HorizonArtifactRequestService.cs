@@ -104,11 +104,24 @@ public sealed class HorizonArtifactRequestService
     public HorizonArtifactRequestReceipt? FindAcceptedPublicSafeReceipt(string requestId)
     {
         HorizonArtifactRequestReceipt? receipt = FindReceipt(requestId);
-        return receipt is not null
-            && string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase)
-            && IsPublicSafeVisibility(receipt.Visibility)
-            ? receipt
-            : null;
+        if (receipt is null
+            || !string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase)
+            || !IsPublicSafeVisibility(receipt.Visibility))
+        {
+            return null;
+        }
+
+        try
+        {
+            HorizonCapabilityDefinition capability = _capabilities.GetCapability(receipt.HorizonId, receipt.CapabilityId);
+            return IsPublicReceiptEligible(capability)
+                ? receipt
+                : null;
+        }
+        catch (KeyNotFoundException)
+        {
+            return null;
+        }
     }
 
     private static IReadOnlyList<string> Validate(
@@ -152,6 +165,10 @@ public sealed class HorizonArtifactRequestService
 
     private static bool IsPublicSafeVisibility(string? value)
         => Clean(value).Equals("public_safe", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPublicReceiptEligible(HorizonCapabilityDefinition capability)
+        => capability.PublicVisible
+            && !capability.RequiresAuthentication;
 
     private static void AddIfMissing(List<string> blocked, bool condition, string requirement)
     {
