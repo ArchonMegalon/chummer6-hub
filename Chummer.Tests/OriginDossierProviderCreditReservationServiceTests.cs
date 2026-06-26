@@ -117,6 +117,29 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
     }
 
     [Fact]
+    public void PremiumAuthoringQuotaUsesSharedMonthlyEntitlementMetadata()
+    {
+        using Fixture fixture = new();
+
+        HorizonArtifactQuotaSnapshot quota = fixture.Quota.GetQuota(
+            new HorizonArtifactQuotaRequest(
+                UserId: "user-origin",
+                HorizonId: "origin-dossier",
+                ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                Email: "runner@example.invalid"),
+            Fixture.Now);
+
+        Assert.Equal("origin-dossier-premium-authoring", quota.CapabilityId);
+        Assert.Equal("free", quota.AllowanceTier);
+        Assert.Equal("free_monthly_origin_authoring_allowance", quota.EntitlementBasis);
+        Assert.Equal("account", quota.EntitlementScope);
+        Assert.Equal("monthly", quota.WindowKind);
+        Assert.Equal(1, quota.WindowLimit);
+        Assert.Equal(0, quota.WindowUsed);
+        Assert.Equal(1, quota.WindowRemaining);
+    }
+
+    [Fact]
     public void ReserveCapsActiveReservationsPerUser()
     {
         using Fixture fixture = new(maxActiveReservations: 1);
@@ -208,10 +231,13 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
             MyFirstBookUsageStore usageStore = new(configuration);
             Billing = new BrilliantDirectoriesBillingService(billingStore, usageStore, configuration);
             Store = new OriginDossierProviderCreditReservationStore(configuration);
-            Service = new OriginDossierProviderCreditReservationService(Store, Billing, configuration);
+            HorizonCapabilityService capabilities = new(configuration);
+            Quota = new HorizonArtifactQuotaService(new HorizonArtifactUsageStore(configuration), capabilities, Billing);
+            Service = new OriginDossierProviderCreditReservationService(Store, Quota, configuration);
         }
 
         public BrilliantDirectoriesBillingService Billing { get; }
+        public HorizonArtifactQuotaService Quota { get; }
         public OriginDossierProviderCreditReservationStore Store { get; }
         public OriginDossierProviderCreditReservationService Service { get; }
 

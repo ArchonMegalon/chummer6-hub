@@ -1,3 +1,5 @@
+using Chummer.Run.Contracts.Billing;
+
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class HorizonArtifactQuotaService
@@ -25,21 +27,8 @@ public sealed class HorizonArtifactQuotaService
         string userId = RequireValue(request.UserId, "A user id is required before checking artifact allowance.");
         HorizonCapabilityDefinition capability = _capabilities.GetCapability(request.HorizonId, request.ArtifactKindOrCapabilityId);
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
-        DateTimeOffset weekStartUtc = GetWeekStartUtc(effectiveNow);
-        DateTimeOffset weekEndUtc = weekStartUtc.AddDays(7);
-        bool supporterActive = _billing.GetMyFirstBookQuota(userId, effectiveNow, request.Email).SupporterActive;
-        int weeklyLimit = supporterActive ? capability.SupporterWeeklyLimit : capability.FreeWeeklyLimit;
-
-        int weeklyUsed;
-        lock (_store.Gate)
-        {
-            weeklyUsed = _store.Entries.FirstOrDefault(item => Matches(item, userId, capability, weekStartUtc))
-                is HorizonArtifactUsageLedgerEntry entry
-                ? entry.Used
-                : 0;
-        }
-
-        return BuildSnapshot(userId, capability, supporterActive, weeklyLimit, weeklyUsed, weekStartUtc, weekEndUtc);
+        ResolvedQuotaWindow quota = ResolveQuotaWindow(userId, capability, effectiveNow, request.Email);
+        return BuildSnapshot(userId, capability, quota);
     }
 
     public HorizonArtifactQuotaSnapshot Consume(
@@ -56,16 +45,42 @@ public sealed class HorizonArtifactQuotaService
         }
 
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        int unitsRequested = RequirePositiveUnits(request.UnitsRequested);
+        if (string.Equals(capability.QuotaAuthority, "myfirstbook_monthly", StringComparison.OrdinalIgnoreCase))
+        {
+            HorizonArtifactQuotaSnapshot available = GetQuota(request, effectiveNow);
+            if (available.WindowRemaining < unitsRequested)
+            {
+                throw new InvalidOperationException($"{capability.PublicLabel} allowance is exhausted for this {available.WindowKind}.");
+            }
+
+            MyFirstBookQuotaConsumeResultDto? consumed = null;
+            for (int index = 0; index < unitsRequested; index += 1)
+            {
+                consumed = _billing.ConsumeMyFirstBookQuota(userId, effectiveNow, request.Email);
+            }
+
+            MyFirstBookQuotaSnapshotDto quota = consumed?.Quota ?? _billing.GetMyFirstBookQuota(userId, effectiveNow, request.Email);
+            return BuildSnapshot(
+                userId,
+                capability,
+                new ResolvedQuotaWindow(
+                    quota.SupporterActive,
+                    quota.MonthlyLimit,
+                    quota.MonthlyUsed,
+                    quota.WindowStartUtc,
+                    quota.WindowEndUtc,
+                    capability.AllowanceWindowKind));
+        }
+
         DateTimeOffset weekStartUtc = GetWeekStartUtc(effectiveNow);
-        DateTimeOffset weekEndUtc = weekStartUtc.AddDays(7);
-        bool supporterActive = _billing.GetMyFirstBookQuota(userId, effectiveNow, request.Email).SupporterActive;
-        int weeklyLimit = supporterActive ? capability.SupporterWeeklyLimit : capability.FreeWeeklyLimit;
 
         lock (_store.Gate)
         {
             int existingIndex = _store.Entries.FindIndex(item => Matches(item, userId, capability, weekStartUtc));
             int weeklyUsed = existingIndex >= 0 ? _store.Entries[existingIndex].Used : 0;
-            if (weeklyUsed >= weeklyLimit)
+            int weeklyLimit = ResolveWeeklyLimit(userId, capability, effectiveNow, request.Email, out bool supporterActive);
+            if (weeklyUsed + unitsRequested > weeklyLimit)
             {
                 throw new InvalidOperationException($"{capability.PublicLabel} allowance is exhausted for this week.");
             }
@@ -73,7 +88,7 @@ public sealed class HorizonArtifactQuotaService
             HorizonArtifactUsageLedgerEntry updated = existingIndex >= 0
                 ? _store.Entries[existingIndex] with
                 {
-                    Used = _store.Entries[existingIndex].Used + 1,
+                    Used = _store.Entries[existingIndex].Used + unitsRequested,
                     UpdatedAtUtc = effectiveNow
                 }
                 : new HorizonArtifactUsageLedgerEntry(
@@ -83,7 +98,7 @@ public sealed class HorizonArtifactQuotaService
                     capability.ArtifactKind,
                     "weekly",
                     weekStartUtc,
-                    1,
+                    unitsRequested,
                     effectiveNow);
 
             if (existingIndex >= 0)
@@ -96,7 +111,16 @@ public sealed class HorizonArtifactQuotaService
             }
 
             _store.PersistLocked();
-            return BuildSnapshot(userId, capability, supporterActive, weeklyLimit, updated.Used, weekStartUtc, weekEndUtc);
+            return BuildSnapshot(
+                userId,
+                capability,
+                new ResolvedQuotaWindow(
+                    supporterActive,
+                    weeklyLimit,
+                    updated.Used,
+                    weekStartUtc,
+                    weekStartUtc.AddDays(7),
+                    capability.AllowanceWindowKind));
         }
     }
 
@@ -110,9 +134,6 @@ public sealed class HorizonArtifactQuotaService
         string? normalizedHorizonId = CleanOrNull(request.HorizonId);
         string? normalizedSelector = CleanOrNull(request.ArtifactKindOrCapabilityId);
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
-        DateTimeOffset weekStartUtc = GetWeekStartUtc(effectiveNow);
-        DateTimeOffset weekEndUtc = weekStartUtc.AddDays(7);
-        bool supporterActive = _billing.GetMyFirstBookQuota(userId, effectiveNow, request.Email).SupporterActive;
 
         HorizonCapabilityDefinition[] capabilities = _capabilities.ListCapabilities()
             .Where(capability =>
@@ -126,47 +147,87 @@ public sealed class HorizonArtifactQuotaService
             .ThenBy(capability => capability.CapabilityId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        lock (_store.Gate)
-        {
-            return capabilities
-                .Select(capability =>
-                {
-                    int weeklyLimit = supporterActive ? capability.SupporterWeeklyLimit : capability.FreeWeeklyLimit;
-                    int weeklyUsed = _store.Entries.FirstOrDefault(item => Matches(item, userId, capability, weekStartUtc))
-                        is HorizonArtifactUsageLedgerEntry entry
-                        ? entry.Used
-                        : 0;
-                    return BuildSnapshot(userId, capability, supporterActive, weeklyLimit, weeklyUsed, weekStartUtc, weekEndUtc);
-                })
-                .ToArray();
-        }
+        return capabilities
+            .Select(capability => BuildSnapshot(
+                userId,
+                capability,
+                ResolveQuotaWindow(userId, capability, effectiveNow, request.Email)))
+            .ToArray();
     }
 
     private static HorizonArtifactQuotaSnapshot BuildSnapshot(
         string userId,
         HorizonCapabilityDefinition capability,
-        bool supporterActive,
-        int weeklyLimit,
-        int weeklyUsed,
-        DateTimeOffset weekStartUtc,
-        DateTimeOffset weekEndUtc)
+        ResolvedQuotaWindow quota)
     {
-        string allowanceTier = supporterActive ? "supporter" : "free";
+        string allowanceTier = quota.SupporterActive ? "supporter" : "free";
         return new(
             userId,
             capability.HorizonId,
             capability.CapabilityId,
             capability.ArtifactKind,
             capability.PublicLabel,
-            supporterActive,
+            quota.SupporterActive,
             allowanceTier,
-            $"{allowanceTier}_weekly_allowance",
-            "account",
+            $"{allowanceTier}_{capability.EntitlementBasisSuffix}",
+            capability.EntitlementScope,
+            quota.Limit,
+            quota.Used,
+            Math.Max(0, quota.Limit - quota.Used),
+            quota.WindowStartUtc,
+            quota.WindowEndUtc)
+        {
+            WindowKind = quota.WindowKind
+        };
+    }
+
+    private ResolvedQuotaWindow ResolveQuotaWindow(
+        string userId,
+        HorizonCapabilityDefinition capability,
+        DateTimeOffset effectiveNow,
+        string? email)
+    {
+        if (string.Equals(capability.QuotaAuthority, "myfirstbook_monthly", StringComparison.OrdinalIgnoreCase))
+        {
+            MyFirstBookQuotaSnapshotDto quota = _billing.GetMyFirstBookQuota(userId, effectiveNow, email);
+            return new ResolvedQuotaWindow(
+                quota.SupporterActive,
+                quota.MonthlyLimit,
+                quota.MonthlyUsed,
+                quota.WindowStartUtc,
+                quota.WindowEndUtc,
+                capability.AllowanceWindowKind);
+        }
+
+        DateTimeOffset weekStartUtc = GetWeekStartUtc(effectiveNow);
+        int weeklyLimit = ResolveWeeklyLimit(userId, capability, effectiveNow, email, out bool supporterActive);
+        int weeklyUsed;
+        lock (_store.Gate)
+        {
+            weeklyUsed = _store.Entries.FirstOrDefault(item => Matches(item, userId, capability, weekStartUtc))
+                is HorizonArtifactUsageLedgerEntry entry
+                ? entry.Used
+                : 0;
+        }
+
+        return new ResolvedQuotaWindow(
+            supporterActive,
             weeklyLimit,
             weeklyUsed,
-            Math.Max(0, weeklyLimit - weeklyUsed),
             weekStartUtc,
-            weekEndUtc);
+            weekStartUtc.AddDays(7),
+            capability.AllowanceWindowKind);
+    }
+
+    private int ResolveWeeklyLimit(
+        string userId,
+        HorizonCapabilityDefinition capability,
+        DateTimeOffset effectiveNow,
+        string? email,
+        out bool supporterActive)
+    {
+        supporterActive = _billing.GetMyFirstBookQuota(userId, effectiveNow, email).SupporterActive;
+        return supporterActive ? capability.SupporterWeeklyLimit : capability.FreeWeeklyLimit;
     }
 
     private static bool Matches(
@@ -188,6 +249,11 @@ public sealed class HorizonArtifactQuotaService
         return utc.AddDays(-offset);
     }
 
+    private static int RequirePositiveUnits(int unitsRequested)
+        => unitsRequested > 0
+            ? unitsRequested
+            : throw new InvalidOperationException("A positive artifact allowance unit count is required.");
+
     private static string RequireValue(string value, string message)
         => string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value.Trim();
 
@@ -199,7 +265,8 @@ public sealed record HorizonArtifactQuotaRequest(
     string UserId,
     string HorizonId,
     string ArtifactKindOrCapabilityId,
-    string? Email = null);
+    string? Email = null,
+    int UnitsRequested = 1);
 
 public sealed record HorizonArtifactQuotaCatalogRequest(
     string UserId,
@@ -229,4 +296,21 @@ public sealed record HorizonArtifactQuotaSnapshot(
     int WeeklyUsed,
     int WeeklyRemaining,
     DateTimeOffset WindowStartUtc,
-    DateTimeOffset WindowEndUtc);
+    DateTimeOffset WindowEndUtc)
+{
+    public string WindowKind { get; init; } = "weekly";
+
+    public int WindowLimit => WeeklyLimit;
+
+    public int WindowUsed => WeeklyUsed;
+
+    public int WindowRemaining => WeeklyRemaining;
+}
+
+internal sealed record ResolvedQuotaWindow(
+    bool SupporterActive,
+    int Limit,
+    int Used,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc,
+    string WindowKind);

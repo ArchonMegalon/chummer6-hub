@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 
@@ -9,21 +8,22 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class OriginDossierProviderCreditReservationService
 {
     private const int DefaultMaxActiveReservationsPerUser = 5;
+    private const string PremiumAuthoringCapability = "premium_authoring_credit";
     private static readonly IReadOnlySet<string> PremiumAuthoringProviderTokens = new HashSet<string>(
         ["first book", "firstbook", "my first book"],
         StringComparer.OrdinalIgnoreCase);
 
     private readonly OriginDossierProviderCreditReservationStore _store;
-    private readonly BrilliantDirectoriesBillingService _billing;
+    private readonly HorizonArtifactQuotaService _quota;
     private readonly IConfiguration _configuration;
 
     public OriginDossierProviderCreditReservationService(
         OriginDossierProviderCreditReservationStore store,
-        BrilliantDirectoriesBillingService billing,
+        HorizonArtifactQuotaService quota,
         IConfiguration configuration)
     {
         _store = store;
-        _billing = billing;
+        _quota = quota;
         _configuration = configuration;
     }
 
@@ -107,8 +107,15 @@ public sealed class OriginDossierProviderCreditReservationService
 
         if (IsPremiumAuthoringProvider(provider) && !string.IsNullOrWhiteSpace(userId) && request.CreditsRequested > 0)
         {
-            MyFirstBookQuotaSnapshotDto quota = _billing.GetMyFirstBookQuota(userId, checkedAt, request.Email);
-            AddIfMissing(blocked, quota.MonthlyRemaining >= request.CreditsRequested, "available premium authoring quota");
+            HorizonArtifactQuotaSnapshot quota = _quota.GetQuota(
+                new HorizonArtifactQuotaRequest(
+                    UserId: userId,
+                    HorizonId: "origin-dossier",
+                    ArtifactKindOrCapabilityId: PremiumAuthoringCapability,
+                    Email: request.Email,
+                    UnitsRequested: request.CreditsRequested),
+                checkedAt);
+            AddIfMissing(blocked, quota.WindowRemaining >= request.CreditsRequested, "available premium authoring quota");
         }
 
         return blocked

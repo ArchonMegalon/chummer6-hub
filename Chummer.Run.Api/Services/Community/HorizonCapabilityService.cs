@@ -212,6 +212,22 @@ public sealed class HorizonCapabilityService
             QuotaTracked: false),
         new(
             HorizonId: "origin-dossier",
+            CapabilityId: "origin-dossier-premium-authoring",
+            ArtifactKind: "premium_authoring_credit",
+            PublicLabel: "Premium Authoring Credit",
+            CapabilitySlot: "guided_origin_authoring",
+            InternalProviderLane: "First Book ai / Chummer OriginBookEngine",
+            FreeWeeklyLimit: 1,
+            SupporterWeeklyLimit: 2,
+            RequiresAuthentication: true,
+            PublicVisible: false,
+            EnabledByDefault: true,
+            CostClass: "high",
+            QuotaAuthority: "myfirstbook_monthly",
+            AllowanceWindowKind: "monthly",
+            EntitlementBasisSuffix: "monthly_origin_authoring_allowance"),
+        new(
+            HorizonId: "origin-dossier",
             CapabilityId: "origin-dossier-media",
             ArtifactKind: "dossier_media",
             PublicLabel: "Dossier Media",
@@ -282,7 +298,8 @@ public sealed class HorizonCapabilityService
             capability.FreeWeeklyLimit,
             capability.SupporterWeeklyLimit,
             capability.CostClass,
-            capability.QuotaTracked);
+            capability.QuotaTracked,
+            capability.AllowanceWindowKind);
     }
 
     public PublicHorizonCapabilityViewModel BuildPublicCapabilityViewModel(
@@ -426,7 +443,11 @@ public sealed record HorizonCapabilityDefinition(
     bool EnabledByDefault,
     string CostClass,
     bool Enabled = true,
-    bool QuotaTracked = true);
+    bool QuotaTracked = true,
+    string QuotaAuthority = "supporter_weekly",
+    string AllowanceWindowKind = "weekly",
+    string EntitlementBasisSuffix = "weekly_allowance",
+    string EntitlementScope = "account");
 
 public sealed record HorizonArtifactSurfaceDefinition(
     string HorizonId,
@@ -445,4 +466,5 @@ public sealed record HorizonCapabilityHealthSnapshot(
     int FreeWeeklyLimit,
     int SupporterWeeklyLimit,
     string CostClass,
-    bool QuotaTracked);
+    bool QuotaTracked,
+    string AllowanceWindowKind);
