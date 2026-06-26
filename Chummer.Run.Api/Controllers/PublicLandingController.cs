@@ -3355,40 +3355,49 @@ document.addEventListener('DOMContentLoaded', function () {
   const errorPhrases = [
     'something went wrong on our side',
     'could not load posts',
+    'please check your internet connection and try again',
+    'network error',
     'network error while loading tab configuration',
     'please try again or contact ' + 'support@' + 'product' + 'lift.dev'
   ];
 
-  const ensureFailurePanel = function () {
-    if (document.querySelector('[data-chummer-board-failure]')) {
-      return document.querySelector('[data-chummer-board-failure]');
+  const mountFailurePanel = function () {
+    if (!document.body) {
+      return null;
     }
 
-    const panel = document.createElement('section');
-    panel.setAttribute('data-chummer-board-failure', 'true');
-    panel.setAttribute('role', 'status');
+    if (document.body.querySelector('[data-chummer-board-failure-root]')) {
+      return document.body.querySelector('[data-chummer-board-failure-root]');
+    }
+
+    document.title = '__CHUMMER_FAILURE_TITLE__';
+    document.body.replaceChildren();
+    document.body.style.margin = '0';
+    document.body.style.background = '#11131a';
+    document.body.style.color = '#f3f4f7';
+
+    const panel = document.createElement('main');
+    panel.setAttribute('data-chummer-board-failure-root', 'true');
     panel.innerHTML = ''
       + '<style>'
-      + '[data-chummer-board-failure]{margin:0.8rem; padding:0.85rem 0.95rem; border:1px solid rgba(238,232,222,0.12); border-radius:8px; background:#151310; color:#f2ede5; font:500 14px/1.5 Inter,system-ui,sans-serif;}'
-      + '[data-chummer-board-failure] h2{margin:0 0 0.35rem; font-size:1rem; line-height:1.3; color:#f7f1e8;}'
-      + '[data-chummer-board-failure] p{margin:0; color:#cfc7ba;}'
-      + '[data-chummer-board-failure] nav{display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.85rem;}'
-      + '[data-chummer-board-failure] a{display:inline-flex; align-items:center; padding:0.45rem 0.7rem; border:1px solid rgba(238,232,222,0.14); border-radius:999px; background:rgba(238,232,222,0.05); color:inherit; text-decoration:none;}'
+      + '[data-chummer-board-failure-root]{max-width:44rem; margin:0 auto; padding:2rem 1.25rem; color:#f3f4f7; font:500 14px/1.5 Inter,system-ui,sans-serif;}'
+      + '[data-chummer-board-failure-root] section{padding:1rem 1.05rem; border:1px solid rgba(238,232,222,0.12); border-radius:10px; background:#151310;}'
+      + '[data-chummer-board-failure-root] h1{margin:0 0 0.45rem; font-size:1.05rem; line-height:1.3; color:#f7f1e8;}'
+      + '[data-chummer-board-failure-root] p{margin:0; color:#cfc7ba;}'
+      + '[data-chummer-board-failure-root] nav{display:flex; flex-wrap:wrap; gap:0.55rem; margin-top:0.9rem;}'
+      + '[data-chummer-board-failure-root] a{display:inline-flex; align-items:center; padding:0.45rem 0.7rem; border:1px solid rgba(238,232,222,0.14); border-radius:999px; background:rgba(238,232,222,0.05); color:inherit; text-decoration:none;}'
       + '</style>'
-      + '<h2>__CHUMMER_FAILURE_TITLE__</h2>'
+      + '<section role="status" aria-live="polite">'
+      + '<h1>__CHUMMER_FAILURE_TITLE__</h1>'
       + '<p>__CHUMMER_FAILURE_SUMMARY__</p>'
       + '<nav aria-label="Board recovery actions">'
       + '<a href="__CHUMMER_FAILURE_PRIMARY_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_PRIMARY_LABEL__</a>'
       + '<a href="__CHUMMER_FAILURE_SECONDARY_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_SECONDARY_LABEL__</a>'
       + '<a href="__CHUMMER_FAILURE_RETURN_HREF__" target="_top" rel="noopener">__CHUMMER_FAILURE_RETURN_LABEL__</a>'
-      + '</nav>';
+      + '</nav>'
+      + '</section>';
 
-    const host = document.querySelector('main') || document.body;
-    if (!host) {
-      return null;
-    }
-
-    host.prepend(panel);
+    document.body.appendChild(panel);
     return panel;
   };
 
@@ -3411,13 +3420,10 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       found = true;
-      if (node instanceof HTMLElement) {
-        node.style.display = 'none';
-      }
     });
 
     if (found) {
-      ensureFailurePanel();
+      mountFailurePanel();
     }
   };
 
@@ -3554,6 +3560,8 @@ document.addEventListener('DOMContentLoaded', function () {
         [
             "something went wrong on our side",
             "could not load posts",
+            "please check your internet connection and try again",
+            "network error",
             "network error while loading tab configuration",
             string.Concat("please try again or contact ", "support@", "productlift.dev")
         ];

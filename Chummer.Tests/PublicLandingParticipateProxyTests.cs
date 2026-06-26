@@ -49,6 +49,7 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("Use support only for private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Could not load posts", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("support@productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("internet connection", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -356,7 +357,8 @@ public sealed class PublicLandingParticipateProxyTests
 <body>
 <main>
   <h1>Something went wrong on our side.</h1>
-  <p>Could not load posts. Please try again or contact support@example.invalid.</p>
+  <p>Could not load posts. Please try again or contact support@productlift.dev.</p>
+  <p>Network error while loading tab configuration. Please check your internet connection and try again.</p>
 </main>
 </body>
 </html>

@@ -263,13 +263,14 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-chummer-board-failure", rewritten, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-failure-root", rewritten, StringComparison.Ordinal);
         Assert.Contains("The board is unavailable", rewritten, StringComparison.Ordinal);
         Assert.Contains("Try again shortly.", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);
-        Assert.Contains("node.style.display = 'none';", rewritten, StringComparison.Ordinal);
+        Assert.Contains("document.body.replaceChildren();", rewritten, StringComparison.Ordinal);
+        Assert.Contains("document.title = 'The board is unavailable';", rewritten, StringComparison.Ordinal);
         Assert.Contains("new MutationObserver", rewritten, StringComparison.Ordinal);
         Assert.Contains("removeHostedAuth", rewritten, StringComparison.Ordinal);
         Assert.Contains("authObserver.observe(document.documentElement", rewritten, StringComparison.Ordinal);
