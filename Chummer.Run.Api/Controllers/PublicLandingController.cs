@@ -11787,6 +11787,9 @@ Boundary:
         return new
         {
             PublicCapabilityCatalogHref = "/api/v1/public/horizons/capabilities",
+            SignedInCapabilityCatalogHref = capability.RequiresAuthentication
+                ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
             SignedInQuotaCatalogHref = capability.RequiresAuthentication && capability.QuotaTracked
                 ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
