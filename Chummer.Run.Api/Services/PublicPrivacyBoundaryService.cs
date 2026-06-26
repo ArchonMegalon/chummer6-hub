@@ -18,13 +18,13 @@ public sealed class PublicPrivacyBoundaryService
         new(
             MarkdownHeading: "Support cases",
             Id: "support_case_truth",
-            Label: "Private help",
+            Label: "Support cases",
             PublicProjection: "Public pages can mention known issues and fix availability.",
             SignedInProjection: "Your account can show your own help history and follow-up."),
         new(
             MarkdownHeading: "Claim and install linkage",
             Id: "claim_install_linkage",
-            Label: "Install linking",
+            Label: "Install linkage",
             PublicProjection: "Public pages show release status and install help.",
             SignedInProjection: "Your account can show linked installs and recovery context."),
         new(
@@ -155,8 +155,8 @@ public sealed class PublicPrivacyBoundaryService
             ContractName = DefaultContractName,
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
             Eyebrow = "Privacy",
-            Heading = "What Chummer keeps",
-            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product and answer you.",
+            Heading = "Support and feedback data expire on a clear schedule",
+            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product, answer you, and retire raw traces on schedule.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
                 .Select(spec => BuildDomain(spec, retentionDomains))

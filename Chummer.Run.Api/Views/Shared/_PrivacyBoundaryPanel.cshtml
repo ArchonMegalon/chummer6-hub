@@ -32,10 +32,28 @@
             <article class="workflow-card">
                 <div class="workflow-card__copy">
                     <h3>@PublicPrivacyText(domain.Label)</h3>
+                    <p><strong>Kept for:</strong> @PublicPrivacyText(domain.RetentionSummary)</p>
+                    <p><strong>Redaction:</strong> @PublicPrivacyText(domain.RedactionSummary)</p>
                     <p>@PublicPrivacyText(domain.PublicProjection)</p>
                     <p class="muted-copy">@PublicPrivacyText(domain.SignedInProjection)</p>
                 </div>
             </article>
         }
     </div>
+
+    @if (Model.SurfaceRules.Count > 0)
+    {
+        <div class="workflow-grid">
+            @foreach (var rule in Model.SurfaceRules)
+            {
+                <article class="workflow-card">
+                    <div class="workflow-card__copy">
+                        <h3>@PublicPrivacyText(rule.Label)</h3>
+                        <p>@PublicPrivacyText(rule.Summary)</p>
+                        <p class="muted-copy">@PublicPrivacyText(rule.BlockedSummary)</p>
+                    </div>
+                </article>
+            }
+        </div>
+    }
 </section>

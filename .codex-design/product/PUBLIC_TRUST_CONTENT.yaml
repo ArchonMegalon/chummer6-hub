@@ -4,14 +4,14 @@ version: 1
 trust_pages:
   - id: help
     eyebrow: "Help"
-    heading: "Help"
-    intro: "What went wrong?"
+    heading: "Get help without guessing"
+    intro: "Pick the closest path. Keep public ideas, private bugs, and downloads separate."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
-      - "Install or update"
-      - "Account or recovery"
-      - "Private support"
+      - "First-party help comes first"
+      - "Support is separate from participation"
+      - "Downloads and setup stay clear"
     actions:
       - label: "Open support"
         href: "/contact#support-intake"
@@ -26,28 +26,28 @@ trust_pages:
       - id: install-update
         eyebrow: "Install or update"
         heading: "Downloads"
-        body: "Get the current build or the Linux source-build path."
+        body: "Get the current public build."
         bullets:
           - "Stable for normal use."
           - "Source build for Linux users who want to compile it themselves."
       - id: sign-in-recovery
         eyebrow: "Account recovery"
-        heading: "Claim or recover"
+        heading: "Account"
         body: "Claim your copy only when you want recovery or linked installs."
         bullets:
           - "Guest use is fine."
           - "Claim only when you want recovery."
       - id: product-bug
         eyebrow: "Bug report"
-        heading: "Private message"
-        body: "Use Contact for crashes, logs, screenshots, or account details."
+        heading: "Private support"
+        body: "Use Contact when logs, screenshots, crash details, or account details are involved."
         bullets:
           - "One issue per message."
           - "Discord is better for normal questions."
       - id: product-question
         eyebrow: "Product question"
         heading: "FAQ"
-        body: "Read the short answers before sending a private message."
+        body: "Read the short answers before opening a support case."
         bullets:
           - "No account needed."
           - "Support stays private."
@@ -122,14 +122,14 @@ trust_pages:
         body: "Public downloads should match what is honestly available right now. If a regular installer exists later, it becomes the normal path, while manual packages stay as fallback for edge cases or support-directed setup."
   - id: contact
     eyebrow: "Contact"
-    heading: "Talk to Chummer"
-    intro: "Ask in Discord first. Use the form for private details."
+    heading: "Contact Chummer"
+    intro: "For normal questions, reach me on Discord in the Chummer5 server. Use the form only for private install trouble, crashes, logs, or account detail."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
       - "Discord first"
-      - "Private form when needed"
-      - "Participate for public ideas"
+      - "Private form for logs"
+      - "Account history when needed"
     actions:
       - label: "Open Discord"
         href: "https://discord.gg/chummer"
@@ -143,16 +143,16 @@ trust_pages:
     sections:
       - id: discord
         eyebrow: "Discord"
-        heading: "Chummer5 server"
+        heading: "Use the Chummer5 server for normal contact"
         body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is."
       - id: tracked-support
         eyebrow: "Private"
-        heading: "Private message"
-        body: "Use the form only for crashes, logs, screenshots, install trouble, or account details."
+        heading: "Use the form only when Discord is the wrong place"
+        body: "Install failures, crashes, screenshots, logs, or account details should stay private. The form is for those cases."
       - id: public-issues
         eyebrow: "Public feedback"
-        heading: "Participate"
-        body: "Ideas and public feedback belong on Participate."
+        heading: "Use Participate for roadmap items"
+        body: "Ideas and public UX feedback should go to Participate, not the private support form."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"
@@ -180,14 +180,14 @@ faq_pages:
       - title: "Downloads and installs"
         entries:
           - question: "Do I need an account to download the current release?"
-            answer: "No. Downloads stay open. Claim your copy only when you want recovery or linked installs."
+            answer: "No. The current public package stays open. Claim your copy only when you want recovery or linked installs."
           - question: "Does the account change the download file?"
             answer: "No. The published package stays the same for everyone. Account linking is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
-            answer: "Start with Downloads, then use Contact or Account > Support. Public boards are optional."
+            answer: "Start with Downloads, then use Contact or Account > Support. Public issue threads are optional and not the default help door."
       - title: "Participation and help"
         entries:
           - question: "Do I need to participate to help or report a bug?"
-            answer: "No. Support and feedback work without it. Participate is optional."
+            answer: "No. Support and feedback stand on their own. Participation is optional and separate from the normal customer help path."
           - question: "Can I get help without another account?"
             answer: "Yes. Use Discord for normal questions and Contact for private details. Claim your copy only when recovery matters."

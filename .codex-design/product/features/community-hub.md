@@ -1,0 +1,83 @@
+# COMMUNITY HUB
+
+## Explanation video
+
+[Watch the COMMUNITY HUB 90-second deep dive](https://chummer.run/media/horizons/community-hub-90s-deepdive.mp4). [Captions](https://chummer.run/media/horizons/community-hub-90s-deepdive.vtt).
+
+## The problem
+
+Finding a table still means juggling community rules, approvals, chats, calendars, meeting links, roster notes, and after-session follow-up just to get the right people to the table and close the loop afterward.
+
+## What it would do
+
+COMMUNITY HUB would turn BLACK LEDGER and campaign prep into a practical recruitment, scheduling, prep, and closeout layer.
+
+It would let a GM:
+
+* publish an open run from a job bundle, custom run, or creator module
+* accept join requests tied to player accounts and runner dossiers or approved quickstarts
+* apply a visible community rule environment and application preflight before roster lock
+* give players a clear table contract before scheduling
+* schedule the session through a Chummer-owned record path
+* hand accepted players off to Discord, Teams, or another meeting space without giving those tools run state
+* export runner, opposition, and handout bundles to play surfaces without making those play surfaces authoritative
+* give a first-time GM enough autopilot structure to run a beginner table
+* collect a resolution report that feeds the living world back into BLACK LEDGER
+* optionally award seasonal honors and runner-legends from typed, spoiler-safe events
+
+The public fantasy is:
+
+> A GM opens a run on the map.
+> The right players find it.
+> Chummer gets the table into the session.
+> The outcome changes the city.
+
+COMMUNITY HUB is the product name for that lane.
+
+The signed-in command lane is already live at `https://chummer.run/community`.
+That lane currently carries governed open-run bundles, venue handoff, and community closeout without pretending the whole long-range community roadmap is done.
+
+## Likely owners
+
+* `chummer6-hub`
+* `chummer6-ui`
+* `chummer6-mobile`
+* `fleet`
+* `executive-assistant`
+* `chummer6-media-factory`
+
+## Tool posture
+
+Bounded scheduling, intake, and publication tooling may help with discovery, booking, and weekly honors.
+Meeting tools and observer tools stay projection or assistance lanes only.
+
+## What has to be true first
+
+* BLACK LEDGER job bundles and world consequences must already be trustworthy enough to seed open runs
+* campaign and run state must remain Chummer-owned even when meeting platforms are involved
+* community rule environments, roster fit, and rule-environment preflight must be explainable rather than magical
+* quickstart and mobile-first entry paths must be good enough that “no Windows PC” is not an automatic exclusion
+* a beginner GM must be able to open, staff, prep, schedule, and close a starter run without stitching together five external tools
+* observer and debrief lanes must be strictly consent-gated
+* reputation and seasonal honors must derive from typed source events rather than hidden scoring
+
+## Hard boundary
+
+* not a random LFG board with no provenance or rules posture
+* not Discord- or Teams-owned run state
+* not VTT-owned roster or consequence state
+* not default-on recording or observer presence
+* not public shame boards
+* not pay-to-win ranking
+* not Table Pulse or GOD deciding world state or moderation state
+
+## What is ready now
+
+Chummer can now prove the core Community Hub loop:
+
+1. the public board, signed-in board, and typed open-run APIs all point at the same governed open-run spine,
+2. join review, scheduling, meeting handoff, and closeout stay on first-party rails,
+3. public venue posture can be shown without leaking private room state,
+4. meeting tools remain projection-only and do not outrank Chummer-owned records.
+
+The broader organizer/community roadmap is still larger than this shipped slice, but the open-run network itself is no longer only future copy.

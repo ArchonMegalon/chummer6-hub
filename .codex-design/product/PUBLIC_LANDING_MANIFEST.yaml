@@ -349,24 +349,6 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party named prep network receipt
-- path: /propertyquarry
-  title: PROPERTYQUARRY
-  audience: public
-  purpose: product_surface
-  requires_auth: false
-  guest_fallback: /propertyquarry
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party property packet surface only
-- path: /propertyquarry/property-network
-  title: PROPERTYQUARRY property details
-  audience: public
-  purpose: product_surface_detail
-  requires_auth: false
-  guest_fallback: /propertyquarry
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party named property network receipt
 - path: /runbook
   title: RUNBOOK PRESS
   audience: public
@@ -376,33 +358,6 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party primer and campaign-book surface only
-- path: /runbook/primer-network
-  title: RUNBOOK PRESS primer details
-  audience: public
-  purpose: product_surface_detail
-  requires_auth: false
-  guest_fallback: /runbook
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party named primer network receipt
-- path: /origin-dossier
-  title: ORIGIN DOSSIER
-  audience: public
-  purpose: product_surface
-  requires_auth: false
-  guest_fallback: /origin-dossier
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party origin story and bounded media surface only
-- path: /origin-dossier/story-network
-  title: ORIGIN DOSSIER story details
-  audience: public
-  purpose: product_surface_detail
-  requires_auth: false
-  guest_fallback: /origin-dossier
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party named origin story network receipt
 - path: /community
   title: Community Hub
   audience: public
@@ -691,15 +646,6 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: governed discovery entry only
-- path: /participate/karma-forge/discovery-network
-  title: KARMA FORGE discovery details
-  audience: public
-  purpose: product_surface_receipt
-  requires_auth: false
-  guest_fallback: /participate/karma-forge
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: first-party governed discovery network receipt only
 - path: /alice
   title: ALICE compare bench
   audience: public
@@ -1485,33 +1431,6 @@ registered_routes:
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: signed-in RUNSITE workspace prep route
-- path: /account/propertyquarry
-  title: Account PROPERTYQUARRY
-  audience: registered
-  purpose: signed_in_horizon
-  requires_auth: true
-  guest_fallback: /login?next=/account/propertyquarry
-  must_exist: true
-  placeholder_allowed: true
-  placeholder_requirements: signed-in PROPERTYQUARRY property desk redirect or empty-state route
-- path: /account/propertyquarry/open
-  title: Account PROPERTYQUARRY open
-  audience: registered
-  purpose: signed_in_horizon
-  requires_auth: true
-  guest_fallback: /login?next=/account/propertyquarry/open
-  must_exist: true
-  placeholder_allowed: true
-  placeholder_requirements: signed-in PROPERTYQUARRY property desk redirect route
-- path: /account/propertyquarry/{propertyId}
-  title: Account PROPERTYQUARRY property
-  audience: registered
-  purpose: signed_in_horizon
-  requires_auth: true
-  guest_fallback: /login?next=/account/propertyquarry/{propertyId}
-  must_exist: true
-  placeholder_allowed: true
-  placeholder_requirements: signed-in PROPERTYQUARRY prep search route
 - path: /account/run-control
   title: Account RUN CONTROL
   audience: registered
