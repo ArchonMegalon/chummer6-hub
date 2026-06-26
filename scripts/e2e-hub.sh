@@ -136,11 +136,6 @@ if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
 
   playwright_log="$(mktemp)"
   playwright_base_url="$HUB_BASE_URL"
-  playwright_add_host_args=()
-  if [[ "$HUB_BASE_URL" == http://127.0.0.1:* || "$HUB_BASE_URL" == http://localhost:* ]]; then
-    playwright_base_url="http://$HUB_PUBLIC_HOST:${CHUMMER_PUBLIC_EDGE_PORT:-8091}"
-    playwright_add_host_args=(--add-host "$HUB_PUBLIC_HOST:127.0.0.1")
-  fi
   export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
   set +e
   docker compose -p "$HUB_PLAYWRIGHT_PROJECT_NAME" -f legacy/tooling/docker/docker-compose.yml --profile test build \
@@ -148,7 +143,6 @@ if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
   playwright_status=${PIPESTATUS[0]}
   if [[ "$playwright_status" -eq 0 ]]; then
     timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker run --rm --network host \
-      "${playwright_add_host_args[@]}" \
       -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$playwright_base_url" \
       -e CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO="https" \
       chummer-playwright:local \

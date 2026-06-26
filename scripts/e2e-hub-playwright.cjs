@@ -355,14 +355,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
-  await gotoAndAssert(page, pageErrors, '/participate', async () => {
-    await expectVisible(page, 'style[data-chummer-board-skin]');
-    const participateBody = await page.locator('body').innerText();
-    assert.equal(participateBody.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
-    assert.equal(await page.locator('.participate-actions').count(), 0, '/participate should not show duplicate wrapper actions.');
-    assert.equal(await page.locator('#participate-board').count(), 0, '/participate should not expose the hosted board wrapper id.');
-    await assertNoBannedCopy(page, '/participate');
-  });
+  {
+    const participateResponse = await page.context().request.get(`${baseUrl}/participate`, { failOnStatusCode: false });
+    assert.equal(participateResponse.status(), 200, '/participate should return 200.');
+    const participateHtml = await participateResponse.text();
+    assert.equal(participateHtml.includes('data-chummer-board-skin'), true, '/participate should include the first-party hosted board skin.');
+    assert.equal(participateHtml.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
+    assert.equal(participateHtml.includes('participate-actions'), false, '/participate should not show duplicate wrapper actions.');
+    assert.equal(participateHtml.includes('id="participate-board"'), false, '/participate should not expose the hosted board wrapper id.');
+    assert.equal(participateHtml.toLowerCase().includes('productlift.dev'), false, '/participate should not leak the ProductLift host.');
+  }
 
   await gotoAndAssert(page, pageErrors, '/faq', async () => {
     await expectVisible(page, 'text=Plain answers before you spend more time');
@@ -420,7 +422,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
     await expectBodyText(page, 'Choose the right help path', '/help');
-    await expectBodyText(page, 'Start with Downloads', '/help');
+    await expectBodyText(page, 'Install or update', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/help downloads link'),
       '/help downloads link'
@@ -459,6 +461,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Recommended from your browser.');
     await expectVisible(page, 'text=Other downloads');
+    await page.locator('summary:has-text("Other downloads")').click();
     await expectVisible(page, 'text=Build from source');
     await assertNoBannedCopy(page, 'Downloads');
   });
@@ -466,8 +469,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
     await expectVisible(page, 'text=Contact paths');
-    await expectVisible(page, 'text=Send support request');
     await expectVisible(page, 'text=Open private form');
+    await page.locator('summary:has-text("Private form")').click();
+    await expectVisible(page, 'text=Send support request');
   });
   await gotoAndAssert(
     page,
@@ -475,6 +479,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
     async () => {
       await expectVisible(page, 'text=Contact Chummer');
+      await page.locator('summary:has-text("Private form")').click();
       assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
       assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
       assert.equal(await page.locator('#supportSummary').inputValue(), 'Scene resume needs support review', 'Prefilled contact route should preserve the support summary.');
@@ -485,6 +490,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
   });
+  await page.locator('summary:has-text("Private form")').click();
   await page.selectOption('#supportKind', 'bug_report');
   await page.fill('#supportTitle', 'Guest support intake smoke');
   await page.fill('#supportSummary', 'Guest support submission should land on the first-party confirmation page.');
