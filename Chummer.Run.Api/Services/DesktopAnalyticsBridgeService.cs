@@ -11,6 +11,8 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
         "desktop_shell_opened",
         "desktop_open_home",
         "desktop_open_horizons",
+        "desktop_open_auto_alice",
+        "desktop_open_origin_dossier",
         "desktop_open_campaign_workspace",
         "desktop_open_update_status",
         "desktop_open_install_linking",

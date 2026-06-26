@@ -264,6 +264,16 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn('Accepted: false, Forwarded: false, Status: "provider_error"', source)
         self.assertIn('Status: string.IsNullOrWhiteSpace(apiKey) ? "forwarded_public" : "forwarded"', source)
 
+    def test_desktop_analytics_bridge_accepts_every_avalonia_shell_event(self) -> None:
+        bridge_source = (REPO_ROOT / "Chummer.Run.Api" / "Services" / "DesktopAnalyticsBridgeService.cs").read_text(encoding="utf-8")
+        event_handler_source = (REPO_ROOT.parent / "chummer6-ui" / "Chummer.Avalonia" / "MainWindow.EventHandlers.cs").read_text(encoding="utf-8")
+
+        allowed_events = self._read_csharp_string_set(bridge_source, "AllowedEvents")
+        emitted_events = set(re.findall(r'TrackDesktopShellEventAsync\("([^"]+)"', event_handler_source))
+
+        self.assertGreater(len(emitted_events), 0)
+        self.assertLessEqual(emitted_events, allowed_events)
+
 
 if __name__ == "__main__":
     unittest.main()
