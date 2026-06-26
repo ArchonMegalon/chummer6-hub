@@ -60,6 +60,7 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("Same app for everyone.", view, StringComparison.Ordinal);
         Assert.Contains("Origin books: Free 1/month. Supporter 2/month.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
+        Assert.Contains("Not open yet", view, StringComparison.Ordinal);
         Assert.Contains("Supporter billing is not open yet.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer will attach supporter status after the account is open.", view, StringComparison.Ordinal);
         Assert.Contains("--bg: #171716;", view, StringComparison.Ordinal);
@@ -531,7 +532,7 @@ public sealed class BrilliantDirectoriesBillingTests
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.True(model.Unavailable);
         Assert.Equal("Support Chummer", model.Heading);
-        Assert.Contains("supporter checkout is being connected", model.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("supporter checkout is not open yet", model.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
