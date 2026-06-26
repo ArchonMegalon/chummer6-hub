@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Billing;
@@ -19,6 +20,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     private readonly ILogger<BrilliantDirectoriesBillingController> _logger;
     private readonly HubPageChromeService? _chrome;
     private readonly OriginAuthoringAllowanceProjectionService _originAuthoringAllowance;
+    private readonly HorizonArtifactRequestService? _artifactRequests;
 
     public BrilliantDirectoriesBillingController(
         BrilliantDirectoriesBillingService billing,
@@ -27,7 +29,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         ILogger<BrilliantDirectoriesBillingController>? logger = null,
         HubPageChromeService? chrome = null,
         HorizonArtifactQuotaService? horizonArtifactQuota = null,
-        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null)
+        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null,
+        HorizonArtifactRequestService? artifactRequests = null)
     {
         _billing = billing;
         _identity = identity;
@@ -36,6 +39,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         _chrome = chrome;
         _originAuthoringAllowance = originAuthoringAllowance
             ?? new OriginAuthoringAllowanceProjectionService(billing, horizonArtifactQuota);
+        _artifactRequests = artifactRequests;
     }
 
     [HttpGet("/account/billing")]
@@ -475,5 +479,61 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         => _originAuthoringAllowance.GetLegacyQuota(userId, email);
 
     private MyFirstBookQuotaConsumeResultDto ConsumeCurrentOriginAuthoringAllowance(string userId, string? email)
-        => _originAuthoringAllowance.ConsumeLegacyQuota(userId, email);
+    {
+        if (_artifactRequests is null)
+        {
+            return _originAuthoringAllowance.ConsumeLegacyQuota(userId, email);
+        }
+
+        HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "origin-dossier",
+                ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                UserId: userId,
+                SourceRef: "origin-dossier:guided-authoring",
+                Visibility: "private",
+                ExternalProcessingConsent: true,
+                Email: email),
+            consumeQuota: true);
+        ApplyArtifactReceiptHeaders(receipt);
+
+        if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+        {
+            if (receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"{receipt.PublicLabel} allowance is exhausted for this {DescribeAllowanceWindowPeriod(receipt.Quota?.WindowKind)}.");
+            }
+
+            throw new InvalidOperationException("Unable to create a Chummer-owned origin authoring request receipt.");
+        }
+
+        return new MyFirstBookQuotaConsumeResultDto(
+            "consumed",
+            _originAuthoringAllowance.GetLegacyQuota(userId, email));
+    }
+
+    private void ApplyArtifactReceiptHeaders(HorizonArtifactRequestReceipt receipt)
+    {
+        Response.Headers["X-Horizon-Artifact-Quota-Tracked"] = receipt.QuotaTracked ? "true" : "false";
+        Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+        Response.Headers["X-Horizon-Artifact-Request-Href"] = $"/api/v1/horizons/artifact-requests/me/{Uri.EscapeDataString(receipt.RequestId)}";
+        if (receipt.Quota is not null)
+        {
+            Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"] = receipt.Quota.WindowKind;
+            Response.Headers["X-Horizon-Artifact-Quota-Limit"] = receipt.Quota.WindowLimit.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Quota-Used"] = receipt.Quota.WindowUsed.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Quota-Remaining"] = receipt.Quota.WindowRemaining.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Horizon-Artifact-Allowance-Tier"] = receipt.Quota.AllowanceTier;
+            Response.Headers["X-Horizon-Artifact-Entitlement-Basis"] = receipt.Quota.EntitlementBasis;
+            Response.Headers["X-Horizon-Artifact-Entitlement-Scope"] = receipt.Quota.EntitlementScope;
+        }
+    }
+
+    private static string DescribeAllowanceWindowPeriod(string? windowKind)
+        => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
+            ? "month"
+            : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
+                ? "week"
+                : "window";
 }

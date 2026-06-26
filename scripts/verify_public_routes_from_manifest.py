@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import importlib.util
 import json
 import os
@@ -60,6 +61,13 @@ class RouteResult:
     redirect_location: str | None = None
     expectation: str | None = None
     detail: str | None = None
+    response_sha256: str | None = None
+    text_excerpt: str | None = None
+    critical_excerpt: str | None = None
+    cache_control: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    detection_hits: list[str] | None = None
 
 
 @dataclass
@@ -72,6 +80,16 @@ class NegativePathResult:
     status_code: int | None = None
     final_url: str | None = None
     detail: str | None = None
+
+
+PROOF_TOKENS = (
+    "load demo runner",
+    "demo runner",
+    "missing or stale",
+    "not yet gold-ready",
+    "review is required",
+    "preview publication",
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -197,6 +215,26 @@ def resolve_repo_path(path_value: str) -> Path:
     return REPO_ROOT / candidate
 
 
+def build_body_evidence(body_text: str, headers: dict[str, str]) -> dict[str, Any]:
+    lowered = body_text.lower()
+    detection_hits = [token for token in PROOF_TOKENS if token in lowered]
+    first_hit_index = min((lowered.find(token) for token in detection_hits), default=-1)
+    critical_excerpt = None
+    if first_hit_index >= 0:
+        start = max(0, first_hit_index - 120)
+        end = min(len(body_text), first_hit_index + 160)
+        critical_excerpt = " ".join(body_text[start:end].split())[:280]
+    return {
+        "response_sha256": hashlib.sha256(body_text.encode("utf-8")).hexdigest(),
+        "text_excerpt": " ".join(body_text.split())[:280],
+        "critical_excerpt": critical_excerpt,
+        "cache_control": headers.get("cache-control"),
+        "etag": headers.get("etag"),
+        "last_modified": headers.get("last-modified"),
+        "detection_hits": detection_hits,
+    }
+
+
 def verify_route(
     fetch,
     base_url: str,
@@ -319,7 +357,7 @@ def verify_route(
                 detail="strict positive proof for parameterized receipt routes requires --seed-receipts")
 
         try:
-            status, _, headers, final_url = fetch(
+            status, body_text, headers, final_url = fetch(
                 base_url,
                 resolved_request_path,
                 public_host=public_host or None,
@@ -361,7 +399,8 @@ def verify_route(
                 final_url=final_url,
                 redirect_location=redirect_location,
                 expectation=expectation,
-                detail=detail)
+                detail=detail,
+                **build_body_evidence(body_text, headers))
         except Exception as exc:
             return RouteResult(
                 path=path,
@@ -387,7 +426,7 @@ def verify_route(
         mode = "registered_fallback"
         expectation = f"anonymous request redirects to {resolved_guest_fallback}"
         try:
-            status, _, headers, final_url = fetch(
+            status, body_text, headers, final_url = fetch(
                 base_url,
                 resolved_request_path,
                 public_host=public_host or None,
@@ -417,7 +456,8 @@ def verify_route(
                 final_url=final_url,
                 redirect_location=redirect_location,
                 expectation=expectation,
-                detail=detail)
+                detail=detail,
+                **build_body_evidence(body_text, headers))
         except Exception as exc:
             return RouteResult(
                 path=path,
@@ -438,7 +478,7 @@ def verify_route(
         mode = "auth_operation"
         expectation = f"auth operation returns one of {sorted(AUTH_OPERATION_OK_STATUSES)} without a 5xx"
         try:
-            status, _, headers, final_url = fetch(
+            status, body_text, headers, final_url = fetch(
                 base_url,
                 resolved_request_path,
                 public_host=public_host or None,
@@ -466,7 +506,8 @@ def verify_route(
                 final_url=final_url,
                 redirect_location=redirect_location,
                 expectation=expectation,
-                detail=detail)
+                detail=detail,
+                **build_body_evidence(body_text, headers))
         except Exception as exc:
             return RouteResult(
                 path=path,
@@ -486,7 +527,7 @@ def verify_route(
     mode = "public_route"
     expectation = "public route resolves successfully"
     try:
-        status, body, headers, final_url = fetch(
+        status, body_text, headers, final_url = fetch(
             base_url,
             resolved_request_path,
             public_host=public_host or None,
@@ -527,7 +568,8 @@ def verify_route(
             final_url=final_url,
             redirect_location=redirect_location,
             expectation=expectation,
-            detail=detail)
+            detail=detail,
+            **build_body_evidence(body_text, headers))
     except Exception as exc:
         return RouteResult(
             path=path,

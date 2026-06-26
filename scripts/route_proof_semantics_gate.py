@@ -42,6 +42,19 @@ def main() -> int:
         if item.get("positive_proof"):
             errors.append(f"negative path {item.get('sample_path')} counted as positive proof")
 
+    for item in payload.get("routes") or []:
+        if not item.get("success"):
+            continue
+        mode = str(item.get("mode") or "")
+        if mode not in {"public_route", "registered_fallback", "auth_operation", "controller_contract"}:
+            continue
+        if not item.get("response_sha256"):
+            errors.append(f"route {item.get('path')} missing response_sha256")
+        if not item.get("text_excerpt"):
+            errors.append(f"route {item.get('path')} missing text_excerpt")
+        if item.get("detection_hits") is None:
+            errors.append(f"route {item.get('path')} missing detection_hits")
+
     if errors:
         raise SystemExit("route_proof_semantics_gate failed: " + "; ".join(errors))
     return 0

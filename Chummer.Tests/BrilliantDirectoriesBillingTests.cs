@@ -468,6 +468,52 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public async Task SignedInMyFirstBookConsumeEndpointCreatesSharedArtifactReceipt()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestReceiptStore receipts) =
+            CreateAuthenticatedControllerWithArtifacts(service, email: "runner@example.com");
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> result = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        MyFirstBookQuotaConsumeResultDto payload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(ok.Value);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecent("origin-dossier", user.UserId, "premium_authoring_credit", 10));
+
+        Assert.Equal("consumed", payload.Status);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("origin-dossier-premium-authoring", receipt.CapabilityId);
+        Assert.Equal("origin-dossier:guided-authoring", receipt.SourceRef);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(payload.Quota.MonthlyRemaining, receipt.Quota!.WindowRemaining);
+        Assert.Equal(receipt.RequestId, controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString());
+        Assert.Equal($"/api/v1/horizons/artifact-requests/me/{receipt.RequestId}", controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+        Assert.Equal("true", controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("monthly", controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
+    }
+
+    [Fact]
+    public void DirectMyFirstBookConsumeApiCreatesSharedArtifactReceiptWhenRequestServiceIsAvailable()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestReceiptStore receipts) =
+            CreateControllerWithAccountContextAndArtifacts(service, "runner@example.com");
+        controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
+
+        ActionResult<MyFirstBookQuotaConsumeResultDto> result = controller.ConsumeMyFirstBookQuota(user.UserId);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        MyFirstBookQuotaConsumeResultDto payload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(ok.Value);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecent("origin-dossier", user.UserId, "premium_authoring_credit", 10));
+
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("origin-dossier:guided-authoring", receipt.SourceRef);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(payload.Quota.MonthlyUsed, receipt.Quota!.WindowUsed);
+        Assert.Equal(receipt.RequestId, controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString());
+    }
+
+    [Fact]
     public async Task SignedInMyFirstBookEndpointsReturnUnauthorizedWhenNoSessionExists()
     {
         BrilliantDirectoriesBillingService service = CreateService();
@@ -962,6 +1008,62 @@ public sealed class BrilliantDirectoriesBillingTests
         return (controller, ensured!);
     }
 
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestReceiptStore Receipts) CreateAuthenticatedControllerWithArtifacts(
+        BrilliantDirectoriesBillingService service,
+        string email)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(root, "horizon-artifact-usage.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(root, "horizon-artifact-receipts.json"),
+                ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.test"
+            })
+            .Build();
+        CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+        AccountService accounts = new(communityStore);
+        HubIdentitySubjectCache cache = new();
+        const string accessToken = "test-access-token";
+        cache.Set(
+            "https://identity.example.test",
+            accessToken,
+            new AuthenticatedHubSubject(
+                SubjectId: "sub-auth",
+                DisplayName: "Runner",
+                Email: email,
+                Roles: Array.Empty<string>(),
+                AccessToken: accessToken),
+            TimeSpan.FromMinutes(5));
+        HubIdentityClient identity = new(new HttpClient(), configuration, NullLogger<HubIdentityClient>.Instance, cache);
+
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken).ToString();
+
+        accounts.EnsureUser("sub-auth", "Runner", email);
+        HubUserDto? ensured = accounts.GetBySubject("sub-auth");
+        Assert.NotNull(ensured);
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactQuotaService horizonQuota = new(new HorizonArtifactUsageStore(configuration), capabilities, service);
+        HorizonArtifactRequestReceiptStore receipts = new(configuration);
+        HorizonArtifactRequestService artifactRequests = new(capabilities, horizonQuota, receipts);
+        BrilliantDirectoriesBillingController controller = new(
+            service,
+            identity,
+            accounts,
+            horizonArtifactQuota: horizonQuota,
+            artifactRequests: artifactRequests)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+
+        return (controller, ensured!, receipts);
+    }
+
     private static (BrilliantDirectoriesBillingController Controller, HubUserDto User) CreateControllerWithAccountContext(
         BrilliantDirectoriesBillingService service,
         string email,
@@ -989,5 +1091,41 @@ public sealed class BrilliantDirectoriesBillingTests
         };
 
         return (controller, ensured);
+    }
+
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestReceiptStore Receipts) CreateControllerWithAccountContextAndArtifacts(
+        BrilliantDirectoriesBillingService service,
+        string email,
+        string subjectId = "sub-auth")
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(root, "horizon-artifact-usage.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(root, "horizon-artifact-receipts.json")
+            })
+            .Build();
+        CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+        AccountService accounts = new(communityStore);
+        HubUserDto ensured = accounts.EnsureUser(subjectId, "Runner", email);
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactQuotaService horizonQuota = new(new HorizonArtifactUsageStore(configuration), capabilities, service);
+        HorizonArtifactRequestReceiptStore receipts = new(configuration);
+        HorizonArtifactRequestService artifactRequests = new(capabilities, horizonQuota, receipts);
+        BrilliantDirectoriesBillingController controller = new(
+            service,
+            accounts: accounts,
+            horizonArtifactQuota: horizonQuota,
+            artifactRequests: artifactRequests)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        return (controller, ensured, receipts);
     }
 }
