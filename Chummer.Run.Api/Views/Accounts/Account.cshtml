@@ -32,7 +32,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Move between profile, installs, support, billing, participation, and campaigns.";
+    ViewData["ContextSidebarSummary"] = "Move between installs, support, billing, participation, and campaigns.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))

@@ -129,7 +129,8 @@ public sealed class AccountsController : Controller
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
                 ? "work"
                 : NormalizeAccountSection(section);
-        if (string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(selectedSection, "profile", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase)
             || string.Equals(selectedSection, "advanced", StringComparison.OrdinalIgnoreCase))
         {
             return Redirect("/account/billing");
@@ -1498,7 +1499,6 @@ public sealed class AccountsController : Controller
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountCoreSections(string currentSection)
         => new[]
         {
-            new SectionLinkViewModel("profile", "Profile", "/account", string.Equals(currentSection, "profile", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Installs", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),

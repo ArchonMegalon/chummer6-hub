@@ -13,14 +13,17 @@ public sealed class AccountBuildLabHandoffViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
+        Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"work\", \"Campaigns\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("new SectionLinkViewModel(\"profile\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"advanced\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
 
         Assert.Contains("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
-        Assert.Contains("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
+        Assert.Contains("Move between installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"work\" => \"Work\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"advanced\" => \"Billing\"", view, StringComparison.Ordinal);
