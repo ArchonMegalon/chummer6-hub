@@ -320,6 +320,7 @@ public sealed class HorizonCapabilityService
             RequiresAuthentication: health.RequiresAuthentication,
             PublicVisible: health.PublicVisible,
             QuotaTracked: health.QuotaTracked,
+            AllowanceWindowKind: health.AllowanceWindowKind,
             SourceRef: sourceRef,
             Visibility: visibility);
     }
@@ -347,6 +348,7 @@ public sealed class HorizonCapabilityService
             ["requires_authentication"] = capability.RequiresAuthentication,
             ["public_visible"] = capability.PublicVisible,
             ["quota_tracked"] = capability.QuotaTracked,
+            ["allowance_window_kind"] = capability.AllowanceWindowKind,
             ["source_ref"] = capability.SourceRef,
             ["visibility"] = capability.Visibility
         };

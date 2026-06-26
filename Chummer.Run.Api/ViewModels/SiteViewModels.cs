@@ -1120,6 +1120,7 @@ public sealed record PublicHorizonCapabilityViewModel(
     bool RequiresAuthentication,
     bool PublicVisible,
     bool QuotaTracked,
+    string AllowanceWindowKind,
     string SourceRef,
     string Visibility);
 

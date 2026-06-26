@@ -1090,6 +1090,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.True(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.True(capability.GetProperty("quota_tracked").GetBoolean());
+        Assert.Equal("weekly", capability.GetProperty("allowance_window_kind").GetString());
         Assert.Equal("runsite:redmond-dockyard-pack", capability.GetProperty("source_ref").GetString());
         Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("3DVista", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
@@ -1226,6 +1227,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
+        Assert.Equal("weekly", capability.GetProperty("allowance_window_kind").GetString());
         Assert.Equal("signal_deck:pressure_posture", capability.GetProperty("source_ref").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -1264,10 +1266,28 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
+        Assert.Equal("weekly", capability.GetProperty("allowance_window_kind").GetString());
         Assert.Equal("living_world:watch_package_posture", capability.GetProperty("source_ref").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
         Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public void SharedCapabilityJsonCarriesConfiguredAllowanceWindowKind()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+
+        using JsonDocument runsite = JsonSerializer.SerializeToDocument(
+            capabilities.BuildPublicCapabilityJsonNode("runsite", "tour", "runsite:redmond-dockyard-pack"));
+        using JsonDocument origin = JsonSerializer.SerializeToDocument(
+            capabilities.BuildPublicCapabilityJsonNode("origin-dossier", "premium_authoring_credit", "origin-dossier:guided-authoring"));
+
+        Assert.Equal("weekly", runsite.RootElement.GetProperty("allowance_window_kind").GetString());
+        Assert.Equal("monthly", origin.RootElement.GetProperty("allowance_window_kind").GetString());
+        Assert.Equal("origin-dossier:guided-authoring", origin.RootElement.GetProperty("source_ref").GetString());
+        Assert.DoesNotContain("First Book ai", origin.RootElement.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
