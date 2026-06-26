@@ -102,7 +102,9 @@ public sealed record OriginDossierPublicationImportRequest(
     string? MovieStoryboardPath = null,
     string? FinalNoFallbackNoSentinelAuditReceiptPath = null,
     string? ProviderManuscriptAccountAlias = null,
-    string? AudiobookProviderAccountAlias = null);
+    string? AudiobookProviderAccountAlias = null,
+    string? StorySceneCoverAccountAlias = null,
+    string? DossierVideoAccountAlias = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,

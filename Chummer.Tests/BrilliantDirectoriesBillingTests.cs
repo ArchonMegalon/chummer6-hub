@@ -109,6 +109,26 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public void BillingPageStillLoadsWhenCheckoutExistsButSyncSecretIsMissing()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = "https://billing.example.test/supporter",
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+            })
+            .Build();
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
+
+        BrilliantDirectoriesBillingPageDto page = service.GetPage();
+
+        Assert.Equal("Membership", page.Heading);
+        Assert.Contains(page.Plans, item => item.PlanKey == BrilliantDirectoriesBillingConstants.SupporterPlanKey);
+        Assert.Throws<BrilliantDirectoriesBillingUnavailableException>(() => service.EnsureAuthorized("anything"));
+    }
+
+    [Fact]
     public void BillingControllerKeepsGuestCheckoutEmailFirst()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));

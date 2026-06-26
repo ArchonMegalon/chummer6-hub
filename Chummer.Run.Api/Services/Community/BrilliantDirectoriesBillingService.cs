@@ -330,7 +330,7 @@ public sealed class BrilliantDirectoriesBillingService
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER", "BrilliantDirectories:CheckoutUserIdParameter") ?? "chummer_user_id",
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "BrilliantDirectories:CheckoutEmailParameter") ?? "email",
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "BrilliantDirectories:CheckoutPlanParameter") ?? "plan",
-            ReadRequired("BRILLIANT_DIRECTORIES_SYNC_SECRET", "BrilliantDirectories:SyncSecret", "sync secret"),
+            ReadOptional("BRILLIANT_DIRECTORIES_SYNC_SECRET", "BrilliantDirectories:SyncSecret"),
             ReadCsv("BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses", ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]),
             ReadCsv("BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]));
     }
@@ -436,6 +436,11 @@ public sealed class BrilliantDirectoriesBillingService
 
     private static void EnsureAuthorized(string? secret, BillingProviderOptions options)
     {
+        if (string.IsNullOrWhiteSpace(options.SyncSecret))
+        {
+            throw new BrilliantDirectoriesBillingUnavailableException("Billing sync is unavailable right now.");
+        }
+
         if (!SecretsMatch(secret, options.SyncSecret))
         {
             throw new UnauthorizedAccessException("Billing sync secret did not match.");
@@ -482,6 +487,6 @@ internal sealed record BillingProviderOptions(
     string UserIdParameter,
     string EmailParameter,
     string PlanParameter,
-    string SyncSecret,
+    string? SyncSecret,
     IReadOnlyList<string> SupportedMembershipStatuses,
     IReadOnlyList<string> ActiveMembershipStatuses);

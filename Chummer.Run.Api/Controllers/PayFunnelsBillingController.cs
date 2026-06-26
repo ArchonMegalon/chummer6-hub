@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Mvc;
@@ -77,13 +79,45 @@ public sealed class PayFunnelsBillingController : ControllerBase
 
     [HttpPost("/api/billing/payfunnels/webhook")]
     [ProducesResponseType<PayFunnelsWebhookResultDto>(StatusCodes.Status200OK)]
-    public ActionResult<PayFunnelsWebhookResultDto> Webhook([FromBody] PayFunnelsWebhookRequest request)
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<PayFunnelsWebhookResultDto>> Webhook(CancellationToken cancellationToken)
     {
-        string signature = Request.Headers["X-PayFunnels-Signature"].ToString();
-        PayFunnelsWebhookResultDto result = _billing.ProcessWebhook(request, signature);
-        return result.Status == "rejected"
-            ? Problem(statusCode: StatusCodes.Status400BadRequest, detail: result.RejectionReason)
-            : Ok(result);
+        string rawPayload;
+        using (var reader = new StreamReader(Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false))
+        {
+            rawPayload = await reader.ReadToEndAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(rawPayload))
+        {
+            return BadRequest("PayFunnels webhook payload is required.");
+        }
+
+        try
+        {
+            PayFunnelsWebhookRequest? request = JsonSerializer.Deserialize<PayFunnelsWebhookRequest>(
+                rawPayload,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (request is null)
+            {
+                return BadRequest("PayFunnels webhook payload is required.");
+            }
+
+            string signature = Request.Headers["X-PayFunnels-Signature"].ToString();
+            PayFunnelsWebhookResultDto result = _billing.ProcessWebhook(rawPayload, request, signature);
+            return result.Status == "rejected"
+                ? Problem(statusCode: StatusCodes.Status400BadRequest, detail: result.RejectionReason)
+                : Ok(result);
+        }
+        catch (JsonException)
+        {
+            return BadRequest("PayFunnels webhook payload must be valid JSON.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
     }
 
     [HttpGet("/account/billing/success")]

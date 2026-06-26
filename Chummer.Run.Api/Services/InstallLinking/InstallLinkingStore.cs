@@ -52,7 +52,7 @@ public sealed class InstallLinkingStore
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
         File.Move(tempPath, _storagePath, true);
     }
 
@@ -66,18 +66,40 @@ public sealed class InstallLinkingStore
                 return;
             }
 
-            var snapshotJson = File.ReadAllText(_storagePath);
-            var snapshot = JsonSerializer.Deserialize<InstallLinkingStoreSnapshot>(snapshotJson, _jsonOptions)
-                ?? throw new InvalidOperationException($"Unable to deserialize install-linking snapshot: {_storagePath}");
+            try
+            {
+                var snapshotJson = File.ReadAllText(_storagePath, System.Text.Encoding.UTF8);
+                var snapshot = JsonSerializer.Deserialize<InstallLinkingStoreSnapshot>(snapshotJson, _jsonOptions)
+                    ?? throw new InvalidOperationException($"Unable to deserialize install-linking snapshot: {_storagePath}");
 
-            ApplySnapshotLocked(snapshot);
-            _logger.LogInformation(
-                "InstallLinkingStore loaded {ReceiptCount} receipts, {TicketCount} claim tickets, {InstallCount} claimed installs, and {ScriptCount} personalized install scripts from {StoragePath}.",
-                ReceiptsById.Count,
-                ClaimTicketsById.Count,
-                InstallationsById.Count,
-                PersonalizedInstallScriptsById.Count,
-                _storagePath);
+                ApplySnapshotLocked(snapshot);
+                _logger.LogInformation(
+                    "InstallLinkingStore loaded {ReceiptCount} receipts, {TicketCount} claim tickets, {InstallCount} claimed installs, and {ScriptCount} personalized install scripts from {StoragePath}.",
+                    ReceiptsById.Count,
+                    ClaimTicketsById.Count,
+                    InstallationsById.Count,
+                    PersonalizedInstallScriptsById.Count,
+                    _storagePath);
+            }
+            catch (JsonException ex)
+            {
+                ApplySnapshotLocked(new InstallLinkingStoreSnapshot([], [], [], [], [], []));
+                QuarantineCorruptStoreFile();
+                _logger.LogWarning(ex, "InstallLinkingStore quarantined corrupt durable state at {StoragePath} and restarted empty.", _storagePath);
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{_storagePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(_storagePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting empty is safer than crashing when a local install-linking store file is unreadable.
         }
     }
 

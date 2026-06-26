@@ -1,17 +1,17 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-26T03:13:08Z",
+  "generated_at_utc": "2026-06-26T19:08:41Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
-  "row_count": 38,
+  "row_count": 39,
   "summary": {
     "priority_counts": {
       "P0": 27,
-      "P1": 10,
+      "P1": 11,
       "P2": 1
     },
     "status_counts": {
-      "active": 25,
+      "active": 26,
       "blocked-until-next-publish": 1,
       "book-first-ui-pushed": 1,
       "campaign-city-source-pass-pushed": 1,
@@ -39,7 +39,7 @@
       "Operations": 2,
       "Origin Dossier": 2,
       "Packaging": 1,
-      "Provider governance": 3,
+      "Provider governance": 4,
       "Release": 2,
       "Rules data": 1,
       "Rules engine": 1,
@@ -448,6 +448,18 @@
       "acceptance_gate": "Subscribr can draft from approved sources only; publication remains disabled until separate human approval."
     },
     {
+      "item_id": "origin-visuals-magicfit-runsite-magicai",
+      "title": "Magicfit origin visuals and MagicAI runsite pool",
+      "area": "Provider governance",
+      "priority": "P1",
+      "status": "active",
+      "cadence": "daily until stable",
+      "source": "Provider account update",
+      "why_it_matters": "Origin Dossier visual proofs should stay on the preferred Magicfit lane while Runsite uses the multi-account MagicAI/omagic pool through internal-only credentials and API keys.",
+      "next_action": "Keep Magicfit as the approved Origin Dossier visual receipt lane, mint and store at least one omagic API key, and inventory the MagicAI account pool only in env, EA catalog, and Teable-safe operator surfaces.",
+      "acceptance_gate": "Origin Dossier accepts Magicfit-backed visual receipts, Runsite internal ops can use a stored omagic API key, and Teable reflects the split without exposing raw provider credentials."
+    },
+    {
       "item_id": "code-quality-specialization-pass",
       "title": "Code quality specialization pass",
       "area": "Engineering quality",
@@ -511,25 +523,15 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-26T03:13:12Z",
-    "finished_at_utc": "2026-06-26T03:13:58Z",
+    "started_at_utc": "2026-06-26T19:08:41Z",
+    "finished_at_utc": "2026-06-26T19:09:56Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bset367EDGBD4NaB6LZ",
     "table_id": "tblxwx10oPF8KyBggsQ",
     "table_name": "Chummer Important Work",
-    "synced_count": 38,
-    "created_count": 38,
-    "updated_count": 0,
-    "failed_count": 0,
-    "errors": []
-  },
-  "hub_seed": {
-    "state": "passed",
-    "attempted": true,
-    "started_at_utc": "2026-06-26T03:13:08Z",
-    "finished_at_utc": "2026-06-26T03:13:12Z",
-    "hub_base_url": "https://chummer.run",
-    "recorded_count": 38,
+    "synced_count": 39,
+    "created_count": 1,
+    "updated_count": 38,
     "failed_count": 0,
     "errors": []
   }

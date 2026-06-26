@@ -76,57 +76,100 @@ public sealed class PayFunnelsBillingService
         }
     }
 
-    public PayFunnelsWebhookResultDto ProcessWebhook(PayFunnelsWebhookRequest request, string? signature)
+    public PayFunnelsWebhookResultDto ProcessWebhook(string rawPayload, PayFunnelsWebhookRequest request, string? signature)
     {
-        string canonicalPayload = CanonicalPayload(request);
-        string payloadHash = $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalPayload))).ToLowerInvariant()}";
-        if (!VerifySignature(canonicalPayload, signature))
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawPayload);
+        ArgumentNullException.ThrowIfNull(request);
+
+        PayFunnelsWebhookRequest normalizedRequest = request with
         {
-            return RecordRejectedEvent(request, payloadHash, "failed", "signature verification failed");
+            ProviderEventId = Clean(request.ProviderEventId),
+            EventType = Clean(request.EventType),
+            PaymentIntentId = Clean(request.PaymentIntentId),
+            UserId = Clean(request.UserId),
+            ProviderCheckoutId = Clean(request.ProviderCheckoutId),
+            BillingProductId = Clean(request.BillingProductId),
+            Currency = Clean(request.Currency)
+        };
+
+        string payloadHash = $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawPayload))).ToLowerInvariant()}";
+        if (!VerifySignature(rawPayload, signature))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "failed", "signature verification failed");
         }
 
-        if (!SupportedEventTypes.Contains(request.EventType))
+        if (string.IsNullOrWhiteSpace(normalizedRequest.ProviderEventId))
         {
-            return RecordRejectedEvent(request, payloadHash, "verified", "unsupported PayFunnels event type for the $1 test adapter");
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "provider event id is required");
         }
 
-        if (!string.Equals(request.BillingProductId, PayFunnelsTestBillingConstants.ProductId, StringComparison.OrdinalIgnoreCase))
+        if (normalizedRequest.ProviderEventId.Length > 256)
         {
-            return RecordRejectedEvent(request, payloadHash, "verified", "wrong billing product");
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "provider event id exceeds the 256 character limit");
         }
 
-        if (request.AmountCents != PayFunnelsTestBillingConstants.AmountCents
-            || !string.Equals(request.Currency, PayFunnelsTestBillingConstants.Currency, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(normalizedRequest.EventType))
         {
-            return RecordRejectedEvent(request, payloadHash, "verified", "wrong amount or currency");
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "event type is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedRequest.PaymentIntentId))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "payment intent id is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedRequest.UserId))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "user id is required");
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedRequest.ProviderCheckoutId))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "provider checkout id is required");
+        }
+
+        if (!SupportedEventTypes.Contains(normalizedRequest.EventType))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "unsupported PayFunnels event type for the $1 test adapter");
+        }
+
+        if (!string.Equals(normalizedRequest.BillingProductId, PayFunnelsTestBillingConstants.ProductId, StringComparison.OrdinalIgnoreCase))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "wrong billing product");
+        }
+
+        if (normalizedRequest.AmountCents != PayFunnelsTestBillingConstants.AmountCents
+            || !string.Equals(normalizedRequest.Currency, PayFunnelsTestBillingConstants.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            return RecordRejectedEvent(normalizedRequest, payloadHash, "verified", "wrong amount or currency");
         }
 
         lock (_store.Gate)
         {
-            var existingEvent = _store.Events.FirstOrDefault(item => string.Equals(item.ProviderEventId, request.ProviderEventId, StringComparison.OrdinalIgnoreCase));
+            var existingEvent = _store.Events.FirstOrDefault(item => string.Equals(item.ProviderEventId, normalizedRequest.ProviderEventId, StringComparison.OrdinalIgnoreCase));
             if (existingEvent is not null)
             {
-                var existingReceipt = _store.Receipts.FirstOrDefault(item => string.Equals(item.ProviderEventId, request.ProviderEventId, StringComparison.OrdinalIgnoreCase))
-                    ?? _store.Receipts.FirstOrDefault(item => string.Equals(item.ProviderCheckoutId, request.ProviderCheckoutId, StringComparison.OrdinalIgnoreCase));
-                return BuildResult(request, "verified", "duplicate_ignored", existingEvent.Status, existingReceipt?.ReceiptId, FindNoOpEntryId(request.UserId, existingReceipt?.BillingProductId), existingEvent.RejectionReason);
+                var existingReceipt = _store.Receipts.FirstOrDefault(item => string.Equals(item.ProviderEventId, normalizedRequest.ProviderEventId, StringComparison.OrdinalIgnoreCase))
+                    ?? _store.Receipts.FirstOrDefault(item => string.Equals(item.ProviderCheckoutId, normalizedRequest.ProviderCheckoutId, StringComparison.OrdinalIgnoreCase));
+                return BuildResult(normalizedRequest, "verified", "duplicate_ignored", existingEvent.Status, existingReceipt?.ReceiptId, FindNoOpEntryId(normalizedRequest.UserId, existingReceipt?.BillingProductId), existingEvent.RejectionReason);
             }
 
             var intent = _store.Intents.FirstOrDefault(item =>
-                string.Equals(item.IntentId, request.PaymentIntentId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(item.UserId, request.UserId, StringComparison.OrdinalIgnoreCase)
+                string.Equals(item.IntentId, normalizedRequest.PaymentIntentId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.UserId, normalizedRequest.UserId, StringComparison.OrdinalIgnoreCase)
                 && item.BenefitAcknowledged);
             if (intent is null)
             {
-                return RecordRejectedEventLocked(request, payloadHash, "verified", "payment intent metadata did not match an acknowledged Chummer intent");
+                return RecordRejectedEventLocked(normalizedRequest, payloadHash, "verified", "payment intent metadata did not match an acknowledged Chummer intent");
             }
 
             _store.Events.Add(new PaymentEventDto(
                 EventId: NewId("pf_evt"),
                 Provider: PayFunnelsTestBillingConstants.Provider,
-                ProviderEventId: request.ProviderEventId,
-                EventType: request.EventType,
+                ProviderEventId: normalizedRequest.ProviderEventId,
+                EventType: normalizedRequest.EventType,
                 SignatureStatus: "verified",
-                IdempotencyKey: request.ProviderEventId,
+                IdempotencyKey: normalizedRequest.ProviderEventId,
                 RawPayloadHash: payloadHash,
                 Status: "accepted",
                 ProcessedAtUtc: DateTimeOffset.UtcNow,
@@ -134,17 +177,17 @@ public sealed class PayFunnelsBillingService
 
             PaymentReceiptDto? receipt = null;
             BillingEntitlementLedgerEntryDto? ledger = null;
-            if (string.Equals(request.EventType, "payment_succeeded", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedRequest.EventType, "payment_succeeded", StringComparison.OrdinalIgnoreCase))
             {
                 receipt = new PaymentReceiptDto(
                     ReceiptId: NewId("pf_receipt"),
-                    UserId: request.UserId,
+                    UserId: normalizedRequest.UserId,
                     Provider: PayFunnelsTestBillingConstants.Provider,
-                    ProviderEventId: request.ProviderEventId,
-                    ProviderCheckoutId: request.ProviderCheckoutId,
-                    BillingProductId: request.BillingProductId,
-                    AmountCents: request.AmountCents,
-                    Currency: request.Currency,
+                    ProviderEventId: normalizedRequest.ProviderEventId,
+                    ProviderCheckoutId: normalizedRequest.ProviderCheckoutId,
+                    BillingProductId: normalizedRequest.BillingProductId,
+                    AmountCents: normalizedRequest.AmountCents,
+                    Currency: normalizedRequest.Currency,
                     Status: "paid",
                     EntitlementEffect: "none",
                     CreatedAtUtc: DateTimeOffset.UtcNow,
@@ -152,15 +195,15 @@ public sealed class PayFunnelsBillingService
                     Envelope: ReceiptEnvelopeFactory.ExternalWebhook(
                         receiptKind: "billing_payment",
                         ownerScope: "billing.account",
-                        evidenceRef: request.ProviderEventId,
+                        evidenceRef: normalizedRequest.ProviderEventId,
                         reviewState: "verified"));
                 _store.Receipts.Add(receipt);
 
                 ledger = new BillingEntitlementLedgerEntryDto(
                     EntryId: NewId("pf_noop"),
-                    UserId: request.UserId,
+                    UserId: normalizedRequest.UserId,
                     Source: PayFunnelsTestBillingConstants.Provider,
-                    BillingProductId: request.BillingProductId,
+                    BillingProductId: normalizedRequest.BillingProductId,
                     EffectType: PayFunnelsTestBillingConstants.EntitlementEffect,
                     PremiumEnabledDelta: false,
                     RenderUnitsDelta: 0,
@@ -169,11 +212,11 @@ public sealed class PayFunnelsBillingService
                     CreatedAtUtc: DateTimeOffset.UtcNow);
                 _store.EntitlementLedger.Add(ledger);
             }
-            else if (string.Equals(request.EventType, "payment_refunded", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(normalizedRequest.EventType, "payment_refunded", StringComparison.OrdinalIgnoreCase))
             {
                 var original = _store.Receipts.LastOrDefault(item =>
-                    string.Equals(item.UserId, request.UserId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(item.ProviderCheckoutId, request.ProviderCheckoutId, StringComparison.OrdinalIgnoreCase)
+                    string.Equals(item.UserId, normalizedRequest.UserId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.ProviderCheckoutId, normalizedRequest.ProviderCheckoutId, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(item.Status, "paid", StringComparison.OrdinalIgnoreCase));
                 if (original is not null)
                 {
@@ -184,7 +227,7 @@ public sealed class PayFunnelsBillingService
                         Envelope = (original.Envelope ?? ReceiptEnvelopeFactory.ExternalWebhook(
                             receiptKind: "billing_payment",
                             ownerScope: "billing.account",
-                            evidenceRef: request.ProviderEventId,
+                            evidenceRef: normalizedRequest.ProviderEventId,
                             reviewState: "verified")) with
                         {
                             LifecycleState = ReceiptLifecycleStates.Archived
@@ -196,9 +239,12 @@ public sealed class PayFunnelsBillingService
             }
 
             _store.PersistLocked();
-            return BuildResult(request, "verified", "first_seen", "accepted", receipt?.ReceiptId, ledger?.EntryId ?? FindNoOpEntryId(request.UserId, request.BillingProductId), null);
+            return BuildResult(normalizedRequest, "verified", "first_seen", "accepted", receipt?.ReceiptId, ledger?.EntryId ?? FindNoOpEntryId(normalizedRequest.UserId, normalizedRequest.BillingProductId), null);
         }
     }
+
+    public PayFunnelsWebhookResultDto ProcessWebhook(PayFunnelsWebhookRequest request, string? signature)
+        => ProcessWebhook(CanonicalPayload(request), request, signature);
 
     public BillingAccountSummaryDto GetAccountSummary(string userId)
     {
@@ -230,12 +276,17 @@ public sealed class PayFunnelsBillingService
     public static string CanonicalPayload(PayFunnelsWebhookRequest request)
         => JsonSerializer.Serialize(request, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-    public string ComputeSignature(PayFunnelsWebhookRequest request)
+    public string ComputeSignature(string rawPayload)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawPayload);
+
         var secret = GetWebhookSecret();
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        return $"sha256={Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(CanonicalPayload(request)))).ToLowerInvariant()}";
+        return $"sha256={Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(rawPayload))).ToLowerInvariant()}";
     }
+
+    public string ComputeSignature(PayFunnelsWebhookRequest request)
+        => ComputeSignature(CanonicalPayload(request));
 
     private PayFunnelsWebhookResultDto RecordRejectedEvent(PayFunnelsWebhookRequest request, string payloadHash, string signatureStatus, string reason)
     {
@@ -295,7 +346,7 @@ public sealed class PayFunnelsBillingService
             && string.Equals(item.BillingProductId, billingProductId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(item.EffectType, PayFunnelsTestBillingConstants.EntitlementEffect, StringComparison.OrdinalIgnoreCase))?.EntryId;
 
-    private bool VerifySignature(string canonicalPayload, string? signature)
+    private bool VerifySignature(string rawPayload, string? signature)
     {
         if (string.IsNullOrWhiteSpace(signature))
         {
@@ -304,7 +355,7 @@ public sealed class PayFunnelsBillingService
 
         var secret = GetWebhookSecret();
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var expected = $"sha256={Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonicalPayload))).ToLowerInvariant()}";
+        var expected = $"sha256={Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(rawPayload))).ToLowerInvariant()}";
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(signature.Trim()));
     }
 
@@ -320,4 +371,7 @@ public sealed class PayFunnelsBillingService
     }
 
     private static string NewId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
+    private static string Clean(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 }

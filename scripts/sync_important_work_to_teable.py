@@ -458,6 +458,18 @@ def important_work_items() -> list[ImportantWorkItem]:
             acceptance_gate="Subscribr can draft from approved sources only; publication remains disabled until separate human approval.",
         ),
         ImportantWorkItem(
+            item_id="origin-visuals-magicfit-runsite-magicai",
+            title="Magicfit origin visuals and MagicAI runsite pool",
+            area="Provider governance",
+            priority="P1",
+            status="active",
+            cadence="daily until stable",
+            source="Provider account update",
+            why_it_matters="Origin Dossier visual proofs should stay on the preferred Magicfit lane while Runsite uses the multi-account MagicAI/omagic pool through internal-only credentials and API keys.",
+            next_action="Keep Magicfit as the approved Origin Dossier visual receipt lane, mint and store at least one omagic API key, and inventory the MagicAI account pool only in env, EA catalog, and Teable-safe operator surfaces.",
+            acceptance_gate="Origin Dossier accepts Magicfit-backed visual receipts, Runsite internal ops can use a stored omagic API key, and Teable reflects the split without exposing raw provider credentials.",
+        ),
+        ImportantWorkItem(
             item_id="code-quality-specialization-pass",
             title="Code quality specialization pass",
             area="Engineering quality",

@@ -13,6 +13,7 @@ public sealed class OriginDossierPublicationService
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
     private static readonly IReadOnlyList<string> DefaultApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
+    private static readonly IReadOnlyList<string> DefaultApprovedVisualProviderTokens = ["Magicfit"];
     private static readonly IReadOnlyList<string> DefaultTrustedAudiobookshelfHosts = ["audio.chummer.run", "audiobookshelf.chummer.run", "audiobookshelf.girschele.com"];
     private const string SelectedCharacterFaceProofToken = "selected_character_face";
     private const string ApprovedSourcePacketToken = "approved_source_packet";
@@ -410,12 +411,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "story scene cover artifact path");
         AddIfMissing(
             missing,
-            HasArtifactReceipt(
-                entry.StorySceneCoverPath,
-                entry.StorySceneCoverReceiptPath,
-                "selected_face_scene_render",
-                null,
-                RequiredStorySceneCoverTokens(entry)),
+            HasStorySceneCoverReceipt(entry),
             "story scene cover receipt path");
         AddIfMissing(missing, HasCoverConsistencyReceipt(entry), "cover consistency receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
@@ -423,7 +419,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.AudiobookProviderAccountAlias, entry.AudiobookshelfImportReceiptPath, "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES", "OriginDossier:AudioAccountAliases"), "audiobook provider account alias");
         AddIfMissing(missing, HasArchivedArtifact(entry.DossierVideoPath), "dossier video artifact path");
         AddIfMissing(missing, HasArchivedArtifact(entry.MoviePosterPath), "movie poster artifact path");
-        AddIfMissing(missing, HasArtifactReceipt(entry.DossierVideoPath, entry.DossierVideoReceiptPath, "dossier_video_import", null, ExternalProviderReceiptTokens()), "dossier video receipt path");
+        AddIfMissing(missing, HasDossierVideoReceipt(entry), "dossier video receipt path");
         AddIfMissing(missing, entry.TelegramShareDelivered, "Telegram share delivery");
         AddIfMissing(
             missing,
@@ -634,6 +630,26 @@ public sealed class OriginDossierPublicationService
         return ReceiptProviderMatchesAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "OriginDossier:ManuscriptProviderTokens", DefaultApprovedManuscriptProviderTokens));
     }
 
+    private bool HasStorySceneCoverReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        if (!HasArtifactReceipt(
+                entry.StorySceneCoverPath,
+                entry.StorySceneCoverReceiptPath,
+                "selected_face_scene_render",
+                null,
+                RequiredStorySceneCoverTokens(entry)))
+        {
+            return false;
+        }
+
+        return ReceiptProviderMatchesAnyToken(
+            entry.StorySceneCoverReceiptPath,
+            ResolveApprovedProviderTokens(
+                "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
+                "OriginDossier:VisualProviderTokens",
+                DefaultApprovedVisualProviderTokens));
+    }
+
     private bool HasProviderAccountAliasReceipt(string? accountAlias, string? receiptPath, string envKey, string configKey)
     {
         IReadOnlyList<string> configuredAliases = ResolveConfiguredProviderAccountAliases(envKey, configKey);
@@ -690,6 +706,26 @@ public sealed class OriginDossierPublicationService
 
         return ReceiptContainsAnyToken(entry.AudiobookshelfImportReceiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS", "OriginDossier:AudioProviderTokens", DefaultApprovedAudiobookProviderTokens))
             && ReceiptContainsOriginTaxonomy(entry.AudiobookshelfImportReceiptPath, BuildOriginEditionNamespace(entry), "audiobook");
+    }
+
+    private bool HasDossierVideoReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        if (!HasArtifactReceipt(
+                entry.DossierVideoPath,
+                entry.DossierVideoReceiptPath,
+                "dossier_video_import",
+                null,
+                ExternalProviderReceiptTokens()))
+        {
+            return false;
+        }
+
+        return ReceiptProviderMatchesAnyToken(
+            entry.DossierVideoReceiptPath,
+            ResolveApprovedProviderTokens(
+                "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
+                "OriginDossier:VisualProviderTokens",
+                DefaultApprovedVisualProviderTokens));
     }
 
     private static bool HasAudiobookshelfDossierImportReceipt(OriginDossierPublicationIndexEntry entry)

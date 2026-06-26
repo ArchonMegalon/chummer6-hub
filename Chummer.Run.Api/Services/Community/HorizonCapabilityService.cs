@@ -216,7 +216,7 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "dossier_media",
             PublicLabel: "Dossier Media",
             CapabilitySlot: "approved_origin_media",
-            InternalProviderLane: "Subscribr.ai / First Book ai / MarkupGo / vidBoard / Soundmadeseen",
+            InternalProviderLane: "Magicfit / Subscribr.ai / First Book ai / MarkupGo / vidBoard / Soundmadeseen",
             FreeWeeklyLimit: 0,
             SupporterWeeklyLimit: 2,
             RequiresAuthentication: true,

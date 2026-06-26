@@ -2253,6 +2253,25 @@ public sealed record OriginDossierPublicationDetailPageViewModel(
     string AccountHref,
     string LibraryHref);
 
+public sealed record AccountHubPageViewModel(
+    SiteChromeViewModel Chrome,
+    HubUserDto User,
+    string Heading,
+    string Summary,
+    string MembershipLabel,
+    string MembershipSummary,
+    string BookQuotaSummary,
+    IReadOnlyList<AccountHubCardViewModel> Cards);
+
+public sealed record AccountHubCardViewModel(
+    string Eyebrow,
+    string Title,
+    string Summary,
+    string PrimaryLabel,
+    string PrimaryHref,
+    string? SecondaryLabel = null,
+    string? SecondaryHref = null);
+
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
     string CurrentSection,

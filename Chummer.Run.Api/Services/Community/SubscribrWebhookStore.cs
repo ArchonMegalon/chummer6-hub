@@ -52,9 +52,30 @@ public sealed class SubscribrWebhookStore
                 return;
             }
 
-            var snapshot = JsonSerializer.Deserialize<SubscribrWebhookStoreSnapshot>(json, _jsonOptions);
-            Entries.Clear();
-            Entries.AddRange(snapshot?.Entries ?? []);
+            try
+            {
+                var snapshot = JsonSerializer.Deserialize<SubscribrWebhookStoreSnapshot>(json, _jsonOptions);
+                Entries.Clear();
+                Entries.AddRange(snapshot?.Entries ?? []);
+            }
+            catch (JsonException)
+            {
+                Entries.Clear();
+                QuarantineCorruptStoreFile();
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{StoragePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(StoragePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting from an empty in-memory ledger is safer than crashing the webhook lane on a bad store file.
         }
     }
 

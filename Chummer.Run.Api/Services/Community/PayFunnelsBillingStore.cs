@@ -33,7 +33,7 @@ public sealed class PayFunnelsBillingStore
             Events.OrderByDescending(static item => item.ProcessedAtUtc).ToArray(),
             Receipts.OrderByDescending(static item => item.CreatedAtUtc).ToArray(),
             EntitlementLedger.OrderByDescending(static item => item.CreatedAtUtc).ToArray());
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
         File.Move(tempPath, StoragePath, true);
     }
 
@@ -46,16 +46,40 @@ public sealed class PayFunnelsBillingStore
                 return;
             }
 
-            var snapshot = JsonSerializer.Deserialize<PayFunnelsBillingStoreSnapshot>(File.ReadAllText(StoragePath), _jsonOptions)
-                ?? new PayFunnelsBillingStoreSnapshot([], [], [], []);
-            Intents.Clear();
-            Events.Clear();
-            Receipts.Clear();
-            EntitlementLedger.Clear();
-            Intents.AddRange(snapshot.Intents ?? []);
-            Events.AddRange(snapshot.Events ?? []);
-            Receipts.AddRange(snapshot.Receipts ?? []);
-            EntitlementLedger.AddRange(snapshot.EntitlementLedger ?? []);
+            try
+            {
+                var snapshot = JsonSerializer.Deserialize<PayFunnelsBillingStoreSnapshot>(File.ReadAllText(StoragePath, System.Text.Encoding.UTF8), _jsonOptions)
+                    ?? new PayFunnelsBillingStoreSnapshot([], [], [], []);
+                Intents.Clear();
+                Events.Clear();
+                Receipts.Clear();
+                EntitlementLedger.Clear();
+                Intents.AddRange(snapshot.Intents ?? []);
+                Events.AddRange(snapshot.Events ?? []);
+                Receipts.AddRange(snapshot.Receipts ?? []);
+                EntitlementLedger.AddRange(snapshot.EntitlementLedger ?? []);
+            }
+            catch (JsonException)
+            {
+                Intents.Clear();
+                Events.Clear();
+                Receipts.Clear();
+                EntitlementLedger.Clear();
+                QuarantineCorruptStoreFile();
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{StoragePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(StoragePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting with empty billing state is safer than refusing to boot on a corrupt local store file.
         }
     }
 

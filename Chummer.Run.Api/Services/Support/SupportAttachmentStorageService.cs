@@ -4,6 +4,10 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class SupportAttachmentStorageService
 {
+    public const int MaxAttachmentCount = 5;
+    public const int MaxAttachmentBytes = 8 * 1024 * 1024;
+    public const long MaxMultipartBodyBytes = ((long)MaxAttachmentCount * MaxAttachmentBytes) + (256 * 1024);
+
     private static readonly HashSet<string> AllowedExtensions =
     [
         ".txt",
@@ -36,7 +40,7 @@ public sealed class SupportAttachmentStorageService
             return Array.Empty<SupportCaseAttachmentProjection>();
         }
 
-        if (attachments.Count > 5)
+        if (attachments.Count > MaxAttachmentCount)
         {
             throw new ArgumentException("Support intake accepts up to five attachments per case.");
         }
@@ -52,7 +56,7 @@ public sealed class SupportAttachmentStorageService
                 continue;
             }
 
-            if (attachment.Content.Length > 8 * 1024 * 1024)
+            if (attachment.Content.Length > MaxAttachmentBytes)
             {
                 throw new ArgumentException($"Attachment '{attachment.FileName}' exceeds the 8 MB limit.");
             }

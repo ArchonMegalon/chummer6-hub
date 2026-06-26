@@ -11,17 +11,13 @@
     var publicPlatformSummary = publicPlatformLabels.Length switch
     {
         0 => "No public installer right now.",
-        1 => $"Current public installer: {publicPlatformLabels[0]}.",
-        2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
-        _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
+        1 => $"{publicPlatformLabels[0]} is live.",
+        2 => $"{publicPlatformLabels[0]} and {publicPlatformLabels[1]} are live.",
+        _ => $"{string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]} are live."
     };
-    var updateSummary = string.IsNullOrWhiteSpace(Model.ReleaseExperience.UpdatePostureSummary)
-        ? "Updates are available from Downloads."
-        : Model.ReleaseExperience.UpdatePostureSummary.Trim();
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
-        : publicPlatformSummary;
-    statusLine = $"{statusLine} {updateSummary}";
+        : $"Updated. {publicPlatformSummary}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }

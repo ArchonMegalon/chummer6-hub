@@ -216,6 +216,8 @@ public sealed class SupportCasesController : ControllerBase
 
     [HttpPost("form")]
     [Consumes("multipart/form-data")]
+    [RequestFormLimits(MultipartBodyLengthLimit = SupportAttachmentStorageService.MaxMultipartBodyBytes, ValueCountLimit = 64)]
+    [RequestSizeLimit(SupportAttachmentStorageService.MaxMultipartBodyBytes)]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<SupportCaseProjection>> SubmitFromForm(
         [FromForm] string? kind,
@@ -264,6 +266,10 @@ public sealed class SupportCasesController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidDataException ex)
         {
             return BadRequest(ex.Message);
         }
@@ -460,12 +466,22 @@ public sealed class SupportCasesController : ControllerBase
             return Array.Empty<SupportAttachmentUpload>();
         }
 
+        if (files.Count > SupportAttachmentStorageService.MaxAttachmentCount)
+        {
+            throw new InvalidDataException("Support intake accepts up to five attachments per case.");
+        }
+
         List<SupportAttachmentUpload> uploads = new(files.Count);
         foreach (var file in files)
         {
             if (file.Length <= 0)
             {
                 continue;
+            }
+
+            if (file.Length > SupportAttachmentStorageService.MaxAttachmentBytes)
+            {
+                throw new InvalidDataException($"Attachment '{file.FileName}' exceeds the 8 MB limit.");
             }
 
             await using var stream = file.OpenReadStream();

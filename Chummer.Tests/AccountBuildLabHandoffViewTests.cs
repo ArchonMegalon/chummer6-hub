@@ -9,13 +9,16 @@ public sealed class AccountBuildLabHandoffViewTests
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string hubViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Hub.cshtml");
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
+        string hubView = File.ReadAllText(hubViewPath);
 
         Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/account/access\")", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/Accounts/Hub.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account\")", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
@@ -38,6 +41,11 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("Help and policy", view, StringComparison.Ordinal);
         Assert.Contains("var showChannelsSection = showProfileSection;", view, StringComparison.Ordinal);
         Assert.Contains("var showParticipationSettings = showParticipationPage;", view, StringComparison.Ordinal);
+        Assert.Contains("@Model.Heading", hubView, StringComparison.Ordinal);
+        Assert.Contains("@Model.Summary", hubView, StringComparison.Ordinal);
+        Assert.Contains("@foreach (var card in Model.Cards)", hubView, StringComparison.Ordinal);
+        Assert.Contains("@card.Title", hubView, StringComparison.Ordinal);
+        Assert.Contains("@card.PrimaryLabel", hubView, StringComparison.Ordinal);
     }
 
     [Fact]

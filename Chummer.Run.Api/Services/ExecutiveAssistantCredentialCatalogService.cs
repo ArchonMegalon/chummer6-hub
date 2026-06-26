@@ -30,6 +30,7 @@ public sealed class ExecutiveAssistantCredentialCatalogService
                 emailKey: "CHUMMER_EA_MAGICFIT_EMAIL",
                 passwordKey: "CHUMMER_EA_MAGICFIT_PASSWORD",
                 mirrorsDefault: true),
+            BuildMagicAiEntry(),
             BuildMagicfitSessionEntry(),
             BuildPromptArchitectsEntry(),
             BuildPayFunnelsEntry(),
@@ -146,6 +147,32 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             EmailConfigured: !string.IsNullOrWhiteSpace(sessionEmail),
             PasswordConfigured: !string.IsNullOrWhiteSpace(GetValue(passwordKey)),
             PasswordAltConfigured: false,
+            MirrorsDefault: false,
+            Status: status);
+    }
+
+    private ExecutiveAssistantCredentialEntry BuildMagicAiEntry()
+    {
+        const string tierKey = "CHUMMER_EA_MAGICAI_TIER";
+        const string emailKey = "MAGICAI_ACCOUNT_*_EMAIL";
+        const string passwordKey = "MAGICAI_ACCOUNT_*_PASSWORD";
+        const string apiKey = "MAGICAI_ACCOUNT_*_API_KEY";
+
+        MagicAiPoolState state = InspectMagicAiPool();
+        string status = state.HasLogin
+            ? state.HasApiKey ? "multi_account_pool_configured" : "login_only"
+            : state.AnyDeclared ? "pool_declared_missing_credentials" : "missing";
+
+        return new ExecutiveAssistantCredentialEntry(
+            ToolId: "magicai",
+            Tier: GetValue(tierKey) ?? "4",
+            EmailKey: emailKey,
+            PasswordKey: passwordKey,
+            PasswordAltKey: apiKey,
+            EmailMasked: MaskEmail(state.FirstEmail),
+            EmailConfigured: state.HasEmail,
+            PasswordConfigured: state.HasPassword,
+            PasswordAltConfigured: state.HasApiKey,
             MirrorsDefault: false,
             Status: status);
     }
@@ -306,6 +333,76 @@ public sealed class ExecutiveAssistantCredentialCatalogService
         }
 
         return false;
+    }
+
+    private MagicAiPoolState InspectMagicAiPool()
+    {
+        string? firstEmail = null;
+        bool hasEmail = false;
+        bool hasPassword = false;
+        bool hasLogin = false;
+        bool hasApiKey = false;
+        bool anyDeclared = false;
+
+        void Consider(string? email, string? password, string? apiKey)
+        {
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                hasEmail = true;
+                anyDeclared = true;
+                firstEmail ??= email;
+            }
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                hasPassword = true;
+                anyDeclared = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                hasApiKey = true;
+                anyDeclared = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
+            {
+                hasLogin = true;
+            }
+        }
+
+        Consider(
+            GetValue("CHUMMER_EA_MAGICAI_EMAIL"),
+            GetValue("CHUMMER_EA_MAGICAI_PASSWORD"),
+            GetValue("CHUMMER_EA_MAGICAI_API_KEY"));
+
+        foreach (string key in _configuration.AsEnumerable().Select(item => item.Key).OrderBy(static item => item, StringComparer.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            Match match = Regex.Match(key, @"^MAGICAI_ACCOUNT_[A-Za-z0-9_]+_EMAIL$");
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string prefix = key[..^"_EMAIL".Length];
+            Consider(
+                GetValue(key),
+                GetValue($"{prefix}_PASSWORD"),
+                GetValue($"{prefix}_API_KEY"));
+        }
+
+        return new MagicAiPoolState(
+            FirstEmail: firstEmail,
+            HasEmail: hasEmail,
+            HasPassword: hasPassword,
+            HasLogin: hasLogin,
+            HasApiKey: hasApiKey,
+            AnyDeclared: anyDeclared);
     }
 
     private ExecutiveAssistantCredentialEntry BuildSingleKeyEntry(
@@ -511,5 +608,13 @@ public sealed record ExecutiveAssistantCredentialEntry(
     bool PasswordAltConfigured,
     bool MirrorsDefault,
     string Status);
+
+internal readonly record struct MagicAiPoolState(
+    string? FirstEmail,
+    bool HasEmail,
+    bool HasPassword,
+    bool HasLogin,
+    bool HasApiKey,
+    bool AnyDeclared);
 
 internal readonly record struct PathInfo(string FullName);

@@ -38,6 +38,8 @@ def test_origin_publication_service_provider_tokens_are_configurable() -> None:
     assert "OriginDossier:ManuscriptProviderTokens" in source
     assert "CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS" in source
     assert "OriginDossier:AudioProviderTokens" in source
+    assert "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS" in source
+    assert "OriginDossier:VisualProviderTokens" in source
     assert "ResolveApprovedProviderTokens" in source
     assert "ContainsTokenWithBoundary" in source
     assert "ReceiptProviderMatchesAnyToken" in source

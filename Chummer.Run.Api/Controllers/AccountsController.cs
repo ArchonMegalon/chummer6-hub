@@ -5,9 +5,12 @@ using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Campaign.Contracts;
+using Chummer.Control.Contracts.Support;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Ledger;
+using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -41,6 +44,7 @@ public sealed class AccountsController : Controller
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
+    private readonly BrilliantDirectoriesBillingService? _billing;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
@@ -70,6 +74,7 @@ public sealed class AccountsController : Controller
         PublicPrivacyBoundaryService privacyBoundaries,
         SignedInTrustStatusService signedInTrustStatus,
         OriginDossierPublicationService originDossierPublications,
+        BrilliantDirectoriesBillingService? billing,
         ILogger<AccountsController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
         MediaArtifactHorizonsService? mediaHorizons = null)
@@ -98,6 +103,7 @@ public sealed class AccountsController : Controller
         _privacyBoundaries = privacyBoundaries;
         _signedInTrustStatus = signedInTrustStatus;
         _originDossierPublications = originDossierPublications;
+        _billing = billing;
         _artifactRequests = artifactRequests;
         _mediaHorizons = mediaHorizons;
         _logger = logger;
@@ -123,14 +129,13 @@ public sealed class AccountsController : Controller
         [FromRoute] string? publicationId = null,
         [FromQuery] string? prepQuery = null)
     {
-        if (string.IsNullOrWhiteSpace(section)
-            && string.IsNullOrWhiteSpace(caseId)
-            && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId))
-        {
-            return Redirect("/account/access");
-        }
+        bool showHub = string.IsNullOrWhiteSpace(section)
+                       && string.IsNullOrWhiteSpace(caseId)
+                       && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId);
 
-        var selectedSection = !string.IsNullOrWhiteSpace(caseId)
+        var selectedSection = showHub
+            ? "profile"
+            : !string.IsNullOrWhiteSpace(caseId)
             ? "support"
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
                 ? "work"
@@ -139,10 +144,15 @@ public sealed class AccountsController : Controller
             || string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase)
             || string.Equals(selectedSection, "advanced", StringComparison.OrdinalIgnoreCase))
         {
-            return Redirect("/account/billing");
+            if (!showHub)
+            {
+                return Redirect("/account");
+            }
         }
 
-        var currentPath = BuildAccountCurrentPath(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId);
+        var currentPath = showHub
+            ? "/account"
+            : BuildAccountCurrentPath(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId);
         var (chromeTitle, chromeDescription) = DescribeAccountSection(selectedSection);
 
         try
@@ -191,6 +201,13 @@ public sealed class AccountsController : Controller
             IReadOnlyList<ContributionReceiptDto> participationReceipts = participationSession is null
                 ? Array.Empty<ContributionReceiptDto>()
                 : _sessions.ListReceipts(participationSession.SponsorSessionId);
+            if (showHub)
+            {
+                return View(
+                    "~/Views/Accounts/Hub.cshtml",
+                    BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
+            }
+
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
@@ -249,6 +266,95 @@ public sealed class AccountsController : Controller
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
+    }
+
+    private AccountHubPageViewModel BuildAccountHubModel(
+        HubUserDto user,
+        InstallLinkingSummaryDto installLinking,
+        IReadOnlyList<SupportCaseProjection> supportCases,
+        AccountCampaignSummary campaignSpine)
+    {
+        int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
+        int pendingClaimCount = installLinking.PendingClaimTickets.Count;
+        bool hasLinkedInstall = linkedInstallCount > 0;
+        MyFirstBookQuotaSnapshotDto? quota = null;
+        if (_billing is not null)
+        {
+            try
+            {
+                quota = _billing.GetMyFirstBookQuota(user.UserId, email: user.Email);
+            }
+            catch (BrilliantDirectoriesBillingUnavailableException)
+            {
+                quota = null;
+            }
+        }
+
+        string membershipLabel = quota?.PlanName ?? "Free";
+        string membershipSummary = quota is null
+            ? "Supporter handoff is not configured yet."
+            : quota.SupporterActive
+                ? "Supporter only changes the monthly Origin Book allowance."
+                : "Free and Supporter use the same app.";
+        string bookQuotaSummary = quota is null
+            ? "Origin book quota shows up here after billing is configured."
+            : $"{quota.MonthlyRemaining} of {quota.MonthlyLimit} origin books left this month.";
+
+        string installSummary = hasLinkedInstall
+            ? $"{linkedInstallCount} linked install{(linkedInstallCount == 1 ? string.Empty : "s")}."
+            : "No linked install yet.";
+        if (pendingClaimCount > 0)
+        {
+            installSummary += $" {pendingClaimCount} claim ticket{(pendingClaimCount == 1 ? string.Empty : "s")} waiting.";
+        }
+
+        string supportSummary = supportCases.Count == 0
+            ? "No tracked support cases."
+            : $"{supportCases.Count} tracked support case{(supportCases.Count == 1 ? string.Empty : "s")}.";
+        string campaignSummary = $"{campaignSpine.Dossiers.Count} runner{(campaignSpine.Dossiers.Count == 1 ? string.Empty : "s")}, {campaignSpine.Campaigns.Count} campaign{(campaignSpine.Campaigns.Count == 1 ? string.Empty : "s")}.";
+
+        return new AccountHubPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                "Account",
+                "Installs, support, membership, and campaign return paths.",
+                "/account",
+                user.DisplayName,
+                user.Email),
+            User: user,
+            Heading: "Keep installs, support, and membership in one place.",
+            Summary: "Use this page for return paths. Character work belongs in Chummer itself.",
+            MembershipLabel: membershipLabel,
+            MembershipSummary: membershipSummary,
+            BookQuotaSummary: bookQuotaSummary,
+            Cards:
+            [
+                new AccountHubCardViewModel(
+                    "Installs",
+                    "Devices and access",
+                    installSummary,
+                    hasLinkedInstall ? "Open installs" : "Open downloads",
+                    hasLinkedInstall ? "/account/access" : "/downloads",
+                    hasLinkedInstall ? "Downloads" : "Devices and access",
+                    hasLinkedInstall ? "/downloads" : "/account/access"),
+                new AccountHubCardViewModel(
+                    "Membership",
+                    "Billing",
+                    membershipSummary,
+                    "Open billing",
+                    "/account/billing"),
+                new AccountHubCardViewModel(
+                    "Support",
+                    "Tracked help",
+                    supportSummary,
+                    "Open support",
+                    "/account/support"),
+                new AccountHubCardViewModel(
+                    "Campaigns",
+                    "Characters and groups",
+                    campaignSummary,
+                    "Open campaigns",
+                    "/account/work")
+            ]);
     }
 
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]

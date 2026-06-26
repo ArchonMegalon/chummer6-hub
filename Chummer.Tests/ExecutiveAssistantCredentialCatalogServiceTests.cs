@@ -22,6 +22,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
                 ["CHUMMER_EA_MAGICFIT_TIER"] = "5",
                 ["CHUMMER_EA_MAGICFIT_EMAIL"] = "tibor.girschele@gmail.com",
                 ["CHUMMER_EA_MAGICFIT_PASSWORD"] = "rangersofB5",
+                ["CHUMMER_EA_MAGICAI_TIER"] = "4",
+                ["MAGICAI_ACCOUNT_PRIMARY_EMAIL"] = "api.one@example.invalid",
+                ["MAGICAI_ACCOUNT_PRIMARY_PASSWORD"] = "magicai-login-secret",
+                ["MAGICAI_ACCOUNT_PRIMARY_API_KEY"] = "magicai-api-secret",
                 ["CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL"] = "session-account@example.invalid",
                 ["CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD"] = "session-rangersofB5",
                 ["PROMPTING_SYSTEMS_API_KEY"] = "pa-secret",
@@ -54,6 +58,14 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.True(magicfit.EmailConfigured);
         Assert.True(magicfit.PasswordConfigured);
         Assert.Equal("configured", magicfit.Status);
+
+        ExecutiveAssistantCredentialEntry magicai = Assert.Single(result.Entries, static entry => entry.ToolId == "magicai");
+        Assert.Equal("4", magicai.Tier);
+        Assert.Equal("a***@e***", magicai.EmailMasked);
+        Assert.True(magicai.EmailConfigured);
+        Assert.True(magicai.PasswordConfigured);
+        Assert.True(magicai.PasswordAltConfigured);
+        Assert.Equal("multi_account_pool_configured", magicai.Status);
 
         ExecutiveAssistantCredentialEntry promptArchitects = Assert.Single(result.Entries, static entry => entry.ToolId == "prompt_architects");
         Assert.Equal("4", promptArchitects.Tier);
@@ -90,6 +102,8 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         string serialized = System.Text.Json.JsonSerializer.Serialize(result);
         Assert.DoesNotContain("rangersofB5", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("session-rangersofB5", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicai-login-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicai-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("pa-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("pf-webhook-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("subscribr-api-secret", serialized, StringComparison.Ordinal);
@@ -100,6 +114,7 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.DoesNotContain("unmixr-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("voice-123", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("tibor.girschele@gmail.com", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("api.one@example.invalid", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("session-account@example.invalid", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("voice@example.com", serialized, StringComparison.Ordinal);
     }
@@ -121,6 +136,11 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.Equal("missing", magicfit.Status);
         Assert.False(magicfit.PasswordConfigured);
 
+        ExecutiveAssistantCredentialEntry magicai = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicai");
+        Assert.Equal("missing", magicai.Status);
+        Assert.False(magicai.PasswordConfigured);
+        Assert.False(magicai.PasswordAltConfigured);
+
         ExecutiveAssistantCredentialEntry promptArchitects = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "prompt_architects");
         Assert.Equal("missing", promptArchitects.Status);
 
@@ -137,6 +157,33 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         ExecutiveAssistantCredentialEntry unmixr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "unmixr");
         Assert.Equal("missing", unmixr.Status);
         Assert.False(unmixr.PasswordAltConfigured);
+    }
+
+    [Fact]
+    public void GetCatalog_marks_magicai_pool_login_only_until_api_key_exists()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_MAGICAI_TIER"] = "4",
+                ["MAGICAI_ACCOUNT_RUNSITE_01_EMAIL"] = "runsite@example.invalid",
+                ["MAGICAI_ACCOUNT_RUNSITE_01_PASSWORD"] = "shared-password"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry magicai = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicai");
+        Assert.Equal("4", magicai.Tier);
+        Assert.Equal("r***@e***", magicai.EmailMasked);
+        Assert.True(magicai.EmailConfigured);
+        Assert.True(magicai.PasswordConfigured);
+        Assert.False(magicai.PasswordAltConfigured);
+        Assert.Equal("login_only", magicai.Status);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("shared-password", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("runsite@example.invalid", serialized, StringComparison.Ordinal);
     }
 
     [Fact]

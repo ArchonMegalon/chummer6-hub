@@ -48,7 +48,7 @@ public sealed class SupportStore
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         string tempPath = $"{_storagePath}.tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
         File.Move(tempPath, _storagePath, true);
     }
 
@@ -62,17 +62,39 @@ public sealed class SupportStore
                 return;
             }
 
-            string snapshotJson = File.ReadAllText(_storagePath);
-            SupportStoreSnapshot snapshot = JsonSerializer.Deserialize<SupportStoreSnapshot>(snapshotJson, _jsonOptions)
-                ?? throw new InvalidOperationException($"Unable to deserialize support store snapshot: {_storagePath}");
-            ApplySnapshotLocked(snapshot);
-            _logger.LogInformation(
-                "SupportStore loaded {CaseCount} support cases, {IncidentCount} crash incidents, {ClusterCount} clusters, and {WorkItemCount} work items from {StoragePath}.",
-                CasesById.Count,
-                IncidentsById.Count,
-                ClustersById.Count,
-                WorkItemsById.Count,
-                _storagePath);
+            try
+            {
+                string snapshotJson = File.ReadAllText(_storagePath, System.Text.Encoding.UTF8);
+                SupportStoreSnapshot snapshot = JsonSerializer.Deserialize<SupportStoreSnapshot>(snapshotJson, _jsonOptions)
+                    ?? throw new InvalidOperationException($"Unable to deserialize support store snapshot: {_storagePath}");
+                ApplySnapshotLocked(snapshot);
+                _logger.LogInformation(
+                    "SupportStore loaded {CaseCount} support cases, {IncidentCount} crash incidents, {ClusterCount} clusters, and {WorkItemCount} work items from {StoragePath}.",
+                    CasesById.Count,
+                    IncidentsById.Count,
+                    ClustersById.Count,
+                    WorkItemsById.Count,
+                    _storagePath);
+            }
+            catch (JsonException ex)
+            {
+                ApplySnapshotLocked(new SupportStoreSnapshot(null, null, null, null, null, null, null, null, null));
+                QuarantineCorruptStoreFile();
+                _logger.LogWarning(ex, "SupportStore quarantined corrupt durable state at {StoragePath} and restarted empty.", _storagePath);
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{_storagePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(_storagePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting empty is safer than crashing when a local support store file is unreadable.
         }
     }
 

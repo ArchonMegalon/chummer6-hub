@@ -44,7 +44,7 @@ public sealed class PublicConciergeStore
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         string tempPath = $"{_storagePath}.tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
         File.Move(tempPath, _storagePath, true);
     }
 
@@ -58,16 +58,38 @@ public sealed class PublicConciergeStore
                 return;
             }
 
-            string snapshotJson = File.ReadAllText(_storagePath);
-            PublicConciergeStoreSnapshot snapshot = JsonSerializer.Deserialize<PublicConciergeStoreSnapshot>(snapshotJson, _jsonOptions)
-                ?? throw new InvalidOperationException($"Unable to deserialize public concierge store snapshot: {_storagePath}");
-            ApplySnapshotLocked(snapshot);
-            _logger.LogInformation(
-                "PublicConciergeStore loaded {BranchReceiptCount} branch receipts, {WebhookReceiptCount} webhook receipts, and {ModerationItemCount} moderation items from {StoragePath}.",
-                BranchReceiptsById.Count,
-                WebhookReceiptsById.Count,
-                ModerationItemsById.Count,
-                _storagePath);
+            try
+            {
+                string snapshotJson = File.ReadAllText(_storagePath, System.Text.Encoding.UTF8);
+                PublicConciergeStoreSnapshot snapshot = JsonSerializer.Deserialize<PublicConciergeStoreSnapshot>(snapshotJson, _jsonOptions)
+                    ?? throw new InvalidOperationException($"Unable to deserialize public concierge store snapshot: {_storagePath}");
+                ApplySnapshotLocked(snapshot);
+                _logger.LogInformation(
+                    "PublicConciergeStore loaded {BranchReceiptCount} branch receipts, {WebhookReceiptCount} webhook receipts, and {ModerationItemCount} moderation items from {StoragePath}.",
+                    BranchReceiptsById.Count,
+                    WebhookReceiptsById.Count,
+                    ModerationItemsById.Count,
+                    _storagePath);
+            }
+            catch (JsonException ex)
+            {
+                ApplySnapshotLocked(new PublicConciergeStoreSnapshot(null, null, null, null));
+                QuarantineCorruptStoreFile();
+                _logger.LogWarning(ex, "PublicConciergeStore quarantined corrupt durable state at {StoragePath} and restarted empty.", _storagePath);
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{_storagePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(_storagePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting empty is safer than crashing when a local concierge store file is unreadable.
         }
     }
 

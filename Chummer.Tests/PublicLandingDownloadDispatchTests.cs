@@ -1911,6 +1911,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         Assert.Contains("Subscribr.ai", runbook.InternalProviderLane, StringComparison.Ordinal);
         Assert.Contains("First Book ai", runbook.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Contains("Magicfit", origin.InternalProviderLane, StringComparison.Ordinal);
         Assert.Contains("Subscribr.ai", origin.InternalProviderLane, StringComparison.Ordinal);
         Assert.Contains("First Book ai", origin.InternalProviderLane, StringComparison.Ordinal);
         Assert.Null(publicSafeRunbook.InternalProviderLane);

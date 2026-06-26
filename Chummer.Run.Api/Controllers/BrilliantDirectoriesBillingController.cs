@@ -266,6 +266,10 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Billing sync was not authorized.");
         }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: ex.Message);

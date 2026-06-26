@@ -1050,7 +1050,7 @@ public sealed class OriginDossierPublicationServiceTests
                 new
                 {
                     operation = "selected_face_scene_render",
-                    provider = "rendered_cover_lane",
+                    provider = "Magicfit",
                     status = "verified",
                     completedAtUtc = DateTimeOffset.UtcNow,
                     deliveredLinks = new[]
@@ -1082,6 +1082,98 @@ public sealed class OriginDossierPublicationServiceTests
 
         Assert.False(publication.GoldReady);
         Assert.Contains("story scene cover receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRequiresStorySceneCoverReceiptToUseApprovedVisualProvider()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-cover-provider.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-cover-provider");
+        File.WriteAllText(
+            artifacts.StorySceneCoverReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "selected_face_scene_render",
+                    provider = "Generic Visual Lane",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "/account/work/origin-dossiers/origin-cover-provider",
+                        "/account/work/origin-dossiers/origin-cover-provider/cover",
+                        "origin.chummer.run/Varga/Mira/Vanta",
+                        "selected_character_face",
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Generic Visual Lane:selected_face_scene_render"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.StorySceneCoverPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-cover-provider", "Wrong Cover Provider", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("story scene cover receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRequiresDossierVideoReceiptToUseApprovedVisualProvider()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-video-provider.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-video-provider");
+        File.WriteAllText(
+            artifacts.DossierVideoReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "dossier_video_import",
+                    provider = "Generic Video Lane",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[] { "operator_verified_live_run", "provider_receipt_reference:Generic Video Lane:dossier_video_import" },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.DossierVideoPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-video-provider", "Wrong Video Provider", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("dossier video receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
@@ -1640,7 +1732,7 @@ public sealed class OriginDossierPublicationServiceTests
             projectRoot,
             "story-scene-cover.receipt.json",
             "selected_face_scene_render",
-            "rendered_cover_lane",
+            "Magicfit",
             [
                 $"/account/work/origin-dossiers/{projectId}",
                 $"/account/work/origin-dossiers/{projectId}/cover",
@@ -1674,7 +1766,7 @@ public sealed class OriginDossierPublicationServiceTests
             projectRoot,
             "dossier-film.receipt.json",
             "dossier_video_import",
-            "video_lane",
+            "Magicfit",
             artifactPaths: [dossierVideoPath]);
         string telegramShareDeliveryReceiptPath = WriteTelegramShareDeliveryReceipt(
             projectRoot,

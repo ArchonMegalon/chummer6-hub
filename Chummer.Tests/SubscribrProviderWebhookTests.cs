@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
@@ -73,7 +74,85 @@ public sealed class SubscribrProviderWebhookTests
     }
 
     [Fact]
-    public void ControllerUsesInternalRouteAndReturnsProblemWhenSecretMissing()
+    public void WebhookKeepsReceiptPathInsideReceiptRootForUnsafeEventIds()
+    {
+        using Fixture fixture = new();
+        SubscribrWebhookRequest request = fixture.ValidRequest() with { EventId = "../sub_evt_1" };
+        string signature = fixture.Service.ComputeSignature(request, Fixture.Timestamp);
+
+        SubscribrWebhookResult result = fixture.Service.ProcessWebhook(request, signature, Fixture.Timestamp, Fixture.Now);
+
+        Assert.Equal("accepted", result.Status);
+        Assert.NotNull(result.ReceiptPath);
+        string receiptRoot = Path.GetFullPath(fixture.ReceiptRoot) + Path.DirectorySeparatorChar;
+        string receiptPath = Path.GetFullPath(result.ReceiptPath!);
+        Assert.StartsWith(receiptRoot, receiptPath, StringComparison.Ordinal);
+        Assert.True(File.Exists(receiptPath));
+    }
+
+    [Fact]
+    public void WebhookRejectsSourcePathsOutsideConfiguredRoots()
+    {
+        using Fixture fixture = new();
+        string outsideRoot = Path.Combine(Path.GetTempPath(), "chummer-subscribr-webhook-outside", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideRoot);
+
+        try
+        {
+            string packetPath = Path.Combine(outsideRoot, "packet.json");
+            string markdownPath = Path.Combine(outsideRoot, "script.md");
+            File.WriteAllText(packetPath, File.ReadAllText(fixture.PacketPath));
+            File.WriteAllText(markdownPath, "Provider export.\n");
+
+            SubscribrWebhookRequest request = fixture.ValidRequest() with
+            {
+                PacketPath = packetPath,
+                MarkdownExportPath = markdownPath
+            };
+            string signature = fixture.Service.ComputeSignature(request, Fixture.Timestamp);
+
+            SubscribrWebhookResult result = fixture.Service.ProcessWebhook(request, signature, Fixture.Timestamp, Fixture.Now);
+
+            Assert.Equal("rejected", result.Status);
+            Assert.Contains("allowed source roots", result.RejectionReason, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(Directory.GetFiles(fixture.ReceiptRoot));
+        }
+        finally
+        {
+            if (Directory.Exists(outsideRoot))
+            {
+                Directory.Delete(outsideRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ControllerAcceptsValidSignatureOverRawPayload()
+    {
+        using Fixture fixture = new();
+        string timestamp = DateTimeOffset.UtcNow.ToString("O");
+        string rawPayload = fixture.ValidRawRequestJson(includeIgnoredProperty: true);
+        string signature = fixture.Service.ComputeSignature(rawPayload, timestamp);
+        var controller = new SubscribrProviderWebhookController(fixture.Service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(rawPayload));
+        controller.Request.Headers["X-Subscribr-Signature"] = signature;
+        controller.Request.Headers["X-Subscribr-Timestamp"] = timestamp;
+
+        ActionResult<SubscribrWebhookResult> result = await controller.Webhook(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        SubscribrWebhookResult payload = Assert.IsType<SubscribrWebhookResult>(ok.Value);
+        Assert.Equal("accepted", payload.Status);
+    }
+
+    [Fact]
+    public async Task ControllerUsesInternalRouteAndReturnsProblemWhenSecretMissing()
     {
         using Fixture fixture = new(configureSecret: false);
         var controller = new SubscribrProviderWebhookController(fixture.Service)
@@ -83,13 +162,28 @@ public sealed class SubscribrProviderWebhookTests
                 HttpContext = new DefaultHttpContext()
             }
         };
+        controller.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(fixture.ValidRawRequestJson()));
         controller.Request.Headers["X-Subscribr-Signature"] = "sha256=bad";
         controller.Request.Headers["X-Subscribr-Timestamp"] = Fixture.Timestamp;
 
-        ActionResult<SubscribrWebhookResult> result = controller.Webhook(fixture.ValidRequest());
+        ActionResult<SubscribrWebhookResult> result = await controller.Webhook(CancellationToken.None);
 
         ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.StatusCode);
+    }
+
+    [Fact]
+    public void CorruptWebhookLedgerIsQuarantinedAndDoesNotBlockProcessing()
+    {
+        using Fixture fixture = new(seedCorruptStore: true);
+        SubscribrWebhookRequest request = fixture.ValidRequest();
+        string signature = fixture.Service.ComputeSignature(request, Fixture.Timestamp);
+
+        SubscribrWebhookResult result = fixture.Service.ProcessWebhook(request, signature, Fixture.Timestamp, Fixture.Now);
+
+        Assert.Equal("accepted", result.Status);
+        Assert.True(File.Exists(fixture.StorePath));
+        Assert.Single(Directory.GetFiles(fixture.RootPath, "subscribr-webhooks.json.corrupt-*"));
     }
 
     [Fact]
@@ -114,7 +208,7 @@ public sealed class SubscribrProviderWebhookTests
 
         private readonly string _root;
 
-        public Fixture(bool configureSecret = true, bool configureLaneEnabled = true)
+        public Fixture(bool configureSecret = true, bool configureLaneEnabled = true, bool seedCorruptStore = false)
         {
             _root = Path.Combine(Path.GetTempPath(), "chummer-subscribr-webhook-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
@@ -141,6 +235,10 @@ public sealed class SubscribrProviderWebhookTests
                 }
                 """);
             File.WriteAllText(MarkdownPath, "Approved scripted export.\n");
+            if (seedCorruptStore)
+            {
+                File.WriteAllText(StorePath, "{ definitely-not-json", Encoding.UTF8);
+            }
 
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -149,7 +247,8 @@ public sealed class SubscribrProviderWebhookTests
                     ["CHUMMER_SUBSCRIBR_ENABLED"] = configureLaneEnabled ? "true" : "false",
                     ["CHUMMER_SUBSCRIBR_WEBHOOKS_ENABLED"] = configureLaneEnabled ? "true" : "false",
                     ["CHUMMER_SUBSCRIBR_WEBHOOK_STORE_PATH"] = StorePath,
-                    ["CHUMMER_SUBSCRIBR_WEBHOOK_RECEIPT_ROOT"] = ReceiptRoot
+                    ["CHUMMER_SUBSCRIBR_WEBHOOK_RECEIPT_ROOT"] = ReceiptRoot,
+                    ["CHUMMER_SUBSCRIBR_WEBHOOK_ALLOWED_SOURCE_ROOTS"] = _root
                 })
                 .Build();
 
@@ -159,6 +258,7 @@ public sealed class SubscribrProviderWebhookTests
 
         public string PacketPath { get; }
         public string MarkdownPath { get; }
+        public string RootPath => _root;
         public string StorePath { get; }
         public string ReceiptRoot { get; }
         public SubscribrWebhookStore Store { get; }
@@ -173,6 +273,17 @@ public sealed class SubscribrProviderWebhookTests
                 ProviderIdeaId: "idea_1",
                 PacketPath: PacketPath,
                 MarkdownExportPath: MarkdownPath);
+
+        public string ValidRawRequestJson(bool includeIgnoredProperty = false)
+        {
+            string json = JsonSerializer.Serialize(ValidRequest(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (!includeIgnoredProperty)
+            {
+                return json;
+            }
+
+            return json.Insert(json.Length - 1, ",\"ignored\":\"signed-but-not-bound\"");
+        }
 
         public void Dispose()
         {

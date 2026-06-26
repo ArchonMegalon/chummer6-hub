@@ -237,8 +237,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("<h1>Status</h1>", view, StringComparison.Ordinal);
         Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains("statusLine = $\"{statusLine} {updateSummary}\";", view, StringComparison.Ordinal);
-        Assert.Contains("Updates are available from Downloads.", view, StringComparison.Ordinal);
+        Assert.Contains("Updated. {publicPlatformSummary}", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
         Assert.Contains(">Help</a>", view, StringComparison.Ordinal);
@@ -321,7 +320,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);", view, StringComparison.Ordinal);
         Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains("statusLine = $\"{statusLine} {updateSummary}\";", view, StringComparison.Ordinal);
+        Assert.Contains("Updated. {publicPlatformSummary}", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
         Assert.DoesNotContain("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
@@ -359,7 +358,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
         Assert.Contains("<h1>Status</h1>", view, StringComparison.Ordinal);
         Assert.Contains("publicPlatformSummary", view, StringComparison.Ordinal);
-        Assert.Contains("updateSummary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("updateSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer is available.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);

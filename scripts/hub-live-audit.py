@@ -12007,7 +12007,7 @@ def main() -> int:
             "/status",
             "Current release",
             required_texts=(
-                "Current public installer",
+                "Updated.",
                 "Downloads",
                 "Help"),
             forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
@@ -12163,7 +12163,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Current release", "Current public installer", "Downloads", "Help"):
+    for snippet in ("Current release", "Updated.", "Downloads", "Help"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 
