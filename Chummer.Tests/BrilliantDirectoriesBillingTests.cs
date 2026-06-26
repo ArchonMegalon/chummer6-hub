@@ -62,6 +62,10 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
         Assert.Contains("Supporter billing is not open yet.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer will attach supporter status after the account is open.", view, StringComparison.Ordinal);
+        Assert.Contains("--bg: #171716;", view, StringComparison.Ordinal);
+        Assert.Contains("--accent: #d6b763;", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("--bg: #0d1016;", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("--accent: #9fe8d5;", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Account ID", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Required to continue", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("temporarily unavailable", view, StringComparison.OrdinalIgnoreCase);
