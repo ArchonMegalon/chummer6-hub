@@ -11142,6 +11142,10 @@ Boundary:
             : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         try
         {
+            HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
+            bool requireEnabledCapability = capability.RequiresAuthentication
+                || capability.QuotaTracked
+                || !capability.PublicVisible;
             HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
                 new HorizonArtifactRequestCreateRequest(
                     HorizonId: horizonId,
@@ -11151,8 +11155,9 @@ Boundary:
                     Visibility: "public_safe",
                     ExternalProcessingConsent: true,
                     Email: subject?.Email),
-                consumeQuota: false,
-                requireRequestingUser: false);
+                    consumeQuota: false,
+                    requireEnabledCapability: requireEnabledCapability,
+                    requireRequestingUser: false);
 
             if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
             {

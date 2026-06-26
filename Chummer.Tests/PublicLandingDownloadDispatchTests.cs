@@ -756,6 +756,30 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task RunnerPassportReceiptJsonStillReturnsOwnedContractWhenPublicCapabilityIsDisabled()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNNER_PASSPORT_CAPABILITY_RUNNER_PASSPORT_IDENTITY_NETWORK_ENABLED"] = "false";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RunnerPassportIdentityNetworkReceiptJson(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("disabled", capability.GetProperty("Status").GetString());
+        Assert.False(capability.GetProperty("RequestSupported").GetBoolean());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
     public async Task CommunityHubReceiptJsonReturnsSharedOpenRunContract()
     {
         using Fixture fixture = new();
