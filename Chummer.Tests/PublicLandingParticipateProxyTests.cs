@@ -67,7 +67,10 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
         Assert.Contains("rel=\"canonical\" href=\"/participate/board\"", html, StringComparison.Ordinal);
         Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
         Assert.Contains("Say what broke, or what should exist.", html, StringComparison.Ordinal);
+        Assert.Contains("Add a note", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
         Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
@@ -98,6 +101,9 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("rel=\"canonical\" href=\"/participate\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/participate/\" />", html, StringComparison.Ordinal);
         Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
+        Assert.Contains("Add a note", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
     }
 
