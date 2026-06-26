@@ -22,11 +22,11 @@
     var sectionCopy = Model.CurrentSection switch
     {
         "participation" => "Return to public requests, contribution history, and optional public recognition from one account page.",
-        "support" => "Open, track, and close support without leaving the account surface.",
+        "support" => "Open, track, and close support without leaving the account page.",
         "access" => "See linked copies, setup codes, downloads, and install help.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
-        _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account surface."
+        _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account page."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
@@ -328,7 +328,7 @@
         => route switch
         {
             "/account/access" => "Open account access",
-            "/account/work" => "Open work",
+            "/account/work" => "Open campaigns",
             "/downloads" => "Open downloads",
             _ when IsNavigableAccountRoute(route) => $"Open {route}",
             _ => "Open this page"
@@ -871,7 +871,7 @@
             <section id="support" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Support</h2>
-                    <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Progress stays attached to the case instead of disappearing into email.</p>
+                    <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account page. Progress stays attached to the case instead of disappearing into email.</p>
                 </div>
                 @if (selectedSupportCase is not null)
                 {
@@ -1612,15 +1612,15 @@
             @if (showWorkSection && showCampaignSection)
             {
             <details class="details-drawer"@Html.Raw(openCampaignDetailSection ? " open" : string.Empty)>
-            <summary>Campaigns &amp; dossiers</summary>
+            <summary>Campaigns</summary>
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
-                    <h2>Campaigns &amp; dossiers</h2>
-                    <p>Campaigns, runner dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
+                    <h2>Campaigns</h2>
+                    <p>Characters, campaigns, rules answers, live runs, recap material, and recovery notes stay tied together here instead of falling back to one-off files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
-                        <span>Runner dossiers</span>
+                        <span>Characters</span>
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1644,7 +1644,7 @@
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Build plans</span>
+                        <span>Character plans</span>
                         <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -3862,7 +3862,7 @@
                 @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Build plans</summary>
+                        <summary>Character plans</summary>
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
