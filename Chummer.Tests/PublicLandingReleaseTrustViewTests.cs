@@ -40,7 +40,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", view, StringComparison.Ordinal);
         Assert.Contains("minimal-runner-rail", view, StringComparison.Ordinal);
-        Assert.Contains("data-homepage-section=\"runner-roster\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-homepage-section=\"runner-roster\"", view, StringComparison.Ordinal);
         Assert.Contains("Kestrel", view, StringComparison.Ordinal);
         Assert.Contains("Brick", view, StringComparison.Ordinal);
         Assert.Contains("Whisper", view, StringComparison.Ordinal);

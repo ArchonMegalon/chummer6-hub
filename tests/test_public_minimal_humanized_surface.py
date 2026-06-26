@@ -274,7 +274,8 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert 'href="/media/promo/every-wonder-horizon-promo.mp4"' in landing
     assert "/media/product/chummer-desktop-runner.png" in landing
     assert "/media/promo/every-wonder-horizon-promo.mp4" in landing
-    assert 'data-homepage-section="runner-roster"' in landing
+    assert 'data-homepage-section="runner-roster"' not in landing
+    assert landing.count("data-homepage-section=") == 1
     assert "minimal-runner-rail" in landing
     assert "Kestrel" in landing
     assert "Brick" in landing
