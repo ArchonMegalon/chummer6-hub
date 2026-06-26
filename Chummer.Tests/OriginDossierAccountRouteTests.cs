@@ -122,7 +122,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal(artifacts.DossierVideoPath, watch.FileName);
         Assert.Equal("video/mp4", watch.ContentType);
 
-        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.SubjectId, limit: 10);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.UserId, limit: 10);
         Assert.Equal(4, receipts.Count);
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:cover" && receipt.Quota is null && receipt.Visibility == "private");
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:listen" && receipt.Quota is null && receipt.Visibility == "private");
@@ -160,11 +160,16 @@ public sealed class OriginDossierAccountRouteTests
             Root = root;
             SubjectId = subjectId;
             _provider = provider;
+            UserId = _provider.GetRequiredService<AccountService>()
+                .EnsureUser(subjectId, "Route Runner", "route.runner@example.invalid")
+                .UserId;
         }
 
         public string Root { get; }
 
         public string SubjectId { get; }
+
+        public string UserId { get; }
 
         public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts
             => _provider.GetRequiredService<HorizonArtifactRequestReceiptStore>();

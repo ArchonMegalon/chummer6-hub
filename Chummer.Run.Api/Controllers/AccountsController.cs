@@ -501,7 +501,7 @@ public sealed class AccountsController : Controller
                     new HorizonArtifactRequestCreateRequest(
                         HorizonId: surface.HorizonId,
                         ArtifactKindOrCapabilityId: surface.CapabilityId,
-                        UserId: subject.SubjectId,
+                        UserId: user.UserId,
                         SourceRef: sourceRef,
                         Visibility: "private",
                         ExternalProcessingConsent: true,
@@ -512,7 +512,7 @@ public sealed class AccountsController : Controller
                 {
                     _logger.LogWarning(
                         "Origin Dossier artifact access denied for {UserId} on {ProjectId}/{ArtifactKind}; blocked reasons: {BlockedReasons}.",
-                        subject.SubjectId,
+                        user.UserId,
                         originDossierProjectId,
                         normalizedArtifactKind,
                         string.Join(", ", receipt.BlockedReasons));

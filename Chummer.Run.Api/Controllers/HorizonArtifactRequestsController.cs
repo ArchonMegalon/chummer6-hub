@@ -9,15 +9,18 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class HorizonArtifactRequestsController : ControllerBase
 {
     private readonly HorizonArtifactRequestService _requests;
+    private readonly AccountService? _accounts;
     private readonly HubIdentityClient? _identity;
     private readonly ILogger<HorizonArtifactRequestsController> _logger;
 
     public HorizonArtifactRequestsController(
         HorizonArtifactRequestService requests,
+        AccountService? accounts = null,
         HubIdentityClient? identity = null,
         ILogger<HorizonArtifactRequestsController>? logger = null)
     {
         _requests = requests;
+        _accounts = accounts;
         _identity = identity;
         _logger = logger ?? NullLogger<HorizonArtifactRequestsController>.Instance;
     }
@@ -31,20 +34,20 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        AuthenticatedHubSubject? subject = await TryGetCurrentSubjectAsync(cancellationToken).ConfigureAwait(false);
-        if (subject is null)
+        ResolvedHorizonActor? actor = await TryGetCurrentActorAsync(cancellationToken).ConfigureAwait(false);
+        if (actor is null)
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Sign in before checking horizon artifact requests.");
         }
 
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = _requests.ListRecentReceipts(
             horizonId,
-            subject.SubjectId,
+            actor.UserId,
             artifactKindOrCapabilityId,
             limit);
         return Ok(new HorizonArtifactRequestReceiptCatalog(
             HorizonId: TrimToNull(horizonId),
-            UserId: subject.SubjectId,
+            UserId: actor.UserId,
             Receipts: receipts,
             ArtifactKindOrCapabilityId: TrimToNull(artifactKindOrCapabilityId)));
     }
@@ -57,13 +60,13 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
         [FromRoute] string requestId,
         CancellationToken cancellationToken = default)
     {
-        AuthenticatedHubSubject? subject = await TryGetCurrentSubjectAsync(cancellationToken).ConfigureAwait(false);
-        if (subject is null)
+        ResolvedHorizonActor? actor = await TryGetCurrentActorAsync(cancellationToken).ConfigureAwait(false);
+        if (actor is null)
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Sign in before checking a horizon artifact request.");
         }
 
-        HorizonArtifactRequestReceipt? receipt = _requests.FindReceiptForUser(requestId, subject.SubjectId);
+        HorizonArtifactRequestReceipt? receipt = _requests.FindReceiptForUser(requestId, actor.UserId);
         return receipt is null
             ? NotFound()
             : Ok(receipt);
@@ -80,7 +83,7 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
             : Ok(BuildPublicReceipt(receipt));
     }
 
-    private async Task<AuthenticatedHubSubject?> TryGetCurrentSubjectAsync(CancellationToken cancellationToken)
+    private async Task<ResolvedHorizonActor?> TryGetCurrentActorAsync(CancellationToken cancellationToken)
     {
         if (_identity is null)
         {
@@ -89,7 +92,10 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
 
         try
         {
-            return await _identity.RequireSubjectAsync(Request, cancellationToken).ConfigureAwait(false);
+            AuthenticatedHubSubject subject = await _identity.RequireSubjectAsync(Request, cancellationToken).ConfigureAwait(false);
+            string userId = _accounts?.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email).UserId
+                ?? subject.SubjectId;
+            return new ResolvedHorizonActor(userId);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -104,6 +110,8 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
 
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record ResolvedHorizonActor(string UserId);
 
     private static PublicHorizonArtifactRequestReceipt BuildPublicReceipt(HorizonArtifactRequestReceipt receipt)
     {

@@ -4575,6 +4575,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return Redirect($"/login?next={Uri.EscapeDataString(dispatchRoute)}");
         }
 
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+
         HorizonArtifactQuotaSnapshot? dispatchQuota = null;
         if (_artifactRequests is not null)
         {
@@ -4584,7 +4586,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     new HorizonArtifactRequestCreateRequest(
                         HorizonId: horizonId,
                         ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
-                        UserId: subject.SubjectId,
+                        UserId: user.UserId,
                         SourceRef: sourceRef,
                         Visibility: "private",
                         ExternalProcessingConsent: true,
@@ -4597,7 +4599,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     _logger.LogWarning(
                         "{Operation} dispatch denied for {UserId} on {SourceId}; blocked reasons: {BlockedReasons}.",
                         operationLabel,
-                        subject.SubjectId,
+                        user.UserId,
                         sourceId,
                         string.Join(", ", receipt.BlockedReasons));
                     ApplyArtifactDispatchReceiptHeaders(receipt, receiptQuota, emitRunsiteHeaders);
@@ -4611,7 +4613,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (receipt.QuotaTracked && receiptQuota is null)
                 {
-                    _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, subject.SubjectId, sourceId);
+                    _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, user.UserId, sourceId);
                     return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
                 }
 
@@ -11116,13 +11118,16 @@ Boundary:
         }
 
         AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync(currentPath, cancellationToken);
+        HubUserDto? user = subject is null
+            ? null
+            : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         try
         {
             HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
                 new HorizonArtifactRequestCreateRequest(
                     HorizonId: horizonId,
                     ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
-                    UserId: subject?.SubjectId ?? string.Empty,
+                    UserId: user?.UserId ?? string.Empty,
                     SourceRef: sourceRef,
                     Visibility: "public_safe",
                     ExternalProcessingConsent: true,

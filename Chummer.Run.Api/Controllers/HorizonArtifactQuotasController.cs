@@ -9,15 +9,18 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class HorizonArtifactQuotasController : ControllerBase
 {
     private readonly HorizonArtifactQuotaService _quota;
+    private readonly AccountService? _accounts;
     private readonly HubIdentityClient? _identity;
     private readonly ILogger<HorizonArtifactQuotasController> _logger;
 
     public HorizonArtifactQuotasController(
         HorizonArtifactQuotaService quota,
+        AccountService? accounts = null,
         HubIdentityClient? identity = null,
         ILogger<HorizonArtifactQuotasController>? logger = null)
     {
         _quota = quota;
+        _accounts = accounts;
         _identity = identity;
         _logger = logger ?? NullLogger<HorizonArtifactQuotasController>.Instance;
     }
@@ -32,8 +35,8 @@ public sealed class HorizonArtifactQuotasController : ControllerBase
         [FromQuery] bool publicVisibleOnly = false,
         CancellationToken cancellationToken = default)
     {
-        AuthenticatedHubSubject? subject = await TryGetCurrentSubjectAsync(cancellationToken).ConfigureAwait(false);
-        if (subject is null)
+        ResolvedHorizonActor? actor = await TryGetCurrentActorAsync(cancellationToken).ConfigureAwait(false);
+        if (actor is null)
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Sign in before checking horizon artifact allowance.");
         }
@@ -42,13 +45,13 @@ public sealed class HorizonArtifactQuotasController : ControllerBase
         {
             IReadOnlyList<HorizonArtifactQuotaSnapshot> quotas = _quota.ListQuotas(
                 new HorizonArtifactQuotaCatalogRequest(
-                    UserId: subject.SubjectId,
+                    UserId: actor.UserId,
                     HorizonId: horizonId,
                     ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
-                    Email: subject.Email,
+                    Email: actor.Email,
                     PublicVisibleOnly: publicVisibleOnly));
             return Ok(new HorizonArtifactQuotaCatalog(
-                UserId: subject.SubjectId,
+                UserId: actor.UserId,
                 HorizonId: TrimToNull(horizonId),
                 ArtifactKindOrCapabilityId: TrimToNull(artifactKindOrCapabilityId),
                 PublicVisibleOnly: publicVisibleOnly,
@@ -64,7 +67,7 @@ public sealed class HorizonArtifactQuotasController : ControllerBase
         }
     }
 
-    private async Task<AuthenticatedHubSubject?> TryGetCurrentSubjectAsync(CancellationToken cancellationToken)
+    private async Task<ResolvedHorizonActor?> TryGetCurrentActorAsync(CancellationToken cancellationToken)
     {
         if (_identity is null)
         {
@@ -73,7 +76,10 @@ public sealed class HorizonArtifactQuotasController : ControllerBase
 
         try
         {
-            return await _identity.RequireSubjectAsync(Request, cancellationToken).ConfigureAwait(false);
+            AuthenticatedHubSubject subject = await _identity.RequireSubjectAsync(Request, cancellationToken).ConfigureAwait(false);
+            string userId = _accounts?.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email).UserId
+                ?? subject.SubjectId;
+            return new ResolvedHorizonActor(userId, subject.Email);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -88,4 +94,8 @@ public sealed class HorizonArtifactQuotasController : ControllerBase
 
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record ResolvedHorizonActor(
+        string UserId,
+        string? Email);
 }
